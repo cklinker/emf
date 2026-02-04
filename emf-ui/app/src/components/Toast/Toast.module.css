@@ -1,0 +1,363 @@
+/**
+ * Toast Notification Styles
+ *
+ * Provides styling for toast notifications with support for:
+ * - Multiple toast types (success, error, warning, info)
+ * - Smooth enter/exit animations
+ * - Reduced motion preferences
+ * - Responsive design
+ * - Accessibility (focus indicators, contrast)
+ */
+
+/* Toast Container - positioned fixed at top-right by default */
+.container {
+  position: fixed;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  pointer-events: none;
+  max-height: 100vh;
+  overflow: hidden;
+}
+
+/* Position variants */
+.topright {
+  top: 0;
+  right: 0;
+  align-items: flex-end;
+}
+
+.topleft {
+  top: 0;
+  left: 0;
+  align-items: flex-start;
+}
+
+.bottomright {
+  bottom: 0;
+  right: 0;
+  align-items: flex-end;
+  flex-direction: column-reverse;
+}
+
+.bottomleft {
+  bottom: 0;
+  left: 0;
+  align-items: flex-start;
+  flex-direction: column-reverse;
+}
+
+.topcenter {
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  align-items: center;
+}
+
+.bottomcenter {
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  align-items: center;
+  flex-direction: column-reverse;
+}
+
+/* Individual Toast */
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.1);
+  min-width: 280px;
+  max-width: 420px;
+  pointer-events: auto;
+  animation: slideIn 0.3s ease-out;
+  transition: opacity 0.2s ease-out, transform 0.2s ease-out;
+}
+
+/* Exit animation state */
+.toast.exiting {
+  animation: slideOut 0.2s ease-in forwards;
+}
+
+/* Toast type variants */
+.success {
+  background-color: var(--toast-success-bg, #10b981);
+  color: var(--toast-success-text, #ffffff);
+  border-left: 4px solid var(--toast-success-border, #059669);
+}
+
+.error {
+  background-color: var(--toast-error-bg, #ef4444);
+  color: var(--toast-error-text, #ffffff);
+  border-left: 4px solid var(--toast-error-border, #dc2626);
+}
+
+.warning {
+  background-color: var(--toast-warning-bg, #f59e0b);
+  color: var(--toast-warning-text, #1f2937);
+  border-left: 4px solid var(--toast-warning-border, #d97706);
+}
+
+.info {
+  background-color: var(--toast-info-bg, #3b82f6);
+  color: var(--toast-info-text, #ffffff);
+  border-left: 4px solid var(--toast-info-border, #2563eb);
+}
+
+/* Icon */
+.icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  font-size: 1rem;
+  font-weight: bold;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Message */
+.message {
+  flex: 1;
+  font-size: 0.9375rem;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+/* Close button */
+.closeButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: none;
+  border-radius: 0.25rem;
+  background-color: transparent;
+  color: inherit;
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.15s ease, background-color 0.15s ease;
+  flex-shrink: 0;
+}
+
+.closeButton:hover {
+  opacity: 1;
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+.closeButton:focus {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+  opacity: 1;
+}
+
+.closeButton:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.closeButton:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+  opacity: 1;
+}
+
+/* Animations */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideOut {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}
+
+/* Left-positioned animations */
+.topleft .toast,
+.bottomleft .toast {
+  animation-name: slideInLeft;
+}
+
+.topleft .toast.exiting,
+.bottomleft .toast.exiting {
+  animation-name: slideOutLeft;
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideOutLeft {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-100%);
+  }
+}
+
+/* Center-positioned animations */
+.topcenter .toast,
+.bottomcenter .toast {
+  animation-name: slideInCenter;
+}
+
+.topcenter .toast.exiting,
+.bottomcenter .toast.exiting {
+  animation-name: slideOutCenter;
+}
+
+@keyframes slideInCenter {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideOutCenter {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation: fadeIn 0.15s ease-out;
+    transition: opacity 0.15s ease-out;
+  }
+
+  .toast.exiting {
+    animation: fadeOut 0.15s ease-in forwards;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes fadeOut {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 480px) {
+  .container {
+    padding: 0.5rem;
+    left: 0;
+    right: 0;
+  }
+
+  .topright,
+  .topleft,
+  .topcenter {
+    top: 0;
+    left: 0;
+    right: 0;
+    transform: none;
+    align-items: stretch;
+  }
+
+  .bottomright,
+  .bottomleft,
+  .bottomcenter {
+    bottom: 0;
+    left: 0;
+    right: 0;
+    transform: none;
+    align-items: stretch;
+  }
+
+  .toast {
+    min-width: auto;
+    max-width: none;
+    width: 100%;
+    border-radius: 0.375rem;
+  }
+}
+
+/* Dark mode support via CSS custom properties */
+@media (prefers-color-scheme: dark) {
+  .success {
+    background-color: var(--toast-success-bg-dark, #065f46);
+    border-left-color: var(--toast-success-border-dark, #10b981);
+  }
+
+  .error {
+    background-color: var(--toast-error-bg-dark, #991b1b);
+    border-left-color: var(--toast-error-border-dark, #ef4444);
+  }
+
+  .warning {
+    background-color: var(--toast-warning-bg-dark, #92400e);
+    color: var(--toast-warning-text-dark, #fef3c7);
+    border-left-color: var(--toast-warning-border-dark, #f59e0b);
+  }
+
+  .info {
+    background-color: var(--toast-info-bg-dark, #1e40af);
+    border-left-color: var(--toast-info-border-dark, #3b82f6);
+  }
+}
+
+/* High contrast mode support */
+@media (forced-colors: active) {
+  .toast {
+    border: 2px solid currentColor;
+  }
+
+  .closeButton:focus {
+    outline: 3px solid currentColor;
+  }
+}

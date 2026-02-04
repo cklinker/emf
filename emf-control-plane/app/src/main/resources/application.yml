@@ -1,0 +1,219 @@
+spring:
+  application:
+    name: emf-control-plane
+
+  # Database Configuration
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:emf_control_plane}
+    username: ${DB_USERNAME:emf}
+    password: ${DB_PASSWORD:emf}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:10}
+      minimum-idle: ${DB_POOL_MIN_IDLE:2}
+      connection-timeout: ${DB_CONNECTION_TIMEOUT:30000}
+      idle-timeout: ${DB_IDLE_TIMEOUT:600000}
+      max-lifetime: ${DB_MAX_LIFETIME:1800000}
+
+  # JPA Configuration
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: false
+        jdbc:
+          time_zone: UTC
+    open-in-view: false
+
+  # Flyway Database Migration Configuration
+  flyway:
+    enabled: ${FLYWAY_ENABLED:true}
+    locations: classpath:db/migration
+    baseline-on-migrate: ${FLYWAY_BASELINE_ON_MIGRATE:false}
+    validate-on-migrate: true
+    clean-disabled: true
+    out-of-order: false
+    table: flyway_schema_history
+
+  # Kafka Configuration
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      retries: 3
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 5
+    consumer:
+      group-id: ${spring.application.name}
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: com.emf.controlplane.event
+
+  # Redis Configuration
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: ${REDIS_TIMEOUT:2000ms}
+      lettuce:
+        pool:
+          max-active: ${REDIS_POOL_MAX_ACTIVE:8}
+          max-idle: ${REDIS_POOL_MAX_IDLE:8}
+          min-idle: ${REDIS_POOL_MIN_IDLE:0}
+          max-wait: ${REDIS_POOL_MAX_WAIT:-1ms}
+
+  # Security Configuration
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${OIDC_ISSUER_URI:}
+          jwk-set-uri: ${OIDC_JWKS_URI:}
+
+  # Cache Configuration
+  cache:
+    type: redis
+    redis:
+      time-to-live: ${CACHE_TTL:3600000}
+      cache-null-values: false
+
+# Server Configuration
+server:
+  port: ${SERVER_PORT:8080}
+  servlet:
+    context-path: /
+  compression:
+    enabled: true
+    mime-types: application/json,application/xml,text/html,text/xml,text/plain
+
+# Actuator Configuration
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when_authorized
+      probes:
+        enabled: true
+      group:
+        # Liveness probe - basic check that the application is running
+        # Used by Kubernetes to determine if the container should be restarted
+        # Requirements: 13.5
+        liveness:
+          include: livenessState
+          show-details: always
+        # Readiness probe - checks all dependencies
+        # Used by Kubernetes to determine if the container can receive traffic
+        # Requirements: 13.6, 13.7, 13.8, 13.9
+        readiness:
+          include: readinessState,db,redis,kafka
+          show-details: always
+  health:
+    # Database health indicator - Requirement 13.7
+    db:
+      enabled: true
+    # Redis health indicator - Requirement 13.9
+    redis:
+      enabled: true
+    # Kafka health indicator - Requirement 13.8
+    kafka:
+      enabled: true
+    # Disk space health indicator
+    diskspace:
+      enabled: true
+      threshold: 10MB
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      percentiles:
+        http.server.requests: 0.5, 0.75, 0.95, 0.99
+    export:
+      prometheus:
+        enabled: true
+  tracing:
+    enabled: true
+    sampling:
+      probability: ${TRACING_SAMPLE_RATE:1.0}
+  observations:
+    http:
+      server:
+        requests:
+          name: http.server.requests
+
+# OpenAPI Configuration
+springdoc:
+  api-docs:
+    path: /openapi
+    enabled: true
+  swagger-ui:
+    path: /swagger-ui
+    enabled: true
+  show-actuator: false
+
+# OpenTelemetry Configuration
+otel:
+  service:
+    name: ${spring.application.name}
+  exporter:
+    otlp:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4317}
+  traces:
+    exporter: ${OTEL_TRACES_EXPORTER:otlp}
+  metrics:
+    exporter: ${OTEL_METRICS_EXPORTER:none}
+  logs:
+    exporter: ${OTEL_LOGS_EXPORTER:none}
+
+# Application-specific Configuration
+emf:
+  control-plane:
+    # Kafka Topics
+    kafka:
+      enabled: ${KAFKA_EVENTS_ENABLED:false}
+      topics:
+        service-changed: emf.config.service.changed
+        collection-changed: emf.config.collection.changed
+        authz-changed: emf.config.authz.changed
+        ui-changed: emf.config.ui.changed
+        oidc-changed: emf.config.oidc.changed
+    # Cache Configuration
+    cache:
+      collections:
+        name: collections
+        ttl: ${CACHE_COLLECTIONS_TTL:3600}
+      jwks:
+        name: jwks
+        ttl: ${CACHE_JWKS_TTL:86400}
+    # Security
+    security:
+      enabled: ${SECURITY_ENABLED:true}
+      admin-role: ADMIN
+      role-claim-name: roles
+
+# Logging Configuration
+# Requirements: 13.1, 13.2 - Structured JSON logs with correlation IDs
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{requestId}] [%X{traceId}/%X{spanId}] %-5level %logger{36} - %msg%n"
+  level:
+    root: INFO
+    com.emf: ${LOG_LEVEL_EMF:INFO}
+    org.springframework.web: ${LOG_LEVEL_SPRING_WEB:INFO}
+    org.springframework.security: ${LOG_LEVEL_SPRING_SECURITY:INFO}
+    org.hibernate.SQL: ${LOG_LEVEL_HIBERNATE_SQL:WARN}
+    org.apache.kafka: ${LOG_LEVEL_KAFKA:WARN}
+    io.lettuce: ${LOG_LEVEL_REDIS:WARN}

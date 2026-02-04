@@ -1,0 +1,19 @@
+/**
+ * Collection and field definition models for the EMF runtime.
+ * 
+ * <p>This package contains the core domain models including:
+ * <ul>
+ *   <li>{@code CollectionDefinition} - In-memory representation of a collection</li>
+ *   <li>{@code FieldDefinition} - Specification of a single field within a collection</li>
+ *   <li>{@code FieldType} - Supported data types (STRING, INTEGER, LONG, DOUBLE, BOOLEAN, DATE, DATETIME, JSON)</li>
+ *   <li>{@code ValidationRules} - Field validation constraints</li>
+ *   <li>Configuration records (StorageConfig, ApiConfig, AuthzConfig, EventsConfig, ReferenceConfig)</li>
+ *   <li>Builder classes for constructing definitions</li>
+ * </ul>
+ * 
+ * <p>All models use Java records for immutability and clarity, with defensive copying
+ * to ensure thread safety.
+ * 
+ * @since 1.0.0
+ */
+package com.emf.runtime.model;

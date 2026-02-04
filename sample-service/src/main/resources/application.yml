@@ -1,0 +1,79 @@
+spring:
+  application:
+    name: sample-service
+  
+  datasource:
+    url: jdbc:postgresql://localhost:5432/emf_control_plane
+    username: emf
+    password: emf
+    driver-class-name: org.postgresql.Driver
+  
+  data:
+    redis:
+      host: localhost
+      port: 6379
+  
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+
+server:
+  port: 8082
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+emf:
+  storage:
+    mode: PHYSICAL_TABLES
+  control-plane:
+    url: http://localhost:8081
+  keycloak:
+    url: http://localhost:8180
+    realm: emf
+    client-id: emf-sample-service
+    client-secret: emf-sample-service-secret
+
+logging:
+  level:
+    org.springframework.web: DEBUG
+    org.springframework.boot.autoconfigure: DEBUG
+
+---
+spring:
+  config:
+    activate:
+      on-profile: integration-test
+  
+  datasource:
+    url: jdbc:postgresql://postgres:5432/emf_control_plane
+    username: emf
+    password: emf
+  
+  data:
+    redis:
+      host: redis
+      port: 6379
+  
+  kafka:
+    bootstrap-servers: kafka:9092
+
+emf:
+  control-plane:
+    url: http://emf-control-plane:8080
+  keycloak:
+    url: http://emf-keycloak:8180
+    realm: emf
+    client-id: emf-sample-service
+    client-secret: emf-sample-service-secret
+
+server:
+  port: 8080

@@ -1,0 +1,404 @@
+/**
+ * PageLoader Styles
+ *
+ * Provides styling for page loading states and skeleton placeholders with support for:
+ * - Full-page loading overlay
+ * - Inline loading state
+ * - Multiple skeleton variants (text, card, table, form, header, list)
+ * - Shimmer animation for skeletons
+ * - Reduced motion support
+ * - Theme support via CSS custom properties
+ */
+
+/* ==========================================================================
+   Page Loader Styles
+   ========================================================================== */
+
+.pageLoader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fullPage {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1000;
+  background-color: var(--page-loader-bg, rgba(255, 255, 255, 0.95));
+}
+
+.inline {
+  min-height: 200px;
+  width: 100%;
+}
+
+.loaderContent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+}
+
+/* Dark mode support */
+[data-theme='dark'] .fullPage {
+  background-color: var(--page-loader-bg-dark, rgba(26, 26, 26, 0.95));
+}
+
+/* ==========================================================================
+   Skeleton Base Styles
+   ========================================================================== */
+
+.skeletonContainer {
+  width: 100%;
+}
+
+.skeleton {
+  background: var(--skeleton-bg, #e5e7eb);
+  background-image: linear-gradient(
+    90deg,
+    var(--skeleton-bg, #e5e7eb) 0%,
+    var(--skeleton-shimmer, #f3f4f6) 50%,
+    var(--skeleton-bg, #e5e7eb) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: var(--skeleton-radius, 4px);
+}
+
+/* Shimmer animation */
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Dark mode skeleton colors */
+[data-theme='dark'] .skeleton {
+  background: var(--skeleton-bg-dark, #374151);
+  background-image: linear-gradient(
+    90deg,
+    var(--skeleton-bg-dark, #374151) 0%,
+    var(--skeleton-shimmer-dark, #4b5563) 50%,
+    var(--skeleton-bg-dark, #374151) 100%
+  );
+  background-size: 200% 100%;
+}
+
+/* ==========================================================================
+   Skeleton Variants
+   ========================================================================== */
+
+/* Text skeleton */
+.skeletonText {
+  height: 1rem;
+  width: 100%;
+  margin-bottom: 0.5rem;
+}
+
+.skeletonText:last-child {
+  width: 70%;
+}
+
+/* Line skeleton (used within other variants) */
+.skeletonLine {
+  height: 0.875rem;
+  margin-bottom: 0.5rem;
+  background: inherit;
+  background-image: inherit;
+  background-size: inherit;
+  animation: inherit;
+  border-radius: var(--skeleton-radius, 4px);
+}
+
+.skeletonLine:last-child {
+  margin-bottom: 0;
+}
+
+/* Card skeleton */
+.skeletonCard {
+  padding: 1rem;
+  border-radius: var(--skeleton-card-radius, 8px);
+  margin-bottom: 1rem;
+  min-height: 150px;
+}
+
+.skeletonCardHeader {
+  height: 1.25rem;
+  width: 60%;
+  margin-bottom: 1rem;
+  background: inherit;
+  background-image: inherit;
+  background-size: inherit;
+  animation: inherit;
+  border-radius: var(--skeleton-radius, 4px);
+}
+
+.skeletonCardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* Table skeleton */
+.skeletonTableRow {
+  display: flex;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--skeleton-border, #e5e7eb);
+}
+
+.skeletonTableRow:last-child {
+  border-bottom: none;
+}
+
+.skeletonCell {
+  height: 1rem;
+  background: inherit;
+  background-image: inherit;
+  background-size: inherit;
+  animation: inherit;
+  border-radius: var(--skeleton-radius, 4px);
+}
+
+[data-theme='dark'] .skeletonTableRow {
+  border-bottom-color: var(--skeleton-border-dark, #374151);
+}
+
+/* Form skeleton */
+.skeletonForm {
+  padding: 0;
+  background: transparent;
+  background-image: none;
+  animation: none;
+}
+
+.skeletonFormField {
+  margin-bottom: 1.5rem;
+}
+
+.skeletonLabel {
+  height: 0.875rem;
+  width: 30%;
+  margin-bottom: 0.5rem;
+  background: var(--skeleton-bg, #e5e7eb);
+  background-image: linear-gradient(
+    90deg,
+    var(--skeleton-bg, #e5e7eb) 0%,
+    var(--skeleton-shimmer, #f3f4f6) 50%,
+    var(--skeleton-bg, #e5e7eb) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: var(--skeleton-radius, 4px);
+}
+
+.skeletonInput {
+  height: 2.5rem;
+  width: 100%;
+  background: var(--skeleton-bg, #e5e7eb);
+  background-image: linear-gradient(
+    90deg,
+    var(--skeleton-bg, #e5e7eb) 0%,
+    var(--skeleton-shimmer, #f3f4f6) 50%,
+    var(--skeleton-bg, #e5e7eb) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: var(--skeleton-radius, 4px);
+}
+
+[data-theme='dark'] .skeletonLabel,
+[data-theme='dark'] .skeletonInput {
+  background: var(--skeleton-bg-dark, #374151);
+  background-image: linear-gradient(
+    90deg,
+    var(--skeleton-bg-dark, #374151) 0%,
+    var(--skeleton-shimmer-dark, #4b5563) 50%,
+    var(--skeleton-bg-dark, #374151) 100%
+  );
+  background-size: 200% 100%;
+}
+
+/* Header skeleton */
+.skeletonHeader {
+  padding: 0;
+  background: transparent;
+  background-image: none;
+  animation: none;
+  margin-bottom: 1.5rem;
+}
+
+.skeletonTitle {
+  height: 2rem;
+  width: 50%;
+  margin-bottom: 0.75rem;
+  background: var(--skeleton-bg, #e5e7eb);
+  background-image: linear-gradient(
+    90deg,
+    var(--skeleton-bg, #e5e7eb) 0%,
+    var(--skeleton-shimmer, #f3f4f6) 50%,
+    var(--skeleton-bg, #e5e7eb) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: var(--skeleton-radius, 4px);
+}
+
+.skeletonSubtitle {
+  height: 1rem;
+  width: 35%;
+  background: var(--skeleton-bg, #e5e7eb);
+  background-image: linear-gradient(
+    90deg,
+    var(--skeleton-bg, #e5e7eb) 0%,
+    var(--skeleton-shimmer, #f3f4f6) 50%,
+    var(--skeleton-bg, #e5e7eb) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: var(--skeleton-radius, 4px);
+}
+
+[data-theme='dark'] .skeletonTitle,
+[data-theme='dark'] .skeletonSubtitle {
+  background: var(--skeleton-bg-dark, #374151);
+  background-image: linear-gradient(
+    90deg,
+    var(--skeleton-bg-dark, #374151) 0%,
+    var(--skeleton-shimmer-dark, #4b5563) 50%,
+    var(--skeleton-bg-dark, #374151) 100%
+  );
+  background-size: 200% 100%;
+}
+
+/* List skeleton */
+.skeletonListItem {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  background: transparent;
+  background-image: none;
+  animation: none;
+  border-bottom: 1px solid var(--skeleton-border, #e5e7eb);
+}
+
+.skeletonListItem:last-child {
+  border-bottom: none;
+}
+
+.skeletonAvatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--skeleton-bg, #e5e7eb);
+  background-image: linear-gradient(
+    90deg,
+    var(--skeleton-bg, #e5e7eb) 0%,
+    var(--skeleton-shimmer, #f3f4f6) 50%,
+    var(--skeleton-bg, #e5e7eb) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+.skeletonListContent {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+[data-theme='dark'] .skeletonListItem {
+  border-bottom-color: var(--skeleton-border-dark, #374151);
+}
+
+[data-theme='dark'] .skeletonAvatar {
+  background: var(--skeleton-bg-dark, #374151);
+  background-image: linear-gradient(
+    90deg,
+    var(--skeleton-bg-dark, #374151) 0%,
+    var(--skeleton-shimmer-dark, #4b5563) 50%,
+    var(--skeleton-bg-dark, #374151) 100%
+  );
+  background-size: 200% 100%;
+}
+
+/* ==========================================================================
+   Screen Reader Only
+   ========================================================================== */
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ==========================================================================
+   Reduced Motion Support
+   Requirement 14.7: Support reduced motion preferences
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton,
+  .skeletonLine,
+  .skeletonCardHeader,
+  .skeletonCell,
+  .skeletonLabel,
+  .skeletonInput,
+  .skeletonTitle,
+  .skeletonSubtitle,
+  .skeletonAvatar {
+    animation: none !important;
+    background-image: none !important;
+  }
+}
+
+/* ==========================================================================
+   High Contrast Mode Support
+   ========================================================================== */
+
+@media (forced-colors: active) {
+  .skeleton,
+  .skeletonLine,
+  .skeletonCardHeader,
+  .skeletonCell,
+  .skeletonLabel,
+  .skeletonInput,
+  .skeletonTitle,
+  .skeletonSubtitle,
+  .skeletonAvatar {
+    background: GrayText !important;
+    background-image: none !important;
+    animation: none !important;
+  }
+
+  .fullPage {
+    background-color: Canvas !important;
+  }
+}
+
+/* ==========================================================================
+   Print Styles
+   ========================================================================== */
+
+@media print {
+  .pageLoader,
+  .skeletonContainer {
+    display: none !important;
+  }
+}

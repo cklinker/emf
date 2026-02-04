@@ -1,0 +1,274 @@
+# Default values for emf-control-plane
+# This is a YAML-formatted file.
+
+# =============================================================================
+# Image Configuration
+# =============================================================================
+image:
+  repository: emf/control-plane
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+# =============================================================================
+# Replica Configuration
+# =============================================================================
+replicaCount: 1
+
+# =============================================================================
+# Service Account
+# =============================================================================
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+# =============================================================================
+# Pod Configuration
+# =============================================================================
+podAnnotations: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1000
+  capabilities:
+    drop:
+      - ALL
+
+# =============================================================================
+# Service Configuration
+# =============================================================================
+service:
+  type: ClusterIP
+  port: 8080
+  annotations: {}
+
+# =============================================================================
+# Ingress Configuration
+# =============================================================================
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: control-plane.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  #  - secretName: control-plane-tls
+  #    hosts:
+  #      - control-plane.local
+
+# =============================================================================
+# Resource Limits
+# =============================================================================
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 250m
+    memory: 512Mi
+
+# =============================================================================
+# Autoscaling Configuration
+# =============================================================================
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+
+# =============================================================================
+# Node Selection
+# =============================================================================
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# =============================================================================
+# Health Probes
+# =============================================================================
+livenessProbe:
+  enabled: true
+  httpGet:
+    path: /actuator/health/liveness
+    port: http
+  initialDelaySeconds: 60
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+  successThreshold: 1
+
+readinessProbe:
+  enabled: true
+  httpGet:
+    path: /actuator/health/readiness
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+  successThreshold: 1
+
+startupProbe:
+  enabled: true
+  httpGet:
+    path: /actuator/health/liveness
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 30
+  successThreshold: 1
+
+# =============================================================================
+# Database Configuration (PostgreSQL)
+# =============================================================================
+database:
+  # External database connection settings
+  host: "postgresql"
+  port: 5432
+  name: "emf_control_plane"
+  # Username is stored in ConfigMap, password in Secret
+  username: "emf"
+  # Connection pool settings
+  pool:
+    maxSize: 10
+    minIdle: 2
+    connectionTimeout: 30000
+    idleTimeout: 600000
+    maxLifetime: 1800000
+
+# =============================================================================
+# Kafka Configuration
+# =============================================================================
+kafka:
+  enabled: true
+  bootstrapServers: "kafka:9092"
+  # Topic names
+  topics:
+    collectionChanged: "config.collection.changed"
+    authzChanged: "config.authz.changed"
+    uiChanged: "config.ui.changed"
+    oidcChanged: "config.oidc.changed"
+
+# =============================================================================
+# Redis Configuration
+# =============================================================================
+redis:
+  enabled: true
+  host: "redis"
+  port: 6379
+  # Timeout in milliseconds
+  timeout: 2000
+  pool:
+    maxActive: 8
+    maxIdle: 8
+    minIdle: 0
+
+# =============================================================================
+# Security Configuration
+# =============================================================================
+security:
+  enabled: true
+  # OIDC provider settings
+  oidc:
+    issuerUri: ""
+    jwksUri: ""
+  # Role configuration
+  adminRole: "ADMIN"
+  roleClaimName: "roles"
+
+# =============================================================================
+# Cache Configuration
+# =============================================================================
+cache:
+  # TTL in seconds
+  ttl: 3600
+  collections:
+    ttl: 3600
+  jwks:
+    ttl: 86400
+
+# =============================================================================
+# Observability Configuration
+# =============================================================================
+observability:
+  # Logging
+  logging:
+    level:
+      root: INFO
+      emf: INFO
+      springWeb: INFO
+      springSecurity: INFO
+      hibernateSql: WARN
+      kafka: WARN
+      redis: WARN
+  # Tracing
+  tracing:
+    enabled: true
+    sampleRate: "1.0"
+    otlpEndpoint: "http://otel-collector:4317"
+  # Metrics
+  metrics:
+    enabled: true
+
+# =============================================================================
+# Flyway Migration Configuration
+# =============================================================================
+flyway:
+  enabled: true
+  baselineOnMigrate: false
+
+# =============================================================================
+# Secrets Configuration
+# =============================================================================
+secrets:
+  # Database password (base64 encoded)
+  # Default: "changeme" - MUST be changed for production
+  # Generate with: echo -n 'your-password' | base64
+  dbPassword: ""
+  
+  # Redis password (base64 encoded, optional)
+  redisPassword: ""
+  
+  # Use an existing secret instead of creating one
+  # The secret must contain DB_PASSWORD and optionally REDIS_PASSWORD
+  existingSecret: ""
+
+# =============================================================================
+# Extra Environment Variables
+# =============================================================================
+extraEnv: []
+#  - name: EXTRA_VAR
+#    value: "extra-value"
+
+# =============================================================================
+# Extra Volume Mounts
+# =============================================================================
+extraVolumeMounts: []
+
+extraVolumes: []

@@ -1,0 +1,981 @@
+openapi: 3.0.3
+info:
+  title: EMF Control Plane API
+  description: |
+    Control Plane API for managing collections, fields, authorization, UI configuration, and packages.
+    This specification serves as the single source of truth for the API contract between the control plane and UI/SDK.
+  version: 1.0.0
+  contact:
+    name: EMF Platform Team
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+  - url: https://api.emf.example.com
+    description: Production server
+
+tags:
+  - name: Collections
+    description: Collection management operations
+  - name: Fields
+    description: Field management operations
+  - name: Authorization
+    description: Role and policy management
+  - name: OIDC
+    description: OIDC provider management
+  - name: UI Configuration
+    description: UI configuration management
+  - name: Packages
+    description: Package import/export operations
+  - name: Migrations
+    description: Schema migration operations
+  - name: Discovery
+    description: Resource discovery
+
+paths:
+  /control/collections:
+    get:
+      tags: [Collections]
+      summary: List collections
+      description: Returns a paginated list of active collections with optional filtering and sorting
+      operationId: listCollections
+      parameters:
+        - name: filter
+          in: query
+          description: Filter string to search by name or description
+          schema:
+            type: string
+        - name: sort
+          in: query
+          description: Sort criteria (e.g., 'name,asc' or 'createdAt,desc')
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Successfully retrieved collections
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageCollectionDto'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Collections]
+      summary: Create collection
+      description: Creates a new collection with the provided name and description
+      operationId: createCollection
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCollectionRequest'
+      responses:
+        '201':
+          description: Collection created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CollectionDto'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /control/collections/{id}:
+    get:
+      tags: [Collections]
+      summary: Get collection
+      description: Retrieves a collection by its ID
+      operationId: getCollection
+      parameters:
+        - $ref: '#/components/parameters/IdPathParam'
+      responses:
+        '200':
+          description: Collection found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CollectionDto'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Collections]
+      summary: Update collection
+      description: Updates an existing collection. Creates a new version.
+      operationId: updateCollection
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdPathParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCollectionRequest'
+      responses:
+        '200':
+          description: Collection updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CollectionDto'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Collections]
+      summary: Delete collection
+      description: Soft-deletes a collection by marking it as inactive
+      operationId: deleteCollection
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdPathParam'
+      responses:
+        '204':
+          description: Collection deleted successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /control/collections/{id}/fields:
+    get:
+      tags: [Fields]
+      summary: List fields
+      description: Returns a list of all active fields for the specified collection
+      operationId: listFields
+      parameters:
+        - $ref: '#/components/parameters/IdPathParam'
+      responses:
+        '200':
+          description: Successfully retrieved fields
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FieldDto'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      tags: [Fields]
+      summary: Add field
+      description: Adds a new field to the collection. Creates a new version.
+      operationId: addField
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdPathParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddFieldRequest'
+      responses:
+        '201':
+          description: Field created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FieldDto'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /control/collections/{id}/fields/{fieldId}:
+    put:
+      tags: [Fields]
+      summary: Update field
+      description: Updates an existing field in the collection. Creates a new version.
+      operationId: updateField
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdPathParam'
+        - name: fieldId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateFieldRequest'
+      responses:
+        '200':
+          description: Field updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FieldDto'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Fields]
+      summary: Delete field
+      description: Soft-deletes a field by marking it as inactive. Creates a new version.
+      operationId: deleteField
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdPathParam'
+        - name: fieldId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Field deleted successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /control/roles:
+    get:
+      tags: [Authorization]
+      summary: List roles
+      description: Returns a list of all defined roles
+      operationId: listRoles
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Successfully retrieved roles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RoleDto'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      tags: [Authorization]
+      summary: Create role
+      description: Creates a new role with the provided name and description
+      operationId: createRole
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRoleRequest'
+      responses:
+        '201':
+          description: Role created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleDto'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /control/policies:
+    get:
+      tags: [Authorization]
+      summary: List policies
+      description: Returns a list of all authorization policies
+      operationId: listPolicies
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Successfully retrieved policies
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PolicyDto'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      tags: [Authorization]
+      summary: Create policy
+      description: Creates a new authorization policy
+      operationId: createPolicy
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePolicyRequest'
+      responses:
+        '201':
+          description: Policy created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PolicyDto'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /control/collections/{id}/authz:
+    put:
+      tags: [Authorization]
+      summary: Set collection authorization
+      description: Sets the authorization configuration for a collection
+      operationId: setCollectionAuthorization
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdPathParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetAuthorizationRequest'
+      responses:
+        '200':
+          description: Authorization configuration set successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthorizationConfigDto'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /control/oidc/providers:
+    get:
+      tags: [OIDC]
+      summary: List OIDC providers
+      operationId: listOidcProviders
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Successfully retrieved OIDC providers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OidcProviderDto'
+
+    post:
+      tags: [OIDC]
+      summary: Add OIDC provider
+      operationId: addOidcProvider
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddOidcProviderRequest'
+      responses:
+        '201':
+          description: OIDC provider created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OidcProviderDto'
+
+  /api/_meta/resources:
+    get:
+      tags: [Discovery]
+      summary: Discover resources
+      description: Returns metadata about all available resources
+      operationId: discoverResources
+      responses:
+        '200':
+          description: Successfully retrieved resource metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourceDiscoveryDto'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    IdPathParam:
+      name: id
+      in: path
+      required: true
+      description: Resource ID
+      schema:
+        type: string
+
+  responses:
+    BadRequest:
+      description: Invalid request - validation errors
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    Unauthorized:
+      description: Unauthorized - invalid or missing JWT token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    Forbidden:
+      description: Forbidden - requires ADMIN role
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    Conflict:
+      description: Conflict - resource with same name already exists
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    CollectionDto:
+      type: object
+      required:
+        - id
+        - name
+        - displayName
+        - storageMode
+        - active
+        - currentVersion
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+        storageMode:
+          type: string
+          enum: [PHYSICAL_TABLE, JSONB]
+        active:
+          type: boolean
+        currentVersion:
+          type: integer
+        fields:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldDto'
+        authz:
+          $ref: '#/components/schemas/AuthorizationConfigDto'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    FieldDto:
+      type: object
+      required:
+        - id
+        - name
+        - type
+        - required
+        - unique
+        - indexed
+        - order
+        - active
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        collectionId:
+          type: string
+          format: uuid
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        displayName:
+          type: string
+          maxLength: 100
+        type:
+          type: string
+          enum: [string, number, boolean, date, datetime, json, reference]
+        required:
+          type: boolean
+        unique:
+          type: boolean
+        indexed:
+          type: boolean
+        defaultValue:
+          type: string
+          description: JSON string representation of default value
+        referenceTarget:
+          type: string
+          maxLength: 100
+        order:
+          type: integer
+        active:
+          type: boolean
+        description:
+          type: string
+          maxLength: 500
+        constraints:
+          type: string
+          description: JSON string containing validation constraints
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    RoleDto:
+      type: object
+      required:
+        - id
+        - name
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+        createdAt:
+          type: string
+          format: date-time
+
+    PolicyDto:
+      type: object
+      required:
+        - id
+        - name
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+        expression:
+          type: string
+          description: Policy expression for evaluation
+        rules:
+          type: string
+          description: JSON string containing policy rules
+        createdAt:
+          type: string
+          format: date-time
+
+    OidcProviderDto:
+      type: object
+      required:
+        - id
+        - name
+        - issuer
+        - clientId
+        - enabled
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        issuer:
+          type: string
+          format: uri
+        clientId:
+          type: string
+        clientSecret:
+          type: string
+        scopes:
+          type: string
+          description: JSON array of scopes
+        enabled:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    AuthorizationConfigDto:
+      type: object
+      properties:
+        collectionId:
+          type: string
+          format: uuid
+        routePolicies:
+          type: array
+          items:
+            $ref: '#/components/schemas/RoutePolicyDto'
+        fieldPolicies:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldPolicyDto'
+
+    RoutePolicyDto:
+      type: object
+      properties:
+        id:
+          type: string
+        operation:
+          type: string
+          enum: [read, create, update, delete]
+        policyId:
+          type: string
+
+    FieldPolicyDto:
+      type: object
+      properties:
+        id:
+          type: string
+        fieldName:
+          type: string
+        operation:
+          type: string
+          enum: [read, write]
+        policyId:
+          type: string
+
+    ResourceDiscoveryDto:
+      type: object
+      properties:
+        resources:
+          type: array
+          items:
+            $ref: '#/components/schemas/ResourceMetadataDto'
+
+    ResourceMetadataDto:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+        endpoints:
+          type: object
+
+    CreateCollectionRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        displayName:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+        storageMode:
+          type: string
+          enum: [PHYSICAL_TABLE, JSONB]
+          default: PHYSICAL_TABLE
+
+    UpdateCollectionRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        displayName:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+        storageMode:
+          type: string
+          enum: [PHYSICAL_TABLE, JSONB]
+
+    AddFieldRequest:
+      type: object
+      required:
+        - name
+        - type
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        displayName:
+          type: string
+          maxLength: 100
+        type:
+          type: string
+        required:
+          type: boolean
+          default: false
+        unique:
+          type: boolean
+          default: false
+        indexed:
+          type: boolean
+          default: false
+        defaultValue:
+          type: string
+        referenceTarget:
+          type: string
+        order:
+          type: integer
+          default: 0
+        description:
+          type: string
+          maxLength: 500
+        constraints:
+          type: string
+
+    UpdateFieldRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        displayName:
+          type: string
+          maxLength: 100
+        type:
+          type: string
+        required:
+          type: boolean
+        unique:
+          type: boolean
+        indexed:
+          type: boolean
+        defaultValue:
+          type: string
+        referenceTarget:
+          type: string
+        order:
+          type: integer
+        description:
+          type: string
+          maxLength: 500
+        constraints:
+          type: string
+
+    CreateRoleRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+
+    CreatePolicyRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+        expression:
+          type: string
+        rules:
+          type: string
+
+    SetAuthorizationRequest:
+      type: object
+      properties:
+        routePolicies:
+          type: array
+          items:
+            type: object
+            properties:
+              operation:
+                type: string
+              policyId:
+                type: string
+        fieldPolicies:
+          type: array
+          items:
+            type: object
+            properties:
+              fieldName:
+                type: string
+              operation:
+                type: string
+              policyId:
+                type: string
+
+    AddOidcProviderRequest:
+      type: object
+      required:
+        - name
+        - issuer
+        - clientId
+      properties:
+        name:
+          type: string
+        issuer:
+          type: string
+        clientId:
+          type: string
+        clientSecret:
+          type: string
+        scopes:
+          type: array
+          items:
+            type: string
+        enabled:
+          type: boolean
+          default: true
+
+    PageCollectionDto:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/CollectionDto'
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+        size:
+          type: integer
+        number:
+          type: integer
+
+    ErrorResponse:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: integer
+        error:
+          type: string
+        message:
+          type: string
+        path:
+          type: string
+        validationErrors:
+          type: object
+          additionalProperties:
+            type: string

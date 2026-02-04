@@ -1,0 +1,31 @@
+# Build output
+dist/
+build/
+
+# Dependencies
+node_modules/
+
+# Package manager files
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
+# Coverage reports
+coverage/
+
+# Generated files
+*.min.js
+*.min.css
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test snapshots (optional - remove if you want to format snapshots)
+**/__snapshots__/

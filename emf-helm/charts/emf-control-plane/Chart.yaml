@@ -1,0 +1,25 @@
+apiVersion: v2
+name: emf-control-plane
+description: Helm chart for EMF Control Plane Service - Central configuration management for EMF Platform
+type: application
+version: 0.1.0
+appVersion: "1.0.0-SNAPSHOT"
+
+keywords:
+  - emf
+  - control-plane
+  - configuration
+  - microservices
+
+home: https://github.com/emf/emf-control-plane
+sources:
+  - https://github.com/emf/emf-control-plane
+
+maintainers:
+  - name: EMF Team
+    email: team@emf.io
+
+dependencies: []
+
+annotations:
+  category: Configuration Management

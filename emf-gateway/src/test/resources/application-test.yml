@@ -1,0 +1,58 @@
+spring:
+  application:
+    name: emf-gateway-test
+  
+  # Kafka configuration for integration tests
+  kafka:
+    bootstrap-servers: localhost:9094
+    consumer:
+      group-id: emf-gateway-test
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+  
+  # Redis configuration for integration tests
+  data:
+    redis:
+      host: localhost
+      port: 6379
+  
+  # JWT configuration for integration tests - use real Keycloak
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8180/realms/emf
+          jwk-set-uri: http://localhost:8180/realms/emf/protocol/openid-connect/certs
+
+# EMF Gateway test configuration
+emf:
+  gateway:
+    control-plane:
+      url: http://localhost:8081
+      bootstrap-path: /control/bootstrap
+    kafka:
+      topics:
+        collection-changed: emf.collection.changed
+        authz-changed: emf.authz.changed
+        service-changed: emf.service.changed
+    rate-limit:
+      default:
+        requests-per-window: 100
+        window-duration: PT1M
+
+# Disable actuator endpoints for tests
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+# Reduce logging noise in tests
+logging:
+  level:
+    root: WARN
+    com.emf.gateway: INFO

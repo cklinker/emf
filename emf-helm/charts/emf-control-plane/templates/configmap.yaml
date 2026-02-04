@@ -1,0 +1,69 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "emf-control-plane.configMapName" . }}
+  labels:
+    {{- include "emf-control-plane.labels" . | nindent 4 }}
+data:
+  # Server Configuration
+  SERVER_PORT: "8080"
+  
+  # Database Configuration
+  DB_HOST: {{ .Values.database.host | quote }}
+  DB_PORT: {{ .Values.database.port | quote }}
+  DB_NAME: {{ .Values.database.name | quote }}
+  DB_USERNAME: {{ .Values.database.username | quote }}
+  DB_POOL_SIZE: {{ .Values.database.pool.maxSize | quote }}
+  DB_POOL_MIN_IDLE: {{ .Values.database.pool.minIdle | quote }}
+  DB_CONNECTION_TIMEOUT: {{ .Values.database.pool.connectionTimeout | quote }}
+  DB_IDLE_TIMEOUT: {{ .Values.database.pool.idleTimeout | quote }}
+  DB_MAX_LIFETIME: {{ .Values.database.pool.maxLifetime | quote }}
+  
+  # Flyway Configuration
+  FLYWAY_ENABLED: {{ .Values.flyway.enabled | quote }}
+  FLYWAY_BASELINE_ON_MIGRATE: {{ .Values.flyway.baselineOnMigrate | quote }}
+  
+  # Kafka Configuration
+  KAFKA_EVENTS_ENABLED: {{ .Values.kafka.enabled | quote }}
+  KAFKA_BOOTSTRAP_SERVERS: {{ .Values.kafka.bootstrapServers | quote }}
+  
+  # Redis Configuration
+  REDIS_HOST: {{ .Values.redis.host | quote }}
+  REDIS_PORT: {{ .Values.redis.port | quote }}
+  REDIS_TIMEOUT: "{{ .Values.redis.timeout }}ms"
+  REDIS_POOL_MAX_ACTIVE: {{ .Values.redis.pool.maxActive | quote }}
+  REDIS_POOL_MAX_IDLE: {{ .Values.redis.pool.maxIdle | quote }}
+  REDIS_POOL_MIN_IDLE: {{ .Values.redis.pool.minIdle | quote }}
+  
+  # Security Configuration
+  SECURITY_ENABLED: {{ .Values.security.enabled | quote }}
+  {{- if .Values.security.oidc.issuerUri }}
+  OIDC_ISSUER_URI: {{ .Values.security.oidc.issuerUri | quote }}
+  {{- end }}
+  {{- if .Values.security.oidc.jwksUri }}
+  OIDC_JWKS_URI: {{ .Values.security.oidc.jwksUri | quote }}
+  {{- end }}
+  
+  # Cache Configuration
+  CACHE_TTL: {{ mul .Values.cache.ttl 1000 | quote }}
+  CACHE_COLLECTIONS_TTL: {{ .Values.cache.collections.ttl | quote }}
+  CACHE_JWKS_TTL: {{ .Values.cache.jwks.ttl | quote }}
+  
+  # Observability - Logging
+  LOG_LEVEL_EMF: {{ .Values.observability.logging.level.emf | quote }}
+  LOG_LEVEL_SPRING_WEB: {{ .Values.observability.logging.level.springWeb | quote }}
+  LOG_LEVEL_SPRING_SECURITY: {{ .Values.observability.logging.level.springSecurity | quote }}
+  LOG_LEVEL_HIBERNATE_SQL: {{ .Values.observability.logging.level.hibernateSql | quote }}
+  LOG_LEVEL_KAFKA: {{ .Values.observability.logging.level.kafka | quote }}
+  LOG_LEVEL_REDIS: {{ .Values.observability.logging.level.redis | quote }}
+  
+  # Observability - Tracing
+  TRACING_SAMPLE_RATE: {{ .Values.observability.tracing.sampleRate | quote }}
+  OTEL_EXPORTER_OTLP_ENDPOINT: {{ .Values.observability.tracing.otlpEndpoint | quote }}
+  {{- if .Values.observability.tracing.enabled }}
+  OTEL_TRACES_EXPORTER: "otlp"
+  {{- else }}
+  OTEL_TRACES_EXPORTER: "none"
+  {{- end }}
+  OTEL_METRICS_EXPORTER: "none"
+  OTEL_LOGS_EXPORTER: "none"

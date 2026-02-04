@@ -1,0 +1,31 @@
+# Maven build artifacts
+target/
+!target/emf-gateway-*.jar
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+README.md
+docs/
+
+# Test files
+src/test/
+
+# Helm charts (built separately)
+helm/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db

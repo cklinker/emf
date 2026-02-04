@@ -1,0 +1,393 @@
+/**
+ * ResourceFormPage Styles
+ *
+ * Styles for the resource form page including:
+ * - Page layout and header
+ * - Form fields with type-specific styling
+ * - Validation error display
+ * - Action buttons
+ *
+ * Uses CSS custom properties for theming support.
+ * Supports responsive design for mobile, tablet, and desktop.
+ *
+ * Requirements:
+ * - 11.6: Resource browser allows creating new resources
+ * - 11.9: Resource browser allows editing existing resources
+ */
+
+/* Container */
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg, 1.5rem);
+  padding: var(--spacing-lg, 1.5rem);
+  width: 100%;
+}
+
+/* Loading Container */
+.loadingContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 300px;
+}
+
+/* Page Header */
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm, 0.5rem);
+}
+
+.headerLeft {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs, 0.25rem);
+}
+
+/* Breadcrumb Navigation */
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs, 0.25rem);
+  font-size: var(--font-size-sm, 0.875rem);
+  color: var(--color-text-secondary, #666666);
+}
+
+.breadcrumbLink {
+  color: var(--color-link, #0066cc);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.breadcrumbLink:hover {
+  color: var(--color-link-hover, #0052a3);
+  text-decoration: underline;
+}
+
+.breadcrumbLink:focus {
+  outline: 2px solid var(--color-focus-ring, #0066cc);
+  outline-offset: 2px;
+  border-radius: var(--border-radius-sm, 0.25rem);
+}
+
+.breadcrumbSeparator {
+  color: var(--color-text-tertiary, #9ca3af);
+  margin: 0 var(--spacing-xs, 0.25rem);
+}
+
+.breadcrumbCurrent {
+  color: var(--color-text-primary, #1a1a1a);
+  font-weight: var(--font-weight-medium, 500);
+}
+
+/* Page Title */
+.title {
+  margin: 0;
+  font-size: var(--font-size-2xl, 1.5rem);
+  font-weight: var(--font-weight-semibold, 600);
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+.subtitle {
+  margin: 0;
+  font-size: var(--font-size-sm, 0.875rem);
+  color: var(--color-text-secondary, #666666);
+  font-family: var(--font-family-mono, monospace);
+}
+
+/* Form */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg, 1.5rem);
+}
+
+/* Fields Container */
+.fieldsContainer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg, 1.5rem);
+  padding: var(--spacing-lg, 1.5rem);
+  background-color: var(--color-surface-primary, #ffffff);
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: var(--border-radius-md, 0.375rem);
+}
+
+/* Field Group */
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs, 0.25rem);
+}
+
+/* Label */
+.label {
+  font-size: var(--font-size-sm, 0.875rem);
+  font-weight: var(--font-weight-medium, 500);
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+.required {
+  color: var(--color-error, #dc2626);
+  margin-left: var(--spacing-xs, 0.25rem);
+}
+
+/* Field Type Hint */
+.fieldTypeHint {
+  font-size: var(--font-size-xs, 0.75rem);
+  color: var(--color-text-tertiary, #9ca3af);
+  margin-bottom: var(--spacing-xs, 0.25rem);
+}
+
+/* Input Styles */
+.input {
+  width: 100%;
+  padding: var(--spacing-sm, 0.5rem) var(--spacing-md, 1rem);
+  font-size: var(--font-size-md, 1rem);
+  font-family: inherit;
+  color: var(--color-text-primary, #1a1a1a);
+  background-color: var(--color-surface-primary, #ffffff);
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: var(--border-radius-md, 0.375rem);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.input:hover {
+  border-color: var(--color-border-hover, #9ca3af);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--color-focus-ring, #0066cc);
+  box-shadow: 0 0 0 3px var(--color-focus-ring-alpha, rgba(0, 102, 204, 0.2));
+}
+
+.input::placeholder {
+  color: var(--color-text-tertiary, #9ca3af);
+}
+
+.inputError {
+  border-color: var(--color-error, #dc2626);
+}
+
+.inputError:focus {
+  border-color: var(--color-error, #dc2626);
+  box-shadow: 0 0 0 3px var(--color-error-alpha, rgba(220, 38, 38, 0.2));
+}
+
+/* Textarea Styles */
+.textarea {
+  width: 100%;
+  padding: var(--spacing-sm, 0.5rem) var(--spacing-md, 1rem);
+  font-size: var(--font-size-md, 1rem);
+  font-family: inherit;
+  color: var(--color-text-primary, #1a1a1a);
+  background-color: var(--color-surface-primary, #ffffff);
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: var(--border-radius-md, 0.375rem);
+  resize: vertical;
+  min-height: 100px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.textarea:hover {
+  border-color: var(--color-border-hover, #9ca3af);
+}
+
+.textarea:focus {
+  outline: none;
+  border-color: var(--color-focus-ring, #0066cc);
+  box-shadow: 0 0 0 3px var(--color-focus-ring-alpha, rgba(0, 102, 204, 0.2));
+}
+
+.jsonTextarea {
+  font-family: var(--font-family-mono, monospace);
+  font-size: var(--font-size-sm, 0.875rem);
+}
+
+/* Checkbox Styles */
+.checkboxWrapper {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm, 0.5rem);
+  padding: var(--spacing-sm, 0.5rem) 0;
+}
+
+.checkbox {
+  width: 1.25rem;
+  height: 1.25rem;
+  cursor: pointer;
+  accent-color: var(--color-button-primary, #0066cc);
+}
+
+.checkbox:focus {
+  outline: 2px solid var(--color-focus-ring, #0066cc);
+  outline-offset: 2px;
+}
+
+.checkboxLabel {
+  font-size: var(--font-size-md, 1rem);
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+/* Error Message */
+.errorMessage {
+  font-size: var(--font-size-sm, 0.875rem);
+  color: var(--color-error, #dc2626);
+  margin-top: var(--spacing-xs, 0.25rem);
+}
+
+/* Form Actions */
+.formActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-md, 1rem);
+  padding-top: var(--spacing-md, 1rem);
+  border-top: 1px solid var(--color-border, #d1d5db);
+}
+
+/* Button Styles */
+.cancelButton,
+.submitButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm, 0.5rem);
+  padding: var(--spacing-sm, 0.5rem) var(--spacing-lg, 1.5rem);
+  font-size: var(--font-size-md, 1rem);
+  font-weight: var(--font-weight-medium, 500);
+  border-radius: var(--border-radius-md, 0.375rem);
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.cancelButton {
+  color: var(--color-text-secondary, #666666);
+  background-color: transparent;
+  border: 1px solid var(--color-border, #d1d5db);
+}
+
+.cancelButton:hover:not(:disabled) {
+  background-color: var(--color-surface-hover, #f9fafb);
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+.cancelButton:focus {
+  outline: 2px solid var(--color-focus-ring, #0066cc);
+  outline-offset: 2px;
+}
+
+.cancelButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.submitButton {
+  color: var(--color-button-primary-text, #ffffff);
+  background-color: var(--color-button-primary, #0066cc);
+  border: 1px solid var(--color-button-primary, #0066cc);
+}
+
+.submitButton:hover:not(:disabled) {
+  background-color: var(--color-button-primary-hover, #0052a3);
+  border-color: var(--color-button-primary-hover, #0052a3);
+}
+
+.submitButton:focus {
+  outline: 2px solid var(--color-focus-ring, #0066cc);
+  outline-offset: 2px;
+}
+
+.submitButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Empty State */
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-xl, 2rem);
+  text-align: center;
+  color: var(--color-text-secondary, #666666);
+  background-color: var(--color-surface-secondary, #f5f5f5);
+  border-radius: var(--border-radius-md, 0.375rem);
+}
+
+.emptyState p {
+  margin: 0;
+  font-size: var(--font-size-md, 1rem);
+}
+
+/* Responsive Design */
+
+/* Tablet (768px - 1023px) */
+@media (max-width: 1023px) {
+  .container {
+    padding: var(--spacing-md, 1rem);
+  }
+}
+
+/* Mobile (below 768px) */
+@media (max-width: 767px) {
+  .container {
+    padding: var(--spacing-sm, 0.5rem);
+    gap: var(--spacing-md, 1rem);
+  }
+
+  .title {
+    font-size: var(--font-size-xl, 1.25rem);
+  }
+
+  .breadcrumb {
+    flex-wrap: wrap;
+  }
+
+  .fieldsContainer {
+    padding: var(--spacing-md, 1rem);
+  }
+
+  .formActions {
+    flex-direction: column-reverse;
+  }
+
+  .cancelButton,
+  .submitButton {
+    width: 100%;
+  }
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .input,
+  .textarea,
+  .cancelButton,
+  .submitButton,
+  .breadcrumbLink {
+    transition: none;
+  }
+}
+
+/* Dark Theme Support */
+[data-theme='dark'] .container {
+  --color-text-primary: #f9fafb;
+  --color-text-secondary: #d1d5db;
+  --color-text-tertiary: #9ca3af;
+  --color-surface-primary: #1f2937;
+  --color-surface-secondary: #111827;
+  --color-surface-hover: #374151;
+  --color-border: #374151;
+  --color-border-hover: #4b5563;
+  --color-link: #60a5fa;
+  --color-link-hover: #93c5fd;
+  --color-error: #f87171;
+  --color-error-alpha: rgba(248, 113, 113, 0.2);
+  --color-button-primary: #3b82f6;
+  --color-button-primary-hover: #2563eb;
+  --color-button-primary-text: #ffffff;
+  --color-focus-ring: #60a5fa;
+  --color-focus-ring-alpha: rgba(96, 165, 250, 0.2);
+}

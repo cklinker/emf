@@ -1,0 +1,1229 @@
+/**
+ * ResourceListPage Component
+ *
+ * Displays records in a collection with pagination, filtering, sorting,
+ * column selection, bulk selection, and export capabilities.
+ *
+ * Requirements:
+ * - 11.2: Resource browser displays paginated list of resources
+ * - 11.3: Resource browser supports filtering by field values
+ * - 11.4: Resource browser supports multiple filter conditions
+ * - 11.5: Resource browser supports filter operators (equals, contains, greater than, etc.)
+ * - 11.11: Resource browser supports bulk selection
+ * - 11.12: Resource browser supports exporting selected records
+ */
+
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useI18n } from '../../context/I18nContext';
+import { useApi } from '../../context/ApiContext';
+import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components';
+import styles from './ResourceListPage.module.css';
+
+/**
+ * Export format type
+ * Requirement 11.12: Support CSV and JSON export formats
+ */
+export type ExportFormat = 'csv' | 'json';
+
+/**
+ * Escape a value for CSV format
+ * Handles commas, quotes, and newlines
+ */
+export function escapeCSVValue(value: unknown): string {
+  if (value === null || value === undefined) {
+    return '';
+  }
+  
+  const stringValue = typeof value === 'object' 
+    ? JSON.stringify(value) 
+    : String(value);
+  
+  // Check if the value needs to be quoted
+  const needsQuoting = stringValue.includes(',') || 
+                       stringValue.includes('"') || 
+                       stringValue.includes('\n') ||
+                       stringValue.includes('\r');
+  
+  if (needsQuoting) {
+    // Escape double quotes by doubling them
+    const escaped = stringValue.replace(/"/g, '""');
+    return `"${escaped}"`;
+  }
+  
+  return stringValue;
+}
+
+/**
+ * Convert records to CSV format
+ * Requirement 11.12: Export selected records to CSV
+ */
+export function recordsToCSV(
+  records: Resource[],
+  fields: FieldDefinition[],
+  includeId: boolean = true
+): string {
+  // Build headers
+  const headers: string[] = [];
+  if (includeId) {
+    headers.push('id');
+  }
+  fields.forEach(field => {
+    headers.push(field.displayName || field.name);
+  });
+  
+  // Build rows
+  const rows: string[] = [headers.map(escapeCSVValue).join(',')];
+  
+  records.forEach(record => {
+    const values: string[] = [];
+    if (includeId) {
+      values.push(escapeCSVValue(record.id));
+    }
+    fields.forEach(field => {
+      values.push(escapeCSVValue(record[field.name]));
+    });
+    rows.push(values.join(','));
+  });
+  
+  return rows.join('\n');
+}
+
+/**
+ * Convert records to JSON format
+ * Requirement 11.12: Export selected records to JSON
+ */
+export function recordsToJSON(records: Resource[]): string {
+  return JSON.stringify(records, null, 2);
+}
+
+/**
+ * Trigger a file download in the browser
+ */
+export function downloadFile(content: string, filename: string, mimeType: string): void {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Field definition interface for collection schema
+ */
+export interface FieldDefinition {
+  id: string;
+  name: string;
+  displayName?: string;
+  type: 'string' | 'number' | 'boolean' | 'date' | 'datetime' | 'json' | 'reference';
+  required: boolean;
+}
+
+/**
+ * Collection schema interface
+ */
+export interface CollectionSchema {
+  id: string;
+  name: string;
+  displayName: string;
+  fields: FieldDefinition[];
+}
+
+/**
+ * Resource record interface
+ */
+export interface Resource {
+  id: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Filter condition interface
+ * Requirement 11.4, 11.5: Support multiple filter conditions with operators
+ */
+export interface FilterCondition {
+  id: string;
+  field: string;
+  operator: FilterOperator;
+  value: string;
+}
+
+/**
+ * Filter operator type
+ * Requirement 11.5: Support filter operators
+ */
+export type FilterOperator = 'equals' | 'not_equals' | 'contains' | 'starts_with' | 'ends_with' | 'greater_than' | 'less_than' | 'greater_than_or_equal' | 'less_than_or_equal';
+
+/**
+ * Sort state interface
+ */
+interface SortState {
+  field: string;
+  direction: 'asc' | 'desc';
+}
+
+/**
+ * Paginated response interface
+ */
+interface PaginatedResponse {
+  data: Resource[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+/**
+ * Props for ResourceListPage component
+ */
+export interface ResourceListPageProps {
+  /** Optional test ID for testing */
+  testId?: string;
+}
+
+// Filter operators with labels
+const FILTER_OPERATORS: { value: FilterOperator; label: string }[] = [
+  { value: 'equals', label: 'Equals' },
+  { value: 'not_equals', label: 'Not Equals' },
+  { value: 'contains', label: 'Contains' },
+  { value: 'starts_with', label: 'Starts With' },
+  { value: 'ends_with', label: 'Ends With' },
+  { value: 'greater_than', label: 'Greater Than' },
+  { value: 'less_than', label: 'Less Than' },
+  { value: 'greater_than_or_equal', label: 'Greater Than or Equal' },
+  { value: 'less_than_or_equal', label: 'Less Than or Equal' },
+];
+
+// Page size options
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
+
+// Generate unique ID for filter conditions
+let filterIdCounter = 0;
+function generateFilterId(): string {
+  return `filter-${++filterIdCounter}`;
+}
+
+// API functions using apiClient
+async function fetchCollectionSchema(apiClient: any, collectionName: string): Promise<CollectionSchema> {
+  console.log('[fetchCollectionSchema] Fetching collection by name:', collectionName);
+  
+  // First, fetch all collections to find the one with matching name
+  const response = await apiClient.get<{ content: any[] }>('/control/collections');
+  console.log('[fetchCollectionSchema] Collections response:', response);
+  
+  const collections = response?.content || [];
+  console.log('[fetchCollectionSchema] Collections array:', collections);
+  
+  const collection = collections.find((c: any) => c.name === collectionName);
+  console.log('[fetchCollectionSchema] Found collection:', collection);
+  
+  if (!collection) {
+    throw new Error(`Collection '${collectionName}' not found`);
+  }
+  
+  // Now fetch the full collection details by ID
+  const schema = await apiClient.get(`/control/collections/${collection.id}`);
+  console.log('[fetchCollectionSchema] Collection schema:', schema);
+  return schema;
+}
+
+interface FetchResourcesParams {
+  collectionName: string;
+  page: number;
+  pageSize: number;
+  sort?: SortState;
+  filters?: FilterCondition[];
+}
+
+async function fetchResources(apiClient: any, params: FetchResourcesParams): Promise<PaginatedResponse> {
+  const { collectionName, page, pageSize, sort, filters } = params;
+  
+  // Build query parameters
+  const queryParams = new URLSearchParams();
+  queryParams.set('page', String(page));
+  queryParams.set('pageSize', String(pageSize));
+  
+  if (sort) {
+    queryParams.set('sortField', sort.field);
+    queryParams.set('sortDirection', sort.direction);
+  }
+  
+  if (filters && filters.length > 0) {
+    queryParams.set('filters', JSON.stringify(filters));
+  }
+  
+  return apiClient.get(`/api/${collectionName}?${queryParams.toString()}`);
+}
+
+async function deleteResource(apiClient: any, collectionName: string, resourceId: string): Promise<void> {
+  return apiClient.delete(`/api/${collectionName}/${resourceId}`);
+}
+
+async function deleteResources(apiClient: any, collectionName: string, resourceIds: string[]): Promise<void> {
+  return apiClient.post(`/api/${collectionName}/bulk-delete`, { ids: resourceIds });
+}
+
+/**
+ * ResourceListPage Component
+ *
+ * Main page for displaying and managing resources in a collection.
+ * Provides listing, filtering, sorting, column selection, and bulk operations.
+ */
+export function ResourceListPage({ testId = 'resource-list-page' }: ResourceListPageProps): React.ReactElement {
+  const { collection: collectionName } = useParams<{ collection: string }>();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { t, formatDate } = useI18n();
+  const { apiClient } = useApi();
+  const { showToast } = useToast();
+
+  // Pagination state
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+
+  // Sort state
+  const [sort, setSort] = useState<SortState | undefined>(undefined);
+
+  // Filter state - Requirement 11.3, 11.4
+  const [filters, setFilters] = useState<FilterCondition[]>([]);
+  const [pendingFilters, setPendingFilters] = useState<FilterCondition[]>([]);
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Column visibility state - Requirement 11.5 (column selection)
+  const [visibleColumns, setVisibleColumns] = useState<Set<string>>(new Set());
+  const [showColumnSelector, setShowColumnSelector] = useState(false);
+
+  // Bulk selection state - Requirement 11.11
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // Delete confirmation dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [resourceToDelete, setResourceToDelete] = useState<Resource | null>(null);
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
+
+  // Export dropdown state - Requirement 11.12
+  const [showExportDropdown, setShowExportDropdown] = useState(false);
+  const exportDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Fetch collection schema
+  const {
+    data: schema,
+    isLoading: schemaLoading,
+    error: schemaError,
+  } = useQuery({
+    queryKey: ['collection-schema', collectionName],
+    queryFn: () => fetchCollectionSchema(apiClient, collectionName!),
+    enabled: !!collectionName,
+  });
+
+  // Initialize visible columns when schema loads
+  useEffect(() => {
+    if (schema && visibleColumns.size === 0) {
+      // Show first 5 fields by default plus id
+      const defaultColumns = new Set<string>(['id']);
+      schema.fields.slice(0, 5).forEach((field) => {
+        defaultColumns.add(field.name);
+      });
+      setVisibleColumns(defaultColumns);
+    }
+  }, [schema, visibleColumns.size]);
+
+  // Fetch resources - Requirement 11.2
+  const {
+    data: resourcesData,
+    isLoading: resourcesLoading,
+    error: resourcesError,
+    refetch: refetchResources,
+  } = useQuery({
+    queryKey: ['resources', collectionName, page, pageSize, sort, filters],
+    queryFn: () =>
+      fetchResources(apiClient, {
+        collectionName: collectionName!,
+        page,
+        pageSize,
+        sort,
+        filters,
+      }),
+    enabled: !!collectionName && !!schema,
+  });
+
+  // Delete mutation
+  const deleteMutation = useMutation({
+    mutationFn: ({ id }: { id: string }) => deleteResource(apiClient, collectionName!, id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['resources', collectionName] });
+      showToast(t('success.deleted', { item: t('resources.record') }), 'success');
+      setDeleteDialogOpen(false);
+      setResourceToDelete(null);
+    },
+    onError: (error: Error) => {
+      showToast(error.message || t('errors.generic'), 'error');
+    },
+  });
+
+  // Bulk delete mutation - Requirement 11.11
+  const bulkDeleteMutation = useMutation({
+    mutationFn: (ids: string[]) => deleteResources(apiClient, collectionName!, ids),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['resources', collectionName] });
+      showToast(t('success.deleted', { item: `${selectedIds.size} records` }), 'success');
+      setBulkDeleteDialogOpen(false);
+      setSelectedIds(new Set());
+    },
+    onError: (error: Error) => {
+      showToast(error.message || t('errors.generic'), 'error');
+    },
+  });
+
+  // Get visible fields for table columns
+  const visibleFields = useMemo(() => {
+    if (!schema) return [];
+    return schema.fields.filter((field) => visibleColumns.has(field.name));
+  }, [schema, visibleColumns]);
+
+  // Calculate total pages
+  const totalPages = useMemo(() => {
+    if (!resourcesData) return 0;
+    return Math.ceil(resourcesData.total / pageSize);
+  }, [resourcesData, pageSize]);
+
+  // Check if all visible records are selected
+  const allSelected = useMemo(() => {
+    if (!resourcesData || resourcesData.data.length === 0) return false;
+    return resourcesData.data.every((resource) => selectedIds.has(resource.id));
+  }, [resourcesData, selectedIds]);
+
+  // Handle sort change - Requirement 11.4 (column sorting)
+  const handleSortChange = useCallback((field: string) => {
+    setSort((prev) => {
+      if (prev?.field === field) {
+        return prev.direction === 'asc'
+          ? { field, direction: 'desc' }
+          : undefined;
+      }
+      return { field, direction: 'asc' };
+    });
+    setPage(1);
+  }, []);
+
+  // Handle page change
+  const handlePageChange = useCallback((newPage: number) => {
+    setPage(newPage);
+    setSelectedIds(new Set()); // Clear selection on page change
+  }, []);
+
+  // Handle page size change
+  const handlePageSizeChange = useCallback((event: React.ChangeEvent<HTMLSelectElement>) => {
+    setPageSize(Number(event.target.value));
+    setPage(1);
+    setSelectedIds(new Set());
+  }, []);
+
+  // Filter handlers - Requirement 11.3, 11.4, 11.5
+  const handleToggleFilters = useCallback(() => {
+    setShowFilters((prev) => !prev);
+    if (!showFilters) {
+      setPendingFilters(filters);
+    }
+  }, [showFilters, filters]);
+
+  const handleAddFilter = useCallback(() => {
+    if (!schema || schema.fields.length === 0) return;
+    const newFilter: FilterCondition = {
+      id: generateFilterId(),
+      field: schema.fields[0].name,
+      operator: 'equals',
+      value: '',
+    };
+    setPendingFilters((prev) => [...prev, newFilter]);
+  }, [schema]);
+
+  const handleRemoveFilter = useCallback((filterId: string) => {
+    setPendingFilters((prev) => prev.filter((f) => f.id !== filterId));
+  }, []);
+
+  const handleFilterFieldChange = useCallback((filterId: string, field: string) => {
+    setPendingFilters((prev) =>
+      prev.map((f) => (f.id === filterId ? { ...f, field } : f))
+    );
+  }, []);
+
+  const handleFilterOperatorChange = useCallback((filterId: string, operator: FilterOperator) => {
+    setPendingFilters((prev) =>
+      prev.map((f) => (f.id === filterId ? { ...f, operator } : f))
+    );
+  }, []);
+
+  const handleFilterValueChange = useCallback((filterId: string, value: string) => {
+    setPendingFilters((prev) =>
+      prev.map((f) => (f.id === filterId ? { ...f, value } : f))
+    );
+  }, []);
+
+  const handleApplyFilters = useCallback(() => {
+    setFilters(pendingFilters.filter((f) => f.value.trim() !== ''));
+    setPage(1);
+    setSelectedIds(new Set());
+  }, [pendingFilters]);
+
+  const handleClearFilters = useCallback(() => {
+    setPendingFilters([]);
+    setFilters([]);
+    setPage(1);
+    setSelectedIds(new Set());
+  }, []);
+
+  // Column visibility handlers
+  const handleToggleColumnSelector = useCallback(() => {
+    setShowColumnSelector((prev) => !prev);
+  }, []);
+
+  const handleToggleColumn = useCallback((fieldName: string) => {
+    setVisibleColumns((prev) => {
+      const next = new Set(prev);
+      if (next.has(fieldName)) {
+        next.delete(fieldName);
+      } else {
+        next.add(fieldName);
+      }
+      return next;
+    });
+  }, []);
+
+  // Selection handlers - Requirement 11.11
+  const handleSelectAll = useCallback(() => {
+    if (!resourcesData) return;
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(resourcesData.data.map((r) => r.id)));
+    }
+  }, [resourcesData, allSelected]);
+
+  const handleSelectRow = useCallback((resourceId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(resourceId)) {
+        next.delete(resourceId);
+      } else {
+        next.add(resourceId);
+      }
+      return next;
+    });
+  }, []);
+
+  // Navigation handlers
+  const handleCreate = useCallback(() => {
+    navigate(`/resources/${collectionName}/new`);
+  }, [navigate, collectionName]);
+
+  const handleView = useCallback((resource: Resource) => {
+    navigate(`/resources/${collectionName}/${resource.id}`);
+  }, [navigate, collectionName]);
+
+  const handleEdit = useCallback((resource: Resource) => {
+    navigate(`/resources/${collectionName}/${resource.id}/edit`);
+  }, [navigate, collectionName]);
+
+  // Delete handlers
+  const handleDeleteClick = useCallback((resource: Resource) => {
+    setResourceToDelete(resource);
+    setDeleteDialogOpen(true);
+  }, []);
+
+  const handleDeleteConfirm = useCallback(() => {
+    if (resourceToDelete) {
+      deleteMutation.mutate({ id: resourceToDelete.id });
+    }
+  }, [resourceToDelete, deleteMutation]);
+
+  const handleDeleteCancel = useCallback(() => {
+    setDeleteDialogOpen(false);
+    setResourceToDelete(null);
+  }, []);
+
+  // Bulk delete handlers - Requirement 11.11
+  const handleBulkDeleteClick = useCallback(() => {
+    setBulkDeleteDialogOpen(true);
+  }, []);
+
+  const handleBulkDeleteConfirm = useCallback(() => {
+    bulkDeleteMutation.mutate(Array.from(selectedIds));
+  }, [bulkDeleteMutation, selectedIds]);
+
+  const handleBulkDeleteCancel = useCallback(() => {
+    setBulkDeleteDialogOpen(false);
+  }, []);
+
+  // Export handlers - Requirement 11.12
+  const handleToggleExportDropdown = useCallback(() => {
+    setShowExportDropdown((prev) => !prev);
+  }, []);
+
+  const handleExportSelected = useCallback((format: ExportFormat) => {
+    if (!schema || !resourcesData) return;
+    
+    // Get selected records
+    const selectedRecords = resourcesData.data.filter((r) => selectedIds.has(r.id));
+    if (selectedRecords.length === 0) return;
+    
+    const timestamp = new Date().toISOString().slice(0, 10);
+    const filename = `${collectionName}-export-${timestamp}`;
+    
+    if (format === 'csv') {
+      const csv = recordsToCSV(selectedRecords, visibleFields, visibleColumns.has('id'));
+      downloadFile(csv, `${filename}.csv`, 'text/csv;charset=utf-8');
+      showToast(t('resources.exportSuccess', { count: selectedRecords.length, format: 'CSV' }), 'success');
+    } else {
+      const json = recordsToJSON(selectedRecords);
+      downloadFile(json, `${filename}.json`, 'application/json');
+      showToast(t('resources.exportSuccess', { count: selectedRecords.length, format: 'JSON' }), 'success');
+    }
+    
+    setShowExportDropdown(false);
+  }, [schema, resourcesData, selectedIds, collectionName, visibleFields, visibleColumns, showToast, t]);
+
+  const handleExportAll = useCallback((format: ExportFormat) => {
+    if (!schema || !resourcesData) return;
+    
+    const records = resourcesData.data;
+    if (records.length === 0) return;
+    
+    const timestamp = new Date().toISOString().slice(0, 10);
+    const filename = `${collectionName}-export-${timestamp}`;
+    
+    if (format === 'csv') {
+      const csv = recordsToCSV(records, visibleFields, visibleColumns.has('id'));
+      downloadFile(csv, `${filename}.csv`, 'text/csv;charset=utf-8');
+      showToast(t('resources.exportSuccess', { count: records.length, format: 'CSV' }), 'success');
+    } else {
+      const json = recordsToJSON(records);
+      downloadFile(json, `${filename}.json`, 'application/json');
+      showToast(t('resources.exportSuccess', { count: records.length, format: 'JSON' }), 'success');
+    }
+    
+    setShowExportDropdown(false);
+  }, [schema, resourcesData, collectionName, visibleFields, visibleColumns, showToast, t]);
+
+  // Close export dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (exportDropdownRef.current && !exportDropdownRef.current.contains(event.target as Node)) {
+        setShowExportDropdown(false);
+      }
+    };
+    
+    if (showExportDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showExportDropdown]);
+
+  // Get sort indicator
+  const getSortIndicator = useCallback((field: string) => {
+    if (sort?.field !== field) return null;
+    return sort.direction === 'asc' ? ' ↑' : ' ↓';
+  }, [sort]);
+
+  // Get aria-sort value
+  const getAriaSort = useCallback((field: string): 'ascending' | 'descending' | 'none' => {
+    if (sort?.field !== field) return 'none';
+    return sort.direction === 'asc' ? 'ascending' : 'descending';
+  }, [sort]);
+
+  // Format cell value based on field type
+  const formatCellValue = useCallback((value: unknown, field: FieldDefinition): string => {
+    if (value === null || value === undefined) return '-';
+    
+    switch (field.type) {
+      case 'boolean':
+        return value ? t('common.yes') : t('common.no');
+      case 'date':
+        return formatDate(new Date(value as string), { year: 'numeric', month: 'short', day: 'numeric' });
+      case 'datetime':
+        return formatDate(new Date(value as string), { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+      case 'json':
+        return typeof value === 'object' ? JSON.stringify(value) : String(value);
+      default:
+        return String(value);
+    }
+  }, [t, formatDate]);
+
+  // Loading state
+  if (schemaLoading) {
+    return (
+      <div className={styles.container} data-testid={testId}>
+        <div className={styles.loadingContainer}>
+          <LoadingSpinner size="large" label={t('common.loading')} />
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (schemaError) {
+    return (
+      <div className={styles.container} data-testid={testId}>
+        <ErrorMessage
+          error={schemaError instanceof Error ? schemaError : new Error(t('errors.generic'))}
+          onRetry={() => queryClient.invalidateQueries({ queryKey: ['collection-schema', collectionName] })}
+        />
+      </div>
+    );
+  }
+
+  if (!schema) {
+    return (
+      <div className={styles.container} data-testid={testId}>
+        <ErrorMessage error={new Error(t('errors.notFound'))} />
+      </div>
+    );
+  }
+
+  const resources = resourcesData?.data ?? [];
+  const totalCount = resourcesData?.total ?? 0;
+
+  return (
+    <div className={styles.container} data-testid={testId}>
+      {/* Page Header */}
+      <header className={styles.header}>
+        <div className={styles.headerLeft}>
+          <nav className={styles.breadcrumb} aria-label="Breadcrumb">
+            <Link to="/resources" className={styles.breadcrumbLink}>
+              {t('resources.title')}
+            </Link>
+            <span className={styles.breadcrumbSeparator} aria-hidden="true">/</span>
+            <span>{schema.displayName}</span>
+          </nav>
+          <h1 className={styles.title}>{schema.displayName}</h1>
+        </div>
+        <div className={styles.headerActions}>
+          <button
+            type="button"
+            className={styles.createButton}
+            onClick={handleCreate}
+            aria-label={t('resources.createRecord')}
+            data-testid="create-record-button"
+          >
+            {t('resources.createRecord')}
+          </button>
+        </div>
+      </header>
+
+      {/* Toolbar */}
+      <div className={styles.toolbar}>
+        <div className={styles.toolbarLeft}>
+          {/* Bulk Actions - Requirement 11.11, 11.12 */}
+          {selectedIds.size > 0 && (
+            <div className={styles.bulkActions} data-testid="bulk-actions">
+              <span className={styles.selectedCount}>
+                {selectedIds.size} {t('common.selected')}
+              </span>
+              
+              {/* Export Dropdown - Requirement 11.12 */}
+              <div className={styles.exportDropdownContainer} ref={exportDropdownRef}>
+                <button
+                  type="button"
+                  className={styles.bulkButton}
+                  onClick={handleToggleExportDropdown}
+                  aria-expanded={showExportDropdown}
+                  aria-haspopup="menu"
+                  aria-label={t('resources.exportSelected')}
+                  data-testid="export-button"
+                >
+                  {t('resources.exportSelected')}
+                </button>
+                {showExportDropdown && (
+                  <div
+                    className={styles.exportDropdown}
+                    role="menu"
+                    aria-label={t('resources.exportOptions')}
+                    data-testid="export-dropdown"
+                  >
+                    <div className={styles.exportSection}>
+                      <span className={styles.exportSectionLabel}>{t('resources.exportSelectedLabel', { count: selectedIds.size })}</span>
+                      <button
+                        type="button"
+                        className={styles.exportOption}
+                        onClick={() => handleExportSelected('csv')}
+                        role="menuitem"
+                        data-testid="export-selected-csv"
+                      >
+                        {t('resources.exportToCSV')}
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.exportOption}
+                        onClick={() => handleExportSelected('json')}
+                        role="menuitem"
+                        data-testid="export-selected-json"
+                      >
+                        {t('resources.exportToJSON')}
+                      </button>
+                    </div>
+                    <div className={styles.exportDivider} />
+                    <div className={styles.exportSection}>
+                      <span className={styles.exportSectionLabel}>{t('resources.exportAllVisible', { count: resourcesData?.data.length ?? 0 })}</span>
+                      <button
+                        type="button"
+                        className={styles.exportOption}
+                        onClick={() => handleExportAll('csv')}
+                        role="menuitem"
+                        data-testid="export-all-csv"
+                      >
+                        {t('resources.exportToCSV')}
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.exportOption}
+                        onClick={() => handleExportAll('json')}
+                        role="menuitem"
+                        data-testid="export-all-json"
+                      >
+                        {t('resources.exportToJSON')}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              <button
+                type="button"
+                className={`${styles.bulkButton} ${styles.bulkDeleteButton}`}
+                onClick={handleBulkDeleteClick}
+                aria-label={t('resources.bulkDelete')}
+                data-testid="bulk-delete-button"
+              >
+                {t('resources.bulkDelete')}
+              </button>
+            </div>
+          )}
+
+          {/* Filter Toggle - Requirement 11.3 */}
+          <button
+            type="button"
+            className={`${styles.filterToggle} ${showFilters ? styles.filterToggleActive : ''}`}
+            onClick={handleToggleFilters}
+            aria-expanded={showFilters}
+            aria-controls="filter-builder"
+            data-testid="filter-toggle"
+          >
+            {t('common.filter')}
+            {filters.length > 0 && (
+              <span className={styles.filterCount} data-testid="filter-count">
+                {filters.length}
+              </span>
+            )}
+          </button>
+        </div>
+
+        <div className={styles.toolbarRight}>
+          {/* Column Selector */}
+          <div className={styles.columnSelector}>
+            <button
+              type="button"
+              className={styles.columnSelectorButton}
+              onClick={handleToggleColumnSelector}
+              aria-expanded={showColumnSelector}
+              aria-haspopup="listbox"
+              data-testid="column-selector-button"
+            >
+              Columns ({visibleColumns.size})
+            </button>
+            {showColumnSelector && (
+              <div
+                className={styles.columnDropdown}
+                role="listbox"
+                aria-label="Select columns"
+                data-testid="column-dropdown"
+              >
+                <label className={styles.columnOption}>
+                  <input
+                    type="checkbox"
+                    className={styles.columnCheckbox}
+                    checked={visibleColumns.has('id')}
+                    onChange={() => handleToggleColumn('id')}
+                  />
+                  ID
+                </label>
+                {schema.fields.map((field) => (
+                  <label key={field.name} className={styles.columnOption}>
+                    <input
+                      type="checkbox"
+                      className={styles.columnCheckbox}
+                      checked={visibleColumns.has(field.name)}
+                      onChange={() => handleToggleColumn(field.name)}
+                    />
+                    {field.displayName || field.name}
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Filter Builder - Requirements 11.3, 11.4, 11.5 */}
+      {showFilters && (
+        <div
+          id="filter-builder"
+          className={styles.filterBuilder}
+          data-testid="filter-builder"
+        >
+          {pendingFilters.length === 0 ? (
+            <p>{t('common.noResults')}</p>
+          ) : (
+            pendingFilters.map((filter) => (
+              <div key={filter.id} className={styles.filterRow} data-testid={`filter-row-${filter.id}`}>
+                {/* Field Selector */}
+                <select
+                  className={`${styles.filterSelect} ${styles.filterFieldSelect}`}
+                  value={filter.field}
+                  onChange={(e) => handleFilterFieldChange(filter.id, e.target.value)}
+                  aria-label="Filter field"
+                  data-testid={`filter-field-${filter.id}`}
+                >
+                  {schema.fields.map((field) => (
+                    <option key={field.name} value={field.name}>
+                      {field.displayName || field.name}
+                    </option>
+                  ))}
+                </select>
+
+                {/* Operator Selector - Requirement 11.5 */}
+                <select
+                  className={`${styles.filterSelect} ${styles.filterOperatorSelect}`}
+                  value={filter.operator}
+                  onChange={(e) => handleFilterOperatorChange(filter.id, e.target.value as FilterOperator)}
+                  aria-label="Filter operator"
+                  data-testid={`filter-operator-${filter.id}`}
+                >
+                  {FILTER_OPERATORS.map((op) => (
+                    <option key={op.value} value={op.value}>
+                      {op.label}
+                    </option>
+                  ))}
+                </select>
+
+                {/* Value Input */}
+                <input
+                  type="text"
+                  className={`${styles.filterInput} ${styles.filterValueInput}`}
+                  value={filter.value}
+                  onChange={(e) => handleFilterValueChange(filter.id, e.target.value)}
+                  placeholder="Value"
+                  aria-label="Filter value"
+                  data-testid={`filter-value-${filter.id}`}
+                />
+
+                {/* Remove Filter Button */}
+                <button
+                  type="button"
+                  className={styles.removeFilterButton}
+                  onClick={() => handleRemoveFilter(filter.id)}
+                  aria-label="Remove filter"
+                  data-testid={`remove-filter-${filter.id}`}
+                >
+                  ×
+                </button>
+              </div>
+            ))
+          )}
+
+          <div className={styles.filterActions}>
+            <button
+              type="button"
+              className={styles.addFilterButton}
+              onClick={handleAddFilter}
+              data-testid="add-filter-button"
+            >
+              + Add Filter
+            </button>
+            <button
+              type="button"
+              className={styles.applyFilterButton}
+              onClick={handleApplyFilters}
+              data-testid="apply-filters-button"
+            >
+              Apply Filters
+            </button>
+            {(pendingFilters.length > 0 || filters.length > 0) && (
+              <button
+                type="button"
+                className={styles.clearFiltersButton}
+                onClick={handleClearFilters}
+                data-testid="clear-filters-button"
+              >
+                Clear All
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Data Table - Requirement 11.2 */}
+      {resourcesLoading ? (
+        <div className={styles.loadingContainer}>
+          <LoadingSpinner size="medium" label={t('common.loading')} />
+        </div>
+      ) : resourcesError ? (
+        <ErrorMessage
+          error={resourcesError instanceof Error ? resourcesError : new Error(t('errors.generic'))}
+          onRetry={() => refetchResources()}
+        />
+      ) : resources.length === 0 ? (
+        <div className={styles.emptyState} data-testid="empty-state">
+          <p>{t('common.noResults')}</p>
+        </div>
+      ) : (
+        <>
+          <div className={styles.tableContainer}>
+            <table
+              className={styles.table}
+              role="grid"
+              aria-label={`${schema.displayName} records`}
+              data-testid="resources-table"
+            >
+              <thead>
+                <tr role="row">
+                  {/* Select All Checkbox - Requirement 11.11 */}
+                  <th role="columnheader" className={styles.checkboxCell}>
+                    <input
+                      type="checkbox"
+                      className={styles.rowCheckbox}
+                      checked={allSelected}
+                      onChange={handleSelectAll}
+                      aria-label={allSelected ? t('common.deselectAll') : t('common.selectAll')}
+                      data-testid="select-all-checkbox"
+                    />
+                  </th>
+
+                  {/* ID Column */}
+                  {visibleColumns.has('id') && (
+                    <th
+                      role="columnheader"
+                      scope="col"
+                      className={styles.sortableHeader}
+                      onClick={() => handleSortChange('id')}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          handleSortChange('id');
+                        }
+                      }}
+                      tabIndex={0}
+                      aria-sort={getAriaSort('id')}
+                      data-testid="header-id"
+                    >
+                      ID
+                      <span className={styles.sortIndicator} aria-hidden="true">
+                        {getSortIndicator('id')}
+                      </span>
+                    </th>
+                  )}
+
+                  {/* Field Columns */}
+                  {visibleFields.map((field) => (
+                    <th
+                      key={field.name}
+                      role="columnheader"
+                      scope="col"
+                      className={styles.sortableHeader}
+                      onClick={() => handleSortChange(field.name)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          handleSortChange(field.name);
+                        }
+                      }}
+                      tabIndex={0}
+                      aria-sort={getAriaSort(field.name)}
+                      data-testid={`header-${field.name}`}
+                    >
+                      {field.displayName || field.name}
+                      <span className={styles.sortIndicator} aria-hidden="true">
+                        {getSortIndicator(field.name)}
+                      </span>
+                    </th>
+                  ))}
+
+                  {/* Actions Column */}
+                  <th role="columnheader" scope="col">
+                    {t('common.actions')}
+                  </th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {resources.map((resource, index) => {
+                  const isSelected = selectedIds.has(resource.id);
+                  return (
+                    <tr
+                      key={resource.id}
+                      role="row"
+                      className={`${styles.tableRow} ${isSelected ? styles.tableRowSelected : ''}`}
+                      onClick={() => handleView(resource)}
+                      data-testid={`resource-row-${index}`}
+                    >
+                      {/* Row Checkbox - Requirement 11.11 */}
+                      <td
+                        role="gridcell"
+                        className={styles.checkboxCell}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <input
+                          type="checkbox"
+                          className={styles.rowCheckbox}
+                          checked={isSelected}
+                          onChange={() => handleSelectRow(resource.id)}
+                          aria-label={`Select row ${index + 1}`}
+                          data-testid={`row-checkbox-${index}`}
+                        />
+                      </td>
+
+                      {/* ID Cell */}
+                      {visibleColumns.has('id') && (
+                        <td role="gridcell" data-testid={`cell-id-${index}`}>
+                          {resource.id}
+                        </td>
+                      )}
+
+                      {/* Field Cells */}
+                      {visibleFields.map((field) => (
+                        <td
+                          key={field.name}
+                          role="gridcell"
+                          data-testid={`cell-${field.name}-${index}`}
+                        >
+                          {formatCellValue(resource[field.name], field)}
+                        </td>
+                      ))}
+
+                      {/* Actions Cell */}
+                      <td role="gridcell" className={styles.actionsCell}>
+                        <div
+                          className={styles.actions}
+                          onClick={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => e.stopPropagation()}
+                        >
+                          <button
+                            type="button"
+                            className={styles.actionButton}
+                            onClick={() => handleEdit(resource)}
+                            aria-label={`${t('common.edit')} ${resource.id}`}
+                            data-testid={`edit-button-${index}`}
+                          >
+                            {t('common.edit')}
+                          </button>
+                          <button
+                            type="button"
+                            className={`${styles.actionButton} ${styles.deleteButton}`}
+                            onClick={() => handleDeleteClick(resource)}
+                            aria-label={`${t('common.delete')} ${resource.id}`}
+                            data-testid={`delete-button-${index}`}
+                          >
+                            {t('common.delete')}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination - Requirement 11.2 */}
+          <nav
+            className={styles.pagination}
+            role="navigation"
+            aria-label="Table pagination"
+            data-testid="pagination"
+          >
+            <div className={styles.paginationLeft}>
+              <label className={styles.pageSizeLabel} htmlFor="page-size-select">
+                Rows per page:
+              </label>
+              <select
+                id="page-size-select"
+                className={styles.pageSizeSelect}
+                value={pageSize}
+                onChange={handlePageSizeChange}
+                data-testid="page-size-select"
+              >
+                {PAGE_SIZE_OPTIONS.map((size) => (
+                  <option key={size} value={size}>
+                    {size}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className={styles.paginationCenter}>
+              <button
+                type="button"
+                className={styles.paginationButton}
+                disabled={page <= 1}
+                onClick={() => handlePageChange(page - 1)}
+                aria-label={t('common.previous')}
+                data-testid="prev-page-button"
+              >
+                {t('common.previous')}
+              </button>
+              <span className={styles.paginationInfo} aria-live="polite">
+                Page {page} of {totalPages || 1}
+              </span>
+              <button
+                type="button"
+                className={styles.paginationButton}
+                disabled={page >= totalPages}
+                onClick={() => handlePageChange(page + 1)}
+                aria-label={t('common.next')}
+                data-testid="next-page-button"
+              >
+                {t('common.next')}
+              </button>
+            </div>
+
+            <div className={styles.paginationRight} data-testid="total-count">
+              {totalCount} total records
+            </div>
+          </nav>
+        </>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        title={t('resources.deleteRecord')}
+        message={t('resources.confirmDelete', { count: 1 })}
+        confirmLabel={t('common.delete')}
+        cancelLabel={t('common.cancel')}
+        onConfirm={handleDeleteConfirm}
+        onCancel={handleDeleteCancel}
+        variant="danger"
+      />
+
+      {/* Bulk Delete Confirmation Dialog - Requirement 11.11 */}
+      <ConfirmDialog
+        open={bulkDeleteDialogOpen}
+        title={t('resources.bulkDelete')}
+        message={t('resources.confirmBulkDelete', { count: selectedIds.size })}
+        confirmLabel={t('common.delete')}
+        cancelLabel={t('common.cancel')}
+        onConfirm={handleBulkDeleteConfirm}
+        onCancel={handleBulkDeleteCancel}
+        variant="danger"
+      />
+    </div>
+  );
+}
+
+export default ResourceListPage;

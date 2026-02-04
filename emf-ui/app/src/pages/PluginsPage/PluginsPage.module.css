@@ -1,0 +1,526 @@
+/**
+ * PluginsPage Styles
+ *
+ * Styles for the plugin configuration page including:
+ * - Page layout and header
+ * - Plugin list/cards
+ * - Plugin details panel
+ * - Settings interface
+ * - Status indicators
+ *
+ * Uses CSS custom properties for theming support.
+ * Supports responsive design for mobile, tablet, and desktop.
+ */
+
+/* Container */
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg, 1.5rem);
+  padding: var(--spacing-lg, 1.5rem);
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* Loading Container */
+.loadingContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+}
+
+/* Page Header */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-md, 1rem);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--font-size-2xl, 1.5rem);
+  font-weight: var(--font-weight-semibold, 600);
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+.headerInfo {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md, 1rem);
+  font-size: var(--font-size-sm, 0.875rem);
+  color: var(--color-text-secondary, #666666);
+}
+
+/* Plugin Grid */
+.pluginGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: var(--spacing-lg, 1.5rem);
+}
+
+/* Plugin Card */
+.pluginCard {
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-surface-primary, #ffffff);
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: var(--border-radius-lg, 0.5rem);
+  overflow: hidden;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.pluginCard:hover {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.pluginCard.selected {
+  border-color: var(--color-primary, #0066cc);
+  box-shadow: 0 0 0 2px var(--color-focus-ring-alpha, rgba(0, 102, 204, 0.2));
+}
+
+.pluginCardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: var(--spacing-md, 1rem);
+  border-bottom: 1px solid var(--color-border-light, #e5e7eb);
+}
+
+.pluginInfo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs, 0.25rem);
+  flex: 1;
+  min-width: 0;
+}
+
+.pluginName {
+  margin: 0;
+  font-size: var(--font-size-md, 1rem);
+  font-weight: var(--font-weight-semibold, 600);
+  color: var(--color-text-primary, #1a1a1a);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pluginVersion {
+  font-size: var(--font-size-xs, 0.75rem);
+  color: var(--color-text-secondary, #666666);
+}
+
+.pluginCardBody {
+  padding: var(--spacing-md, 1rem);
+  flex: 1;
+}
+
+.pluginDescription {
+  margin: 0;
+  font-size: var(--font-size-sm, 0.875rem);
+  color: var(--color-text-secondary, #666666);
+  line-height: 1.5;
+}
+
+.pluginCardFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-md, 1rem);
+  border-top: 1px solid var(--color-border-light, #e5e7eb);
+  background-color: var(--color-surface-secondary, #f5f5f5);
+}
+
+/* Status Badge */
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs, 0.25rem);
+  padding: var(--spacing-xs, 0.25rem) var(--spacing-sm, 0.5rem);
+  font-size: var(--font-size-xs, 0.75rem);
+  font-weight: var(--font-weight-medium, 500);
+  border-radius: var(--border-radius-full, 9999px);
+}
+
+.statusBadge.loaded {
+  color: var(--color-success-text, #166534);
+  background-color: var(--color-success-bg, #dcfce7);
+}
+
+.statusBadge.loading {
+  color: var(--color-warning-text, #854d0e);
+  background-color: var(--color-warning-bg, #fef9c3);
+}
+
+.statusBadge.error {
+  color: var(--color-error-text, #dc2626);
+  background-color: var(--color-error-bg, #fee2e2);
+}
+
+.statusBadge.pending {
+  color: var(--color-text-secondary, #666666);
+  background-color: var(--color-surface-secondary, #f5f5f5);
+}
+
+.statusBadge.disabled {
+  color: var(--color-text-secondary, #666666);
+  background-color: var(--color-surface-secondary, #f5f5f5);
+}
+
+.statusDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: currentColor;
+}
+
+/* Toggle Switch */
+.toggleContainer {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm, 0.5rem);
+}
+
+.toggleLabel {
+  font-size: var(--font-size-sm, 0.875rem);
+  color: var(--color-text-secondary, #666666);
+}
+
+.toggle {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  background-color: var(--color-border, #d1d5db);
+  border-radius: var(--border-radius-full, 9999px);
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  border: none;
+  padding: 0;
+}
+
+.toggle:focus {
+  outline: 2px solid var(--color-focus-ring, #0066cc);
+  outline-offset: 2px;
+}
+
+.toggle.enabled {
+  background-color: var(--color-primary, #0066cc);
+}
+
+.toggle.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.toggleKnob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  background-color: var(--color-surface-primary, #ffffff);
+  border-radius: 50%;
+  transition: transform 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.toggle.enabled .toggleKnob {
+  transform: translateX(20px);
+}
+
+/* Plugin Actions */
+.pluginActions {
+  display: flex;
+  gap: var(--spacing-sm, 0.5rem);
+}
+
+.actionButton {
+  padding: var(--spacing-xs, 0.25rem) var(--spacing-sm, 0.5rem);
+  font-size: var(--font-size-xs, 0.75rem);
+  font-weight: var(--font-weight-medium, 500);
+  color: var(--color-text-primary, #1a1a1a);
+  background-color: var(--color-surface-primary, #ffffff);
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: var(--border-radius-sm, 0.25rem);
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.actionButton:hover {
+  background-color: var(--color-surface-hover, #f9fafb);
+  border-color: var(--color-border-hover, #9ca3af);
+}
+
+.actionButton:focus {
+  outline: 2px solid var(--color-focus-ring, #0066cc);
+  outline-offset: 2px;
+}
+
+.actionButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Empty State */
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-2xl, 3rem);
+  text-align: center;
+  color: var(--color-text-secondary, #666666);
+  background-color: var(--color-surface-secondary, #f5f5f5);
+  border-radius: var(--border-radius-md, 0.375rem);
+}
+
+.emptyState p {
+  margin: 0;
+  font-size: var(--font-size-md, 1rem);
+}
+
+/* Error List */
+.errorList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm, 0.5rem);
+  margin-top: var(--spacing-md, 1rem);
+  padding: var(--spacing-md, 1rem);
+  background-color: var(--color-error-bg, #fee2e2);
+  border-radius: var(--border-radius-md, 0.375rem);
+}
+
+.errorItem {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs, 0.25rem);
+}
+
+.errorPluginId {
+  font-size: var(--font-size-sm, 0.875rem);
+  font-weight: var(--font-weight-medium, 500);
+  color: var(--color-error-text, #dc2626);
+}
+
+.errorMessage {
+  font-size: var(--font-size-xs, 0.75rem);
+  color: var(--color-text-secondary, #666666);
+}
+
+/* Plugin Details Panel */
+.detailsPanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md, 1rem);
+  padding: var(--spacing-lg, 1.5rem);
+  background-color: var(--color-surface-primary, #ffffff);
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: var(--border-radius-lg, 0.5rem);
+}
+
+.detailsHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding-bottom: var(--spacing-md, 1rem);
+  border-bottom: 1px solid var(--color-border-light, #e5e7eb);
+}
+
+.detailsTitle {
+  margin: 0;
+  font-size: var(--font-size-lg, 1.125rem);
+  font-weight: var(--font-weight-semibold, 600);
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+.closeButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  font-size: var(--font-size-xl, 1.25rem);
+  color: var(--color-text-secondary, #666666);
+  background: none;
+  border: none;
+  border-radius: var(--border-radius-sm, 0.25rem);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.closeButton:hover {
+  background-color: var(--color-surface-hover, #f9fafb);
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+.closeButton:focus {
+  outline: 2px solid var(--color-focus-ring, #0066cc);
+  outline-offset: 2px;
+}
+
+/* Details Section */
+.detailsSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm, 0.5rem);
+}
+
+.detailsSectionTitle {
+  margin: 0;
+  font-size: var(--font-size-sm, 0.875rem);
+  font-weight: var(--font-weight-semibold, 600);
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+.detailsRow {
+  display: flex;
+  gap: var(--spacing-md, 1rem);
+}
+
+.detailsLabel {
+  font-size: var(--font-size-sm, 0.875rem);
+  font-weight: var(--font-weight-medium, 500);
+  color: var(--color-text-secondary, #666666);
+  min-width: 120px;
+}
+
+.detailsValue {
+  font-size: var(--font-size-sm, 0.875rem);
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+/* Registered Components List */
+.componentsList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs, 0.25rem);
+}
+
+.componentTag {
+  display: inline-flex;
+  padding: var(--spacing-xs, 0.25rem) var(--spacing-sm, 0.5rem);
+  font-size: var(--font-size-xs, 0.75rem);
+  color: var(--color-primary, #0066cc);
+  background-color: var(--color-primary-bg, #e0f2fe);
+  border-radius: var(--border-radius-sm, 0.25rem);
+}
+
+/* Settings Panel */
+.settingsPanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md, 1rem);
+  padding: var(--spacing-md, 1rem);
+  background-color: var(--color-surface-secondary, #f5f5f5);
+  border-radius: var(--border-radius-md, 0.375rem);
+}
+
+.settingsTitle {
+  margin: 0;
+  font-size: var(--font-size-sm, 0.875rem);
+  font-weight: var(--font-weight-semibold, 600);
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+.settingsContent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm, 0.5rem);
+}
+
+.noSettings {
+  font-size: var(--font-size-sm, 0.875rem);
+  color: var(--color-text-secondary, #666666);
+  font-style: italic;
+}
+
+/* Responsive Design */
+
+/* Tablet (768px - 1023px) */
+@media (max-width: 1023px) {
+  .container {
+    padding: var(--spacing-md, 1rem);
+  }
+
+  .pluginGrid {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  }
+}
+
+/* Mobile (below 768px) */
+@media (max-width: 767px) {
+  .container {
+    padding: var(--spacing-sm, 0.5rem);
+    gap: var(--spacing-md, 1rem);
+  }
+
+  .header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .title {
+    font-size: var(--font-size-xl, 1.25rem);
+  }
+
+  .pluginGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .pluginCardFooter {
+    flex-direction: column;
+    gap: var(--spacing-sm, 0.5rem);
+    align-items: stretch;
+  }
+
+  .toggleContainer {
+    justify-content: space-between;
+  }
+
+  .pluginActions {
+    justify-content: flex-end;
+  }
+
+  .detailsRow {
+    flex-direction: column;
+    gap: var(--spacing-xs, 0.25rem);
+  }
+
+  .detailsLabel {
+    min-width: auto;
+  }
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .pluginCard,
+  .toggle,
+  .toggleKnob,
+  .actionButton,
+  .closeButton {
+    transition: none;
+  }
+}
+
+/* Dark Theme Support */
+[data-theme='dark'] .container {
+  --color-text-primary: #f9fafb;
+  --color-text-secondary: #d1d5db;
+  --color-surface-primary: #1f2937;
+  --color-surface-secondary: #111827;
+  --color-surface-hover: #374151;
+  --color-border: #374151;
+  --color-border-light: #4b5563;
+  --color-border-hover: #6b7280;
+  --color-success-text: #86efac;
+  --color-success-bg: #14532d;
+  --color-warning-text: #fde047;
+  --color-warning-bg: #713f12;
+  --color-error-text: #fca5a5;
+  --color-error-bg: #450a0a;
+  --color-primary-bg: #1e3a5f;
+}

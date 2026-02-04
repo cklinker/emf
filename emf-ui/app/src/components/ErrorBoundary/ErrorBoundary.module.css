@@ -1,0 +1,417 @@
+/**
+ * ErrorBoundary Component Styles
+ *
+ * CSS Module for the error boundary fallback UI.
+ * Provides a user-friendly error display with recovery options.
+ *
+ * Requirements:
+ * - 18.7: Global error boundary with fallback UI
+ * - 18.8: User-friendly error page with recovery options
+ * - 14.4: Maintain sufficient color contrast ratios
+ * - 14.6: Provide visible focus indicators
+ * - 17.1-17.3: Responsive design for all screen sizes
+ */
+
+/* ==========================================================================
+   Error Container
+   ========================================================================== */
+
+.errorContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: var(--spacing-xl, 32px);
+  background-color: var(--color-background, #f5f5f5);
+  color: var(--color-text, #1a1a1a);
+}
+
+/* ==========================================================================
+   Error Content
+   ========================================================================== */
+
+.errorContent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 600px;
+  width: 100%;
+  padding: var(--spacing-xl, 32px);
+  background-color: var(--color-surface, #ffffff);
+  border-radius: var(--border-radius-lg, 8px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+/* ==========================================================================
+   Error Icon
+   ========================================================================== */
+
+.errorIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 80px;
+  height: 80px;
+  margin-bottom: var(--spacing-lg, 24px);
+  border-radius: 50%;
+  background-color: var(--color-error-light, #fef2f2);
+  color: var(--color-error, #dc2626);
+}
+
+.errorIconSvg {
+  width: 48px;
+  height: 48px;
+}
+
+/* ==========================================================================
+   Error Title
+   ========================================================================== */
+
+.errorTitle {
+  margin: 0 0 var(--spacing-md, 16px) 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--color-text, #1a1a1a);
+  line-height: 1.3;
+}
+
+/* ==========================================================================
+   Error Message
+   ========================================================================== */
+
+.errorMessage {
+  margin: 0 0 var(--spacing-lg, 24px) 0;
+  font-size: 1rem;
+  color: var(--color-text-secondary, #666666);
+  line-height: 1.5;
+}
+
+/* ==========================================================================
+   Stack Trace (Development Only)
+   ========================================================================== */
+
+.stackTraceContainer {
+  width: 100%;
+  margin-bottom: var(--spacing-lg, 24px);
+  text-align: left;
+}
+
+.stackTraceSummary {
+  padding: var(--spacing-sm, 8px) var(--spacing-md, 16px);
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text-secondary, #666666);
+  background-color: var(--color-surface-secondary, #f9fafb);
+  border-radius: var(--border-radius, 4px);
+  cursor: pointer;
+  transition: background-color 150ms ease-in-out;
+}
+
+.stackTraceSummary:hover {
+  background-color: var(--color-surface-hover, #f3f4f6);
+}
+
+.stackTraceSummary:focus {
+  outline: 2px solid var(--color-focus, #0066cc);
+  outline-offset: 2px;
+}
+
+.stackTraceSummary:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.stackTrace {
+  margin: var(--spacing-sm, 8px) 0 0 0;
+  padding: var(--spacing-md, 16px);
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--color-text, #1a1a1a);
+  background-color: var(--color-surface-secondary, #f9fafb);
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: var(--border-radius, 4px);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+/* ==========================================================================
+   Error Actions
+   ========================================================================== */
+
+.errorActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm, 8px);
+  justify-content: center;
+  margin-bottom: var(--spacing-lg, 24px);
+}
+
+/* ==========================================================================
+   Buttons
+   ========================================================================== */
+
+.primaryButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-sm, 8px) var(--spacing-lg, 24px);
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text-inverse, #ffffff);
+  background-color: var(--color-primary, #0066cc);
+  border: none;
+  border-radius: var(--border-radius, 4px);
+  cursor: pointer;
+  transition: background-color 150ms ease-in-out,
+              transform 150ms ease-in-out;
+  min-height: 40px;
+}
+
+.primaryButton:hover {
+  background-color: var(--color-primary-hover, #0052a3);
+}
+
+.primaryButton:focus {
+  outline: 2px solid var(--color-focus, #0066cc);
+  outline-offset: 2px;
+}
+
+.primaryButton:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.primaryButton:active {
+  transform: scale(0.98);
+}
+
+.secondaryButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-sm, 8px) var(--spacing-lg, 24px);
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text, #1a1a1a);
+  background-color: transparent;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: var(--border-radius, 4px);
+  cursor: pointer;
+  transition: background-color 150ms ease-in-out,
+              border-color 150ms ease-in-out,
+              transform 150ms ease-in-out;
+  min-height: 40px;
+}
+
+.secondaryButton:hover {
+  background-color: var(--color-surface-hover, #f3f4f6);
+  border-color: var(--color-border-hover, #d1d5db);
+}
+
+.secondaryButton:focus {
+  outline: 2px solid var(--color-focus, #0066cc);
+  outline-offset: 2px;
+}
+
+.secondaryButton:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.secondaryButton:active {
+  transform: scale(0.98);
+}
+
+/* ==========================================================================
+   Help Text
+   ========================================================================== */
+
+.helpText {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--color-text-tertiary, #9ca3af);
+}
+
+/* ==========================================================================
+   Responsive Styles - Mobile
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  .errorContainer {
+    padding: var(--spacing-md, 16px);
+  }
+
+  .errorContent {
+    padding: var(--spacing-lg, 24px) var(--spacing-md, 16px);
+  }
+
+  .errorIcon {
+    width: 64px;
+    height: 64px;
+    margin-bottom: var(--spacing-md, 16px);
+  }
+
+  .errorIconSvg {
+    width: 36px;
+    height: 36px;
+  }
+
+  .errorTitle {
+    font-size: 1.25rem;
+  }
+
+  .errorMessage {
+    font-size: 0.875rem;
+  }
+
+  .errorActions {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .primaryButton,
+  .secondaryButton {
+    width: 100%;
+  }
+
+  .stackTrace {
+    font-size: 0.625rem;
+    max-height: 200px;
+  }
+}
+
+/* ==========================================================================
+   Responsive Styles - Tablet
+   ========================================================================== */
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .errorContent {
+    max-width: 500px;
+  }
+}
+
+/* ==========================================================================
+   Dark Theme Support
+   ========================================================================== */
+
+[data-theme='dark'] .errorContainer {
+  background-color: var(--color-background-dark, #111827);
+}
+
+[data-theme='dark'] .errorContent {
+  background-color: var(--color-surface-dark, #1f2937);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme='dark'] .errorIcon {
+  background-color: var(--color-error-dark-light, #450a0a);
+  color: var(--color-error-dark, #f87171);
+}
+
+[data-theme='dark'] .errorTitle {
+  color: var(--color-text-dark, #f9fafb);
+}
+
+[data-theme='dark'] .errorMessage {
+  color: var(--color-text-secondary-dark, #9ca3af);
+}
+
+[data-theme='dark'] .stackTraceSummary {
+  background-color: var(--color-surface-secondary-dark, #374151);
+  color: var(--color-text-secondary-dark, #9ca3af);
+}
+
+[data-theme='dark'] .stackTraceSummary:hover {
+  background-color: var(--color-surface-hover-dark, #4b5563);
+}
+
+[data-theme='dark'] .stackTrace {
+  background-color: var(--color-surface-secondary-dark, #374151);
+  border-color: var(--color-border-dark, #4b5563);
+  color: var(--color-text-dark, #f9fafb);
+}
+
+[data-theme='dark'] .secondaryButton {
+  color: var(--color-text-dark, #f9fafb);
+  border-color: var(--color-border-dark, #4b5563);
+}
+
+[data-theme='dark'] .secondaryButton:hover {
+  background-color: var(--color-surface-hover-dark, #374151);
+  border-color: var(--color-border-hover-dark, #6b7280);
+}
+
+[data-theme='dark'] .helpText {
+  color: var(--color-text-tertiary-dark, #6b7280);
+}
+
+/* ==========================================================================
+   Reduced Motion Support
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .primaryButton,
+  .secondaryButton,
+  .stackTraceSummary {
+    transition: none;
+  }
+
+  .primaryButton:active,
+  .secondaryButton:active {
+    transform: none;
+  }
+}
+
+/* ==========================================================================
+   High Contrast Mode Support
+   ========================================================================== */
+
+@media (forced-colors: active) {
+  .errorContent {
+    border: 2px solid currentColor;
+  }
+
+  .errorIcon {
+    border: 2px solid currentColor;
+  }
+
+  .primaryButton {
+    border: 2px solid currentColor;
+  }
+
+  .secondaryButton {
+    border: 2px solid currentColor;
+  }
+
+  .stackTrace {
+    border: 2px solid currentColor;
+  }
+}
+
+/* ==========================================================================
+   Print Styles
+   ========================================================================== */
+
+@media print {
+  .errorContainer {
+    min-height: auto;
+    padding: 0;
+    background: none;
+  }
+
+  .errorContent {
+    box-shadow: none;
+    border: 1px solid #000;
+  }
+
+  .errorActions {
+    display: none;
+  }
+
+  .stackTraceContainer {
+    display: none;
+  }
+}

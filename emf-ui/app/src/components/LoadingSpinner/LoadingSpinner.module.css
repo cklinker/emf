@@ -1,0 +1,163 @@
+/**
+ * LoadingSpinner Styles
+ *
+ * Provides styling for the loading spinner component with support for:
+ * - Multiple size variants (small, medium, large)
+ * - Smooth rotation animation
+ * - Reduced motion preferences (static indicator)
+ * - Theme support via CSS custom properties
+ * - Accessibility (visible focus, high contrast mode)
+ */
+
+/* Container - centers spinner and optional label */
+.container {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+/* Spinner wrapper */
+.spinner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Size variants */
+.small {
+  width: 16px;
+  height: 16px;
+}
+
+.medium {
+  width: 24px;
+  height: 24px;
+}
+
+.large {
+  width: 48px;
+  height: 48px;
+}
+
+/* SVG element */
+.svg {
+  width: 100%;
+  height: 100%;
+  animation: spin 1s linear infinite;
+}
+
+/* Track circle (background) */
+.track {
+  stroke: var(--spinner-track-color, rgba(0, 0, 0, 0.1));
+  fill: none;
+}
+
+/* Animated arc */
+.arc {
+  stroke: var(--spinner-arc-color, var(--color-primary, #3b82f6));
+  fill: none;
+  stroke-dasharray: 45, 200;
+  stroke-dashoffset: 0;
+  transform-origin: center;
+}
+
+/* Visible label text */
+.label {
+  font-size: 0.875rem;
+  color: var(--spinner-label-color, var(--color-text-secondary, #6b7280));
+  text-align: center;
+  line-height: 1.4;
+}
+
+/* Screen reader only text */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Spin animation */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Reduced motion preference - show static indicator instead of animation */
+@media (prefers-reduced-motion: reduce) {
+  .svg {
+    animation: none;
+  }
+
+  /* Show a pulsing opacity effect instead of rotation */
+  .arc {
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.4;
+    }
+  }
+}
+
+/* Dark mode support via CSS custom properties */
+@media (prefers-color-scheme: dark) {
+  .track {
+    stroke: var(--spinner-track-color-dark, rgba(255, 255, 255, 0.1));
+  }
+
+  .arc {
+    stroke: var(--spinner-arc-color-dark, var(--color-primary-dark, #60a5fa));
+  }
+
+  .label {
+    color: var(--spinner-label-color-dark, var(--color-text-secondary-dark, #9ca3af));
+  }
+}
+
+/* High contrast mode support */
+@media (forced-colors: active) {
+  .track {
+    stroke: GrayText;
+  }
+
+  .arc {
+    stroke: Highlight;
+  }
+
+  .label {
+    color: CanvasText;
+  }
+}
+
+/* Size-specific label adjustments */
+.container:has(.small) .label {
+  font-size: 0.75rem;
+}
+
+.container:has(.large) .label {
+  font-size: 1rem;
+}
+
+/* Fallback for browsers that don't support :has() */
+@supports not selector(:has(*)) {
+  .label {
+    font-size: 0.875rem;
+  }
+}

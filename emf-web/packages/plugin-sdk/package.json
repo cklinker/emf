@@ -1,0 +1,44 @@
+{
+  "name": "@emf/plugin-sdk",
+  "version": "0.0.1",
+  "description": "Plugin development toolkit for EMF",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "vite build",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@emf/sdk": "^0.0.1",
+    "react": "^18.2.0",
+    "react-router-dom": "^6.0.0"
+  },
+  "devDependencies": {
+    "react": "^18.2.0",
+    "react-router-dom": "^6.22.2"
+  },
+  "keywords": [
+    "emf",
+    "plugin",
+    "sdk",
+    "extensibility"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/emf/emf-web.git",
+    "directory": "packages/plugin-sdk"
+  }
+}

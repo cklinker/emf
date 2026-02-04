@@ -1,0 +1,50 @@
+{
+  "name": "@emf/components",
+  "version": "0.0.1",
+  "description": "Reusable React component library for EMF",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "vite build",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@emf/sdk": "^0.0.1",
+    "@tanstack/react-query": "^5.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-hook-form": "^7.0.0",
+    "react-router-dom": "^6.0.0"
+  },
+  "devDependencies": {
+    "@tanstack/react-query": "^5.24.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-hook-form": "^7.51.0",
+    "react-router-dom": "^6.22.2"
+  },
+  "keywords": [
+    "emf",
+    "react",
+    "components",
+    "ui"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/emf/emf-web.git",
+    "directory": "packages/components"
+  }
+}

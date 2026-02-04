@@ -1,0 +1,3 @@
+# Property-based tests directory
+# This directory contains property-based tests using JUnit QuickCheck
+# These tests verify universal properties hold across all valid inputs

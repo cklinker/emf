@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160" role="img" aria-label="Enterprise microservice framework icon">
+  <defs>
+    <linearGradient id="g2" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#0f62fe"/>
+      <stop offset="1" stop-color="#00bfa6"/>
+    </linearGradient>
+  </defs>
+
+  <!-- outer rounded square -->
+  <rect x="8" y="8" width="144" height="144" rx="18" fill="#071233" opacity="0.06"/>
+
+  <!-- centre circle -->
+  <circle cx="80" cy="58" r="26" fill="url(#g2)"/>
+
+  <!-- nodes -->
+  <g stroke="#022045" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="#ffffff">
+    <circle cx="80" cy="58" r="9" />
+    <circle cx="44" cy="98" r="7" />
+    <circle cx="116" cy="98" r="7" />
+  </g>
+
+  <!-- connections -->
+  <g fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.9">
+    <path d="M80 67 L52 92" />
+    <path d="M80 67 L108 92" />
+    <path d="M52 92 L108 92" stroke-dasharray="4 5" stroke-opacity="0.75"/>
+  </g>
+
+  <!-- small enterprise gear hint -->
+  <g transform="translate(124,14) rotate(15)">
+    <circle cx="0" cy="0" r="10" fill="#0f62fe" opacity="0.12"/>
+    <path d="M-6 -2 L-10 -2 L-8 -6 L-10 -10 L-6 -8 L-2 -10 L-2 -6 L6 -6 L6 -2 L2 -2 L2 6 L-2 6 L-2 2 L-6 2 Z" fill="#0f62fe" opacity="0.22"/>
+  </g>
+</svg>

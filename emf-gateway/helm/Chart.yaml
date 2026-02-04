@@ -1,0 +1,24 @@
+apiVersion: v2
+name: emf-gateway
+description: A Helm chart for EMF API Gateway - main ingress point with authentication, authorization, and JSON:API processing
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+
+keywords:
+  - emf
+  - gateway
+  - api-gateway
+  - spring-cloud-gateway
+  - authentication
+  - authorization
+
+maintainers:
+  - name: EMF Platform Team
+    email: platform@emf.example.com
+
+home: https://github.com/emf-platform/emf-gateway
+sources:
+  - https://github.com/emf-platform/emf-gateway
+
+dependencies: []

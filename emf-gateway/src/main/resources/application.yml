@@ -1,0 +1,93 @@
+spring:
+  application:
+    name: emf-gateway
+  
+  # Kafka configuration for receiving configuration updates
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: emf-gateway
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: com.emf.gateway.event,com.emf.controlplane.event
+  
+  # Redis configuration for caching and rate limiting
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 2000ms
+      connect-timeout: 2000ms
+      lettuce:
+        pool:
+          min-idle: 5
+          max-idle: 10
+          max-active: 20
+  
+  # Security configuration for JWT validation
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${JWT_ISSUER_URI:http://localhost:9000/realms/emf}
+  
+  # Cloud Gateway configuration
+  cloud:
+    gateway:
+      default-filters:
+        - name: RequestTime
+      httpclient:
+        connect-timeout: 5000
+        response-timeout: 30s
+        pool:
+          max-connections: 500
+          max-idle-time: 30s
+
+# EMF Gateway specific configuration
+emf:
+  gateway:
+    # Control plane connection
+    control-plane:
+      url: ${CONTROL_PLANE_URL:http://localhost:8080}
+      bootstrap-path: /control/bootstrap
+    
+    # Kafka topics for configuration updates
+    kafka:
+      topics:
+        collection-changed: emf.config.collection.changed
+        authz-changed: emf.config.authz.changed
+        service-changed: emf.config.service.changed
+    
+    # Default rate limiting configuration
+    rate-limit:
+      default:
+        requests-per-window: 1000
+        window-duration: PT1M  # 1 minute
+
+# Actuator configuration for health and metrics
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,info
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+  health:
+    redis:
+      enabled: true
+    kafka:
+      enabled: true
+
+# Logging configuration
+logging:
+  level:
+    root: INFO
+    com.emf.gateway: DEBUG
+    org.springframework.cloud.gateway: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"

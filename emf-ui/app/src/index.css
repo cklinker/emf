@@ -1,0 +1,99 @@
+/**
+ * Global Styles for EMF Admin/Builder UI
+ * 
+ * This file contains base styles and CSS custom properties.
+ * Accessibility styles are imported from ./styles/accessibility.css
+ * 
+ * Color Contrast Requirements (WCAG 2.1 AA):
+ * - Normal text: 4.5:1 minimum contrast ratio
+ * - Large text (18pt+ or 14pt+ bold): 3:1 minimum contrast ratio
+ * - UI components: 3:1 minimum contrast ratio
+ */
+
+/* Import accessibility styles */
+@import './styles/accessibility.css';
+
+:root {
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: light dark;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #242424;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  
+  /* Focus indicator variables - used throughout the application */
+  --color-focus: #0066cc;
+  --color-focus-ring: #0066cc;
+  --color-focus-ring-alpha: rgba(0, 102, 204, 0.25);
+}
+
+a {
+  font-weight: 500;
+  color: #646cff;
+  text-decoration: inherit;
+}
+a:hover {
+  color: #535bf2;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  width: 100%;
+}
+
+h1 {
+  font-size: 3.2em;
+  line-height: 1.1;
+}
+
+button {
+  border-radius: 8px;
+  border: 1px solid transparent;
+  padding: 0.6em 1.2em;
+  font-size: 1em;
+  font-weight: 500;
+  font-family: inherit;
+  background-color: #1a1a1a;
+  cursor: pointer;
+  transition: border-color 0.25s, background-color 0.25s;
+}
+button:hover {
+  border-color: #646cff;
+}
+/* 
+ * Focus indicator styles (Requirement 14.6)
+ * Visible focus indicators for keyboard navigation
+ */
+button:focus {
+  outline: 2px solid var(--color-focus, #0066cc);
+  outline-offset: 2px;
+}
+button:focus:not(:focus-visible) {
+  outline: none;
+}
+button:focus-visible {
+  outline: 2px solid var(--color-focus, #0066cc);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--color-focus-ring-alpha, rgba(0, 102, 204, 0.25));
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color: #213547;
+    background-color: #ffffff;
+  }
+  a:hover {
+    color: #747bff;
+  }
+  button {
+    background-color: #f9f9f9;
+  }
+}

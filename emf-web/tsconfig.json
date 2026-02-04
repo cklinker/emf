@@ -1,0 +1,38 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "strictNullChecks": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "@emf/sdk": ["packages/sdk/src"],
+      "@emf/sdk/*": ["packages/sdk/src/*"],
+      "@emf/components": ["packages/components/src"],
+      "@emf/components/*": ["packages/components/src/*"],
+      "@emf/plugin-sdk": ["packages/plugin-sdk/src"],
+      "@emf/plugin-sdk/*": ["packages/plugin-sdk/src/*"]
+    }
+  },
+  "references": [
+    { "path": "./packages/sdk" },
+    { "path": "./packages/components" },
+    { "path": "./packages/plugin-sdk" }
+  ],
+  "include": [],
+  "exclude": ["node_modules", "dist"]
+}

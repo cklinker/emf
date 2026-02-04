@@ -1,0 +1,344 @@
+/**
+ * FieldsPanel Component Styles
+ *
+ * Styles for the fields panel including the sortable list,
+ * drag-and-drop interactions, and field item display.
+ */
+
+/* Container */
+.container {
+  background-color: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #e0e0e0);
+  border-radius: var(--border-radius, 8px);
+  overflow: hidden;
+}
+
+/* Header */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-md, 16px);
+  border-bottom: 1px solid var(--color-border, #e0e0e0);
+  background-color: var(--color-surface-secondary, #f5f5f5);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--font-size-lg, 18px);
+  font-weight: 600;
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+/* Add Button */
+.addButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs, 4px);
+  padding: var(--spacing-sm, 8px) var(--spacing-md, 16px);
+  background-color: var(--color-primary, #0066cc);
+  color: var(--color-text-on-primary, #ffffff);
+  border: none;
+  border-radius: var(--border-radius-sm, 4px);
+  font-size: var(--font-size-sm, 14px);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.addButton:hover {
+  background-color: var(--color-primary-hover, #0052a3);
+}
+
+.addButton:focus {
+  outline: 2px solid var(--color-focus, #0066cc);
+  outline-offset: 2px;
+}
+
+.addIcon {
+  font-size: var(--font-size-md, 16px);
+  font-weight: bold;
+}
+
+/* Loading Container */
+.loadingContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: var(--spacing-xl, 32px);
+  min-height: 200px;
+}
+
+/* Empty State */
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-xl, 32px);
+  text-align: center;
+  min-height: 200px;
+}
+
+.emptyMessage {
+  margin: 0 0 var(--spacing-sm, 8px) 0;
+  font-size: var(--font-size-md, 16px);
+  color: var(--color-text-secondary, #666666);
+}
+
+.emptyHint {
+  margin: 0;
+  font-size: var(--font-size-sm, 14px);
+  color: var(--color-text-tertiary, #999999);
+}
+
+/* Field List */
+.fieldList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Field Item */
+.fieldItem {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm, 8px);
+  padding: var(--spacing-md, 16px);
+  border-bottom: 1px solid var(--color-border, #e0e0e0);
+  background-color: var(--color-surface, #ffffff);
+  cursor: grab;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.fieldItem:last-child {
+  border-bottom: none;
+}
+
+.fieldItem:hover {
+  background-color: var(--color-surface-hover, #f9f9f9);
+}
+
+.fieldItem:focus {
+  outline: 2px solid var(--color-focus, #0066cc);
+  outline-offset: -2px;
+  z-index: 1;
+}
+
+.fieldItem.dragging {
+  opacity: 0.5;
+  background-color: var(--color-surface-secondary, #f5f5f5);
+}
+
+.fieldItem.dragOver {
+  background-color: var(--color-primary-light, #e6f0ff);
+  box-shadow: inset 0 -2px 0 var(--color-primary, #0066cc);
+}
+
+/* Drag Handle */
+.dragHandle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: var(--color-text-tertiary, #999999);
+  cursor: grab;
+  flex-shrink: 0;
+}
+
+.dragHandle:active {
+  cursor: grabbing;
+}
+
+.dragIcon {
+  font-size: var(--font-size-md, 16px);
+  line-height: 1;
+  letter-spacing: -2px;
+}
+
+/* Field Info */
+.fieldInfo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs, 4px);
+}
+
+.fieldMain {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm, 8px);
+}
+
+.fieldTypeIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background-color: var(--color-surface-secondary, #f5f5f5);
+  border-radius: var(--border-radius-sm, 4px);
+  font-size: var(--font-size-sm, 14px);
+  color: var(--color-text-secondary, #666666);
+  flex-shrink: 0;
+}
+
+.fieldName {
+  font-weight: 600;
+  font-size: var(--font-size-md, 16px);
+  color: var(--color-text-primary, #1a1a1a);
+  font-family: var(--font-family-mono, 'Consolas', 'Monaco', monospace);
+}
+
+.fieldDisplayName {
+  font-size: var(--font-size-sm, 14px);
+  color: var(--color-text-secondary, #666666);
+}
+
+/* Field Meta */
+.fieldMeta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm, 8px);
+}
+
+.fieldType {
+  font-size: var(--font-size-sm, 14px);
+  color: var(--color-text-secondary, #666666);
+}
+
+/* Badges */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  font-size: var(--font-size-xs, 12px);
+  font-weight: 500;
+  border-radius: var(--border-radius-sm, 4px);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.requiredBadge {
+  background-color: var(--color-error-light, #ffebee);
+  color: var(--color-error, #d32f2f);
+}
+
+.uniqueBadge {
+  background-color: var(--color-warning-light, #fff8e1);
+  color: var(--color-warning, #f57c00);
+}
+
+.indexedBadge {
+  background-color: var(--color-info-light, #e3f2fd);
+  color: var(--color-info, #1976d2);
+}
+
+.referenceTarget {
+  font-size: var(--font-size-sm, 14px);
+  color: var(--color-primary, #0066cc);
+  font-family: var(--font-family-mono, 'Consolas', 'Monaco', monospace);
+}
+
+/* Field Actions */
+.fieldActions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs, 4px);
+  flex-shrink: 0;
+}
+
+.actionButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background-color: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--border-radius-sm, 4px);
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.actionButton:hover {
+  background-color: var(--color-surface-secondary, #f5f5f5);
+  border-color: var(--color-border, #e0e0e0);
+}
+
+.actionButton:focus {
+  outline: 2px solid var(--color-focus, #0066cc);
+  outline-offset: 2px;
+}
+
+.actionButton span {
+  font-size: var(--font-size-md, 16px);
+}
+
+.deleteButton:hover {
+  background-color: var(--color-error-light, #ffebee);
+  border-color: var(--color-error, #d32f2f);
+}
+
+/* RTL Support */
+[dir='rtl'] .fieldItem {
+  flex-direction: row-reverse;
+}
+
+[dir='rtl'] .fieldMain {
+  flex-direction: row-reverse;
+}
+
+[dir='rtl'] .fieldMeta {
+  flex-direction: row-reverse;
+}
+
+[dir='rtl'] .fieldActions {
+  flex-direction: row-reverse;
+}
+
+[dir='rtl'] .referenceTarget {
+  direction: ltr;
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .fieldItem,
+  .addButton,
+  .actionButton {
+    transition: none;
+  }
+}
+
+/* Responsive */
+@media (max-width: 767px) {
+  .header {
+    flex-direction: column;
+    gap: var(--spacing-sm, 8px);
+    align-items: stretch;
+  }
+
+  .addButton {
+    justify-content: center;
+  }
+
+  .fieldItem {
+    flex-wrap: wrap;
+  }
+
+  .fieldInfo {
+    flex-basis: calc(100% - 60px);
+  }
+
+  .fieldActions {
+    flex-basis: 100%;
+    justify-content: flex-end;
+    margin-top: var(--spacing-sm, 8px);
+    padding-top: var(--spacing-sm, 8px);
+    border-top: 1px solid var(--color-border, #e0e0e0);
+  }
+}

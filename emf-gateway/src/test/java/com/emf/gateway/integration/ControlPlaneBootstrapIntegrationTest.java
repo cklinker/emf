@@ -7,7 +7,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,7 +17,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 
 import java.io.IOException;
 import java.util.List;
@@ -36,13 +39,11 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 
  * Validates: Requirements 1.1, 1.2, 1.3, 1.4, 1.5, 10.4
  */
-@SpringBootTest
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
-@TestPropertySource(properties = {
-    "emf.gateway.control-plane.url=http://localhost:${mock.server.port}",
-    "emf.gateway.control-plane.bootstrap-path=/control/bootstrap"
-})
 class ControlPlaneBootstrapIntegrationTest {
+    
+    private static MockWebServer mockControlPlane;
     
     @Autowired
     private RouteConfigService routeConfigService;
@@ -53,23 +54,30 @@ class ControlPlaneBootstrapIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
     
-    private MockWebServer mockControlPlane;
-    
-    @BeforeEach
-    void setUp() throws IOException {
-        // Start mock control plane server
+    @BeforeAll
+    static void setUpMockServer() throws IOException {
+        // Start mock control plane server BEFORE Spring context loads
         mockControlPlane = new MockWebServer();
         mockControlPlane.start();
-        
-        // Clear route registry
-        routeRegistry.clear();
     }
     
-    @AfterEach
-    void tearDown() throws IOException {
+    @AfterAll
+    static void tearDownMockServer() throws IOException {
         if (mockControlPlane != null) {
             mockControlPlane.shutdown();
         }
+    }
+    
+    @DynamicPropertySource
+    static void configureProperties(DynamicPropertyRegistry registry) {
+        registry.add("emf.gateway.control-plane.url", () -> mockControlPlane.url("/").toString().replaceAll("/$", ""));
+        registry.add("emf.gateway.control-plane.bootstrap-path", () -> "/control/bootstrap");
+    }
+    
+    @BeforeEach
+    void setUp() {
+        // Clear route registry before each test
+        routeRegistry.clear();
     }
     
     @Test
@@ -149,7 +157,6 @@ class ControlPlaneBootstrapIntegrationTest {
                 .setBody(bootstrapResponse));
         
         // Update the control plane URL to use the mock server
-        System.setProperty("emf.gateway.control-plane.url", mockControlPlane.url("/").toString());
         
         // Act - fetch bootstrap configuration
         routeConfigService.refreshRoutes();
@@ -215,7 +222,6 @@ class ControlPlaneBootstrapIntegrationTest {
                 .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .setBody(bootstrapResponse));
         
-        System.setProperty("emf.gateway.control-plane.url", mockControlPlane.url("/").toString());
         
         // Act - fetch bootstrap configuration
         routeConfigService.refreshRoutes();
@@ -249,7 +255,6 @@ class ControlPlaneBootstrapIntegrationTest {
                 .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .setBody(bootstrapResponse));
         
-        System.setProperty("emf.gateway.control-plane.url", mockControlPlane.url("/").toString());
         
         // Act - fetch bootstrap configuration
         routeConfigService.refreshRoutes();
@@ -266,7 +271,6 @@ class ControlPlaneBootstrapIntegrationTest {
                 .setResponseCode(500)
                 .setBody("Internal Server Error"));
         
-        System.setProperty("emf.gateway.control-plane.url", mockControlPlane.url("/").toString());
         
         // Act & Assert - should handle error gracefully
         try {
@@ -286,7 +290,6 @@ class ControlPlaneBootstrapIntegrationTest {
                 .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .setBody("{ invalid json }"));
         
-        System.setProperty("emf.gateway.control-plane.url", mockControlPlane.url("/").toString());
         
         // Act & Assert - should handle error gracefully
         try {
@@ -337,7 +340,6 @@ class ControlPlaneBootstrapIntegrationTest {
                 .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .setBody(bootstrapResponse));
         
-        System.setProperty("emf.gateway.control-plane.url", mockControlPlane.url("/").toString());
         
         // Act - fetch bootstrap configuration
         routeConfigService.refreshRoutes();

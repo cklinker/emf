@@ -126,6 +126,7 @@
     "confirmDelete": "Are you sure you want to delete this collection?"
   },
   "fields": {
+    "relationship": "Relationship",
     "types": {
       "string": "String",
       "number": "Number",
@@ -133,7 +134,23 @@
       "date": "Date",
       "datetime": "Date & Time",
       "json": "JSON",
-      "reference": "Reference"
+      "reference": "Reference",
+      "picklist": "Picklist",
+      "multi_picklist": "Multi-Picklist",
+      "currency": "Currency",
+      "percent": "Percent",
+      "auto_number": "Auto Number",
+      "phone": "Phone",
+      "email": "Email",
+      "url": "URL",
+      "rich_text": "Rich Text",
+      "encrypted": "Encrypted",
+      "external_id": "External ID",
+      "geolocation": "Geolocation",
+      "lookup": "Lookup",
+      "master_detail": "Master-Detail",
+      "formula": "Formula",
+      "rollup_summary": "Rollup Summary"
     },
     "validation": {
       "required": "Required",

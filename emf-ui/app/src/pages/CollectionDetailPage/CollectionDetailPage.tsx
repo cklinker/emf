@@ -13,31 +13,34 @@
  * - 3.12: Display collection version history with ability to view previous versions
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useI18n } from '../../context/I18nContext';
-import { useApi } from '../../context/ApiContext';
-import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components';
-import { FieldEditor, type FieldDefinition as FieldEditorDefinition } from '../../components/FieldEditor';
-import type { Collection, FieldDefinition, CollectionVersion } from '../../types/collections';
-import styles from './CollectionDetailPage.module.css';
+import React, { useState, useCallback, useMemo } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useI18n } from '../../context/I18nContext'
+import { useApi } from '../../context/ApiContext'
+import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
+import {
+  FieldEditor,
+  type FieldDefinition as FieldEditorDefinition,
+} from '../../components/FieldEditor'
+import type { Collection, FieldDefinition, CollectionVersion } from '../../types/collections'
+import styles from './CollectionDetailPage.module.css'
 
 /**
  * Props for CollectionDetailPage component
  */
 export interface CollectionDetailPageProps {
   /** Collection ID/name from route params (optional, can be from useParams) */
-  collectionId?: string;
+  collectionId?: string
   /** Optional test ID for testing */
-  testId?: string;
+  testId?: string
 }
 
 /**
  * Get display text for field type
  */
 function getFieldTypeDisplay(type: FieldDefinition['type'], t: (key: string) => string): string {
-  return t(`fields.types.${type}`);
+  return t(`fields.types.${type}`)
 }
 
 /**
@@ -46,11 +49,11 @@ function getFieldTypeDisplay(type: FieldDefinition['type'], t: (key: string) => 
 function getStorageModeDisplay(mode: Collection['storageMode']): string {
   switch (mode) {
     case 'PHYSICAL_TABLE':
-      return 'Physical Table';
+      return 'Physical Table'
     case 'JSONB':
-      return 'JSONB';
+      return 'JSONB'
     default:
-      return mode;
+      return mode
   }
 }
 
@@ -64,25 +67,25 @@ export function CollectionDetailPage({
   collectionId: propCollectionId,
   testId = 'collection-detail-page',
 }: CollectionDetailPageProps): React.ReactElement {
-  const params = useParams<{ id: string }>();
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const { t, formatDate } = useI18n();
-  const { showToast } = useToast();
-  const { apiClient } = useApi();
+  const params = useParams<{ id: string }>()
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const { t, formatDate } = useI18n()
+  const { showToast } = useToast()
+  const { apiClient } = useApi()
 
   // Get collection ID from props or route params
-  const collectionId = propCollectionId || params.id || '';
+  const collectionId = propCollectionId || params.id || ''
 
   // Delete confirmation dialog state
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
 
   // Field editor modal state
-  const [fieldEditorOpen, setFieldEditorOpen] = useState(false);
-  const [editingField, setEditingField] = useState<FieldDefinition | undefined>(undefined);
+  const [fieldEditorOpen, setFieldEditorOpen] = useState(false)
+  const [editingField, setEditingField] = useState<FieldDefinition | undefined>(undefined)
 
   // Active tab state for sections
-  const [activeTab, setActiveTab] = useState<'fields' | 'authorization' | 'versions'>('fields');
+  const [activeTab, setActiveTab] = useState<'fields' | 'authorization' | 'versions'>('fields')
 
   // Fetch collection data
   const {
@@ -93,11 +96,11 @@ export function CollectionDetailPage({
   } = useQuery({
     queryKey: ['collection', collectionId],
     queryFn: async () => {
-      const response = await apiClient.get<Collection>(`/control/collections/${collectionId}`);
-      return response;
+      const response = await apiClient.get<Collection>(`/control/collections/${collectionId}`)
+      return response
     },
     enabled: !!collectionId,
-  });
+  })
 
   // Fetch version history
   const {
@@ -107,122 +110,145 @@ export function CollectionDetailPage({
   } = useQuery({
     queryKey: ['collection-versions', collectionId],
     queryFn: async () => {
-      const response = await apiClient.get<CollectionVersion[]>(`/control/collections/${collectionId}/versions`);
-      return response;
+      const response = await apiClient.get<CollectionVersion[]>(
+        `/control/collections/${collectionId}/versions`
+      )
+      return response
     },
     enabled: !!collectionId && activeTab === 'versions',
-  });
+  })
 
   // Fetch all collections for reference field dropdown
-  const {
-    data: collectionsPage,
-  } = useQuery({
+  const { data: collectionsPage } = useQuery({
     queryKey: ['collections'],
     queryFn: async () => {
-      const response = await apiClient.get<{ content: Collection[] }>('/control/collections?size=1000');
-      return response;
+      const response = await apiClient.get<{ content: Collection[] }>(
+        '/control/collections?size=1000'
+      )
+      return response
     },
     enabled: fieldEditorOpen,
-  });
+  })
 
-  const allCollections = collectionsPage?.content || [];
+  const allCollections = collectionsPage?.content || []
 
   // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: async () => {
-      await apiClient.delete(`/control/collections/${collectionId}`);
+      await apiClient.delete(`/control/collections/${collectionId}`)
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['collections'] });
-      showToast(t('success.deleted', { item: t('collections.title') }), 'success');
-      navigate('/collections');
+      queryClient.invalidateQueries({ queryKey: ['collections'] })
+      showToast(t('success.deleted', { item: t('collections.title') }), 'success')
+      navigate('/collections')
     },
     onError: (error: Error) => {
-      showToast(error.message || t('errors.generic'), 'error');
+      showToast(error.message || t('errors.generic'), 'error')
     },
-  });
+  })
 
   // Add field mutation
   const addFieldMutation = useMutation({
     mutationFn: async (fieldData: Omit<FieldEditorDefinition, 'id' | 'order'>) => {
-      await apiClient.post(`/control/collections/${collectionId}/fields`, fieldData);
+      await apiClient.post(`/control/collections/${collectionId}/fields`, fieldData)
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['collection', collectionId] });
-      showToast(t('success.created', { item: t('collections.field') }), 'success');
-      setFieldEditorOpen(false);
-      setEditingField(undefined);
+      queryClient.invalidateQueries({ queryKey: ['collection', collectionId] })
+      showToast(t('success.created', { item: t('collections.field') }), 'success')
+      setFieldEditorOpen(false)
+      setEditingField(undefined)
     },
     onError: (error: Error) => {
-      showToast(error.message || t('errors.generic'), 'error');
+      showToast(error.message || t('errors.generic'), 'error')
     },
-  });
+  })
 
   // Update field mutation
   const updateFieldMutation = useMutation({
-    mutationFn: async ({ fieldId, fieldData }: { fieldId: string; fieldData: Partial<FieldEditorDefinition> }) => {
-      await apiClient.put(`/control/collections/${collectionId}/fields/${fieldId}`, fieldData);
+    mutationFn: async ({
+      fieldId,
+      fieldData,
+    }: {
+      fieldId: string
+      fieldData: Partial<FieldEditorDefinition>
+    }) => {
+      await apiClient.put(`/control/collections/${collectionId}/fields/${fieldId}`, fieldData)
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['collection', collectionId] });
-      showToast(t('success.updated', { item: t('collections.field') }), 'success');
-      setFieldEditorOpen(false);
-      setEditingField(undefined);
+      queryClient.invalidateQueries({ queryKey: ['collection', collectionId] })
+      showToast(t('success.updated', { item: t('collections.field') }), 'success')
+      setFieldEditorOpen(false)
+      setEditingField(undefined)
     },
     onError: (error: Error) => {
-      showToast(error.message || t('errors.generic'), 'error');
+      showToast(error.message || t('errors.generic'), 'error')
     },
-  });
+  })
 
   // Handle edit action
   const handleEdit = useCallback(() => {
-    navigate(`/collections/${collectionId}/edit`);
-  }, [navigate, collectionId]);
+    navigate(`/collections/${collectionId}/edit`)
+  }, [navigate, collectionId])
 
   // Handle delete action - open confirmation dialog
   const handleDeleteClick = useCallback(() => {
-    setDeleteDialogOpen(true);
-  }, []);
+    setDeleteDialogOpen(true)
+  }, [])
 
   // Handle delete confirmation
   const handleDeleteConfirm = useCallback(() => {
-    deleteMutation.mutate();
-  }, [deleteMutation]);
+    deleteMutation.mutate()
+  }, [deleteMutation])
 
   // Handle delete cancel
   const handleDeleteCancel = useCallback(() => {
-    setDeleteDialogOpen(false);
-  }, []);
+    setDeleteDialogOpen(false)
+  }, [])
 
   // Handle back navigation
   const handleBack = useCallback(() => {
-    navigate('/collections');
-  }, [navigate]);
+    navigate('/collections')
+  }, [navigate])
 
   // Handle tab change
   const handleTabChange = useCallback((tab: 'fields' | 'authorization' | 'versions') => {
-    setActiveTab(tab);
-  }, []);
+    setActiveTab(tab)
+  }, [])
 
   // Handle add field action
   const handleAddField = useCallback(() => {
-    setEditingField(undefined);
-    setFieldEditorOpen(true);
-  }, []);
+    setEditingField(undefined)
+    setFieldEditorOpen(true)
+  }, [])
 
   // Handle edit field action
   const handleEditField = useCallback((field: FieldDefinition) => {
-    setEditingField(field);
-    setFieldEditorOpen(true);
-  }, []);
+    setEditingField(field)
+    setFieldEditorOpen(true)
+  }, [])
 
   // Handle field editor save
-  const handleFieldSave = useCallback(async (fieldData: FieldEditorDefinition) => {
-    if (editingField) {
-      // Update existing field
-      await updateFieldMutation.mutateAsync({
-        fieldId: editingField.id,
-        fieldData: {
+  const handleFieldSave = useCallback(
+    async (fieldData: FieldEditorDefinition) => {
+      if (editingField) {
+        // Update existing field
+        await updateFieldMutation.mutateAsync({
+          fieldId: editingField.id,
+          fieldData: {
+            name: fieldData.name,
+            displayName: fieldData.displayName,
+            type: fieldData.type,
+            required: fieldData.required,
+            unique: fieldData.unique,
+            indexed: fieldData.indexed,
+            defaultValue: fieldData.defaultValue,
+            referenceTarget: fieldData.referenceTarget,
+            validation: fieldData.validation,
+          },
+        })
+      } else {
+        // Create new field
+        await addFieldMutation.mutateAsync({
           name: fieldData.name,
           displayName: fieldData.displayName,
           type: fieldData.type,
@@ -232,40 +258,31 @@ export function CollectionDetailPage({
           defaultValue: fieldData.defaultValue,
           referenceTarget: fieldData.referenceTarget,
           validation: fieldData.validation,
-        },
-      });
-    } else {
-      // Create new field
-      await addFieldMutation.mutateAsync({
-        name: fieldData.name,
-        displayName: fieldData.displayName,
-        type: fieldData.type,
-        required: fieldData.required,
-        unique: fieldData.unique,
-        indexed: fieldData.indexed,
-        defaultValue: fieldData.defaultValue,
-        referenceTarget: fieldData.referenceTarget,
-        validation: fieldData.validation,
-      });
-    }
-  }, [editingField, addFieldMutation, updateFieldMutation]);
+        })
+      }
+    },
+    [editingField, addFieldMutation, updateFieldMutation]
+  )
 
   // Handle field editor cancel
   const handleFieldCancel = useCallback(() => {
-    setFieldEditorOpen(false);
-    setEditingField(undefined);
-  }, []);
+    setFieldEditorOpen(false)
+    setEditingField(undefined)
+  }, [])
 
   // Handle view version action
-  const handleViewVersion = useCallback((version: CollectionVersion) => {
-    navigate(`/collections/${collectionId}/versions/${version.version}`);
-  }, [navigate, collectionId]);
+  const handleViewVersion = useCallback(
+    (version: CollectionVersion) => {
+      navigate(`/collections/${collectionId}/versions/${version.version}`)
+    },
+    [navigate, collectionId]
+  )
 
   // Sort fields by order
   const sortedFields = useMemo(() => {
-    if (!collection?.fields) return [];
-    return [...collection.fields].sort((a, b) => a.order - b.order);
-  }, [collection]);
+    if (!collection?.fields) return []
+    return [...collection.fields].sort((a, b) => a.order - b.order)
+  }, [collection])
 
   // Render loading state
   if (isLoadingCollection) {
@@ -275,7 +292,7 @@ export function CollectionDetailPage({
           <LoadingSpinner size="large" label={t('common.loading')} />
         </div>
       </div>
-    );
+    )
   }
 
   // Render error state
@@ -283,23 +300,22 @@ export function CollectionDetailPage({
     return (
       <div className={styles.container} data-testid={testId}>
         <ErrorMessage
-          error={collectionError instanceof Error ? collectionError : new Error(t('errors.generic'))}
+          error={
+            collectionError instanceof Error ? collectionError : new Error(t('errors.generic'))
+          }
           onRetry={() => refetchCollection()}
         />
       </div>
-    );
+    )
   }
 
   // Render not found state
   if (!collection) {
     return (
       <div className={styles.container} data-testid={testId}>
-        <ErrorMessage
-          error={new Error(t('errors.notFound'))}
-          type="notFound"
-        />
+        <ErrorMessage error={new Error(t('errors.notFound'))} type="notFound" />
       </div>
-    );
+    )
   }
 
   return (
@@ -487,11 +503,7 @@ export function CollectionDetailPage({
           {sortedFields.length === 0 ? (
             <div className={styles.emptyState} data-testid="fields-empty-state">
               <p>{t('common.noData')}</p>
-              <button
-                type="button"
-                className={styles.addButton}
-                onClick={handleAddField}
-              >
+              <button type="button" className={styles.addButton} onClick={handleAddField}>
                 {t('collections.addField')}
               </button>
             </div>
@@ -511,6 +523,7 @@ export function CollectionDetailPage({
                     <th scope="col">{t('fields.validation.required')}</th>
                     <th scope="col">{t('fields.validation.unique')}</th>
                     <th scope="col">{t('fields.validation.indexed')}</th>
+                    <th scope="col">{t('fields.relationship')}</th>
                     <th scope="col">{t('common.actions')}</th>
                   </tr>
                 </thead>
@@ -522,9 +535,7 @@ export function CollectionDetailPage({
                       data-testid={`field-row-${index}`}
                     >
                       <td>{field.order}</td>
-                      <td className={styles.fieldNameCell}>
-                        {field.name}
-                      </td>
+                      <td className={styles.fieldNameCell}>{field.name}</td>
                       <td>{field.displayName || '-'}</td>
                       <td>
                         <span className={styles.fieldTypeBadge}>
@@ -545,6 +556,21 @@ export function CollectionDetailPage({
                         <span className={field.indexed ? styles.checkMark : styles.crossMark}>
                           {field.indexed ? '✓' : '✕'}
                         </span>
+                      </td>
+                      <td>
+                        {field.relationshipType ? (
+                          <span
+                            className={styles.relationshipBadge}
+                            title={field.referenceTarget || ''}
+                          >
+                            {field.relationshipType === 'MASTER_DETAIL'
+                              ? 'Master-Detail'
+                              : 'Lookup'}
+                            {field.relationshipName ? ` → ${field.relationshipName}` : ''}
+                          </span>
+                        ) : (
+                          '-'
+                        )}
                       </td>
                       <td className={styles.actionsCell}>
                         <button
@@ -578,7 +604,7 @@ export function CollectionDetailPage({
           <div className={styles.panelHeader}>
             <h2 className={styles.panelTitle}>{t('authorization.title')}</h2>
           </div>
-          
+
           {/* Route Authorization */}
           <div className={styles.authzSection}>
             <h3 className={styles.authzSectionTitle}>{t('authorization.routeAuthorization')}</h3>
@@ -597,7 +623,10 @@ export function CollectionDetailPage({
                   </thead>
                   <tbody>
                     {collection.authz.routePolicies.map((policy, index) => (
-                      <tr key={`${policy.operation}-${policy.policyId}`} data-testid={`route-policy-row-${index}`}>
+                      <tr
+                        key={`${policy.operation}-${policy.policyId}`}
+                        data-testid={`route-policy-row-${index}`}
+                      >
                         <td>
                           <span className={styles.operationBadge}>
                             {t(`authorization.operations.${policy.operation}`)}
@@ -635,11 +664,16 @@ export function CollectionDetailPage({
                   </thead>
                   <tbody>
                     {collection.authz.fieldPolicies.map((policy, index) => (
-                      <tr key={`${policy.fieldName}-${policy.operation}-${policy.policyId}`} data-testid={`field-policy-row-${index}`}>
+                      <tr
+                        key={`${policy.fieldName}-${policy.operation}-${policy.policyId}`}
+                        data-testid={`field-policy-row-${index}`}
+                      >
                         <td>{policy.fieldName}</td>
                         <td>
                           <span className={styles.operationBadge}>
-                            {policy.operation === 'read' ? t('authorization.operations.read') : 'Write'}
+                            {policy.operation === 'read'
+                              ? t('authorization.operations.read')
+                              : 'Write'}
                           </span>
                         </td>
                         <td>{policy.policyId}</td>
@@ -675,7 +709,9 @@ export function CollectionDetailPage({
             </div>
           ) : versionsError ? (
             <ErrorMessage
-              error={versionsError instanceof Error ? versionsError : new Error(t('errors.generic'))}
+              error={
+                versionsError instanceof Error ? versionsError : new Error(t('errors.generic'))
+              }
               variant="compact"
             />
           ) : versions.length === 0 ? (
@@ -761,7 +797,7 @@ export function CollectionDetailPage({
             <FieldEditor
               collectionId={collectionId}
               field={editingField}
-              collections={allCollections.map(c => ({
+              collections={allCollections.map((c) => ({
                 id: c.id,
                 name: c.name,
                 displayName: c.displayName || c.name,
@@ -774,7 +810,7 @@ export function CollectionDetailPage({
         </div>
       )}
     </div>
-  );
+  )
 }
 
-export default CollectionDetailPage;
+export default CollectionDetailPage

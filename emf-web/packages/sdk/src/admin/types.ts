@@ -77,6 +77,10 @@ export interface FieldTypeConfig {
   latitude?: number;
   /** Geolocation: longitude */
   longitude?: number;
+  /** Lookup/MasterDetail: target collection name */
+  targetCollection?: string;
+  /** Lookup/MasterDetail: human-readable relationship name */
+  relationshipName?: string;
 }
 
 /**
@@ -98,8 +102,35 @@ export interface FieldDefinition {
   active?: boolean;
   description?: string;
   constraints?: string;
+  relationshipType?: 'LOOKUP' | 'MASTER_DETAIL';
+  relationshipName?: string;
+  cascadeDelete?: boolean;
+  referenceCollectionId?: string;
   createdAt?: string;
   updatedAt?: string;
+}
+
+/**
+ * Relationship information for a field
+ */
+export interface RelationshipInfo {
+  fieldId: string;
+  fieldName: string;
+  relationshipType: 'LOOKUP' | 'MASTER_DETAIL';
+  relationshipName: string;
+  targetCollectionId: string;
+  targetCollectionName: string;
+  cascadeDelete: boolean;
+}
+
+/**
+ * All relationships for a collection
+ */
+export interface CollectionRelationships {
+  collectionId: string;
+  collectionName: string;
+  outgoing: RelationshipInfo[];
+  incoming: RelationshipInfo[];
 }
 
 /**

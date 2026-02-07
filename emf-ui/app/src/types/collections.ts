@@ -40,6 +40,10 @@ export interface FieldDefinition {
   active?: boolean
   description?: string
   constraints?: string
+  relationshipType?: 'LOOKUP' | 'MASTER_DETAIL'
+  relationshipName?: string
+  cascadeDelete?: boolean
+  referenceCollectionId?: string
   createdAt?: string
   updatedAt?: string
 }

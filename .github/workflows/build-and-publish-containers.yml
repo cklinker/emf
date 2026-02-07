@@ -8,6 +8,7 @@ on:
       - 'emf-control-plane/**'
       - 'emf-platform/runtime/**'
       - 'emf-web/**'
+      - 'emf-ui/**'
       - '.github/workflows/build-and-publish-containers.yml'
   workflow_dispatch:
     inputs:
@@ -223,12 +224,54 @@ jobs:
           cache-to: type=gha,mode=max
           platforms: linux/amd64
 
+  build-ui:
+    name: Build & Push Admin UI
+    needs: [test-control-plane, test-gateway, test-frontend]
+    runs-on: ubuntu-latest
+    outputs:
+      image-tag: ${{ steps.meta.outputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to DockerHub
+        if: github.event_name != 'workflow_dispatch' || inputs.push_images
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKERHUB_USERNAME }}/emf-ui
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Admin UI
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: emf-ui/Dockerfile
+          push: ${{ github.event_name != 'workflow_dispatch' || inputs.push_images }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+
   # ===========================================================================
   # Update ArgoCD manifests to trigger deployment
   # ===========================================================================
   deploy:
     name: Update ArgoCD Manifests
-    needs: [build-gateway, build-control-plane]
+    needs: [build-gateway, build-control-plane, build-ui]
     if: github.ref == 'refs/heads/main' && (github.event_name != 'workflow_dispatch' || inputs.deploy)
     runs-on: ubuntu-latest
     steps:
@@ -258,6 +301,11 @@ jobs:
             sed -i "s|image: cklinker/emf-gateway:.*|image: cklinker/emf-gateway:${IMAGE_TAG}|g" emf/gateway-deployment.yaml
           fi
 
+          # Update admin UI deployment
+          if [ -f emf/ui-deployment.yaml ]; then
+            sed -i "s|image: cklinker/emf-ui:.*|image: cklinker/emf-ui:${IMAGE_TAG}|g" emf/ui-deployment.yaml
+          fi
+
       - name: Commit and push
         working-directory: homelab-argo
         run: |
@@ -285,6 +333,7 @@ jobs:
           echo "Waiting for deployments to roll out..."
           kubectl -n emf rollout status deployment/emf-control-plane --timeout=300s || true
           kubectl -n emf rollout status deployment/emf-gateway --timeout=300s || true
+          kubectl -n emf rollout status deployment/emf-ui --timeout=300s || true
 
       - name: Verify control plane health
         run: |

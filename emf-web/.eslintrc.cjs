@@ -19,7 +19,7 @@ module.exports = {
   parserOptions: {
     ecmaVersion: 'latest',
     sourceType: 'module',
-    project: ['./tsconfig.json', './packages/*/tsconfig.json'],
+    project: './tsconfig.eslint.json',
     tsconfigRootDir: __dirname,
   },
   plugins: ['@typescript-eslint', 'react', 'react-hooks'],
@@ -53,13 +53,18 @@ module.exports = {
   },
   overrides: [
     {
-      files: ['**/*.test.ts', '**/*.test.tsx', '**/*.spec.ts', '**/*.spec.tsx', '**/*.property.test.ts', '**/*.property.test.tsx'],
+      files: ['**/*.test.ts', '**/*.test.tsx', '**/*.spec.ts', '**/*.spec.tsx', '**/*.property.test.ts', '**/*.property.test.tsx', '**/vitest.setup.ts'],
       rules: {
         '@typescript-eslint/no-explicit-any': 'off',
         '@typescript-eslint/no-unsafe-assignment': 'off',
         '@typescript-eslint/no-unsafe-member-access': 'off',
         '@typescript-eslint/no-unsafe-call': 'off',
         '@typescript-eslint/no-unsafe-return': 'off',
+        '@typescript-eslint/no-unsafe-argument': 'off',
+        '@typescript-eslint/unbound-method': 'off',
+        '@typescript-eslint/require-await': 'off',
+        '@typescript-eslint/no-unused-vars': 'off',
+        '@typescript-eslint/no-unnecessary-type-assertion': 'off',
       },
     },
   ],

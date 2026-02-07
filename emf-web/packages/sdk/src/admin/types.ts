@@ -159,3 +159,78 @@ export interface MigrationResult {
   message: string;
   details?: unknown;
 }
+
+/**
+ * UI Page definition
+ */
+export interface UIPage {
+  id?: string;
+  name: string;
+  path: string;
+  component?: string;
+  layout?: string;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * UI Menu definition
+ */
+export interface UIMenu {
+  id?: string;
+  name: string;
+  items: UIMenuItem[];
+  position?: string;
+}
+
+/**
+ * UI Menu item
+ */
+export interface UIMenuItem {
+  id?: string;
+  label: string;
+  path?: string;
+  icon?: string;
+  children?: UIMenuItem[];
+  order?: number;
+}
+
+/**
+ * Migration plan result
+ */
+export interface MigrationPlan {
+  steps: MigrationStep[];
+  warnings?: string[];
+  estimatedDuration?: number;
+}
+
+/**
+ * Migration step
+ */
+export interface MigrationStep {
+  type: string;
+  description: string;
+  sql?: string;
+  reversible: boolean;
+}
+
+/**
+ * Migration run details
+ */
+export interface MigrationRun {
+  id: string;
+  migrationId: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  startedAt?: string;
+  completedAt?: string;
+  error?: string;
+  steps: MigrationStepResult[];
+}
+
+/**
+ * Migration step result
+ */
+export interface MigrationStepResult {
+  step: MigrationStep;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  error?: string;
+}

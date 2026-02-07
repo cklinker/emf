@@ -10,7 +10,10 @@ import type {
   ExportOptions,
   ImportResult,
   Migration,
-  MigrationResult,
+  UIPage,
+  UIMenu,
+  MigrationPlan,
+  MigrationRun,
 } from './types';
 
 /**
@@ -166,28 +169,28 @@ export class AdminClient {
       return response.data;
     },
 
-    listPages: async (): Promise<any[]> => {
-      const response = await this.axios.get<any[]>('/ui/pages');
+    listPages: async (): Promise<UIPage[]> => {
+      const response = await this.axios.get<UIPage[]>('/ui/pages');
       return response.data;
     },
 
-    createPage: async (page: any): Promise<any> => {
-      const response = await this.axios.post<any>('/ui/pages', page);
+    createPage: async (page: UIPage): Promise<UIPage> => {
+      const response = await this.axios.post<UIPage>('/ui/pages', page);
       return response.data;
     },
 
-    updatePage: async (id: string, page: any): Promise<any> => {
-      const response = await this.axios.put<any>(`/ui/pages/${id}`, page);
+    updatePage: async (id: string, page: UIPage): Promise<UIPage> => {
+      const response = await this.axios.put<UIPage>(`/ui/pages/${id}`, page);
       return response.data;
     },
 
-    listMenus: async (): Promise<any[]> => {
-      const response = await this.axios.get<any[]>('/ui/menus');
+    listMenus: async (): Promise<UIMenu[]> => {
+      const response = await this.axios.get<UIMenu[]>('/ui/menus');
       return response.data;
     },
 
-    updateMenu: async (id: string, menu: any): Promise<any> => {
-      const response = await this.axios.put<any>(`/ui/menus/${id}`, menu);
+    updateMenu: async (id: string, menu: UIMenu): Promise<UIMenu> => {
+      const response = await this.axios.put<UIMenu>(`/ui/menus/${id}`, menu);
       return response.data;
     },
   };
@@ -214,8 +217,8 @@ export class AdminClient {
    * Migration operations
    */
   readonly migrations = {
-    plan: async (collectionId: string, targetSchema: any): Promise<any> => {
-      const response = await this.axios.post<any>('/control/migrations/plan', {
+    plan: async (collectionId: string, targetSchema: CollectionDefinition): Promise<MigrationPlan> => {
+      const response = await this.axios.post<MigrationPlan>('/control/migrations/plan', {
         collectionId,
         targetSchema,
       });
@@ -227,8 +230,8 @@ export class AdminClient {
       return response.data;
     },
 
-    getRun: async (id: string): Promise<any> => {
-      const response = await this.axios.get<any>(`/control/migrations/runs/${id}`);
+    getRun: async (id: string): Promise<MigrationRun> => {
+      const response = await this.axios.get<MigrationRun>(`/control/migrations/runs/${id}`);
       return response.data;
     },
   };

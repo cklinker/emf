@@ -77,6 +77,7 @@ export function parseArgs(args: string[]): TypeGenerationOptions | { error: stri
  * Print help message
  */
 export function printHelp(): void {
+  // eslint-disable-next-line no-console
   console.log(`
 EMF Type Generator - Generate TypeScript types from OpenAPI specifications
 
@@ -110,13 +111,13 @@ export async function fetchOpenAPISpec(url: string): Promise<unknown> {
   const contentType = response.headers.get('content-type') || '';
   
   if (contentType.includes('application/json') || contentType.includes('application/yaml') || url.endsWith('.json')) {
-    return response.json();
+    return response.json() as Promise<unknown>;
   }
 
   // Try to parse as JSON anyway
   const text = await response.text();
   try {
-    return JSON.parse(text);
+    return JSON.parse(text) as unknown;
   } catch {
     throw new Error('Failed to parse OpenAPI spec as JSON');
   }
@@ -165,6 +166,7 @@ export async function main(args: string[]): Promise<TypeGenerationResult> {
 
   const { url, output, includeRequests, includeResponses } = parsedArgs;
 
+  // eslint-disable-next-line no-console
   console.log(`Fetching OpenAPI spec from: ${url}`);
 
   try {
@@ -199,6 +201,7 @@ export async function main(args: string[]): Promise<TypeGenerationResult> {
     // Write to file
     await writeFile(output, content);
 
+    // eslint-disable-next-line no-console
     console.log(`Successfully generated ${result.typesGenerated} types to: ${output}`);
     return result;
   } catch (error) {

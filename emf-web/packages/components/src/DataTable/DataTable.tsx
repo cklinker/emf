@@ -38,7 +38,7 @@ export function DataTable<T = unknown>({
   onRowClick,
   selectable = false,
   onSelectionChange,
-  onFiltersChange,
+  onFiltersChange: _onFiltersChange,
   onSortChange,
   onPageChange,
   className = '',
@@ -79,6 +79,7 @@ export function DataTable<T = unknown>({
   // Handle page change
   const handlePageChange = useCallback((newPage: number) => {
     setPage(newPage);
+    setFocusedRowIndex(-1); // Reset focus when page changes
     onPageChange?.(newPage);
   }, [onPageChange]);
 
@@ -192,7 +193,7 @@ export function DataTable<T = unknown>({
         }
         break;
     }
-  }, [data?.data, focusedRowIndex, selectable, handleRowSelect, onRowClick, page, handlePageChange]);
+  }, [data?.data, focusedRowIndex, selectable, handleRowSelect, onRowClick, page, handlePageChange, pagination]);
 
   // Get sort indicator for a column
   const getSortIndicator = (column: ColumnDefinition<T>): string => {
@@ -240,7 +241,7 @@ export function DataTable<T = unknown>({
         </div>
         <button 
           className="emf-datatable__retry-button"
-          onClick={() => refetch()}
+          onClick={() => void refetch()}
           aria-label="Retry loading data"
         >
           Retry

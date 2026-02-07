@@ -62,7 +62,7 @@ export class ResourceClient<T = unknown> {
       // For single resource responses, we validate that it's an object (not null/undefined)
       if (response.data === null || response.data === undefined) {
         throw new ValidationError(
-          `Invalid get response for ${this.resourceName}/${id}: expected object, got ${response.data}`,
+          `Invalid get response for ${this.resourceName}/${id}: expected object, got ${String(response.data)}`,
           { schema: ['Response must be an object'] }
         );
       }
@@ -84,7 +84,7 @@ export class ResourceClient<T = unknown> {
     if (this.client.isValidationEnabled()) {
       if (response.data === null || response.data === undefined) {
         throw new ValidationError(
-          `Invalid create response for ${this.resourceName}: expected object, got ${response.data}`,
+          `Invalid create response for ${this.resourceName}: expected object, got ${String(response.data)}`,
           { schema: ['Response must be an object'] }
         );
       }
@@ -106,7 +106,7 @@ export class ResourceClient<T = unknown> {
     if (this.client.isValidationEnabled()) {
       if (response.data === null || response.data === undefined) {
         throw new ValidationError(
-          `Invalid update response for ${this.resourceName}/${id}: expected object, got ${response.data}`,
+          `Invalid update response for ${this.resourceName}/${id}: expected object, got ${String(response.data)}`,
           { schema: ['Response must be an object'] }
         );
       }
@@ -128,7 +128,7 @@ export class ResourceClient<T = unknown> {
     if (this.client.isValidationEnabled()) {
       if (response.data === null || response.data === undefined) {
         throw new ValidationError(
-          `Invalid patch response for ${this.resourceName}/${id}: expected object, got ${response.data}`,
+          `Invalid patch response for ${this.resourceName}/${id}: expected object, got ${String(response.data)}`,
           { schema: ['Response must be an object'] }
         );
       }

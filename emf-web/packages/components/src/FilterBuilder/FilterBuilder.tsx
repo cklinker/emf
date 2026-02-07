@@ -173,7 +173,7 @@ export function FilterBuilder({
       <div className="emf-filter-builder__filters" role="list">
         {value.length === 0 && (
           <div className="emf-filter-builder__empty" role="listitem">
-            No filters applied. Click "Add Filter" to add one.
+            No filters applied. Click &quot;Add Filter&quot; to add one.
           </div>
         )}
         {value.map((filter, index) => (

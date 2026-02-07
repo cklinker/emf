@@ -102,7 +102,7 @@ export class QueryBuilder<T = unknown> {
 
     if (options.filters) {
       options.filters.forEach((f) => {
-        params.push(`${f.field}[${f.operator}]=${f.value}`);
+        params.push(`${f.field}[${f.operator}]=${String(f.value)}`);
       });
     }
 

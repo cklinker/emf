@@ -91,7 +91,7 @@ function buildZodSchema(fields: FieldDefinition[]): z.ZodObject<Record<string, z
 
     // Apply validation rules (only for non-number types, as number is handled above)
     if (field.validation && field.type !== 'number') {
-      fieldSchema = applyValidationRules(fieldSchema, field.validation, field.type);
+      fieldSchema = applyValidationRules(fieldSchema, field.validation as Record<string, unknown>, field.type);
     } else if (field.validation && field.type === 'number') {
       // For numbers, we need to apply validation after the preprocess
       // This is handled in the preprocess above
@@ -471,7 +471,7 @@ function renderField(field: FieldDefinition, options: RenderFieldOptions): JSX.E
           control={control}
           render={({ field: formField }) => (
             <CustomRenderer
-              value={formField.value}
+              value={formField.value as unknown}
               field={field}
               onChange={formField.onChange}
               readOnly={readOnly}

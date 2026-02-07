@@ -82,7 +82,7 @@ export class TokenManager {
         return null;
       }
 
-      const payload = JSON.parse(atob(parts[1]));
+      const payload = JSON.parse(atob(parts[1])) as { exp?: number };
       if (typeof payload.exp === 'number') {
         return payload.exp * 1000; // Convert to milliseconds
       }

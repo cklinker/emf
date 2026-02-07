@@ -130,6 +130,7 @@ export class EMFClient {
         resources = parseResult.data.resources;
       } else {
         // Skip validation - use raw response
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
         resources = response.data.resources ?? [];
       }
 
@@ -193,27 +194,31 @@ export class EMFClient {
     this.axiosInstance.interceptors.response.use(
       (response) => response,
       async (error) => {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
         const config = error.config;
 
-        // Initialize retry count
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
         config.__retryCount = config.__retryCount || 0;
 
-        // Check if we should retry
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         if (!this.shouldRetry(error) || config.__retryCount >= this.retryConfig.maxAttempts) {
           return Promise.reject(error);
         }
 
-        // Increment retry count
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         config.__retryCount += 1;
 
         // Calculate delay with exponential backoff
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         const delay = Math.min(
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
           1000 * Math.pow(this.retryConfig.backoffMultiplier, config.__retryCount - 1),
           this.retryConfig.maxDelay
         );
 
         // Wait and retry
         await new Promise((resolve) => setTimeout(resolve, delay));
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         return this.axiosInstance(config);
       }
     );

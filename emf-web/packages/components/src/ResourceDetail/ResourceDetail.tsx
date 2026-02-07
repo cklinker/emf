@@ -223,7 +223,7 @@ export function ResourceDetail({
         role="alert"
       >
         <div className="emf-resource-detail__not-found">
-          Resource schema not found for "{resourceName}"
+          Resource schema not found for &quot;{resourceName}&quot;
         </div>
       </div>
     );
@@ -237,7 +237,7 @@ export function ResourceDetail({
         role="alert"
       >
         <div className="emf-resource-detail__not-found">
-          Record not found with ID "{recordId}"
+          Record not found with ID &quot;{recordId}&quot;
         </div>
       </div>
     );

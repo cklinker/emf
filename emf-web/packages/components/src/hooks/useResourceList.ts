@@ -32,6 +32,6 @@ export function useResourceList<T = unknown>(resourceName: string, options?: Lis
     pagination: query.data?.pagination,
     isLoading: query.isLoading,
     error: query.error,
-    refetch: query.refetch,
+    refetch: () => void query.refetch(),
   };
 }

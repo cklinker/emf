@@ -70,10 +70,7 @@ const mockDeeplyNestedItems: MenuItem[] = [
 describe('Navigation', () => {
   describe('Menu Rendering (Requirement 15.1)', () => {
     it('should render all menu items', () => {
-      render(
-        <Navigation items={mockMenuItems} />,
-        { wrapper: createWrapper() }
-      );
+      render(<Navigation items={mockMenuItems} />, { wrapper: createWrapper() });
 
       expect(screen.getByText('Home')).toBeInTheDocument();
       expect(screen.getByText('Users')).toBeInTheDocument();
@@ -81,10 +78,7 @@ describe('Navigation', () => {
     });
 
     it('should render correct number of menu items', () => {
-      render(
-        <Navigation items={mockMenuItems} />,
-        { wrapper: createWrapper() }
-      );
+      render(<Navigation items={mockMenuItems} />, { wrapper: createWrapper() });
 
       const menuItems = screen.getAllByRole('menuitem');
       expect(menuItems).toHaveLength(mockMenuItems.length);
@@ -93,13 +87,15 @@ describe('Navigation', () => {
     it('should render menu items with icons', () => {
       const itemsWithIcons: MenuItem[] = [
         { id: 'home', label: 'Home', path: '/', icon: <span data-testid="home-icon">🏠</span> },
-        { id: 'users', label: 'Users', path: '/users', icon: <span data-testid="users-icon">👥</span> },
+        {
+          id: 'users',
+          label: 'Users',
+          path: '/users',
+          icon: <span data-testid="users-icon">👥</span>,
+        },
       ];
 
-      render(
-        <Navigation items={itemsWithIcons} />,
-        { wrapper: createWrapper() }
-      );
+      render(<Navigation items={itemsWithIcons} />, { wrapper: createWrapper() });
 
       expect(screen.getByTestId('home-icon')).toBeInTheDocument();
       expect(screen.getByTestId('users-icon')).toBeInTheDocument();
@@ -114,10 +110,9 @@ describe('Navigation', () => {
         roles: ['user'],
       };
 
-      render(
-        <Navigation items={mockMenuItemsWithRoles} currentUser={regularUser} />,
-        { wrapper: createWrapper() }
-      );
+      render(<Navigation items={mockMenuItemsWithRoles} currentUser={regularUser} />, {
+        wrapper: createWrapper(),
+      });
 
       // Home and Public should be visible (no role restriction)
       expect(screen.getByText('Home')).toBeInTheDocument();
@@ -135,10 +130,9 @@ describe('Navigation', () => {
         roles: ['admin'],
       };
 
-      render(
-        <Navigation items={mockMenuItemsWithRoles} currentUser={adminUser} />,
-        { wrapper: createWrapper() }
-      );
+      render(<Navigation items={mockMenuItemsWithRoles} currentUser={adminUser} />, {
+        wrapper: createWrapper(),
+      });
 
       // All items should be visible for admin
       expect(screen.getByText('Home')).toBeInTheDocument();
@@ -154,10 +148,9 @@ describe('Navigation', () => {
         roles: ['manager'],
       };
 
-      render(
-        <Navigation items={mockMenuItemsWithRoles} currentUser={managerUser} />,
-        { wrapper: createWrapper() }
-      );
+      render(<Navigation items={mockMenuItemsWithRoles} currentUser={managerUser} />, {
+        wrapper: createWrapper(),
+      });
 
       // Settings requires admin OR manager, so should be visible
       expect(screen.getByText('Settings')).toBeInTheDocument();
@@ -166,10 +159,9 @@ describe('Navigation', () => {
     });
 
     it('should hide all restricted items when no user is logged in', () => {
-      render(
-        <Navigation items={mockMenuItemsWithRoles} currentUser={null} />,
-        { wrapper: createWrapper() }
-      );
+      render(<Navigation items={mockMenuItemsWithRoles} currentUser={null} />, {
+        wrapper: createWrapper(),
+      });
 
       expect(screen.getByText('Home')).toBeInTheDocument();
       expect(screen.getByText('Public')).toBeInTheDocument();
@@ -182,10 +174,7 @@ describe('Navigation', () => {
     it('should navigate to path when menu item is clicked', async () => {
       const user = userEvent.setup();
 
-      render(
-        <Navigation items={mockMenuItems} />,
-        { wrapper: createWrapper('/') }
-      );
+      render(<Navigation items={mockMenuItems} />, { wrapper: createWrapper('/') });
 
       await user.click(screen.getByText('Users'));
 
@@ -195,14 +184,9 @@ describe('Navigation', () => {
     it('should call onClick handler when provided', async () => {
       const user = userEvent.setup();
       const onClick = vi.fn();
-      const itemsWithHandler: MenuItem[] = [
-        { id: 'action', label: 'Action', onClick },
-      ];
+      const itemsWithHandler: MenuItem[] = [{ id: 'action', label: 'Action', onClick }];
 
-      render(
-        <Navigation items={itemsWithHandler} />,
-        { wrapper: createWrapper() }
-      );
+      render(<Navigation items={itemsWithHandler} />, { wrapper: createWrapper() });
 
       await user.click(screen.getByText('Action'));
 
@@ -216,10 +200,7 @@ describe('Navigation', () => {
         { id: 'action', label: 'Action', path: '/action', onClick },
       ];
 
-      render(
-        <Navigation items={itemsWithHandler} />,
-        { wrapper: createWrapper('/') }
-      );
+      render(<Navigation items={itemsWithHandler} />, { wrapper: createWrapper('/') });
 
       await user.click(screen.getByText('Action'));
 
@@ -231,10 +212,7 @@ describe('Navigation', () => {
 
   describe('Active State (Requirement 15.4)', () => {
     it('should highlight active menu item based on current route', () => {
-      render(
-        <Navigation items={mockMenuItems} />,
-        { wrapper: createWrapper('/users') }
-      );
+      render(<Navigation items={mockMenuItems} />, { wrapper: createWrapper('/users') });
 
       const usersItem = screen.getByText('Users').closest('li');
       expect(usersItem).toHaveClass('emf-navigation__item--active');
@@ -244,10 +222,7 @@ describe('Navigation', () => {
     });
 
     it('should set aria-current on active item', () => {
-      render(
-        <Navigation items={mockMenuItems} />,
-        { wrapper: createWrapper('/users') }
-      );
+      render(<Navigation items={mockMenuItems} />, { wrapper: createWrapper('/users') });
 
       const usersButton = screen.getByText('Users').closest('button');
       expect(usersButton).toHaveAttribute('aria-current', 'page');
@@ -256,10 +231,9 @@ describe('Navigation', () => {
     it('should highlight parent when child route is active', async () => {
       const user = userEvent.setup();
 
-      render(
-        <Navigation items={mockNestedMenuItems} />,
-        { wrapper: createWrapper('/settings/profile') }
-      );
+      render(<Navigation items={mockNestedMenuItems} />, {
+        wrapper: createWrapper('/settings/profile'),
+      });
 
       // Expand the settings menu first
       await user.click(screen.getByText('Settings'));
@@ -269,10 +243,7 @@ describe('Navigation', () => {
     });
 
     it('should handle exact match for root path', () => {
-      render(
-        <Navigation items={mockMenuItems} />,
-        { wrapper: createWrapper('/') }
-      );
+      render(<Navigation items={mockMenuItems} />, { wrapper: createWrapper('/') });
 
       const homeItem = screen.getByText('Home').closest('li');
       expect(homeItem).toHaveClass('emf-navigation__item--active');
@@ -287,10 +258,7 @@ describe('Navigation', () => {
     it('should render submenu items when parent has children', async () => {
       const user = userEvent.setup();
 
-      render(
-        <Navigation items={mockNestedMenuItems} />,
-        { wrapper: createWrapper() }
-      );
+      render(<Navigation items={mockNestedMenuItems} />, { wrapper: createWrapper() });
 
       // Initially, submenu items should not be visible
       expect(screen.queryByText('Profile')).not.toBeInTheDocument();
@@ -307,10 +275,7 @@ describe('Navigation', () => {
     it('should expand submenu when parent is clicked', async () => {
       const user = userEvent.setup();
 
-      render(
-        <Navigation items={mockNestedMenuItems} />,
-        { wrapper: createWrapper() }
-      );
+      render(<Navigation items={mockNestedMenuItems} />, { wrapper: createWrapper() });
 
       const settingsButton = screen.getByText('Settings').closest('button');
       expect(settingsButton).toHaveAttribute('aria-expanded', 'false');
@@ -323,10 +288,7 @@ describe('Navigation', () => {
     it('should collapse submenu when parent is clicked again', async () => {
       const user = userEvent.setup();
 
-      render(
-        <Navigation items={mockNestedMenuItems} />,
-        { wrapper: createWrapper() }
-      );
+      render(<Navigation items={mockNestedMenuItems} />, { wrapper: createWrapper() });
 
       // Expand
       await user.click(screen.getByText('Settings'));
@@ -338,10 +300,7 @@ describe('Navigation', () => {
     });
 
     it('should show expand/collapse arrow for items with children', () => {
-      render(
-        <Navigation items={mockNestedMenuItems} />,
-        { wrapper: createWrapper() }
-      );
+      render(<Navigation items={mockNestedMenuItems} />, { wrapper: createWrapper() });
 
       const settingsButton = screen.getByText('Settings').closest('button');
       expect(settingsButton).toHaveTextContent('▶');
@@ -350,10 +309,7 @@ describe('Navigation', () => {
     it('should change arrow direction when expanded', async () => {
       const user = userEvent.setup();
 
-      render(
-        <Navigation items={mockNestedMenuItems} />,
-        { wrapper: createWrapper() }
-      );
+      render(<Navigation items={mockNestedMenuItems} />, { wrapper: createWrapper() });
 
       await user.click(screen.getByText('Settings'));
 
@@ -364,10 +320,7 @@ describe('Navigation', () => {
     it('should navigate to child item path when clicked', async () => {
       const user = userEvent.setup();
 
-      render(
-        <Navigation items={mockNestedMenuItems} />,
-        { wrapper: createWrapper() }
-      );
+      render(<Navigation items={mockNestedMenuItems} />, { wrapper: createWrapper() });
 
       // Expand settings
       await user.click(screen.getByText('Settings'));
@@ -381,10 +334,7 @@ describe('Navigation', () => {
     it('should support deeply nested menus', async () => {
       const user = userEvent.setup();
 
-      render(
-        <Navigation items={mockDeeplyNestedItems} />,
-        { wrapper: createWrapper() }
-      );
+      render(<Navigation items={mockDeeplyNestedItems} />, { wrapper: createWrapper() });
 
       // Expand Admin
       await user.click(screen.getByText('Admin'));
@@ -401,10 +351,7 @@ describe('Navigation', () => {
     it('should navigate with arrow keys', async () => {
       const user = userEvent.setup();
 
-      render(
-        <Navigation items={mockMenuItems} />,
-        { wrapper: createWrapper() }
-      );
+      render(<Navigation items={mockMenuItems} />, { wrapper: createWrapper() });
 
       // Focus on first item
       const homeButton = screen.getByText('Home').closest('button')!;
@@ -421,10 +368,7 @@ describe('Navigation', () => {
     it('should activate item with Enter key', async () => {
       const user = userEvent.setup();
 
-      render(
-        <Navigation items={mockMenuItems} />,
-        { wrapper: createWrapper('/') }
-      );
+      render(<Navigation items={mockMenuItems} />, { wrapper: createWrapper('/') });
 
       const usersButton = screen.getByText('Users').closest('button')!;
       usersButton.focus();
@@ -437,10 +381,7 @@ describe('Navigation', () => {
     it('should activate item with Space key', async () => {
       const user = userEvent.setup();
 
-      render(
-        <Navigation items={mockMenuItems} />,
-        { wrapper: createWrapper('/') }
-      );
+      render(<Navigation items={mockMenuItems} />, { wrapper: createWrapper('/') });
 
       const usersButton = screen.getByText('Users').closest('button')!;
       usersButton.focus();
@@ -453,10 +394,7 @@ describe('Navigation', () => {
     it('should expand/collapse submenu with Enter key', async () => {
       const user = userEvent.setup();
 
-      render(
-        <Navigation items={mockNestedMenuItems} />,
-        { wrapper: createWrapper() }
-      );
+      render(<Navigation items={mockNestedMenuItems} />, { wrapper: createWrapper() });
 
       const settingsButton = screen.getByText('Settings').closest('button')!;
       settingsButton.focus();
@@ -469,28 +407,23 @@ describe('Navigation', () => {
 
   describe('Orientation', () => {
     it('should apply horizontal orientation class by default', () => {
-      render(
-        <Navigation items={mockMenuItems} />,
-        { wrapper: createWrapper() }
-      );
+      render(<Navigation items={mockMenuItems} />, { wrapper: createWrapper() });
 
       expect(screen.getByTestId('emf-navigation')).toHaveClass('emf-navigation--horizontal');
     });
 
     it('should apply vertical orientation class when specified', () => {
-      render(
-        <Navigation items={mockMenuItems} orientation="vertical" />,
-        { wrapper: createWrapper() }
-      );
+      render(<Navigation items={mockMenuItems} orientation="vertical" />, {
+        wrapper: createWrapper(),
+      });
 
       expect(screen.getByTestId('emf-navigation')).toHaveClass('emf-navigation--vertical');
     });
 
     it('should set aria-orientation on menubar', () => {
-      render(
-        <Navigation items={mockMenuItems} orientation="vertical" />,
-        { wrapper: createWrapper() }
-      );
+      render(<Navigation items={mockMenuItems} orientation="vertical" />, {
+        wrapper: createWrapper(),
+      });
 
       expect(screen.getByRole('menubar')).toHaveAttribute('aria-orientation', 'vertical');
     });
@@ -498,58 +431,42 @@ describe('Navigation', () => {
 
   describe('Accessibility', () => {
     it('should have proper ARIA attributes', () => {
-      render(
-        <Navigation items={mockMenuItems} />,
-        { wrapper: createWrapper() }
-      );
+      render(<Navigation items={mockMenuItems} />, { wrapper: createWrapper() });
 
       expect(screen.getByRole('navigation')).toHaveAttribute('aria-label', 'Main navigation');
       expect(screen.getByRole('menubar')).toBeInTheDocument();
     });
 
     it('should have menuitem role for each item', () => {
-      render(
-        <Navigation items={mockMenuItems} />,
-        { wrapper: createWrapper() }
-      );
+      render(<Navigation items={mockMenuItems} />, { wrapper: createWrapper() });
 
       const menuItems = screen.getAllByRole('menuitem');
       expect(menuItems).toHaveLength(mockMenuItems.length);
     });
 
     it('should have aria-haspopup for items with children', () => {
-      render(
-        <Navigation items={mockNestedMenuItems} />,
-        { wrapper: createWrapper() }
-      );
+      render(<Navigation items={mockNestedMenuItems} />, { wrapper: createWrapper() });
 
       const settingsButton = screen.getByText('Settings').closest('button');
       expect(settingsButton).toHaveAttribute('aria-haspopup', 'true');
     });
 
     it('should apply custom className', () => {
-      render(
-        <Navigation items={mockMenuItems} className="custom-nav" />,
-        { wrapper: createWrapper() }
-      );
+      render(<Navigation items={mockMenuItems} className="custom-nav" />, {
+        wrapper: createWrapper(),
+      });
 
       expect(screen.getByTestId('emf-navigation')).toHaveClass('custom-nav');
     });
 
     it('should use custom testId', () => {
-      render(
-        <Navigation items={mockMenuItems} testId="my-nav" />,
-        { wrapper: createWrapper() }
-      );
+      render(<Navigation items={mockMenuItems} testId="my-nav" />, { wrapper: createWrapper() });
 
       expect(screen.getByTestId('my-nav')).toBeInTheDocument();
     });
 
     it('should apply collapsible class when enabled', () => {
-      render(
-        <Navigation items={mockMenuItems} collapsible />,
-        { wrapper: createWrapper() }
-      );
+      render(<Navigation items={mockMenuItems} collapsible />, { wrapper: createWrapper() });
 
       expect(screen.getByTestId('emf-navigation')).toHaveClass('emf-navigation--collapsible');
     });

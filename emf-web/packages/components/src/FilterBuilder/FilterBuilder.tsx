@@ -5,14 +5,14 @@ import { OPERATORS_BY_TYPE } from './types';
 
 /**
  * FilterBuilder component for building filter expressions.
- * 
+ *
  * Features:
  * - Displays available fields from schema
  * - Implements add/remove filter UI
  * - Shows appropriate operators for field types
  * - Provides type-appropriate value inputs
  * - Calls onFilterChange callback on changes
- * 
+ *
  * @example
  * ```tsx
  * <FilterBuilder
@@ -153,7 +153,9 @@ export function FilterBuilder({
           updateFilter(index, {
             value:
               inputType === 'number'
-                ? e.target.value === '' ? '' : Number(e.target.value)
+                ? e.target.value === ''
+                  ? ''
+                  : Number(e.target.value)
                 : e.target.value,
           })
         }
@@ -164,7 +166,7 @@ export function FilterBuilder({
   };
 
   return (
-    <div 
+    <div
       className={`emf-filter-builder ${className}`}
       data-testid={testId}
       role="group"
@@ -177,13 +179,13 @@ export function FilterBuilder({
           </div>
         )}
         {value.map((filter, index) => (
-          <div 
-            key={index} 
+          <div
+            key={index}
             className="emf-filter-builder__filter"
             role="listitem"
             data-filter-index={index}
           >
-            <label 
+            <label
               htmlFor={`filter-field-${index}`}
               className="emf-filter-builder__label emf-filter-builder__label--sr-only"
             >
@@ -203,7 +205,7 @@ export function FilterBuilder({
               ))}
             </select>
 
-            <label 
+            <label
               htmlFor={`filter-operator-${index}`}
               className="emf-filter-builder__label emf-filter-builder__label--sr-only"
             >
@@ -251,7 +253,8 @@ export function FilterBuilder({
         Add Filter
         {maxFilters && value.length > 0 && (
           <span className="emf-filter-builder__count">
-            {' '}({value.length}/{maxFilters})
+            {' '}
+            ({value.length}/{maxFilters})
           </span>
         )}
       </button>

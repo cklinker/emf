@@ -40,7 +40,9 @@ describe('Type Generator', () => {
     it('should generate simple types', () => {
       expect(generateFieldType({ name: 'id', type: 'string', required: true })).toBe('string');
       expect(generateFieldType({ name: 'count', type: 'number', required: true })).toBe('number');
-      expect(generateFieldType({ name: 'active', type: 'boolean', required: true })).toBe('boolean');
+      expect(generateFieldType({ name: 'active', type: 'boolean', required: true })).toBe(
+        'boolean'
+      );
     });
 
     it('should generate enum types', () => {
@@ -104,9 +106,7 @@ describe('Type Generator', () => {
       const collection: ParsedCollection = {
         name: 'users',
         displayName: 'Users',
-        fields: [
-          { name: 'id', type: 'string', required: true, description: 'Unique identifier' },
-        ],
+        fields: [{ name: 'id', type: 'string', required: true, description: 'Unique identifier' }],
         operations: [],
       };
 

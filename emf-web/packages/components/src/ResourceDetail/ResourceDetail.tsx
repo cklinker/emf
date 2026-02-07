@@ -37,26 +37,16 @@ export function getComponentRegistry(): ComponentRegistryInterface | undefined {
 const defaultRenderers: Record<string, FieldRenderer> = {
   string: (value) => String(value ?? ''),
   number: (value) => String(value ?? ''),
-  boolean: (value) => (
-    <span aria-label={value ? 'Yes' : 'No'}>{value ? 'Yes' : 'No'}</span>
-  ),
+  boolean: (value) => <span aria-label={value ? 'Yes' : 'No'}>{value ? 'Yes' : 'No'}</span>,
   date: (value) => {
     if (!value) return '';
     const date = new Date(value as string);
-    return (
-      <time dateTime={date.toISOString()}>
-        {date.toLocaleDateString()}
-      </time>
-    );
+    return <time dateTime={date.toISOString()}>{date.toLocaleDateString()}</time>;
   },
   datetime: (value) => {
     if (!value) return '';
     const date = new Date(value as string);
-    return (
-      <time dateTime={date.toISOString()}>
-        {date.toLocaleString()}
-      </time>
-    );
+    return <time dateTime={date.toISOString()}>{date.toLocaleString()}</time>;
   },
   json: (value) => (
     <pre className="emf-resource-detail__json">
@@ -68,7 +58,7 @@ const defaultRenderers: Record<string, FieldRenderer> = {
 
 /**
  * ResourceDetail component for displaying resource details in read-only mode.
- * 
+ *
  * Features:
  * - Fetches resource data and schema on mount
  * - Renders fields based on the Collection_Schema
@@ -76,7 +66,7 @@ const defaultRenderers: Record<string, FieldRenderer> = {
  * - Uses default renderers for standard types
  * - Handles field-level authorization (hides restricted fields)
  * - Provides loading and error states with proper accessibility
- * 
+ *
  * @example
  * ```tsx
  * <ResourceDetail
@@ -101,8 +91,8 @@ export function ResourceDetail({
   const user = useCurrentUser();
 
   // Fetch schema
-  const { 
-    data: schema, 
+  const {
+    data: schema,
     isLoading: schemaLoading,
     error: schemaError,
   } = useQuery({
@@ -116,9 +106,9 @@ export function ResourceDetail({
   });
 
   // Fetch resource data
-  const { 
-    data, 
-    isLoading: dataLoading, 
+  const {
+    data,
+    isLoading: dataLoading,
     error: dataError,
     refetch,
   } = useQuery({
@@ -129,13 +119,16 @@ export function ResourceDetail({
   });
 
   // Check if user has access to a field
-  const hasFieldAccess = useCallback((field: FieldDefinition, schemaData: ResourceMetadata | null | undefined): boolean => {
-    if (!schemaData?.authz?.fieldLevel) return true;
-    const requiredRoles = schemaData.authz.fieldLevel[field.name];
-    if (!requiredRoles || requiredRoles.length === 0) return true;
-    if (!user) return false;
-    return requiredRoles.some((role) => user.roles.includes(role));
-  }, [user]);
+  const hasFieldAccess = useCallback(
+    (field: FieldDefinition, schemaData: ResourceMetadata | null | undefined): boolean => {
+      if (!schemaData?.authz?.fieldLevel) return true;
+      const requiredRoles = schemaData.authz.fieldLevel[field.name];
+      if (!requiredRoles || requiredRoles.length === 0) return true;
+      if (!user) return false;
+      return requiredRoles.some((role) => user.roles.includes(role));
+    },
+    [user]
+  );
 
   // Get accessible fields
   const accessibleFields = useMemo((): FieldDefinition[] => {
@@ -144,31 +137,30 @@ export function ResourceDetail({
   }, [schema, hasFieldAccess]);
 
   // Get renderer for a field - checks custom renderers, then registry, then defaults
-  const getRenderer = useCallback((field: FieldDefinition): FieldRenderer => {
-    // First check custom renderers passed as props (by field name)
-    if (customRenderers[field.name]) {
-      return customRenderers[field.name];
-    }
-
-    // Then check ComponentRegistry for type-based renderers
-    const registry = getComponentRegistry();
-    if (registry?.hasFieldRenderer(field.type)) {
-      const RegistryRenderer = registry.getFieldRenderer(field.type);
-      if (RegistryRenderer) {
-        // Wrap the component-based renderer to match FieldRenderer signature
-        return (value: unknown, fieldDef: FieldDefinition) => (
-          <RegistryRenderer
-            value={value}
-            field={fieldDef}
-            readOnly={true}
-          />
-        );
+  const getRenderer = useCallback(
+    (field: FieldDefinition): FieldRenderer => {
+      // First check custom renderers passed as props (by field name)
+      if (customRenderers[field.name]) {
+        return customRenderers[field.name];
       }
-    }
 
-    // Fall back to default renderers
-    return defaultRenderers[field.type] || defaultRenderers.string;
-  }, [customRenderers]);
+      // Then check ComponentRegistry for type-based renderers
+      const registry = getComponentRegistry();
+      if (registry?.hasFieldRenderer(field.type)) {
+        const RegistryRenderer = registry.getFieldRenderer(field.type);
+        if (RegistryRenderer) {
+          // Wrap the component-based renderer to match FieldRenderer signature
+          return (value: unknown, fieldDef: FieldDefinition) => (
+            <RegistryRenderer value={value} field={fieldDef} readOnly={true} />
+          );
+        }
+      }
+
+      // Fall back to default renderers
+      return defaultRenderers[field.type] || defaultRenderers.string;
+    },
+    [customRenderers]
+  );
 
   // Combined error
   const error = schemaError || dataError;
@@ -177,7 +169,7 @@ export function ResourceDetail({
   // Render loading state
   if (isLoading) {
     return (
-      <div 
+      <div
         className={`emf-resource-detail emf-resource-detail--loading ${className}`}
         data-testid={testId}
         role="status"
@@ -194,7 +186,7 @@ export function ResourceDetail({
   // Render error state
   if (error) {
     return (
-      <div 
+      <div
         className={`emf-resource-detail emf-resource-detail--error ${className}`}
         data-testid={testId}
         role="alert"
@@ -203,7 +195,7 @@ export function ResourceDetail({
         <div className="emf-resource-detail__error">
           Error loading data: {error instanceof Error ? error.message : 'Unknown error'}
         </div>
-        <button 
+        <button
           className="emf-resource-detail__retry-button"
           onClick={() => void refetch()}
           aria-label="Retry loading data"
@@ -217,7 +209,7 @@ export function ResourceDetail({
   // Render not found state
   if (!schema) {
     return (
-      <div 
+      <div
         className={`emf-resource-detail emf-resource-detail--not-found ${className}`}
         data-testid={testId}
         role="alert"
@@ -231,7 +223,7 @@ export function ResourceDetail({
 
   if (!data) {
     return (
-      <div 
+      <div
         className={`emf-resource-detail emf-resource-detail--not-found ${className}`}
         data-testid={testId}
         role="alert"
@@ -246,20 +238,14 @@ export function ResourceDetail({
   const record = data as Record<string, unknown>;
 
   return (
-    <dl 
+    <dl
       className={`emf-resource-detail emf-resource-detail--${layout} ${className}`}
       data-testid={testId}
       aria-label={`${schema.displayName || resourceName} details`}
     >
       {accessibleFields.map((field) => (
-        <div 
-          key={field.name} 
-          className="emf-resource-detail__field" 
-          data-field={field.name}
-        >
-          <dt className="emf-resource-detail__label">
-            {field.displayName || field.name}
-          </dt>
+        <div key={field.name} className="emf-resource-detail__field" data-field={field.name}>
+          <dt className="emf-resource-detail__label">{field.displayName || field.name}</dt>
           <dd className="emf-resource-detail__value">
             {getRenderer(field)(record[field.name], field)}
           </dd>

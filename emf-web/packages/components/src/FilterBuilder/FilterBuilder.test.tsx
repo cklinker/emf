@@ -19,17 +19,9 @@ describe('FilterBuilder', () => {
     it('should display all available fields in the field selector', () => {
       const onChange = vi.fn();
       // Start with one filter already added
-      const existingFilters: FilterExpression[] = [
-        { field: 'name', operator: 'eq', value: '' },
-      ];
+      const existingFilters: FilterExpression[] = [{ field: 'name', operator: 'eq', value: '' }];
 
-      render(
-        <FilterBuilder
-          fields={mockFields}
-          value={existingFilters}
-          onChange={onChange}
-        />
-      );
+      render(<FilterBuilder fields={mockFields} value={existingFilters} onChange={onChange} />);
 
       // Check that all fields are available in the dropdown
       const fieldSelect = screen.getByLabelText(/filter field 1/i);
@@ -38,7 +30,7 @@ describe('FilterBuilder', () => {
       // Verify all field options are present by checking the select element
       const options = fieldSelect.querySelectorAll('option');
       expect(options).toHaveLength(mockFields.length);
-      
+
       mockFields.forEach((field, index) => {
         expect(options[index]).toHaveTextContent(field.displayName || field.name);
       });
@@ -46,21 +38,13 @@ describe('FilterBuilder', () => {
 
     it('should display field display names when available', () => {
       const onChange = vi.fn();
-      const existingFilters: FilterExpression[] = [
-        { field: 'name', operator: 'eq', value: '' },
-      ];
+      const existingFilters: FilterExpression[] = [{ field: 'name', operator: 'eq', value: '' }];
 
-      render(
-        <FilterBuilder
-          fields={mockFields}
-          value={existingFilters}
-          onChange={onChange}
-        />
-      );
+      render(<FilterBuilder fields={mockFields} value={existingFilters} onChange={onChange} />);
 
       const fieldSelect = screen.getByLabelText(/filter field 1/i);
       const options = fieldSelect.querySelectorAll('option');
-      
+
       expect(options[0]).toHaveTextContent('Full Name');
       expect(options[1]).toHaveTextContent('Email Address');
     });
@@ -68,13 +52,7 @@ describe('FilterBuilder', () => {
     it('should show empty state when no filters are applied', () => {
       const onChange = vi.fn();
 
-      render(
-        <FilterBuilder
-          fields={mockFields}
-          value={[]}
-          onChange={onChange}
-        />
-      );
+      render(<FilterBuilder fields={mockFields} value={[]} onChange={onChange} />);
 
       expect(screen.getByText(/no filters applied/i)).toBeInTheDocument();
     });
@@ -85,13 +63,7 @@ describe('FilterBuilder', () => {
       const user = userEvent.setup();
       const onChange = vi.fn();
 
-      render(
-        <FilterBuilder
-          fields={mockFields}
-          value={[]}
-          onChange={onChange}
-        />
-      );
+      render(<FilterBuilder fields={mockFields} value={[]} onChange={onChange} />);
 
       await user.click(screen.getByRole('button', { name: /add/i }));
 
@@ -112,21 +84,13 @@ describe('FilterBuilder', () => {
         { field: 'age', operator: 'gt', value: 25 },
       ];
 
-      render(
-        <FilterBuilder
-          fields={mockFields}
-          value={existingFilters}
-          onChange={onChange}
-        />
-      );
+      render(<FilterBuilder fields={mockFields} value={existingFilters} onChange={onChange} />);
 
       // Remove the first filter
       const removeButtons = screen.getAllByRole('button', { name: /remove filter/i });
       await user.click(removeButtons[0]);
 
-      expect(onChange).toHaveBeenCalledWith([
-        { field: 'age', operator: 'gt', value: 25 },
-      ]);
+      expect(onChange).toHaveBeenCalledWith([{ field: 'age', operator: 'gt', value: 25 }]);
     });
 
     it('should disable Add Filter button when max filters reached', () => {
@@ -151,13 +115,7 @@ describe('FilterBuilder', () => {
     it('should disable Add Filter button when no fields available', () => {
       const onChange = vi.fn();
 
-      render(
-        <FilterBuilder
-          fields={[]}
-          value={[]}
-          onChange={onChange}
-        />
-      );
+      render(<FilterBuilder fields={[]} value={[]} onChange={onChange} />);
 
       expect(screen.getByRole('button', { name: /add/i })).toBeDisabled();
     });
@@ -185,20 +143,12 @@ describe('FilterBuilder', () => {
     it('should show string operators for string fields', async () => {
       const user = userEvent.setup();
       const onChange = vi.fn();
-      const existingFilters: FilterExpression[] = [
-        { field: 'name', operator: 'eq', value: '' },
-      ];
+      const existingFilters: FilterExpression[] = [{ field: 'name', operator: 'eq', value: '' }];
 
-      render(
-        <FilterBuilder
-          fields={mockFields}
-          value={existingFilters}
-          onChange={onChange}
-        />
-      );
+      render(<FilterBuilder fields={mockFields} value={existingFilters} onChange={onChange} />);
 
       const operatorSelect = screen.getByLabelText(/filter operator 1/i);
-      
+
       // String operators should be available
       expect(screen.getByRole('option', { name: 'Equals' })).toBeInTheDocument();
       expect(screen.getByRole('option', { name: 'Contains' })).toBeInTheDocument();
@@ -208,17 +158,9 @@ describe('FilterBuilder', () => {
 
     it('should show number operators for number fields', async () => {
       const onChange = vi.fn();
-      const existingFilters: FilterExpression[] = [
-        { field: 'age', operator: 'eq', value: '' },
-      ];
+      const existingFilters: FilterExpression[] = [{ field: 'age', operator: 'eq', value: '' }];
 
-      render(
-        <FilterBuilder
-          fields={mockFields}
-          value={existingFilters}
-          onChange={onChange}
-        />
-      );
+      render(<FilterBuilder fields={mockFields} value={existingFilters} onChange={onChange} />);
 
       // Number operators should be available
       expect(screen.getByRole('option', { name: 'Equals' })).toBeInTheDocument();
@@ -234,13 +176,7 @@ describe('FilterBuilder', () => {
         { field: 'isActive', operator: 'eq', value: '' },
       ];
 
-      render(
-        <FilterBuilder
-          fields={mockFields}
-          value={existingFilters}
-          onChange={onChange}
-        />
-      );
+      render(<FilterBuilder fields={mockFields} value={existingFilters} onChange={onChange} />);
 
       // Boolean should only have equals
       const operatorSelect = screen.getByLabelText(/filter operator 1/i);
@@ -255,13 +191,7 @@ describe('FilterBuilder', () => {
         { field: 'createdAt', operator: 'eq', value: '' },
       ];
 
-      render(
-        <FilterBuilder
-          fields={mockFields}
-          value={existingFilters}
-          onChange={onChange}
-        />
-      );
+      render(<FilterBuilder fields={mockFields} value={existingFilters} onChange={onChange} />);
 
       // Date operators should be available
       expect(screen.getByRole('option', { name: 'Equals' })).toBeInTheDocument();
@@ -276,13 +206,7 @@ describe('FilterBuilder', () => {
         { field: 'name', operator: 'contains', value: 'test' },
       ];
 
-      render(
-        <FilterBuilder
-          fields={mockFields}
-          value={existingFilters}
-          onChange={onChange}
-        />
-      );
+      render(<FilterBuilder fields={mockFields} value={existingFilters} onChange={onChange} />);
 
       // Change field from string to number
       const fieldSelect = screen.getByLabelText(/filter field 1/i);
@@ -302,17 +226,9 @@ describe('FilterBuilder', () => {
   describe('Type-Appropriate Value Inputs (Requirement 14.5)', () => {
     it('should render text input for string fields', () => {
       const onChange = vi.fn();
-      const existingFilters: FilterExpression[] = [
-        { field: 'name', operator: 'eq', value: '' },
-      ];
+      const existingFilters: FilterExpression[] = [{ field: 'name', operator: 'eq', value: '' }];
 
-      render(
-        <FilterBuilder
-          fields={mockFields}
-          value={existingFilters}
-          onChange={onChange}
-        />
-      );
+      render(<FilterBuilder fields={mockFields} value={existingFilters} onChange={onChange} />);
 
       const valueInput = screen.getByLabelText(/filter value for name/i);
       expect(valueInput).toHaveAttribute('type', 'text');
@@ -320,17 +236,9 @@ describe('FilterBuilder', () => {
 
     it('should render number input for number fields', () => {
       const onChange = vi.fn();
-      const existingFilters: FilterExpression[] = [
-        { field: 'age', operator: 'eq', value: '' },
-      ];
+      const existingFilters: FilterExpression[] = [{ field: 'age', operator: 'eq', value: '' }];
 
-      render(
-        <FilterBuilder
-          fields={mockFields}
-          value={existingFilters}
-          onChange={onChange}
-        />
-      );
+      render(<FilterBuilder fields={mockFields} value={existingFilters} onChange={onChange} />);
 
       const valueInput = screen.getByLabelText(/filter value for age/i);
       expect(valueInput).toHaveAttribute('type', 'number');
@@ -342,13 +250,7 @@ describe('FilterBuilder', () => {
         { field: 'isActive', operator: 'eq', value: '' },
       ];
 
-      render(
-        <FilterBuilder
-          fields={mockFields}
-          value={existingFilters}
-          onChange={onChange}
-        />
-      );
+      render(<FilterBuilder fields={mockFields} value={existingFilters} onChange={onChange} />);
 
       const valueInput = screen.getByLabelText(/filter value for isActive/i);
       expect(valueInput.tagName).toBe('SELECT');
@@ -362,13 +264,7 @@ describe('FilterBuilder', () => {
         { field: 'createdAt', operator: 'eq', value: '' },
       ];
 
-      render(
-        <FilterBuilder
-          fields={mockFields}
-          value={existingFilters}
-          onChange={onChange}
-        />
-      );
+      render(<FilterBuilder fields={mockFields} value={existingFilters} onChange={onChange} />);
 
       const valueInput = screen.getByLabelText(/filter value for createdAt/i);
       expect(valueInput).toHaveAttribute('type', 'date');
@@ -380,13 +276,7 @@ describe('FilterBuilder', () => {
         { field: 'updatedAt', operator: 'eq', value: '' },
       ];
 
-      render(
-        <FilterBuilder
-          fields={mockFields}
-          value={existingFilters}
-          onChange={onChange}
-        />
-      );
+      render(<FilterBuilder fields={mockFields} value={existingFilters} onChange={onChange} />);
 
       const valueInput = screen.getByLabelText(/filter value for updatedAt/i);
       expect(valueInput).toHaveAttribute('type', 'datetime-local');
@@ -396,32 +286,20 @@ describe('FilterBuilder', () => {
   describe('onChange Callback (Requirement 14.5)', () => {
     it('should call onChange when filter value changes', async () => {
       const user = userEvent.setup();
-      let currentFilters: FilterExpression[] = [
-        { field: 'name', operator: 'eq', value: '' },
-      ];
+      let currentFilters: FilterExpression[] = [{ field: 'name', operator: 'eq', value: '' }];
       const onChange = vi.fn((newFilters) => {
         currentFilters = newFilters;
       });
 
       const { rerender } = render(
-        <FilterBuilder
-          fields={mockFields}
-          value={currentFilters}
-          onChange={onChange}
-        />
+        <FilterBuilder fields={mockFields} value={currentFilters} onChange={onChange} />
       );
 
       const valueInput = screen.getByLabelText(/filter value for name/i);
-      
+
       // Type one character at a time, rerendering with updated value
       await user.type(valueInput, 'J');
-      rerender(
-        <FilterBuilder
-          fields={mockFields}
-          value={currentFilters}
-          onChange={onChange}
-        />
-      );
+      rerender(<FilterBuilder fields={mockFields} value={currentFilters} onChange={onChange} />);
 
       expect(onChange).toHaveBeenCalled();
       expect(currentFilters[0].value).toBe('J');
@@ -434,13 +312,7 @@ describe('FilterBuilder', () => {
         { field: 'name', operator: 'eq', value: 'test' },
       ];
 
-      render(
-        <FilterBuilder
-          fields={mockFields}
-          value={existingFilters}
-          onChange={onChange}
-        />
-      );
+      render(<FilterBuilder fields={mockFields} value={existingFilters} onChange={onChange} />);
 
       const operatorSelect = screen.getByLabelText(/filter operator 1/i);
       await user.selectOptions(operatorSelect, 'contains');
@@ -461,13 +333,7 @@ describe('FilterBuilder', () => {
         { field: 'name', operator: 'eq', value: 'test' },
       ];
 
-      render(
-        <FilterBuilder
-          fields={mockFields}
-          value={existingFilters}
-          onChange={onChange}
-        />
-      );
+      render(<FilterBuilder fields={mockFields} value={existingFilters} onChange={onChange} />);
 
       const fieldSelect = screen.getByLabelText(/filter field 1/i);
       await user.selectOptions(fieldSelect, 'email');
@@ -481,33 +347,21 @@ describe('FilterBuilder', () => {
 
     it('should handle number value conversion correctly', async () => {
       const user = userEvent.setup();
-      let currentFilters: FilterExpression[] = [
-        { field: 'age', operator: 'gt', value: '' },
-      ];
+      let currentFilters: FilterExpression[] = [{ field: 'age', operator: 'gt', value: '' }];
       const onChange = vi.fn((newFilters) => {
         currentFilters = newFilters;
       });
 
       const { rerender } = render(
-        <FilterBuilder
-          fields={mockFields}
-          value={currentFilters}
-          onChange={onChange}
-        />
+        <FilterBuilder fields={mockFields} value={currentFilters} onChange={onChange} />
       );
 
       const valueInput = screen.getByLabelText(/filter value for age/i);
-      
+
       // Clear and type the number
       await user.clear(valueInput);
       await user.type(valueInput, '2');
-      rerender(
-        <FilterBuilder
-          fields={mockFields}
-          value={currentFilters}
-          onChange={onChange}
-        />
-      );
+      rerender(<FilterBuilder fields={mockFields} value={currentFilters} onChange={onChange} />);
       await user.type(valueInput, '5');
 
       // The last call should have a number value
@@ -522,13 +376,7 @@ describe('FilterBuilder', () => {
         { field: 'isActive', operator: 'eq', value: '' },
       ];
 
-      render(
-        <FilterBuilder
-          fields={mockFields}
-          value={existingFilters}
-          onChange={onChange}
-        />
-      );
+      render(<FilterBuilder fields={mockFields} value={existingFilters} onChange={onChange} />);
 
       const valueInput = screen.getByLabelText(/filter value for isActive/i);
       await user.selectOptions(valueInput, 'true');
@@ -552,17 +400,11 @@ describe('FilterBuilder', () => {
         { field: 'isActive', operator: 'eq', value: true },
       ];
 
-      render(
-        <FilterBuilder
-          fields={mockFields}
-          value={existingFilters}
-          onChange={onChange}
-        />
-      );
+      render(<FilterBuilder fields={mockFields} value={existingFilters} onChange={onChange} />);
 
-      const filterItems = screen.getAllByRole('listitem').filter(
-        item => item.getAttribute('data-filter-index') !== null
-      );
+      const filterItems = screen
+        .getAllByRole('listitem')
+        .filter((item) => item.getAttribute('data-filter-index') !== null);
       expect(filterItems).toHaveLength(3);
     });
 
@@ -574,13 +416,7 @@ describe('FilterBuilder', () => {
         { field: 'age', operator: 'gt', value: 25 },
       ];
 
-      render(
-        <FilterBuilder
-          fields={mockFields}
-          value={existingFilters}
-          onChange={onChange}
-        />
-      );
+      render(<FilterBuilder fields={mockFields} value={existingFilters} onChange={onChange} />);
 
       // Update the second filter's operator
       const operatorSelects = screen.getAllByLabelText(/filter operator/i);
@@ -597,13 +433,7 @@ describe('FilterBuilder', () => {
     it('should have proper ARIA attributes', () => {
       const onChange = vi.fn();
 
-      render(
-        <FilterBuilder
-          fields={mockFields}
-          value={[]}
-          onChange={onChange}
-        />
-      );
+      render(<FilterBuilder fields={mockFields} value={[]} onChange={onChange} />);
 
       const container = screen.getByTestId('emf-filter-builder');
       expect(container).toHaveAttribute('role', 'group');
@@ -612,17 +442,9 @@ describe('FilterBuilder', () => {
 
     it('should have accessible labels for all inputs', () => {
       const onChange = vi.fn();
-      const existingFilters: FilterExpression[] = [
-        { field: 'name', operator: 'eq', value: '' },
-      ];
+      const existingFilters: FilterExpression[] = [{ field: 'name', operator: 'eq', value: '' }];
 
-      render(
-        <FilterBuilder
-          fields={mockFields}
-          value={existingFilters}
-          onChange={onChange}
-        />
-      );
+      render(<FilterBuilder fields={mockFields} value={existingFilters} onChange={onChange} />);
 
       expect(screen.getByLabelText(/filter field 1/i)).toBeInTheDocument();
       expect(screen.getByLabelText(/filter operator 1/i)).toBeInTheDocument();

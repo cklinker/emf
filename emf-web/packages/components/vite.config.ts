@@ -8,7 +8,14 @@ export default defineConfig({
     react(),
     dts({
       include: ['src/**/*.ts', 'src/**/*.tsx'],
-      exclude: ['**/*.test.ts', '**/*.test.tsx', '**/*.spec.ts', '**/*.spec.tsx', '**/*.property.test.ts', '**/*.property.test.tsx'],
+      exclude: [
+        '**/*.test.ts',
+        '**/*.test.tsx',
+        '**/*.spec.ts',
+        '**/*.spec.tsx',
+        '**/*.property.test.ts',
+        '**/*.property.test.tsx',
+      ],
       rollupTypes: true,
     }),
   ],

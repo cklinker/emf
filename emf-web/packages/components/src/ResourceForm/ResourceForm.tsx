@@ -61,10 +61,9 @@ function buildZodSchema(fields: FieldDefinition[]): z.ZodObject<Record<string, z
         break;
       case 'date':
       case 'datetime':
-        fieldSchema = z.string().refine(
-          (val) => !val || !isNaN(Date.parse(val)),
-          { message: 'Invalid date format' }
-        );
+        fieldSchema = z
+          .string()
+          .refine((val) => !val || !isNaN(Date.parse(val)), { message: 'Invalid date format' });
         break;
       case 'json':
         fieldSchema = z.string().refine(
@@ -91,7 +90,11 @@ function buildZodSchema(fields: FieldDefinition[]): z.ZodObject<Record<string, z
 
     // Apply validation rules (only for non-number types, as number is handled above)
     if (field.validation && field.type !== 'number') {
-      fieldSchema = applyValidationRules(fieldSchema, field.validation as Record<string, unknown>, field.type);
+      fieldSchema = applyValidationRules(
+        fieldSchema,
+        field.validation as Record<string, unknown>,
+        field.type
+      );
     } else if (field.validation && field.type === 'number') {
       // For numbers, we need to apply validation after the preprocess
       // This is handled in the preprocess above
@@ -160,7 +163,7 @@ function applyValidationRules(
 
 /**
  * ResourceForm component for creating and editing resources
- * 
+ *
  * Features:
  * - Fetches collection schema on mount
  * - Generates form fields from schema
@@ -185,7 +188,11 @@ export function ResourceForm({
   const isEditMode = !!recordId;
 
   // Fetch schema
-  const { data: schema, isLoading: schemaLoading, error: schemaError } = useQuery({
+  const {
+    data: schema,
+    isLoading: schemaLoading,
+    error: schemaError,
+  } = useQuery({
     queryKey: ['schema', resourceName],
     queryFn: async () => {
       const resources = await client.discover();
@@ -194,13 +201,16 @@ export function ResourceForm({
   });
 
   // Check if user has access to a field
-  const hasFieldAccess = useCallback((field: FieldDefinition, schemaData: ResourceMetadata | undefined): boolean => {
-    if (!schemaData?.authz?.fieldLevel) return true;
-    const requiredRoles = schemaData.authz.fieldLevel[field.name];
-    if (!requiredRoles || requiredRoles.length === 0) return true;
-    if (!user) return false;
-    return requiredRoles.some((role) => user.roles.includes(role));
-  }, [user]);
+  const hasFieldAccess = useCallback(
+    (field: FieldDefinition, schemaData: ResourceMetadata | undefined): boolean => {
+      if (!schemaData?.authz?.fieldLevel) return true;
+      const requiredRoles = schemaData.authz.fieldLevel[field.name];
+      if (!requiredRoles || requiredRoles.length === 0) return true;
+      if (!user) return false;
+      return requiredRoles.some((role) => user.roles.includes(role));
+    },
+    [user]
+  );
 
   // Get accessible fields
   const accessibleFields = useMemo((): FieldDefinition[] => {
@@ -227,7 +237,11 @@ export function ResourceForm({
   });
 
   // Fetch existing data for edit mode
-  const { data: existingData, isLoading: dataLoading, error: dataError } = useQuery({
+  const {
+    data: existingData,
+    isLoading: dataLoading,
+    error: dataError,
+  } = useQuery({
     queryKey: ['resource', resourceName, recordId],
     queryFn: () => {
       if (!recordId) return null;
@@ -251,10 +265,10 @@ export function ResourceForm({
     onMutate: async () => {
       // Cancel any outgoing refetches
       await queryClient.cancelQueries({ queryKey: ['resource', resourceName] });
-      
+
       // Snapshot the previous value
       const previousData = queryClient.getQueryData(['resource', resourceName, 'list']);
-      
+
       return { previousData };
     },
     onSuccess: (data) => {
@@ -279,13 +293,13 @@ export function ResourceForm({
     onMutate: async (newData) => {
       // Cancel any outgoing refetches
       await queryClient.cancelQueries({ queryKey: ['resource', resourceName, recordId] });
-      
+
       // Snapshot the previous value
       const previousData = queryClient.getQueryData(['resource', resourceName, recordId]);
-      
+
       // Optimistically update to the new value
       queryClient.setQueryData(['resource', resourceName, recordId], newData);
-      
+
       return { previousData };
     },
     onSuccess: (data) => {
@@ -305,7 +319,7 @@ export function ResourceForm({
   const onSubmit = async (data: Record<string, unknown>): Promise<void> => {
     // Transform data before submission (e.g., parse JSON fields)
     const transformedData = transformFormData(data, accessibleFields);
-    
+
     if (isEditMode) {
       await updateMutation.mutateAsync(transformedData);
     } else {
@@ -319,7 +333,11 @@ export function ResourceForm({
   // Render loading state
   if (schemaLoading || (isEditMode && dataLoading)) {
     return (
-      <div className={`emf-resource-form emf-resource-form--loading ${className}`} role="status" aria-busy="true">
+      <div
+        className={`emf-resource-form emf-resource-form--loading ${className}`}
+        role="status"
+        aria-busy="true"
+      >
         <div className="emf-resource-form__loading">Loading...</div>
       </div>
     );
@@ -330,7 +348,9 @@ export function ResourceForm({
     return (
       <div className={`emf-resource-form emf-resource-form--error ${className}`} role="alert">
         <div className="emf-resource-form__error">
-          {schemaError ? `Error loading schema: ${schemaError.message}` : 'Resource schema not found'}
+          {schemaError
+            ? `Error loading schema: ${schemaError.message}`
+            : 'Resource schema not found'}
         </div>
       </div>
     );
@@ -340,9 +360,7 @@ export function ResourceForm({
   if (isEditMode && dataError) {
     return (
       <div className={`emf-resource-form emf-resource-form--error ${className}`} role="alert">
-        <div className="emf-resource-form__error">
-          Error loading data: {dataError.message}
-        </div>
+        <div className="emf-resource-form__error">Error loading data: {dataError.message}</div>
       </div>
     );
   }
@@ -361,22 +379,26 @@ export function ResourceForm({
       )}
 
       {accessibleFields.map((field) => (
-        <div 
-          key={field.name} 
-          className={`emf-resource-form__field ${errors[field.name] ? 'emf-resource-form__field--error' : ''}`} 
+        <div
+          key={field.name}
+          className={`emf-resource-form__field ${errors[field.name] ? 'emf-resource-form__field--error' : ''}`}
           data-field={field.name}
         >
           <label className="emf-resource-form__label" htmlFor={`field-${field.name}`}>
             {field.displayName ?? field.name}
-            {field.required && <span className="emf-resource-form__required" aria-label="required">*</span>}
+            {field.required && (
+              <span className="emf-resource-form__required" aria-label="required">
+                *
+              </span>
+            )}
           </label>
-          
+
           {renderField(field, {
             register,
             control,
             readOnly,
           })}
-          
+
           {errors[field.name] && (
             <span className="emf-resource-form__error-message" role="alert">
               {(errors[field.name] as { message?: string })?.message ?? 'Invalid value'}
@@ -506,40 +528,18 @@ function renderDefaultFieldInput(
 
   switch (field.type) {
     case 'boolean':
-      return (
-        <input 
-          type="checkbox" 
-          {...register(field.name)}
-          {...commonProps}
-        />
-      );
+      return <input type="checkbox" {...register(field.name)} {...commonProps} />;
     case 'number':
       return (
-        <input 
-          type="number" 
-          {...register(field.name, { valueAsNumber: true })}
-          {...commonProps}
-        />
+        <input type="number" {...register(field.name, { valueAsNumber: true })} {...commonProps} />
       );
     case 'date':
-      return (
-        <input 
-          type="date" 
-          {...register(field.name)}
-          {...commonProps}
-        />
-      );
+      return <input type="date" {...register(field.name)} {...commonProps} />;
     case 'datetime':
-      return (
-        <input 
-          type="datetime-local" 
-          {...register(field.name)}
-          {...commonProps}
-        />
-      );
+      return <input type="datetime-local" {...register(field.name)} {...commonProps} />;
     case 'json':
       return (
-        <textarea 
+        <textarea
           {...register(field.name)}
           {...commonProps}
           rows={4}
@@ -548,8 +548,8 @@ function renderDefaultFieldInput(
       );
     case 'reference':
       return (
-        <input 
-          type="text" 
+        <input
+          type="text"
           {...register(field.name)}
           {...commonProps}
           placeholder={`Reference to ${field.referenceTarget ?? 'resource'}`}
@@ -557,12 +557,6 @@ function renderDefaultFieldInput(
       );
     case 'string':
     default:
-      return (
-        <input 
-          type="text" 
-          {...register(field.name)}
-          {...commonProps}
-        />
-      );
+      return <input type="text" {...register(field.name)} {...commonProps} />;
   }
 }

@@ -41,10 +41,7 @@ describe('PageLayout', () => {
 
     it('should render header and footer together', () => {
       render(
-        <PageLayout
-          header={<div>Header</div>}
-          footer={<div>Footer</div>}
-        >
+        <PageLayout header={<div>Header</div>} footer={<div>Footer</div>}>
           <div>Main</div>
         </PageLayout>
       );
@@ -78,10 +75,7 @@ describe('PageLayout', () => {
   describe('Accessibility', () => {
     it('should have proper semantic roles', () => {
       render(
-        <PageLayout
-          header={<div>Header</div>}
-          footer={<div>Footer</div>}
-        >
+        <PageLayout header={<div>Header</div>} footer={<div>Footer</div>}>
           <div>Main</div>
         </PageLayout>
       );
@@ -141,12 +135,7 @@ describe('TwoColumnLayout', () => {
     });
 
     it('should render sidebar on left by default', () => {
-      render(
-        <TwoColumnLayout
-          sidebar={<div>Sidebar</div>}
-          main={<div>Main</div>}
-        />
-      );
+      render(<TwoColumnLayout sidebar={<div>Sidebar</div>} main={<div>Main</div>} />);
 
       const layout = screen.getByTestId('emf-two-column-layout');
       expect(layout).toHaveClass('emf-two-column-layout--sidebar-left');
@@ -171,11 +160,7 @@ describe('TwoColumnLayout', () => {
   describe('Configurable Sidebar (Requirement 16.2)', () => {
     it('should apply custom sidebar width', () => {
       render(
-        <TwoColumnLayout
-          sidebar={<div>Sidebar</div>}
-          main={<div>Main</div>}
-          sidebarWidth="300px"
-        />
+        <TwoColumnLayout sidebar={<div>Sidebar</div>} main={<div>Main</div>} sidebarWidth="300px" />
       );
 
       const layout = screen.getByTestId('emf-two-column-layout');
@@ -183,12 +168,7 @@ describe('TwoColumnLayout', () => {
     });
 
     it('should use default sidebar width when not specified', () => {
-      render(
-        <TwoColumnLayout
-          sidebar={<div>Sidebar</div>}
-          main={<div>Main</div>}
-        />
-      );
+      render(<TwoColumnLayout sidebar={<div>Sidebar</div>} main={<div>Main</div>} />);
 
       const layout = screen.getByTestId('emf-two-column-layout');
       expect(layout).toHaveStyle({ '--sidebar-width': '250px' });
@@ -205,7 +185,9 @@ describe('TwoColumnLayout', () => {
         />
       );
 
-      expect(screen.getByTestId('emf-two-column-layout')).toHaveClass('emf-two-column-layout--collapsible');
+      expect(screen.getByTestId('emf-two-column-layout')).toHaveClass(
+        'emf-two-column-layout--collapsible'
+      );
     });
 
     it('should not apply collapsible class when disabled', () => {
@@ -217,7 +199,9 @@ describe('TwoColumnLayout', () => {
         />
       );
 
-      expect(screen.getByTestId('emf-two-column-layout')).not.toHaveClass('emf-two-column-layout--collapsible');
+      expect(screen.getByTestId('emf-two-column-layout')).not.toHaveClass(
+        'emf-two-column-layout--collapsible'
+      );
     });
 
     it('should apply custom breakpoints as CSS variables', () => {
@@ -238,24 +222,14 @@ describe('TwoColumnLayout', () => {
 
   describe('Accessibility', () => {
     it('should have proper semantic roles', () => {
-      render(
-        <TwoColumnLayout
-          sidebar={<div>Sidebar</div>}
-          main={<div>Main</div>}
-        />
-      );
+      render(<TwoColumnLayout sidebar={<div>Sidebar</div>} main={<div>Main</div>} />);
 
       expect(screen.getByRole('complementary')).toBeInTheDocument();
       expect(screen.getByRole('main')).toBeInTheDocument();
     });
 
     it('should have aria-label on sidebar', () => {
-      render(
-        <TwoColumnLayout
-          sidebar={<div>Sidebar</div>}
-          main={<div>Main</div>}
-        />
-      );
+      render(<TwoColumnLayout sidebar={<div>Sidebar</div>} main={<div>Main</div>} />);
 
       expect(screen.getByRole('complementary')).toHaveAttribute('aria-label', 'Sidebar');
     });
@@ -327,7 +301,7 @@ describe('ThreeColumnLayout', () => {
 
       const layout = screen.getByTestId('emf-three-column-layout');
       const children = layout.children;
-      
+
       expect(children[0]).toHaveClass('emf-three-column-layout__left');
       expect(children[1]).toHaveClass('emf-three-column-layout__main');
       expect(children[2]).toHaveClass('emf-three-column-layout__right');
@@ -365,11 +339,7 @@ describe('ThreeColumnLayout', () => {
 
     it('should use default widths when not specified', () => {
       render(
-        <ThreeColumnLayout
-          left={<div>Left</div>}
-          main={<div>Main</div>}
-          right={<div>Right</div>}
-        />
+        <ThreeColumnLayout left={<div>Left</div>} main={<div>Main</div>} right={<div>Right</div>} />
       );
 
       const layout = screen.getByTestId('emf-three-column-layout');
@@ -389,7 +359,9 @@ describe('ThreeColumnLayout', () => {
         />
       );
 
-      expect(screen.getByTestId('emf-three-column-layout')).toHaveClass('emf-three-column-layout--collapsible');
+      expect(screen.getByTestId('emf-three-column-layout')).toHaveClass(
+        'emf-three-column-layout--collapsible'
+      );
     });
 
     it('should not apply collapsible class when disabled', () => {
@@ -402,7 +374,9 @@ describe('ThreeColumnLayout', () => {
         />
       );
 
-      expect(screen.getByTestId('emf-three-column-layout')).not.toHaveClass('emf-three-column-layout--collapsible');
+      expect(screen.getByTestId('emf-three-column-layout')).not.toHaveClass(
+        'emf-three-column-layout--collapsible'
+      );
     });
 
     it('should apply custom breakpoints as CSS variables', () => {
@@ -425,11 +399,7 @@ describe('ThreeColumnLayout', () => {
   describe('Accessibility', () => {
     it('should have proper semantic roles', () => {
       render(
-        <ThreeColumnLayout
-          left={<div>Left</div>}
-          main={<div>Main</div>}
-          right={<div>Right</div>}
-        />
+        <ThreeColumnLayout left={<div>Left</div>} main={<div>Main</div>} right={<div>Right</div>} />
       );
 
       const sidebars = screen.getAllByRole('complementary');
@@ -439,11 +409,7 @@ describe('ThreeColumnLayout', () => {
 
     it('should have aria-labels on sidebars', () => {
       render(
-        <ThreeColumnLayout
-          left={<div>Left</div>}
-          main={<div>Main</div>}
-          right={<div>Right</div>}
-        />
+        <ThreeColumnLayout left={<div>Left</div>} main={<div>Main</div>} right={<div>Right</div>} />
       );
 
       expect(screen.getByLabelText('Left sidebar')).toBeInTheDocument();

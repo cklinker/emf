@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * CLI tool for generating TypeScript types from OpenAPI specifications
- * 
+ *
  * Usage:
  *   npx @emf/sdk generate-types --url <openapi-url> --output <output-file>
  *   npx @emf/sdk generate-types -u http://localhost:8080/openapi.json -o ./src/types/api.ts
@@ -109,8 +109,12 @@ export async function fetchOpenAPISpec(url: string): Promise<unknown> {
   }
 
   const contentType = response.headers.get('content-type') || '';
-  
-  if (contentType.includes('application/json') || contentType.includes('application/yaml') || url.endsWith('.json')) {
+
+  if (
+    contentType.includes('application/json') ||
+    contentType.includes('application/yaml') ||
+    url.endsWith('.json')
+  ) {
     return response.json() as Promise<unknown>;
   }
 
@@ -247,11 +251,12 @@ export function generateTypesFromSpec(
 
 // Run CLI if executed directly
 // Check if this module is the main entry point
-const isMainModule = typeof process !== 'undefined' && 
-  process.argv[1] && 
-  (process.argv[1].endsWith('generate-types.ts') || 
-   process.argv[1].endsWith('generate-types.js') ||
-   process.argv[1].includes('@emf/sdk'));
+const isMainModule =
+  typeof process !== 'undefined' &&
+  process.argv[1] &&
+  (process.argv[1].endsWith('generate-types.ts') ||
+    process.argv[1].endsWith('generate-types.js') ||
+    process.argv[1].includes('@emf/sdk'));
 
 if (isMainModule) {
   main(process.argv.slice(2)).catch((error) => {

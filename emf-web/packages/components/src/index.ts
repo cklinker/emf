@@ -14,11 +14,23 @@ export { DataTable } from './DataTable/DataTable';
 export type { DataTableProps, ColumnDefinition } from './DataTable/types';
 
 // ResourceForm
-export { ResourceForm, setComponentRegistry, getComponentRegistry } from './ResourceForm/ResourceForm';
-export type { ResourceFormProps, FieldRendererProps, FieldRendererComponent } from './ResourceForm/types';
+export {
+  ResourceForm,
+  setComponentRegistry,
+  getComponentRegistry,
+} from './ResourceForm/ResourceForm';
+export type {
+  ResourceFormProps,
+  FieldRendererProps,
+  FieldRendererComponent,
+} from './ResourceForm/types';
 
 // ResourceDetail
-export { ResourceDetail, setComponentRegistry as setDetailComponentRegistry, getComponentRegistry as getDetailComponentRegistry } from './ResourceDetail/ResourceDetail';
+export {
+  ResourceDetail,
+  setComponentRegistry as setDetailComponentRegistry,
+  getComponentRegistry as getDetailComponentRegistry,
+} from './ResourceDetail/ResourceDetail';
 export type { ResourceDetailProps, FieldRenderer } from './ResourceDetail/types';
 
 // FilterBuilder

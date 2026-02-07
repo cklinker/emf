@@ -16,7 +16,10 @@ interface UseResourceListResult<T> {
 /**
  * Hook for fetching a list of resources
  */
-export function useResourceList<T = unknown>(resourceName: string, options?: ListOptions): UseResourceListResult<T> {
+export function useResourceList<T = unknown>(
+  resourceName: string,
+  options?: ListOptions
+): UseResourceListResult<T> {
   const client = useEMFClient();
   const resource = client.resource<T>(resourceName);
 

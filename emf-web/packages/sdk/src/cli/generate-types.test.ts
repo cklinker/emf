@@ -18,7 +18,12 @@ describe('CLI generate-types', () => {
     });
 
     it('should parse valid arguments with long flags', () => {
-      const result = parseArgs(['--url', 'http://example.com/openapi.json', '--output', './types.ts']);
+      const result = parseArgs([
+        '--url',
+        'http://example.com/openapi.json',
+        '--output',
+        './types.ts',
+      ]);
       expect(result).toEqual({
         url: 'http://example.com/openapi.json',
         output: './types.ts',
@@ -28,13 +33,25 @@ describe('CLI generate-types', () => {
     });
 
     it('should parse --no-requests flag', () => {
-      const result = parseArgs(['-u', 'http://example.com/openapi.json', '-o', './types.ts', '--no-requests']);
+      const result = parseArgs([
+        '-u',
+        'http://example.com/openapi.json',
+        '-o',
+        './types.ts',
+        '--no-requests',
+      ]);
       expect(result).not.toHaveProperty('error');
       expect((result as any).includeRequests).toBe(false);
     });
 
     it('should parse --no-responses flag', () => {
-      const result = parseArgs(['-u', 'http://example.com/openapi.json', '-o', './types.ts', '--no-responses']);
+      const result = parseArgs([
+        '-u',
+        'http://example.com/openapi.json',
+        '-o',
+        './types.ts',
+        '--no-responses',
+      ]);
       expect(result).not.toHaveProperty('error');
       expect((result as any).includeResponses).toBe(false);
     });
@@ -58,7 +75,13 @@ describe('CLI generate-types', () => {
     });
 
     it('should return error for unknown option', () => {
-      const result = parseArgs(['-u', 'http://example.com/openapi.json', '-o', './types.ts', '--unknown']);
+      const result = parseArgs([
+        '-u',
+        'http://example.com/openapi.json',
+        '-o',
+        './types.ts',
+        '--unknown',
+      ]);
       expect(result).toHaveProperty('error');
       expect((result as any).error).toContain('Unknown option');
     });

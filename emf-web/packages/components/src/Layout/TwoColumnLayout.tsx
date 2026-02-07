@@ -11,14 +11,14 @@ const DEFAULT_BREAKPOINTS = {
 
 /**
  * TwoColumnLayout component for sidebar layouts.
- * 
+ *
  * Features:
  * - Configurable sidebar width and position
  * - Responsive behavior with breakpoints
  * - Collapsible sidebar on mobile
  * - Flexbox-based layout system
  * - Supports custom styling props
- * 
+ *
  * @example
  * ```tsx
  * <TwoColumnLayout
@@ -57,26 +57,15 @@ export function TwoColumnLayout({
       data-sidebar-position={sidebarPosition}
     >
       {sidebarPosition === 'left' && (
-        <aside 
-          className="emf-two-column-layout__sidebar"
-          role="complementary"
-          aria-label="Sidebar"
-        >
+        <aside className="emf-two-column-layout__sidebar" role="complementary" aria-label="Sidebar">
           {sidebar}
         </aside>
       )}
-      <main 
-        className="emf-two-column-layout__main"
-        role="main"
-      >
+      <main className="emf-two-column-layout__main" role="main">
         {main}
       </main>
       {sidebarPosition === 'right' && (
-        <aside 
-          className="emf-two-column-layout__sidebar"
-          role="complementary"
-          aria-label="Sidebar"
-        >
+        <aside className="emf-two-column-layout__sidebar" role="complementary" aria-label="Sidebar">
           {sidebar}
         </aside>
       )}

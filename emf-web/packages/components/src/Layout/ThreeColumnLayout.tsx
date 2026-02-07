@@ -11,14 +11,14 @@ const DEFAULT_BREAKPOINTS = {
 
 /**
  * ThreeColumnLayout component for complex layouts with left and right sidebars.
- * 
+ *
  * Features:
  * - Configurable left and right sidebar widths
  * - Responsive behavior with breakpoints
  * - Collapsible sidebars on mobile
  * - Flexbox-based layout system
  * - Supports custom styling props
- * 
+ *
  * @example
  * ```tsx
  * <ThreeColumnLayout
@@ -53,25 +53,22 @@ export function ThreeColumnLayout({
   } as React.CSSProperties;
 
   return (
-    <div 
-      className={`emf-three-column-layout ${collapsibleOnMobile ? 'emf-three-column-layout--collapsible' : ''} ${className}`} 
+    <div
+      className={`emf-three-column-layout ${collapsibleOnMobile ? 'emf-three-column-layout--collapsible' : ''} ${className}`}
       style={layoutStyle}
       data-testid={testId}
     >
-      <aside 
+      <aside
         className="emf-three-column-layout__left"
         role="complementary"
         aria-label="Left sidebar"
       >
         {left}
       </aside>
-      <main 
-        className="emf-three-column-layout__main"
-        role="main"
-      >
+      <main className="emf-three-column-layout__main" role="main">
         {main}
       </main>
-      <aside 
+      <aside
         className="emf-three-column-layout__right"
         role="complementary"
         aria-label="Right sidebar"

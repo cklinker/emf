@@ -21,10 +21,7 @@ export function isReferenceObject(obj: unknown): obj is ReferenceObject {
 /**
  * Resolve a reference to its schema
  */
-export function resolveReference(
-  ref: string,
-  spec: OpenAPISpec
-): SchemaObject | undefined {
+export function resolveReference(ref: string, spec: OpenAPISpec): SchemaObject | undefined {
   // Reference format: #/components/schemas/SchemaName
   const parts = ref.split('/');
   if (parts[0] !== '#' || parts[1] !== 'components' || parts[2] !== 'schemas') {
@@ -56,10 +53,7 @@ export function getSchema(
 /**
  * Map OpenAPI type to TypeScript type
  */
-export function mapOpenAPITypeToTS(
-  schema: SchemaObject,
-  spec: OpenAPISpec
-): string {
+export function mapOpenAPITypeToTS(schema: SchemaObject, spec: OpenAPISpec): string {
   if (schema.$ref) {
     const refParts = schema.$ref.split('/');
     return refParts[refParts.length - 1];

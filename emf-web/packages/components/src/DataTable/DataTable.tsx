@@ -6,7 +6,7 @@ import type { DataTableProps, ColumnDefinition } from './types';
 
 /**
  * DataTable component for displaying resource lists with TanStack Query integration.
- * 
+ *
  * Features:
  * - Data fetching using EMFClient
  * - Column rendering based on configuration
@@ -15,7 +15,7 @@ import type { DataTableProps, ColumnDefinition } from './types';
  * - Filter application
  * - Loading and error states
  * - Keyboard navigation support for accessibility
- * 
+ *
  * @example
  * ```tsx
  * <DataTable
@@ -77,35 +77,41 @@ export function DataTable<T = unknown>({
   });
 
   // Handle page change
-  const handlePageChange = useCallback((newPage: number) => {
-    setPage(newPage);
-    setFocusedRowIndex(-1); // Reset focus when page changes
-    onPageChange?.(newPage);
-  }, [onPageChange]);
+  const handlePageChange = useCallback(
+    (newPage: number) => {
+      setPage(newPage);
+      setFocusedRowIndex(-1); // Reset focus when page changes
+      onPageChange?.(newPage);
+    },
+    [onPageChange]
+  );
 
   // Handle column header click for sorting
-  const handleSort = useCallback((column: ColumnDefinition<T>) => {
-    if (!column.sortable) return;
+  const handleSort = useCallback(
+    (column: ColumnDefinition<T>) => {
+      if (!column.sortable) return;
 
-    setSort((prevSort) => {
-      const field = String(column.field);
-      const existing = prevSort.find((s) => s.field === field);
+      setSort((prevSort) => {
+        const field = String(column.field);
+        const existing = prevSort.find((s) => s.field === field);
 
-      let newSort: SortCriteria[];
-      if (!existing) {
-        newSort = [...prevSort, { field, direction: 'asc' as const }];
-      } else if (existing.direction === 'asc') {
-        newSort = prevSort.map((s) =>
-          s.field === field ? { ...s, direction: 'desc' as const } : s
-        );
-      } else {
-        newSort = prevSort.filter((s) => s.field !== field);
-      }
+        let newSort: SortCriteria[];
+        if (!existing) {
+          newSort = [...prevSort, { field, direction: 'asc' as const }];
+        } else if (existing.direction === 'asc') {
+          newSort = prevSort.map((s) =>
+            s.field === field ? { ...s, direction: 'desc' as const } : s
+          );
+        } else {
+          newSort = prevSort.filter((s) => s.field !== field);
+        }
 
-      onSortChange?.(newSort);
-      return newSort;
-    });
-  }, [onSortChange]);
+        onSortChange?.(newSort);
+        return newSort;
+      });
+    },
+    [onSortChange]
+  );
 
   // Handle row selection
   const handleRowSelect = useCallback(
@@ -114,9 +120,7 @@ export function DataTable<T = unknown>({
 
       setSelected((prev) => {
         const isSelected = prev.includes(row);
-        const newSelected = isSelected
-          ? prev.filter((r) => r !== row)
-          : [...prev, row];
+        const newSelected = isSelected ? prev.filter((r) => r !== row) : [...prev, row];
 
         onSelectionChange?.(newSelected);
         return newSelected;
@@ -147,53 +151,65 @@ export function DataTable<T = unknown>({
   );
 
   // Keyboard navigation handler
-  const handleKeyDown = useCallback((event: KeyboardEvent<HTMLTableElement>) => {
-    const rows = data?.data ?? [];
-    if (rows.length === 0) return;
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLTableElement>) => {
+      const rows = data?.data ?? [];
+      if (rows.length === 0) return;
 
-    switch (event.key) {
-      case 'ArrowDown':
-        event.preventDefault();
-        setFocusedRowIndex((prev) => Math.min(prev + 1, rows.length - 1));
-        break;
-      case 'ArrowUp':
-        event.preventDefault();
-        setFocusedRowIndex((prev) => Math.max(prev - 1, 0));
-        break;
-      case 'Home':
-        event.preventDefault();
-        setFocusedRowIndex(0);
-        break;
-      case 'End':
-        event.preventDefault();
-        setFocusedRowIndex(rows.length - 1);
-        break;
-      case 'Enter':
-      case ' ':
-        event.preventDefault();
-        if (focusedRowIndex >= 0 && focusedRowIndex < rows.length) {
-          const row = rows[focusedRowIndex];
-          if (selectable && event.key === ' ') {
-            handleRowSelect(row);
-          } else if (event.key === 'Enter') {
-            onRowClick?.(row);
+      switch (event.key) {
+        case 'ArrowDown':
+          event.preventDefault();
+          setFocusedRowIndex((prev) => Math.min(prev + 1, rows.length - 1));
+          break;
+        case 'ArrowUp':
+          event.preventDefault();
+          setFocusedRowIndex((prev) => Math.max(prev - 1, 0));
+          break;
+        case 'Home':
+          event.preventDefault();
+          setFocusedRowIndex(0);
+          break;
+        case 'End':
+          event.preventDefault();
+          setFocusedRowIndex(rows.length - 1);
+          break;
+        case 'Enter':
+        case ' ':
+          event.preventDefault();
+          if (focusedRowIndex >= 0 && focusedRowIndex < rows.length) {
+            const row = rows[focusedRowIndex];
+            if (selectable && event.key === ' ') {
+              handleRowSelect(row);
+            } else if (event.key === 'Enter') {
+              onRowClick?.(row);
+            }
           }
-        }
-        break;
-      case 'PageDown':
-        event.preventDefault();
-        if (pagination && page < pagination.totalPages) {
-          handlePageChange(page + 1);
-        }
-        break;
-      case 'PageUp':
-        event.preventDefault();
-        if (page > 1) {
-          handlePageChange(page - 1);
-        }
-        break;
-    }
-  }, [data?.data, focusedRowIndex, selectable, handleRowSelect, onRowClick, page, handlePageChange, pagination]);
+          break;
+        case 'PageDown':
+          event.preventDefault();
+          if (pagination && page < pagination.totalPages) {
+            handlePageChange(page + 1);
+          }
+          break;
+        case 'PageUp':
+          event.preventDefault();
+          if (page > 1) {
+            handlePageChange(page - 1);
+          }
+          break;
+      }
+    },
+    [
+      data?.data,
+      focusedRowIndex,
+      selectable,
+      handleRowSelect,
+      onRowClick,
+      page,
+      handlePageChange,
+      pagination,
+    ]
+  );
 
   // Get sort indicator for a column
   const getSortIndicator = (column: ColumnDefinition<T>): string => {
@@ -203,7 +219,9 @@ export function DataTable<T = unknown>({
   };
 
   // Get sort direction for aria-sort
-  const getAriaSort = (column: ColumnDefinition<T>): 'ascending' | 'descending' | 'none' | undefined => {
+  const getAriaSort = (
+    column: ColumnDefinition<T>
+  ): 'ascending' | 'descending' | 'none' | undefined => {
     if (!column.sortable) return undefined;
     const sortItem = sort.find((s) => s.field === String(column.field));
     if (!sortItem) return 'none';
@@ -213,7 +231,7 @@ export function DataTable<T = unknown>({
   // Render loading state
   if (isLoading) {
     return (
-      <div 
+      <div
         className={`emf-datatable emf-datatable--loading ${className}`}
         data-testid={testId}
         role="status"
@@ -230,7 +248,7 @@ export function DataTable<T = unknown>({
   // Render error state
   if (error) {
     return (
-      <div 
+      <div
         className={`emf-datatable emf-datatable--error ${className}`}
         data-testid={testId}
         role="alert"
@@ -239,7 +257,7 @@ export function DataTable<T = unknown>({
         <div className="emf-datatable__error">
           Error loading data: {error instanceof Error ? error.message : 'Unknown error'}
         </div>
-        <button 
+        <button
           className="emf-datatable__retry-button"
           onClick={() => void refetch()}
           aria-label="Retry loading data"
@@ -254,11 +272,8 @@ export function DataTable<T = unknown>({
   const pagination = data?.pagination;
 
   return (
-    <div 
-      className={`emf-datatable ${className}`}
-      data-testid={testId}
-    >
-      <table 
+    <div className={`emf-datatable ${className}`} data-testid={testId}>
+      <table
         ref={tableRef}
         className="emf-datatable__table"
         role="grid"
@@ -270,7 +285,7 @@ export function DataTable<T = unknown>({
         <thead>
           <tr role="row">
             {selectable && (
-              <th 
+              <th
                 className="emf-datatable__header emf-datatable__header--checkbox"
                 role="columnheader"
                 scope="col"
@@ -314,7 +329,7 @@ export function DataTable<T = unknown>({
         <tbody>
           {rows.length === 0 ? (
             <tr role="row">
-              <td 
+              <td
                 colSpan={columns.length + (selectable ? 1 : 0)}
                 className="emf-datatable__empty"
                 role="gridcell"
@@ -335,10 +350,7 @@ export function DataTable<T = unknown>({
                 data-row-index={rowIndex}
               >
                 {selectable && (
-                  <td 
-                    className="emf-datatable__cell emf-datatable__cell--checkbox"
-                    role="gridcell"
-                  >
+                  <td className="emf-datatable__cell emf-datatable__cell--checkbox" role="gridcell">
                     <input
                       type="checkbox"
                       checked={selected.includes(row)}
@@ -352,8 +364,8 @@ export function DataTable<T = unknown>({
                   </td>
                 )}
                 {columns.map((column, colIndex) => (
-                  <td 
-                    key={colIndex} 
+                  <td
+                    key={colIndex}
                     className="emf-datatable__cell"
                     role="gridcell"
                     data-field={String(column.field)}
@@ -370,11 +382,7 @@ export function DataTable<T = unknown>({
       </table>
 
       {pagination && (
-        <nav 
-          className="emf-datatable__pagination"
-          role="navigation"
-          aria-label="Table pagination"
-        >
+        <nav className="emf-datatable__pagination" role="navigation" aria-label="Table pagination">
           <button
             className="emf-datatable__pagination-button emf-datatable__pagination-button--prev"
             disabled={page <= 1}
@@ -386,7 +394,8 @@ export function DataTable<T = unknown>({
           <span className="emf-datatable__pagination-info" aria-live="polite">
             Page {pagination.page} of {pagination.totalPages}
             <span className="emf-datatable__pagination-total">
-              {' '}({pagination.total} total items)
+              {' '}
+              ({pagination.total} total items)
             </span>
           </span>
           <button

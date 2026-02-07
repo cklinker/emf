@@ -54,9 +54,7 @@ export const OPERATORS_BY_TYPE: Record<string, Array<{ value: string; label: str
     { value: 'lt', label: 'Less than' },
     { value: 'lte', label: 'Less than or equal' },
   ],
-  boolean: [
-    { value: 'eq', label: 'Equals' },
-  ],
+  boolean: [{ value: 'eq', label: 'Equals' }],
   date: [
     { value: 'eq', label: 'Equals' },
     { value: 'gt', label: 'After' },

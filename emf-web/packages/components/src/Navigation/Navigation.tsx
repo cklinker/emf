@@ -4,7 +4,7 @@ import type { NavigationProps, MenuItem } from './types';
 
 /**
  * Navigation component for menu rendering with React Router integration.
- * 
+ *
  * Features:
  * - Renders menu items from configuration
  * - Filters items based on user roles
@@ -12,15 +12,15 @@ import type { NavigationProps, MenuItem } from './types';
  * - Highlights active menu item based on current route
  * - Supports nested menus with expand/collapse
  * - Keyboard navigation support for accessibility
- * 
+ *
  * @example
  * ```tsx
  * <Navigation
  *   items={[
  *     { id: 'home', label: 'Home', path: '/' },
  *     { id: 'users', label: 'Users', path: '/users', roles: ['admin'] },
- *     { 
- *       id: 'settings', 
+ *     {
+ *       id: 'settings',
  *       label: 'Settings',
  *       children: [
  *         { id: 'profile', label: 'Profile', path: '/settings/profile' },
@@ -93,9 +93,7 @@ export function Navigation({
   const hasActiveChild = useCallback(
     (item: MenuItem): boolean => {
       if (!item.children) return false;
-      return item.children.some(
-        (child) => isActive(child.path) || hasActiveChild(child)
-      );
+      return item.children.some((child) => isActive(child.path) || hasActiveChild(child));
     },
     [isActive]
   );
@@ -117,7 +115,7 @@ export function Navigation({
   const handleItemClick = useCallback(
     (item: MenuItem, event?: React.MouseEvent) => {
       event?.preventDefault();
-      
+
       if (item.onClick) {
         item.onClick();
         return;
@@ -139,7 +137,7 @@ export function Navigation({
   const getVisibleItems = useCallback(
     (menuItems: MenuItem[], parentExpanded = true): MenuItem[] => {
       if (!parentExpanded) return [];
-      
+
       return menuItems.flatMap((item) => {
         const result = [item];
         if (item.children && expandedItems.has(item.id)) {
@@ -155,7 +153,7 @@ export function Navigation({
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLElement>, item: MenuItem, visibleItems: MenuItem[]) => {
       const currentIndex = visibleItems.findIndex((i) => i.id === item.id);
-      
+
       switch (event.key) {
         case 'ArrowDown':
         case 'ArrowRight': {
@@ -200,11 +198,7 @@ export function Navigation({
   );
 
   // Render a menu item
-  const renderItem = (
-    item: MenuItem, 
-    depth: number = 0, 
-    visibleItems: MenuItem[]
-  ): JSX.Element => {
+  const renderItem = (item: MenuItem, depth: number = 0, visibleItems: MenuItem[]): JSX.Element => {
     const hasChildren = item.children && item.children.length > 0;
     const isExpanded = expandedItems.has(item.id);
     const active = isActive(item.path) || hasActiveChild(item);
@@ -227,7 +221,9 @@ export function Navigation({
           aria-current={isActive(item.path) ? 'page' : undefined}
           aria-haspopup={hasChildren ? 'true' : undefined}
           role="menuitem"
-          tabIndex={isFocused || (!focusedItemId && depth === 0 && visibleItems[0]?.id === item.id) ? 0 : -1}
+          tabIndex={
+            isFocused || (!focusedItemId && depth === 0 && visibleItems[0]?.id === item.id) ? 0 : -1
+          }
         >
           {item.icon && (
             <span className="emf-navigation__icon" aria-hidden="true">
@@ -236,21 +232,14 @@ export function Navigation({
           )}
           <span className="emf-navigation__label">{item.label}</span>
           {hasChildren && (
-            <span 
-              className="emf-navigation__arrow" 
-              aria-hidden="true"
-            >
+            <span className="emf-navigation__arrow" aria-hidden="true">
               {isExpanded ? '▼' : '▶'}
             </span>
           )}
         </button>
 
         {hasChildren && isExpanded && (
-          <ul 
-            className="emf-navigation__submenu"
-            role="menu"
-            aria-label={`${item.label} submenu`}
-          >
+          <ul className="emf-navigation__submenu" role="menu" aria-label={`${item.label} submenu`}>
             {item.children!.map((child) => renderItem(child, depth + 1, visibleItems))}
           </ul>
         )}
@@ -268,11 +257,7 @@ export function Navigation({
       data-testid={testId}
       aria-label="Main navigation"
     >
-      <ul 
-        className="emf-navigation__list"
-        role="menubar"
-        aria-orientation={orientation}
-      >
+      <ul className="emf-navigation__list" role="menubar" aria-orientation={orientation}>
         {filteredItems.map((item) => renderItem(item, 0, visibleItems))}
       </ul>
     </nav>

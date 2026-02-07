@@ -33,11 +33,7 @@ export class QueryBuilder<T = unknown> {
   /**
    * Add a filter expression
    */
-  filter(
-    field: string,
-    operator: FilterExpression['operator'],
-    value: unknown
-  ): QueryBuilder<T> {
+  filter(field: string, operator: FilterExpression['operator'], value: unknown): QueryBuilder<T> {
     this.filterExpressions.push({ field, operator, value });
     return this;
   }

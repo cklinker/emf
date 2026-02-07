@@ -74,10 +74,7 @@ describe('QueryBuilder', () => {
     });
 
     it('should preserve sort order when multiple criteria are added (Requirement 5.7)', () => {
-      queryBuilder
-        .sort('field1', 'asc')
-        .sort('field2', 'desc')
-        .sort('field3', 'asc');
+      queryBuilder.sort('field1', 'asc').sort('field2', 'desc').sort('field3', 'asc');
 
       const options = queryBuilder.buildOptions();
       expect(options.sort).toEqual([
@@ -102,9 +99,7 @@ describe('QueryBuilder', () => {
     });
 
     it('should accumulate multiple filters with AND logic (Requirement 5.6)', () => {
-      queryBuilder
-        .filter('status', 'eq', 'active')
-        .filter('age', 'gte', 18);
+      queryBuilder.filter('status', 'eq', 'active').filter('age', 'gte', 18);
 
       const options = queryBuilder.buildOptions();
       expect(options.filters).toHaveLength(2);
@@ -113,8 +108,19 @@ describe('QueryBuilder', () => {
     });
 
     it('should support all filter operators', () => {
-      const operators = ['eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'contains', 'startsWith', 'endsWith', 'in'] as const;
-      
+      const operators = [
+        'eq',
+        'ne',
+        'gt',
+        'gte',
+        'lt',
+        'lte',
+        'contains',
+        'startsWith',
+        'endsWith',
+        'in',
+      ] as const;
+
       operators.forEach((op, index) => {
         queryBuilder.filter(`field${index}`, op, `value${index}`);
       });
@@ -253,9 +259,7 @@ describe('QueryBuilder', () => {
     });
 
     it('should allow multiple filters on the same field', () => {
-      queryBuilder
-        .filter('age', 'gte', 18)
-        .filter('age', 'lte', 65);
+      queryBuilder.filter('age', 'gte', 18).filter('age', 'lte', 65);
 
       const options = queryBuilder.buildOptions();
       expect(options.filters).toHaveLength(2);
@@ -266,10 +270,7 @@ describe('QueryBuilder', () => {
 
   describe('Sort order preservation - Requirement 5.7', () => {
     it('should apply sort criteria in the order they were added', () => {
-      queryBuilder
-        .sort('lastName', 'asc')
-        .sort('firstName', 'asc')
-        .sort('createdAt', 'desc');
+      queryBuilder.sort('lastName', 'asc').sort('firstName', 'asc').sort('createdAt', 'desc');
 
       const options = queryBuilder.buildOptions();
       expect(options.sort).toEqual([

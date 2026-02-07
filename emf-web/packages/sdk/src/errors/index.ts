@@ -94,9 +94,9 @@ export class NetworkError extends EMFError {
  */
 export function parseErrorResponse(
   statusCode: number,
-  data?: { 
-    error?: string; 
-    message?: string; 
+  data?: {
+    error?: string;
+    message?: string;
     fieldErrors?: Record<string, string[]>;
     resource?: string;
     id?: string;
@@ -113,10 +113,7 @@ export function parseErrorResponse(
       return new AuthorizationError(message);
     case 404:
       // Extract resource and id from response data if available
-      return new NotFoundError(
-        data?.resource || 'Resource',
-        data?.id || 'unknown'
-      );
+      return new NotFoundError(data?.resource || 'Resource', data?.id || 'unknown');
     default:
       if (statusCode >= 500) {
         return new ServerError(message, statusCode);
@@ -149,9 +146,9 @@ export function mapAxiosError(error: unknown): EMFError {
     // Parse the error response
     return parseErrorResponse(
       axiosError.response.status,
-      axiosError.response.data as { 
-        error?: string; 
-        message?: string; 
+      axiosError.response.data as {
+        error?: string;
+        message?: string;
         fieldErrors?: Record<string, string[]>;
         resource?: string;
         id?: string;

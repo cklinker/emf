@@ -81,13 +81,18 @@ export function generateCollectionInterface(collection: ParsedCollection): strin
 /**
  * Generate request type for create/update operations
  */
-export function generateRequestType(collection: ParsedCollection, operation: 'create' | 'update'): string {
+export function generateRequestType(
+  collection: ParsedCollection,
+  operation: 'create' | 'update'
+): string {
   const interfaceName = toInterfaceName(collection.name);
   const typeName = `${interfaceName}${operation === 'create' ? 'Create' : 'Update'}Request`;
   const lines: string[] = [];
 
   lines.push(`/**`);
-  lines.push(` * Request type for ${operation === 'create' ? 'creating' : 'updating'} a ${collection.displayName}`);
+  lines.push(
+    ` * Request type for ${operation === 'create' ? 'creating' : 'updating'} a ${collection.displayName}`
+  );
   lines.push(` */`);
 
   if (operation === 'create') {
@@ -296,7 +301,8 @@ export function generateTypesWithResult(
       typesGenerated++; // Main interface
       if (options.includeRequests !== false) {
         if (collection.operations.includes('create')) typesGenerated++;
-        if (collection.operations.includes('update') || collection.operations.includes('patch')) typesGenerated++;
+        if (collection.operations.includes('update') || collection.operations.includes('patch'))
+          typesGenerated++;
       }
       if (options.includeResponses !== false) {
         typesGenerated++; // List response

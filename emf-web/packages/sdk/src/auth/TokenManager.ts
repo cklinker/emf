@@ -31,7 +31,7 @@ export class TokenManager {
 
     // Get fresh token from provider
     const token = await this.provider.getToken();
-    
+
     if (token) {
       this.state.token = token;
       // Parse expiration from JWT if possible

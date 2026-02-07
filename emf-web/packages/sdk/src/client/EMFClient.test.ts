@@ -14,7 +14,7 @@ const createMockAxiosInstance = (config: Record<string, unknown> = {}) => ({
     baseURL: config.baseURL || '',
     headers: {
       'Content-Type': 'application/json',
-      ...(config.headers as Record<string, string> || {}),
+      ...((config.headers as Record<string, string>) || {}),
     },
     timeout: config.timeout,
   },
@@ -31,7 +31,8 @@ vi.mock('axios', async () => {
     ...actual,
     default: {
       create: vi.fn((config: Record<string, unknown> = {}) => createMockAxiosInstance(config)),
-      isAxiosError: (error: unknown) => error && typeof error === 'object' && 'isAxiosError' in error,
+      isAxiosError: (error: unknown) =>
+        error && typeof error === 'object' && 'isAxiosError' in error,
     },
   };
 });
@@ -110,23 +111,23 @@ describe('EMFClient', () => {
       });
 
       const axiosInstance = client.getAxiosInstance();
-      
+
       // Get the interceptor function that was registered
       const interceptorUse = axiosInstance.interceptors.request.use as ReturnType<typeof vi.fn>;
       expect(interceptorUse).toHaveBeenCalled();
-      
+
       // Get the interceptor callback function
       const interceptorCallback = interceptorUse.mock.calls[0][0];
       expect(interceptorCallback).toBeDefined();
-      
+
       // Create a mock config object
       const mockConfig = {
         headers: {} as Record<string, string>,
       };
-      
+
       // Call the interceptor
       await interceptorCallback(mockConfig);
-      
+
       // Verify getToken was called
       expect(tokenProvider.getToken).toHaveBeenCalled();
     });
@@ -142,19 +143,19 @@ describe('EMFClient', () => {
       });
 
       const axiosInstance = client.getAxiosInstance();
-      
+
       // Get the interceptor callback function
       const interceptorUse = axiosInstance.interceptors.request.use as ReturnType<typeof vi.fn>;
       const interceptorCallback = interceptorUse.mock.calls[0][0];
-      
+
       // Create a mock config object
       const mockConfig = {
         headers: {} as Record<string, string>,
       };
-      
+
       // Call the interceptor
       const resultConfig = await interceptorCallback(mockConfig);
-      
+
       // Verify Authorization header is set with Bearer token
       expect(resultConfig.headers.Authorization).toBe('Bearer my-auth-token-123');
     });
@@ -170,19 +171,19 @@ describe('EMFClient', () => {
       });
 
       const axiosInstance = client.getAxiosInstance();
-      
+
       // Get the interceptor callback function
       const interceptorUse = axiosInstance.interceptors.request.use as ReturnType<typeof vi.fn>;
       const interceptorCallback = interceptorUse.mock.calls[0][0];
-      
+
       // Create a mock config object
       const mockConfig = {
         headers: {} as Record<string, string>,
       };
-      
+
       // Call the interceptor
       const resultConfig = await interceptorCallback(mockConfig);
-      
+
       // Verify Authorization header is NOT set
       expect(resultConfig.headers.Authorization).toBeUndefined();
     });
@@ -194,16 +195,16 @@ describe('EMFClient', () => {
       });
 
       const axiosInstance = client.getAxiosInstance();
-      
+
       // Get the interceptor use calls
       const interceptorUse = axiosInstance.interceptors.request.use as ReturnType<typeof vi.fn>;
-      
+
       // When no token provider is configured, the auth interceptor should not be registered
       // Only the retry interceptor is registered on response
       // Check that no request interceptor was registered for auth
       // The interceptor.request.use should not have been called for auth purposes
       // (it may be called for other purposes, but we verify no auth-related interceptor)
-      
+
       // Since we don't have a token provider, the setupAuthInterceptor is not called
       // We can verify this by checking that no request interceptor was added
       // In our mock, interceptors.request.use is a mock function
@@ -212,7 +213,8 @@ describe('EMFClient', () => {
 
     it('should call token provider for each request', async () => {
       const tokenProvider: TokenProvider = {
-        getToken: vi.fn()
+        getToken: vi
+          .fn()
           .mockResolvedValueOnce('token-1')
           .mockResolvedValueOnce('token-2')
           .mockResolvedValueOnce('token-3'),
@@ -224,23 +226,23 @@ describe('EMFClient', () => {
       });
 
       const axiosInstance = client.getAxiosInstance();
-      
+
       // Get the interceptor callback function
       const interceptorUse = axiosInstance.interceptors.request.use as ReturnType<typeof vi.fn>;
       const interceptorCallback = interceptorUse.mock.calls[0][0];
-      
+
       // Simulate multiple requests
       const config1 = { headers: {} as Record<string, string> };
       const config2 = { headers: {} as Record<string, string> };
       const config3 = { headers: {} as Record<string, string> };
-      
+
       const result1 = await interceptorCallback(config1);
       const result2 = await interceptorCallback(config2);
       const result3 = await interceptorCallback(config3);
-      
+
       // Verify getToken was called for each request
       expect(tokenProvider.getToken).toHaveBeenCalledTimes(3);
-      
+
       // Verify each request got the correct token
       expect(result1.headers.Authorization).toBe('Bearer token-1');
       expect(result2.headers.Authorization).toBe('Bearer token-2');
@@ -258,19 +260,19 @@ describe('EMFClient', () => {
       });
 
       const axiosInstance = client.getAxiosInstance();
-      
+
       // Get the interceptor callback function
       const interceptorUse = axiosInstance.interceptors.request.use as ReturnType<typeof vi.fn>;
       const interceptorCallback = interceptorUse.mock.calls[0][0];
-      
+
       // Create a mock config object
       const mockConfig = {
         headers: {} as Record<string, string>,
       };
-      
+
       // Call the interceptor
       const resultConfig = await interceptorCallback(mockConfig);
-      
+
       // Empty string is falsy, so Authorization header should not be set
       expect(resultConfig.headers.Authorization).toBeUndefined();
     });
@@ -286,11 +288,11 @@ describe('EMFClient', () => {
       });
 
       const axiosInstance = client.getAxiosInstance();
-      
+
       // Get the interceptor callback function
       const interceptorUse = axiosInstance.interceptors.request.use as ReturnType<typeof vi.fn>;
       const interceptorCallback = interceptorUse.mock.calls[0][0];
-      
+
       // Create a mock config object with existing headers
       const mockConfig = {
         headers: {
@@ -298,13 +300,13 @@ describe('EMFClient', () => {
           'X-Custom-Header': 'custom-value',
         } as Record<string, string>,
       };
-      
+
       // Call the interceptor
       const resultConfig = await interceptorCallback(mockConfig);
-      
+
       // Verify Authorization header is added
       expect(resultConfig.headers.Authorization).toBe('Bearer test-token');
-      
+
       // Verify existing headers are preserved
       expect(resultConfig.headers['Content-Type']).toBe('application/json');
       expect(resultConfig.headers['X-Custom-Header']).toBe('custom-value');
@@ -459,7 +461,7 @@ describe('EMFClient', () => {
 
     beforeEach(() => {
       vi.useFakeTimers();
-      client = new EMFClient({ 
+      client = new EMFClient({
         baseUrl: 'https://api.example.com',
         cache: { discoveryTTL: 60000 }, // 1 minute TTL for testing
       });
@@ -479,13 +481,13 @@ describe('EMFClient', () => {
 
     it('should return ResourceMetadata array for all resources (Requirement 2.2)', async () => {
       const resources = await client.discover();
-      
+
       expect(resources).toHaveLength(2);
       expect(resources[0].name).toBe('users');
       expect(resources[0].displayName).toBe('Users');
       expect(resources[0].fields).toHaveLength(2);
       expect(resources[0].operations).toContain('list');
-      
+
       expect(resources[1].name).toBe('orders');
       expect(resources[1].authz).toBeDefined();
       expect(resources[1].authz?.read).toContain('admin');
@@ -543,7 +545,7 @@ describe('EMFClient', () => {
         validation: false,
       });
       const mockGet = clientNoValidation.getAxiosInstance().get as ReturnType<typeof vi.fn>;
-      
+
       // Response missing displayName - would fail validation
       const partialResponse = {
         resources: [
@@ -577,14 +579,14 @@ describe('EMFClient', () => {
 
     it('should handle empty resources array', async () => {
       mockAxiosGet.mockResolvedValueOnce({ data: { resources: [] } });
-      
+
       const resources = await client.discover();
       expect(resources).toEqual([]);
     });
 
     it('should preserve all resource metadata fields', async () => {
       const resources = await client.discover();
-      
+
       // Check first resource
       const users = resources[0];
       expect(users.name).toBe('users');

@@ -77,9 +77,7 @@ const createWrapper = (client: EMFClient) => {
 
   return ({ children }: { children: React.ReactNode }) => (
     <QueryClientProvider client={queryClient}>
-      <EMFProvider client={client}>
-        {children}
-      </EMFProvider>
+      <EMFProvider client={client}>{children}</EMFProvider>
     </QueryClientProvider>
   );
 };
@@ -106,13 +104,9 @@ describe('DataTable', () => {
 
   describe('Data Fetching (Requirement 11.1)', () => {
     it('should fetch data using EMFClient on mount', async () => {
-      render(
-        <DataTable<TestUser>
-          resourceName="users"
-          columns={defaultColumns}
-        />,
-        { wrapper: createWrapper(mockClient) }
-      );
+      render(<DataTable<TestUser> resourceName="users" columns={defaultColumns} />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       await waitFor(() => {
         expect(mockClient.resource).toHaveBeenCalledWith('users');
@@ -124,13 +118,9 @@ describe('DataTable', () => {
     });
 
     it('should display fetched data in the table', async () => {
-      render(
-        <DataTable<TestUser>
-          resourceName="users"
-          columns={defaultColumns}
-        />,
-        { wrapper: createWrapper(mockClient) }
-      );
+      render(<DataTable<TestUser> resourceName="users" columns={defaultColumns} />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       await waitFor(() => {
         expect(screen.getByText('John Doe')).toBeInTheDocument();
@@ -141,13 +131,9 @@ describe('DataTable', () => {
 
   describe('Column Rendering (Requirement 11.2)', () => {
     it('should render columns in the specified order', async () => {
-      render(
-        <DataTable<TestUser>
-          resourceName="users"
-          columns={defaultColumns}
-        />,
-        { wrapper: createWrapper(mockClient) }
-      );
+      render(<DataTable<TestUser> resourceName="users" columns={defaultColumns} />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       await waitFor(() => {
         const headers = screen.getAllByRole('columnheader');
@@ -159,21 +145,17 @@ describe('DataTable', () => {
 
     it('should render custom column content using render function', async () => {
       const columnsWithRender: ColumnDefinition<TestUser>[] = [
-        { 
-          field: 'name', 
+        {
+          field: 'name',
           header: 'Name',
-          render: (value) => <strong data-testid="custom-render">{String(value)}</strong>
+          render: (value) => <strong data-testid="custom-render">{String(value)}</strong>,
         },
         { field: 'email', header: 'Email' },
       ];
 
-      render(
-        <DataTable<TestUser>
-          resourceName="users"
-          columns={columnsWithRender}
-        />,
-        { wrapper: createWrapper(mockClient) }
-      );
+      render(<DataTable<TestUser> resourceName="users" columns={columnsWithRender} />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       await waitFor(() => {
         const customElements = screen.getAllByTestId('custom-render');
@@ -188,13 +170,9 @@ describe('DataTable', () => {
         { field: 'email', header: 'Email', width: '300px' },
       ];
 
-      render(
-        <DataTable<TestUser>
-          resourceName="users"
-          columns={columnsWithWidth}
-        />,
-        { wrapper: createWrapper(mockClient) }
-      );
+      render(<DataTable<TestUser> resourceName="users" columns={columnsWithWidth} />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       await waitFor(() => {
         const headers = screen.getAllByRole('columnheader');
@@ -207,14 +185,10 @@ describe('DataTable', () => {
   describe('Sorting (Requirement 11.3)', () => {
     it('should sort by column when header is clicked', async () => {
       const user = userEvent.setup();
-      
-      render(
-        <DataTable<TestUser>
-          resourceName="users"
-          columns={defaultColumns}
-        />,
-        { wrapper: createWrapper(mockClient) }
-      );
+
+      render(<DataTable<TestUser> resourceName="users" columns={defaultColumns} />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       await waitFor(() => {
         expect(screen.getByText('John Doe')).toBeInTheDocument();
@@ -227,8 +201,8 @@ describe('DataTable', () => {
         expect(mockListFn).toHaveBeenCalledWith(
           expect.objectContaining({
             sort: expect.arrayContaining([
-              expect.objectContaining({ field: 'name', direction: 'asc' })
-            ])
+              expect.objectContaining({ field: 'name', direction: 'asc' }),
+            ]),
           })
         );
       });
@@ -236,14 +210,10 @@ describe('DataTable', () => {
 
     it('should toggle sort direction on subsequent clicks', async () => {
       const user = userEvent.setup();
-      
-      render(
-        <DataTable<TestUser>
-          resourceName="users"
-          columns={defaultColumns}
-        />,
-        { wrapper: createWrapper(mockClient) }
-      );
+
+      render(<DataTable<TestUser> resourceName="users" columns={defaultColumns} />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       await waitFor(() => {
         expect(screen.getByText('John Doe')).toBeInTheDocument();
@@ -251,7 +221,7 @@ describe('DataTable', () => {
 
       // Helper to get the name header element (re-query each time to avoid stale references)
       const getNameHeader = () => document.querySelector('th[data-field="name"]') as HTMLElement;
-      
+
       // First click - ascending
       await user.click(getNameHeader());
       await waitFor(() => {
@@ -273,14 +243,10 @@ describe('DataTable', () => {
 
     it('should not sort non-sortable columns', async () => {
       const user = userEvent.setup();
-      
-      render(
-        <DataTable<TestUser>
-          resourceName="users"
-          columns={defaultColumns}
-        />,
-        { wrapper: createWrapper(mockClient) }
-      );
+
+      render(<DataTable<TestUser> resourceName="users" columns={defaultColumns} />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       await waitFor(() => {
         expect(screen.getByText('John Doe')).toBeInTheDocument();
@@ -296,7 +262,7 @@ describe('DataTable', () => {
     it('should call onSortChange callback when sort changes', async () => {
       const user = userEvent.setup();
       const onSortChange = vi.fn();
-      
+
       render(
         <DataTable<TestUser>
           resourceName="users"
@@ -314,9 +280,7 @@ describe('DataTable', () => {
       await user.click(nameHeader);
 
       await waitFor(() => {
-        expect(onSortChange).toHaveBeenCalledWith([
-          { field: 'name', direction: 'asc' }
-        ]);
+        expect(onSortChange).toHaveBeenCalledWith([{ field: 'name', direction: 'asc' }]);
       });
     });
   });
@@ -324,15 +288,10 @@ describe('DataTable', () => {
   describe('Pagination (Requirement 11.4)', () => {
     it('should display pagination controls', async () => {
       mockListFn.mockResolvedValue(mockMultiPageResponse);
-      
-      render(
-        <DataTable<TestUser>
-          resourceName="users"
-          columns={defaultColumns}
-          pageSize={2}
-        />,
-        { wrapper: createWrapper(mockClient) }
-      );
+
+      render(<DataTable<TestUser> resourceName="users" columns={defaultColumns} pageSize={2} />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       await waitFor(() => {
         expect(screen.getByText('Page 1 of 3')).toBeInTheDocument();
@@ -344,15 +303,10 @@ describe('DataTable', () => {
     it('should fetch new page when pagination button is clicked', async () => {
       const user = userEvent.setup();
       mockListFn.mockResolvedValue(mockMultiPageResponse);
-      
-      render(
-        <DataTable<TestUser>
-          resourceName="users"
-          columns={defaultColumns}
-          pageSize={2}
-        />,
-        { wrapper: createWrapper(mockClient) }
-      );
+
+      render(<DataTable<TestUser> resourceName="users" columns={defaultColumns} pageSize={2} />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       await waitFor(() => {
         expect(screen.getByText('Page 1 of 3')).toBeInTheDocument();
@@ -362,23 +316,16 @@ describe('DataTable', () => {
       await user.click(nextButton);
 
       await waitFor(() => {
-        expect(mockListFn).toHaveBeenCalledWith(
-          expect.objectContaining({ page: 2 })
-        );
+        expect(mockListFn).toHaveBeenCalledWith(expect.objectContaining({ page: 2 }));
       });
     });
 
     it('should disable previous button on first page', async () => {
       mockListFn.mockResolvedValue(mockMultiPageResponse);
-      
-      render(
-        <DataTable<TestUser>
-          resourceName="users"
-          columns={defaultColumns}
-          pageSize={2}
-        />,
-        { wrapper: createWrapper(mockClient) }
-      );
+
+      render(<DataTable<TestUser> resourceName="users" columns={defaultColumns} pageSize={2} />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       await waitFor(() => {
         const prevButton = screen.getByRole('button', { name: /previous/i });
@@ -392,17 +339,12 @@ describe('DataTable', () => {
       // So we need to mock a response where page 1 is the last page
       mockListFn.mockResolvedValue({
         data: mockUsers,
-        pagination: { page: 1, size: 10, total: 3, totalPages: 1 }
+        pagination: { page: 1, size: 10, total: 3, totalPages: 1 },
       });
-      
-      render(
-        <DataTable<TestUser>
-          resourceName="users"
-          columns={defaultColumns}
-          pageSize={10}
-        />,
-        { wrapper: createWrapper(mockClient) }
-      );
+
+      render(<DataTable<TestUser> resourceName="users" columns={defaultColumns} pageSize={10} />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       await waitFor(() => {
         const nextButton = screen.getByRole('button', { name: /next/i });
@@ -414,7 +356,7 @@ describe('DataTable', () => {
       const user = userEvent.setup();
       const onPageChange = vi.fn();
       mockListFn.mockResolvedValue(mockMultiPageResponse);
-      
+
       render(
         <DataTable<TestUser>
           resourceName="users"
@@ -440,16 +382,10 @@ describe('DataTable', () => {
 
   describe('Filter Application (Requirement 11.5)', () => {
     it('should apply initial filters', async () => {
-      const filters = [
-        { field: 'name', operator: 'contains' as const, value: 'John' }
-      ];
-      
+      const filters = [{ field: 'name', operator: 'contains' as const, value: 'John' }];
+
       render(
-        <DataTable<TestUser>
-          resourceName="users"
-          columns={defaultColumns}
-          filters={filters}
-        />,
+        <DataTable<TestUser> resourceName="users" columns={defaultColumns} filters={filters} />,
         { wrapper: createWrapper(mockClient) }
       );
 
@@ -457,8 +393,8 @@ describe('DataTable', () => {
         expect(mockListFn).toHaveBeenCalledWith(
           expect.objectContaining({
             filters: expect.arrayContaining([
-              expect.objectContaining({ field: 'name', operator: 'contains', value: 'John' })
-            ])
+              expect.objectContaining({ field: 'name', operator: 'contains', value: 'John' }),
+            ]),
           })
         );
       });
@@ -466,11 +402,7 @@ describe('DataTable', () => {
 
     it('should refetch data when filters change', async () => {
       const { rerender } = render(
-        <DataTable<TestUser>
-          resourceName="users"
-          columns={defaultColumns}
-          filters={[]}
-        />,
+        <DataTable<TestUser> resourceName="users" columns={defaultColumns} filters={[]} />,
         { wrapper: createWrapper(mockClient) }
       );
 
@@ -478,24 +410,18 @@ describe('DataTable', () => {
         expect(mockListFn).toHaveBeenCalled();
       });
 
-      const newFilters = [
-        { field: 'age', operator: 'gt' as const, value: 25 }
-      ];
+      const newFilters = [{ field: 'age', operator: 'gt' as const, value: 25 }];
 
       rerender(
-        <DataTable<TestUser>
-          resourceName="users"
-          columns={defaultColumns}
-          filters={newFilters}
-        />
+        <DataTable<TestUser> resourceName="users" columns={defaultColumns} filters={newFilters} />
       );
 
       await waitFor(() => {
         expect(mockListFn).toHaveBeenCalledWith(
           expect.objectContaining({
             filters: expect.arrayContaining([
-              expect.objectContaining({ field: 'age', operator: 'gt', value: 25 })
-            ])
+              expect.objectContaining({ field: 'age', operator: 'gt', value: 25 }),
+            ]),
           })
         );
       });
@@ -503,7 +429,7 @@ describe('DataTable', () => {
 
     it('should call onFiltersChange callback when filters are updated', async () => {
       const onFiltersChange = vi.fn();
-      
+
       render(
         <DataTable<TestUser>
           resourceName="users"
@@ -531,13 +457,9 @@ describe('DataTable', () => {
       });
       mockListFn.mockReturnValue(pendingPromise);
 
-      render(
-        <DataTable<TestUser>
-          resourceName="users"
-          columns={defaultColumns}
-        />,
-        { wrapper: createWrapper(mockClient) }
-      );
+      render(<DataTable<TestUser> resourceName="users" columns={defaultColumns} />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       expect(screen.getByText('Loading...')).toBeInTheDocument();
       expect(screen.getByRole('status')).toHaveAttribute('aria-busy', 'true');
@@ -553,13 +475,9 @@ describe('DataTable', () => {
       });
       mockListFn.mockReturnValue(pendingPromise);
 
-      render(
-        <DataTable<TestUser>
-          resourceName="users"
-          columns={defaultColumns}
-        />,
-        { wrapper: createWrapper(mockClient) }
-      );
+      render(<DataTable<TestUser> resourceName="users" columns={defaultColumns} />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       const loadingContainer = screen.getByRole('status');
       expect(loadingContainer).toHaveAttribute('aria-busy', 'true');
@@ -573,13 +491,9 @@ describe('DataTable', () => {
     it('should display error message when data fetching fails', async () => {
       mockListFn.mockRejectedValue(new Error('Network error'));
 
-      render(
-        <DataTable<TestUser>
-          resourceName="users"
-          columns={defaultColumns}
-        />,
-        { wrapper: createWrapper(mockClient) }
-      );
+      render(<DataTable<TestUser> resourceName="users" columns={defaultColumns} />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       await waitFor(() => {
         expect(screen.getByText(/Error loading data/)).toBeInTheDocument();
@@ -590,13 +504,9 @@ describe('DataTable', () => {
     it('should display retry button on error', async () => {
       mockListFn.mockRejectedValue(new Error('Network error'));
 
-      render(
-        <DataTable<TestUser>
-          resourceName="users"
-          columns={defaultColumns}
-        />,
-        { wrapper: createWrapper(mockClient) }
-      );
+      render(<DataTable<TestUser> resourceName="users" columns={defaultColumns} />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       await waitFor(() => {
         expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
@@ -606,13 +516,9 @@ describe('DataTable', () => {
     it('should have proper accessibility attributes for error state', async () => {
       mockListFn.mockRejectedValue(new Error('Network error'));
 
-      render(
-        <DataTable<TestUser>
-          resourceName="users"
-          columns={defaultColumns}
-        />,
-        { wrapper: createWrapper(mockClient) }
-      );
+      render(<DataTable<TestUser> resourceName="users" columns={defaultColumns} />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       await waitFor(() => {
         const errorContainer = screen.getByRole('alert');
@@ -700,13 +606,9 @@ describe('DataTable', () => {
     it('should navigate rows with arrow keys', async () => {
       const user = userEvent.setup();
 
-      render(
-        <DataTable<TestUser>
-          resourceName="users"
-          columns={defaultColumns}
-        />,
-        { wrapper: createWrapper(mockClient) }
-      );
+      render(<DataTable<TestUser> resourceName="users" columns={defaultColumns} />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       await waitFor(() => {
         expect(screen.getByText('John Doe')).toBeInTheDocument();
@@ -777,16 +679,12 @@ describe('DataTable', () => {
     it('should display empty message when no data is available', async () => {
       mockListFn.mockResolvedValue({
         data: [],
-        pagination: { page: 1, size: 10, total: 0, totalPages: 0 }
+        pagination: { page: 1, size: 10, total: 0, totalPages: 0 },
       });
 
-      render(
-        <DataTable<TestUser>
-          resourceName="users"
-          columns={defaultColumns}
-        />,
-        { wrapper: createWrapper(mockClient) }
-      );
+      render(<DataTable<TestUser> resourceName="users" columns={defaultColumns} />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       await waitFor(() => {
         expect(screen.getByText('No data available')).toBeInTheDocument();
@@ -796,13 +694,9 @@ describe('DataTable', () => {
 
   describe('Accessibility', () => {
     it('should have proper ARIA attributes', async () => {
-      render(
-        <DataTable<TestUser>
-          resourceName="users"
-          columns={defaultColumns}
-        />,
-        { wrapper: createWrapper(mockClient) }
-      );
+      render(<DataTable<TestUser> resourceName="users" columns={defaultColumns} />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       await waitFor(() => {
         const table = screen.getByRole('grid');
@@ -811,13 +705,9 @@ describe('DataTable', () => {
     });
 
     it('should have proper column header roles', async () => {
-      render(
-        <DataTable<TestUser>
-          resourceName="users"
-          columns={defaultColumns}
-        />,
-        { wrapper: createWrapper(mockClient) }
-      );
+      render(<DataTable<TestUser> resourceName="users" columns={defaultColumns} />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       await waitFor(() => {
         const headers = screen.getAllByRole('columnheader');

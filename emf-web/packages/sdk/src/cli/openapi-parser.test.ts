@@ -73,7 +73,10 @@ describe('OpenAPI Parser', () => {
 
     it('should resolve reference and return schema', () => {
       const ref = { $ref: '#/components/schemas/User' };
-      expect(getSchema(ref, spec)).toEqual({ type: 'object', properties: { id: { type: 'string' } } });
+      expect(getSchema(ref, spec)).toEqual({
+        type: 'object',
+        properties: { id: { type: 'string' } },
+      });
     });
 
     it('should return undefined for undefined input', () => {
@@ -102,16 +105,24 @@ describe('OpenAPI Parser', () => {
     });
 
     it('should map array type', () => {
-      expect(mapOpenAPITypeToTS({ type: 'array', items: { type: 'string' } }, spec)).toBe('string[]');
+      expect(mapOpenAPITypeToTS({ type: 'array', items: { type: 'string' } }, spec)).toBe(
+        'string[]'
+      );
     });
 
     it('should map object type with additionalProperties', () => {
-      expect(mapOpenAPITypeToTS({ type: 'object', additionalProperties: true }, spec)).toBe('Record<string, unknown>');
-      expect(mapOpenAPITypeToTS({ type: 'object', additionalProperties: { type: 'string' } }, spec)).toBe('Record<string, string>');
+      expect(mapOpenAPITypeToTS({ type: 'object', additionalProperties: true }, spec)).toBe(
+        'Record<string, unknown>'
+      );
+      expect(
+        mapOpenAPITypeToTS({ type: 'object', additionalProperties: { type: 'string' } }, spec)
+      ).toBe('Record<string, string>');
     });
 
     it('should map enum type', () => {
-      expect(mapOpenAPITypeToTS({ enum: ['active', 'inactive'] }, spec)).toBe("'active' | 'inactive'");
+      expect(mapOpenAPITypeToTS({ enum: ['active', 'inactive'] }, spec)).toBe(
+        "'active' | 'inactive'"
+      );
       expect(mapOpenAPITypeToTS({ enum: [1, 2, 3] }, spec)).toBe('1 | 2 | 3');
     });
 
@@ -128,7 +139,12 @@ describe('OpenAPI Parser', () => {
     };
 
     it('should parse simple string field', () => {
-      const field = parseSchemaToField('name', { type: 'string', description: 'User name' }, spec, true);
+      const field = parseSchemaToField(
+        'name',
+        { type: 'string', description: 'User name' },
+        spec,
+        true
+      );
       expect(field).toEqual({
         name: 'name',
         type: 'string',
@@ -139,12 +155,22 @@ describe('OpenAPI Parser', () => {
     });
 
     it('should parse field with enum', () => {
-      const field = parseSchemaToField('status', { type: 'string', enum: ['active', 'inactive'] }, spec, false);
+      const field = parseSchemaToField(
+        'status',
+        { type: 'string', enum: ['active', 'inactive'] },
+        spec,
+        false
+      );
       expect(field.enum).toEqual(['active', 'inactive']);
     });
 
     it('should parse array field with items', () => {
-      const field = parseSchemaToField('tags', { type: 'array', items: { type: 'string' } }, spec, false);
+      const field = parseSchemaToField(
+        'tags',
+        { type: 'array', items: { type: 'string' } },
+        spec,
+        false
+      );
       expect(field.type).toBe('string[]');
       expect(field.items).toBeDefined();
     });

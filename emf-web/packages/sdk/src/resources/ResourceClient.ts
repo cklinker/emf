@@ -26,10 +26,9 @@ export class ResourceClient<T = unknown> {
    */
   async list(options?: ListOptions): Promise<ListResponse<T>> {
     const params = this.buildQueryParams(options);
-    const response = await this.client.getAxiosInstance().get<ListResponse<T>>(
-      `/api/${this.resourceName}`,
-      { params }
-    );
+    const response = await this.client
+      .getAxiosInstance()
+      .get<ListResponse<T>>(`/api/${this.resourceName}`, { params });
 
     // Validate response if validation is enabled
     if (this.client.isValidationEnabled()) {
@@ -53,9 +52,7 @@ export class ResourceClient<T = unknown> {
    * Get a single resource by ID
    */
   async get(id: string): Promise<T> {
-    const response = await this.client.getAxiosInstance().get<T>(
-      `/api/${this.resourceName}/${id}`
-    );
+    const response = await this.client.getAxiosInstance().get<T>(`/api/${this.resourceName}/${id}`);
 
     // Validate response if validation is enabled
     if (this.client.isValidationEnabled()) {
@@ -75,10 +72,9 @@ export class ResourceClient<T = unknown> {
    * Create a new resource
    */
   async create(data: Partial<T>): Promise<T> {
-    const response = await this.client.getAxiosInstance().post<T>(
-      `/api/${this.resourceName}`,
-      data
-    );
+    const response = await this.client
+      .getAxiosInstance()
+      .post<T>(`/api/${this.resourceName}`, data);
 
     // Validate response if validation is enabled
     if (this.client.isValidationEnabled()) {
@@ -97,10 +93,9 @@ export class ResourceClient<T = unknown> {
    * Update a resource (full replacement)
    */
   async update(id: string, data: T): Promise<T> {
-    const response = await this.client.getAxiosInstance().put<T>(
-      `/api/${this.resourceName}/${id}`,
-      data
-    );
+    const response = await this.client
+      .getAxiosInstance()
+      .put<T>(`/api/${this.resourceName}/${id}`, data);
 
     // Validate response if validation is enabled
     if (this.client.isValidationEnabled()) {
@@ -119,10 +114,9 @@ export class ResourceClient<T = unknown> {
    * Patch a resource (partial update)
    */
   async patch(id: string, data: Partial<T>): Promise<T> {
-    const response = await this.client.getAxiosInstance().patch<T>(
-      `/api/${this.resourceName}/${id}`,
-      data
-    );
+    const response = await this.client
+      .getAxiosInstance()
+      .patch<T>(`/api/${this.resourceName}/${id}`, data);
 
     // Validate response if validation is enabled
     if (this.client.isValidationEnabled()) {

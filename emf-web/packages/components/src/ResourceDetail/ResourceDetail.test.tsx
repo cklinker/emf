@@ -119,10 +119,9 @@ describe('ResourceDetail', () => {
 
   describe('Data Fetching (Requirement 13.1)', () => {
     it('should fetch resource data and schema on mount', async () => {
-      render(
-        <ResourceDetail resourceName="users" recordId="1" />,
-        { wrapper: createWrapper(mockClient) }
-      );
+      render(<ResourceDetail resourceName="users" recordId="1" />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       await waitFor(() => {
         expect(mockClient.discover).toHaveBeenCalled();
@@ -135,10 +134,9 @@ describe('ResourceDetail', () => {
     });
 
     it('should display fetched data', async () => {
-      render(
-        <ResourceDetail resourceName="users" recordId="1" />,
-        { wrapper: createWrapper(mockClient) }
-      );
+      render(<ResourceDetail resourceName="users" recordId="1" />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       await waitFor(() => {
         expect(screen.getByText('John Doe')).toBeInTheDocument();
@@ -150,10 +148,9 @@ describe('ResourceDetail', () => {
 
   describe('Field Rendering (Requirement 13.2)', () => {
     it('should render fields based on schema', async () => {
-      render(
-        <ResourceDetail resourceName="users" recordId="1" />,
-        { wrapper: createWrapper(mockClient) }
-      );
+      render(<ResourceDetail resourceName="users" recordId="1" />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       await waitFor(() => {
         // Check labels are rendered
@@ -165,10 +162,9 @@ describe('ResourceDetail', () => {
     });
 
     it('should render all fields from schema', async () => {
-      render(
-        <ResourceDetail resourceName="users" recordId="1" />,
-        { wrapper: createWrapper(mockClient) }
-      );
+      render(<ResourceDetail resourceName="users" recordId="1" />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       await waitFor(() => {
         const fields = screen.getAllByRole('term');
@@ -180,17 +176,11 @@ describe('ResourceDetail', () => {
   describe('Custom Field Renderers (Requirement 13.3)', () => {
     it('should use custom renderer when provided', async () => {
       const customRenderers = {
-        name: (value: unknown) => (
-          <strong data-testid="custom-name">{String(value)}</strong>
-        ),
+        name: (value: unknown) => <strong data-testid="custom-name">{String(value)}</strong>,
       };
 
       render(
-        <ResourceDetail
-          resourceName="users"
-          recordId="1"
-          customRenderers={customRenderers}
-        />,
+        <ResourceDetail resourceName="users" recordId="1" customRenderers={customRenderers} />,
         { wrapper: createWrapper(mockClient) }
       );
 
@@ -207,14 +197,13 @@ describe('ResourceDetail', () => {
       ));
 
       setComponentRegistry({
-        getFieldRenderer: (type: string) => type === 'string' ? mockRegistryRenderer : undefined,
+        getFieldRenderer: (type: string) => (type === 'string' ? mockRegistryRenderer : undefined),
         hasFieldRenderer: (type: string) => type === 'string',
       });
 
-      render(
-        <ResourceDetail resourceName="users" recordId="1" />,
-        { wrapper: createWrapper(mockClient) }
-      );
+      render(<ResourceDetail resourceName="users" recordId="1" />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       await waitFor(() => {
         const registryElements = screen.getAllByTestId('registry-renderer');
@@ -225,10 +214,9 @@ describe('ResourceDetail', () => {
 
   describe('Default Renderers (Requirement 13.4)', () => {
     it('should use default renderer for string type', async () => {
-      render(
-        <ResourceDetail resourceName="users" recordId="1" />,
-        { wrapper: createWrapper(mockClient) }
-      );
+      render(<ResourceDetail resourceName="users" recordId="1" />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       await waitFor(() => {
         expect(screen.getByText('John Doe')).toBeInTheDocument();
@@ -236,10 +224,9 @@ describe('ResourceDetail', () => {
     });
 
     it('should use default renderer for number type', async () => {
-      render(
-        <ResourceDetail resourceName="users" recordId="1" />,
-        { wrapper: createWrapper(mockClient) }
-      );
+      render(<ResourceDetail resourceName="users" recordId="1" />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       await waitFor(() => {
         expect(screen.getByText('30')).toBeInTheDocument();
@@ -247,10 +234,9 @@ describe('ResourceDetail', () => {
     });
 
     it('should use default renderer for boolean type', async () => {
-      render(
-        <ResourceDetail resourceName="users" recordId="1" />,
-        { wrapper: createWrapper(mockClient) }
-      );
+      render(<ResourceDetail resourceName="users" recordId="1" />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       await waitFor(() => {
         expect(screen.getByText('Yes')).toBeInTheDocument();
@@ -258,10 +244,9 @@ describe('ResourceDetail', () => {
     });
 
     it('should use default renderer for datetime type', async () => {
-      render(
-        <ResourceDetail resourceName="users" recordId="1" />,
-        { wrapper: createWrapper(mockClient) }
-      );
+      render(<ResourceDetail resourceName="users" recordId="1" />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       await waitFor(() => {
         // The time element is rendered for datetime fields
@@ -271,10 +256,9 @@ describe('ResourceDetail', () => {
     });
 
     it('should use default renderer for json type', async () => {
-      render(
-        <ResourceDetail resourceName="users" recordId="1" />,
-        { wrapper: createWrapper(mockClient) }
-      );
+      render(<ResourceDetail resourceName="users" recordId="1" />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       await waitFor(() => {
         expect(screen.getByText(/"role": "admin"/)).toBeInTheDocument();
@@ -313,10 +297,9 @@ describe('ResourceDetail', () => {
         roles: ['user'],
       };
 
-      render(
-        <ResourceDetail resourceName="users" recordId="1" />,
-        { wrapper: createWrapper(authzClient, regularUser) }
-      );
+      render(<ResourceDetail resourceName="users" recordId="1" />, {
+        wrapper: createWrapper(authzClient, regularUser),
+      });
 
       await waitFor(() => {
         // Name should be visible (no restriction)
@@ -359,10 +342,9 @@ describe('ResourceDetail', () => {
         roles: ['admin'],
       };
 
-      render(
-        <ResourceDetail resourceName="users" recordId="1" />,
-        { wrapper: createWrapper(authzClient, adminUser) }
-      );
+      render(<ResourceDetail resourceName="users" recordId="1" />, {
+        wrapper: createWrapper(authzClient, adminUser),
+      });
 
       await waitFor(() => {
         expect(screen.getByText('Full Name')).toBeInTheDocument();
@@ -372,10 +354,9 @@ describe('ResourceDetail', () => {
     });
 
     it('should show all fields when no user is logged in and no restrictions', async () => {
-      render(
-        <ResourceDetail resourceName="users" recordId="1" />,
-        { wrapper: createWrapper(mockClient, null) }
-      );
+      render(<ResourceDetail resourceName="users" recordId="1" />, {
+        wrapper: createWrapper(mockClient, null),
+      });
 
       await waitFor(() => {
         expect(screen.getByText('Full Name')).toBeInTheDocument();
@@ -392,10 +373,9 @@ describe('ResourceDetail', () => {
       });
       mockGetFn.mockReturnValue(pendingPromise);
 
-      render(
-        <ResourceDetail resourceName="users" recordId="1" />,
-        { wrapper: createWrapper(mockClient) }
-      );
+      render(<ResourceDetail resourceName="users" recordId="1" />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       expect(screen.getByText('Loading...')).toBeInTheDocument();
       expect(screen.getByRole('status')).toHaveAttribute('aria-busy', 'true');
@@ -410,10 +390,9 @@ describe('ResourceDetail', () => {
       });
       mockGetFn.mockReturnValue(pendingPromise);
 
-      render(
-        <ResourceDetail resourceName="users" recordId="1" />,
-        { wrapper: createWrapper(mockClient) }
-      );
+      render(<ResourceDetail resourceName="users" recordId="1" />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       const loadingContainer = screen.getByRole('status');
       expect(loadingContainer).toHaveAttribute('aria-busy', 'true');
@@ -427,10 +406,9 @@ describe('ResourceDetail', () => {
     it('should display error message when data fetching fails', async () => {
       mockGetFn.mockRejectedValue(new Error('Network error'));
 
-      render(
-        <ResourceDetail resourceName="users" recordId="1" />,
-        { wrapper: createWrapper(mockClient) }
-      );
+      render(<ResourceDetail resourceName="users" recordId="1" />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       await waitFor(() => {
         expect(screen.getByText(/Error loading data/)).toBeInTheDocument();
@@ -441,10 +419,9 @@ describe('ResourceDetail', () => {
     it('should display retry button on error', async () => {
       mockGetFn.mockRejectedValue(new Error('Network error'));
 
-      render(
-        <ResourceDetail resourceName="users" recordId="1" />,
-        { wrapper: createWrapper(mockClient) }
-      );
+      render(<ResourceDetail resourceName="users" recordId="1" />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       await waitFor(() => {
         expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
@@ -458,10 +435,9 @@ describe('ResourceDetail', () => {
         .mockResolvedValueOnce(mockUserData);
       mockClient = createMockClient(mockDiscoverFn, mockGetFn);
 
-      render(
-        <ResourceDetail resourceName="users" recordId="1" />,
-        { wrapper: createWrapper(mockClient) }
-      );
+      render(<ResourceDetail resourceName="users" recordId="1" />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       await waitFor(() => {
         expect(screen.getByText(/Error loading data/)).toBeInTheDocument();
@@ -479,10 +455,9 @@ describe('ResourceDetail', () => {
     it('should have proper accessibility attributes for error state', async () => {
       mockGetFn.mockRejectedValue(new Error('Network error'));
 
-      render(
-        <ResourceDetail resourceName="users" recordId="1" />,
-        { wrapper: createWrapper(mockClient) }
-      );
+      render(<ResourceDetail resourceName="users" recordId="1" />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       await waitFor(() => {
         const errorContainer = screen.getByRole('alert');
@@ -495,10 +470,9 @@ describe('ResourceDetail', () => {
       const emptyDiscoverFn = vi.fn().mockResolvedValue([]);
       const localClient = createMockClient(emptyDiscoverFn, mockGetFn);
 
-      render(
-        <ResourceDetail resourceName="nonexistent" recordId="1" />,
-        { wrapper: createWrapper(localClient) }
-      );
+      render(<ResourceDetail resourceName="nonexistent" recordId="1" />, {
+        wrapper: createWrapper(localClient),
+      });
 
       await waitFor(() => {
         // When schema is not found, it shows the not found message
@@ -509,10 +483,9 @@ describe('ResourceDetail', () => {
     it('should display not found message when record is not found', async () => {
       mockGetFn.mockResolvedValue(null);
 
-      render(
-        <ResourceDetail resourceName="users" recordId="999" />,
-        { wrapper: createWrapper(mockClient) }
-      );
+      render(<ResourceDetail resourceName="users" recordId="999" />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       await waitFor(() => {
         expect(screen.getByText(/Record not found/)).toBeInTheDocument();
@@ -522,10 +495,9 @@ describe('ResourceDetail', () => {
 
   describe('Layout Options', () => {
     it('should apply vertical layout class by default', async () => {
-      render(
-        <ResourceDetail resourceName="users" recordId="1" />,
-        { wrapper: createWrapper(mockClient) }
-      );
+      render(<ResourceDetail resourceName="users" recordId="1" />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       await waitFor(() => {
         const container = screen.getByTestId('emf-resource-detail');
@@ -534,10 +506,9 @@ describe('ResourceDetail', () => {
     });
 
     it('should apply horizontal layout class when specified', async () => {
-      render(
-        <ResourceDetail resourceName="users" recordId="1" layout="horizontal" />,
-        { wrapper: createWrapper(mockClient) }
-      );
+      render(<ResourceDetail resourceName="users" recordId="1" layout="horizontal" />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       await waitFor(() => {
         const container = screen.getByTestId('emf-resource-detail');
@@ -546,10 +517,9 @@ describe('ResourceDetail', () => {
     });
 
     it('should apply grid layout class when specified', async () => {
-      render(
-        <ResourceDetail resourceName="users" recordId="1" layout="grid" />,
-        { wrapper: createWrapper(mockClient) }
-      );
+      render(<ResourceDetail resourceName="users" recordId="1" layout="grid" />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       await waitFor(() => {
         const container = screen.getByTestId('emf-resource-detail');
@@ -560,10 +530,9 @@ describe('ResourceDetail', () => {
 
   describe('Accessibility', () => {
     it('should use description list semantics', async () => {
-      render(
-        <ResourceDetail resourceName="users" recordId="1" />,
-        { wrapper: createWrapper(mockClient) }
-      );
+      render(<ResourceDetail resourceName="users" recordId="1" />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       await waitFor(() => {
         const container = screen.getByTestId('emf-resource-detail');
@@ -572,10 +541,9 @@ describe('ResourceDetail', () => {
     });
 
     it('should have proper aria-label', async () => {
-      render(
-        <ResourceDetail resourceName="users" recordId="1" />,
-        { wrapper: createWrapper(mockClient) }
-      );
+      render(<ResourceDetail resourceName="users" recordId="1" />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       await waitFor(() => {
         const container = screen.getByTestId('emf-resource-detail');
@@ -584,14 +552,9 @@ describe('ResourceDetail', () => {
     });
 
     it('should apply custom className', async () => {
-      render(
-        <ResourceDetail 
-          resourceName="users" 
-          recordId="1" 
-          className="custom-class"
-        />,
-        { wrapper: createWrapper(mockClient) }
-      );
+      render(<ResourceDetail resourceName="users" recordId="1" className="custom-class" />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       await waitFor(() => {
         const container = screen.getByTestId('emf-resource-detail');
@@ -600,14 +563,9 @@ describe('ResourceDetail', () => {
     });
 
     it('should use custom testId', async () => {
-      render(
-        <ResourceDetail 
-          resourceName="users" 
-          recordId="1" 
-          testId="my-detail"
-        />,
-        { wrapper: createWrapper(mockClient) }
-      );
+      render(<ResourceDetail resourceName="users" recordId="1" testId="my-detail" />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       await waitFor(() => {
         expect(screen.getByTestId('my-detail')).toBeInTheDocument();

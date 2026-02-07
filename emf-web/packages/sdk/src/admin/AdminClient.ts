@@ -32,9 +32,7 @@ export class AdminClient {
     },
 
     get: async (id: string): Promise<CollectionDefinition> => {
-      const response = await this.axios.get<CollectionDefinition>(
-        `/control/collections/${id}`
-      );
+      const response = await this.axios.get<CollectionDefinition>(`/control/collections/${id}`);
       return response.data;
     },
 
@@ -151,7 +149,10 @@ export class AdminClient {
     },
 
     update: async (id: string, provider: OIDCProvider): Promise<OIDCProvider> => {
-      const response = await this.axios.put<OIDCProvider>(`/control/oidc/providers/${id}`, provider);
+      const response = await this.axios.put<OIDCProvider>(
+        `/control/oidc/providers/${id}`,
+        provider
+      );
       return response.data;
     },
 
@@ -205,10 +206,7 @@ export class AdminClient {
     },
 
     import: async (packageData: PackageData): Promise<ImportResult> => {
-      const response = await this.axios.post<ImportResult>(
-        '/control/packages/import',
-        packageData
-      );
+      const response = await this.axios.post<ImportResult>('/control/packages/import', packageData);
       return response.data;
     },
   };
@@ -217,7 +215,10 @@ export class AdminClient {
    * Migration operations
    */
   readonly migrations = {
-    plan: async (collectionId: string, targetSchema: CollectionDefinition): Promise<MigrationPlan> => {
+    plan: async (
+      collectionId: string,
+      targetSchema: CollectionDefinition
+    ): Promise<MigrationPlan> => {
       const response = await this.axios.post<MigrationPlan>('/control/migrations/plan', {
         collectionId,
         targetSchema,

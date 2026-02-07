@@ -1,8 +1,4 @@
-import type {
-  FieldRendererComponent,
-  PageComponent,
-  RegisteredPageComponent,
-} from './types';
+import type { FieldRendererComponent, PageComponent, RegisteredPageComponent } from './types';
 
 /**
  * Registry for custom field renderers and page components

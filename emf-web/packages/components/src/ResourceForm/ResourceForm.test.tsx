@@ -12,7 +12,13 @@ const mockSchema: ResourceMetadata = {
   displayName: 'Users',
   fields: [
     { name: 'name', type: 'string', displayName: 'Name', required: true },
-    { name: 'email', type: 'string', displayName: 'Email', required: true, validation: [{ type: 'email', message: 'Invalid email' }] },
+    {
+      name: 'email',
+      type: 'string',
+      displayName: 'Email',
+      required: true,
+      validation: [{ type: 'email', message: 'Invalid email' }],
+    },
     { name: 'age', type: 'number', displayName: 'Age', required: false },
     { name: 'active', type: 'boolean', displayName: 'Active', required: false },
     { name: 'birthDate', type: 'date', displayName: 'Birth Date', required: false },
@@ -42,12 +48,14 @@ const mockExistingData = {
 };
 
 // Mock EMFClient
-const createMockClient = (options: {
-  discoverFn?: ReturnType<typeof vi.fn>;
-  getFn?: ReturnType<typeof vi.fn>;
-  createFn?: ReturnType<typeof vi.fn>;
-  updateFn?: ReturnType<typeof vi.fn>;
-} = {}) => {
+const createMockClient = (
+  options: {
+    discoverFn?: ReturnType<typeof vi.fn>;
+    getFn?: ReturnType<typeof vi.fn>;
+    createFn?: ReturnType<typeof vi.fn>;
+    updateFn?: ReturnType<typeof vi.fn>;
+  } = {}
+) => {
   const mockResource = {
     list: vi.fn(),
     get: options.getFn ?? vi.fn().mockResolvedValue(mockExistingData),
@@ -105,14 +113,9 @@ describe('ResourceForm', () => {
 
   describe('Schema Fetching (Requirement 12.1)', () => {
     it('should fetch collection schema on mount', async () => {
-      render(
-        <ResourceForm
-          resourceName="users"
-          onSave={mockOnSave}
-          onCancel={mockOnCancel}
-        />,
-        { wrapper: createWrapper(mockClient) }
-      );
+      render(<ResourceForm resourceName="users" onSave={mockOnSave} onCancel={mockOnCancel} />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       await waitFor(() => {
         expect(mockClient.discover).toHaveBeenCalled();
@@ -125,14 +128,9 @@ describe('ResourceForm', () => {
         discoverFn: vi.fn().mockReturnValue(new Promise(() => {})),
       });
 
-      render(
-        <ResourceForm
-          resourceName="users"
-          onSave={mockOnSave}
-          onCancel={mockOnCancel}
-        />,
-        { wrapper: createWrapper(pendingClient) }
-      );
+      render(<ResourceForm resourceName="users" onSave={mockOnSave} onCancel={mockOnCancel} />, {
+        wrapper: createWrapper(pendingClient),
+      });
 
       expect(screen.getByText('Loading...')).toBeInTheDocument();
       expect(screen.getByRole('status')).toHaveAttribute('aria-busy', 'true');
@@ -144,11 +142,7 @@ describe('ResourceForm', () => {
       });
 
       render(
-        <ResourceForm
-          resourceName="nonexistent"
-          onSave={mockOnSave}
-          onCancel={mockOnCancel}
-        />,
+        <ResourceForm resourceName="nonexistent" onSave={mockOnSave} onCancel={mockOnCancel} />,
         { wrapper: createWrapper(emptyClient) }
       );
 
@@ -161,14 +155,9 @@ describe('ResourceForm', () => {
 
   describe('Field Generation (Requirement 12.2)', () => {
     it('should generate form fields from schema', async () => {
-      render(
-        <ResourceForm
-          resourceName="users"
-          onSave={mockOnSave}
-          onCancel={mockOnCancel}
-        />,
-        { wrapper: createWrapper(mockClient) }
-      );
+      render(<ResourceForm resourceName="users" onSave={mockOnSave} onCancel={mockOnCancel} />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       await waitFor(() => {
         expect(screen.getByLabelText(/Name/)).toBeInTheDocument();
@@ -181,14 +170,9 @@ describe('ResourceForm', () => {
     });
 
     it('should render correct input types for each field type', async () => {
-      render(
-        <ResourceForm
-          resourceName="users"
-          onSave={mockOnSave}
-          onCancel={mockOnCancel}
-        />,
-        { wrapper: createWrapper(mockClient) }
-      );
+      render(<ResourceForm resourceName="users" onSave={mockOnSave} onCancel={mockOnCancel} />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       await waitFor(() => {
         // String field
@@ -214,14 +198,9 @@ describe('ResourceForm', () => {
     });
 
     it('should mark required fields with asterisk', async () => {
-      render(
-        <ResourceForm
-          resourceName="users"
-          onSave={mockOnSave}
-          onCancel={mockOnCancel}
-        />,
-        { wrapper: createWrapper(mockClient) }
-      );
+      render(<ResourceForm resourceName="users" onSave={mockOnSave} onCancel={mockOnCancel} />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       await waitFor(() => {
         const nameLabel = screen.getByText('Name').closest('label');
@@ -281,14 +260,9 @@ describe('ResourceForm', () => {
       const getFn = vi.fn();
       const clientWithGet = createMockClient({ getFn });
 
-      render(
-        <ResourceForm
-          resourceName="users"
-          onSave={mockOnSave}
-          onCancel={mockOnCancel}
-        />,
-        { wrapper: createWrapper(clientWithGet) }
-      );
+      render(<ResourceForm resourceName="users" onSave={mockOnSave} onCancel={mockOnCancel} />, {
+        wrapper: createWrapper(clientWithGet),
+      });
 
       await waitFor(() => {
         expect(screen.getByLabelText(/Name/)).toBeInTheDocument();
@@ -302,14 +276,9 @@ describe('ResourceForm', () => {
     it('should validate required fields', async () => {
       const user = userEvent.setup();
 
-      render(
-        <ResourceForm
-          resourceName="users"
-          onSave={mockOnSave}
-          onCancel={mockOnCancel}
-        />,
-        { wrapper: createWrapper(mockClient) }
-      );
+      render(<ResourceForm resourceName="users" onSave={mockOnSave} onCancel={mockOnCancel} />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       await waitFor(() => {
         expect(screen.getByLabelText(/Name/)).toBeInTheDocument();
@@ -326,14 +295,9 @@ describe('ResourceForm', () => {
     it('should validate email format', async () => {
       const user = userEvent.setup();
 
-      render(
-        <ResourceForm
-          resourceName="users"
-          onSave={mockOnSave}
-          onCancel={mockOnCancel}
-        />,
-        { wrapper: createWrapper(mockClient) }
-      );
+      render(<ResourceForm resourceName="users" onSave={mockOnSave} onCancel={mockOnCancel} />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       await waitFor(() => {
         expect(screen.getByLabelText(/Email/)).toBeInTheDocument();
@@ -359,17 +323,14 @@ describe('ResourceForm', () => {
   describe('Create/Update Operation Selection (Requirement 12.5)', () => {
     it('should call create when recordId is not provided', async () => {
       const user = userEvent.setup();
-      const createFn = vi.fn().mockResolvedValue({ id: 'new-123', name: 'John Doe', email: 'john@example.com' });
+      const createFn = vi
+        .fn()
+        .mockResolvedValue({ id: 'new-123', name: 'John Doe', email: 'john@example.com' });
       const clientWithCreate = createMockClient({ createFn });
 
-      render(
-        <ResourceForm
-          resourceName="users"
-          onSave={mockOnSave}
-          onCancel={mockOnCancel}
-        />,
-        { wrapper: createWrapper(clientWithCreate) }
-      );
+      render(<ResourceForm resourceName="users" onSave={mockOnSave} onCancel={mockOnCancel} />, {
+        wrapper: createWrapper(clientWithCreate),
+      });
 
       await waitFor(() => {
         expect(screen.getByLabelText(/Name/)).toBeInTheDocument();
@@ -424,14 +385,9 @@ describe('ResourceForm', () => {
     });
 
     it('should show "Create" button in create mode', async () => {
-      render(
-        <ResourceForm
-          resourceName="users"
-          onSave={mockOnSave}
-          onCancel={mockOnCancel}
-        />,
-        { wrapper: createWrapper(mockClient) }
-      );
+      render(<ResourceForm resourceName="users" onSave={mockOnSave} onCancel={mockOnCancel} />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       await waitFor(() => {
         expect(screen.getByRole('button', { name: /Create/i })).toBeInTheDocument();
@@ -461,17 +417,14 @@ describe('ResourceForm', () => {
   describe('Callbacks (Requirement 12.6, 12.7)', () => {
     it('should call onSave callback after successful save', async () => {
       const user = userEvent.setup();
-      const createFn = vi.fn().mockResolvedValue({ id: 'new-123', name: 'John Doe', email: 'john@example.com' });
+      const createFn = vi
+        .fn()
+        .mockResolvedValue({ id: 'new-123', name: 'John Doe', email: 'john@example.com' });
       const clientWithCreate = createMockClient({ createFn });
 
-      render(
-        <ResourceForm
-          resourceName="users"
-          onSave={mockOnSave}
-          onCancel={mockOnCancel}
-        />,
-        { wrapper: createWrapper(clientWithCreate) }
-      );
+      render(<ResourceForm resourceName="users" onSave={mockOnSave} onCancel={mockOnCancel} />, {
+        wrapper: createWrapper(clientWithCreate),
+      });
 
       await waitFor(() => {
         expect(screen.getByLabelText(/Name/)).toBeInTheDocument();
@@ -491,14 +444,9 @@ describe('ResourceForm', () => {
     it('should call onCancel callback when cancel button is clicked', async () => {
       const user = userEvent.setup();
 
-      render(
-        <ResourceForm
-          resourceName="users"
-          onSave={mockOnSave}
-          onCancel={mockOnCancel}
-        />,
-        { wrapper: createWrapper(mockClient) }
-      );
+      render(<ResourceForm resourceName="users" onSave={mockOnSave} onCancel={mockOnCancel} />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       await waitFor(() => {
         expect(screen.getByLabelText(/Name/)).toBeInTheDocument();
@@ -523,22 +471,17 @@ describe('ResourceForm', () => {
         roles: ['user'],
       };
 
-      render(
-        <ResourceForm
-          resourceName="users"
-          onSave={mockOnSave}
-          onCancel={mockOnCancel}
-        />,
-        { wrapper: createWrapper(authzClient, regularUser) }
-      );
+      render(<ResourceForm resourceName="users" onSave={mockOnSave} onCancel={mockOnCancel} />, {
+        wrapper: createWrapper(authzClient, regularUser),
+      });
 
       await waitFor(() => {
         // Name should be visible (no role restriction)
         expect(screen.getByLabelText(/Name/)).toBeInTheDocument();
-        
+
         // Email should be hidden (requires admin role)
         expect(screen.queryByLabelText(/Email/)).not.toBeInTheDocument();
-        
+
         // Metadata should be hidden (requires admin or editor role)
         expect(screen.queryByLabelText(/Metadata/)).not.toBeInTheDocument();
       });
@@ -555,14 +498,9 @@ describe('ResourceForm', () => {
         roles: ['admin'],
       };
 
-      render(
-        <ResourceForm
-          resourceName="users"
-          onSave={mockOnSave}
-          onCancel={mockOnCancel}
-        />,
-        { wrapper: createWrapper(authzClient, adminUser) }
-      );
+      render(<ResourceForm resourceName="users" onSave={mockOnSave} onCancel={mockOnCancel} />, {
+        wrapper: createWrapper(authzClient, adminUser),
+      });
 
       await waitFor(() => {
         // All fields should be visible for admin
@@ -583,22 +521,17 @@ describe('ResourceForm', () => {
         roles: ['editor'],
       };
 
-      render(
-        <ResourceForm
-          resourceName="users"
-          onSave={mockOnSave}
-          onCancel={mockOnCancel}
-        />,
-        { wrapper: createWrapper(authzClient, editorUser) }
-      );
+      render(<ResourceForm resourceName="users" onSave={mockOnSave} onCancel={mockOnCancel} />, {
+        wrapper: createWrapper(authzClient, editorUser),
+      });
 
       await waitFor(() => {
         // Name should be visible (no role restriction)
         expect(screen.getByLabelText(/Name/)).toBeInTheDocument();
-        
+
         // Email should be hidden (requires admin role only)
         expect(screen.queryByLabelText(/Email/)).not.toBeInTheDocument();
-        
+
         // Metadata should be visible (editor is in the allowed roles)
         expect(screen.getByLabelText(/Metadata/)).toBeInTheDocument();
       });
@@ -690,7 +623,7 @@ describe('ResourceForm', () => {
         <input
           data-testid="custom-string-input"
           type="text"
-          value={value as string ?? ''}
+          value={(value as string) ?? ''}
           onChange={(e) => onChange?.(e.target.value)}
           disabled={readOnly}
         />
@@ -698,17 +631,12 @@ describe('ResourceForm', () => {
 
       setComponentRegistry({
         hasFieldRenderer: (type: string) => type === 'string',
-        getFieldRenderer: (type: string) => type === 'string' ? CustomStringRenderer : undefined,
+        getFieldRenderer: (type: string) => (type === 'string' ? CustomStringRenderer : undefined),
       });
 
-      render(
-        <ResourceForm
-          resourceName="users"
-          onSave={mockOnSave}
-          onCancel={mockOnCancel}
-        />,
-        { wrapper: createWrapper(mockClient) }
-      );
+      render(<ResourceForm resourceName="users" onSave={mockOnSave} onCancel={mockOnCancel} />, {
+        wrapper: createWrapper(mockClient),
+      });
 
       await waitFor(() => {
         // Custom renderer should be used for string fields
@@ -725,14 +653,9 @@ describe('ResourceForm', () => {
       const createFn = vi.fn().mockRejectedValue(saveError);
       const clientWithError = createMockClient({ createFn });
 
-      render(
-        <ResourceForm
-          resourceName="users"
-          onSave={mockOnSave}
-          onCancel={mockOnCancel}
-        />,
-        { wrapper: createWrapper(clientWithError) }
-      );
+      render(<ResourceForm resourceName="users" onSave={mockOnSave} onCancel={mockOnCancel} />, {
+        wrapper: createWrapper(clientWithError),
+      });
 
       await waitFor(() => {
         expect(screen.getByLabelText(/Name/)).toBeInTheDocument();
@@ -745,10 +668,13 @@ describe('ResourceForm', () => {
       await user.click(submitButton);
 
       // Wait for the error to be displayed
-      await waitFor(() => {
-        const errorBanner = screen.queryByRole('alert');
-        expect(errorBanner).toBeInTheDocument();
-      }, { timeout: 2000 });
+      await waitFor(
+        () => {
+          const errorBanner = screen.queryByRole('alert');
+          expect(errorBanner).toBeInTheDocument();
+        },
+        { timeout: 2000 }
+      );
     });
   });
 });

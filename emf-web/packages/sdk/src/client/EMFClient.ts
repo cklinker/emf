@@ -95,10 +95,10 @@ export class EMFClient {
 
   /**
    * Discover available resources from the control plane
-   * 
+   *
    * Fetches resource metadata from the Discovery_Endpoint (/api/_meta/resources)
    * and caches the results for the configured TTL period.
-   * 
+   *
    * @returns Promise<ResourceMetadata[]> - Array of resource metadata objects
    * @throws ValidationError - If the response doesn't match the expected schema
    * @throws EMFError - If the API request fails
@@ -122,10 +122,9 @@ export class EMFClient {
           const errorMessages = parseResult.error.errors.map(
             (e) => `${e.path.join('.')}: ${e.message}`
           );
-          throw new ValidationError(
-            `Invalid discovery response: ${errorMessages.join(', ')}`,
-            { schema: errorMessages }
-          );
+          throw new ValidationError(`Invalid discovery response: ${errorMessages.join(', ')}`, {
+            schema: errorMessages,
+          });
         }
         resources = parseResult.data.resources;
       } else {

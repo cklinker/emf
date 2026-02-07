@@ -24,11 +24,7 @@ export interface EMFProviderProps {
  * Provider component for EMF context
  */
 export function EMFProvider({ client, user = null, children }: EMFProviderProps) {
-  return (
-    <EMFContext.Provider value={{ client, user }}>
-      {children}
-    </EMFContext.Provider>
-  );
+  return <EMFContext.Provider value={{ client, user }}>{children}</EMFContext.Provider>;
 }
 
 /**

@@ -12,6 +12,7 @@ import com.emf.controlplane.exception.ResourceNotFoundException;
 import com.emf.controlplane.repository.CollectionRepository;
 import com.emf.controlplane.repository.FieldRepository;
 import com.emf.controlplane.repository.MigrationRunRepository;
+import com.emf.controlplane.tenant.TenantContextHolder;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -102,6 +103,10 @@ public class MigrationService {
 
         MigrationRun migrationRun = new MigrationRun(collection.getId(), fromVersion, toVersion);
         migrationRun.setStatus(STATUS_PLANNED);
+        String tenantId = TenantContextHolder.getTenantId();
+        if (tenantId != null) {
+            migrationRun.setTenantId(tenantId);
+        }
 
         // Add steps to the migration run
         int stepNumber = 1;

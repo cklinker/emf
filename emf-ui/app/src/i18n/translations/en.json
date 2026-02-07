@@ -491,6 +491,27 @@
     "noFieldValue": "No value",
     "metadata": "Metadata"
   },
+  "tenants": {
+    "title": "Tenants",
+    "createTenant": "Create Tenant",
+    "editTenant": "Edit Tenant",
+    "suspendTenant": "Suspend Tenant",
+    "activateTenant": "Activate Tenant",
+    "slug": "Slug",
+    "name": "Name",
+    "edition": "Edition",
+    "status": "Status",
+    "limits": "Governor Limits",
+    "dashboard": "Tenant Dashboard",
+    "usageAndLimits": "Usage & Limits",
+    "apiCallsToday": "API Calls Today",
+    "storage": "Storage",
+    "activeUsers": "Active Users",
+    "collections": "Collections",
+    "used": "used",
+    "confirmSuspend": "Are you sure you want to suspend this tenant? Users will not be able to access this tenant's data.",
+    "confirmActivate": "Are you sure you want to activate this tenant?"
+  },
   "dashboard": {
     "title": "Dashboard",
     "systemHealth": "System Health",

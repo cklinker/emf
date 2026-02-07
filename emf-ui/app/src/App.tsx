@@ -54,6 +54,8 @@ import {
   ResourceFormPage,
   PluginsPage,
   ServicesPage,
+  TenantsPage,
+  TenantDashboardPage,
   LoginPage,
   UnauthorizedPage,
   NotFoundPage,
@@ -445,6 +447,24 @@ function App({ plugins = [] }: AppProps): React.ReactElement {
                             element={
                               <ProtectedPageRoute>
                                 <PluginsPage />
+                              </ProtectedPageRoute>
+                            }
+                          />
+
+                          {/* Tenant Management routes (platform admin) */}
+                          <Route
+                            path="/tenants"
+                            element={
+                              <ProtectedPageRoute requiredRoles={['PLATFORM_ADMIN']}>
+                                <TenantsPage />
+                              </ProtectedPageRoute>
+                            }
+                          />
+                          <Route
+                            path="/tenant-dashboard"
+                            element={
+                              <ProtectedPageRoute>
+                                <TenantDashboardPage />
                               </ProtectedPageRoute>
                             }
                           />

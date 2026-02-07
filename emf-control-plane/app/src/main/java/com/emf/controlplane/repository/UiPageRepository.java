@@ -13,48 +13,43 @@ import java.util.Optional;
 @Repository
 public interface UiPageRepository extends JpaRepository<UiPage, String> {
 
-    /**
-     * Find all active pages.
-     */
+    // ---- Tenant-scoped methods ----
+
+    List<UiPage> findByTenantIdAndActiveTrue(String tenantId);
+
+    List<UiPage> findByTenantIdAndActiveTrueOrderByNameAsc(String tenantId);
+
+    Optional<UiPage> findByIdAndTenantIdAndActiveTrue(String id, String tenantId);
+
+    Optional<UiPage> findByTenantIdAndPath(String tenantId, String path);
+
+    Optional<UiPage> findByTenantIdAndPathAndActiveTrue(String tenantId, String path);
+
+    Optional<UiPage> findByTenantIdAndName(String tenantId, String name);
+
+    boolean existsByTenantIdAndPath(String tenantId, String path);
+
+    boolean existsByTenantIdAndPathAndActiveTrue(String tenantId, String path);
+
+    long countByTenantIdAndActiveTrue(String tenantId);
+
+    // ---- Legacy methods ----
+
     List<UiPage> findByActiveTrue();
 
-    /**
-     * Find all active pages ordered by name.
-     */
     List<UiPage> findByActiveTrueOrderByNameAsc();
 
-    /**
-     * Find active page by ID.
-     */
     Optional<UiPage> findByIdAndActiveTrue(String id);
 
-    /**
-     * Find page by path.
-     */
     Optional<UiPage> findByPath(String path);
 
-    /**
-     * Find active page by path.
-     */
     Optional<UiPage> findByPathAndActiveTrue(String path);
 
-    /**
-     * Find page by name.
-     */
     Optional<UiPage> findByName(String name);
 
-    /**
-     * Check if a page with the given path exists.
-     */
     boolean existsByPath(String path);
 
-    /**
-     * Check if an active page with the given path exists.
-     */
     boolean existsByPathAndActiveTrue(String path);
 
-    /**
-     * Count active pages.
-     */
     long countByActiveTrue();
 }

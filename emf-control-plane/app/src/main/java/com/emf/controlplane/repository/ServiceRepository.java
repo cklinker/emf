@@ -16,29 +16,33 @@ import java.util.Optional;
 @Repository
 public interface ServiceRepository extends JpaRepository<Service, String> {
 
-    /**
-     * Find all active services.
-     */
+    // ---- Tenant-scoped methods ----
+
+    Page<Service> findByTenantIdAndActiveTrue(String tenantId, Pageable pageable);
+
+    Optional<Service> findByIdAndTenantIdAndActiveTrue(String id, String tenantId);
+
+    Optional<Service> findByTenantIdAndNameAndActiveTrue(String tenantId, String name);
+
+    boolean existsByTenantIdAndNameAndActiveTrue(String tenantId, String name);
+
+    @Query("SELECT s FROM Service s WHERE s.tenantId = :tenantId AND s.active = true AND " +
+           "(LOWER(s.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
+           "LOWER(s.description) LIKE LOWER(CONCAT('%', :searchTerm, '%')))")
+    Page<Service> findByTenantIdAndActiveAndSearchTerm(@Param("tenantId") String tenantId,
+                                                       @Param("searchTerm") String searchTerm,
+                                                       Pageable pageable);
+
+    // ---- Legacy methods (kept for platform-level operations) ----
+
     Page<Service> findByActiveTrue(Pageable pageable);
 
-    /**
-     * Find an active service by ID.
-     */
     Optional<Service> findByIdAndActiveTrue(String id);
 
-    /**
-     * Find an active service by name.
-     */
     Optional<Service> findByNameAndActiveTrue(String name);
 
-    /**
-     * Check if a service with the given name exists and is active.
-     */
     boolean existsByNameAndActiveTrue(String name);
 
-    /**
-     * Search services by name or description.
-     */
     @Query("SELECT s FROM Service s WHERE s.active = true AND " +
            "(LOWER(s.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
            "LOWER(s.description) LIKE LOWER(CONCAT('%', :searchTerm, '%')))")

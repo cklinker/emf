@@ -21,7 +21,10 @@ public class Role {
     @Column(name = "id", nullable = false, updatable = false, length = 36)
     private String id;
 
-    @Column(name = "name", nullable = false, unique = true, length = 100)
+    @Column(name = "tenant_id", nullable = false, length = 36)
+    private String tenantId;
+
+    @Column(name = "name", nullable = false, length = 100)
     private String name;
 
     @Column(name = "description", length = 500)
@@ -47,6 +50,14 @@ public class Role {
 
     public void setId(String id) {
         this.id = id;
+    }
+
+    public String getTenantId() {
+        return tenantId;
+    }
+
+    public void setTenantId(String tenantId) {
+        this.tenantId = tenantId;
     }
 
     public String getName() {

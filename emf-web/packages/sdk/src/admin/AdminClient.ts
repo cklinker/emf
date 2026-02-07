@@ -14,6 +14,11 @@ import type {
   UIMenu,
   MigrationPlan,
   MigrationRun,
+  Tenant,
+  CreateTenantRequest,
+  UpdateTenantRequest,
+  GovernorLimits,
+  Page,
 } from './types';
 
 /**
@@ -207,6 +212,46 @@ export class AdminClient {
 
     import: async (packageData: PackageData): Promise<ImportResult> => {
       const response = await this.axios.post<ImportResult>('/control/packages/import', packageData);
+      return response.data;
+    },
+  };
+
+  /**
+   * Tenant management operations (platform admin)
+   */
+  readonly tenants = {
+    list: async (page = 0, size = 20): Promise<Page<Tenant>> => {
+      const response = await this.axios.get<Page<Tenant>>(
+        `/platform/tenants?page=${page}&size=${size}`
+      );
+      return response.data;
+    },
+
+    get: async (id: string): Promise<Tenant> => {
+      const response = await this.axios.get<Tenant>(`/platform/tenants/${id}`);
+      return response.data;
+    },
+
+    create: async (request: CreateTenantRequest): Promise<Tenant> => {
+      const response = await this.axios.post<Tenant>('/platform/tenants', request);
+      return response.data;
+    },
+
+    update: async (id: string, request: UpdateTenantRequest): Promise<Tenant> => {
+      const response = await this.axios.put<Tenant>(`/platform/tenants/${id}`, request);
+      return response.data;
+    },
+
+    suspend: async (id: string): Promise<void> => {
+      await this.axios.post(`/platform/tenants/${id}/suspend`);
+    },
+
+    activate: async (id: string): Promise<void> => {
+      await this.axios.post(`/platform/tenants/${id}/activate`);
+    },
+
+    getLimits: async (id: string): Promise<GovernorLimits> => {
+      const response = await this.axios.get<GovernorLimits>(`/platform/tenants/${id}/limits`);
       return response.data;
     },
   };

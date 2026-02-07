@@ -10,10 +10,13 @@ import jakarta.persistence.*;
 @Table(name = "ui_page")
 public class UiPage extends BaseEntity {
 
+    @Column(name = "tenant_id", nullable = false, length = 36)
+    private String tenantId;
+
     @Column(name = "name", nullable = false, length = 100)
     private String name;
 
-    @Column(name = "path", nullable = false, unique = true, length = 200)
+    @Column(name = "path", nullable = false, length = 200)
     private String path;
 
     @Column(name = "title", length = 200)
@@ -33,6 +36,14 @@ public class UiPage extends BaseEntity {
         super();
         this.name = name;
         this.path = path;
+    }
+
+    public String getTenantId() {
+        return tenantId;
+    }
+
+    public void setTenantId(String tenantId) {
+        this.tenantId = tenantId;
     }
 
     public String getName() {

@@ -8,6 +8,7 @@ import com.emf.controlplane.exception.DuplicateResourceException;
 import com.emf.controlplane.exception.ResourceNotFoundException;
 import com.emf.controlplane.exception.ValidationException;
 import com.emf.controlplane.repository.OidcProviderRepository;
+import com.emf.controlplane.tenant.TenantContextHolder;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,7 +60,11 @@ public class OidcProviderService {
      */
     @Transactional(readOnly = true)
     public List<OidcProvider> listProviders() {
-        log.debug("Listing all active OIDC providers");
+        String tenantId = TenantContextHolder.getTenantId();
+        log.debug("Listing all active OIDC providers for tenant: {}", tenantId);
+        if (tenantId != null) {
+            return providerRepository.findByTenantIdAndActiveTrueOrderByNameAsc(tenantId);
+        }
         return providerRepository.findByActiveTrueOrderByNameAsc();
     }
 
@@ -91,9 +96,17 @@ public class OidcProviderService {
         // Validate roles mapping JSON
         validateRolesMapping(request.getRolesMapping());
 
+        String tenantId = TenantContextHolder.getTenantId();
+
         // Check for duplicate name
-        if (providerRepository.existsByName(request.getName())) {
-            throw new DuplicateResourceException("OidcProvider", "name", request.getName());
+        if (tenantId != null) {
+            if (providerRepository.existsByTenantIdAndName(tenantId, request.getName())) {
+                throw new DuplicateResourceException("OidcProvider", "name", request.getName());
+            }
+        } else {
+            if (providerRepository.existsByName(request.getName())) {
+                throw new DuplicateResourceException("OidcProvider", "name", request.getName());
+            }
         }
 
         // Check for duplicate issuer
@@ -115,6 +128,9 @@ public class OidcProviderService {
         provider.setUsernameClaim(request.getUsernameClaim());
         provider.setNameClaim(request.getNameClaim());
         provider.setActive(true);
+        if (tenantId != null) {
+            provider.setTenantId(tenantId);
+        }
 
         // Save the provider
         provider = providerRepository.save(provider);
@@ -141,10 +157,17 @@ public class OidcProviderService {
      */
     @Transactional
     public OidcProvider updateProvider(String id, UpdateOidcProviderRequest request) {
-        log.info("Updating OIDC provider with id: {}", id);
+        String tenantId = TenantContextHolder.getTenantId();
+        log.info("Updating OIDC provider with id: {} for tenant: {}", id, tenantId);
 
-        OidcProvider provider = providerRepository.findByIdAndActiveTrue(id)
-                .orElseThrow(() -> new ResourceNotFoundException("OidcProvider", id));
+        OidcProvider provider;
+        if (tenantId != null) {
+            provider = providerRepository.findByIdAndTenantIdAndActiveTrue(id, tenantId)
+                    .orElseThrow(() -> new ResourceNotFoundException("OidcProvider", id));
+        } else {
+            provider = providerRepository.findByIdAndActiveTrue(id)
+                    .orElseThrow(() -> new ResourceNotFoundException("OidcProvider", id));
+        }
 
         // Update name if provided
         if (request.getName() != null && !request.getName().equals(provider.getName())) {
@@ -235,10 +258,17 @@ public class OidcProviderService {
      */
     @Transactional
     public void deleteProvider(String id) {
-        log.info("Deleting OIDC provider with id: {}", id);
+        String tenantId = TenantContextHolder.getTenantId();
+        log.info("Deleting OIDC provider with id: {} for tenant: {}", id, tenantId);
 
-        OidcProvider provider = providerRepository.findByIdAndActiveTrue(id)
-                .orElseThrow(() -> new ResourceNotFoundException("OidcProvider", id));
+        OidcProvider provider;
+        if (tenantId != null) {
+            provider = providerRepository.findByIdAndTenantIdAndActiveTrue(id, tenantId)
+                    .orElseThrow(() -> new ResourceNotFoundException("OidcProvider", id));
+        } else {
+            provider = providerRepository.findByIdAndActiveTrue(id)
+                    .orElseThrow(() -> new ResourceNotFoundException("OidcProvider", id));
+        }
 
         // Soft delete - mark as inactive
         provider.setActive(false);
@@ -369,7 +399,12 @@ public class OidcProviderService {
      */
     @Transactional(readOnly = true)
     public OidcProvider getProvider(String id) {
-        log.debug("Getting OIDC provider with id: {}", id);
+        String tenantId = TenantContextHolder.getTenantId();
+        log.debug("Getting OIDC provider with id: {} for tenant: {}", id, tenantId);
+        if (tenantId != null) {
+            return providerRepository.findByIdAndTenantIdAndActiveTrue(id, tenantId)
+                    .orElseThrow(() -> new ResourceNotFoundException("OidcProvider", id));
+        }
         return providerRepository.findByIdAndActiveTrue(id)
                 .orElseThrow(() -> new ResourceNotFoundException("OidcProvider", id));
     }

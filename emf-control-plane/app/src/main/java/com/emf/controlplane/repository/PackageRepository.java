@@ -15,33 +15,31 @@ import java.util.Optional;
 @Repository
 public interface PackageRepository extends JpaRepository<ConfigPackage, String> {
 
-    /**
-     * Find package by name.
-     */
+    // ---- Tenant-scoped methods ----
+
+    Optional<ConfigPackage> findByTenantIdAndName(String tenantId, String name);
+
+    Optional<ConfigPackage> findByTenantIdAndNameAndVersion(String tenantId, String name, String version);
+
+    List<ConfigPackage> findByTenantIdAndNameOrderByCreatedAtDesc(String tenantId, String name);
+
+    List<ConfigPackage> findByTenantIdOrderByCreatedAtDesc(String tenantId);
+
+    Page<ConfigPackage> findByTenantIdOrderByCreatedAtDesc(String tenantId, Pageable pageable);
+
+    boolean existsByTenantIdAndNameAndVersion(String tenantId, String name, String version);
+
+    // ---- Legacy methods ----
+
     Optional<ConfigPackage> findByName(String name);
 
-    /**
-     * Find package by name and version.
-     */
     Optional<ConfigPackage> findByNameAndVersion(String name, String version);
 
-    /**
-     * Find all packages with a given name ordered by creation date descending.
-     */
     List<ConfigPackage> findByNameOrderByCreatedAtDesc(String name);
 
-    /**
-     * Find all packages ordered by creation date descending.
-     */
     List<ConfigPackage> findAllByOrderByCreatedAtDesc();
 
-    /**
-     * Find all packages with pagination ordered by creation date descending.
-     */
     Page<ConfigPackage> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
-    /**
-     * Check if a package with the given name and version exists.
-     */
     boolean existsByNameAndVersion(String name, String version);
 }

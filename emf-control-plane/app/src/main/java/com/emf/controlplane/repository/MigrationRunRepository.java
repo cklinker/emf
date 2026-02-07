@@ -14,33 +14,31 @@ import java.util.List;
 @Repository
 public interface MigrationRunRepository extends JpaRepository<MigrationRun, String> {
 
-    /**
-     * Find all migration runs for a collection ordered by creation date descending.
-     */
+    // ---- Tenant-scoped methods ----
+
+    List<MigrationRun> findByTenantIdAndCollectionIdOrderByCreatedAtDesc(String tenantId, String collectionId);
+
+    Page<MigrationRun> findByTenantIdOrderByCreatedAtDesc(String tenantId, Pageable pageable);
+
+    List<MigrationRun> findByTenantIdAndStatus(String tenantId, String status);
+
+    List<MigrationRun> findByTenantIdAndCollectionIdAndStatus(String tenantId, String collectionId, String status);
+
+    long countByTenantIdAndStatus(String tenantId, String status);
+
+    long countByTenantIdAndCollectionId(String tenantId, String collectionId);
+
+    // ---- Legacy methods ----
+
     List<MigrationRun> findByCollectionIdOrderByCreatedAtDesc(String collectionId);
 
-    /**
-     * Find all migration runs with pagination ordered by creation date descending.
-     */
     Page<MigrationRun> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
-    /**
-     * Find migration runs by status.
-     */
     List<MigrationRun> findByStatus(String status);
 
-    /**
-     * Find migration runs for a collection by status.
-     */
     List<MigrationRun> findByCollectionIdAndStatus(String collectionId, String status);
 
-    /**
-     * Count migration runs by status.
-     */
     long countByStatus(String status);
 
-    /**
-     * Count migration runs for a collection.
-     */
     long countByCollectionId(String collectionId);
 }

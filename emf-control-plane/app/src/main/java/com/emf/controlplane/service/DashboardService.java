@@ -1,5 +1,6 @@
 package com.emf.controlplane.service;
 
+import com.emf.controlplane.tenant.TenantContextHolder;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
@@ -38,7 +39,8 @@ public class DashboardService {
      * @return Dashboard data map
      */
     public Map<String, Object> getDashboardData(String timeRange) {
-        log.debug("Collecting dashboard data for timeRange: {}", timeRange);
+        String tenantId = TenantContextHolder.getTenantId();
+        log.debug("Collecting dashboard data for timeRange: {} tenant: {}", timeRange, tenantId);
 
         List<Map<String, Object>> health = getHealthStatus();
         Map<String, Object> metrics = getMetrics(timeRange);

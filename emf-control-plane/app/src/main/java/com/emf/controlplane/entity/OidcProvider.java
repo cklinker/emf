@@ -10,7 +10,10 @@ import jakarta.persistence.*;
 @Table(name = "oidc_provider")
 public class OidcProvider extends BaseEntity {
 
-    @Column(name = "name", nullable = false, unique = true, length = 100)
+    @Column(name = "tenant_id", nullable = false, length = 36)
+    private String tenantId;
+
+    @Column(name = "name", nullable = false, length = 100)
     private String name;
 
     @Column(name = "issuer", nullable = false, length = 500)
@@ -52,6 +55,14 @@ public class OidcProvider extends BaseEntity {
         this.name = name;
         this.issuer = issuer;
         this.jwksUri = jwksUri;
+    }
+
+    public String getTenantId() {
+        return tenantId;
+    }
+
+    public void setTenantId(String tenantId) {
+        this.tenantId = tenantId;
     }
 
     public String getName() {

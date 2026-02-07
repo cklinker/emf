@@ -123,6 +123,10 @@ export type { UsersPageProps } from './UsersPage'
 export { UserDetailPage } from './UserDetailPage'
 export type { UserDetailPageProps } from './UserDetailPage'
 
+// PicklistsPage - Global picklist management page
+export { PicklistsPage } from './PicklistsPage'
+export type { PicklistsPageProps } from './PicklistsPage'
+
 // DashboardPage - System health and metrics dashboard
 export { DashboardPage } from './DashboardPage'
 export type {

@@ -128,9 +128,13 @@ public class DefaultValidationEngine implements ValidationEngine {
             validateRules(field, value, rules, errors);
         }
         
-        // 5. Enum validation
+        // 5. Enum / Picklist validation
         if (field.enumValues() != null && !field.enumValues().isEmpty()) {
-            validateEnum(field, value, errors);
+            if (field.type() == FieldType.MULTI_PICKLIST && value instanceof List<?> listValue) {
+                validateMultiPicklist(field, listValue, errors);
+            } else {
+                validateEnum(field, value, errors);
+            }
         }
         
         // 6. Unique constraint validation
@@ -291,6 +295,22 @@ public class DefaultValidationEngine implements ValidationEngine {
         String stringValue = value.toString();
         if (!field.enumValues().contains(stringValue)) {
             errors.add(FieldError.enumViolation(field.name(), field.enumValues()));
+        }
+    }
+
+    /**
+     * Validates that each value in a MULTI_PICKLIST list is in the allowed enum values.
+     */
+    private void validateMultiPicklist(FieldDefinition field, List<?> values, List<FieldError> errors) {
+        for (Object item : values) {
+            if (item != null) {
+                String stringValue = item.toString();
+                if (!field.enumValues().contains(stringValue)) {
+                    errors.add(new FieldError(field.name(),
+                            "Value '" + stringValue + "' is not a valid picklist option",
+                            "picklist"));
+                }
+            }
         }
     }
     

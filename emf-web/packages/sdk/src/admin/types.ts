@@ -685,3 +685,74 @@ export interface MigrationStepResult {
   status: 'pending' | 'running' | 'completed' | 'failed';
   error?: string;
 }
+
+/**
+ * Global picklist definition
+ */
+export interface GlobalPicklist {
+  id: string;
+  tenantId: string;
+  name: string;
+  description?: string;
+  sorted: boolean;
+  restricted: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Picklist value
+ */
+export interface PicklistValue {
+  id: string;
+  value: string;
+  label: string;
+  isDefault: boolean;
+  active: boolean;
+  sortOrder: number;
+  color?: string;
+  description?: string;
+}
+
+/**
+ * Picklist dependency mapping
+ */
+export interface PicklistDependency {
+  id: string;
+  controllingFieldId: string;
+  dependentFieldId: string;
+  mapping: Record<string, string[]>;
+}
+
+/**
+ * Request to create a global picklist
+ */
+export interface CreateGlobalPicklistRequest {
+  name: string;
+  description?: string;
+  sorted?: boolean;
+  restricted?: boolean;
+  values?: PicklistValueRequest[];
+}
+
+/**
+ * Request to set picklist values
+ */
+export interface PicklistValueRequest {
+  value: string;
+  label: string;
+  isDefault?: boolean;
+  active?: boolean;
+  sortOrder?: number;
+  color?: string;
+  description?: string;
+}
+
+/**
+ * Request to set a picklist dependency
+ */
+export interface SetDependencyRequest {
+  controllingFieldId: string;
+  dependentFieldId: string;
+  mapping: Record<string, string[]>;
+}

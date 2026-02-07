@@ -119,3 +119,45 @@ export interface CollectionVersion {
   schema: string
   createdAt: string
 }
+
+/**
+ * Collection-level validation rule using formula evaluation
+ */
+export interface CollectionValidationRule {
+  id: string
+  collectionId: string
+  name: string
+  description?: string
+  active: boolean
+  errorConditionFormula: string
+  errorMessage: string
+  errorField?: string
+  evaluateOn: 'CREATE' | 'UPDATE' | 'CREATE_AND_UPDATE'
+  createdAt: string
+  updatedAt: string
+}
+
+/**
+ * Record type definition
+ */
+export interface RecordType {
+  id: string
+  collectionId: string
+  name: string
+  description?: string
+  active: boolean
+  isDefault: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+/**
+ * Picklist override for a record type
+ */
+export interface RecordTypePicklistOverride {
+  id: string
+  fieldId: string
+  fieldName: string
+  availableValues: string
+  defaultValue?: string
+}

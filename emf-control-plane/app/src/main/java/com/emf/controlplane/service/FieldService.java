@@ -1,5 +1,6 @@
 package com.emf.controlplane.service;
 
+import com.emf.controlplane.audit.SetupAudited;
 import com.emf.controlplane.config.CacheConfig;
 import com.emf.controlplane.dto.AddFieldRequest;
 import com.emf.controlplane.dto.UpdateFieldRequest;
@@ -145,6 +146,7 @@ public class FieldService {
      */
     @Transactional
     @CacheEvict(value = CacheConfig.COLLECTIONS_CACHE, key = "#collectionId")
+    @SetupAudited(section = "Fields", entityType = "Field")
     public Field addField(String collectionId, AddFieldRequest request) {
         log.info("Adding field '{}' to collection: {}", request.getName(), collectionId);
         
@@ -174,6 +176,7 @@ public class FieldService {
         field.setDescription(request.getDescription());
         field.setConstraints(request.getConstraints());
         field.setFieldTypeConfig(request.getFieldTypeConfig());
+        field.setTrackHistory(request.isTrackHistory());
         field.setActive(true);
         field.setCollection(collection);
 
@@ -182,7 +185,12 @@ public class FieldService {
             String seqName = "seq_" + collection.getName() + "_" + request.getName();
             field.setAutoNumberSequenceName(seqName);
         }
-        
+
+        // For LOOKUP / MASTER_DETAIL: set relationship metadata
+        if ("LOOKUP".equals(canonicalType) || "MASTER_DETAIL".equals(canonicalType)) {
+            configureRelationshipField(field, canonicalType, collection, request);
+        }
+
         // Save the field
         field = fieldRepository.save(field);
         
@@ -215,6 +223,7 @@ public class FieldService {
      */
     @Transactional
     @CacheEvict(value = CacheConfig.COLLECTIONS_CACHE, key = "#collectionId")
+    @SetupAudited(section = "Fields", entityType = "Field")
     public Field updateField(String collectionId, String fieldId, UpdateFieldRequest request) {
         log.info("Updating field '{}' in collection: {}", fieldId, collectionId);
         
@@ -250,6 +259,11 @@ public class FieldService {
             field.setDescription(request.getDescription());
         }
         
+        // Update trackHistory if provided
+        if (request.getTrackHistory() != null) {
+            field.setTrackHistory(request.getTrackHistory());
+        }
+
         // Update constraints if provided
         if (request.getConstraints() != null) {
             String effectiveType = request.getType() != null ? request.getType() : field.getType();
@@ -287,6 +301,7 @@ public class FieldService {
      */
     @Transactional
     @CacheEvict(value = CacheConfig.COLLECTIONS_CACHE, key = "#collectionId")
+    @SetupAudited(section = "Fields", entityType = "Field")
     public void deleteField(String collectionId, String fieldId) {
         log.info("Deleting field '{}' from collection: {}", fieldId, collectionId);
         
@@ -574,15 +589,97 @@ public class FieldService {
         if (field.getConstraints() != null) {
             fieldSchema.put("constraints", field.getConstraints());
         }
+        if (field.getRelationshipType() != null) {
+            fieldSchema.put("relationshipType", field.getRelationshipType());
+            fieldSchema.put("relationshipName", field.getRelationshipName());
+            fieldSchema.put("cascadeDelete", field.isCascadeDelete());
+            fieldSchema.put("referenceCollectionId", field.getReferenceCollectionId());
+        }
         return fieldSchema;
+    }
+
+    /**
+     * Configures relationship metadata for LOOKUP and MASTER_DETAIL fields.
+     * Validates the target collection and enforces relationship rules:
+     * <ul>
+     *   <li>Target collection must exist and be active</li>
+     *   <li>MASTER_DETAIL: no self-referencing, max 2 per collection, always required + cascade</li>
+     *   <li>LOOKUP: nullable, no cascade delete</li>
+     * </ul>
+     */
+    private void configureRelationshipField(Field field, String canonicalType,
+                                            Collection collection, AddFieldRequest request) {
+        // Parse fieldTypeConfig to get target collection
+        String parsedTargetCollection = null;
+        String parsedRelationshipName = null;
+        if (request.getFieldTypeConfig() != null && !request.getFieldTypeConfig().isBlank()) {
+            try {
+                JsonNode config = objectMapper.readTree(request.getFieldTypeConfig());
+                if (config.has("targetCollection")) {
+                    parsedTargetCollection = config.get("targetCollection").asText();
+                }
+                if (config.has("relationshipName")) {
+                    parsedRelationshipName = config.get("relationshipName").asText();
+                }
+            } catch (JsonProcessingException e) {
+                throw new ValidationException("fieldTypeConfig", "Invalid JSON: " + e.getMessage());
+            }
+        }
+
+        if (parsedTargetCollection == null || parsedTargetCollection.isBlank()) {
+            throw new ValidationException("fieldTypeConfig",
+                    canonicalType + " fields require fieldTypeConfig.targetCollection");
+        }
+
+        // Effectively final for lambda
+        final String targetCollectionName = parsedTargetCollection;
+
+        // Resolve target collection
+        Collection targetCollection = collectionRepository.findByNameAndActiveTrue(targetCollectionName)
+                .orElseThrow(() -> new ValidationException("fieldTypeConfig.targetCollection",
+                        "Target collection '" + targetCollectionName + "' not found"));
+
+        // Default relationship name to target collection name if not specified
+        String relationshipName = parsedRelationshipName;
+        if (relationshipName == null || relationshipName.isBlank()) {
+            relationshipName = targetCollection.getDisplayName() != null
+                    ? targetCollection.getDisplayName() : targetCollectionName;
+        }
+
+        if ("MASTER_DETAIL".equals(canonicalType)) {
+            // No self-referencing master-detail
+            if (targetCollection.getId().equals(collection.getId())) {
+                throw new ValidationException("fieldTypeConfig.targetCollection",
+                        "MASTER_DETAIL cannot reference its own collection");
+            }
+
+            // Max 2 master-detail fields per collection
+            long masterDetailCount = fieldRepository.countMasterDetailFieldsByCollectionId(collection.getId());
+            if (masterDetailCount >= 2) {
+                throw new ValidationException("type",
+                        "Collection already has the maximum of 2 MASTER_DETAIL relationships");
+            }
+
+            // Force required and cascade delete
+            field.setRequired(true);
+            field.setCascadeDelete(true);
+        } else {
+            // LOOKUP: nullable, no cascade
+            field.setCascadeDelete(false);
+        }
+
+        field.setRelationshipType(canonicalType);
+        field.setRelationshipName(relationshipName);
+        field.setReferenceCollectionId(targetCollection.getId());
+        field.setReferenceTarget(targetCollectionName);
     }
 
     /**
      * Publishes a collection changed event to Kafka.
      * Only publishes if the event publisher is available (Kafka is enabled).
-     * 
+     *
      * @param collection The collection that changed
-     * 
+     *
      * Validates: Requirement 2.6
      */
     private void publishCollectionChangedEvent(Collection collection) {

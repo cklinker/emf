@@ -84,7 +84,10 @@ public class IncludeResolver {
     /**
      * Extracts resource identifiers from relationships in primary data.
      * Only extracts identifiers for relationships specified in includeParams.
-     * 
+     * Supports matching by both relationship key name and relationship display name
+     * (case-insensitive) to allow named relationships like "Account" to resolve
+     * to the underlying relationship key "account_id".
+     *
      * @param includeParams List of relationship names to include
      * @param primaryData List of primary data resources
      * @return Set of unique resource identifiers
@@ -92,7 +95,7 @@ public class IncludeResolver {
     private Set<ResourceIdentifier> extractResourceIdentifiers(
             List<String> includeParams,
             List<ResourceObject> primaryData) {
-        
+
         Set<ResourceIdentifier> identifiers = new HashSet<>();
 
         for (ResourceObject resource : primaryData) {
@@ -104,6 +107,17 @@ public class IncludeResolver {
             // For each requested include parameter
             for (String includeName : includeParams) {
                 Relationship relationship = relationships.get(includeName);
+
+                // Fallback: try case-insensitive match on relationship keys
+                if (relationship == null) {
+                    for (Map.Entry<String, Relationship> entry : relationships.entrySet()) {
+                        if (entry.getKey().equalsIgnoreCase(includeName)) {
+                            relationship = entry.getValue();
+                            break;
+                        }
+                    }
+                }
+
                 if (relationship == null) {
                     continue;
                 }

@@ -32,6 +32,8 @@ public class UpdateFieldRequest {
      */
     private String constraints;
 
+    private Boolean trackHistory;
+
     public UpdateFieldRequest() {
     }
 
@@ -81,6 +83,14 @@ public class UpdateFieldRequest {
 
     public void setConstraints(String constraints) {
         this.constraints = constraints;
+    }
+
+    public Boolean getTrackHistory() {
+        return trackHistory;
+    }
+
+    public void setTrackHistory(Boolean trackHistory) {
+        this.trackHistory = trackHistory;
     }
 
     @Override

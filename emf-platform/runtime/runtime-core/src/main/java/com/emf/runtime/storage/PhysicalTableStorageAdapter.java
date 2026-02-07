@@ -114,11 +114,32 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
 
             // Unique index for EXTERNAL_ID
             if (field.type() == FieldType.EXTERNAL_ID) {
-                String tableName2 = getTableName(definition);
+                String tbl = getTableName(definition);
                 postCreateStatements.add(
-                    "CREATE UNIQUE INDEX IF NOT EXISTS idx_" + sanitizeIdentifier(tableName2)
+                    "CREATE UNIQUE INDEX IF NOT EXISTS idx_" + sanitizeIdentifier(tbl)
                     + "_" + sanitizeIdentifier(field.name())
-                    + " ON " + sanitizeIdentifier(tableName2) + "(" + sanitizeIdentifier(field.name()) + ")"
+                    + " ON " + sanitizeIdentifier(tbl) + "(" + sanitizeIdentifier(field.name()) + ")"
+                );
+            }
+
+            // FK constraints for LOOKUP and MASTER_DETAIL
+            if ((field.type() == FieldType.LOOKUP || field.type() == FieldType.MASTER_DETAIL)
+                    && field.referenceConfig() != null) {
+                String tbl = getTableName(definition);
+                String targetTable = "tbl_" + sanitizeIdentifier(field.referenceConfig().targetCollection());
+                String targetCol = sanitizeIdentifier(field.referenceConfig().targetField());
+                String fkName = "fk_" + sanitizeIdentifier(tbl) + "_" + sanitizeIdentifier(field.name());
+                String onDelete = field.type() == FieldType.MASTER_DETAIL
+                        ? "ON DELETE CASCADE" : "ON DELETE SET NULL";
+
+                postCreateStatements.add(
+                    "DO $$ BEGIN " +
+                    "IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = '" + fkName + "') THEN " +
+                    "ALTER TABLE " + sanitizeIdentifier(tbl) +
+                    " ADD CONSTRAINT " + fkName +
+                    " FOREIGN KEY (" + sanitizeIdentifier(field.name()) + ")" +
+                    " REFERENCES " + targetTable + "(" + targetCol + ") " + onDelete + "; " +
+                    "END IF; END $$"
                 );
             }
         }
@@ -316,8 +337,18 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
     @Override
     public boolean delete(CollectionDefinition definition, String id) {
         String tableName = getTableName(definition);
+
+        // Log cascade-affected MASTER_DETAIL child records before delete
+        for (FieldDefinition field : definition.fields()) {
+            if (field.type() == FieldType.MASTER_DETAIL && field.referenceConfig() != null
+                    && field.referenceConfig().isMasterDetail()) {
+                log.info("Cascade delete: record '{}' in '{}' will cascade via MASTER_DETAIL field '{}'",
+                        id, definition.name(), field.name());
+            }
+        }
+
         String sql = "DELETE FROM " + sanitizeIdentifier(tableName) + " WHERE id = ?";
-        
+
         try {
             int rowsAffected = jdbcTemplate.update(sql, id);
             if (rowsAffected > 0) {

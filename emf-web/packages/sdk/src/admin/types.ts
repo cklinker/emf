@@ -77,6 +77,10 @@ export interface FieldTypeConfig {
   latitude?: number;
   /** Geolocation: longitude */
   longitude?: number;
+  /** Lookup/MasterDetail: target collection name */
+  targetCollection?: string;
+  /** Lookup/MasterDetail: human-readable relationship name */
+  relationshipName?: string;
 }
 
 /**
@@ -98,8 +102,35 @@ export interface FieldDefinition {
   active?: boolean;
   description?: string;
   constraints?: string;
+  relationshipType?: 'LOOKUP' | 'MASTER_DETAIL';
+  relationshipName?: string;
+  cascadeDelete?: boolean;
+  referenceCollectionId?: string;
   createdAt?: string;
   updatedAt?: string;
+}
+
+/**
+ * Relationship information for a field
+ */
+export interface RelationshipInfo {
+  fieldId: string;
+  fieldName: string;
+  relationshipType: 'LOOKUP' | 'MASTER_DETAIL';
+  relationshipName: string;
+  targetCollectionId: string;
+  targetCollectionName: string;
+  cascadeDelete: boolean;
+}
+
+/**
+ * All relationships for a collection
+ */
+export interface CollectionRelationships {
+  collectionId: string;
+  collectionName: string;
+  outgoing: RelationshipInfo[];
+  incoming: RelationshipInfo[];
 }
 
 /**
@@ -684,4 +715,176 @@ export interface MigrationStepResult {
   step: MigrationStep;
   status: 'pending' | 'running' | 'completed' | 'failed';
   error?: string;
+}
+
+/**
+ * Global picklist definition
+ */
+export interface GlobalPicklist {
+  id: string;
+  tenantId: string;
+  name: string;
+  description?: string;
+  sorted: boolean;
+  restricted: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Picklist value
+ */
+export interface PicklistValue {
+  id: string;
+  value: string;
+  label: string;
+  isDefault: boolean;
+  active: boolean;
+  sortOrder: number;
+  color?: string;
+  description?: string;
+}
+
+/**
+ * Picklist dependency mapping
+ */
+export interface PicklistDependency {
+  id: string;
+  controllingFieldId: string;
+  dependentFieldId: string;
+  mapping: Record<string, string[]>;
+}
+
+/**
+ * Request to create a global picklist
+ */
+export interface CreateGlobalPicklistRequest {
+  name: string;
+  description?: string;
+  sorted?: boolean;
+  restricted?: boolean;
+  values?: PicklistValueRequest[];
+}
+
+/**
+ * Request to set picklist values
+ */
+export interface PicklistValueRequest {
+  value: string;
+  label: string;
+  isDefault?: boolean;
+  active?: boolean;
+  sortOrder?: number;
+  color?: string;
+  description?: string;
+}
+
+/**
+ * Request to set a picklist dependency
+ */
+export interface SetDependencyRequest {
+  controllingFieldId: string;
+  dependentFieldId: string;
+  mapping: Record<string, string[]>;
+}
+
+// --- Validation Rules (Phase 2 Stream D) ---
+
+/**
+ * Collection-level validation rule using formula evaluation
+ */
+export interface CollectionValidationRule {
+  id: string;
+  collectionId: string;
+  name: string;
+  description?: string;
+  active: boolean;
+  errorConditionFormula: string;
+  errorMessage: string;
+  errorField?: string;
+  evaluateOn: 'CREATE' | 'UPDATE' | 'CREATE_AND_UPDATE';
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Request to create a collection validation rule
+ */
+export interface CreateCollectionValidationRuleRequest {
+  name: string;
+  description?: string;
+  errorConditionFormula: string;
+  errorMessage: string;
+  errorField?: string;
+  evaluateOn?: 'CREATE' | 'UPDATE' | 'CREATE_AND_UPDATE';
+}
+
+/**
+ * Validation error returned when a record fails validation
+ */
+export interface CollectionValidationError {
+  ruleName: string;
+  errorMessage: string;
+  errorField?: string;
+}
+
+// --- Record Types (Phase 2 Stream D) ---
+
+/**
+ * Record type definition
+ */
+export interface RecordType {
+  id: string;
+  collectionId: string;
+  name: string;
+  description?: string;
+  active: boolean;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Request to create a record type
+ */
+export interface CreateRecordTypeRequest {
+  name: string;
+  description?: string;
+  isDefault?: boolean;
+}
+
+/**
+ * Picklist value override for a record type
+ */
+export interface RecordTypePicklistOverride {
+  id: string;
+  fieldId: string;
+  fieldName: string;
+  availableValues: string;
+  defaultValue?: string;
+}
+
+/**
+ * Request to set picklist override for a record type
+ */
+export interface SetPicklistOverrideRequest {
+  availableValues: string[];
+  defaultValue?: string;
+}
+
+// --- Field History (Phase 2 Stream E) ---
+
+/**
+ * Field history entry tracking a single field change
+ */
+export interface FieldHistoryEntry {
+  id: string;
+  collectionId: string;
+  recordId: string;
+  fieldName: string;
+  oldValue: unknown;
+  newValue: unknown;
+  changedBy: string;
+  changedAt: string;
+  changeSource: 'UI' | 'API' | 'WORKFLOW' | 'SYSTEM' | 'IMPORT';
 }

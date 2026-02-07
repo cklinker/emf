@@ -43,6 +43,21 @@ import type {
   RoleHierarchyNode,
   SetupAuditTrailEntry,
   GovernorLimitsStatus,
+  GlobalPicklist,
+  PicklistValue,
+  PicklistDependency,
+  CreateGlobalPicklistRequest,
+  PicklistValueRequest,
+  SetDependencyRequest,
+  CollectionRelationships,
+  CollectionValidationRule,
+  CreateCollectionValidationRuleRequest,
+  CollectionValidationError,
+  RecordType,
+  CreateRecordTypeRequest,
+  RecordTypePicklistOverride,
+  SetPicklistOverrideRequest,
+  FieldHistoryEntry,
 } from './types';
 
 /**
@@ -330,6 +345,339 @@ export class AdminClient {
       params.append('size', size.toString());
       const response = await this.axios.get<Page<LoginHistoryEntry>>(
         `/control/users/${id}/login-history?${params.toString()}`
+      );
+      return response.data;
+    },
+  };
+
+  /**
+   * Picklist management operations
+   */
+  readonly picklists = {
+    listGlobal: async (tenantId = 'default'): Promise<GlobalPicklist[]> => {
+      const params = new URLSearchParams();
+      params.append('tenantId', tenantId);
+      const response = await this.axios.get<GlobalPicklist[]>(
+        `/control/picklists/global?${params.toString()}`
+      );
+      return response.data;
+    },
+
+    createGlobal: async (
+      request: CreateGlobalPicklistRequest,
+      tenantId = 'default'
+    ): Promise<GlobalPicklist> => {
+      const params = new URLSearchParams();
+      params.append('tenantId', tenantId);
+      const response = await this.axios.post<GlobalPicklist>(
+        `/control/picklists/global?${params.toString()}`,
+        request
+      );
+      return response.data;
+    },
+
+    getGlobal: async (id: string): Promise<GlobalPicklist> => {
+      const response = await this.axios.get<GlobalPicklist>(`/control/picklists/global/${id}`);
+      return response.data;
+    },
+
+    updateGlobal: async (
+      id: string,
+      request: Partial<CreateGlobalPicklistRequest>
+    ): Promise<GlobalPicklist> => {
+      const response = await this.axios.put<GlobalPicklist>(
+        `/control/picklists/global/${id}`,
+        request
+      );
+      return response.data;
+    },
+
+    deleteGlobal: async (id: string): Promise<void> => {
+      await this.axios.delete(`/control/picklists/global/${id}`);
+    },
+
+    getGlobalValues: async (id: string): Promise<PicklistValue[]> => {
+      const response = await this.axios.get<PicklistValue[]>(
+        `/control/picklists/global/${id}/values`
+      );
+      return response.data;
+    },
+
+    setGlobalValues: async (
+      id: string,
+      values: PicklistValueRequest[]
+    ): Promise<PicklistValue[]> => {
+      const response = await this.axios.put<PicklistValue[]>(
+        `/control/picklists/global/${id}/values`,
+        values
+      );
+      return response.data;
+    },
+
+    getFieldValues: async (fieldId: string): Promise<PicklistValue[]> => {
+      const response = await this.axios.get<PicklistValue[]>(
+        `/control/picklists/fields/${fieldId}/values`
+      );
+      return response.data;
+    },
+
+    setFieldValues: async (
+      fieldId: string,
+      values: PicklistValueRequest[]
+    ): Promise<PicklistValue[]> => {
+      const response = await this.axios.put<PicklistValue[]>(
+        `/control/picklists/fields/${fieldId}/values`,
+        values
+      );
+      return response.data;
+    },
+
+    getDependencies: async (fieldId: string): Promise<PicklistDependency[]> => {
+      const response = await this.axios.get<PicklistDependency[]>(
+        `/control/picklists/fields/${fieldId}/dependencies`
+      );
+      return response.data;
+    },
+
+    setDependency: async (request: SetDependencyRequest): Promise<PicklistDependency> => {
+      const response = await this.axios.put<PicklistDependency>(
+        '/control/picklists/dependencies',
+        request
+      );
+      return response.data;
+    },
+
+    removeDependency: async (
+      controllingFieldId: string,
+      dependentFieldId: string
+    ): Promise<void> => {
+      await this.axios.delete(
+        `/control/picklists/dependencies/${controllingFieldId}/${dependentFieldId}`
+      );
+    },
+  };
+
+  /**
+   * Relationship operations
+   */
+  readonly relationships = {
+    getForCollection: async (collectionId: string): Promise<CollectionRelationships> => {
+      const response = await this.axios.get<CollectionRelationships>(
+        `/control/collections/${collectionId}/relationships`
+      );
+      return response.data;
+    },
+  };
+
+  /**
+   * Validation rule operations
+   */
+  readonly validationRules = {
+    list: async (collectionId: string): Promise<CollectionValidationRule[]> => {
+      const response = await this.axios.get<CollectionValidationRule[]>(
+        `/control/collections/${collectionId}/validation-rules`
+      );
+      return response.data;
+    },
+
+    create: async (
+      collectionId: string,
+      request: CreateCollectionValidationRuleRequest
+    ): Promise<CollectionValidationRule> => {
+      const response = await this.axios.post<CollectionValidationRule>(
+        `/control/collections/${collectionId}/validation-rules`,
+        request
+      );
+      return response.data;
+    },
+
+    get: async (collectionId: string, ruleId: string): Promise<CollectionValidationRule> => {
+      const response = await this.axios.get<CollectionValidationRule>(
+        `/control/collections/${collectionId}/validation-rules/${ruleId}`
+      );
+      return response.data;
+    },
+
+    update: async (
+      collectionId: string,
+      ruleId: string,
+      request: Partial<CreateCollectionValidationRuleRequest> & { active?: boolean }
+    ): Promise<CollectionValidationRule> => {
+      const response = await this.axios.put<CollectionValidationRule>(
+        `/control/collections/${collectionId}/validation-rules/${ruleId}`,
+        request
+      );
+      return response.data;
+    },
+
+    delete: async (collectionId: string, ruleId: string): Promise<void> => {
+      await this.axios.delete(`/control/collections/${collectionId}/validation-rules/${ruleId}`);
+    },
+
+    activate: async (collectionId: string, ruleId: string): Promise<void> => {
+      await this.axios.post(
+        `/control/collections/${collectionId}/validation-rules/${ruleId}/activate`
+      );
+    },
+
+    deactivate: async (collectionId: string, ruleId: string): Promise<void> => {
+      await this.axios.post(
+        `/control/collections/${collectionId}/validation-rules/${ruleId}/deactivate`
+      );
+    },
+
+    test: async (
+      collectionId: string,
+      testRecord: Record<string, unknown>
+    ): Promise<CollectionValidationError[]> => {
+      const response = await this.axios.post<CollectionValidationError[]>(
+        `/control/collections/${collectionId}/validation-rules/test`,
+        testRecord
+      );
+      return response.data;
+    },
+  };
+
+  /**
+   * Record type operations
+   */
+  readonly recordTypes = {
+    list: async (collectionId: string): Promise<RecordType[]> => {
+      const response = await this.axios.get<RecordType[]>(
+        `/control/collections/${collectionId}/record-types`
+      );
+      return response.data;
+    },
+
+    create: async (collectionId: string, request: CreateRecordTypeRequest): Promise<RecordType> => {
+      const response = await this.axios.post<RecordType>(
+        `/control/collections/${collectionId}/record-types`,
+        request
+      );
+      return response.data;
+    },
+
+    get: async (collectionId: string, recordTypeId: string): Promise<RecordType> => {
+      const response = await this.axios.get<RecordType>(
+        `/control/collections/${collectionId}/record-types/${recordTypeId}`
+      );
+      return response.data;
+    },
+
+    update: async (
+      collectionId: string,
+      recordTypeId: string,
+      request: Partial<CreateRecordTypeRequest> & { active?: boolean }
+    ): Promise<RecordType> => {
+      const response = await this.axios.put<RecordType>(
+        `/control/collections/${collectionId}/record-types/${recordTypeId}`,
+        request
+      );
+      return response.data;
+    },
+
+    delete: async (collectionId: string, recordTypeId: string): Promise<void> => {
+      await this.axios.delete(`/control/collections/${collectionId}/record-types/${recordTypeId}`);
+    },
+
+    getPicklistOverrides: async (
+      collectionId: string,
+      recordTypeId: string
+    ): Promise<RecordTypePicklistOverride[]> => {
+      const response = await this.axios.get<RecordTypePicklistOverride[]>(
+        `/control/collections/${collectionId}/record-types/${recordTypeId}/picklists`
+      );
+      return response.data;
+    },
+
+    setPicklistOverride: async (
+      collectionId: string,
+      recordTypeId: string,
+      fieldId: string,
+      request: SetPicklistOverrideRequest
+    ): Promise<RecordTypePicklistOverride> => {
+      const response = await this.axios.put<RecordTypePicklistOverride>(
+        `/control/collections/${collectionId}/record-types/${recordTypeId}/picklists/${fieldId}`,
+        request
+      );
+      return response.data;
+    },
+
+    removePicklistOverride: async (
+      collectionId: string,
+      recordTypeId: string,
+      fieldId: string
+    ): Promise<void> => {
+      await this.axios.delete(
+        `/control/collections/${collectionId}/record-types/${recordTypeId}/picklists/${fieldId}`
+      );
+    },
+  };
+
+  /**
+   * Field history operations
+   */
+  readonly fieldHistory = {
+    getRecordHistory: async (
+      collectionId: string,
+      recordId: string,
+      page?: number,
+      size?: number
+    ): Promise<Page<FieldHistoryEntry>> => {
+      const params = new URLSearchParams();
+      if (page !== undefined) params.append('page', String(page));
+      if (size !== undefined) params.append('size', String(size));
+      const query = params.toString();
+      const response = await this.axios.get<Page<FieldHistoryEntry>>(
+        `/control/collections/${collectionId}/records/${recordId}/history${query ? `?${query}` : ''}`
+      );
+      return response.data;
+    },
+
+    getFieldHistory: async (
+      collectionId: string,
+      recordId: string,
+      fieldName: string,
+      page?: number,
+      size?: number
+    ): Promise<Page<FieldHistoryEntry>> => {
+      const params = new URLSearchParams();
+      if (page !== undefined) params.append('page', String(page));
+      if (size !== undefined) params.append('size', String(size));
+      const query = params.toString();
+      const response = await this.axios.get<Page<FieldHistoryEntry>>(
+        `/control/collections/${collectionId}/records/${recordId}/history/${fieldName}${query ? `?${query}` : ''}`
+      );
+      return response.data;
+    },
+
+    getFieldHistoryAcrossRecords: async (
+      collectionId: string,
+      fieldName: string,
+      page?: number,
+      size?: number
+    ): Promise<Page<FieldHistoryEntry>> => {
+      const params = new URLSearchParams();
+      if (page !== undefined) params.append('page', String(page));
+      if (size !== undefined) params.append('size', String(size));
+      const query = params.toString();
+      const response = await this.axios.get<Page<FieldHistoryEntry>>(
+        `/control/collections/${collectionId}/field-history/${fieldName}${query ? `?${query}` : ''}`
+      );
+      return response.data;
+    },
+
+    getUserHistory: async (
+      userId: string,
+      page?: number,
+      size?: number
+    ): Promise<Page<FieldHistoryEntry>> => {
+      const params = new URLSearchParams();
+      if (page !== undefined) params.append('page', String(page));
+      if (size !== undefined) params.append('size', String(size));
+      const query = params.toString();
+      const response = await this.axios.get<Page<FieldHistoryEntry>>(
+        `/control/users/${userId}/field-history${query ? `?${query}` : ''}`
       );
       return response.data;
     },

@@ -25,16 +25,23 @@ public class FieldDto {
     private boolean active;
     private String description;
     private String constraints;
+    private String relationshipType;
+    private String relationshipName;
+    private boolean cascadeDelete;
+    private String referenceCollectionId;
+    private boolean trackHistory;
     private Instant createdAt;
     private Instant updatedAt;
 
     public FieldDto() {
     }
 
-    public FieldDto(String id, String collectionId, String name, String displayName, String type, 
+    public FieldDto(String id, String collectionId, String name, String displayName, String type,
                     boolean required, boolean unique, boolean indexed, String defaultValue,
-                    String referenceTarget, Integer order, boolean active, String description, 
-                    String constraints, Instant createdAt, Instant updatedAt) {
+                    String referenceTarget, Integer order, boolean active, String description,
+                    String constraints, String relationshipType, String relationshipName,
+                    boolean cascadeDelete, String referenceCollectionId, boolean trackHistory,
+                    Instant createdAt, Instant updatedAt) {
         this.id = id;
         this.collectionId = collectionId;
         this.name = name;
@@ -49,6 +56,11 @@ public class FieldDto {
         this.active = active;
         this.description = description;
         this.constraints = constraints;
+        this.relationshipType = relationshipType;
+        this.relationshipName = relationshipName;
+        this.cascadeDelete = cascadeDelete;
+        this.referenceCollectionId = referenceCollectionId;
+        this.trackHistory = trackHistory;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
     }
@@ -78,6 +90,11 @@ public class FieldDto {
                 field.isActive(),
                 field.getDescription(),
                 field.getConstraints(),
+                field.getRelationshipType(),
+                field.getRelationshipName(),
+                field.isCascadeDelete(),
+                field.getReferenceCollectionId(),
+                field.isTrackHistory(),
                 field.getCreatedAt(),
                 field.getUpdatedAt()
         );
@@ -195,6 +212,46 @@ public class FieldDto {
         this.constraints = constraints;
     }
 
+    public String getRelationshipType() {
+        return relationshipType;
+    }
+
+    public void setRelationshipType(String relationshipType) {
+        this.relationshipType = relationshipType;
+    }
+
+    public String getRelationshipName() {
+        return relationshipName;
+    }
+
+    public void setRelationshipName(String relationshipName) {
+        this.relationshipName = relationshipName;
+    }
+
+    public boolean isCascadeDelete() {
+        return cascadeDelete;
+    }
+
+    public void setCascadeDelete(boolean cascadeDelete) {
+        this.cascadeDelete = cascadeDelete;
+    }
+
+    public String getReferenceCollectionId() {
+        return referenceCollectionId;
+    }
+
+    public void setReferenceCollectionId(String referenceCollectionId) {
+        this.referenceCollectionId = referenceCollectionId;
+    }
+
+    public boolean isTrackHistory() {
+        return trackHistory;
+    }
+
+    public void setTrackHistory(boolean trackHistory) {
+        this.trackHistory = trackHistory;
+    }
+
     public Instant getCreatedAt() {
         return createdAt;
     }
@@ -235,6 +292,8 @@ public class FieldDto {
                 unique == fieldDto.unique &&
                 indexed == fieldDto.indexed &&
                 active == fieldDto.active &&
+                cascadeDelete == fieldDto.cascadeDelete &&
+                trackHistory == fieldDto.trackHistory &&
                 Objects.equals(id, fieldDto.id) &&
                 Objects.equals(collectionId, fieldDto.collectionId) &&
                 Objects.equals(name, fieldDto.name) &&
@@ -245,14 +304,18 @@ public class FieldDto {
                 Objects.equals(order, fieldDto.order) &&
                 Objects.equals(description, fieldDto.description) &&
                 Objects.equals(constraints, fieldDto.constraints) &&
+                Objects.equals(relationshipType, fieldDto.relationshipType) &&
+                Objects.equals(relationshipName, fieldDto.relationshipName) &&
+                Objects.equals(referenceCollectionId, fieldDto.referenceCollectionId) &&
                 Objects.equals(createdAt, fieldDto.createdAt) &&
                 Objects.equals(updatedAt, fieldDto.updatedAt);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, collectionId, name, displayName, type, required, unique, indexed, 
-                           defaultValue, referenceTarget, order, active, description, constraints, 
-                           createdAt, updatedAt);
+        return Objects.hash(id, collectionId, name, displayName, type, required, unique, indexed,
+                           defaultValue, referenceTarget, order, active, description, constraints,
+                           relationshipType, relationshipName, cascadeDelete, referenceCollectionId,
+                           trackHistory, createdAt, updatedAt);
     }
 }

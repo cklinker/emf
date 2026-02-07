@@ -65,4 +65,20 @@ public interface FieldRepository extends JpaRepository<Field, String> {
      */
     @Query("SELECT f FROM Field f WHERE f.collection.id = :collectionId AND f.active = true AND f.required = true")
     List<Field> findRequiredFieldsByCollectionId(@Param("collectionId") String collectionId);
+
+    /**
+     * Count active MASTER_DETAIL relationship fields in a collection.
+     */
+    @Query("SELECT COUNT(f) FROM Field f WHERE f.collection.id = :collectionId AND f.active = true AND f.relationshipType = 'MASTER_DETAIL'")
+    long countMasterDetailFieldsByCollectionId(@Param("collectionId") String collectionId);
+
+    /**
+     * Find all active fields that reference a given collection (by referenceCollectionId).
+     */
+    List<Field> findByReferenceCollectionIdAndActiveTrue(String referenceCollectionId);
+
+    /**
+     * Find all active fields with history tracking enabled for a collection.
+     */
+    List<Field> findByCollectionIdAndTrackHistoryTrueAndActiveTrue(String collectionId);
 }

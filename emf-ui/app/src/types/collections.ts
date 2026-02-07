@@ -40,6 +40,11 @@ export interface FieldDefinition {
   active?: boolean
   description?: string
   constraints?: string
+  relationshipType?: 'LOOKUP' | 'MASTER_DETAIL'
+  relationshipName?: string
+  cascadeDelete?: boolean
+  referenceCollectionId?: string
+  trackHistory?: boolean
   createdAt?: string
   updatedAt?: string
 }
@@ -114,4 +119,77 @@ export interface CollectionVersion {
   version: number
   schema: string
   createdAt: string
+}
+
+/**
+ * Collection-level validation rule using formula evaluation
+ */
+export interface CollectionValidationRule {
+  id: string
+  collectionId: string
+  name: string
+  description?: string
+  active: boolean
+  errorConditionFormula: string
+  errorMessage: string
+  errorField?: string
+  evaluateOn: 'CREATE' | 'UPDATE' | 'CREATE_AND_UPDATE'
+  createdAt: string
+  updatedAt: string
+}
+
+/**
+ * Record type definition
+ */
+export interface RecordType {
+  id: string
+  collectionId: string
+  name: string
+  description?: string
+  active: boolean
+  isDefault: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+/**
+ * Picklist override for a record type
+ */
+export interface RecordTypePicklistOverride {
+  id: string
+  fieldId: string
+  fieldName: string
+  availableValues: string
+  defaultValue?: string
+}
+
+/**
+ * Field history entry
+ */
+export interface FieldHistoryEntry {
+  id: string
+  collectionId: string
+  recordId: string
+  fieldName: string
+  oldValue: unknown
+  newValue: unknown
+  changedBy: string
+  changedAt: string
+  changeSource: 'UI' | 'API' | 'WORKFLOW' | 'SYSTEM' | 'IMPORT'
+}
+
+/**
+ * Setup audit trail entry
+ */
+export interface SetupAuditTrailEntry {
+  id: string
+  userId: string
+  action: 'CREATED' | 'UPDATED' | 'DELETED' | 'ACTIVATED' | 'DEACTIVATED'
+  section: string
+  entityType: string
+  entityId?: string
+  entityName?: string
+  oldValue?: string
+  newValue?: string
+  timestamp: string
 }

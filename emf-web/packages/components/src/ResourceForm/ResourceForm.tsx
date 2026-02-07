@@ -320,10 +320,15 @@ export function ResourceForm({
     // Transform data before submission (e.g., parse JSON fields)
     const transformedData = transformFormData(data, accessibleFields);
 
-    if (isEditMode) {
-      await updateMutation.mutateAsync(transformedData);
-    } else {
-      await createMutation.mutateAsync(transformedData);
+    try {
+      if (isEditMode) {
+        await updateMutation.mutateAsync(transformedData);
+      } else {
+        await createMutation.mutateAsync(transformedData);
+      }
+    } catch (error) {
+      // Error is handled by mutation's onError callback
+      // This catch prevents unhandled promise rejection
     }
   };
 

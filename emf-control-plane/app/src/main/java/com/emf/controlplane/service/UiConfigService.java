@@ -12,6 +12,7 @@ import com.emf.controlplane.exception.DuplicateResourceException;
 import com.emf.controlplane.exception.ResourceNotFoundException;
 import com.emf.controlplane.repository.UiMenuRepository;
 import com.emf.controlplane.repository.UiPageRepository;
+import com.emf.controlplane.tenant.TenantContextHolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.lang.Nullable;
@@ -65,10 +66,18 @@ public class UiConfigService {
      */
     @Transactional(readOnly = true)
     public BootstrapConfig getBootstrapConfig() {
-        log.debug("Getting bootstrap configuration");
+        String tenantId = TenantContextHolder.getTenantId();
+        log.debug("Getting bootstrap configuration for tenant: {}", tenantId);
 
-        List<UiPage> pages = pageRepository.findByActiveTrueOrderByNameAsc();
-        List<UiMenu> menus = menuRepository.findAllWithItemsOrderByNameAsc();
+        List<UiPage> pages;
+        List<UiMenu> menus;
+        if (tenantId != null) {
+            pages = pageRepository.findByTenantIdAndActiveTrueOrderByNameAsc(tenantId);
+            menus = menuRepository.findByTenantIdWithItemsOrderByNameAsc(tenantId);
+        } else {
+            pages = pageRepository.findByActiveTrueOrderByNameAsc();
+            menus = menuRepository.findAllWithItemsOrderByNameAsc();
+        }
 
         return new BootstrapConfig(pages, menus);
     }
@@ -83,7 +92,11 @@ public class UiConfigService {
      */
     @Transactional(readOnly = true)
     public List<UiPage> listPages() {
-        log.debug("Listing all active UI pages");
+        String tenantId = TenantContextHolder.getTenantId();
+        log.debug("Listing all active UI pages for tenant: {}", tenantId);
+        if (tenantId != null) {
+            return pageRepository.findByTenantIdAndActiveTrueOrderByNameAsc(tenantId);
+        }
         return pageRepository.findByActiveTrueOrderByNameAsc();
     }
 
@@ -99,11 +112,18 @@ public class UiConfigService {
      */
     @Transactional
     public UiPage createPage(CreateUiPageRequest request) {
-        log.info("Creating UI page with name: {}", request.getName());
+        String tenantId = TenantContextHolder.getTenantId();
+        log.info("Creating UI page with name: {} for tenant: {}", request.getName(), tenantId);
 
         // Check for duplicate path
-        if (pageRepository.existsByPathAndActiveTrue(request.getPath())) {
-            throw new DuplicateResourceException("UiPage", "path", request.getPath());
+        if (tenantId != null) {
+            if (pageRepository.existsByTenantIdAndPathAndActiveTrue(tenantId, request.getPath())) {
+                throw new DuplicateResourceException("UiPage", "path", request.getPath());
+            }
+        } else {
+            if (pageRepository.existsByPathAndActiveTrue(request.getPath())) {
+                throw new DuplicateResourceException("UiPage", "path", request.getPath());
+            }
         }
 
         // Create the page entity
@@ -111,6 +131,9 @@ public class UiConfigService {
         page.setTitle(request.getTitle());
         page.setConfig(request.getConfig());
         page.setActive(true);
+        if (tenantId != null) {
+            page.setTenantId(tenantId);
+        }
 
         // Save the page
         page = pageRepository.save(page);
@@ -189,7 +212,11 @@ public class UiConfigService {
      */
     @Transactional(readOnly = true)
     public List<UiMenu> listMenus() {
-        log.debug("Listing all UI menus");
+        String tenantId = TenantContextHolder.getTenantId();
+        log.debug("Listing all UI menus for tenant: {}", tenantId);
+        if (tenantId != null) {
+            return menuRepository.findByTenantIdWithItemsOrderByNameAsc(tenantId);
+        }
         return menuRepository.findAllByOrderByNameAsc();
     }
 
@@ -208,17 +235,29 @@ public class UiConfigService {
      */
     @Transactional
     public UiMenu updateMenu(String id, UpdateUiMenuRequest request) {
-        log.info("Updating UI menu with id: {}", id);
+        String tenantId = TenantContextHolder.getTenantId();
+        log.info("Updating UI menu with id: {} for tenant: {}", id, tenantId);
 
         UiMenu menu = menuRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("UiMenu", id));
 
         // Update name if provided
         if (request.getName() != null && !request.getName().equals(menu.getName())) {
-            if (menuRepository.existsByName(request.getName())) {
-                throw new DuplicateResourceException("UiMenu", "name", request.getName());
+            if (tenantId != null) {
+                if (menuRepository.existsByTenantIdAndName(tenantId, request.getName())) {
+                    throw new DuplicateResourceException("UiMenu", "name", request.getName());
+                }
+            } else {
+                if (menuRepository.existsByName(request.getName())) {
+                    throw new DuplicateResourceException("UiMenu", "name", request.getName());
+                }
             }
             menu.setName(request.getName());
+        }
+
+        // Set tenantId if not already set
+        if (tenantId != null && menu.getTenantId() == null) {
+            menu.setTenantId(tenantId);
         }
 
         // Update description if provided

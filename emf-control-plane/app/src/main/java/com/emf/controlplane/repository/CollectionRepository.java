@@ -17,63 +17,66 @@ import java.util.Optional;
 @Repository
 public interface CollectionRepository extends JpaRepository<Collection, String> {
 
-    /**
-     * Find all active collections with pagination.
-     */
+    // ---- Tenant-scoped methods ----
+
+    Page<Collection> findByTenantIdAndActiveTrue(String tenantId, Pageable pageable);
+
+    List<Collection> findByTenantIdAndActiveTrue(String tenantId);
+
+    Optional<Collection> findByIdAndTenantIdAndActiveTrue(String id, String tenantId);
+
+    Optional<Collection> findByTenantIdAndName(String tenantId, String name);
+
+    Optional<Collection> findByTenantIdAndNameAndActiveTrue(String tenantId, String name);
+
+    boolean existsByTenantIdAndName(String tenantId, String name);
+
+    boolean existsByTenantIdAndNameAndActiveTrue(String tenantId, String name);
+
+    @Query("SELECT c FROM Collection c WHERE c.tenantId = :tenantId AND c.active = true AND " +
+           "LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%'))")
+    Page<Collection> findByTenantIdAndActiveAndNameContaining(@Param("tenantId") String tenantId,
+                                                              @Param("search") String search,
+                                                              Pageable pageable);
+
+    @Query("SELECT c FROM Collection c WHERE c.tenantId = :tenantId AND c.active = true AND " +
+           "(LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+           "LOWER(c.description) LIKE LOWER(CONCAT('%', :search, '%')))")
+    Page<Collection> findByTenantIdAndActiveAndSearchTerm(@Param("tenantId") String tenantId,
+                                                          @Param("search") String search,
+                                                          Pageable pageable);
+
+    long countByTenantIdAndActiveTrue(String tenantId);
+
+    @Query("SELECT DISTINCT c FROM Collection c LEFT JOIN FETCH c.fields WHERE c.tenantId = :tenantId AND c.active = true")
+    List<Collection> findByTenantIdAndActiveTrueWithFields(@Param("tenantId") String tenantId);
+
+    // ---- Legacy methods (kept for platform-level operations) ----
+
     Page<Collection> findByActiveTrue(Pageable pageable);
 
-    /**
-     * Find all active collections.
-     */
     List<Collection> findByActiveTrue();
 
-    /**
-     * Find active collection by ID.
-     */
     Optional<Collection> findByIdAndActiveTrue(String id);
 
-    /**
-     * Find collection by name.
-     */
     Optional<Collection> findByName(String name);
 
-    /**
-     * Find active collection by name.
-     */
     Optional<Collection> findByNameAndActiveTrue(String name);
 
-    /**
-     * Check if a collection with the given name exists.
-     */
     boolean existsByName(String name);
 
-    /**
-     * Check if an active collection with the given name exists.
-     */
     boolean existsByNameAndActiveTrue(String name);
 
-    /**
-     * Find active collections with name containing the search term (case-insensitive).
-     */
     @Query("SELECT c FROM Collection c WHERE c.active = true AND LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%'))")
     Page<Collection> findByActiveAndNameContaining(@Param("search") String search, Pageable pageable);
 
-    /**
-     * Find active collections with name or description containing the search term.
-     */
     @Query("SELECT c FROM Collection c WHERE c.active = true AND " +
            "(LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
            "LOWER(c.description) LIKE LOWER(CONCAT('%', :search, '%')))")
     Page<Collection> findByActiveAndSearchTerm(@Param("search") String search, Pageable pageable);
 
-    /**
-     * Count active collections.
-     */
     long countByActiveTrue();
-    
-    /**
-     * Find all active collections with fields eagerly loaded.
-     */
+
     @Query("SELECT DISTINCT c FROM Collection c LEFT JOIN FETCH c.fields WHERE c.active = true")
     List<Collection> findByActiveTrueWithFields();
 }

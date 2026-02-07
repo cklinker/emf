@@ -111,6 +111,14 @@ export type {
 export { PluginsPage } from './PluginsPage';
 export type { PluginSettings, PluginsPageProps } from './PluginsPage';
 
+// TenantsPage - Platform admin tenant management page
+export { TenantsPage } from './TenantsPage';
+export type { TenantsPageProps, Tenant } from './TenantsPage';
+
+// TenantDashboardPage - Per-tenant usage and health metrics
+export { TenantDashboardPage } from './TenantDashboardPage';
+export type { TenantDashboardPageProps } from './TenantDashboardPage';
+
 // DashboardPage - System health and metrics dashboard
 export { DashboardPage } from './DashboardPage';
 export type {

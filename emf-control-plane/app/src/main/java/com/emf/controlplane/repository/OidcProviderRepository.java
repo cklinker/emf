@@ -13,53 +13,45 @@ import java.util.Optional;
 @Repository
 public interface OidcProviderRepository extends JpaRepository<OidcProvider, String> {
 
-    /**
-     * Find all active OIDC providers.
-     */
+    // ---- Tenant-scoped methods ----
+
+    List<OidcProvider> findByTenantIdAndActiveTrue(String tenantId);
+
+    List<OidcProvider> findByTenantIdAndActiveTrueOrderByNameAsc(String tenantId);
+
+    Optional<OidcProvider> findByIdAndTenantIdAndActiveTrue(String id, String tenantId);
+
+    Optional<OidcProvider> findByTenantIdAndName(String tenantId, String name);
+
+    Optional<OidcProvider> findByTenantIdAndNameAndActiveTrue(String tenantId, String name);
+
+    Optional<OidcProvider> findByTenantIdAndIssuerAndActiveTrue(String tenantId, String issuer);
+
+    boolean existsByTenantIdAndName(String tenantId, String name);
+
+    boolean existsByTenantIdAndIssuer(String tenantId, String issuer);
+
+    long countByTenantIdAndActiveTrue(String tenantId);
+
+    // ---- Legacy methods (used by SecurityConfig for JWT validation across all tenants) ----
+
     List<OidcProvider> findByActiveTrue();
 
-    /**
-     * Find all active OIDC providers ordered by name.
-     */
     List<OidcProvider> findByActiveTrueOrderByNameAsc();
 
-    /**
-     * Find active provider by ID.
-     */
     Optional<OidcProvider> findByIdAndActiveTrue(String id);
 
-    /**
-     * Find provider by name.
-     */
     Optional<OidcProvider> findByName(String name);
 
-    /**
-     * Find active provider by name.
-     */
     Optional<OidcProvider> findByNameAndActiveTrue(String name);
 
-    /**
-     * Find provider by issuer.
-     */
     Optional<OidcProvider> findByIssuer(String issuer);
 
-    /**
-     * Find active provider by issuer.
-     */
     Optional<OidcProvider> findByIssuerAndActiveTrue(String issuer);
 
-    /**
-     * Check if a provider with the given name exists.
-     */
     boolean existsByName(String name);
 
-    /**
-     * Check if a provider with the given issuer exists.
-     */
     boolean existsByIssuer(String issuer);
 
-    /**
-     * Count active providers.
-     */
     long countByActiveTrue();
 }

@@ -13,18 +13,19 @@ import java.util.Optional;
 @Repository
 public interface PolicyRepository extends JpaRepository<Policy, String> {
 
-    /**
-     * Find policy by name.
-     */
+    // ---- Tenant-scoped methods ----
+
+    Optional<Policy> findByTenantIdAndName(String tenantId, String name);
+
+    boolean existsByTenantIdAndName(String tenantId, String name);
+
+    List<Policy> findByTenantIdOrderByNameAsc(String tenantId);
+
+    // ---- Legacy methods ----
+
     Optional<Policy> findByName(String name);
 
-    /**
-     * Check if a policy with the given name exists.
-     */
     boolean existsByName(String name);
 
-    /**
-     * Find all policies ordered by name.
-     */
     List<Policy> findAllByOrderByNameAsc();
 }

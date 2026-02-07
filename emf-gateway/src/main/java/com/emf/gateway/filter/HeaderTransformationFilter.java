@@ -39,6 +39,8 @@ public class HeaderTransformationFilter implements GlobalFilter, Ordered {
     private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String X_FORWARDED_USER_HEADER = "X-Forwarded-User";
     private static final String X_FORWARDED_ROLES_HEADER = "X-Forwarded-Roles";
+    private static final String X_TENANT_ID_HEADER = "X-Tenant-ID";
+    private static final String X_TENANT_SLUG_HEADER = "X-Tenant-Slug";
     
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
@@ -46,10 +48,21 @@ public class HeaderTransformationFilter implements GlobalFilter, Ordered {
         GatewayPrincipal principal = JwtAuthenticationFilter.getPrincipal(exchange);
         
         // If no principal is present (unauthenticated request like bootstrap endpoint),
-        // just continue without header transformation
+        // still propagate tenant headers if available
         if (principal == null) {
-            log.debug("No principal found, skipping header transformation for path: {}", 
+            log.debug("No principal found, skipping user header transformation for path: {}",
                     exchange.getRequest().getPath().value());
+            String tenantId = TenantResolutionFilter.getTenantId(exchange);
+            String tenantSlug = TenantResolutionFilter.getTenantSlug(exchange);
+            if (tenantId != null || tenantSlug != null) {
+                ServerHttpRequest req = exchange.getRequest().mutate()
+                        .headers(headers -> {
+                            if (tenantId != null) headers.set(X_TENANT_ID_HEADER, tenantId);
+                            if (tenantSlug != null) headers.set(X_TENANT_SLUG_HEADER, tenantSlug);
+                        })
+                        .build();
+                return chain.filter(exchange.mutate().request(req).build());
+            }
             return chain.filter(exchange);
         }
         
@@ -69,9 +82,19 @@ public class HeaderTransformationFilter implements GlobalFilter, Ordered {
                     String roles = principal.getRoles().stream()
                             .collect(Collectors.joining(","));
                     headers.set(X_FORWARDED_ROLES_HEADER, roles);
-                    
-                    log.debug("Added forwarding headers for user: {}, roles: {}", 
-                            principal.getUsername(), roles);
+
+                    // Add tenant headers from exchange attributes (set by TenantResolutionFilter)
+                    String tenantId = TenantResolutionFilter.getTenantId(exchange);
+                    if (tenantId != null) {
+                        headers.set(X_TENANT_ID_HEADER, tenantId);
+                    }
+                    String tenantSlug = TenantResolutionFilter.getTenantSlug(exchange);
+                    if (tenantSlug != null) {
+                        headers.set(X_TENANT_SLUG_HEADER, tenantSlug);
+                    }
+
+                    log.debug("Added forwarding headers for user: {}, roles: {}, tenantId: {}",
+                            principal.getUsername(), roles, tenantId);
                 })
                 .build();
         

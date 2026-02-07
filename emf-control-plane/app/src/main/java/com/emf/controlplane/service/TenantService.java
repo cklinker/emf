@@ -7,6 +7,7 @@ import com.emf.controlplane.entity.Tenant;
 import com.emf.controlplane.exception.DuplicateResourceException;
 import com.emf.controlplane.exception.ResourceNotFoundException;
 import com.emf.controlplane.repository.TenantRepository;
+import com.emf.controlplane.tenant.TenantSchemaManager;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -33,12 +34,15 @@ public class TenantService {
 
     private final TenantRepository tenantRepository;
     private final ObjectMapper objectMapper;
+    private final TenantSchemaManager tenantSchemaManager;
 
     public TenantService(
             TenantRepository tenantRepository,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            @Nullable TenantSchemaManager tenantSchemaManager) {
         this.tenantRepository = tenantRepository;
         this.objectMapper = objectMapper;
+        this.tenantSchemaManager = tenantSchemaManager;
     }
 
     /**
@@ -76,7 +80,10 @@ public class TenantService {
         // Status starts as PROVISIONING (entity default)
         tenant = tenantRepository.save(tenant);
 
-        // TODO: A8 — call TenantSchemaManager.provisionSchema() here
+        // Provision default data for the new tenant
+        if (tenantSchemaManager != null) {
+            tenantSchemaManager.provisionTenant(tenant.getId(), tenant.getSlug());
+        }
         // TODO: C12 — seed default profile after schema provisioning
 
         // Transition to ACTIVE after provisioning

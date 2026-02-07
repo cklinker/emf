@@ -21,6 +21,7 @@ import com.emf.controlplane.repository.FieldRepository;
 import com.emf.controlplane.repository.PolicyRepository;
 import com.emf.controlplane.repository.RoleRepository;
 import com.emf.controlplane.repository.RoutePolicyRepository;
+import com.emf.controlplane.tenant.TenantContextHolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.lang.Nullable;
@@ -82,7 +83,11 @@ public class AuthorizationService {
      */
     @Transactional(readOnly = true)
     public List<Role> listRoles() {
-        log.debug("Listing all roles");
+        String tenantId = TenantContextHolder.getTenantId();
+        log.debug("Listing all roles for tenant: {}", tenantId);
+        if (tenantId != null) {
+            return roleRepository.findByTenantIdOrderByNameAsc(tenantId);
+        }
         return roleRepository.findAllByOrderByNameAsc();
     }
 
@@ -97,15 +102,25 @@ public class AuthorizationService {
      */
     @Transactional
     public Role createRole(CreateRoleRequest request) {
-        log.info("Creating role with name: {}", request.getName());
+        String tenantId = TenantContextHolder.getTenantId();
+        log.info("Creating role with name: {} for tenant: {}", request.getName(), tenantId);
 
         // Check for duplicate name
-        if (roleRepository.existsByName(request.getName())) {
-            throw new DuplicateResourceException("Role", "name", request.getName());
+        if (tenantId != null) {
+            if (roleRepository.existsByTenantIdAndName(tenantId, request.getName())) {
+                throw new DuplicateResourceException("Role", "name", request.getName());
+            }
+        } else {
+            if (roleRepository.existsByName(request.getName())) {
+                throw new DuplicateResourceException("Role", "name", request.getName());
+            }
         }
 
         // Create the role entity
         Role role = new Role(request.getName(), request.getDescription());
+        if (tenantId != null) {
+            role.setTenantId(tenantId);
+        }
 
         // Save and return
         role = roleRepository.save(role);
@@ -123,7 +138,11 @@ public class AuthorizationService {
      */
     @Transactional(readOnly = true)
     public List<Policy> listPolicies() {
-        log.debug("Listing all policies");
+        String tenantId = TenantContextHolder.getTenantId();
+        log.debug("Listing all policies for tenant: {}", tenantId);
+        if (tenantId != null) {
+            return policyRepository.findByTenantIdOrderByNameAsc(tenantId);
+        }
         return policyRepository.findAllByOrderByNameAsc();
     }
 
@@ -138,15 +157,25 @@ public class AuthorizationService {
      */
     @Transactional
     public Policy createPolicy(CreatePolicyRequest request) {
-        log.info("Creating policy with name: {}", request.getName());
+        String tenantId = TenantContextHolder.getTenantId();
+        log.info("Creating policy with name: {} for tenant: {}", request.getName(), tenantId);
 
         // Check for duplicate name
-        if (policyRepository.existsByName(request.getName())) {
-            throw new DuplicateResourceException("Policy", "name", request.getName());
+        if (tenantId != null) {
+            if (policyRepository.existsByTenantIdAndName(tenantId, request.getName())) {
+                throw new DuplicateResourceException("Policy", "name", request.getName());
+            }
+        } else {
+            if (policyRepository.existsByName(request.getName())) {
+                throw new DuplicateResourceException("Policy", "name", request.getName());
+            }
         }
 
         // Create the policy entity
         Policy policy = new Policy(request.getName(), request.getDescription(), request.getExpression(), request.getRules());
+        if (tenantId != null) {
+            policy.setTenantId(tenantId);
+        }
 
         // Save and return
         policy = policyRepository.save(policy);

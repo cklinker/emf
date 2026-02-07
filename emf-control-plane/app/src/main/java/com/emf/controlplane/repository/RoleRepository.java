@@ -13,18 +13,19 @@ import java.util.Optional;
 @Repository
 public interface RoleRepository extends JpaRepository<Role, String> {
 
-    /**
-     * Find role by name.
-     */
+    // ---- Tenant-scoped methods ----
+
+    Optional<Role> findByTenantIdAndName(String tenantId, String name);
+
+    boolean existsByTenantIdAndName(String tenantId, String name);
+
+    List<Role> findByTenantIdOrderByNameAsc(String tenantId);
+
+    // ---- Legacy methods ----
+
     Optional<Role> findByName(String name);
 
-    /**
-     * Check if a role with the given name exists.
-     */
     boolean existsByName(String name);
 
-    /**
-     * Find all roles ordered by name.
-     */
     List<Role> findAllByOrderByNameAsc();
 }

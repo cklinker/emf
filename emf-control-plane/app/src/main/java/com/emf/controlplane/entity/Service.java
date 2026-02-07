@@ -13,7 +13,10 @@ import java.util.List;
 @Table(name = "service")
 public class Service extends BaseEntity {
 
-    @Column(name = "name", nullable = false, unique = true, length = 100)
+    @Column(name = "tenant_id", nullable = false, length = 36)
+    private String tenantId;
+
+    @Column(name = "name", nullable = false, length = 100)
     private String name;
 
     @Column(name = "display_name", length = 100)
@@ -47,6 +50,14 @@ public class Service extends BaseEntity {
         this.name = name;
         this.displayName = name;
         this.description = description;
+    }
+
+    public String getTenantId() {
+        return tenantId;
+    }
+
+    public void setTenantId(String tenantId) {
+        this.tenantId = tenantId;
     }
 
     public String getName() {

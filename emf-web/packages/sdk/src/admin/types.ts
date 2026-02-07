@@ -195,6 +195,66 @@ export interface UIMenuItem {
 }
 
 /**
+ * Tenant definition
+ */
+export interface Tenant {
+  id: string;
+  slug: string;
+  name: string;
+  edition: 'FREE' | 'PROFESSIONAL' | 'ENTERPRISE' | 'UNLIMITED';
+  status: 'PROVISIONING' | 'ACTIVE' | 'SUSPENDED' | 'DECOMMISSIONED';
+  settings?: string;
+  limits?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Request to create a tenant
+ */
+export interface CreateTenantRequest {
+  slug: string;
+  name: string;
+  edition?: string;
+  settings?: Record<string, unknown>;
+  limits?: Partial<GovernorLimits>;
+}
+
+/**
+ * Request to update a tenant
+ */
+export interface UpdateTenantRequest {
+  name?: string;
+  edition?: string;
+  settings?: Record<string, unknown>;
+  limits?: Partial<GovernorLimits>;
+}
+
+/**
+ * Governor limits for a tenant
+ */
+export interface GovernorLimits {
+  apiCallsPerDay: number;
+  storageGb: number;
+  maxUsers: number;
+  maxCollections: number;
+  maxFieldsPerCollection: number;
+  maxWorkflows: number;
+  maxReports: number;
+}
+
+/**
+ * Paginated response
+ */
+export interface Page<T> {
+  content: T[];
+  totalElements: number;
+  totalPages: number;
+  number: number;
+  size: number;
+}
+
+/**
  * Migration plan result
  */
 export interface MigrationPlan {

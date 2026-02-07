@@ -9,6 +9,7 @@ import com.emf.controlplane.entity.*;
 import com.emf.controlplane.exception.ResourceNotFoundException;
 import com.emf.controlplane.exception.ValidationException;
 import com.emf.controlplane.repository.*;
+import com.emf.controlplane.tenant.TenantContextHolder;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -85,11 +86,15 @@ public class PackageService {
      */
     @Transactional
     public PackageDto exportPackage(ExportPackageRequest request) {
-        log.info("Exporting package: {} v{}", request.getName(), request.getVersion());
+        String tenantId = TenantContextHolder.getTenantId();
+        log.info("Exporting package: {} v{} for tenant: {}", request.getName(), request.getVersion(), tenantId);
 
         // Create the package entity
         ConfigPackage pkg = new ConfigPackage(request.getName(), request.getVersion());
         pkg.setDescription(request.getDescription());
+        if (tenantId != null) {
+            pkg.setTenantId(tenantId);
+        }
 
         // Create the DTO to hold exported data
         PackageDto dto = new PackageDto(
@@ -345,12 +350,17 @@ public class PackageService {
      *
      * Validates: Requirements 6.3, 6.5
      */
-    private ImportResultDto applyImport(PackageDto packageData, 
+    private ImportResultDto applyImport(PackageDto packageData,
                                         ImportPackageRequest.ConflictStrategy conflictStrategy,
                                         ImportPreviewDto preview) {
+        String tenantId = TenantContextHolder.getTenantId();
+
         // Create package record for tracking
         ConfigPackage pkg = new ConfigPackage(packageData.getName(), packageData.getVersion());
         pkg.setDescription(packageData.getDescription());
+        if (tenantId != null) {
+            pkg.setTenantId(tenantId);
+        }
 
         ImportResultDto result = ImportResultDto.success(
                 pkg.getId(), packageData.getName(), packageData.getVersion(), false);

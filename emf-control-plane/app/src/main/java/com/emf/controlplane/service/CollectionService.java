@@ -14,6 +14,7 @@ import com.emf.controlplane.repository.CollectionRepository;
 import com.emf.controlplane.repository.CollectionVersionRepository;
 import com.emf.controlplane.repository.FieldRepository;
 import com.emf.controlplane.repository.ServiceRepository;
+import com.emf.controlplane.tenant.TenantContextHolder;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -82,12 +83,19 @@ public class CollectionService {
      */
     @Transactional(readOnly = true)
     public Page<Collection> listCollections(String filter, String sort, Pageable pageable) {
-        log.debug("Listing collections with filter: {}, sort: {}, pageable: {}", filter, sort, pageable);
-        
+        String tenantId = TenantContextHolder.getTenantId();
+        log.debug("Listing collections for tenant: {} with filter: {}", tenantId, filter);
+
+        if (tenantId != null) {
+            if (filter != null && !filter.isBlank()) {
+                return collectionRepository.findByTenantIdAndActiveAndSearchTerm(tenantId, filter.trim(), pageable);
+            }
+            return collectionRepository.findByTenantIdAndActiveTrue(tenantId, pageable);
+        }
+
         if (filter != null && !filter.isBlank()) {
             return collectionRepository.findByActiveAndSearchTerm(filter.trim(), pageable);
         }
-        
         return collectionRepository.findByActiveTrue(pageable);
     }
 
@@ -104,21 +112,37 @@ public class CollectionService {
      */
     @Transactional
     public Collection createCollection(CreateCollectionRequest request) {
-        log.info("Creating collection with name: {} for service: {}", request.getName(), request.getServiceId());
-        
+        String tenantId = TenantContextHolder.getTenantId();
+        log.info("Creating collection with name: {} for service: {} tenant: {}", request.getName(), request.getServiceId(), tenantId);
+
         // Verify service exists
-        com.emf.controlplane.entity.Service service = serviceRepository.findByIdAndActiveTrue(request.getServiceId())
-                .orElseThrow(() -> new ResourceNotFoundException("Service", request.getServiceId()));
-        
-        // Check for duplicate name within the service
-        if (collectionRepository.existsByNameAndActiveTrue(request.getName())) {
-            throw new DuplicateResourceException("Collection", "name", request.getName());
+        com.emf.controlplane.entity.Service service;
+        if (tenantId != null) {
+            service = serviceRepository.findByIdAndTenantIdAndActiveTrue(request.getServiceId(), tenantId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Service", request.getServiceId()));
+        } else {
+            service = serviceRepository.findByIdAndActiveTrue(request.getServiceId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Service", request.getServiceId()));
         }
-        
+
+        // Check for duplicate name within the tenant
+        if (tenantId != null) {
+            if (collectionRepository.existsByTenantIdAndNameAndActiveTrue(tenantId, request.getName())) {
+                throw new DuplicateResourceException("Collection", "name", request.getName());
+            }
+        } else {
+            if (collectionRepository.existsByNameAndActiveTrue(request.getName())) {
+                throw new DuplicateResourceException("Collection", "name", request.getName());
+            }
+        }
+
         // Create the collection entity
         Collection collection = new Collection(service, request.getName(), request.getDescription());
         collection.setCurrentVersion(1);
         collection.setActive(true);
+        if (tenantId != null) {
+            collection.setTenantId(tenantId);
+        }
         
         // Set path if provided, otherwise generate default path
         if (request.getPath() != null && !request.getPath().isEmpty()) {
@@ -165,8 +189,13 @@ public class CollectionService {
      */
     @Transactional(readOnly = true)
     public Collection getCollection(String id) {
-        log.debug("Fetching collection from database: {}", id);
-        
+        String tenantId = TenantContextHolder.getTenantId();
+        log.debug("Fetching collection: {} for tenant: {}", id, tenantId);
+
+        if (tenantId != null) {
+            return collectionRepository.findByIdAndTenantIdAndActiveTrue(id, tenantId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Collection", id));
+        }
         return collectionRepository.findByIdAndActiveTrue(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Collection", id));
     }
@@ -187,14 +216,24 @@ public class CollectionService {
     @Transactional
     @CacheEvict(value = CacheConfig.COLLECTIONS_CACHE, key = "#id")
     public Collection updateCollection(String id, UpdateCollectionRequest request) {
-        log.info("Updating collection with id: {}", id);
-        
-        Collection collection = collectionRepository.findByIdAndActiveTrue(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Collection", id));
-        
+        String tenantId = TenantContextHolder.getTenantId();
+        log.info("Updating collection with id: {} for tenant: {}", id, tenantId);
+
+        Collection collection;
+        if (tenantId != null) {
+            collection = collectionRepository.findByIdAndTenantIdAndActiveTrue(id, tenantId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Collection", id));
+        } else {
+            collection = collectionRepository.findByIdAndActiveTrue(id)
+                    .orElseThrow(() -> new ResourceNotFoundException("Collection", id));
+        }
+
         // Check for duplicate name if name is being changed
         if (request.getName() != null && !request.getName().equals(collection.getName())) {
-            if (collectionRepository.existsByNameAndActiveTrue(request.getName())) {
+            boolean nameExists = tenantId != null
+                    ? collectionRepository.existsByTenantIdAndNameAndActiveTrue(tenantId, request.getName())
+                    : collectionRepository.existsByNameAndActiveTrue(request.getName());
+            if (nameExists) {
                 throw new DuplicateResourceException("Collection", "name", request.getName());
             }
             collection.setName(request.getName());
@@ -232,10 +271,17 @@ public class CollectionService {
     @Transactional
     @CacheEvict(value = CacheConfig.COLLECTIONS_CACHE, key = "#id")
     public void deleteCollection(String id) {
-        log.info("Deleting collection with id: {}", id);
-        
-        Collection collection = collectionRepository.findByIdAndActiveTrue(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Collection", id));
+        String tenantId = TenantContextHolder.getTenantId();
+        log.info("Deleting collection with id: {} for tenant: {}", id, tenantId);
+
+        Collection collection;
+        if (tenantId != null) {
+            collection = collectionRepository.findByIdAndTenantIdAndActiveTrue(id, tenantId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Collection", id));
+        } else {
+            collection = collectionRepository.findByIdAndActiveTrue(id)
+                    .orElseThrow(() -> new ResourceNotFoundException("Collection", id));
+        }
         
         // Soft delete - mark as inactive
         collection.setActive(false);

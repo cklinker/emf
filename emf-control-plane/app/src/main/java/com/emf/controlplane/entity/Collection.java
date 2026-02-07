@@ -13,6 +13,9 @@ import java.util.List;
 @Table(name = "collection")
 public class Collection extends BaseEntity {
 
+    @Column(name = "tenant_id", nullable = false, length = 36)
+    private String tenantId;
+
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "service_id", nullable = false)
     private Service service;
@@ -56,6 +59,14 @@ public class Collection extends BaseEntity {
         this.name = name;
         this.displayName = name;
         this.description = description;
+    }
+
+    public String getTenantId() {
+        return tenantId;
+    }
+
+    public void setTenantId(String tenantId) {
+        this.tenantId = tenantId;
     }
 
     public Service getService() {

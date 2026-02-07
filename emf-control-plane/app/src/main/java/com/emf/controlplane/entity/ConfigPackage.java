@@ -24,6 +24,9 @@ public class ConfigPackage {
     @Column(name = "id", nullable = false, updatable = false, length = 36)
     private String id;
 
+    @Column(name = "tenant_id", nullable = false, length = 36)
+    private String tenantId;
+
     @Column(name = "name", nullable = false, length = 100)
     private String name;
 
@@ -56,6 +59,14 @@ public class ConfigPackage {
 
     public void setId(String id) {
         this.id = id;
+    }
+
+    public String getTenantId() {
+        return tenantId;
+    }
+
+    public void setTenantId(String tenantId) {
+        this.tenantId = tenantId;
     }
 
     public String getName() {

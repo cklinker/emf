@@ -13,6 +13,7 @@ import com.emf.controlplane.repository.CollectionRepository;
 import com.emf.controlplane.repository.FieldPolicyRepository;
 import com.emf.controlplane.repository.FieldRepository;
 import com.emf.controlplane.repository.RoutePolicyRepository;
+import com.emf.controlplane.tenant.TenantContextHolder;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -83,9 +84,15 @@ public class DiscoveryService {
      */
     @Transactional(readOnly = true)
     public ResourceDiscoveryDto discoverResources() {
-        log.debug("Discovering all active resources");
+        String tenantId = TenantContextHolder.getTenantId();
+        log.debug("Discovering all active resources for tenant: {}", tenantId);
 
-        List<Collection> activeCollections = collectionRepository.findByActiveTrue();
+        List<Collection> activeCollections;
+        if (tenantId != null) {
+            activeCollections = collectionRepository.findByTenantIdAndActiveTrue(tenantId);
+        } else {
+            activeCollections = collectionRepository.findByActiveTrue();
+        }
         
         List<ResourceMetadataDto> resources = activeCollections.stream()
                 .map(this::buildResourceMetadata)

@@ -174,17 +174,19 @@ mvn verify -f emf-control-plane/pom.xml -B
 mvn verify -f emf-gateway/pom.xml -B
 ```
 
-#### Frontend (if changes were made to emf-web or emf-ui)
+#### Frontend (always — CI runs these on every PR)
 
 ```bash
-# emf-web
+# emf-web (always run — CI checks this on every PR regardless of changes)
 cd emf-web && npm install
 npm run lint
 npm run typecheck
 npm run format:check
 npm run test:coverage
+```
 
-# emf-ui (if modified)
+If changes were made to emf-ui:
+```bash
 cd emf-ui/app && npm install
 npm run lint
 npm run format:check
@@ -195,7 +197,10 @@ npm run test:run
 
 - [ ] `mvn verify` passes for control-plane (zero test failures, zero lint errors)
 - [ ] `mvn verify` passes for gateway (zero test failures, zero lint errors)
-- [ ] Frontend `lint`, `typecheck`, `format:check`, and tests pass (if modified)
+- [ ] `npm run lint` passes in emf-web
+- [ ] `npm run typecheck` passes in emf-web
+- [ ] `npm run format:check` passes in emf-web
+- [ ] `npm run test:coverage` passes in emf-web
 - [ ] No compiler warnings introduced
 - [ ] Flyway migration numbering is correct and sequential
 - [ ] New tests cover the feature adequately

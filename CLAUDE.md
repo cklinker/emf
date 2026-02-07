@@ -4,6 +4,8 @@
 
 This is the EMF Enterprise Platform monorepo. When working on tasks, follow this workflow exactly.
 
+**Autonomy:** When a task is listed in an EPIC document, proceed through the entire workflow without asking for confirmation. Execute all steps (mark in progress, branch, implement, build, test, PR, mark code review) end-to-end. Only stop to ask if there is a genuine ambiguity or blocker that cannot be resolved from the EPIC spec.
+
 ## Project Structure
 
 ```

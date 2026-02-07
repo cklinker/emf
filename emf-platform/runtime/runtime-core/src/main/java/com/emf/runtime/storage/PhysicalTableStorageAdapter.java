@@ -79,6 +79,7 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         StringBuilder sql = new StringBuilder("CREATE TABLE IF NOT EXISTS ");
         sql.append(sanitizeIdentifier(tableName)).append(" (");
         sql.append("id VARCHAR(36) PRIMARY KEY, ");
+        sql.append("owner_id VARCHAR(36), ");
         sql.append("created_at TIMESTAMP NOT NULL, ");
         sql.append("updated_at TIMESTAMP NOT NULL");
         
@@ -183,6 +184,8 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         // Add system fields
         columns.add("id");
         values.add(data.get("id"));
+        columns.add("owner_id");
+        values.add(data.get("ownerId"));
         columns.add("created_at");
         values.add(convertValueForStorage(data.get("createdAt"), FieldType.DATETIME));
         columns.add("updated_at");

@@ -437,6 +437,114 @@ export interface UpdatePermissionSetRequest {
 }
 
 /**
+ * Organization-wide default
+ */
+export interface OrgWideDefault {
+  id?: string;
+  collectionId: string;
+  internalAccess: 'PRIVATE' | 'PUBLIC_READ' | 'PUBLIC_READ_WRITE';
+  externalAccess: 'PRIVATE' | 'PUBLIC_READ' | 'PUBLIC_READ_WRITE';
+}
+
+/**
+ * Request to set OWD
+ */
+export interface SetOwdRequest {
+  internalAccess: 'PRIVATE' | 'PUBLIC_READ' | 'PUBLIC_READ_WRITE';
+  externalAccess?: 'PRIVATE' | 'PUBLIC_READ' | 'PUBLIC_READ_WRITE';
+}
+
+/**
+ * Sharing rule
+ */
+export interface SharingRule {
+  id: string;
+  collectionId: string;
+  name: string;
+  ruleType: 'OWNER_BASED' | 'CRITERIA_BASED';
+  sharedFrom?: string;
+  sharedTo: string;
+  sharedToType: 'ROLE' | 'GROUP' | 'QUEUE';
+  accessLevel: 'READ' | 'READ_WRITE';
+  criteria?: string;
+  active: boolean;
+}
+
+/**
+ * Request to create a sharing rule
+ */
+export interface CreateSharingRuleRequest {
+  name: string;
+  ruleType: 'OWNER_BASED' | 'CRITERIA_BASED';
+  sharedFrom?: string;
+  sharedTo: string;
+  sharedToType: 'ROLE' | 'GROUP' | 'QUEUE';
+  accessLevel: 'READ' | 'READ_WRITE';
+  criteria?: string;
+}
+
+/**
+ * Request to update a sharing rule
+ */
+export interface UpdateSharingRuleRequest {
+  name?: string;
+  sharedFrom?: string;
+  sharedTo?: string;
+  sharedToType?: 'ROLE' | 'GROUP' | 'QUEUE';
+  accessLevel?: 'READ' | 'READ_WRITE';
+  criteria?: string;
+  active?: boolean;
+}
+
+/**
+ * Record share
+ */
+export interface RecordShare {
+  id: string;
+  collectionId: string;
+  recordId: string;
+  sharedWithId: string;
+  sharedWithType: 'USER' | 'GROUP' | 'ROLE';
+  accessLevel: 'READ' | 'READ_WRITE';
+  reason: 'MANUAL' | 'RULE' | 'TEAM' | 'TERRITORY';
+  createdBy: string;
+  createdAt: string;
+}
+
+/**
+ * User group
+ */
+export interface UserGroup {
+  id: string;
+  name: string;
+  description?: string;
+  groupType: 'PUBLIC' | 'QUEUE';
+  memberIds?: string[];
+}
+
+/**
+ * Request to create a user group
+ */
+export interface CreateUserGroupRequest {
+  name: string;
+  description?: string;
+  groupType?: 'PUBLIC' | 'QUEUE';
+  memberIds?: string[];
+}
+
+/**
+ * Role hierarchy node
+ */
+export interface RoleHierarchyNode {
+  id: string;
+  name: string;
+  description?: string;
+  parentRoleId?: string;
+  hierarchyLevel: number;
+  children?: RoleHierarchyNode[];
+}
+
+/**
  * Migration plan result
  */
 export interface MigrationPlan {

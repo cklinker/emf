@@ -206,6 +206,22 @@ export type { ScheduledJobsPageProps } from './ScheduledJobsPage'
 export { EmailTemplatesPage } from './EmailTemplatesPage'
 export type { EmailTemplatesPageProps } from './EmailTemplatesPage'
 
+// ScriptsPage - Server-side scripts management page
+export { ScriptsPage } from './ScriptsPage'
+export type { ScriptsPageProps } from './ScriptsPage'
+
+// WebhooksPage - Webhook management page
+export { WebhooksPage } from './WebhooksPage'
+export type { WebhooksPageProps } from './WebhooksPage'
+
+// ConnectedAppsPage - Connected apps management page
+export { ConnectedAppsPage } from './ConnectedAppsPage'
+export type { ConnectedAppsPageProps } from './ConnectedAppsPage'
+
+// BulkJobsPage - Bulk job management page
+export { BulkJobsPage } from './BulkJobsPage'
+export type { BulkJobsPageProps } from './BulkJobsPage'
+
 // NotFoundPage - 404 error page
 export { NotFoundPage } from './NotFoundPage'
 export type { NotFoundPageProps } from './NotFoundPage'

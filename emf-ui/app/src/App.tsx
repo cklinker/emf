@@ -74,6 +74,10 @@ import {
   FlowsPage,
   ScheduledJobsPage,
   EmailTemplatesPage,
+  ScriptsPage,
+  WebhooksPage,
+  ConnectedAppsPage,
+  BulkJobsPage,
   LoginPage,
   UnauthorizedPage,
   NotFoundPage,
@@ -647,6 +651,46 @@ function App({ plugins = [] }: AppProps): React.ReactElement {
                               element={
                                 <ProtectedPageRoute>
                                   <TenantDashboardPage />
+                                </ProtectedPageRoute>
+                              }
+                            />
+
+                            {/* Scripts route */}
+                            <Route
+                              path="/scripts"
+                              element={
+                                <ProtectedPageRoute>
+                                  <ScriptsPage />
+                                </ProtectedPageRoute>
+                              }
+                            />
+
+                            {/* Webhooks route */}
+                            <Route
+                              path="/webhooks"
+                              element={
+                                <ProtectedPageRoute>
+                                  <WebhooksPage />
+                                </ProtectedPageRoute>
+                              }
+                            />
+
+                            {/* Connected Apps route */}
+                            <Route
+                              path="/connected-apps"
+                              element={
+                                <ProtectedPageRoute>
+                                  <ConnectedAppsPage />
+                                </ProtectedPageRoute>
+                              }
+                            />
+
+                            {/* Bulk Jobs route */}
+                            <Route
+                              path="/bulk-jobs"
+                              element={
+                                <ProtectedPageRoute>
+                                  <BulkJobsPage />
                                 </ProtectedPageRoute>
                               }
                             />

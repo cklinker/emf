@@ -1,52 +1,52 @@
-import React, { useState, useCallback } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
-import { useApi } from '../../context/ApiContext';
-import { useI18n } from '../../context/I18nContext';
-import { useToast } from '../../components/Toast';
-import styles from './UsersPage.module.css';
+import React, { useState, useCallback } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
+import { useApi } from '../../context/ApiContext'
+import { useI18n } from '../../context/I18nContext'
+import { useToast } from '../../components/Toast'
+import styles from './UsersPage.module.css'
 
 interface PlatformUser {
-  id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  username?: string;
-  status: 'ACTIVE' | 'INACTIVE' | 'LOCKED' | 'PENDING_ACTIVATION';
-  locale: string;
-  timezone: string;
-  profileId?: string;
-  managerId?: string;
-  lastLoginAt?: string;
-  loginCount: number;
-  mfaEnabled: boolean;
-  createdAt: string;
-  updatedAt: string;
+  id: string
+  email: string
+  firstName: string
+  lastName: string
+  username?: string
+  status: 'ACTIVE' | 'INACTIVE' | 'LOCKED' | 'PENDING_ACTIVATION'
+  locale: string
+  timezone: string
+  profileId?: string
+  managerId?: string
+  lastLoginAt?: string
+  loginCount: number
+  mfaEnabled: boolean
+  createdAt: string
+  updatedAt: string
 }
 
 interface PageResponse<T> {
-  content: T[];
-  totalElements: number;
-  totalPages: number;
-  number: number;
-  size: number;
+  content: T[]
+  totalElements: number
+  totalPages: number
+  number: number
+  size: number
 }
 
 interface CreateUserFormData {
-  email: string;
-  firstName: string;
-  lastName: string;
-  username: string;
+  email: string
+  firstName: string
+  lastName: string
+  username: string
 }
 
 interface FormErrors {
-  email?: string;
-  firstName?: string;
-  lastName?: string;
+  email?: string
+  firstName?: string
+  lastName?: string
 }
 
 export interface UsersPageProps {
-  testId?: string;
+  testId?: string
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -55,13 +55,9 @@ function StatusBadge({ status }: { status: string }) {
     INACTIVE: styles.statusInactive,
     LOCKED: styles.statusLocked,
     PENDING_ACTIVATION: styles.statusPending,
-  };
+  }
 
-  return (
-    <span className={`${styles.statusBadge} ${colorMap[status] || ''}`}>
-      {status}
-    </span>
-  );
+  return <span className={`${styles.statusBadge} ${colorMap[status] || ''}`}>{status}</span>
 }
 
 function UserForm({
@@ -69,43 +65,50 @@ function UserForm({
   onCancel,
   isSubmitting,
 }: {
-  onSubmit: (data: CreateUserFormData) => void;
-  onCancel: () => void;
-  isSubmitting: boolean;
+  onSubmit: (data: CreateUserFormData) => void
+  onCancel: () => void
+  isSubmitting: boolean
 }) {
-  const { t } = useI18n();
+  const { t } = useI18n()
   const [formData, setFormData] = useState<CreateUserFormData>({
     email: '',
     firstName: '',
     lastName: '',
     username: '',
-  });
-  const [errors, setErrors] = useState<FormErrors>({});
+  })
+  const [errors, setErrors] = useState<FormErrors>({})
 
   const validate = useCallback((): FormErrors => {
-    const errs: FormErrors = {};
-    if (!formData.email.trim()) errs.email = 'Email is required';
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) errs.email = 'Invalid email';
-    if (!formData.firstName.trim()) errs.firstName = 'First name is required';
-    if (!formData.lastName.trim()) errs.lastName = 'Last name is required';
-    return errs;
-  }, [formData]);
+    const errs: FormErrors = {}
+    if (!formData.email.trim()) errs.email = 'Email is required'
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) errs.email = 'Invalid email'
+    if (!formData.firstName.trim()) errs.firstName = 'First name is required'
+    if (!formData.lastName.trim()) errs.lastName = 'Last name is required'
+    return errs
+  }, [formData])
 
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
-      e.preventDefault();
-      const errs = validate();
-      setErrors(errs);
+      e.preventDefault()
+      const errs = validate()
+      setErrors(errs)
       if (Object.keys(errs).length === 0) {
-        onSubmit(formData);
+        onSubmit(formData)
       }
     },
     [formData, validate, onSubmit]
-  );
+  )
 
   return (
-    <div className={styles.modalOverlay} onClick={onCancel}>
-      <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+    <div
+      className={styles.modalOverlay}
+      onClick={(e) => e.target === e.currentTarget && onCancel()}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') onCancel()
+      }}
+      role="presentation"
+    >
+      <div className={styles.modal} role="dialog" aria-modal="true">
         <h2>{t('users.createUser')}</h2>
         <form onSubmit={handleSubmit}>
           <div className={styles.formGroup}>
@@ -161,70 +164,70 @@ function UserForm({
         </form>
       </div>
     </div>
-  );
+  )
 }
 
 export function UsersPage({ testId = 'users-page' }: UsersPageProps) {
-  const queryClient = useQueryClient();
-  const { t, formatDate } = useI18n();
-  const { apiClient } = useApi();
-  const { showToast } = useToast();
-  const navigate = useNavigate();
+  const queryClient = useQueryClient()
+  const { t, formatDate } = useI18n()
+  const { apiClient } = useApi()
+  const { showToast } = useToast()
+  const navigate = useNavigate()
 
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [filter, setFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [page, setPage] = useState(0);
+  const [isFormOpen, setIsFormOpen] = useState(false)
+  const [filter, setFilter] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [page, setPage] = useState(0)
 
   const [confirmDialog, setConfirmDialog] = useState<{
-    open: boolean;
-    userId: string;
-    action: 'deactivate' | 'activate';
-    userName: string;
-  }>({ open: false, userId: '', action: 'deactivate', userName: '' });
+    open: boolean
+    userId: string
+    action: 'deactivate' | 'activate'
+    userName: string
+  }>({ open: false, userId: '', action: 'deactivate', userName: '' })
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['users', filter, statusFilter, page],
     queryFn: async () => {
-      const params = new URLSearchParams();
-      if (filter) params.append('filter', filter);
-      if (statusFilter) params.append('status', statusFilter);
-      params.append('page', page.toString());
-      params.append('size', '20');
-      return apiClient.get<PageResponse<PlatformUser>>(`/control/users?${params}`);
+      const params = new URLSearchParams()
+      if (filter) params.append('filter', filter)
+      if (statusFilter) params.append('status', statusFilter)
+      params.append('page', page.toString())
+      params.append('size', '20')
+      return apiClient.get<PageResponse<PlatformUser>>(`/control/users?${params}`)
     },
-  });
+  })
 
   const createMutation = useMutation({
     mutationFn: (formData: CreateUserFormData) =>
       apiClient.post<PlatformUser>('/control/users', formData),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-      showToast(t('users.createSuccess'), 'success');
-      setIsFormOpen(false);
+      queryClient.invalidateQueries({ queryKey: ['users'] })
+      showToast(t('users.createSuccess'), 'success')
+      setIsFormOpen(false)
     },
     onError: (err: Error) => {
-      showToast(err.message || t('errors.generic'), 'error');
+      showToast(err.message || t('errors.generic'), 'error')
     },
-  });
+  })
 
   const statusMutation = useMutation({
     mutationFn: ({ userId, action }: { userId: string; action: 'deactivate' | 'activate' }) =>
       apiClient.post(`/control/users/${userId}/${action}`, {}),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.invalidateQueries({ queryKey: ['users'] })
       showToast(
         confirmDialog.action === 'deactivate'
           ? t('users.deactivateSuccess')
           : t('users.activateSuccess'),
         'success'
-      );
-      setConfirmDialog({ open: false, userId: '', action: 'deactivate', userName: '' });
+      )
+      setConfirmDialog({ open: false, userId: '', action: 'deactivate', userName: '' })
     },
     onError: (err: Error) => {
-      showToast(err.message || t('errors.generic'), 'error');
+      showToast(err.message || t('errors.generic'), 'error')
     },
-  });
+  })
 
   const handleStatusAction = useCallback(
     (user: PlatformUser, action: 'deactivate' | 'activate') => {
@@ -233,20 +236,20 @@ export function UsersPage({ testId = 'users-page' }: UsersPageProps) {
         userId: user.id,
         action,
         userName: `${user.firstName} ${user.lastName}`,
-      });
+      })
     },
     []
-  );
+  )
 
   const confirmAction = useCallback(() => {
     statusMutation.mutate({
       userId: confirmDialog.userId,
       action: confirmDialog.action,
-    });
-  }, [confirmDialog, statusMutation]);
+    })
+  }, [confirmDialog, statusMutation])
 
-  const users = data?.content ?? [];
-  const totalPages = data?.totalPages ?? 0;
+  const users = data?.content ?? []
+  const totalPages = data?.totalPages ?? 0
 
   if (error) {
     return (
@@ -258,7 +261,7 @@ export function UsersPage({ testId = 'users-page' }: UsersPageProps) {
           </button>
         </div>
       </div>
-    );
+    )
   }
 
   return (
@@ -276,16 +279,16 @@ export function UsersPage({ testId = 'users-page' }: UsersPageProps) {
           placeholder={t('users.searchPlaceholder')}
           value={filter}
           onChange={(e) => {
-            setFilter(e.target.value);
-            setPage(0);
+            setFilter(e.target.value)
+            setPage(0)
           }}
           className={styles.searchInput}
         />
         <select
           value={statusFilter}
           onChange={(e) => {
-            setStatusFilter(e.target.value);
-            setPage(0);
+            setStatusFilter(e.target.value)
+            setPage(0)
           }}
           className={styles.statusSelect}
         >
@@ -371,9 +374,7 @@ export function UsersPage({ testId = 'users-page' }: UsersPageProps) {
               >
                 {t('common.previous')}
               </button>
-              <span>
-                {t('common.pageOf', { current: page + 1, total: totalPages })}
-              </span>
+              <span>{t('common.pageOf', { current: page + 1, total: totalPages })}</span>
               <button
                 disabled={page >= totalPages - 1}
                 onClick={() => setPage((p) => p + 1)}
@@ -395,8 +396,17 @@ export function UsersPage({ testId = 'users-page' }: UsersPageProps) {
       )}
 
       {confirmDialog.open && (
-        <div className={styles.modalOverlay} onClick={() => setConfirmDialog({ ...confirmDialog, open: false })}>
-          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+        <div
+          className={styles.modalOverlay}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setConfirmDialog({ ...confirmDialog, open: false })
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setConfirmDialog({ ...confirmDialog, open: false })
+          }}
+          role="presentation"
+        >
+          <div className={styles.modal} role="dialog" aria-modal="true">
             <h2>{t('common.confirm')}</h2>
             <p>
               {confirmDialog.action === 'deactivate'
@@ -411,7 +421,9 @@ export function UsersPage({ testId = 'users-page' }: UsersPageProps) {
                 {t('common.cancel')}
               </button>
               <button
-                className={confirmDialog.action === 'deactivate' ? styles.btnDanger : styles.btnPrimary}
+                className={
+                  confirmDialog.action === 'deactivate' ? styles.btnDanger : styles.btnPrimary
+                }
                 onClick={confirmAction}
                 disabled={statusMutation.isPending}
               >
@@ -422,5 +434,5 @@ export function UsersPage({ testId = 'users-page' }: UsersPageProps) {
         </div>
       )}
     </div>
-  );
+  )
 }

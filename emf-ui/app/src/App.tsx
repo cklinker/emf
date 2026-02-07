@@ -11,29 +11,29 @@
  * - 2.1: Redirect unauthenticated users to OIDC provider login page
  */
 
-import React, { useCallback } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import React, { useCallback } from 'react'
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 // Context Providers
-import { AuthProvider } from './context/AuthContext';
-import { ApiProvider } from './context/ApiContext';
-import { ConfigProvider, useConfig } from './context/ConfigContext';
-import { ThemeProvider } from './context/ThemeContext';
-import { I18nProvider } from './context/I18nContext';
-import { PluginProvider } from './context/PluginContext';
-import { useAuth } from './context/AuthContext';
+import { AuthProvider } from './context/AuthContext'
+import { ApiProvider } from './context/ApiContext'
+import { ConfigProvider, useConfig } from './context/ConfigContext'
+import { ThemeProvider } from './context/ThemeContext'
+import { I18nProvider } from './context/I18nContext'
+import { PluginProvider } from './context/PluginContext'
+import { useAuth } from './context/AuthContext'
 
 // Components
-import { ErrorBoundary } from './components/ErrorBoundary';
-import { ToastProvider } from './components/Toast';
-import { LiveRegionProvider } from './components/LiveRegion';
-import { ProtectedRoute } from './components/ProtectedRoute';
-import { AppShell, useAppShell } from './components/AppShell';
-import { Header } from './components/Header';
-import { Sidebar } from './components/Sidebar';
-import { PageTransition } from './components/PageTransition';
-import { PageLoader } from './components/PageLoader';
+import { ErrorBoundary } from './components/ErrorBoundary'
+import { ToastProvider } from './components/Toast'
+import { LiveRegionProvider } from './components/LiveRegion'
+import { ProtectedRoute } from './components/ProtectedRoute'
+import { AppShell, useAppShell } from './components/AppShell'
+import { Header } from './components/Header'
+import { Sidebar } from './components/Sidebar'
+import { PageTransition } from './components/PageTransition'
+import { PageLoader } from './components/PageLoader'
 
 // Pages
 import {
@@ -61,11 +61,11 @@ import {
   LoginPage,
   UnauthorizedPage,
   NotFoundPage,
-} from './pages';
+} from './pages'
 
 // Types
-import type { Plugin } from './types/plugin';
-import type { MenuConfig } from './types/config';
+import type { Plugin } from './types/plugin'
+import type { MenuConfig } from './types/config'
 
 // Create a QueryClient instance for TanStack Query
 const queryClient = new QueryClient({
@@ -76,26 +76,26 @@ const queryClient = new QueryClient({
       refetchOnWindowFocus: false,
     },
   },
-});
+})
 
 /**
  * Props for the App component
  */
 export interface AppProps {
   /** Optional plugins to load */
-  plugins?: Plugin[];
+  plugins?: Plugin[]
 }
 
 /**
  * Bootstrap error display component
  * Shows when the bootstrap API call fails with retry option
  */
-function BootstrapError({ 
-  error, 
-  onRetry 
-}: { 
-  error: Error; 
-  onRetry: () => void;
+function BootstrapError({
+  error,
+  onRetry,
+}: {
+  error: Error
+  onRetry: () => void
 }): React.ReactElement {
   return (
     <div
@@ -127,9 +127,7 @@ function BootstrapError({
       <p style={{ margin: '0 0 0.5rem', color: '#666', maxWidth: '400px' }}>
         Failed to connect to the server. Please check your connection and try again.
       </p>
-      <p style={{ margin: '0 0 1.5rem', color: '#999', fontSize: '0.875rem' }}>
-        {error.message}
-      </p>
+      <p style={{ margin: '0 0 1.5rem', color: '#999', fontSize: '0.875rem' }}>{error.message}</p>
       <button
         onClick={onRetry}
         style={{
@@ -146,7 +144,7 @@ function BootstrapError({
         Retry
       </button>
     </div>
-  );
+  )
 }
 
 /**
@@ -154,17 +152,17 @@ function BootstrapError({
  * Wraps content with PageTransition for smooth page changes
  */
 function AppLayout({ children }: { children: React.ReactNode }): React.ReactElement {
-  const { user, logout } = useAuth();
-  const { config, isLoading: configLoading, error, reload } = useConfig();
+  const { user, logout } = useAuth()
+  const { config, isLoading: configLoading, error, reload } = useConfig()
 
   // Show loading state while config is loading
   if (configLoading) {
-    return <PageLoader fullPage message="Loading application..." />;
+    return <PageLoader fullPage message="Loading application..." />
   }
 
   // Show error state if bootstrap failed
   if (error) {
-    return <BootstrapError error={error} onRetry={reload} />;
+    return <BootstrapError error={error} onRetry={reload} />
   }
 
   // Extract branding and menus from config
@@ -172,41 +170,33 @@ function AppLayout({ children }: { children: React.ReactNode }): React.ReactElem
     logoUrl: '',
     applicationName: 'EMF Admin',
     faviconUrl: '',
-  };
+  }
 
-  const menus = config?.menus ?? [];
+  const menus = config?.menus ?? []
 
   return (
     <AppShell
-      header={
-        <Header
-          branding={branding}
-          user={user}
-          onLogout={logout}
-        />
-      }
-      sidebar={
-        <SidebarWithContext menus={menus} />
-      }
+      header={<Header branding={branding} user={user} onLogout={logout} />}
+      sidebar={<SidebarWithContext menus={menus} />}
     >
       <PageTransition type="fade" duration={200}>
         {children}
       </PageTransition>
     </AppShell>
-  );
+  )
 }
 
 /**
  * Sidebar wrapper that uses AppShell context
  */
 function SidebarWithContext({ menus }: { menus: MenuConfig[] }): React.ReactElement {
-  const { sidebarCollapsed, toggleSidebar, closeMobileSidebar, screenSize } = useAppShell();
-  
+  const { sidebarCollapsed, toggleSidebar, closeMobileSidebar, screenSize } = useAppShell()
+
   const handleItemClick = useCallback(() => {
     if (screenSize === 'mobile') {
-      closeMobileSidebar();
+      closeMobileSidebar()
     }
-  }, [screenSize, closeMobileSidebar]);
+  }, [screenSize, closeMobileSidebar])
 
   return (
     <Sidebar
@@ -215,7 +205,7 @@ function SidebarWithContext({ menus }: { menus: MenuConfig[] }): React.ReactElem
       onToggle={toggleSidebar}
       onItemClick={handleItemClick}
     />
-  );
+  )
 }
 
 /**
@@ -226,15 +216,15 @@ function ProtectedPageRoute({
   requiredRoles,
   requiredPolicies,
 }: {
-  children: React.ReactNode;
-  requiredRoles?: string[];
-  requiredPolicies?: string[];
+  children: React.ReactNode
+  requiredRoles?: string[]
+  requiredPolicies?: string[]
 }): React.ReactElement {
   return (
     <ProtectedRoute requiredRoles={requiredRoles} requiredPolicies={requiredPolicies}>
       <AppLayout>{children}</AppLayout>
     </ProtectedRoute>
-  );
+  )
 }
 
 /**
@@ -268,242 +258,242 @@ function App({ plugins = [] }: AppProps): React.ReactElement {
                     <ToastProvider>
                       <LiveRegionProvider>
                         <BrowserRouter>
-                        <Routes>
-                          {/* Public routes */}
-                          <Route path="/login" element={<LoginPage />} />
-                          <Route path="/unauthorized" element={<UnauthorizedPage />} />
-                          
-                          {/* OAuth callback route - shows loading while AuthContext processes the callback */}
-                          <Route 
-                            path="/auth/callback" 
-                            element={
-                              <PageLoader fullPage message="Completing authentication..." />
-                            } 
-                          />
+                          <Routes>
+                            {/* Public routes */}
+                            <Route path="/login" element={<LoginPage />} />
+                            <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
-                          {/* Dashboard - Home route */}
-                          <Route
-                            path="/"
-                            element={
-                              <ProtectedPageRoute>
-                                <DashboardPage />
-                              </ProtectedPageRoute>
-                            }
-                          />
+                            {/* OAuth callback route - shows loading while AuthContext processes the callback */}
+                            <Route
+                              path="/auth/callback"
+                              element={
+                                <PageLoader fullPage message="Completing authentication..." />
+                              }
+                            />
 
-                          {/* Collections routes */}
-                          <Route
-                            path="/collections"
-                            element={
-                              <ProtectedPageRoute>
-                                <CollectionsPage />
-                              </ProtectedPageRoute>
-                            }
-                          />
-                          <Route
-                            path="/collections/new"
-                            element={
-                              <ProtectedPageRoute>
-                                <CollectionFormPage />
-                              </ProtectedPageRoute>
-                            }
-                          />
-                          <Route
-                            path="/collections/:id"
-                            element={
-                              <ProtectedPageRoute>
-                                <CollectionDetailPage />
-                              </ProtectedPageRoute>
-                            }
-                          />
-                          <Route
-                            path="/collections/:id/edit"
-                            element={
-                              <ProtectedPageRoute>
-                                <CollectionFormPage />
-                              </ProtectedPageRoute>
-                            }
-                          />
+                            {/* Dashboard - Home route */}
+                            <Route
+                              path="/"
+                              element={
+                                <ProtectedPageRoute>
+                                  <DashboardPage />
+                                </ProtectedPageRoute>
+                              }
+                            />
 
-                          {/* Authorization routes */}
-                          <Route
-                            path="/roles"
-                            element={
-                              <ProtectedPageRoute>
-                                <RolesPage />
-                              </ProtectedPageRoute>
-                            }
-                          />
-                          <Route
-                            path="/policies"
-                            element={
-                              <ProtectedPageRoute>
-                                <PoliciesPage />
-                              </ProtectedPageRoute>
-                            }
-                          />
+                            {/* Collections routes */}
+                            <Route
+                              path="/collections"
+                              element={
+                                <ProtectedPageRoute>
+                                  <CollectionsPage />
+                                </ProtectedPageRoute>
+                              }
+                            />
+                            <Route
+                              path="/collections/new"
+                              element={
+                                <ProtectedPageRoute>
+                                  <CollectionFormPage />
+                                </ProtectedPageRoute>
+                              }
+                            />
+                            <Route
+                              path="/collections/:id"
+                              element={
+                                <ProtectedPageRoute>
+                                  <CollectionDetailPage />
+                                </ProtectedPageRoute>
+                              }
+                            />
+                            <Route
+                              path="/collections/:id/edit"
+                              element={
+                                <ProtectedPageRoute>
+                                  <CollectionFormPage />
+                                </ProtectedPageRoute>
+                              }
+                            />
 
-                          {/* OIDC Providers route */}
-                          <Route
-                            path="/oidc-providers"
-                            element={
-                              <ProtectedPageRoute>
-                                <OIDCProvidersPage />
-                              </ProtectedPageRoute>
-                            }
-                          />
+                            {/* Authorization routes */}
+                            <Route
+                              path="/roles"
+                              element={
+                                <ProtectedPageRoute>
+                                  <RolesPage />
+                                </ProtectedPageRoute>
+                              }
+                            />
+                            <Route
+                              path="/policies"
+                              element={
+                                <ProtectedPageRoute>
+                                  <PoliciesPage />
+                                </ProtectedPageRoute>
+                              }
+                            />
 
-                          {/* Services route */}
-                          <Route
-                            path="/services"
-                            element={
-                              <ProtectedPageRoute>
-                                <ServicesPage />
-                              </ProtectedPageRoute>
-                            }
-                          />
+                            {/* OIDC Providers route */}
+                            <Route
+                              path="/oidc-providers"
+                              element={
+                                <ProtectedPageRoute>
+                                  <OIDCProvidersPage />
+                                </ProtectedPageRoute>
+                              }
+                            />
 
-                          {/* UI Builder routes */}
-                          <Route
-                            path="/pages"
-                            element={
-                              <ProtectedPageRoute>
-                                <PageBuilderPage />
-                              </ProtectedPageRoute>
-                            }
-                          />
-                          <Route
-                            path="/menus"
-                            element={
-                              <ProtectedPageRoute>
-                                <MenuBuilderPage />
-                              </ProtectedPageRoute>
-                            }
-                          />
+                            {/* Services route */}
+                            <Route
+                              path="/services"
+                              element={
+                                <ProtectedPageRoute>
+                                  <ServicesPage />
+                                </ProtectedPageRoute>
+                              }
+                            />
 
-                          {/* Package Management route */}
-                          <Route
-                            path="/packages"
-                            element={
-                              <ProtectedPageRoute>
-                                <PackagesPage />
-                              </ProtectedPageRoute>
-                            }
-                          />
+                            {/* UI Builder routes */}
+                            <Route
+                              path="/pages"
+                              element={
+                                <ProtectedPageRoute>
+                                  <PageBuilderPage />
+                                </ProtectedPageRoute>
+                              }
+                            />
+                            <Route
+                              path="/menus"
+                              element={
+                                <ProtectedPageRoute>
+                                  <MenuBuilderPage />
+                                </ProtectedPageRoute>
+                              }
+                            />
 
-                          {/* Migrations route */}
-                          <Route
-                            path="/migrations"
-                            element={
-                              <ProtectedPageRoute>
-                                <MigrationsPage />
-                              </ProtectedPageRoute>
-                            }
-                          />
+                            {/* Package Management route */}
+                            <Route
+                              path="/packages"
+                              element={
+                                <ProtectedPageRoute>
+                                  <PackagesPage />
+                                </ProtectedPageRoute>
+                              }
+                            />
 
-                          {/* Resource Browser routes */}
-                          <Route
-                            path="/resources"
-                            element={
-                              <ProtectedPageRoute>
-                                <ResourceBrowserPage />
-                              </ProtectedPageRoute>
-                            }
-                          />
-                          <Route
-                            path="/resources/:collection"
-                            element={
-                              <ProtectedPageRoute>
-                                <ResourceListPage />
-                              </ProtectedPageRoute>
-                            }
-                          />
-                          <Route
-                            path="/resources/:collection/new"
-                            element={
-                              <ProtectedPageRoute>
-                                <ResourceFormPage />
-                              </ProtectedPageRoute>
-                            }
-                          />
-                          <Route
-                            path="/resources/:collection/:id"
-                            element={
-                              <ProtectedPageRoute>
-                                <ResourceDetailPage />
-                              </ProtectedPageRoute>
-                            }
-                          />
-                          <Route
-                            path="/resources/:collection/:id/edit"
-                            element={
-                              <ProtectedPageRoute>
-                                <ResourceFormPage />
-                              </ProtectedPageRoute>
-                            }
-                          />
+                            {/* Migrations route */}
+                            <Route
+                              path="/migrations"
+                              element={
+                                <ProtectedPageRoute>
+                                  <MigrationsPage />
+                                </ProtectedPageRoute>
+                              }
+                            />
 
-                          {/* Plugins route */}
-                          <Route
-                            path="/plugins"
-                            element={
-                              <ProtectedPageRoute>
-                                <PluginsPage />
-                              </ProtectedPageRoute>
-                            }
-                          />
+                            {/* Resource Browser routes */}
+                            <Route
+                              path="/resources"
+                              element={
+                                <ProtectedPageRoute>
+                                  <ResourceBrowserPage />
+                                </ProtectedPageRoute>
+                              }
+                            />
+                            <Route
+                              path="/resources/:collection"
+                              element={
+                                <ProtectedPageRoute>
+                                  <ResourceListPage />
+                                </ProtectedPageRoute>
+                              }
+                            />
+                            <Route
+                              path="/resources/:collection/new"
+                              element={
+                                <ProtectedPageRoute>
+                                  <ResourceFormPage />
+                                </ProtectedPageRoute>
+                              }
+                            />
+                            <Route
+                              path="/resources/:collection/:id"
+                              element={
+                                <ProtectedPageRoute>
+                                  <ResourceDetailPage />
+                                </ProtectedPageRoute>
+                              }
+                            />
+                            <Route
+                              path="/resources/:collection/:id/edit"
+                              element={
+                                <ProtectedPageRoute>
+                                  <ResourceFormPage />
+                                </ProtectedPageRoute>
+                              }
+                            />
 
-                          {/* User Management routes */}
-                          <Route
-                            path="/users"
-                            element={
-                              <ProtectedPageRoute>
-                                <UsersPage />
-                              </ProtectedPageRoute>
-                            }
-                          />
-                          <Route
-                            path="/users/:id"
-                            element={
-                              <ProtectedPageRoute>
-                                <UserDetailPage />
-                              </ProtectedPageRoute>
-                            }
-                          />
+                            {/* Plugins route */}
+                            <Route
+                              path="/plugins"
+                              element={
+                                <ProtectedPageRoute>
+                                  <PluginsPage />
+                                </ProtectedPageRoute>
+                              }
+                            />
 
-                          {/* Tenant Management routes (platform admin) */}
-                          <Route
-                            path="/tenants"
-                            element={
-                              <ProtectedPageRoute requiredRoles={['PLATFORM_ADMIN']}>
-                                <TenantsPage />
-                              </ProtectedPageRoute>
-                            }
-                          />
-                          <Route
-                            path="/tenant-dashboard"
-                            element={
-                              <ProtectedPageRoute>
-                                <TenantDashboardPage />
-                              </ProtectedPageRoute>
-                            }
-                          />
+                            {/* User Management routes */}
+                            <Route
+                              path="/users"
+                              element={
+                                <ProtectedPageRoute>
+                                  <UsersPage />
+                                </ProtectedPageRoute>
+                              }
+                            />
+                            <Route
+                              path="/users/:id"
+                              element={
+                                <ProtectedPageRoute>
+                                  <UserDetailPage />
+                                </ProtectedPageRoute>
+                              }
+                            />
 
-                          {/* 404 Not Found - catch all */}
-                          <Route path="*" element={<NotFoundPage />} />
-                        </Routes>
-                      </BrowserRouter>
-                    </LiveRegionProvider>
-                  </ToastProvider>
-                </PluginProvider>
-              </I18nProvider>
-            </ThemeProvider>
-          </ConfigProvider>
+                            {/* Tenant Management routes (platform admin) */}
+                            <Route
+                              path="/tenants"
+                              element={
+                                <ProtectedPageRoute requiredRoles={['PLATFORM_ADMIN']}>
+                                  <TenantsPage />
+                                </ProtectedPageRoute>
+                              }
+                            />
+                            <Route
+                              path="/tenant-dashboard"
+                              element={
+                                <ProtectedPageRoute>
+                                  <TenantDashboardPage />
+                                </ProtectedPageRoute>
+                              }
+                            />
+
+                            {/* 404 Not Found - catch all */}
+                            <Route path="*" element={<NotFoundPage />} />
+                          </Routes>
+                        </BrowserRouter>
+                      </LiveRegionProvider>
+                    </ToastProvider>
+                  </PluginProvider>
+                </I18nProvider>
+              </ThemeProvider>
+            </ConfigProvider>
           </ApiProvider>
         </AuthProvider>
       </QueryClientProvider>
     </ErrorBoundary>
-  );
+  )
 }
 
-export default App;
+export default App

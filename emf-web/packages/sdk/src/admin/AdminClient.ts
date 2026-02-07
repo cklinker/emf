@@ -276,7 +276,7 @@ export class AdminClient {
       params.append('page', page.toString());
       params.append('size', size.toString());
       const response = await this.axios.get<Page<PlatformUser>>(
-        `/control/users?${params}`
+        `/control/users?${params.toString()}`
       );
       return response.data;
     },
@@ -304,16 +304,12 @@ export class AdminClient {
       await this.axios.post(`/control/users/${id}/activate`);
     },
 
-    getLoginHistory: async (
-      id: string,
-      page = 0,
-      size = 20
-    ): Promise<Page<LoginHistoryEntry>> => {
+    getLoginHistory: async (id: string, page = 0, size = 20): Promise<Page<LoginHistoryEntry>> => {
       const params = new URLSearchParams();
       params.append('page', page.toString());
       params.append('size', size.toString());
       const response = await this.axios.get<Page<LoginHistoryEntry>>(
-        `/control/users/${id}/login-history?${params}`
+        `/control/users/${id}/login-history?${params.toString()}`
       );
       return response.data;
     },

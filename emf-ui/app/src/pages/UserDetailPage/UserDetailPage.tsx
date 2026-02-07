@@ -1,57 +1,57 @@
-import React, { useState, useCallback } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useNavigate, useParams } from 'react-router-dom';
-import { useApi } from '../../context/ApiContext';
-import { useI18n } from '../../context/I18nContext';
-import { useToast } from '../../components/Toast';
-import styles from './UserDetailPage.module.css';
+import React, { useState, useCallback } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useNavigate, useParams } from 'react-router-dom'
+import { useApi } from '../../context/ApiContext'
+import { useI18n } from '../../context/I18nContext'
+import { useToast } from '../../components/Toast'
+import styles from './UserDetailPage.module.css'
 
 interface PlatformUser {
-  id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  username?: string;
-  status: 'ACTIVE' | 'INACTIVE' | 'LOCKED' | 'PENDING_ACTIVATION';
-  locale: string;
-  timezone: string;
-  profileId?: string;
-  managerId?: string;
-  lastLoginAt?: string;
-  loginCount: number;
-  mfaEnabled: boolean;
-  createdAt: string;
-  updatedAt: string;
+  id: string
+  email: string
+  firstName: string
+  lastName: string
+  username?: string
+  status: 'ACTIVE' | 'INACTIVE' | 'LOCKED' | 'PENDING_ACTIVATION'
+  locale: string
+  timezone: string
+  profileId?: string
+  managerId?: string
+  lastLoginAt?: string
+  loginCount: number
+  mfaEnabled: boolean
+  createdAt: string
+  updatedAt: string
 }
 
 interface LoginHistoryEntry {
-  id: string;
-  userId: string;
-  loginTime: string;
-  sourceIp: string;
-  loginType: 'UI' | 'API' | 'OAUTH' | 'SERVICE_ACCOUNT';
-  status: 'SUCCESS' | 'FAILED' | 'LOCKED_OUT';
-  userAgent: string;
+  id: string
+  userId: string
+  loginTime: string
+  sourceIp: string
+  loginType: 'UI' | 'API' | 'OAUTH' | 'SERVICE_ACCOUNT'
+  status: 'SUCCESS' | 'FAILED' | 'LOCKED_OUT'
+  userAgent: string
 }
 
 interface PageResponse<T> {
-  content: T[];
-  totalElements: number;
-  totalPages: number;
-  number: number;
-  size: number;
+  content: T[]
+  totalElements: number
+  totalPages: number
+  number: number
+  size: number
 }
 
 interface UpdateFormData {
-  firstName: string;
-  lastName: string;
-  username: string;
-  locale: string;
-  timezone: string;
+  firstName: string
+  lastName: string
+  username: string
+  locale: string
+  timezone: string
 }
 
 export interface UserDetailPageProps {
-  testId?: string;
+  testId?: string
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -60,13 +60,9 @@ function StatusBadge({ status }: { status: string }) {
     INACTIVE: styles.statusInactive,
     LOCKED: styles.statusLocked,
     PENDING_ACTIVATION: styles.statusPending,
-  };
+  }
 
-  return (
-    <span className={`${styles.statusBadge} ${colorMap[status] || ''}`}>
-      {status}
-    </span>
-  );
+  return <span className={`${styles.statusBadge} ${colorMap[status] || ''}`}>{status}</span>
 }
 
 function LoginStatusLabel({ status }: { status: string }) {
@@ -74,89 +70,93 @@ function LoginStatusLabel({ status }: { status: string }) {
     SUCCESS: styles.loginStatusSuccess,
     FAILED: styles.loginStatusFailed,
     LOCKED_OUT: styles.loginStatusLocked,
-  };
+  }
 
-  return <span className={colorMap[status] || ''}>{status}</span>;
+  return <span className={colorMap[status] || ''}>{status}</span>
 }
 
 export function UserDetailPage({ testId = 'user-detail-page' }: UserDetailPageProps) {
-  const { id } = useParams<{ id: string }>();
-  const queryClient = useQueryClient();
-  const { t, formatDate } = useI18n();
-  const { apiClient } = useApi();
-  const { showToast } = useToast();
-  const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>()
+  const queryClient = useQueryClient()
+  const { t, formatDate } = useI18n()
+  const { apiClient } = useApi()
+  const { showToast } = useToast()
+  const navigate = useNavigate()
 
-  const [activeTab, setActiveTab] = useState<'details' | 'loginHistory'>('details');
-  const [isEditing, setIsEditing] = useState(false);
+  const [activeTab, setActiveTab] = useState<'details' | 'loginHistory'>('details')
+  const [isEditing, setIsEditing] = useState(false)
   const [formData, setFormData] = useState<UpdateFormData>({
     firstName: '',
     lastName: '',
     username: '',
     locale: '',
     timezone: '',
-  });
-  const [historyPage, setHistoryPage] = useState(0);
+  })
+  const [historyPage, setHistoryPage] = useState(0)
 
-  const { data: user, isLoading, error, refetch } = useQuery({
+  const {
+    data: user,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
     queryKey: ['users', id],
     queryFn: async () => {
-      const result = await apiClient.get<PlatformUser>(`/control/users/${id}`);
+      const result = await apiClient.get<PlatformUser>(`/control/users/${id}`)
       setFormData({
         firstName: result.firstName,
         lastName: result.lastName,
         username: result.username || '',
         locale: result.locale,
         timezone: result.timezone,
-      });
-      return result;
+      })
+      return result
     },
     enabled: !!id,
-  });
+  })
 
   const { data: loginHistory, isLoading: historyLoading } = useQuery({
     queryKey: ['users', id, 'login-history', historyPage],
     queryFn: async () => {
-      const params = new URLSearchParams();
-      params.append('page', historyPage.toString());
-      params.append('size', '20');
+      const params = new URLSearchParams()
+      params.append('page', historyPage.toString())
+      params.append('size', '20')
       return apiClient.get<PageResponse<LoginHistoryEntry>>(
         `/control/users/${id}/login-history?${params}`
-      );
+      )
     },
     enabled: !!id && activeTab === 'loginHistory',
-  });
+  })
 
   const updateMutation = useMutation({
-    mutationFn: (data: UpdateFormData) =>
-      apiClient.put<PlatformUser>(`/control/users/${id}`, data),
+    mutationFn: (data: UpdateFormData) => apiClient.put<PlatformUser>(`/control/users/${id}`, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users', id] });
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-      showToast(t('users.updateSuccess'), 'success');
-      setIsEditing(false);
+      queryClient.invalidateQueries({ queryKey: ['users', id] })
+      queryClient.invalidateQueries({ queryKey: ['users'] })
+      showToast(t('users.updateSuccess'), 'success')
+      setIsEditing(false)
     },
     onError: (err: Error) => {
-      showToast(err.message || t('errors.generic'), 'error');
+      showToast(err.message || t('errors.generic'), 'error')
     },
-  });
+  })
 
   const statusMutation = useMutation({
     mutationFn: (action: 'deactivate' | 'activate') =>
       apiClient.post(`/control/users/${id}/${action}`, {}),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users', id] });
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-      showToast(t('users.statusUpdateSuccess'), 'success');
+      queryClient.invalidateQueries({ queryKey: ['users', id] })
+      queryClient.invalidateQueries({ queryKey: ['users'] })
+      showToast(t('users.statusUpdateSuccess'), 'success')
     },
     onError: (err: Error) => {
-      showToast(err.message || t('errors.generic'), 'error');
+      showToast(err.message || t('errors.generic'), 'error')
     },
-  });
+  })
 
   const handleSave = useCallback(() => {
-    updateMutation.mutate(formData);
-  }, [formData, updateMutation]);
+    updateMutation.mutate(formData)
+  }, [formData, updateMutation])
 
   const handleCancel = useCallback(() => {
     if (user) {
@@ -166,10 +166,10 @@ export function UserDetailPage({ testId = 'user-detail-page' }: UserDetailPagePr
         username: user.username || '',
         locale: user.locale,
         timezone: user.timezone,
-      });
+      })
     }
-    setIsEditing(false);
-  }, [user]);
+    setIsEditing(false)
+  }, [user])
 
   if (error) {
     return (
@@ -181,7 +181,7 @@ export function UserDetailPage({ testId = 'user-detail-page' }: UserDetailPagePr
           </button>
         </div>
       </div>
-    );
+    )
   }
 
   if (isLoading || !user) {
@@ -189,11 +189,11 @@ export function UserDetailPage({ testId = 'user-detail-page' }: UserDetailPagePr
       <div className={styles.container} data-testid={testId}>
         <div className={styles.loadingState}>{t('common.loading')}</div>
       </div>
-    );
+    )
   }
 
-  const historyEntries = loginHistory?.content ?? [];
-  const historyTotalPages = loginHistory?.totalPages ?? 0;
+  const historyEntries = loginHistory?.content ?? []
+  const historyTotalPages = loginHistory?.totalPages ?? 0
 
   return (
     <div className={styles.container} data-testid={testId}>
@@ -202,7 +202,9 @@ export function UserDetailPage({ testId = 'user-detail-page' }: UserDetailPagePr
           <button className={styles.backButton} onClick={() => navigate('/users')}>
             {t('common.back')}
           </button>
-          <h1>{user.firstName} {user.lastName}</h1>
+          <h1>
+            {user.firstName} {user.lastName}
+          </h1>
           <StatusBadge status={user.status} />
         </div>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -362,9 +364,18 @@ export function UserDetailPage({ testId = 'user-detail-page' }: UserDetailPagePr
                     <tr key={entry.id}>
                       <td>{formatDate(entry.loginTime)}</td>
                       <td>{entry.loginType}</td>
-                      <td><LoginStatusLabel status={entry.status} /></td>
+                      <td>
+                        <LoginStatusLabel status={entry.status} />
+                      </td>
                       <td>{entry.sourceIp}</td>
-                      <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <td
+                        style={{
+                          maxWidth: '200px',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
                         {entry.userAgent}
                       </td>
                     </tr>
@@ -398,5 +409,5 @@ export function UserDetailPage({ testId = 'user-detail-page' }: UserDetailPagePr
         </div>
       )}
     </div>
-  );
+  )
 }

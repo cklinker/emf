@@ -76,6 +76,10 @@ export function DataTable<T = unknown>({
     },
   });
 
+  // Extract pagination early to avoid reference errors
+  const rows = data?.data ?? [];
+  const pagination = data?.pagination;
+
   // Handle page change
   const handlePageChange = useCallback(
     (newPage: number) => {
@@ -131,7 +135,6 @@ export function DataTable<T = unknown>({
 
   // Handle select all
   const handleSelectAll = useCallback(() => {
-    const rows = data?.data ?? [];
     if (selected.length === rows.length) {
       setSelected([]);
       onSelectionChange?.([]);
@@ -139,7 +142,7 @@ export function DataTable<T = unknown>({
       setSelected(rows);
       onSelectionChange?.(rows);
     }
-  }, [data?.data, selected.length, onSelectionChange]);
+  }, [rows, selected.length, onSelectionChange]);
 
   // Handle row click
   const handleRowClick = useCallback(
@@ -153,7 +156,6 @@ export function DataTable<T = unknown>({
   // Keyboard navigation handler
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLTableElement>) => {
-      const rows = data?.data ?? [];
       if (rows.length === 0) return;
 
       switch (event.key) {
@@ -200,7 +202,7 @@ export function DataTable<T = unknown>({
       }
     },
     [
-      data?.data,
+      rows,
       focusedRowIndex,
       selectable,
       handleRowSelect,
@@ -267,9 +269,6 @@ export function DataTable<T = unknown>({
       </div>
     );
   }
-
-  const rows = data?.data ?? [];
-  const pagination = data?.pagination;
 
   return (
     <div className={`emf-datatable ${className}`} data-testid={testId}>

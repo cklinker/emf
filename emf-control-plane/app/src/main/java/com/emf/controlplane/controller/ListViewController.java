@@ -1,0 +1,62 @@
+package com.emf.controlplane.controller;
+
+import com.emf.controlplane.dto.CreateListViewRequest;
+import com.emf.controlplane.dto.ListViewDto;
+import com.emf.controlplane.service.ListViewService;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/control/listviews")
+public class ListViewController {
+
+    private final ListViewService listViewService;
+
+    public ListViewController(ListViewService listViewService) {
+        this.listViewService = listViewService;
+    }
+
+    @GetMapping
+    public List<ListViewDto> listViews(
+            @RequestParam String tenantId,
+            @RequestParam String collectionId,
+            @RequestParam(required = false) String userId) {
+        if (userId != null) {
+            return listViewService.listViews(tenantId, collectionId, userId).stream()
+                    .map(ListViewDto::fromEntity).toList();
+        }
+        return listViewService.listAllViews(tenantId, collectionId).stream()
+                .map(ListViewDto::fromEntity).toList();
+    }
+
+    @GetMapping("/{id}")
+    public ListViewDto getView(@PathVariable String id) {
+        return ListViewDto.fromEntity(listViewService.getView(id));
+    }
+
+    @PostMapping
+    public ResponseEntity<ListViewDto> createView(
+            @RequestParam String tenantId,
+            @RequestParam String collectionId,
+            @RequestParam String userId,
+            @RequestBody CreateListViewRequest request) {
+        var view = listViewService.createView(tenantId, collectionId, userId, request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(ListViewDto.fromEntity(view));
+    }
+
+    @PutMapping("/{id}")
+    public ListViewDto updateView(
+            @PathVariable String id,
+            @RequestBody CreateListViewRequest request) {
+        return ListViewDto.fromEntity(listViewService.updateView(id, request));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteView(@PathVariable String id) {
+        listViewService.deleteView(id);
+        return ResponseEntity.noContent().build();
+    }
+}

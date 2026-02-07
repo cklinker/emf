@@ -888,3 +888,249 @@ export interface FieldHistoryEntry {
   changedAt: string;
   changeSource: 'UI' | 'API' | 'WORKFLOW' | 'SYSTEM' | 'IMPORT';
 }
+
+// --- Page Layouts (Phase 3 Stream A) ---
+
+export interface PageLayout {
+  id: string;
+  tenantId: string;
+  collectionId: string;
+  name: string;
+  description?: string;
+  layoutType: 'DETAIL' | 'EDIT' | 'MINI' | 'LIST';
+  isDefault: boolean;
+  sections: LayoutSection[];
+  relatedLists: LayoutRelatedList[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LayoutSection {
+  id: string;
+  heading: string;
+  columns: number;
+  sortOrder: number;
+  collapsed: boolean;
+  style: 'DEFAULT' | 'COLLAPSIBLE' | 'CARD';
+  fields: LayoutFieldPlacement[];
+}
+
+export interface LayoutFieldPlacement {
+  id: string;
+  fieldId: string;
+  columnNumber: number;
+  sortOrder: number;
+  requiredOnLayout: boolean;
+  readOnlyOnLayout: boolean;
+}
+
+export interface LayoutRelatedList {
+  id: string;
+  relatedCollectionId: string;
+  relationshipField: string;
+  displayColumns: string;
+  sortField?: string;
+  sortDirection: 'ASC' | 'DESC';
+  rowLimit: number;
+  sortOrder: number;
+}
+
+export interface CreatePageLayoutRequest {
+  collectionId: string;
+  name: string;
+  description?: string;
+  layoutType: string;
+  isDefault?: boolean;
+  sections?: CreateLayoutSectionRequest[];
+  relatedLists?: CreateRelatedListRequest[];
+}
+
+export interface CreateLayoutSectionRequest {
+  heading: string;
+  columns?: number;
+  sortOrder: number;
+  collapsed?: boolean;
+  style?: string;
+  fields?: CreateFieldPlacementRequest[];
+}
+
+export interface CreateFieldPlacementRequest {
+  fieldId: string;
+  columnNumber?: number;
+  sortOrder: number;
+  requiredOnLayout?: boolean;
+  readOnlyOnLayout?: boolean;
+}
+
+export interface CreateRelatedListRequest {
+  relatedCollectionId: string;
+  relationshipField: string;
+  displayColumns?: string;
+  sortField?: string;
+  sortDirection?: string;
+  rowLimit?: number;
+  sortOrder: number;
+}
+
+export interface LayoutAssignment {
+  id: string;
+  collectionId: string;
+  profileId?: string;
+  recordTypeId?: string;
+  layoutId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LayoutAssignmentRequest {
+  collectionId: string;
+  profileId?: string;
+  recordTypeId?: string;
+  layoutId: string;
+}
+
+// --- List Views (Phase 3 Stream B) ---
+
+export interface ListView {
+  id: string;
+  tenantId: string;
+  collectionId: string;
+  name: string;
+  columns: string;
+  filters: string;
+  filterLogic?: string;
+  sortField?: string;
+  sortDirection: 'ASC' | 'DESC';
+  chartConfig?: string;
+  visibility: 'PRIVATE' | 'PUBLIC' | 'GROUP';
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateListViewRequest {
+  collectionId: string;
+  name: string;
+  columns: string;
+  filters?: string;
+  filterLogic?: string;
+  sortField?: string;
+  sortDirection?: string;
+  chartConfig?: string;
+  visibility?: string;
+}
+
+// --- Reports (Phase 3 Stream C) ---
+
+export interface Report {
+  id: string;
+  name: string;
+  description?: string;
+  reportType: 'TABULAR' | 'SUMMARY' | 'MATRIX';
+  primaryCollectionId: string;
+  relatedJoins: string;
+  columns: string;
+  filters: string;
+  filterLogic?: string;
+  rowGroupings: string;
+  columnGroupings: string;
+  sortOrder: string;
+  chartType?: string;
+  chartConfig?: string;
+  scope: 'MY_RECORDS' | 'ALL_RECORDS' | 'MY_TEAM_RECORDS';
+  folderId?: string;
+  accessLevel: 'PRIVATE' | 'PUBLIC' | 'HIDDEN';
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ReportFolder {
+  id: string;
+  tenantId: string;
+  name: string;
+  accessLevel: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateReportRequest {
+  name: string;
+  description?: string;
+  reportType: string;
+  primaryCollectionId: string;
+  relatedJoins?: string;
+  columns: string;
+  filters?: string;
+  filterLogic?: string;
+  rowGroupings?: string;
+  columnGroupings?: string;
+  sortOrder?: string;
+  chartType?: string;
+  chartConfig?: string;
+  scope?: string;
+  folderId?: string;
+  accessLevel?: string;
+}
+
+// --- Dashboards (Phase 3 Stream D) ---
+
+export interface UserDashboard {
+  id: string;
+  name: string;
+  description?: string;
+  folderId?: string;
+  accessLevel: 'PRIVATE' | 'PUBLIC' | 'HIDDEN';
+  dynamic: boolean;
+  runningUserId?: string;
+  columnCount: number;
+  createdBy: string;
+  components: DashboardComponent[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DashboardComponent {
+  id: string;
+  reportId: string;
+  componentType: 'CHART' | 'GAUGE' | 'METRIC' | 'TABLE';
+  title?: string;
+  columnPosition: number;
+  rowPosition: number;
+  columnSpan: number;
+  rowSpan: number;
+  config: string;
+  sortOrder: number;
+}
+
+export interface CreateDashboardRequest {
+  name: string;
+  description?: string;
+  folderId?: string;
+  accessLevel?: string;
+  dynamic?: boolean;
+  runningUserId?: string;
+  columnCount?: number;
+  components?: CreateDashboardComponentRequest[];
+}
+
+export interface CreateDashboardComponentRequest {
+  reportId: string;
+  componentType: string;
+  title?: string;
+  columnPosition: number;
+  rowPosition: number;
+  columnSpan?: number;
+  rowSpan?: number;
+  config?: string;
+  sortOrder: number;
+}
+
+// --- Data Export (Phase 3 Stream E) ---
+
+export interface ExportRequest {
+  filename?: string;
+  columns: string[];
+  rows: Record<string, unknown>[];
+}

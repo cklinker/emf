@@ -58,6 +58,18 @@ import type {
   RecordTypePicklistOverride,
   SetPicklistOverrideRequest,
   FieldHistoryEntry,
+  PageLayout,
+  CreatePageLayoutRequest,
+  LayoutAssignment,
+  LayoutAssignmentRequest,
+  ListView,
+  CreateListViewRequest,
+  Report,
+  ReportFolder,
+  CreateReportRequest,
+  UserDashboard,
+  CreateDashboardRequest,
+  ExportRequest,
 } from './types';
 
 /**
@@ -977,6 +989,237 @@ export class AdminClient {
         parentRoleId
       );
       return response.data;
+    },
+  };
+
+  /**
+   * Page layout operations
+   */
+  readonly layouts = {
+    list: async (collectionId: string): Promise<PageLayout[]> => {
+      const params = new URLSearchParams({ collectionId });
+      const response = await this.axios.get<PageLayout[]>(`/control/layouts?${params.toString()}`);
+      return response.data;
+    },
+
+    get: async (id: string): Promise<PageLayout> => {
+      const response = await this.axios.get<PageLayout>(`/control/layouts/${id}`);
+      return response.data;
+    },
+
+    create: async (tenantId: string, request: CreatePageLayoutRequest): Promise<PageLayout> => {
+      const params = new URLSearchParams({ tenantId });
+      const response = await this.axios.post<PageLayout>(
+        `/control/layouts?${params.toString()}`,
+        request
+      );
+      return response.data;
+    },
+
+    update: async (id: string, request: Partial<CreatePageLayoutRequest>): Promise<PageLayout> => {
+      const response = await this.axios.put<PageLayout>(`/control/layouts/${id}`, request);
+      return response.data;
+    },
+
+    delete: async (id: string): Promise<void> => {
+      await this.axios.delete(`/control/layouts/${id}`);
+    },
+
+    listAssignments: async (collectionId: string): Promise<LayoutAssignment[]> => {
+      const params = new URLSearchParams({ collectionId });
+      const response = await this.axios.get<LayoutAssignment[]>(
+        `/control/layouts/assignments?${params.toString()}`
+      );
+      return response.data;
+    },
+
+    assign: async (request: LayoutAssignmentRequest): Promise<LayoutAssignment> => {
+      const response = await this.axios.post<LayoutAssignment>(
+        '/control/layouts/assignments',
+        request
+      );
+      return response.data;
+    },
+
+    resolve: async (
+      collectionId: string,
+      profileId?: string,
+      recordTypeId?: string
+    ): Promise<PageLayout> => {
+      const params = new URLSearchParams({ collectionId });
+      if (profileId) params.set('profileId', profileId);
+      if (recordTypeId) params.set('recordTypeId', recordTypeId);
+      const response = await this.axios.get<PageLayout>(
+        `/control/layouts/resolve?${params.toString()}`
+      );
+      return response.data;
+    },
+  };
+
+  /**
+   * List view operations
+   */
+  readonly listViews = {
+    list: async (tenantId: string, collectionId: string, userId?: string): Promise<ListView[]> => {
+      const params = new URLSearchParams({ tenantId, collectionId });
+      if (userId) params.set('userId', userId);
+      const response = await this.axios.get<ListView[]>(`/control/listviews?${params.toString()}`);
+      return response.data;
+    },
+
+    get: async (id: string): Promise<ListView> => {
+      const response = await this.axios.get<ListView>(`/control/listviews/${id}`);
+      return response.data;
+    },
+
+    create: async (
+      tenantId: string,
+      userId: string,
+      request: CreateListViewRequest
+    ): Promise<ListView> => {
+      const params = new URLSearchParams({ tenantId, userId });
+      const response = await this.axios.post<ListView>(
+        `/control/listviews?${params.toString()}`,
+        request
+      );
+      return response.data;
+    },
+
+    update: async (id: string, request: Partial<CreateListViewRequest>): Promise<ListView> => {
+      const response = await this.axios.put<ListView>(`/control/listviews/${id}`, request);
+      return response.data;
+    },
+
+    delete: async (id: string): Promise<void> => {
+      await this.axios.delete(`/control/listviews/${id}`);
+    },
+  };
+
+  /**
+   * Report operations
+   */
+  readonly reports = {
+    list: async (tenantId: string, userId?: string): Promise<Report[]> => {
+      const params = new URLSearchParams({ tenantId });
+      if (userId) params.set('userId', userId);
+      const response = await this.axios.get<Report[]>(`/control/reports?${params.toString()}`);
+      return response.data;
+    },
+
+    get: async (id: string): Promise<Report> => {
+      const response = await this.axios.get<Report>(`/control/reports/${id}`);
+      return response.data;
+    },
+
+    create: async (
+      tenantId: string,
+      userId: string,
+      request: CreateReportRequest
+    ): Promise<Report> => {
+      const params = new URLSearchParams({ tenantId, userId });
+      const response = await this.axios.post<Report>(
+        `/control/reports?${params.toString()}`,
+        request
+      );
+      return response.data;
+    },
+
+    update: async (id: string, request: Partial<CreateReportRequest>): Promise<Report> => {
+      const response = await this.axios.put<Report>(`/control/reports/${id}`, request);
+      return response.data;
+    },
+
+    delete: async (id: string): Promise<void> => {
+      await this.axios.delete(`/control/reports/${id}`);
+    },
+
+    listFolders: async (tenantId: string): Promise<ReportFolder[]> => {
+      const params = new URLSearchParams({ tenantId });
+      const response = await this.axios.get<ReportFolder[]>(
+        `/control/reports/folders?${params.toString()}`
+      );
+      return response.data;
+    },
+
+    createFolder: async (
+      tenantId: string,
+      userId: string,
+      name: string,
+      accessLevel?: string
+    ): Promise<ReportFolder> => {
+      const params = new URLSearchParams({ tenantId, userId, name });
+      if (accessLevel) params.set('accessLevel', accessLevel);
+      const response = await this.axios.post<ReportFolder>(
+        `/control/reports/folders?${params.toString()}`
+      );
+      return response.data;
+    },
+
+    deleteFolder: async (id: string): Promise<void> => {
+      await this.axios.delete(`/control/reports/folders/${id}`);
+    },
+  };
+
+  /**
+   * Dashboard operations
+   */
+  readonly dashboards = {
+    list: async (tenantId: string, userId?: string): Promise<UserDashboard[]> => {
+      const params = new URLSearchParams({ tenantId });
+      if (userId) params.set('userId', userId);
+      const response = await this.axios.get<UserDashboard[]>(
+        `/control/dashboards?${params.toString()}`
+      );
+      return response.data;
+    },
+
+    get: async (id: string): Promise<UserDashboard> => {
+      const response = await this.axios.get<UserDashboard>(`/control/dashboards/${id}`);
+      return response.data;
+    },
+
+    create: async (
+      tenantId: string,
+      userId: string,
+      request: CreateDashboardRequest
+    ): Promise<UserDashboard> => {
+      const params = new URLSearchParams({ tenantId, userId });
+      const response = await this.axios.post<UserDashboard>(
+        `/control/dashboards?${params.toString()}`,
+        request
+      );
+      return response.data;
+    },
+
+    update: async (
+      id: string,
+      request: Partial<CreateDashboardRequest>
+    ): Promise<UserDashboard> => {
+      const response = await this.axios.put<UserDashboard>(`/control/dashboards/${id}`, request);
+      return response.data;
+    },
+
+    delete: async (id: string): Promise<void> => {
+      await this.axios.delete(`/control/dashboards/${id}`);
+    },
+  };
+
+  /**
+   * Data export operations
+   */
+  readonly dataExport = {
+    exportCsv: async (request: ExportRequest): Promise<Blob> => {
+      const response = await this.axios.post('/control/export/csv', request, {
+        responseType: 'blob',
+      });
+      return response.data as Blob;
+    },
+
+    exportXlsx: async (request: ExportRequest): Promise<Blob> => {
+      const response = await this.axios.post('/control/export/xlsx', request, {
+        responseType: 'blob',
+      });
+      return response.data as Blob;
     },
   };
 }

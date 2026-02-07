@@ -14,14 +14,11 @@
 
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { createTestWrapper, setupAuthMocks } from '../../test/testUtils';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
 import { PackagesPage } from './PackagesPage';
-import { I18nProvider } from '../../context/I18nContext';
-import { ToastProvider } from '../../components/Toast';
 import { server } from '../../../vitest.setup';
 
 // Mock URL.createObjectURL and revokeObjectURL
@@ -29,29 +26,6 @@ global.URL.createObjectURL = vi.fn(() => 'blob:mock-url');
 global.URL.revokeObjectURL = vi.fn();
 
 // Create a wrapper with all required providers
-function createWrapper() {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: false,
-      },
-    },
-  });
-
-  return function Wrapper({ children }: { children: React.ReactNode }) {
-    return (
-      <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
-          <I18nProvider>
-            <ToastProvider>
-              {children}
-            </ToastProvider>
-          </I18nProvider>
-        </BrowserRouter>
-      </QueryClientProvider>
-    );
-  };
-}
 
 
 // Mock data
@@ -129,51 +103,55 @@ const mockImportResult = {
 // Helper to setup MSW handlers
 function setupMswHandlers(overrides: Record<string, unknown> = {}) {
   server.use(
-    http.get('/api/_admin/packages/history', () => {
+    http.get('/control/packages/history', () => {
       return HttpResponse.json(overrides.history ?? mockPackageHistory);
     }),
-    http.get('/api/_admin/collections', () => {
+    http.get('/control/collections', () => {
       return HttpResponse.json(overrides.collections ?? mockCollections);
     }),
-    http.get('/api/_admin/authz/roles', () => {
+    http.get('/control/roles', () => {
       return HttpResponse.json(overrides.roles ?? mockRoles);
     }),
-    http.get('/api/_admin/authz/policies', () => {
+    http.get('/control/policies', () => {
       return HttpResponse.json(overrides.policies ?? mockPolicies);
     }),
-    http.get('/api/_admin/ui/pages', () => {
+    http.get('/ui/pages', () => {
       return HttpResponse.json(overrides.pages ?? mockPages);
     }),
-    http.get('/api/_admin/ui/menus', () => {
+    http.get('/ui/menus', () => {
       return HttpResponse.json(overrides.menus ?? mockMenus);
     }),
-    http.post('/api/_admin/packages/export', () => {
+    http.post('/control/packages/export', () => {
       return new HttpResponse(JSON.stringify({}), {
         headers: { 'Content-Type': 'application/json' },
       });
     }),
-    http.post('/api/_admin/packages/import/preview', () => {
+    http.post('/control/packages/import/preview', () => {
       return HttpResponse.json(overrides.importPreview ?? mockImportPreview);
     }),
-    http.post('/api/_admin/packages/import', () => {
+    http.post('/control/packages/import', () => {
       return HttpResponse.json(overrides.importResult ?? mockImportResult);
     }),
   );
 }
 
 describe('PackagesPage', () => {
+  let cleanupAuthMocks: () => void;
+
   beforeEach(() => {
+    cleanupAuthMocks = setupAuthMocks();
     vi.clearAllMocks();
     setupMswHandlers();
   });
 
   afterEach(() => {
+    cleanupAuthMocks();
     vi.restoreAllMocks();
   });
 
   describe('Rendering', () => {
     it('renders the page with title and tabs', async () => {
-      render(<PackagesPage />, { wrapper: createWrapper() });
+      render(<PackagesPage />, { wrapper: createTestWrapper() });
 
       expect(screen.getByText('Packages')).toBeInTheDocument();
       expect(screen.getByTestId('tab-export')).toBeInTheDocument();
@@ -182,13 +160,13 @@ describe('PackagesPage', () => {
     });
 
     it('renders with custom testId', () => {
-      render(<PackagesPage testId="custom-packages" />, { wrapper: createWrapper() });
+      render(<PackagesPage testId="custom-packages" />, { wrapper: createTestWrapper() });
 
       expect(screen.getByTestId('custom-packages')).toBeInTheDocument();
     });
 
     it('shows export panel by default', async () => {
-      render(<PackagesPage />, { wrapper: createWrapper() });
+      render(<PackagesPage />, { wrapper: createTestWrapper() });
 
       expect(screen.getByTestId('export-panel')).toBeInTheDocument();
     });
@@ -198,7 +176,7 @@ describe('PackagesPage', () => {
   describe('Tab Navigation', () => {
     it('switches to import panel when import tab is clicked', async () => {
       const user = userEvent.setup();
-      render(<PackagesPage />, { wrapper: createWrapper() });
+      render(<PackagesPage />, { wrapper: createTestWrapper() });
 
       await user.click(screen.getByTestId('tab-import'));
 
@@ -208,7 +186,7 @@ describe('PackagesPage', () => {
 
     it('switches to history panel when history tab is clicked', async () => {
       const user = userEvent.setup();
-      render(<PackagesPage />, { wrapper: createWrapper() });
+      render(<PackagesPage />, { wrapper: createTestWrapper() });
 
       await user.click(screen.getByTestId('tab-history'));
 
@@ -220,7 +198,7 @@ describe('PackagesPage', () => {
 
     it('marks active tab with correct aria-selected', async () => {
       const user = userEvent.setup();
-      render(<PackagesPage />, { wrapper: createWrapper() });
+      render(<PackagesPage />, { wrapper: createTestWrapper() });
 
       const exportTab = screen.getByTestId('tab-export');
       const importTab = screen.getByTestId('tab-import');
@@ -237,7 +215,7 @@ describe('PackagesPage', () => {
 
   describe('Export Panel - Requirement 9.1', () => {
     it('displays item selection sections for all types', async () => {
-      render(<PackagesPage />, { wrapper: createWrapper() });
+      render(<PackagesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('item-section-collections')).toBeInTheDocument();
@@ -250,7 +228,7 @@ describe('PackagesPage', () => {
     });
 
     it('loads and displays available items', async () => {
-      render(<PackagesPage />, { wrapper: createWrapper() });
+      render(<PackagesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('item-col-1')).toBeInTheDocument();
@@ -263,7 +241,7 @@ describe('PackagesPage', () => {
 
     it('allows selecting items for export', async () => {
       const user = userEvent.setup();
-      render(<PackagesPage />, { wrapper: createWrapper() });
+      render(<PackagesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('checkbox-col-1')).toBeInTheDocument();
@@ -279,7 +257,7 @@ describe('PackagesPage', () => {
 
     it('allows selecting all items in a section', async () => {
       const user = userEvent.setup();
-      render(<PackagesPage />, { wrapper: createWrapper() });
+      render(<PackagesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('select-all-collections')).toBeInTheDocument();
@@ -292,7 +270,7 @@ describe('PackagesPage', () => {
     });
 
     it('disables export button when no items selected', async () => {
-      render(<PackagesPage />, { wrapper: createWrapper() });
+      render(<PackagesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('export-button')).toBeInTheDocument();
@@ -303,21 +281,40 @@ describe('PackagesPage', () => {
 
     it('enables export button when items are selected', async () => {
       const user = userEvent.setup();
-      render(<PackagesPage />, { wrapper: createWrapper() });
+      render(<PackagesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('checkbox-col-1')).toBeInTheDocument();
       });
 
-      await user.click(screen.getByTestId('checkbox-col-1'));
+      // Fill in required fields using labels
+      const nameInput = screen.getByLabelText(/Package Name/i);
+      const versionInput = screen.getByLabelText(/Package Version/i);
+      
+      await user.clear(nameInput);
+      await user.type(nameInput, 'test-package');
+      await user.clear(versionInput);
+      await user.type(versionInput, '1.0.0');
 
-      expect(screen.getByTestId('export-button')).not.toBeDisabled();
+      // Select a collection
+      const checkbox = screen.getByTestId('checkbox-col-1');
+      await user.click(checkbox);
+
+      // Wait for checkbox to be checked
+      await waitFor(() => {
+        expect(checkbox).toBeChecked();
+      });
+
+      // Then wait for export button to be enabled
+      await waitFor(() => {
+        expect(screen.getByTestId('export-button')).not.toBeDisabled();
+      }, { timeout: 3000 });
     });
 
     it('triggers export when export button is clicked', async () => {
       let exportCalled = false;
       server.use(
-        http.post('/api/_admin/packages/export', () => {
+        http.post('/control/packages/export', () => {
           exportCalled = true;
           return new HttpResponse(JSON.stringify({}), {
             headers: { 'Content-Type': 'application/json' },
@@ -326,13 +323,35 @@ describe('PackagesPage', () => {
       );
 
       const user = userEvent.setup();
-      render(<PackagesPage />, { wrapper: createWrapper() });
+      render(<PackagesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('checkbox-col-1')).toBeInTheDocument();
       });
 
-      await user.click(screen.getByTestId('checkbox-col-1'));
+      // Fill in required fields using labels
+      const nameInput = screen.getByLabelText(/Package Name/i);
+      const versionInput = screen.getByLabelText(/Package Version/i);
+      
+      await user.clear(nameInput);
+      await user.type(nameInput, 'test-package');
+      await user.clear(versionInput);
+      await user.type(versionInput, '1.0.0');
+
+      // Select a collection
+      const checkbox = screen.getByTestId('checkbox-col-1');
+      await user.click(checkbox);
+      
+      // Wait for checkbox to be checked
+      await waitFor(() => {
+        expect(checkbox).toBeChecked();
+      });
+      
+      // Then wait for export button to be enabled
+      await waitFor(() => {
+        expect(screen.getByTestId('export-button')).not.toBeDisabled();
+      }, { timeout: 3000 });
+      
       await user.click(screen.getByTestId('export-button'));
 
       await waitFor(() => {
@@ -345,7 +364,7 @@ describe('PackagesPage', () => {
   describe('Import Panel - Requirement 9.1', () => {
     it('displays file upload drop zone', async () => {
       const user = userEvent.setup();
-      render(<PackagesPage />, { wrapper: createWrapper() });
+      render(<PackagesPage />, { wrapper: createTestWrapper() });
 
       await user.click(screen.getByTestId('tab-import'));
 
@@ -355,7 +374,7 @@ describe('PackagesPage', () => {
 
     it('accepts file selection via input', async () => {
       const user = userEvent.setup();
-      render(<PackagesPage />, { wrapper: createWrapper() });
+      render(<PackagesPage />, { wrapper: createTestWrapper() });
 
       await user.click(screen.getByTestId('tab-import'));
 
@@ -371,7 +390,7 @@ describe('PackagesPage', () => {
 
     it('shows import preview after file selection', async () => {
       const user = userEvent.setup();
-      render(<PackagesPage />, { wrapper: createWrapper() });
+      render(<PackagesPage />, { wrapper: createTestWrapper() });
 
       await user.click(screen.getByTestId('tab-import'));
 
@@ -392,7 +411,7 @@ describe('PackagesPage', () => {
 
     it('allows clearing selected file', async () => {
       const user = userEvent.setup();
-      render(<PackagesPage />, { wrapper: createWrapper() });
+      render(<PackagesPage />, { wrapper: createTestWrapper() });
 
       await user.click(screen.getByTestId('tab-import'));
 
@@ -412,7 +431,7 @@ describe('PackagesPage', () => {
 
     it('disables import buttons when no file selected', async () => {
       const user = userEvent.setup();
-      render(<PackagesPage />, { wrapper: createWrapper() });
+      render(<PackagesPage />, { wrapper: createTestWrapper() });
 
       await user.click(screen.getByTestId('tab-import'));
 
@@ -422,7 +441,7 @@ describe('PackagesPage', () => {
 
     it('enables import buttons when file is selected', async () => {
       const user = userEvent.setup();
-      render(<PackagesPage />, { wrapper: createWrapper() });
+      render(<PackagesPage />, { wrapper: createTestWrapper() });
 
       await user.click(screen.getByTestId('tab-import'));
 
@@ -440,14 +459,14 @@ describe('PackagesPage', () => {
     it('triggers dry run when dry run button is clicked', async () => {
       let dryRunCalled = false;
       server.use(
-        http.post('/api/_admin/packages/import', () => {
+        http.post('/control/packages/import', () => {
           dryRunCalled = true;
           return HttpResponse.json(mockImportResult);
         }),
       );
 
       const user = userEvent.setup();
-      render(<PackagesPage />, { wrapper: createWrapper() });
+      render(<PackagesPage />, { wrapper: createTestWrapper() });
 
       await user.click(screen.getByTestId('tab-import'));
 
@@ -469,7 +488,7 @@ describe('PackagesPage', () => {
 
     it('shows import result after import', async () => {
       const user = userEvent.setup();
-      render(<PackagesPage />, { wrapper: createWrapper() });
+      render(<PackagesPage />, { wrapper: createTestWrapper() });
 
       await user.click(screen.getByTestId('tab-import'));
 
@@ -495,7 +514,7 @@ describe('PackagesPage', () => {
   describe('History Panel - Requirement 9.10', () => {
     it('displays package history table', async () => {
       const user = userEvent.setup();
-      render(<PackagesPage />, { wrapper: createWrapper() });
+      render(<PackagesPage />, { wrapper: createTestWrapper() });
 
       await user.click(screen.getByTestId('tab-history'));
 
@@ -506,7 +525,7 @@ describe('PackagesPage', () => {
 
     it('displays all package history entries', async () => {
       const user = userEvent.setup();
-      render(<PackagesPage />, { wrapper: createWrapper() });
+      render(<PackagesPage />, { wrapper: createTestWrapper() });
 
       await user.click(screen.getByTestId('tab-history'));
 
@@ -520,7 +539,7 @@ describe('PackagesPage', () => {
 
     it('displays package names in history', async () => {
       const user = userEvent.setup();
-      render(<PackagesPage />, { wrapper: createWrapper() });
+      render(<PackagesPage />, { wrapper: createTestWrapper() });
 
       await user.click(screen.getByTestId('tab-history'));
 
@@ -533,7 +552,7 @@ describe('PackagesPage', () => {
 
     it('displays type badges for export and import', async () => {
       const user = userEvent.setup();
-      render(<PackagesPage />, { wrapper: createWrapper() });
+      render(<PackagesPage />, { wrapper: createTestWrapper() });
 
       await user.click(screen.getByTestId('tab-history'));
 
@@ -545,7 +564,7 @@ describe('PackagesPage', () => {
 
     it('displays status badges', async () => {
       const user = userEvent.setup();
-      render(<PackagesPage />, { wrapper: createWrapper() });
+      render(<PackagesPage />, { wrapper: createTestWrapper() });
 
       await user.click(screen.getByTestId('tab-history'));
 
@@ -557,12 +576,12 @@ describe('PackagesPage', () => {
 
     it('displays empty state when no history', async () => {
       server.use(
-        http.get('/api/_admin/packages/history', () => {
+        http.get('/control/packages/history', () => {
           return HttpResponse.json([]);
         }),
       );
       const user = userEvent.setup();
-      render(<PackagesPage />, { wrapper: createWrapper() });
+      render(<PackagesPage />, { wrapper: createTestWrapper() });
 
       await user.click(screen.getByTestId('tab-history'));
 
@@ -573,7 +592,7 @@ describe('PackagesPage', () => {
 
     it('displays item count for each package', async () => {
       const user = userEvent.setup();
-      render(<PackagesPage />, { wrapper: createWrapper() });
+      render(<PackagesPage />, { wrapper: createTestWrapper() });
 
       await user.click(screen.getByTestId('tab-history'));
 
@@ -590,30 +609,30 @@ describe('PackagesPage', () => {
   describe('Error Handling', () => {
     it('handles history fetch error', async () => {
       server.use(
-        http.get('/api/_admin/packages/history', () => {
+        http.get('/control/packages/history', () => {
           return new HttpResponse(null, { status: 500 });
         }),
       );
 
       const user = userEvent.setup();
-      render(<PackagesPage />, { wrapper: createWrapper() });
+      render(<PackagesPage />, { wrapper: createTestWrapper() });
 
       await user.click(screen.getByTestId('tab-history'));
 
       await waitFor(() => {
-        expect(screen.getByText(/error/i)).toBeInTheDocument();
+        expect(screen.getByTestId('error-message')).toBeInTheDocument();
       });
     });
 
     it('handles export error gracefully', async () => {
       server.use(
-        http.post('/api/_admin/packages/export', () => {
+        http.post('/control/packages/export', () => {
           return HttpResponse.json({ message: 'Export failed' }, { status: 500 });
         }),
       );
 
       const user = userEvent.setup();
-      render(<PackagesPage />, { wrapper: createWrapper() });
+      render(<PackagesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('checkbox-col-1')).toBeInTheDocument();
@@ -630,13 +649,13 @@ describe('PackagesPage', () => {
 
     it('handles import preview error gracefully - Requirement 9.9', async () => {
       server.use(
-        http.post('/api/_admin/packages/import/preview', () => {
+        http.post('/control/packages/import/preview', () => {
           return HttpResponse.json({ message: 'Invalid package format' }, { status: 400 });
         }),
       );
 
       const user = userEvent.setup();
-      render(<PackagesPage />, { wrapper: createWrapper() });
+      render(<PackagesPage />, { wrapper: createTestWrapper() });
 
       await user.click(screen.getByTestId('tab-import'));
 
@@ -656,13 +675,13 @@ describe('PackagesPage', () => {
 
     it('handles import execution error gracefully - Requirement 9.9', async () => {
       server.use(
-        http.post('/api/_admin/packages/import', () => {
+        http.post('/control/packages/import', () => {
           return HttpResponse.json({ message: 'Import failed: database error' }, { status: 500 });
         }),
       );
 
       const user = userEvent.setup();
-      render(<PackagesPage />, { wrapper: createWrapper() });
+      render(<PackagesPage />, { wrapper: createTestWrapper() });
 
       await user.click(screen.getByTestId('tab-import'));
 
@@ -695,13 +714,13 @@ describe('PackagesPage', () => {
       };
 
       server.use(
-        http.post('/api/_admin/packages/import', () => {
+        http.post('/control/packages/import', () => {
           return HttpResponse.json(importResultWithErrors);
         }),
       );
 
       const user = userEvent.setup();
-      render(<PackagesPage />, { wrapper: createWrapper() });
+      render(<PackagesPage />, { wrapper: createTestWrapper() });
 
       await user.click(screen.getByTestId('tab-import'));
 
@@ -728,7 +747,7 @@ describe('PackagesPage', () => {
 
   describe('Accessibility', () => {
     it('has proper tab roles and aria attributes', () => {
-      render(<PackagesPage />, { wrapper: createWrapper() });
+      render(<PackagesPage />, { wrapper: createTestWrapper() });
 
       const tablist = screen.getByRole('tablist');
       expect(tablist).toBeInTheDocument();
@@ -738,7 +757,7 @@ describe('PackagesPage', () => {
     });
 
     it('has proper tabpanel roles', async () => {
-      render(<PackagesPage />, { wrapper: createWrapper() });
+      render(<PackagesPage />, { wrapper: createTestWrapper() });
 
       const tabpanel = screen.getByRole('tabpanel');
       expect(tabpanel).toBeInTheDocument();
@@ -746,7 +765,7 @@ describe('PackagesPage', () => {
 
     it('drop zone is keyboard accessible', async () => {
       const user = userEvent.setup();
-      render(<PackagesPage />, { wrapper: createWrapper() });
+      render(<PackagesPage />, { wrapper: createTestWrapper() });
 
       await user.click(screen.getByTestId('tab-import'));
 

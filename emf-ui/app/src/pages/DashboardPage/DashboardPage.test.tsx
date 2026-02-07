@@ -25,12 +25,9 @@
 import React from 'react';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { BrowserRouter } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { createTestWrapper, setupAuthMocks, wrapFetchMock } from '../../test/testUtils';
 import { DashboardPage } from './DashboardPage';
 import type { DashboardData, HealthStatus, RecentError } from './DashboardPage';
-import { I18nProvider } from '../../context/I18nContext';
-import { ToastProvider } from '../../components/Toast';
 
 // Mock fetch function
 const mockFetch = vi.fn();
@@ -151,34 +148,18 @@ const mockDashboardData: DashboardData = {
 /**
  * Create a wrapper component with all required providers
  */
-function createWrapper() {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: false,
-      },
-    },
-  });
-
-  return function Wrapper({ children }: { children: React.ReactNode }) {
-    return (
-      <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
-          <I18nProvider>
-            <ToastProvider>{children}</ToastProvider>
-          </I18nProvider>
-        </BrowserRouter>
-      </QueryClientProvider>
-    );
-  };
-}
 
 describe('DashboardPage', () => {
+  let cleanupAuthMocks: () => void;
+
   beforeEach(() => {
+    cleanupAuthMocks = setupAuthMocks();
     mockFetch.mockReset();
+    wrapFetchMock(mockFetch);
   });
 
   afterEach(() => {
+    cleanupAuthMocks();
     vi.clearAllMocks();
   });
 
@@ -192,7 +173,7 @@ describe('DashboardPage', () => {
           )
       );
 
-      render(<DashboardPage />, { wrapper: createWrapper() });
+      render(<DashboardPage />, { wrapper: createTestWrapper() });
 
       // Look for the loading spinner component
       expect(screen.getByRole('status')).toBeInTheDocument();
@@ -203,17 +184,17 @@ describe('DashboardPage', () => {
     it('should display error message when fetch fails', async () => {
       mockFetch.mockResolvedValue(createMockResponse(null, false, 500));
 
-      render(<DashboardPage />, { wrapper: createWrapper() });
+      render(<DashboardPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
-        expect(screen.getByText(/failed to fetch dashboard data/i)).toBeInTheDocument();
+        expect(screen.getByTestId('error-message')).toBeInTheDocument();
       });
     });
 
     it('should display retry button on error', async () => {
       mockFetch.mockResolvedValue(createMockResponse(null, false, 500));
 
-      render(<DashboardPage />, { wrapper: createWrapper() });
+      render(<DashboardPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
@@ -227,7 +208,7 @@ describe('DashboardPage', () => {
     });
 
     it('should display page title', async () => {
-      render(<DashboardPage />, { wrapper: createWrapper() });
+      render(<DashboardPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByRole('heading', { name: /dashboard/i })).toBeInTheDocument();
@@ -235,7 +216,7 @@ describe('DashboardPage', () => {
     });
 
     it('should display system health section', async () => {
-      render(<DashboardPage />, { wrapper: createWrapper() });
+      render(<DashboardPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText(/system health/i)).toBeInTheDocument();
@@ -243,7 +224,7 @@ describe('DashboardPage', () => {
     });
 
     it('should display health cards for all services', async () => {
-      render(<DashboardPage />, { wrapper: createWrapper() });
+      render(<DashboardPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         // Use getAllByText since Kafka appears in both health alerts and health cards
@@ -255,7 +236,7 @@ describe('DashboardPage', () => {
     });
 
     it('should display correct status badges for each service', async () => {
-      render(<DashboardPage />, { wrapper: createWrapper() });
+      render(<DashboardPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         // Check for healthy status badges
@@ -271,7 +252,7 @@ describe('DashboardPage', () => {
     });
 
     it('should display health card details when available', async () => {
-      render(<DashboardPage />, { wrapper: createWrapper() });
+      render(<DashboardPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('All systems operational')).toBeInTheDocument();
@@ -282,7 +263,7 @@ describe('DashboardPage', () => {
     });
 
     it('should have accessible health cards', async () => {
-      render(<DashboardPage />, { wrapper: createWrapper() });
+      render(<DashboardPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         const healthCards = screen.getByTestId('health-cards');
@@ -298,11 +279,11 @@ describe('DashboardPage', () => {
 
   describe('Metrics Display', () => {
     beforeEach(() => {
-      mockFetch.mockResolvedValue(createMockResponse(mockDashboardData));
+      mockFetch.mockResolvedValue(createMockResponse({ content: mockDashboardData, totalElements: mockDashboardData.length, totalPages: 1, size: 1000, number: 0 }));
     });
 
     it('should display metrics section', async () => {
-      render(<DashboardPage />, { wrapper: createWrapper() });
+      render(<DashboardPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText(/metrics/i)).toBeInTheDocument();
@@ -310,7 +291,7 @@ describe('DashboardPage', () => {
     });
 
     it('should display all metric cards', async () => {
-      render(<DashboardPage />, { wrapper: createWrapper() });
+      render(<DashboardPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('metrics-request-rate')).toBeInTheDocument();
@@ -321,7 +302,7 @@ describe('DashboardPage', () => {
     });
 
     it('should display request rate metric', async () => {
-      render(<DashboardPage />, { wrapper: createWrapper() });
+      render(<DashboardPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText(/request rate/i)).toBeInTheDocument();
@@ -329,7 +310,7 @@ describe('DashboardPage', () => {
     });
 
     it('should display error rate metric', async () => {
-      render(<DashboardPage />, { wrapper: createWrapper() });
+      render(<DashboardPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText(/error rate/i)).toBeInTheDocument();
@@ -337,7 +318,7 @@ describe('DashboardPage', () => {
     });
 
     it('should display latency metrics', async () => {
-      render(<DashboardPage />, { wrapper: createWrapper() });
+      render(<DashboardPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText(/latency.*p50/i)).toBeInTheDocument();
@@ -346,7 +327,7 @@ describe('DashboardPage', () => {
     });
 
     it('should display metric values', async () => {
-      render(<DashboardPage />, { wrapper: createWrapper() });
+      render(<DashboardPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         // Check that the metrics cards container exists
@@ -356,7 +337,7 @@ describe('DashboardPage', () => {
     });
 
     it('should have accessible metrics cards', async () => {
-      render(<DashboardPage />, { wrapper: createWrapper() });
+      render(<DashboardPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         const requestRateCard = screen.getByTestId('metrics-request-rate');
@@ -372,7 +353,7 @@ describe('DashboardPage', () => {
     });
 
     it('should display recent errors section', async () => {
-      render(<DashboardPage />, { wrapper: createWrapper() });
+      render(<DashboardPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText(/recent errors/i)).toBeInTheDocument();
@@ -380,7 +361,7 @@ describe('DashboardPage', () => {
     });
 
     it('should display all error items', async () => {
-      render(<DashboardPage />, { wrapper: createWrapper() });
+      render(<DashboardPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('error-item-1')).toBeInTheDocument();
@@ -390,7 +371,7 @@ describe('DashboardPage', () => {
     });
 
     it('should display error messages', async () => {
-      render(<DashboardPage />, { wrapper: createWrapper() });
+      render(<DashboardPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('Failed to connect to Kafka broker')).toBeInTheDocument();
@@ -400,7 +381,7 @@ describe('DashboardPage', () => {
     });
 
     it('should display error levels', async () => {
-      render(<DashboardPage />, { wrapper: createWrapper() });
+      render(<DashboardPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         const errorBadges = screen.getAllByText('ERROR');
@@ -412,7 +393,7 @@ describe('DashboardPage', () => {
     });
 
     it('should display error sources', async () => {
-      render(<DashboardPage />, { wrapper: createWrapper() });
+      render(<DashboardPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('kafka-consumer')).toBeInTheDocument();
@@ -422,7 +403,7 @@ describe('DashboardPage', () => {
     });
 
     it('should display truncated trace IDs when available', async () => {
-      render(<DashboardPage />, { wrapper: createWrapper() });
+      render(<DashboardPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         // Trace IDs are truncated to first 8 characters
@@ -432,7 +413,7 @@ describe('DashboardPage', () => {
     });
 
     it('should have accessible errors list', async () => {
-      render(<DashboardPage />, { wrapper: createWrapper() });
+      render(<DashboardPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         const errorsList = screen.getByTestId('errors-list');
@@ -450,7 +431,7 @@ describe('DashboardPage', () => {
       };
       mockFetch.mockResolvedValue(createMockResponse(dataWithNoErrors));
 
-      render(<DashboardPage />, { wrapper: createWrapper() });
+      render(<DashboardPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText(/no results found/i)).toBeInTheDocument();
@@ -464,7 +445,7 @@ describe('DashboardPage', () => {
     });
 
     it('should have proper heading hierarchy', async () => {
-      render(<DashboardPage />, { wrapper: createWrapper() });
+      render(<DashboardPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         // Main title should be h1
@@ -478,7 +459,7 @@ describe('DashboardPage', () => {
     });
 
     it('should have accessible sections with proper labels', async () => {
-      render(<DashboardPage />, { wrapper: createWrapper() });
+      render(<DashboardPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         // Check that sections have aria-labelledby
@@ -496,11 +477,11 @@ describe('DashboardPage', () => {
 
   describe('Time Range Selector', () => {
     beforeEach(() => {
-      mockFetch.mockResolvedValue(createMockResponse(mockDashboardData));
+      mockFetch.mockResolvedValue(createMockResponse({ content: mockDashboardData, totalElements: mockDashboardData.length, totalPages: 1, size: 1000, number: 0 }));
     });
 
     it('should display time range selector', async () => {
-      render(<DashboardPage />, { wrapper: createWrapper() });
+      render(<DashboardPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('time-range-selector')).toBeInTheDocument();
@@ -508,7 +489,7 @@ describe('DashboardPage', () => {
     });
 
     it('should have default time range of 15 minutes', async () => {
-      render(<DashboardPage />, { wrapper: createWrapper() });
+      render(<DashboardPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         const select = screen.getByLabelText(/time range/i);
@@ -517,7 +498,7 @@ describe('DashboardPage', () => {
     });
 
     it('should display all time range options', async () => {
-      render(<DashboardPage />, { wrapper: createWrapper() });
+      render(<DashboardPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         const select = screen.getByLabelText(/time range/i);
@@ -529,7 +510,7 @@ describe('DashboardPage', () => {
     });
 
     it('should update time range when selection changes', async () => {
-      render(<DashboardPage />, { wrapper: createWrapper() });
+      render(<DashboardPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('time-range-selector')).toBeInTheDocument();
@@ -542,7 +523,7 @@ describe('DashboardPage', () => {
     });
 
     it('should refetch data when time range changes', async () => {
-      render(<DashboardPage />, { wrapper: createWrapper() });
+      render(<DashboardPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('time-range-selector')).toBeInTheDocument();
@@ -550,7 +531,7 @@ describe('DashboardPage', () => {
 
       // Clear previous calls
       mockFetch.mockClear();
-      mockFetch.mockResolvedValue(createMockResponse(mockDashboardData));
+      mockFetch.mockResolvedValue(createMockResponse({ content: mockDashboardData, totalElements: mockDashboardData.length, totalPages: 1, size: 1000, number: 0 }));
 
       const select = screen.getByLabelText(/time range/i);
       fireEvent.change(select, { target: { value: '1h' } });
@@ -567,11 +548,11 @@ describe('DashboardPage', () => {
 
   describe('Auto-Refresh Interval Selector', () => {
     beforeEach(() => {
-      mockFetch.mockResolvedValue(createMockResponse(mockDashboardData));
+      mockFetch.mockResolvedValue(createMockResponse({ content: mockDashboardData, totalElements: mockDashboardData.length, totalPages: 1, size: 1000, number: 0 }));
     });
 
     it('should display auto-refresh selector', async () => {
-      render(<DashboardPage />, { wrapper: createWrapper() });
+      render(<DashboardPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('refresh-interval-selector')).toBeInTheDocument();
@@ -579,7 +560,7 @@ describe('DashboardPage', () => {
     });
 
     it('should have default refresh interval of 30 seconds', async () => {
-      render(<DashboardPage />, { wrapper: createWrapper() });
+      render(<DashboardPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         const select = screen.getByLabelText(/auto refresh/i);
@@ -588,7 +569,7 @@ describe('DashboardPage', () => {
     });
 
     it('should display all refresh interval options', async () => {
-      render(<DashboardPage />, { wrapper: createWrapper() });
+      render(<DashboardPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         const select = screen.getByLabelText(/auto refresh/i);
@@ -600,7 +581,7 @@ describe('DashboardPage', () => {
     });
 
     it('should update refresh interval when selection changes', async () => {
-      render(<DashboardPage />, { wrapper: createWrapper() });
+      render(<DashboardPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('refresh-interval-selector')).toBeInTheDocument();
@@ -613,7 +594,7 @@ describe('DashboardPage', () => {
     });
 
     it('should allow disabling auto-refresh', async () => {
-      render(<DashboardPage />, { wrapper: createWrapper() });
+      render(<DashboardPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('refresh-interval-selector')).toBeInTheDocument();
@@ -630,7 +611,7 @@ describe('DashboardPage', () => {
     it('should display health alerts when services are unhealthy', async () => {
       mockFetch.mockResolvedValue(createMockResponse(mockDashboardData));
 
-      render(<DashboardPage />, { wrapper: createWrapper() });
+      render(<DashboardPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('health-alerts')).toBeInTheDocument();
@@ -640,7 +621,7 @@ describe('DashboardPage', () => {
     it('should display alert for unhealthy Kafka service', async () => {
       mockFetch.mockResolvedValue(createMockResponse(mockDashboardData));
 
-      render(<DashboardPage />, { wrapper: createWrapper() });
+      render(<DashboardPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('health-alert-kafka')).toBeInTheDocument();
@@ -661,7 +642,7 @@ describe('DashboardPage', () => {
       };
       mockFetch.mockResolvedValue(createMockResponse(healthyData));
 
-      render(<DashboardPage />, { wrapper: createWrapper() });
+      render(<DashboardPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('health-cards')).toBeInTheDocument();
@@ -673,7 +654,7 @@ describe('DashboardPage', () => {
     it('should have accessible health alerts with role="alert"', async () => {
       mockFetch.mockResolvedValue(createMockResponse(mockDashboardData));
 
-      render(<DashboardPage />, { wrapper: createWrapper() });
+      render(<DashboardPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         const alertsContainer = screen.getByTestId('health-alerts');
@@ -684,7 +665,7 @@ describe('DashboardPage', () => {
     it('should display health alerts title', async () => {
       mockFetch.mockResolvedValue(createMockResponse(mockDashboardData));
 
-      render(<DashboardPage />, { wrapper: createWrapper() });
+      render(<DashboardPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText(/health alerts/i)).toBeInTheDocument();
@@ -698,7 +679,7 @@ describe('DashboardPage', () => {
     });
 
     it('should display dashboard controls container', async () => {
-      render(<DashboardPage />, { wrapper: createWrapper() });
+      render(<DashboardPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('dashboard-controls')).toBeInTheDocument();
@@ -706,7 +687,7 @@ describe('DashboardPage', () => {
     });
 
     it('should have accessible select elements', async () => {
-      render(<DashboardPage />, { wrapper: createWrapper() });
+      render(<DashboardPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         const timeRangeSelect = screen.getByLabelText(/time range/i);

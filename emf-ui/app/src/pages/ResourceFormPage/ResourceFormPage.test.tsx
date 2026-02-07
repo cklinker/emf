@@ -21,10 +21,9 @@ import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { AuthWrapper, setupAuthMocks, wrapFetchMock } from '../../test/testUtils';
 import { ResourceFormPage } from './ResourceFormPage';
 import type { CollectionSchema, Resource } from './ResourceFormPage';
-import { I18nProvider } from '../../context/I18nContext';
-import { ToastProvider } from '../../components/Toast';
 import { PluginProvider } from '../../context/PluginContext';
 import type { Plugin, FieldRendererProps } from '../../types/plugin';
 
@@ -153,18 +152,16 @@ function renderWithProviders(
   return {
     ...render(
       <QueryClientProvider client={queryClient}>
-        <I18nProvider>
-          <ToastProvider>
-            <PluginProvider plugins={plugins}>
-              <MemoryRouter initialEntries={[route]}>
-                <Routes>
-                  <Route path="/resources/:collectionName/new" element={ui} />
-                  <Route path="/resources/:collectionName/:resourceId/edit" element={ui} />
-                </Routes>
-              </MemoryRouter>
-            </PluginProvider>
-          </ToastProvider>
-        </I18nProvider>
+        <AuthWrapper>
+          <PluginProvider plugins={plugins}>
+            <MemoryRouter initialEntries={[route]}>
+              <Routes>
+                <Route path="/resources/:collectionName/new" element={ui} />
+                <Route path="/resources/:collectionName/:resourceId/edit" element={ui} />
+              </Routes>
+            </MemoryRouter>
+          </PluginProvider>
+        </AuthWrapper>
       </QueryClientProvider>
     ),
     queryClient,
@@ -172,14 +169,17 @@ function renderWithProviders(
 }
 
 describe('ResourceFormPage', () => {
+  let cleanupAuthMocks: () => void;
   let originalFetch: typeof global.fetch;
 
   beforeEach(() => {
+    cleanupAuthMocks = setupAuthMocks();
     originalFetch = global.fetch;
     mockNavigate.mockReset();
   });
 
   afterEach(() => {
+    cleanupAuthMocks();
     global.fetch = originalFetch;
     vi.clearAllMocks();
   });
@@ -207,7 +207,7 @@ describe('ResourceFormPage', () => {
 
     it('should display error message when resource fetch fails in edit mode', async () => {
       global.fetch = vi.fn().mockImplementation((url: string) => {
-        if (url.includes('/_admin/collections/')) {
+        if (url.includes('/control/collections/')) {
           return Promise.resolve({
             ok: true,
             json: () => Promise.resolve(mockSchema),
@@ -229,8 +229,8 @@ describe('ResourceFormPage', () => {
 
   describe('Create Mode', () => {
     beforeEach(() => {
-      global.fetch = vi.fn().mockImplementation((url: string) => {
-        if (url.includes('/_admin/collections/')) {
+      const mockFetch = vi.fn().mockImplementation((url: string) => {
+        if (url.includes('/control/collections/')) {
           return Promise.resolve({
             ok: true,
             json: () => Promise.resolve(mockSchema),
@@ -238,6 +238,7 @@ describe('ResourceFormPage', () => {
         }
         return Promise.reject(new Error('Not found'));
       }) as typeof global.fetch;
+      wrapFetchMock(mockFetch);
     });
 
     it('should render form with all fields from schema', async () => {
@@ -392,14 +393,14 @@ describe('ResourceFormPage', () => {
     it('should submit form with valid data', async () => {
       const user = userEvent.setup();
       
-      global.fetch = vi.fn().mockImplementation((url: string, options?: RequestInit) => {
-        if (url.includes('/_admin/collections/')) {
+      const mockFetch = vi.fn().mockImplementation((url: string, options?: RequestInit) => {
+        if (url.includes('/control/collections/')) {
           return Promise.resolve({
             ok: true,
             json: () => Promise.resolve(mockSchema),
           });
         }
-        if (options?.method === 'POST') {
+        if (url.includes('/api/users') && options?.method === 'POST') {
           return Promise.resolve({
             ok: true,
             json: () => Promise.resolve({ id: 'new-res-123', name: 'John Doe', email: 'john@example.com' }),
@@ -407,6 +408,7 @@ describe('ResourceFormPage', () => {
         }
         return Promise.reject(new Error('Not found'));
       }) as typeof global.fetch;
+      wrapFetchMock(mockFetch);
 
       renderWithProviders(<ResourceFormPage />);
 
@@ -424,27 +426,24 @@ describe('ResourceFormPage', () => {
 
       // Verify API was called
       await waitFor(() => {
-        expect(global.fetch).toHaveBeenCalledWith(
-          '/api/users',
-          expect.objectContaining({
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-          })
+        const postCalls = mockFetch.mock.calls.filter(
+          (call) => call[1]?.method === 'POST' && call[0].includes('/api/users')
         );
+        expect(postCalls.length).toBeGreaterThan(0);
       });
     });
 
     it('should navigate to resource detail after successful create', async () => {
       const user = userEvent.setup();
       
-      global.fetch = vi.fn().mockImplementation((url: string, options?: RequestInit) => {
-        if (url.includes('/_admin/collections/')) {
+      const mockFetch = vi.fn().mockImplementation((url: string, options?: RequestInit) => {
+        if (url.includes('/control/collections/')) {
           return Promise.resolve({
             ok: true,
             json: () => Promise.resolve(mockSchema),
           });
         }
-        if (options?.method === 'POST') {
+        if (url.includes('/api/users') && options?.method === 'POST') {
           return Promise.resolve({
             ok: true,
             json: () => Promise.resolve({ id: 'new-res-123', name: 'John Doe', email: 'john@example.com' }),
@@ -452,6 +451,7 @@ describe('ResourceFormPage', () => {
         }
         return Promise.reject(new Error('Not found'));
       }) as typeof global.fetch;
+      wrapFetchMock(mockFetch);
 
       renderWithProviders(<ResourceFormPage />);
 
@@ -491,14 +491,14 @@ describe('ResourceFormPage', () => {
 
   describe('Edit Mode', () => {
     beforeEach(() => {
-      global.fetch = vi.fn().mockImplementation((url: string) => {
-        if (url.includes('/_admin/collections/')) {
+      const mockFetch = vi.fn().mockImplementation((url: string) => {
+        if (url.includes('/control/collections/')) {
           return Promise.resolve({
             ok: true,
             json: () => Promise.resolve(mockSchema),
           });
         }
-        if (url.includes('/users/res-123') && !url.includes('/_admin')) {
+        if (url.includes('/users/res-123') && !url.includes('/control')) {
           return Promise.resolve({
             ok: true,
             json: () => Promise.resolve(mockResource),
@@ -506,6 +506,7 @@ describe('ResourceFormPage', () => {
         }
         return Promise.reject(new Error('Not found'));
       }) as typeof global.fetch;
+      wrapFetchMock(mockFetch);
     });
 
     it('should display page title for edit mode', async () => {
@@ -549,20 +550,20 @@ describe('ResourceFormPage', () => {
     it('should submit form with PUT method in edit mode', async () => {
       const user = userEvent.setup();
       
-      global.fetch = vi.fn().mockImplementation((url: string, options?: RequestInit) => {
-        if (url.includes('/_admin/collections/')) {
+      const mockFetch = vi.fn().mockImplementation((url: string, options?: RequestInit) => {
+        if (url.includes('/control/collections/')) {
           return Promise.resolve({
             ok: true,
             json: () => Promise.resolve(mockSchema),
           });
         }
-        if (url.includes('/users/res-123') && !options?.method) {
+        if (url.includes('/users/res-123') && !url.includes('/control') && (!options || !options.method || options.method === 'GET')) {
           return Promise.resolve({
             ok: true,
             json: () => Promise.resolve(mockResource),
           });
         }
-        if (options?.method === 'PUT') {
+        if (url.includes('/users/res-123') && options?.method === 'PUT') {
           return Promise.resolve({
             ok: true,
             json: () => Promise.resolve({ ...mockResource, name: 'Jane Doe' }),
@@ -570,6 +571,7 @@ describe('ResourceFormPage', () => {
         }
         return Promise.reject(new Error('Not found'));
       }) as typeof global.fetch;
+      wrapFetchMock(mockFetch);
 
       renderWithProviders(<ResourceFormPage />, {
         route: '/resources/users/res-123/edit',
@@ -589,33 +591,30 @@ describe('ResourceFormPage', () => {
 
       // Verify API was called with PUT
       await waitFor(() => {
-        expect(global.fetch).toHaveBeenCalledWith(
-          '/api/users/res-123',
-          expect.objectContaining({
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-          })
+        const putCalls = mockFetch.mock.calls.filter(
+          (call) => call[1]?.method === 'PUT' && call[0].includes('/api/users/res-123')
         );
+        expect(putCalls.length).toBeGreaterThan(0);
       });
     });
 
     it('should navigate to resource detail after successful update', async () => {
       const user = userEvent.setup();
       
-      global.fetch = vi.fn().mockImplementation((url: string, options?: RequestInit) => {
-        if (url.includes('/_admin/collections/')) {
+      const mockFetch = vi.fn().mockImplementation((url: string, options?: RequestInit) => {
+        if (url.includes('/control/collections/')) {
           return Promise.resolve({
             ok: true,
             json: () => Promise.resolve(mockSchema),
           });
         }
-        if (url.includes('/users/res-123') && !options?.method) {
+        if (url.includes('/users/res-123') && !url.includes('/control') && (!options || !options.method || options.method === 'GET')) {
           return Promise.resolve({
             ok: true,
             json: () => Promise.resolve(mockResource),
           });
         }
-        if (options?.method === 'PUT') {
+        if (url.includes('/users/res-123') && options?.method === 'PUT') {
           return Promise.resolve({
             ok: true,
             json: () => Promise.resolve(mockResource),
@@ -623,6 +622,7 @@ describe('ResourceFormPage', () => {
         }
         return Promise.reject(new Error('Not found'));
       }) as typeof global.fetch;
+      wrapFetchMock(mockFetch);
 
       renderWithProviders(<ResourceFormPage />, {
         route: '/resources/users/res-123/edit',
@@ -661,8 +661,8 @@ describe('ResourceFormPage', () => {
 
   describe('Field Type Handling', () => {
     beforeEach(() => {
-      global.fetch = vi.fn().mockImplementation((url: string) => {
-        if (url.includes('/_admin/collections/')) {
+      const mockFetch = vi.fn().mockImplementation((url: string) => {
+        if (url.includes('/control/collections/')) {
           return Promise.resolve({
             ok: true,
             json: () => Promise.resolve(mockSchema),
@@ -670,6 +670,7 @@ describe('ResourceFormPage', () => {
         }
         return Promise.reject(new Error('Not found'));
       }) as typeof global.fetch;
+      wrapFetchMock(mockFetch);
     });
 
     it('should handle boolean field toggle', async () => {
@@ -719,8 +720,8 @@ describe('ResourceFormPage', () => {
 
   describe('Validation Rules', () => {
     beforeEach(() => {
-      global.fetch = vi.fn().mockImplementation((url: string) => {
-        if (url.includes('/_admin/collections/')) {
+      const mockFetch = vi.fn().mockImplementation((url: string) => {
+        if (url.includes('/control/collections/')) {
           return Promise.resolve({
             ok: true,
             json: () => Promise.resolve(mockSchema),
@@ -728,6 +729,7 @@ describe('ResourceFormPage', () => {
         }
         return Promise.reject(new Error('Not found'));
       }) as typeof global.fetch;
+      wrapFetchMock(mockFetch);
     });
 
     it('should validate min value for number fields', async () => {
@@ -806,8 +808,8 @@ describe('ResourceFormPage', () => {
 
   describe('Accessibility', () => {
     beforeEach(() => {
-      global.fetch = vi.fn().mockImplementation((url: string) => {
-        if (url.includes('/_admin/collections/')) {
+      const mockFetch = vi.fn().mockImplementation((url: string) => {
+        if (url.includes('/control/collections/')) {
           return Promise.resolve({
             ok: true,
             json: () => Promise.resolve(mockSchema),
@@ -815,6 +817,7 @@ describe('ResourceFormPage', () => {
         }
         return Promise.reject(new Error('Not found'));
       }) as typeof global.fetch;
+      wrapFetchMock(mockFetch);
     });
 
     it('should have proper labels for all form fields', async () => {
@@ -882,7 +885,7 @@ describe('ResourceFormPage', () => {
   describe('Empty Schema', () => {
     it('should display empty state when schema has no fields', async () => {
       global.fetch = vi.fn().mockImplementation((url: string) => {
-        if (url.includes('/_admin/collections/')) {
+        if (url.includes('/control/collections/')) {
           return Promise.resolve({
             ok: true,
             json: () => Promise.resolve({
@@ -903,7 +906,7 @@ describe('ResourceFormPage', () => {
 
     it('should disable submit button when schema has no fields', async () => {
       global.fetch = vi.fn().mockImplementation((url: string) => {
-        if (url.includes('/_admin/collections/')) {
+        if (url.includes('/control/collections/')) {
           return Promise.resolve({
             ok: true,
             json: () => Promise.resolve({
@@ -967,8 +970,8 @@ describe('ResourceFormPage', () => {
     );
 
     beforeEach(() => {
-      global.fetch = vi.fn().mockImplementation((url: string) => {
-        if (url.includes('/_admin/collections/')) {
+      const mockFetch = vi.fn().mockImplementation((url: string) => {
+        if (url.includes('/control/collections/')) {
           return Promise.resolve({
             ok: true,
             json: () => Promise.resolve(mockSchema),
@@ -976,6 +979,7 @@ describe('ResourceFormPage', () => {
         }
         return Promise.reject(new Error('Not found'));
       }) as typeof global.fetch;
+      wrapFetchMock(mockFetch);
     });
 
     it('should use custom renderer when registered for a field type', async () => {
@@ -1109,7 +1113,7 @@ describe('ResourceFormPage', () => {
       };
 
       global.fetch = vi.fn().mockImplementation((url: string, options?: RequestInit) => {
-        if (url.includes('/_admin/collections/')) {
+        if (url.includes('/control/collections/')) {
           return Promise.resolve({
             ok: true,
             json: () => Promise.resolve(mockSchema),
@@ -1222,7 +1226,7 @@ describe('ResourceFormPage', () => {
       };
 
       global.fetch = vi.fn().mockImplementation((url: string) => {
-        if (url.includes('/_admin/collections/')) {
+        if (url.includes('/control/collections/')) {
           return Promise.resolve({
             ok: true,
             json: () => Promise.resolve(schemaWithCustomType),

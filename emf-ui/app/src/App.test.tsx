@@ -223,9 +223,7 @@ vi.mock('./components/ProtectedRoute', () => ({
 vi.mock('./pages', () => ({
   DashboardPage: () => <div data-testid="dashboard-page">Dashboard Page</div>,
   CollectionsPage: () => <div data-testid="collections-page">Collections Page</div>,
-  CollectionDetailPage: () => (
-    <div data-testid="collection-detail-page">Collection Detail Page</div>
-  ),
+  CollectionDetailPage: () => <div data-testid="collection-detail-page">Collection Detail Page</div>,
   CollectionFormPage: () => <div data-testid="collection-form-page">Collection Form Page</div>,
   RolesPage: () => <div data-testid="roles-page">Roles Page</div>,
   PoliciesPage: () => <div data-testid="policies-page">Policies Page</div>,

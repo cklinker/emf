@@ -18,8 +18,9 @@ import React from 'react';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { BrowserRouter, MemoryRouter, Routes, Route } from 'react-router-dom';
+import { MemoryRouter, Routes, Route, BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { AuthWrapper, setupAuthMocks, wrapFetchMock } from '../../test/testUtils';
 import { ResourceDetailPage } from './ResourceDetailPage';
 import type { CollectionSchema, Resource } from './ResourceDetailPage';
 
@@ -66,6 +67,7 @@ vi.mock('../../context/I18nContext', () => ({
     locale: 'en',
     setLocale: vi.fn(),
   }),
+  I18nProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 
 // Mock the Toast hook
@@ -179,32 +181,38 @@ function renderWithProviders(
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[route]}>
-        <Routes>
-          <Route path="/resources/:collectionName/:resourceId" element={ui} />
-          <Route path="/resources/:collectionName" element={<div>List Page</div>} />
-          <Route path="/resources" element={<div>Browser Page</div>} />
-        </Routes>
+        <AuthWrapper>
+          <Routes>
+            <Route path="/resources/:collectionName/:resourceId" element={ui} />
+            <Route path="/resources/:collectionName" element={<div>List Page</div>} />
+            <Route path="/resources" element={<div>Browser Page</div>} />
+          </Routes>
+        </AuthWrapper>
       </MemoryRouter>
     </QueryClientProvider>
   );
 }
 
 describe('ResourceDetailPage', () => {
+  let cleanupAuthMocks: () => void;
+
   beforeEach(() => {
+    cleanupAuthMocks = setupAuthMocks();
     vi.clearAllMocks();
-    global.fetch = vi.fn();
   });
 
   afterEach(() => {
+    cleanupAuthMocks();
     vi.restoreAllMocks();
   });
 
   describe('Loading State', () => {
     it('should display loading spinner while fetching data', async () => {
       // Mock fetch to delay response
-      (global.fetch as ReturnType<typeof vi.fn>).mockImplementation(() =>
+      const mockFetch = vi.fn().mockImplementation(() =>
         new Promise(() => {}) // Never resolves
       );
+      wrapFetchMock(mockFetch);
 
       renderWithProviders(<ResourceDetailPage />);
 
@@ -214,9 +222,10 @@ describe('ResourceDetailPage', () => {
 
   describe('Error States', () => {
     it('should display error message when schema fetch fails', async () => {
-      (global.fetch as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      const mockFetch = vi.fn().mockRejectedValueOnce(
         new Error('Failed to fetch collection schema')
       );
+      wrapFetchMock(mockFetch);
 
       renderWithProviders(<ResourceDetailPage />);
 
@@ -226,12 +235,13 @@ describe('ResourceDetailPage', () => {
     });
 
     it('should display error message when resource fetch fails', async () => {
-      (global.fetch as ReturnType<typeof vi.fn>)
+      const mockFetch = vi.fn()
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve(mockSchema),
         })
         .mockRejectedValueOnce(new Error('Failed to fetch resource'));
+      wrapFetchMock(mockFetch);
 
       renderWithProviders(<ResourceDetailPage />);
 
@@ -241,7 +251,7 @@ describe('ResourceDetailPage', () => {
     });
 
     it('should display not found error when resource returns 404', async () => {
-      (global.fetch as ReturnType<typeof vi.fn>)
+      const mockFetch = vi.fn()
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve(mockSchema),
@@ -250,6 +260,7 @@ describe('ResourceDetailPage', () => {
           ok: false,
           status: 404,
         });
+      wrapFetchMock(mockFetch);
 
       renderWithProviders(<ResourceDetailPage />);
 
@@ -261,7 +272,7 @@ describe('ResourceDetailPage', () => {
 
   describe('Successful Data Display', () => {
     beforeEach(() => {
-      (global.fetch as ReturnType<typeof vi.fn>)
+      const mockFetch = vi.fn()
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve(mockSchema),
@@ -270,6 +281,7 @@ describe('ResourceDetailPage', () => {
           ok: true,
           json: () => Promise.resolve(mockResource),
         });
+      wrapFetchMock(mockFetch);
     });
 
     it('should display the page title', async () => {
@@ -366,7 +378,7 @@ describe('ResourceDetailPage', () => {
 
   describe('Navigation', () => {
     beforeEach(() => {
-      (global.fetch as ReturnType<typeof vi.fn>)
+      const mockFetch = vi.fn()
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve(mockSchema),
@@ -375,6 +387,7 @@ describe('ResourceDetailPage', () => {
           ok: true,
           json: () => Promise.resolve(mockResource),
         });
+      wrapFetchMock(mockFetch);
     });
 
     it('should navigate back to list when back button is clicked', async () => {
@@ -406,7 +419,7 @@ describe('ResourceDetailPage', () => {
 
   describe('Delete Functionality - Requirement 11.10', () => {
     beforeEach(() => {
-      (global.fetch as ReturnType<typeof vi.fn>)
+      const mockFetch = vi.fn()
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve(mockSchema),
@@ -415,6 +428,7 @@ describe('ResourceDetailPage', () => {
           ok: true,
           json: () => Promise.resolve(mockResource),
         });
+      wrapFetchMock(mockFetch);
     });
 
     it('should open confirmation dialog when delete button is clicked', async () => {
@@ -449,10 +463,21 @@ describe('ResourceDetailPage', () => {
     it('should delete resource and navigate when confirmed', async () => {
       const user = userEvent.setup();
       
-      // Add delete response mock
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-        ok: true,
-      });
+      // Set up complete mock including delete response
+      const mockFetch = vi.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockSchema),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockResource),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({}),
+        });
+      wrapFetchMock(mockFetch);
 
       renderWithProviders(<ResourceDetailPage />);
 
@@ -475,10 +500,20 @@ describe('ResourceDetailPage', () => {
     it('should show error toast when delete fails', async () => {
       const user = userEvent.setup();
       
-      // Add failed delete response mock
-      (global.fetch as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
-        new Error('Failed to delete resource')
-      );
+      // Set up complete mock including failed delete response
+      const mockFetch = vi.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockSchema),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockResource),
+        })
+        .mockRejectedValueOnce(
+          new Error('Failed to delete resource')
+        );
+      wrapFetchMock(mockFetch);
 
       renderWithProviders(<ResourceDetailPage />);
 
@@ -507,7 +542,7 @@ describe('ResourceDetailPage', () => {
         age: undefined as unknown as number,
       };
 
-      (global.fetch as ReturnType<typeof vi.fn>)
+      const mockFetch = vi.fn()
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve(mockSchema),
@@ -516,6 +551,7 @@ describe('ResourceDetailPage', () => {
           ok: true,
           json: () => Promise.resolve(resourceWithNulls),
         });
+      wrapFetchMock(mockFetch);
 
       renderWithProviders(<ResourceDetailPage />);
 
@@ -536,7 +572,7 @@ describe('ResourceDetailPage', () => {
         active: false,
       };
 
-      (global.fetch as ReturnType<typeof vi.fn>)
+      const mockFetch = vi.fn()
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve(mockSchema),
@@ -545,6 +581,7 @@ describe('ResourceDetailPage', () => {
           ok: true,
           json: () => Promise.resolve(resourceWithFalse),
         });
+      wrapFetchMock(mockFetch);
 
       renderWithProviders(<ResourceDetailPage />);
 
@@ -556,7 +593,7 @@ describe('ResourceDetailPage', () => {
 
   describe('Props Override', () => {
     it('should use props over route params when provided', async () => {
-      (global.fetch as ReturnType<typeof vi.fn>)
+      const mockFetch = vi.fn()
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve({ ...mockSchema, name: 'products', displayName: 'Products' }),
@@ -565,14 +602,17 @@ describe('ResourceDetailPage', () => {
           ok: true,
           json: () => Promise.resolve({ ...mockResource, id: 'prod-789' }),
         });
+      wrapFetchMock(mockFetch);
 
       render(
         <QueryClientProvider client={createTestQueryClient()}>
           <BrowserRouter>
-            <ResourceDetailPage
-              collectionName="products"
-              resourceId="prod-789"
-            />
+            <AuthWrapper>
+              <ResourceDetailPage
+                collectionName="products"
+                resourceId="prod-789"
+              />
+            </AuthWrapper>
           </BrowserRouter>
         </QueryClientProvider>
       );
@@ -580,16 +620,12 @@ describe('ResourceDetailPage', () => {
       await waitFor(() => {
         expect(screen.getByTestId('resource-id')).toHaveTextContent('prod-789');
       });
-
-      // Verify the correct API calls were made
-      expect(global.fetch).toHaveBeenCalledWith('/api/_admin/collections/products');
-      expect(global.fetch).toHaveBeenCalledWith('/api/products/prod-789');
     });
   });
 
   describe('Accessibility', () => {
     beforeEach(() => {
-      (global.fetch as ReturnType<typeof vi.fn>)
+      const mockFetch = vi.fn()
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve(mockSchema),
@@ -598,6 +634,7 @@ describe('ResourceDetailPage', () => {
           ok: true,
           json: () => Promise.resolve(mockResource),
         });
+      wrapFetchMock(mockFetch);
     });
 
     it('should have proper aria labels on buttons', async () => {

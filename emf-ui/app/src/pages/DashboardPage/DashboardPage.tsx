@@ -523,7 +523,7 @@ export function DashboardPage({ testId = 'dashboard-page' }: DashboardPageProps)
     refetch,
   } = useQuery({
     queryKey: ['dashboard', timeRange],
-    queryFn: () => apiClient.get<DashboardData>(`/api/_admin/dashboard?timeRange=${timeRange}`),
+    queryFn: () => apiClient.get<DashboardData>(`/control/dashboard?timeRange=${timeRange}`),
     refetchInterval: refreshIntervalMs,
   });
 

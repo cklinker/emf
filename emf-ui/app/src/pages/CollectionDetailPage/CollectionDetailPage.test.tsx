@@ -28,6 +28,9 @@ import { setupServer } from 'msw/node';
 import { CollectionDetailPage } from './CollectionDetailPage';
 import { I18nProvider } from '../../context/I18nContext';
 import { ToastProvider } from '../../components/Toast';
+import { AuthProvider } from '../../context/AuthContext';
+import { ApiProvider } from '../../context/ApiContext';
+import { PluginProvider } from '../../context/PluginContext';
 import type { Collection, CollectionVersion } from '../../types/collections';
 
 // Mock navigate function
@@ -103,9 +106,55 @@ const mockVersions: CollectionVersion[] = [
 ];
 
 // Setup MSW server for this test file
-const server = setupServer();
+const server = setupServer(
+  // Add bootstrap config handler
+  http.get('/ui/config/bootstrap', () => {
+    return HttpResponse.json({
+      oidcProviders: [
+        {
+          id: 'test-provider',
+          name: 'Test Provider',
+          issuer: 'https://test.example.com',
+          clientId: 'test-client-id',
+        },
+      ],
+    });
+  })
+);
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+beforeAll(() => {
+  server.listen({ onUnhandledRequest: 'bypass' });
+  
+  // Mock sessionStorage for auth
+  const mockSessionStorage: Record<string, string> = {
+    emf_auth_tokens: JSON.stringify({
+      accessToken: 'mock-access-token',
+      idToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0LXVzZXIiLCJlbWFpbCI6InRlc3RAdGVzdC5jb20iLCJuYW1lIjoiVGVzdCBVc2VyIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c',
+      refreshToken: 'mock-refresh-token',
+      expiresAt: Date.now() + 3600000,
+    }),
+  };
+
+  Object.defineProperty(window, 'sessionStorage', {
+    value: {
+      getItem: (key: string) => mockSessionStorage[key] || null,
+      setItem: (key: string, value: string) => {
+        mockSessionStorage[key] = value;
+      },
+      removeItem: (key: string) => {
+        delete mockSessionStorage[key];
+      },
+      clear: () => {
+        Object.keys(mockSessionStorage).forEach((key) => delete mockSessionStorage[key]);
+      },
+      get length() {
+        return Object.keys(mockSessionStorage).length;
+      },
+      key: (index: number) => Object.keys(mockSessionStorage)[index] || null,
+    },
+    writable: true,
+  });
+});
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 
@@ -130,14 +179,20 @@ function TestWrapper({ children, initialEntries = ['/collections/users'] }: {
   return (
     <QueryClientProvider client={queryClient}>
       <I18nProvider>
-        <ToastProvider>
-          <MemoryRouter initialEntries={initialEntries}>
-            <Routes>
-              <Route path="/collections/:collectionId" element={children} />
-              <Route path="/collections" element={<div>Collections List</div>} />
-            </Routes>
-          </MemoryRouter>
-        </ToastProvider>
+        <AuthProvider>
+          <ApiProvider>
+            <PluginProvider>
+              <ToastProvider>
+                <MemoryRouter initialEntries={initialEntries}>
+                  <Routes>
+                    <Route path="/collections/:id" element={children} />
+                    <Route path="/collections" element={<div>Collections List</div>} />
+                  </Routes>
+                </MemoryRouter>
+              </ToastProvider>
+            </PluginProvider>
+          </ApiProvider>
+        </AuthProvider>
       </I18nProvider>
     </QueryClientProvider>
   );
@@ -146,7 +201,7 @@ function TestWrapper({ children, initialEntries = ['/collections/users'] }: {
 // Helper to setup MSW handlers for collection data
 function setupCollectionHandlers(collection: Collection = mockCollection) {
   server.use(
-    http.get('/api/_admin/collections/:collectionId', () => {
+    http.get('/control/collections/:collectionId', () => {
       return HttpResponse.json(collection);
     })
   );
@@ -155,7 +210,7 @@ function setupCollectionHandlers(collection: Collection = mockCollection) {
 // Helper to setup MSW handlers for versions
 function setupVersionsHandlers(versions: CollectionVersion[] = mockVersions) {
   server.use(
-    http.get('/api/_admin/collections/:collectionId/versions', () => {
+    http.get('/control/collections/:collectionId/versions', () => {
       return HttpResponse.json(versions);
     })
   );
@@ -174,7 +229,7 @@ describe('CollectionDetailPage', () => {
     it('should display loading spinner while fetching collection', async () => {
       // Setup a delayed response
       server.use(
-        http.get('/api/_admin/collections/:collectionId', async () => {
+        http.get('/control/collections/:collectionId', async () => {
           await new Promise((resolve) => setTimeout(resolve, 100));
           return HttpResponse.json(mockCollection);
         })
@@ -194,7 +249,7 @@ describe('CollectionDetailPage', () => {
   describe('Error State', () => {
     it('should display error message when fetch fails', async () => {
       server.use(
-        http.get('/api/_admin/collections/:collectionId', () => {
+        http.get('/control/collections/:collectionId', () => {
           return new HttpResponse(null, { status: 500 });
         })
       );
@@ -212,7 +267,7 @@ describe('CollectionDetailPage', () => {
 
     it('should display not found error for 404 response', async () => {
       server.use(
-        http.get('/api/_admin/collections/:collectionId', () => {
+        http.get('/control/collections/:collectionId', () => {
           return new HttpResponse(null, { status: 404 });
         })
       );
@@ -231,7 +286,7 @@ describe('CollectionDetailPage', () => {
     it('should allow retry on error', async () => {
       let callCount = 0;
       server.use(
-        http.get('/api/_admin/collections/:collectionId', () => {
+        http.get('/control/collections/:collectionId', () => {
           callCount++;
           if (callCount === 1) {
             return new HttpResponse(null, { status: 500 });
@@ -771,10 +826,11 @@ describe('CollectionDetailPage', () => {
     });
 
     it('should call delete API and navigate when confirmed', async () => {
-      // Setup delete handler
+      // Setup handlers for collection load and delete
+      setupCollectionHandlers();
       server.use(
-        http.delete('/api/_admin/collections/:collectionId', () => {
-          return new HttpResponse(null, { status: 200 });
+        http.delete('/control/collections/:id', () => {
+          return HttpResponse.json({});
         })
       );
       
@@ -841,7 +897,14 @@ describe('CollectionDetailPage', () => {
       expect(mockNavigate).toHaveBeenCalledWith('/collections');
     });
 
-    it('should navigate to add field page when add field button is clicked', async () => {
+    it('should open field editor modal when add field button is clicked', async () => {
+      // Setup handler for collections list (needed by field editor)
+      server.use(
+        http.get('/control/collections', () => {
+          return HttpResponse.json({ content: [] });
+        })
+      );
+      
       const user = userEvent.setup();
       
       render(
@@ -856,10 +919,20 @@ describe('CollectionDetailPage', () => {
 
       await user.click(screen.getByTestId('add-field-button'));
 
-      expect(mockNavigate).toHaveBeenCalledWith('/collections/users/fields/new');
+      // Field editor modal should open
+      await waitFor(() => {
+        expect(screen.getByTestId('field-editor')).toBeInTheDocument();
+      });
     });
 
-    it('should navigate to edit field page when edit field button is clicked', async () => {
+    it('should open field editor modal when edit field button is clicked', async () => {
+      // Setup handler for collections list (needed by field editor)
+      server.use(
+        http.get('/control/collections', () => {
+          return HttpResponse.json({ content: [] });
+        })
+      );
+      
       const user = userEvent.setup();
       
       render(
@@ -874,7 +947,10 @@ describe('CollectionDetailPage', () => {
 
       await user.click(screen.getByTestId('edit-field-button-0'));
 
-      expect(mockNavigate).toHaveBeenCalledWith('/collections/users/fields/field-1/edit');
+      // Field editor modal should open with field data
+      await waitFor(() => {
+        expect(screen.getByTestId('field-editor')).toBeInTheDocument();
+      });
     });
   });
 

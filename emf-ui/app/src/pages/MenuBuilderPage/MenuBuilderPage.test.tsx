@@ -28,12 +28,9 @@ import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { BrowserRouter } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { createTestWrapper, setupAuthMocks, wrapFetchMock } from '../../test/testUtils';
 import { MenuBuilderPage } from './MenuBuilderPage';
 import type { UIMenu } from './MenuBuilderPage';
-import { I18nProvider } from '../../context/I18nContext';
-import { ToastProvider } from '../../components/Toast';
 
 // Mock menus data
 const mockMenus: UIMenu[] = [
@@ -127,37 +124,17 @@ function createMockResponse(data: unknown, ok = true, status = 200): Response {
 
 global.fetch = mockFetch;
 
-/**
- * Create a wrapper component with all required providers
- */
-function createWrapper() {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: false,
-      },
-    },
-  });
-
-  return function Wrapper({ children }: { children: React.ReactNode }) {
-    return (
-      <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
-          <I18nProvider>
-            <ToastProvider>{children}</ToastProvider>
-          </I18nProvider>
-        </BrowserRouter>
-      </QueryClientProvider>
-    );
-  };
-}
-
 describe('MenuBuilderPage', () => {
+  let cleanupAuthMocks: () => void;
+
   beforeEach(() => {
+    cleanupAuthMocks = setupAuthMocks();
     mockFetch.mockReset();
+    wrapFetchMock(mockFetch);
   });
 
   afterEach(() => {
+    cleanupAuthMocks();
     vi.clearAllMocks();
   });
 
@@ -173,7 +150,7 @@ describe('MenuBuilderPage', () => {
           )
       );
 
-      render(<MenuBuilderPage />, { wrapper: createWrapper() });
+      render(<MenuBuilderPage />, { wrapper: createTestWrapper() });
 
       expect(screen.getByRole('status')).toBeInTheDocument();
     });
@@ -183,17 +160,17 @@ describe('MenuBuilderPage', () => {
     it('should display error message when fetch fails', async () => {
       mockFetch.mockResolvedValue(createMockResponse(null, false, 500));
 
-      render(<MenuBuilderPage />, { wrapper: createWrapper() });
+      render(<MenuBuilderPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
-        expect(screen.getByText(/failed to fetch menus/i)).toBeInTheDocument();
+        expect(screen.getByText(/API request failed/i)).toBeInTheDocument();
       });
     });
 
     it('should display retry button on error', async () => {
       mockFetch.mockResolvedValue(createMockResponse(null, false, 500));
 
-      render(<MenuBuilderPage />, { wrapper: createWrapper() });
+      render(<MenuBuilderPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
@@ -206,7 +183,7 @@ describe('MenuBuilderPage', () => {
         .mockResolvedValueOnce(createMockResponse(mockMenus));
 
       const user = userEvent.setup();
-      render(<MenuBuilderPage />, { wrapper: createWrapper() });
+      render(<MenuBuilderPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
@@ -227,7 +204,7 @@ describe('MenuBuilderPage', () => {
     });
 
     it('should display all menus in the table', async () => {
-      render(<MenuBuilderPage />, { wrapper: createWrapper() });
+      render(<MenuBuilderPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('main_navigation')).toBeInTheDocument();
@@ -236,7 +213,7 @@ describe('MenuBuilderPage', () => {
     });
 
     it('should display menu item counts', async () => {
-      render(<MenuBuilderPage />, { wrapper: createWrapper() });
+      render(<MenuBuilderPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('2 items')).toBeInTheDocument();
@@ -245,7 +222,7 @@ describe('MenuBuilderPage', () => {
     });
 
     it('should display page title', async () => {
-      render(<MenuBuilderPage />, { wrapper: createWrapper() });
+      render(<MenuBuilderPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByRole('heading', { name: /menu builder/i })).toBeInTheDocument();
@@ -253,7 +230,7 @@ describe('MenuBuilderPage', () => {
     });
 
     it('should display create menu button', async () => {
-      render(<MenuBuilderPage />, { wrapper: createWrapper() });
+      render(<MenuBuilderPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('create-menu-button')).toBeInTheDocument();
@@ -265,7 +242,7 @@ describe('MenuBuilderPage', () => {
     it('should display empty state when no menus exist', async () => {
       mockFetch.mockResolvedValue(createMockResponse([]));
 
-      render(<MenuBuilderPage />, { wrapper: createWrapper() });
+      render(<MenuBuilderPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('empty-state')).toBeInTheDocument();
@@ -280,7 +257,7 @@ describe('MenuBuilderPage', () => {
 
     it('should open create form when clicking create button', async () => {
       const user = userEvent.setup();
-      render(<MenuBuilderPage />, { wrapper: createWrapper() });
+      render(<MenuBuilderPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('main_navigation')).toBeInTheDocument();
@@ -296,7 +273,7 @@ describe('MenuBuilderPage', () => {
 
     it('should close form when clicking cancel', async () => {
       const user = userEvent.setup();
-      render(<MenuBuilderPage />, { wrapper: createWrapper() });
+      render(<MenuBuilderPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('main_navigation')).toBeInTheDocument();
@@ -317,7 +294,7 @@ describe('MenuBuilderPage', () => {
 
     it('should close form when clicking close button', async () => {
       const user = userEvent.setup();
-      render(<MenuBuilderPage />, { wrapper: createWrapper() });
+      render(<MenuBuilderPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('main_navigation')).toBeInTheDocument();
@@ -338,7 +315,7 @@ describe('MenuBuilderPage', () => {
 
     it('should close form when pressing Escape', async () => {
       const user = userEvent.setup();
-      render(<MenuBuilderPage />, { wrapper: createWrapper() });
+      render(<MenuBuilderPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('main_navigation')).toBeInTheDocument();
@@ -359,7 +336,7 @@ describe('MenuBuilderPage', () => {
 
     it('should show validation error for empty name', async () => {
       const user = userEvent.setup();
-      render(<MenuBuilderPage />, { wrapper: createWrapper() });
+      render(<MenuBuilderPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('main_navigation')).toBeInTheDocument();
@@ -391,10 +368,9 @@ describe('MenuBuilderPage', () => {
       mockFetch
         .mockResolvedValueOnce(createMockResponse(mockMenus)) // Initial fetch
         .mockResolvedValueOnce(createMockResponse(newMenu)) // Create
-        .mockResolvedValueOnce(createMockResponse(newMenu)) // Fetch new menu for editor
-        .mockResolvedValueOnce(createMockResponse([...mockMenus, newMenu])); // Refetch
+        .mockResolvedValue(createMockResponse([...mockMenus, newMenu])); // All subsequent fetches
 
-      render(<MenuBuilderPage />, { wrapper: createWrapper() });
+      render(<MenuBuilderPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('main_navigation')).toBeInTheDocument();
@@ -423,7 +399,7 @@ describe('MenuBuilderPage', () => {
 
     it('should open delete confirmation dialog when clicking delete', async () => {
       const user = userEvent.setup();
-      render(<MenuBuilderPage />, { wrapper: createWrapper() });
+      render(<MenuBuilderPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('main_navigation')).toBeInTheDocument();
@@ -439,7 +415,7 @@ describe('MenuBuilderPage', () => {
 
     it('should close delete dialog when clicking cancel', async () => {
       const user = userEvent.setup();
-      render(<MenuBuilderPage />, { wrapper: createWrapper() });
+      render(<MenuBuilderPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('main_navigation')).toBeInTheDocument();
@@ -466,7 +442,7 @@ describe('MenuBuilderPage', () => {
         .mockResolvedValueOnce(createMockResponse(null)) // Delete
         .mockResolvedValueOnce(createMockResponse(mockMenus.slice(1))); // Refetch
 
-      render(<MenuBuilderPage />, { wrapper: createWrapper() });
+      render(<MenuBuilderPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('main_navigation')).toBeInTheDocument();
@@ -490,10 +466,10 @@ describe('MenuBuilderPage', () => {
     beforeEach(() => {
       mockFetch.mockImplementation((url: string | URL | Request) => {
         const urlStr = typeof url === 'string' ? url : url.toString();
-        if (urlStr.includes('/api/_admin/authz/policies')) {
-          return Promise.resolve(createMockResponse(mockPolicies));
+        if (urlStr.includes('/control/authz/policies')) {
+          return Promise.resolve(createMockResponse({ content: mockPolicies, totalElements: mockPolicies.length, totalPages: 1, size: 1000, number: 0 }));
         }
-        if (urlStr.includes('/api/_admin/ui/menus/1') && !urlStr.endsWith('/menus')) {
+        if (urlStr.includes('/control/ui/menus/1') && !urlStr.endsWith('/menus')) {
           return Promise.resolve(createMockResponse(mockMenus[0]));
         }
         return Promise.resolve(createMockResponse(mockMenus));
@@ -502,7 +478,7 @@ describe('MenuBuilderPage', () => {
 
     it('should open editor when clicking on menu name', async () => {
       const user = userEvent.setup();
-      render(<MenuBuilderPage />, { wrapper: createWrapper() });
+      render(<MenuBuilderPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('main_navigation')).toBeInTheDocument();
@@ -518,7 +494,7 @@ describe('MenuBuilderPage', () => {
 
     it('should display back button in editor', async () => {
       const user = userEvent.setup();
-      render(<MenuBuilderPage />, { wrapper: createWrapper() });
+      render(<MenuBuilderPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('main_navigation')).toBeInTheDocument();
@@ -533,7 +509,7 @@ describe('MenuBuilderPage', () => {
 
     it('should return to list when clicking back button', async () => {
       const user = userEvent.setup();
-      render(<MenuBuilderPage />, { wrapper: createWrapper() });
+      render(<MenuBuilderPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('main_navigation')).toBeInTheDocument();
@@ -558,10 +534,10 @@ describe('MenuBuilderPage', () => {
     beforeEach(() => {
       mockFetch.mockImplementation((url: string | URL | Request) => {
         const urlStr = typeof url === 'string' ? url : url.toString();
-        if (urlStr.includes('/api/_admin/authz/policies')) {
-          return Promise.resolve(createMockResponse(mockPolicies));
+        if (urlStr.includes('/control/authz/policies')) {
+          return Promise.resolve(createMockResponse({ content: mockPolicies, totalElements: mockPolicies.length, totalPages: 1, size: 1000, number: 0 }));
         }
-        if (urlStr.includes('/api/_admin/ui/menus/1') && !urlStr.endsWith('/menus')) {
+        if (urlStr.includes('/control/ui/menus/1') && !urlStr.endsWith('/menus')) {
           return Promise.resolve(createMockResponse(mockMenus[0]));
         }
         return Promise.resolve(createMockResponse(mockMenus));
@@ -571,7 +547,7 @@ describe('MenuBuilderPage', () => {
     it('should display add item button in editor', async () => {
       
       const user = userEvent.setup();
-      render(<MenuBuilderPage />, { wrapper: createWrapper() });
+      render(<MenuBuilderPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('main_navigation')).toBeInTheDocument();
@@ -587,7 +563,7 @@ describe('MenuBuilderPage', () => {
     it('should display tree view or empty state in editor', async () => {
       
       const user = userEvent.setup();
-      render(<MenuBuilderPage />, { wrapper: createWrapper() });
+      render(<MenuBuilderPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('main_navigation')).toBeInTheDocument();
@@ -606,7 +582,7 @@ describe('MenuBuilderPage', () => {
     it('should display preview panel in editor', async () => {
       
       const user = userEvent.setup();
-      render(<MenuBuilderPage />, { wrapper: createWrapper() });
+      render(<MenuBuilderPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('main_navigation')).toBeInTheDocument();
@@ -624,10 +600,10 @@ describe('MenuBuilderPage', () => {
     beforeEach(() => {
       mockFetch.mockImplementation((url: string | URL | Request) => {
         const urlStr = typeof url === 'string' ? url : url.toString();
-        if (urlStr.includes('/api/_admin/authz/policies')) {
-          return Promise.resolve(createMockResponse(mockPolicies));
+        if (urlStr.includes('/control/authz/policies')) {
+          return Promise.resolve(createMockResponse({ content: mockPolicies, totalElements: mockPolicies.length, totalPages: 1, size: 1000, number: 0 }));
         }
-        if (urlStr.includes('/api/_admin/ui/menus/1') && !urlStr.endsWith('/menus')) {
+        if (urlStr.includes('/control/ui/menus/1') && !urlStr.endsWith('/menus')) {
           return Promise.resolve(createMockResponse(mockMenus[0]));
         }
         return Promise.resolve(createMockResponse(mockMenus));
@@ -637,7 +613,7 @@ describe('MenuBuilderPage', () => {
     it('should open add item form when clicking add item button', async () => {
       
       const user = userEvent.setup();
-      render(<MenuBuilderPage />, { wrapper: createWrapper() });
+      render(<MenuBuilderPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('main_navigation')).toBeInTheDocument();
@@ -660,7 +636,7 @@ describe('MenuBuilderPage', () => {
     it('should show validation error for empty label', async () => {
       
       const user = userEvent.setup();
-      render(<MenuBuilderPage />, { wrapper: createWrapper() });
+      render(<MenuBuilderPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('main_navigation')).toBeInTheDocument();
@@ -688,7 +664,7 @@ describe('MenuBuilderPage', () => {
     it('should add new item when form is submitted with valid data', async () => {
       
       const user = userEvent.setup();
-      render(<MenuBuilderPage />, { wrapper: createWrapper() });
+      render(<MenuBuilderPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('main_navigation')).toBeInTheDocument();
@@ -727,10 +703,10 @@ describe('MenuBuilderPage', () => {
     beforeEach(() => {
       mockFetch.mockImplementation((url: string | URL | Request) => {
         const urlStr = typeof url === 'string' ? url : url.toString();
-        if (urlStr.includes('/api/_admin/authz/policies')) {
-          return Promise.resolve(createMockResponse(mockPolicies));
+        if (urlStr.includes('/control/authz/policies')) {
+          return Promise.resolve(createMockResponse({ content: mockPolicies, totalElements: mockPolicies.length, totalPages: 1, size: 1000, number: 0 }));
         }
-        if (urlStr.includes('/api/_admin/ui/menus/1') && !urlStr.endsWith('/menus')) {
+        if (urlStr.includes('/control/ui/menus/1') && !urlStr.endsWith('/menus')) {
           return Promise.resolve(createMockResponse(mockMenus[0]));
         }
         return Promise.resolve(createMockResponse(mockMenus));
@@ -740,7 +716,7 @@ describe('MenuBuilderPage', () => {
     it('should display menu preview panel', async () => {
       
       const user = userEvent.setup();
-      render(<MenuBuilderPage />, { wrapper: createWrapper() });
+      render(<MenuBuilderPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('main_navigation')).toBeInTheDocument();
@@ -756,7 +732,7 @@ describe('MenuBuilderPage', () => {
     it('should display preview title', async () => {
       
       const user = userEvent.setup();
-      render(<MenuBuilderPage />, { wrapper: createWrapper() });
+      render(<MenuBuilderPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('main_navigation')).toBeInTheDocument();
@@ -775,10 +751,10 @@ describe('MenuBuilderPage', () => {
     beforeEach(() => {
       mockFetch.mockImplementation((url: string | URL | Request) => {
         const urlStr = typeof url === 'string' ? url : url.toString();
-        if (urlStr.includes('/api/_admin/authz/policies')) {
-          return Promise.resolve(createMockResponse(mockPolicies));
+        if (urlStr.includes('/control/authz/policies')) {
+          return Promise.resolve(createMockResponse({ content: mockPolicies, totalElements: mockPolicies.length, totalPages: 1, size: 1000, number: 0 }));
         }
-        if (urlStr.includes('/api/_admin/ui/menus/1') && !urlStr.endsWith('/menus')) {
+        if (urlStr.includes('/control/ui/menus/1') && !urlStr.endsWith('/menus')) {
           return Promise.resolve(createMockResponse(mockMenus[0]));
         }
         return Promise.resolve(createMockResponse(mockMenus));
@@ -788,7 +764,7 @@ describe('MenuBuilderPage', () => {
     it('should disable save button when no changes', async () => {
       
       const user = userEvent.setup();
-      render(<MenuBuilderPage />, { wrapper: createWrapper() });
+      render(<MenuBuilderPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('main_navigation')).toBeInTheDocument();
@@ -804,7 +780,7 @@ describe('MenuBuilderPage', () => {
     it('should enable save button when changes are made', async () => {
       
       const user = userEvent.setup();
-      render(<MenuBuilderPage />, { wrapper: createWrapper() });
+      render(<MenuBuilderPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('main_navigation')).toBeInTheDocument();
@@ -834,20 +810,20 @@ describe('MenuBuilderPage', () => {
     it('should save menu when save button is clicked', async () => {
       mockFetch.mockImplementation((url: string | URL | Request, options?: RequestInit) => {
         const urlStr = typeof url === 'string' ? url : url.toString();
-        if (urlStr.includes('/api/_admin/authz/policies')) {
-          return Promise.resolve(createMockResponse(mockPolicies));
+        if (urlStr.includes('/control/authz/policies')) {
+          return Promise.resolve(createMockResponse({ content: mockPolicies, totalElements: mockPolicies.length, totalPages: 1, size: 1000, number: 0 }));
         }
         if (options?.method === 'PUT') {
           return Promise.resolve(createMockResponse({ ...mockMenus[0], items: [] }));
         }
-        if (urlStr.includes('/api/_admin/ui/menus/1') && !urlStr.endsWith('/menus')) {
+        if (urlStr.includes('/control/ui/menus/1') && !urlStr.endsWith('/menus')) {
           return Promise.resolve(createMockResponse(mockMenus[0]));
         }
         return Promise.resolve(createMockResponse(mockMenus));
       });
 
       const user = userEvent.setup();
-      render(<MenuBuilderPage />, { wrapper: createWrapper() });
+      render(<MenuBuilderPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('main_navigation')).toBeInTheDocument();
@@ -896,11 +872,11 @@ describe('MenuBuilderPage', () => {
         }
         
         // Check for policies endpoint first (more specific)
-        if (urlStr.includes('authz/policies')) {
+        if (urlStr.includes('/control/policies')) {
           return Promise.resolve(createMockResponse(mockPolicies));
         }
         // Check for specific menu by ID
-        if (urlStr.match(/\/api\/_admin\/ui\/menus\/\d+$/)) {
+        if (urlStr.match(/\/ui\/menus\/\d+$/)) {
           return Promise.resolve(createMockResponse(mockMenus[0]));
         }
         // Default to menus list
@@ -910,7 +886,7 @@ describe('MenuBuilderPage', () => {
 
     it('should display policies container in menu item form', async () => {
       const user = userEvent.setup();
-      render(<MenuBuilderPage />, { wrapper: createWrapper() });
+      render(<MenuBuilderPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('main_navigation')).toBeInTheDocument();
@@ -932,7 +908,7 @@ describe('MenuBuilderPage', () => {
 
     it('should display available policies as checkboxes', async () => {
       const user = userEvent.setup();
-      render(<MenuBuilderPage />, { wrapper: createWrapper() });
+      render(<MenuBuilderPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('main_navigation')).toBeInTheDocument();
@@ -961,7 +937,7 @@ describe('MenuBuilderPage', () => {
 
     it('should allow selecting multiple policies', async () => {
       const user = userEvent.setup();
-      render(<MenuBuilderPage />, { wrapper: createWrapper() });
+      render(<MenuBuilderPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('main_navigation')).toBeInTheDocument();
@@ -999,7 +975,7 @@ describe('MenuBuilderPage', () => {
 
     it('should save menu item with selected policies', async () => {
       const user = userEvent.setup();
-      render(<MenuBuilderPage />, { wrapper: createWrapper() });
+      render(<MenuBuilderPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('main_navigation')).toBeInTheDocument();
@@ -1060,11 +1036,11 @@ describe('MenuBuilderPage', () => {
         }
         
         // Check for policies endpoint first - return empty array
-        if (urlStr.includes('authz/policies')) {
+        if (urlStr.includes('/control/policies')) {
           return Promise.resolve(createMockResponse([]));
         }
         // Check for specific menu by ID
-        if (urlStr.match(/\/api\/_admin\/ui\/menus\/\d+$/)) {
+        if (urlStr.match(/\/ui\/menus\/\d+$/)) {
           return Promise.resolve(createMockResponse(mockMenus[0]));
         }
         // Default to menus list
@@ -1072,7 +1048,7 @@ describe('MenuBuilderPage', () => {
       });
 
       const user = userEvent.setup();
-      render(<MenuBuilderPage />, { wrapper: createWrapper() });
+      render(<MenuBuilderPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('main_navigation')).toBeInTheDocument();
@@ -1112,11 +1088,11 @@ describe('MenuBuilderPage', () => {
         }
         
         // Check for policies endpoint first (more specific)
-        if (urlStr.includes('authz/policies')) {
+        if (urlStr.includes('/control/policies')) {
           return Promise.resolve(createMockResponse(mockPolicies));
         }
         // Check for specific menu by ID
-        if (urlStr.match(/\/api\/_admin\/ui\/menus\/\d+$/)) {
+        if (urlStr.match(/\/ui\/menus\/\d+$/)) {
           return Promise.resolve(createMockResponse(mockMenus[0]));
         }
         // Default to menus list
@@ -1126,7 +1102,7 @@ describe('MenuBuilderPage', () => {
 
     it('should display policies in preview for items with policies', async () => {
       const user = userEvent.setup();
-      render(<MenuBuilderPage />, { wrapper: createWrapper() });
+      render(<MenuBuilderPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('main_navigation')).toBeInTheDocument();
@@ -1182,7 +1158,7 @@ describe('MenuBuilderPage', () => {
     });
 
     it('should have accessible table structure', async () => {
-      render(<MenuBuilderPage />, { wrapper: createWrapper() });
+      render(<MenuBuilderPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByRole('grid')).toBeInTheDocument();
@@ -1192,7 +1168,7 @@ describe('MenuBuilderPage', () => {
     });
 
     it('should have accessible buttons with labels', async () => {
-      render(<MenuBuilderPage />, { wrapper: createWrapper() });
+      render(<MenuBuilderPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('create-menu-button')).toHaveAccessibleName();

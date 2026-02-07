@@ -24,12 +24,9 @@ import React from 'react';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { BrowserRouter } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { createTestWrapper, setupAuthMocks, wrapFetchMock } from '../../test/testUtils';
 import { RolesPage } from './RolesPage';
 import type { Role } from './RolesPage';
-import { I18nProvider } from '../../context/I18nContext';
-import { ToastProvider } from '../../components/Toast';
 
 // Mock roles data
 const mockRoles: Role[] = [
@@ -83,34 +80,18 @@ global.fetch = mockFetch;
 /**
  * Create a wrapper component with all required providers
  */
-function createWrapper() {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: false,
-      },
-    },
-  });
-
-  return function Wrapper({ children }: { children: React.ReactNode }) {
-    return (
-      <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
-          <I18nProvider>
-            <ToastProvider>{children}</ToastProvider>
-          </I18nProvider>
-        </BrowserRouter>
-      </QueryClientProvider>
-    );
-  };
-}
 
 describe('RolesPage', () => {
+  let cleanupAuthMocks: () => void;
+
   beforeEach(() => {
+    cleanupAuthMocks = setupAuthMocks();
     mockFetch.mockReset();
+    wrapFetchMock(mockFetch);
   });
 
   afterEach(() => {
+    cleanupAuthMocks();
     vi.clearAllMocks();
   });
 
@@ -127,7 +108,7 @@ describe('RolesPage', () => {
           )
       );
 
-      render(<RolesPage />, { wrapper: createWrapper() });
+      render(<RolesPage />, { wrapper: createTestWrapper() });
 
       // Look for the loading spinner component
       expect(screen.getByRole('status')).toBeInTheDocument();
@@ -138,17 +119,17 @@ describe('RolesPage', () => {
     it('should display error message when fetch fails', async () => {
       mockFetch.mockResolvedValue(createMockResponse(null, false, 500));
 
-      render(<RolesPage />, { wrapper: createWrapper() });
+      render(<RolesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
-        expect(screen.getByText(/failed to fetch roles/i)).toBeInTheDocument();
+        expect(screen.getByText(/API request failed/i)).toBeInTheDocument();
       });
     });
 
     it('should display retry button on error', async () => {
       mockFetch.mockResolvedValue(createMockResponse(null, false, 500));
 
-      render(<RolesPage />, { wrapper: createWrapper() });
+      render(<RolesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
@@ -161,7 +142,7 @@ describe('RolesPage', () => {
         .mockResolvedValueOnce(createMockResponse(mockRoles));
 
       const user = userEvent.setup();
-      render(<RolesPage />, { wrapper: createWrapper() });
+      render(<RolesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
@@ -181,7 +162,7 @@ describe('RolesPage', () => {
     });
 
     it('should display all roles in the table', async () => {
-      render(<RolesPage />, { wrapper: createWrapper() });
+      render(<RolesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('admin')).toBeInTheDocument();
@@ -191,7 +172,7 @@ describe('RolesPage', () => {
     });
 
     it('should display role descriptions', async () => {
-      render(<RolesPage />, { wrapper: createWrapper() });
+      render(<RolesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('Administrator with full access')).toBeInTheDocument();
@@ -200,7 +181,7 @@ describe('RolesPage', () => {
     });
 
     it('should display dash for roles without description', async () => {
-      render(<RolesPage />, { wrapper: createWrapper() });
+      render(<RolesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         // viewer role has no description
@@ -212,7 +193,7 @@ describe('RolesPage', () => {
     });
 
     it('should display page title', async () => {
-      render(<RolesPage />, { wrapper: createWrapper() });
+      render(<RolesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByRole('heading', { name: /roles/i })).toBeInTheDocument();
@@ -220,7 +201,7 @@ describe('RolesPage', () => {
     });
 
     it('should display create role button', async () => {
-      render(<RolesPage />, { wrapper: createWrapper() });
+      render(<RolesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('create-role-button')).toBeInTheDocument();
@@ -232,7 +213,7 @@ describe('RolesPage', () => {
     it('should display empty state when no roles exist', async () => {
       mockFetch.mockResolvedValue(createMockResponse([]));
 
-      render(<RolesPage />, { wrapper: createWrapper() });
+      render(<RolesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('empty-state')).toBeInTheDocument();
@@ -247,7 +228,7 @@ describe('RolesPage', () => {
 
     it('should open create form when clicking create button', async () => {
       const user = userEvent.setup();
-      render(<RolesPage />, { wrapper: createWrapper() });
+      render(<RolesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('admin')).toBeInTheDocument();
@@ -264,7 +245,7 @@ describe('RolesPage', () => {
 
     it('should close form when clicking cancel', async () => {
       const user = userEvent.setup();
-      render(<RolesPage />, { wrapper: createWrapper() });
+      render(<RolesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('admin')).toBeInTheDocument();
@@ -285,7 +266,7 @@ describe('RolesPage', () => {
 
     it('should close form when clicking close button', async () => {
       const user = userEvent.setup();
-      render(<RolesPage />, { wrapper: createWrapper() });
+      render(<RolesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('admin')).toBeInTheDocument();
@@ -306,7 +287,7 @@ describe('RolesPage', () => {
 
     it('should close form when pressing Escape', async () => {
       const user = userEvent.setup();
-      render(<RolesPage />, { wrapper: createWrapper() });
+      render(<RolesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('admin')).toBeInTheDocument();
@@ -339,7 +320,7 @@ describe('RolesPage', () => {
         .mockResolvedValueOnce(createMockResponse(newRole)) // Create
         .mockResolvedValueOnce(createMockResponse([...mockRoles, newRole])); // Refetch
 
-      render(<RolesPage />, { wrapper: createWrapper() });
+      render(<RolesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('admin')).toBeInTheDocument();
@@ -362,7 +343,7 @@ describe('RolesPage', () => {
 
     it('should show validation error for empty name', async () => {
       const user = userEvent.setup();
-      render(<RolesPage />, { wrapper: createWrapper() });
+      render(<RolesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('admin')).toBeInTheDocument();
@@ -384,7 +365,7 @@ describe('RolesPage', () => {
 
     it('should show validation error for invalid name format', async () => {
       const user = userEvent.setup();
-      render(<RolesPage />, { wrapper: createWrapper() });
+      render(<RolesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('admin')).toBeInTheDocument();
@@ -412,7 +393,7 @@ describe('RolesPage', () => {
 
     it('should open edit form with pre-populated values when clicking edit', async () => {
       const user = userEvent.setup();
-      render(<RolesPage />, { wrapper: createWrapper() });
+      render(<RolesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('admin')).toBeInTheDocument();
@@ -440,7 +421,7 @@ describe('RolesPage', () => {
         .mockResolvedValueOnce(createMockResponse(updatedRole)) // Update
         .mockResolvedValueOnce(createMockResponse([updatedRole, ...mockRoles.slice(1)])); // Refetch
 
-      render(<RolesPage />, { wrapper: createWrapper() });
+      render(<RolesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('admin')).toBeInTheDocument();
@@ -469,7 +450,7 @@ describe('RolesPage', () => {
 
     it('should open delete confirmation dialog when clicking delete', async () => {
       const user = userEvent.setup();
-      render(<RolesPage />, { wrapper: createWrapper() });
+      render(<RolesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('admin')).toBeInTheDocument();
@@ -485,7 +466,7 @@ describe('RolesPage', () => {
 
     it('should close delete dialog when clicking cancel', async () => {
       const user = userEvent.setup();
-      render(<RolesPage />, { wrapper: createWrapper() });
+      render(<RolesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('admin')).toBeInTheDocument();
@@ -512,7 +493,7 @@ describe('RolesPage', () => {
         .mockResolvedValueOnce(createMockResponse(null)) // Delete
         .mockResolvedValueOnce(createMockResponse(mockRoles.slice(1))); // Refetch
 
-      render(<RolesPage />, { wrapper: createWrapper() });
+      render(<RolesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('admin')).toBeInTheDocument();
@@ -538,7 +519,7 @@ describe('RolesPage', () => {
     });
 
     it('should have accessible table structure', async () => {
-      render(<RolesPage />, { wrapper: createWrapper() });
+      render(<RolesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByRole('grid')).toBeInTheDocument();
@@ -548,7 +529,7 @@ describe('RolesPage', () => {
     });
 
     it('should have accessible action buttons', async () => {
-      render(<RolesPage />, { wrapper: createWrapper() });
+      render(<RolesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('admin')).toBeInTheDocument();
@@ -563,7 +544,7 @@ describe('RolesPage', () => {
 
     it('should have accessible form modal', async () => {
       const user = userEvent.setup();
-      render(<RolesPage />, { wrapper: createWrapper() });
+      render(<RolesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('admin')).toBeInTheDocument();
@@ -581,7 +562,7 @@ describe('RolesPage', () => {
 
     it('should have accessible form inputs', async () => {
       const user = userEvent.setup();
-      render(<RolesPage />, { wrapper: createWrapper() });
+      render(<RolesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('admin')).toBeInTheDocument();
@@ -597,7 +578,7 @@ describe('RolesPage', () => {
 
     it('should show validation errors with proper ARIA attributes', async () => {
       const user = userEvent.setup();
-      render(<RolesPage />, { wrapper: createWrapper() });
+      render(<RolesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('admin')).toBeInTheDocument();

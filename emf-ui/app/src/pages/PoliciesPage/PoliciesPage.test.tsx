@@ -22,12 +22,9 @@ import React from 'react';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { BrowserRouter } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { createTestWrapper, setupAuthMocks, wrapFetchMock } from '../../test/testUtils';
 import { PoliciesPage } from './PoliciesPage';
 import type { Policy } from './PoliciesPage';
-import { I18nProvider } from '../../context/I18nContext';
-import { ToastProvider } from '../../components/Toast';
 
 // Mock policies data
 const mockPolicies: Policy[] = [
@@ -84,34 +81,18 @@ global.fetch = mockFetch;
 /**
  * Create a wrapper component with all required providers
  */
-function createWrapper() {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: false,
-      },
-    },
-  });
-
-  return function Wrapper({ children }: { children: React.ReactNode }) {
-    return (
-      <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
-          <I18nProvider>
-            <ToastProvider>{children}</ToastProvider>
-          </I18nProvider>
-        </BrowserRouter>
-      </QueryClientProvider>
-    );
-  };
-}
 
 describe('PoliciesPage', () => {
+  let cleanupAuthMocks: () => void;
+
   beforeEach(() => {
+    cleanupAuthMocks = setupAuthMocks();
     mockFetch.mockReset();
+    wrapFetchMock(mockFetch);
   });
 
   afterEach(() => {
+    cleanupAuthMocks();
     vi.clearAllMocks();
   });
 
@@ -128,7 +109,7 @@ describe('PoliciesPage', () => {
           )
       );
 
-      render(<PoliciesPage />, { wrapper: createWrapper() });
+      render(<PoliciesPage />, { wrapper: createTestWrapper() });
 
       // Look for the loading spinner component
       expect(screen.getByRole('status')).toBeInTheDocument();
@@ -139,17 +120,17 @@ describe('PoliciesPage', () => {
     it('should display error message when fetch fails', async () => {
       mockFetch.mockResolvedValue(createMockResponse(null, false, 500));
 
-      render(<PoliciesPage />, { wrapper: createWrapper() });
+      render(<PoliciesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
-        expect(screen.getByText(/failed to fetch policies/i)).toBeInTheDocument();
+        expect(screen.getByText(/API request failed/i)).toBeInTheDocument();
       });
     });
 
     it('should display retry button on error', async () => {
       mockFetch.mockResolvedValue(createMockResponse(null, false, 500));
 
-      render(<PoliciesPage />, { wrapper: createWrapper() });
+      render(<PoliciesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
@@ -162,7 +143,7 @@ describe('PoliciesPage', () => {
         .mockResolvedValueOnce(createMockResponse(mockPolicies));
 
       const user = userEvent.setup();
-      render(<PoliciesPage />, { wrapper: createWrapper() });
+      render(<PoliciesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
@@ -182,7 +163,7 @@ describe('PoliciesPage', () => {
     });
 
     it('should display all policies in the table', async () => {
-      render(<PoliciesPage />, { wrapper: createWrapper() });
+      render(<PoliciesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('admin_access')).toBeInTheDocument();
@@ -192,7 +173,7 @@ describe('PoliciesPage', () => {
     });
 
     it('should display policy descriptions', async () => {
-      render(<PoliciesPage />, { wrapper: createWrapper() });
+      render(<PoliciesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('Full administrative access')).toBeInTheDocument();
@@ -201,7 +182,7 @@ describe('PoliciesPage', () => {
     });
 
     it('should display policy expressions', async () => {
-      render(<PoliciesPage />, { wrapper: createWrapper() });
+      render(<PoliciesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('user.role == "admin"')).toBeInTheDocument();
@@ -211,7 +192,7 @@ describe('PoliciesPage', () => {
     });
 
     it('should display dash for policies without description', async () => {
-      render(<PoliciesPage />, { wrapper: createWrapper() });
+      render(<PoliciesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         // owner_access policy has no description
@@ -223,7 +204,7 @@ describe('PoliciesPage', () => {
     });
 
     it('should display page title', async () => {
-      render(<PoliciesPage />, { wrapper: createWrapper() });
+      render(<PoliciesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByRole('heading', { name: /policies/i })).toBeInTheDocument();
@@ -231,7 +212,7 @@ describe('PoliciesPage', () => {
     });
 
     it('should display create policy button', async () => {
-      render(<PoliciesPage />, { wrapper: createWrapper() });
+      render(<PoliciesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('create-policy-button')).toBeInTheDocument();
@@ -243,7 +224,7 @@ describe('PoliciesPage', () => {
     it('should display empty state when no policies exist', async () => {
       mockFetch.mockResolvedValue(createMockResponse([]));
 
-      render(<PoliciesPage />, { wrapper: createWrapper() });
+      render(<PoliciesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('empty-state')).toBeInTheDocument();
@@ -258,7 +239,7 @@ describe('PoliciesPage', () => {
 
     it('should open create form when clicking create button', async () => {
       const user = userEvent.setup();
-      render(<PoliciesPage />, { wrapper: createWrapper() });
+      render(<PoliciesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('admin_access')).toBeInTheDocument();
@@ -275,7 +256,7 @@ describe('PoliciesPage', () => {
 
     it('should close form when clicking cancel', async () => {
       const user = userEvent.setup();
-      render(<PoliciesPage />, { wrapper: createWrapper() });
+      render(<PoliciesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('admin_access')).toBeInTheDocument();
@@ -296,7 +277,7 @@ describe('PoliciesPage', () => {
 
     it('should close form when clicking close button', async () => {
       const user = userEvent.setup();
-      render(<PoliciesPage />, { wrapper: createWrapper() });
+      render(<PoliciesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('admin_access')).toBeInTheDocument();
@@ -317,7 +298,7 @@ describe('PoliciesPage', () => {
 
     it('should close form when pressing Escape', async () => {
       const user = userEvent.setup();
-      render(<PoliciesPage />, { wrapper: createWrapper() });
+      render(<PoliciesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('admin_access')).toBeInTheDocument();
@@ -351,7 +332,7 @@ describe('PoliciesPage', () => {
         .mockResolvedValueOnce(createMockResponse(newPolicy)) // Create
         .mockResolvedValueOnce(createMockResponse([...mockPolicies, newPolicy])); // Refetch
 
-      render(<PoliciesPage />, { wrapper: createWrapper() });
+      render(<PoliciesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('admin_access')).toBeInTheDocument();
@@ -375,7 +356,7 @@ describe('PoliciesPage', () => {
 
     it('should show validation error for empty name', async () => {
       const user = userEvent.setup();
-      render(<PoliciesPage />, { wrapper: createWrapper() });
+      render(<PoliciesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('admin_access')).toBeInTheDocument();
@@ -398,7 +379,7 @@ describe('PoliciesPage', () => {
 
     it('should show validation error for empty expression', async () => {
       const user = userEvent.setup();
-      render(<PoliciesPage />, { wrapper: createWrapper() });
+      render(<PoliciesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('admin_access')).toBeInTheDocument();
@@ -421,7 +402,7 @@ describe('PoliciesPage', () => {
 
     it('should show validation error for invalid name format', async () => {
       const user = userEvent.setup();
-      render(<PoliciesPage />, { wrapper: createWrapper() });
+      render(<PoliciesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('admin_access')).toBeInTheDocument();
@@ -450,7 +431,7 @@ describe('PoliciesPage', () => {
 
     it('should open edit form with pre-populated values when clicking edit', async () => {
       const user = userEvent.setup();
-      render(<PoliciesPage />, { wrapper: createWrapper() });
+      render(<PoliciesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('admin_access')).toBeInTheDocument();
@@ -480,7 +461,7 @@ describe('PoliciesPage', () => {
         .mockResolvedValueOnce(createMockResponse(updatedPolicy)) // Update
         .mockResolvedValueOnce(createMockResponse([updatedPolicy, ...mockPolicies.slice(1)])); // Refetch
 
-      render(<PoliciesPage />, { wrapper: createWrapper() });
+      render(<PoliciesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('admin_access')).toBeInTheDocument();
@@ -511,7 +492,7 @@ describe('PoliciesPage', () => {
 
     it('should open delete confirmation dialog when clicking delete', async () => {
       const user = userEvent.setup();
-      render(<PoliciesPage />, { wrapper: createWrapper() });
+      render(<PoliciesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('admin_access')).toBeInTheDocument();
@@ -527,7 +508,7 @@ describe('PoliciesPage', () => {
 
     it('should close delete dialog when clicking cancel', async () => {
       const user = userEvent.setup();
-      render(<PoliciesPage />, { wrapper: createWrapper() });
+      render(<PoliciesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('admin_access')).toBeInTheDocument();
@@ -554,7 +535,7 @@ describe('PoliciesPage', () => {
         .mockResolvedValueOnce(createMockResponse(null)) // Delete
         .mockResolvedValueOnce(createMockResponse(mockPolicies.slice(1))); // Refetch
 
-      render(<PoliciesPage />, { wrapper: createWrapper() });
+      render(<PoliciesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('admin_access')).toBeInTheDocument();
@@ -580,7 +561,7 @@ describe('PoliciesPage', () => {
     });
 
     it('should have accessible table structure', async () => {
-      render(<PoliciesPage />, { wrapper: createWrapper() });
+      render(<PoliciesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByRole('grid')).toBeInTheDocument();
@@ -590,7 +571,7 @@ describe('PoliciesPage', () => {
     });
 
     it('should have accessible action buttons', async () => {
-      render(<PoliciesPage />, { wrapper: createWrapper() });
+      render(<PoliciesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('admin_access')).toBeInTheDocument();
@@ -605,7 +586,7 @@ describe('PoliciesPage', () => {
 
     it('should have accessible form modal', async () => {
       const user = userEvent.setup();
-      render(<PoliciesPage />, { wrapper: createWrapper() });
+      render(<PoliciesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('admin_access')).toBeInTheDocument();
@@ -623,7 +604,7 @@ describe('PoliciesPage', () => {
 
     it('should have accessible form inputs', async () => {
       const user = userEvent.setup();
-      render(<PoliciesPage />, { wrapper: createWrapper() });
+      render(<PoliciesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('admin_access')).toBeInTheDocument();
@@ -642,7 +623,7 @@ describe('PoliciesPage', () => {
 
     it('should show validation errors with proper ARIA attributes', async () => {
       const user = userEvent.setup();
-      render(<PoliciesPage />, { wrapper: createWrapper() });
+      render(<PoliciesPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('admin_access')).toBeInTheDocument();

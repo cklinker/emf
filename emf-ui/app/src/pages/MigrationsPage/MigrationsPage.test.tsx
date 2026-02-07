@@ -19,38 +19,14 @@
 
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { createTestWrapper, setupAuthMocks } from '../../test/testUtils';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
 import { MigrationsPage } from './MigrationsPage';
-import { I18nProvider } from '../../context/I18nContext';
-import { ToastProvider } from '../../components/Toast';
 import { server } from '../../../vitest.setup';
 
 // Create a wrapper with all required providers
-function createWrapper() {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: false,
-      },
-    },
-  });
-
-  return function Wrapper({ children }: { children: React.ReactNode }) {
-    return (
-      <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
-          <I18nProvider>
-            <ToastProvider>{children}</ToastProvider>
-          </I18nProvider>
-        </BrowserRouter>
-      </QueryClientProvider>
-    );
-  };
-}
 
 // Mock data
 const mockMigrationHistory = [
@@ -259,10 +235,10 @@ const mockMigrationPlan = {
 // Helper to setup MSW handlers
 function setupMswHandlers(overrides: Record<string, unknown> = {}) {
   server.use(
-    http.get('/api/_admin/migrations', () => {
+    http.get('/control/migrations', () => {
       return HttpResponse.json(overrides.history ?? mockMigrationHistory);
     }),
-    http.get('/api/_admin/migrations/:id', ({ params }) => {
+    http.get('/control/migrations/:id', ({ params }) => {
       const id = params.id;
       if (overrides.details) {
         return HttpResponse.json(overrides.details);
@@ -273,10 +249,29 @@ function setupMswHandlers(overrides: Record<string, unknown> = {}) {
       }
       return HttpResponse.json(mockMigrationDetails);
     }),
-    http.get('/api/_admin/collections', () => {
-      return HttpResponse.json(overrides.collections ?? mockCollections);
+    http.get('/control/collections', () => {
+      const collections = overrides.collections ?? mockCollections;
+      // Return paginated format
+      return HttpResponse.json({ 
+        content: collections,
+        totalElements: Array.isArray(collections) ? collections.length : 0,
+        totalPages: 1,
+        size: 1000,
+        number: 0
+      });
     }),
-    http.post('/api/_admin/migrations/plan', async ({ request }) => {
+    http.get('/control/collections/:id/versions', ({ params }) => {
+      const id = params.id;
+      const collection = mockCollections.find((c) => c.id === id);
+      if (collection && collection.availableVersions) {
+        // Return versions in the expected format
+        return HttpResponse.json(
+          collection.availableVersions.map((v: number) => ({ version: v }))
+        );
+      }
+      return HttpResponse.json([]);
+    }),
+    http.post('/control/migrations/plan', async ({ request }) => {
       if (overrides.planError) {
         return new HttpResponse(null, { status: 500 });
       }
@@ -297,31 +292,35 @@ function setupMswHandlers(overrides: Record<string, unknown> = {}) {
 }
 
 describe('MigrationsPage', () => {
+  let cleanupAuthMocks: () => void;
+
   beforeEach(() => {
+    cleanupAuthMocks = setupAuthMocks();
     vi.clearAllMocks();
     setupMswHandlers();
   });
 
   afterEach(() => {
+    cleanupAuthMocks();
     vi.restoreAllMocks();
   });
 
   describe('Rendering', () => {
     it('renders the page with title', async () => {
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       expect(screen.getByText('Migrations')).toBeInTheDocument();
       expect(screen.getByText('Migration History')).toBeInTheDocument();
     });
 
     it('renders with custom testId', () => {
-      render(<MigrationsPage testId="custom-migrations" />, { wrapper: createWrapper() });
+      render(<MigrationsPage testId="custom-migrations" />, { wrapper: createTestWrapper() });
 
       expect(screen.getByTestId('custom-migrations')).toBeInTheDocument();
     });
 
     it('shows loading state initially', () => {
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       // LoadingSpinner component has multiple "Loading..." texts (visible and sr-only)
       expect(screen.getByTestId('loading-spinner')).toBeInTheDocument();
@@ -330,7 +329,7 @@ describe('MigrationsPage', () => {
 
   describe('Migration History Table - Requirement 10.1', () => {
     it('displays migration history table after loading', async () => {
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('history-table')).toBeInTheDocument();
@@ -338,7 +337,7 @@ describe('MigrationsPage', () => {
     });
 
     it('displays all migration history entries', async () => {
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('history-row-mig-1')).toBeInTheDocument();
@@ -350,7 +349,7 @@ describe('MigrationsPage', () => {
     });
 
     it('displays collection names in history', async () => {
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('users')).toBeInTheDocument();
@@ -362,7 +361,7 @@ describe('MigrationsPage', () => {
     });
 
     it('displays version changes', async () => {
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('history-row-mig-1')).toBeInTheDocument();
@@ -377,7 +376,7 @@ describe('MigrationsPage', () => {
     });
 
     it('displays status badges for all statuses', async () => {
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         const statusBadges = screen.getAllByTestId('status-badge');
@@ -392,7 +391,7 @@ describe('MigrationsPage', () => {
     });
 
     it('displays step count for each migration', async () => {
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('history-row-mig-1')).toBeInTheDocument();
@@ -408,7 +407,7 @@ describe('MigrationsPage', () => {
     });
 
     it('displays view details button for each migration', async () => {
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('view-details-mig-1')).toBeInTheDocument();
@@ -420,12 +419,12 @@ describe('MigrationsPage', () => {
 
     it('displays empty state when no migrations', async () => {
       server.use(
-        http.get('/api/_admin/migrations', () => {
+        http.get('/control/migrations', () => {
           return HttpResponse.json([]);
         })
       );
 
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('history-empty')).toBeInTheDocument();
@@ -436,7 +435,7 @@ describe('MigrationsPage', () => {
   describe('Migration Run Details - Requirement 10.8', () => {
     it('opens details modal when view details is clicked', async () => {
       const user = userEvent.setup();
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('view-details-mig-1')).toBeInTheDocument();
@@ -451,7 +450,7 @@ describe('MigrationsPage', () => {
 
     it('displays migration overview in details modal', async () => {
       const user = userEvent.setup();
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('view-details-mig-1')).toBeInTheDocument();
@@ -471,7 +470,7 @@ describe('MigrationsPage', () => {
 
     it('displays step details in modal', async () => {
       const user = userEvent.setup();
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('view-details-mig-1')).toBeInTheDocument();
@@ -494,7 +493,7 @@ describe('MigrationsPage', () => {
 
     it('displays step status badges', async () => {
       const user = userEvent.setup();
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('view-details-mig-1')).toBeInTheDocument();
@@ -510,7 +509,7 @@ describe('MigrationsPage', () => {
 
     it('closes modal when close button is clicked', async () => {
       const user = userEvent.setup();
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('view-details-mig-1')).toBeInTheDocument();
@@ -531,7 +530,7 @@ describe('MigrationsPage', () => {
 
     it('closes modal when X button is clicked', async () => {
       const user = userEvent.setup();
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('view-details-mig-1')).toBeInTheDocument();
@@ -552,7 +551,7 @@ describe('MigrationsPage', () => {
 
     it('closes modal when clicking overlay', async () => {
       const user = userEvent.setup();
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('view-details-mig-1')).toBeInTheDocument();
@@ -574,7 +573,7 @@ describe('MigrationsPage', () => {
 
     it('displays error information for failed migrations', async () => {
       const user = userEvent.setup();
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('view-details-mig-2')).toBeInTheDocument();
@@ -593,27 +592,27 @@ describe('MigrationsPage', () => {
   describe('Error Handling', () => {
     it('handles history fetch error', async () => {
       server.use(
-        http.get('/api/_admin/migrations', () => {
+        http.get('/control/migrations', () => {
           return new HttpResponse(null, { status: 500 });
         })
       );
 
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
-        expect(screen.getByText(/error/i)).toBeInTheDocument();
+        expect(screen.getByTestId('error-message')).toBeInTheDocument();
       });
     });
 
     it('handles details fetch error', async () => {
       server.use(
-        http.get('/api/_admin/migrations/:id', () => {
+        http.get('/control/migrations/:id', () => {
           return new HttpResponse(null, { status: 500 });
         })
       );
 
       const user = userEvent.setup();
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('view-details-mig-1')).toBeInTheDocument();
@@ -628,18 +627,18 @@ describe('MigrationsPage', () => {
       // Should show error in modal
       await waitFor(() => {
         const modal = screen.getByTestId('migration-details-modal');
-        expect(within(modal).getByText(/error/i)).toBeInTheDocument();
+        expect(within(modal).getByTestId('error-message')).toBeInTheDocument();
       });
     });
 
     it('displays retry button on error', async () => {
       server.use(
-        http.get('/api/_admin/migrations', () => {
+        http.get('/control/migrations', () => {
           return new HttpResponse(null, { status: 500 });
         })
       );
 
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByText('Retry')).toBeInTheDocument();
@@ -650,7 +649,7 @@ describe('MigrationsPage', () => {
   describe('Accessibility', () => {
     it('has proper modal roles and aria attributes', async () => {
       const user = userEvent.setup();
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('view-details-mig-1')).toBeInTheDocument();
@@ -667,7 +666,7 @@ describe('MigrationsPage', () => {
     });
 
     it('view details buttons have accessible labels', async () => {
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         const viewButton = screen.getByTestId('view-details-mig-1');
@@ -677,7 +676,7 @@ describe('MigrationsPage', () => {
 
     it('close button has accessible label', async () => {
       const user = userEvent.setup();
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('view-details-mig-1')).toBeInTheDocument();
@@ -694,7 +693,7 @@ describe('MigrationsPage', () => {
 
   describe('Duration Calculation', () => {
     it('displays duration for completed migrations', async () => {
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('history-row-mig-1')).toBeInTheDocument();
@@ -706,7 +705,7 @@ describe('MigrationsPage', () => {
     });
 
     it('displays duration for running migrations', async () => {
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('history-row-mig-3')).toBeInTheDocument();
@@ -721,7 +720,7 @@ describe('MigrationsPage', () => {
 
   describe('Migration Planning - Requirement 10.2', () => {
     it('displays Plan Migration button', async () => {
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('plan-migration-button')).toBeInTheDocument();
@@ -732,7 +731,7 @@ describe('MigrationsPage', () => {
 
     it('opens planning form when Plan Migration button is clicked', async () => {
       const user = userEvent.setup();
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('plan-migration-button')).toBeInTheDocument();
@@ -747,7 +746,7 @@ describe('MigrationsPage', () => {
 
     it('displays collection selection dropdown', async () => {
       const user = userEvent.setup();
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('plan-migration-button')).toBeInTheDocument();
@@ -766,7 +765,7 @@ describe('MigrationsPage', () => {
 
     it('displays target version dropdown after selecting collection', async () => {
       const user = userEvent.setup();
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('plan-migration-button')).toBeInTheDocument();
@@ -788,7 +787,7 @@ describe('MigrationsPage', () => {
 
     it('shows available versions for selected collection', async () => {
       const user = userEvent.setup();
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('plan-migration-button')).toBeInTheDocument();
@@ -811,7 +810,7 @@ describe('MigrationsPage', () => {
 
     it('shows warning when collection has no other versions', async () => {
       const user = userEvent.setup();
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('plan-migration-button')).toBeInTheDocument();
@@ -833,7 +832,7 @@ describe('MigrationsPage', () => {
 
     it('displays selection summary when collection and version are selected', async () => {
       const user = userEvent.setup();
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('plan-migration-button')).toBeInTheDocument();
@@ -860,7 +859,7 @@ describe('MigrationsPage', () => {
 
     it('closes planning form when cancel is clicked', async () => {
       const user = userEvent.setup();
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('plan-migration-button')).toBeInTheDocument();
@@ -881,7 +880,7 @@ describe('MigrationsPage', () => {
 
     it('closes planning form when X button is clicked', async () => {
       const user = userEvent.setup();
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('plan-migration-button')).toBeInTheDocument();
@@ -902,7 +901,7 @@ describe('MigrationsPage', () => {
 
     it('has proper modal accessibility attributes', async () => {
       const user = userEvent.setup();
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('plan-migration-button')).toBeInTheDocument();
@@ -922,7 +921,7 @@ describe('MigrationsPage', () => {
   describe('Migration Plan Display - Requirements 10.3, 10.4', () => {
     it('displays migration plan after creating plan', async () => {
       const user = userEvent.setup();
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('plan-migration-button')).toBeInTheDocument();
@@ -949,7 +948,7 @@ describe('MigrationsPage', () => {
 
     it('displays migration steps in plan - Requirement 10.3', async () => {
       const user = userEvent.setup();
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('plan-migration-button')).toBeInTheDocument();
@@ -978,7 +977,7 @@ describe('MigrationsPage', () => {
 
     it('displays step operations and details', async () => {
       const user = userEvent.setup();
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('plan-migration-button')).toBeInTheDocument();
@@ -1006,7 +1005,7 @@ describe('MigrationsPage', () => {
 
     it('displays reversible/irreversible badges for steps', async () => {
       const user = userEvent.setup();
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('plan-migration-button')).toBeInTheDocument();
@@ -1036,7 +1035,7 @@ describe('MigrationsPage', () => {
 
     it('displays estimated impact - Requirement 10.4', async () => {
       const user = userEvent.setup();
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('plan-migration-button')).toBeInTheDocument();
@@ -1067,7 +1066,7 @@ describe('MigrationsPage', () => {
 
     it('displays risks - Requirement 10.4', async () => {
       const user = userEvent.setup();
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('plan-migration-button')).toBeInTheDocument();
@@ -1096,7 +1095,7 @@ describe('MigrationsPage', () => {
 
     it('displays risk level badges', async () => {
       const user = userEvent.setup();
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('plan-migration-button')).toBeInTheDocument();
@@ -1128,7 +1127,7 @@ describe('MigrationsPage', () => {
 
     it('displays risk descriptions', async () => {
       const user = userEvent.setup();
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('plan-migration-button')).toBeInTheDocument();
@@ -1156,7 +1155,7 @@ describe('MigrationsPage', () => {
 
     it('closes plan display when close button is clicked', async () => {
       const user = userEvent.setup();
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('plan-migration-button')).toBeInTheDocument();
@@ -1185,7 +1184,7 @@ describe('MigrationsPage', () => {
 
     it('has proper accessibility attributes for plan modal', async () => {
       const user = userEvent.setup();
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('plan-migration-button')).toBeInTheDocument();
@@ -1215,7 +1214,7 @@ describe('MigrationsPage', () => {
       setupMswHandlers({ planError: true });
 
       const user = userEvent.setup();
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('plan-migration-button')).toBeInTheDocument();
@@ -1238,13 +1237,13 @@ describe('MigrationsPage', () => {
 
     it('handles collections fetch error in planning form', async () => {
       server.use(
-        http.get('/api/_admin/collections', () => {
+        http.get('/control/collections', () => {
           return new HttpResponse(null, { status: 500 });
         })
       );
 
       const user = userEvent.setup();
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('plan-migration-button')).toBeInTheDocument();
@@ -1254,7 +1253,7 @@ describe('MigrationsPage', () => {
 
       await waitFor(() => {
         const modal = screen.getByTestId('plan-migration-modal');
-        expect(within(modal).getByText(/error/i)).toBeInTheDocument();
+        expect(within(modal).getByTestId('error-message')).toBeInTheDocument();
       });
     });
   });
@@ -1349,16 +1348,33 @@ describe('MigrationsPage', () => {
       rollbackError?: boolean;
     } = {}) {
       server.use(
-        http.get('/api/_admin/migrations', () => {
+        http.get('/control/migrations', () => {
           return HttpResponse.json(mockMigrationHistory);
         }),
-        http.get('/api/_admin/collections', () => {
-          return HttpResponse.json(mockCollections);
+        http.get('/control/collections', () => {
+          // Return paginated format
+          return HttpResponse.json({ 
+            content: mockCollections,
+            totalElements: mockCollections.length,
+            totalPages: 1,
+            size: 1000,
+            number: 0
+          });
         }),
-        http.post('/api/_admin/migrations/plan', () => {
+        http.get('/control/collections/:id/versions', ({ params }) => {
+          const id = params.id;
+          const collection = mockCollections.find((c) => c.id === id);
+          if (collection && collection.availableVersions) {
+            return HttpResponse.json(
+              collection.availableVersions.map((v: number) => ({ version: v }))
+            );
+          }
+          return HttpResponse.json([]);
+        }),
+        http.post('/control/migrations/plan', () => {
           return HttpResponse.json(mockMigrationPlan);
         }),
-        http.post('/api/_admin/migrations/execute', () => {
+        http.post('/control/migrations/execute', () => {
           if (options.executeError) {
             return HttpResponse.json(
               { message: 'Failed to start migration' },
@@ -1367,7 +1383,7 @@ describe('MigrationsPage', () => {
           }
           return HttpResponse.json(mockExecutionResponse);
         }),
-        http.get('/api/_admin/migrations/:id', ({ params }) => {
+        http.get('/control/migrations/:id', ({ params }) => {
           const id = params.id;
           if (id === 'run-new-1') {
             switch (options.runStatus) {
@@ -1384,7 +1400,7 @@ describe('MigrationsPage', () => {
           const migration = mockMigrationHistory.find((m) => m.id === id);
           return HttpResponse.json(migration || mockMigrationDetails);
         }),
-        http.post('/api/_admin/migrations/:id/rollback', () => {
+        http.post('/control/migrations/:id/rollback', () => {
           if (options.rollbackError) {
             return HttpResponse.json(
               { message: 'Rollback failed' },
@@ -1399,7 +1415,7 @@ describe('MigrationsPage', () => {
     it('displays Execute Migration button in plan display', async () => {
       setupExecutionHandlers();
       const user = userEvent.setup();
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('plan-migration-button')).toBeInTheDocument();
@@ -1427,7 +1443,7 @@ describe('MigrationsPage', () => {
     it('opens execution modal when Execute Migration is clicked', async () => {
       setupExecutionHandlers();
       const user = userEvent.setup();
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('plan-migration-button')).toBeInTheDocument();
@@ -1457,7 +1473,7 @@ describe('MigrationsPage', () => {
     it('displays progress tracking during execution - Requirement 10.5', async () => {
       setupExecutionHandlers({ runStatus: 'running' });
       const user = userEvent.setup();
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('plan-migration-button')).toBeInTheDocument();
@@ -1492,7 +1508,7 @@ describe('MigrationsPage', () => {
     it('displays step-by-step progress - Requirement 10.5', async () => {
       setupExecutionHandlers({ runStatus: 'running' });
       const user = userEvent.setup();
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('plan-migration-button')).toBeInTheDocument();
@@ -1527,7 +1543,7 @@ describe('MigrationsPage', () => {
     it('displays success message when migration completes - Requirement 10.5', async () => {
       setupExecutionHandlers({ runStatus: 'completed' });
       const user = userEvent.setup();
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('plan-migration-button')).toBeInTheDocument();
@@ -1559,7 +1575,7 @@ describe('MigrationsPage', () => {
     it('handles execution errors gracefully - Requirement 10.6', async () => {
       setupExecutionHandlers({ executeError: true });
       const user = userEvent.setup();
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('plan-migration-button')).toBeInTheDocument();
@@ -1589,7 +1605,7 @@ describe('MigrationsPage', () => {
     it('displays failure message when migration fails - Requirement 10.6', async () => {
       setupExecutionHandlers({ runStatus: 'failed' });
       const user = userEvent.setup();
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('plan-migration-button')).toBeInTheDocument();
@@ -1621,7 +1637,7 @@ describe('MigrationsPage', () => {
     it('displays step error details when a step fails - Requirement 10.6', async () => {
       setupExecutionHandlers({ runStatus: 'failed' });
       const user = userEvent.setup();
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('plan-migration-button')).toBeInTheDocument();
@@ -1653,7 +1669,7 @@ describe('MigrationsPage', () => {
     it('offers rollback option on failure - Requirement 10.7', async () => {
       setupExecutionHandlers({ runStatus: 'failed' });
       const user = userEvent.setup();
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('plan-migration-button')).toBeInTheDocument();
@@ -1686,19 +1702,36 @@ describe('MigrationsPage', () => {
       // Start with failed status, then return rolled_back after rollback
       let rollbackCalled = false;
       server.use(
-        http.get('/api/_admin/migrations', () => {
+        http.get('/control/migrations', () => {
           return HttpResponse.json(mockMigrationHistory);
         }),
-        http.get('/api/_admin/collections', () => {
-          return HttpResponse.json(mockCollections);
+        http.get('/control/collections', () => {
+          // Return paginated format
+          return HttpResponse.json({ 
+            content: mockCollections,
+            totalElements: mockCollections.length,
+            totalPages: 1,
+            size: 1000,
+            number: 0
+          });
         }),
-        http.post('/api/_admin/migrations/plan', () => {
+        http.get('/control/collections/:id/versions', ({ params }) => {
+          const id = params.id;
+          const collection = mockCollections.find((c) => c.id === id);
+          if (collection && collection.availableVersions) {
+            return HttpResponse.json(
+              collection.availableVersions.map((v: number) => ({ version: v }))
+            );
+          }
+          return HttpResponse.json([]);
+        }),
+        http.post('/control/migrations/plan', () => {
           return HttpResponse.json(mockMigrationPlan);
         }),
-        http.post('/api/_admin/migrations/execute', () => {
+        http.post('/control/migrations/execute', () => {
           return HttpResponse.json(mockExecutionResponse);
         }),
-        http.get('/api/_admin/migrations/:id', ({ params }) => {
+        http.get('/control/migrations/:id', ({ params }) => {
           const id = params.id;
           if (id === 'run-new-1') {
             if (rollbackCalled) {
@@ -1709,14 +1742,14 @@ describe('MigrationsPage', () => {
           const migration = mockMigrationHistory.find((m) => m.id === id);
           return HttpResponse.json(migration || mockMigrationDetails);
         }),
-        http.post('/api/_admin/migrations/:id/rollback', () => {
+        http.post('/control/migrations/:id/rollback', () => {
           rollbackCalled = true;
           return HttpResponse.json(mockRolledBackMigration);
         })
       );
 
       const user = userEvent.setup();
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('plan-migration-button')).toBeInTheDocument();
@@ -1754,7 +1787,7 @@ describe('MigrationsPage', () => {
     it('handles rollback error - Requirement 10.7', async () => {
       setupExecutionHandlers({ runStatus: 'failed', rollbackError: true });
       const user = userEvent.setup();
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('plan-migration-button')).toBeInTheDocument();
@@ -1790,7 +1823,7 @@ describe('MigrationsPage', () => {
     it('has proper accessibility attributes for execution modal', async () => {
       setupExecutionHandlers({ runStatus: 'running' });
       const user = userEvent.setup();
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('plan-migration-button')).toBeInTheDocument();
@@ -1823,7 +1856,7 @@ describe('MigrationsPage', () => {
     it('closes execution modal when close button is clicked after completion', async () => {
       setupExecutionHandlers({ runStatus: 'completed' });
       const user = userEvent.setup();
-      render(<MigrationsPage />, { wrapper: createWrapper() });
+      render(<MigrationsPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
         expect(screen.getByTestId('plan-migration-button')).toBeInTheDocument();

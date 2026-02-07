@@ -58,6 +58,7 @@ import {
   UserDetailPage,
   TenantsPage,
   TenantDashboardPage,
+  PicklistsPage,
   LoginPage,
   UnauthorizedPage,
   NotFoundPage,
@@ -429,6 +430,16 @@ function App({ plugins = [] }: AppProps): React.ReactElement {
                               element={
                                 <ProtectedPageRoute>
                                   <ResourceFormPage />
+                                </ProtectedPageRoute>
+                              }
+                            />
+
+                            {/* Picklists route */}
+                            <Route
+                              path="/picklists"
+                              element={
+                                <ProtectedPageRoute>
+                                  <PicklistsPage />
                                 </ProtectedPageRoute>
                               }
                             />

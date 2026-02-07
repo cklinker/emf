@@ -158,6 +158,14 @@ export type { SharingSettingsPageProps } from './SharingSettingsPage'
 export { RoleHierarchyPage } from './RoleHierarchyPage'
 export type { RoleHierarchyPageProps } from './RoleHierarchyPage'
 
+// SetupAuditTrailPage - Configuration audit trail
+export { SetupAuditTrailPage } from './SetupAuditTrailPage'
+export type { SetupAuditTrailPageProps } from './SetupAuditTrailPage'
+
+// GovernorLimitsPage - Governor limits dashboard
+export { GovernorLimitsPage } from './GovernorLimitsPage'
+export type { GovernorLimitsPageProps } from './GovernorLimitsPage'
+
 // NotFoundPage - 404 error page
 export { NotFoundPage } from './NotFoundPage'
 export type { NotFoundPageProps } from './NotFoundPage'

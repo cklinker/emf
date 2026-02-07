@@ -41,6 +41,8 @@ import type {
   UserGroup,
   CreateUserGroupRequest,
   RoleHierarchyNode,
+  SetupAuditTrailEntry,
+  GovernorLimitsStatus,
 } from './types';
 
 /**
@@ -552,6 +554,61 @@ export class AdminClient {
 
     delete: async (id: string): Promise<void> => {
       await this.axios.delete(`/control/sharing/groups/${id}`);
+    },
+  };
+
+  /**
+   * Setup audit trail operations
+   */
+  readonly audit = {
+    list: async (params?: {
+      section?: string;
+      entityType?: string;
+      userId?: string;
+      from?: string;
+      to?: string;
+      page?: number;
+      size?: number;
+    }): Promise<Page<SetupAuditTrailEntry>> => {
+      const searchParams = new URLSearchParams();
+      if (params?.section) searchParams.set('section', params.section);
+      if (params?.entityType) searchParams.set('entityType', params.entityType);
+      if (params?.userId) searchParams.set('userId', params.userId);
+      if (params?.from) searchParams.set('from', params.from);
+      if (params?.to) searchParams.set('to', params.to);
+      if (params?.page !== undefined) searchParams.set('page', String(params.page));
+      if (params?.size !== undefined) searchParams.set('size', String(params.size));
+      const qs = searchParams.toString();
+      const url = qs ? `/control/audit?${qs}` : '/control/audit';
+      const response = await this.axios.get<Page<SetupAuditTrailEntry>>(url);
+      return response.data;
+    },
+
+    getEntityHistory: async (
+      entityType: string,
+      entityId: string,
+      page?: number,
+      size?: number
+    ): Promise<Page<SetupAuditTrailEntry>> => {
+      const searchParams = new URLSearchParams();
+      if (page !== undefined) searchParams.set('page', String(page));
+      if (size !== undefined) searchParams.set('size', String(size));
+      const qs = searchParams.toString();
+      const url = qs
+        ? `/control/audit/entity/${entityType}/${entityId}?${qs}`
+        : `/control/audit/entity/${entityType}/${entityId}`;
+      const response = await this.axios.get<Page<SetupAuditTrailEntry>>(url);
+      return response.data;
+    },
+  };
+
+  /**
+   * Governor limits operations
+   */
+  readonly governorLimits = {
+    getStatus: async (): Promise<GovernorLimitsStatus> => {
+      const response = await this.axios.get<GovernorLimitsStatus>('/control/governor-limits');
+      return response.data;
     },
   };
 

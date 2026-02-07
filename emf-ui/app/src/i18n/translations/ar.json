@@ -62,7 +62,8 @@
     "noData": "لا توجد بيانات متاحة",
     "required": "مطلوب",
     "optional": "اختياري",
-    "none": "لا شيء"
+    "none": "لا شيء",
+    "pageOf": "صفحة {{current}} من {{total}}"
   },
   "auth": {
     "login": "تسجيل الدخول",

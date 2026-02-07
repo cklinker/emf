@@ -255,6 +255,66 @@ export interface Page<T> {
 }
 
 /**
+ * Platform user
+ */
+export interface PlatformUser {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  username?: string;
+  status: 'ACTIVE' | 'INACTIVE' | 'LOCKED' | 'PENDING_ACTIVATION';
+  locale: string;
+  timezone: string;
+  profileId?: string;
+  managerId?: string;
+  lastLoginAt?: string;
+  loginCount: number;
+  mfaEnabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Request to create a user
+ */
+export interface CreatePlatformUserRequest {
+  email: string;
+  firstName: string;
+  lastName: string;
+  username?: string;
+  locale?: string;
+  timezone?: string;
+  profileId?: string;
+}
+
+/**
+ * Request to update a user
+ */
+export interface UpdatePlatformUserRequest {
+  firstName?: string;
+  lastName?: string;
+  username?: string;
+  locale?: string;
+  timezone?: string;
+  managerId?: string;
+  profileId?: string;
+}
+
+/**
+ * Login history entry
+ */
+export interface LoginHistoryEntry {
+  id: string;
+  userId: string;
+  loginTime: string;
+  sourceIp: string;
+  loginType: 'UI' | 'API' | 'OAUTH' | 'SERVICE_ACCOUNT';
+  status: 'SUCCESS' | 'FAILED' | 'LOCKED_OUT';
+  userAgent: string;
+}
+
+/**
  * Migration plan result
  */
 export interface MigrationPlan {

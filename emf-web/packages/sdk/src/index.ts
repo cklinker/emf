@@ -39,6 +39,13 @@ export type {
   MigrationResult,
   RelationshipInfo,
   CollectionRelationships,
+  CollectionValidationRule,
+  CreateCollectionValidationRuleRequest,
+  CollectionValidationError,
+  RecordType,
+  CreateRecordTypeRequest,
+  RecordTypePicklistOverride,
+  SetPicklistOverrideRequest,
 } from './admin/types';
 
 // Authentication

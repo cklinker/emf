@@ -82,6 +82,7 @@
     "policies": "Policies",
     "oidcProviders": "OIDC Providers",
     "services": "Services",
+    "picklists": "Picklists",
     "builder": "Builder",
     "pages": "Pages",
     "menus": "Menus",
@@ -269,6 +270,24 @@
       "basePathInvalid": "Base path must start with / and contain only lowercase letters, numbers, hyphens, and slashes",
       "environmentTooLong": "Environment must be 50 characters or less",
       "databaseUrlTooLong": "Database URL must be 500 characters or less"
+    }
+  },
+  "picklists": {
+    "title": "Picklists",
+    "addPicklist": "Add Picklist",
+    "editPicklist": "Edit Picklist",
+    "deletePicklist": "Delete Picklist",
+    "picklistName": "Picklist Name",
+    "description": "Description",
+    "sorted": "Sorted",
+    "restricted": "Restricted",
+    "namePlaceholder": "e.g., Status, Priority",
+    "descriptionPlaceholder": "Enter a description for this picklist...",
+    "confirmDelete": "Are you sure you want to delete this picklist? This action cannot be undone.",
+    "validation": {
+      "nameRequired": "Picklist name is required",
+      "nameTooLong": "Name must be 100 characters or less",
+      "descriptionTooLong": "Description must be 500 characters or less"
     }
   },
   "builder": {

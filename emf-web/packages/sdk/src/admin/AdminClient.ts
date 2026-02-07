@@ -23,6 +23,12 @@ import type {
   UpdateTenantRequest,
   GovernorLimits,
   Page,
+  GlobalPicklist,
+  PicklistValue,
+  PicklistDependency,
+  CreateGlobalPicklistRequest,
+  PicklistValueRequest,
+  SetDependencyRequest,
 } from './types';
 
 /**
@@ -312,6 +318,113 @@ export class AdminClient {
         `/control/users/${id}/login-history?${params.toString()}`
       );
       return response.data;
+    },
+  };
+
+  /**
+   * Picklist management operations
+   */
+  readonly picklists = {
+    listGlobal: async (tenantId = 'default'): Promise<GlobalPicklist[]> => {
+      const params = new URLSearchParams();
+      params.append('tenantId', tenantId);
+      const response = await this.axios.get<GlobalPicklist[]>(
+        `/control/picklists/global?${params.toString()}`
+      );
+      return response.data;
+    },
+
+    createGlobal: async (
+      request: CreateGlobalPicklistRequest,
+      tenantId = 'default'
+    ): Promise<GlobalPicklist> => {
+      const params = new URLSearchParams();
+      params.append('tenantId', tenantId);
+      const response = await this.axios.post<GlobalPicklist>(
+        `/control/picklists/global?${params.toString()}`,
+        request
+      );
+      return response.data;
+    },
+
+    getGlobal: async (id: string): Promise<GlobalPicklist> => {
+      const response = await this.axios.get<GlobalPicklist>(`/control/picklists/global/${id}`);
+      return response.data;
+    },
+
+    updateGlobal: async (
+      id: string,
+      request: Partial<CreateGlobalPicklistRequest>
+    ): Promise<GlobalPicklist> => {
+      const response = await this.axios.put<GlobalPicklist>(
+        `/control/picklists/global/${id}`,
+        request
+      );
+      return response.data;
+    },
+
+    deleteGlobal: async (id: string): Promise<void> => {
+      await this.axios.delete(`/control/picklists/global/${id}`);
+    },
+
+    getGlobalValues: async (id: string): Promise<PicklistValue[]> => {
+      const response = await this.axios.get<PicklistValue[]>(
+        `/control/picklists/global/${id}/values`
+      );
+      return response.data;
+    },
+
+    setGlobalValues: async (
+      id: string,
+      values: PicklistValueRequest[]
+    ): Promise<PicklistValue[]> => {
+      const response = await this.axios.put<PicklistValue[]>(
+        `/control/picklists/global/${id}/values`,
+        values
+      );
+      return response.data;
+    },
+
+    getFieldValues: async (fieldId: string): Promise<PicklistValue[]> => {
+      const response = await this.axios.get<PicklistValue[]>(
+        `/control/picklists/fields/${fieldId}/values`
+      );
+      return response.data;
+    },
+
+    setFieldValues: async (
+      fieldId: string,
+      values: PicklistValueRequest[]
+    ): Promise<PicklistValue[]> => {
+      const response = await this.axios.put<PicklistValue[]>(
+        `/control/picklists/fields/${fieldId}/values`,
+        values
+      );
+      return response.data;
+    },
+
+    getDependencies: async (fieldId: string): Promise<PicklistDependency[]> => {
+      const response = await this.axios.get<PicklistDependency[]>(
+        `/control/picklists/fields/${fieldId}/dependencies`
+      );
+      return response.data;
+    },
+
+    setDependency: async (request: SetDependencyRequest): Promise<PicklistDependency> => {
+      const response = await this.axios.put<PicklistDependency>(
+        '/control/picklists/dependencies',
+        request
+      );
+      return response.data;
+    },
+
+    removeDependency: async (
+      controllingFieldId: string,
+      dependentFieldId: string
+    ): Promise<void> => {
+      await this.axios.delete(
+        `/control/picklists/dependencies/${controllingFieldId}/${dependentFieldId}`
+      );
     },
   };
 

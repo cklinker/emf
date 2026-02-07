@@ -1,58 +1,54 @@
 /**
  * Page Components
- * 
+ *
  * This module exports all page components used in the application routing.
  * Pages include: CollectionsPage, DashboardPage, RolesPage, PoliciesPage, etc.
  */
 
 // CollectionsPage - Collection management page
-export { CollectionsPage } from './CollectionsPage';
-export type { CollectionsPageProps, Collection } from './CollectionsPage';
+export { CollectionsPage } from './CollectionsPage'
+export type { CollectionsPageProps, Collection } from './CollectionsPage'
 
 // CollectionDetailPage - Collection detail view page
-export { CollectionDetailPage } from './CollectionDetailPage';
-export type { CollectionDetailPageProps } from './CollectionDetailPage';
+export { CollectionDetailPage } from './CollectionDetailPage'
+export type { CollectionDetailPageProps } from './CollectionDetailPage'
 
 // CollectionFormPage - Collection create/edit form page
-export { CollectionFormPage } from './CollectionFormPage';
-export type { CollectionFormPageProps } from './CollectionFormPage';
+export { CollectionFormPage } from './CollectionFormPage'
+export type { CollectionFormPageProps } from './CollectionFormPage'
 
 // RolesPage - Authorization roles management page
-export { RolesPage } from './RolesPage';
-export type { RolesPageProps, Role } from './RolesPage';
+export { RolesPage } from './RolesPage'
+export type { RolesPageProps, Role } from './RolesPage'
 
 // PoliciesPage - Authorization policies management page
-export { PoliciesPage } from './PoliciesPage';
-export type { PoliciesPageProps, Policy } from './PoliciesPage';
+export { PoliciesPage } from './PoliciesPage'
+export type { PoliciesPageProps, Policy } from './PoliciesPage'
 
 // OIDCProvidersPage - OIDC providers management page
-export { OIDCProvidersPage } from './OIDCProvidersPage';
-export type { OIDCProvidersPageProps, OIDCProvider } from './OIDCProvidersPage';
+export { OIDCProvidersPage } from './OIDCProvidersPage'
+export type { OIDCProvidersPageProps, OIDCProvider } from './OIDCProvidersPage'
 
 // ServicesPage - Domain services management page
-export { ServicesPage } from './ServicesPage';
-export type { ServicesPageProps, Service } from './ServicesPage';
+export { ServicesPage } from './ServicesPage'
+export type { ServicesPageProps, Service } from './ServicesPage'
 
 // PageBuilderPage - UI page builder
-export { PageBuilderPage } from './PageBuilderPage';
+export { PageBuilderPage } from './PageBuilderPage'
 export type {
   PageBuilderPageProps,
   UIPage,
   PageLayout,
   PageComponent,
   ComponentPosition,
-} from './PageBuilderPage';
+} from './PageBuilderPage'
 
 // MenuBuilderPage - UI menu builder
-export { MenuBuilderPage } from './MenuBuilderPage';
-export type {
-  MenuBuilderPageProps,
-  UIMenu,
-  UIMenuItem,
-} from './MenuBuilderPage';
+export { MenuBuilderPage } from './MenuBuilderPage'
+export type { MenuBuilderPageProps, UIMenu, UIMenuItem } from './MenuBuilderPage'
 
 // PackagesPage - Package management page
-export { PackagesPage } from './PackagesPage';
+export { PackagesPage } from './PackagesPage'
 export type {
   PackagesPageProps,
   Package,
@@ -62,41 +58,41 @@ export type {
   ImportConflict,
   ImportResult,
   ImportError,
-} from './PackagesPage';
+} from './PackagesPage'
 
 // MigrationsPage - Migration management page
-export { MigrationsPage } from './MigrationsPage';
+export { MigrationsPage } from './MigrationsPage'
 export type {
   MigrationsPageProps,
   MigrationRun,
   MigrationStepResult,
   MigrationStatus,
-} from './MigrationsPage';
+} from './MigrationsPage'
 
 // ResourceBrowserPage - Resource browser page
-export { ResourceBrowserPage } from './ResourceBrowserPage';
-export type { ResourceBrowserPageProps, CollectionSummary } from './ResourceBrowserPage';
+export { ResourceBrowserPage } from './ResourceBrowserPage'
+export type { ResourceBrowserPageProps, CollectionSummary } from './ResourceBrowserPage'
 
 // ResourceListPage - Resource list page for viewing collection data
-export { ResourceListPage } from './ResourceListPage';
+export { ResourceListPage } from './ResourceListPage'
 export type {
   ResourceListPageProps,
   Resource,
   FieldDefinition,
   FilterCondition,
-} from './ResourceListPage';
+} from './ResourceListPage'
 
 // ResourceDetailPage - Resource detail view page
-export { ResourceDetailPage } from './ResourceDetailPage';
+export { ResourceDetailPage } from './ResourceDetailPage'
 export type {
   ResourceDetailPageProps,
   Resource as ResourceDetailResource,
   FieldDefinition as ResourceDetailFieldDefinition,
   CollectionSchema as ResourceDetailCollectionSchema,
-} from './ResourceDetailPage';
+} from './ResourceDetailPage'
 
 // ResourceFormPage - Resource create/edit form page
-export { ResourceFormPage } from './ResourceFormPage';
+export { ResourceFormPage } from './ResourceFormPage'
 export type {
   ResourceFormPageProps,
   Resource as ResourceFormResource,
@@ -105,30 +101,34 @@ export type {
   ValidationRule,
   FormData,
   FormErrors,
-} from './ResourceFormPage';
+} from './ResourceFormPage'
 
 // PluginsPage - Plugin configuration page
-export { PluginsPage } from './PluginsPage';
-export type { PluginSettings, PluginsPageProps } from './PluginsPage';
+export { PluginsPage } from './PluginsPage'
+export type { PluginSettings, PluginsPageProps } from './PluginsPage'
 
 // TenantsPage - Platform admin tenant management page
-export { TenantsPage } from './TenantsPage';
-export type { TenantsPageProps, Tenant } from './TenantsPage';
+export { TenantsPage } from './TenantsPage'
+export type { TenantsPageProps, Tenant } from './TenantsPage'
 
 // TenantDashboardPage - Per-tenant usage and health metrics
-export { TenantDashboardPage } from './TenantDashboardPage';
-export type { TenantDashboardPageProps } from './TenantDashboardPage';
+export { TenantDashboardPage } from './TenantDashboardPage'
+export type { TenantDashboardPageProps } from './TenantDashboardPage'
 
 // UsersPage - User management page
-export { UsersPage } from './UsersPage';
-export type { UsersPageProps } from './UsersPage';
+export { UsersPage } from './UsersPage'
+export type { UsersPageProps } from './UsersPage'
 
 // UserDetailPage - User detail view page
-export { UserDetailPage } from './UserDetailPage';
-export type { UserDetailPageProps } from './UserDetailPage';
+export { UserDetailPage } from './UserDetailPage'
+export type { UserDetailPageProps } from './UserDetailPage'
+
+// PicklistsPage - Global picklist management page
+export { PicklistsPage } from './PicklistsPage'
+export type { PicklistsPageProps } from './PicklistsPage'
 
 // DashboardPage - System health and metrics dashboard
-export { DashboardPage } from './DashboardPage';
+export { DashboardPage } from './DashboardPage'
 export type {
   DashboardPageProps,
   DashboardData,
@@ -136,16 +136,16 @@ export type {
   MetricDataPoint,
   SystemMetrics,
   RecentError,
-} from './DashboardPage';
+} from './DashboardPage'
 
 // LoginPage - Authentication login page
-export { LoginPage } from './LoginPage';
-export type { LoginPageProps } from './LoginPage';
+export { LoginPage } from './LoginPage'
+export type { LoginPageProps } from './LoginPage'
 
 // UnauthorizedPage - Access denied page
-export { UnauthorizedPage } from './UnauthorizedPage';
-export type { UnauthorizedPageProps } from './UnauthorizedPage';
+export { UnauthorizedPage } from './UnauthorizedPage'
+export type { UnauthorizedPageProps } from './UnauthorizedPage'
 
 // NotFoundPage - 404 error page
-export { NotFoundPage } from './NotFoundPage';
-export type { NotFoundPageProps } from './NotFoundPage';
+export { NotFoundPage } from './NotFoundPage'
+export type { NotFoundPageProps } from './NotFoundPage'

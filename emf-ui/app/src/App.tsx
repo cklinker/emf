@@ -65,6 +65,10 @@ import {
   TenantsPage,
   TenantDashboardPage,
   PicklistsPage,
+  PageLayoutsPage,
+  ListViewsPage,
+  ReportsPage,
+  DashboardsPage,
   LoginPage,
   UnauthorizedPage,
   NotFoundPage,
@@ -446,6 +450,46 @@ function App({ plugins = [] }: AppProps): React.ReactElement {
                               element={
                                 <ProtectedPageRoute>
                                   <PicklistsPage />
+                                </ProtectedPageRoute>
+                              }
+                            />
+
+                            {/* Page Layouts route */}
+                            <Route
+                              path="/layouts"
+                              element={
+                                <ProtectedPageRoute>
+                                  <PageLayoutsPage />
+                                </ProtectedPageRoute>
+                              }
+                            />
+
+                            {/* List Views route */}
+                            <Route
+                              path="/listviews"
+                              element={
+                                <ProtectedPageRoute>
+                                  <ListViewsPage />
+                                </ProtectedPageRoute>
+                              }
+                            />
+
+                            {/* Reports route */}
+                            <Route
+                              path="/reports"
+                              element={
+                                <ProtectedPageRoute>
+                                  <ReportsPage />
+                                </ProtectedPageRoute>
+                              }
+                            />
+
+                            {/* Dashboards route */}
+                            <Route
+                              path="/dashboards"
+                              element={
+                                <ProtectedPageRoute>
+                                  <DashboardsPage />
                                 </ProtectedPageRoute>
                               }
                             />

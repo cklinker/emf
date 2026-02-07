@@ -170,6 +170,22 @@ export type { SetupAuditTrailPageProps } from './SetupAuditTrailPage'
 export { GovernorLimitsPage } from './GovernorLimitsPage'
 export type { GovernorLimitsPageProps } from './GovernorLimitsPage'
 
+// PageLayoutsPage - Page layout management page
+export { PageLayoutsPage } from './PageLayoutsPage'
+export type { PageLayoutsPageProps } from './PageLayoutsPage'
+
+// ListViewsPage - List view management page
+export { ListViewsPage } from './ListViewsPage'
+export type { ListViewsPageProps } from './ListViewsPage'
+
+// ReportsPage - Report builder management page
+export { ReportsPage } from './ReportsPage'
+export type { ReportsPageProps } from './ReportsPage'
+
+// DashboardsPage - Dashboard builder management page
+export { DashboardsPage } from './DashboardsPage'
+export type { DashboardsPageProps } from './DashboardsPage'
+
 // NotFoundPage - 404 error page
 export { NotFoundPage } from './NotFoundPage'
 export type { NotFoundPageProps } from './NotFoundPage'

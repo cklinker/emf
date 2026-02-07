@@ -97,14 +97,17 @@ class SchemaMigrationEngineTest {
     
     private String mapFieldTypeToSql(FieldType type) {
         return switch (type) {
-            case STRING -> "TEXT";
+            case STRING, PHONE, EMAIL, URL, RICH_TEXT, EXTERNAL_ID, PICKLIST, AUTO_NUMBER -> "TEXT";
             case INTEGER -> "INTEGER";
             case LONG -> "BIGINT";
-            case DOUBLE -> "DOUBLE PRECISION";
+            case DOUBLE, CURRENCY, PERCENT -> "DOUBLE PRECISION";
             case BOOLEAN -> "BOOLEAN";
             case DATE -> "DATE";
             case DATETIME -> "TIMESTAMP";
-            case JSON -> "CLOB"; // H2 doesn't have JSONB, use CLOB
+            case JSON, ARRAY, MULTI_PICKLIST, GEOLOCATION -> "CLOB"; // H2 doesn't have JSONB, use CLOB
+            case REFERENCE, LOOKUP, MASTER_DETAIL -> "VARCHAR(36)";
+            case ENCRYPTED -> "BINARY(256)";
+            case FORMULA, ROLLUP_SUMMARY -> null;
         };
     }
     

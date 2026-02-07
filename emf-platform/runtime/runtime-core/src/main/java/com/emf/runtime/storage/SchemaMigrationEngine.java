@@ -82,34 +82,72 @@ public class SchemaMigrationEngine {
     static {
         // STRING can change to any type (with data loss risk)
         TYPE_COMPATIBILITY.put(FieldType.STRING, EnumSet.allOf(FieldType.class));
-        
+
         // INTEGER can change to LONG, DOUBLE, STRING
         TYPE_COMPATIBILITY.put(FieldType.INTEGER, EnumSet.of(
             FieldType.INTEGER, FieldType.LONG, FieldType.DOUBLE, FieldType.STRING));
-        
+
         // LONG can change to DOUBLE, STRING
         TYPE_COMPATIBILITY.put(FieldType.LONG, EnumSet.of(
             FieldType.LONG, FieldType.DOUBLE, FieldType.STRING));
-        
+
         // DOUBLE can change to STRING
         TYPE_COMPATIBILITY.put(FieldType.DOUBLE, EnumSet.of(
             FieldType.DOUBLE, FieldType.STRING));
-        
+
         // BOOLEAN can change to STRING
         TYPE_COMPATIBILITY.put(FieldType.BOOLEAN, EnumSet.of(
             FieldType.BOOLEAN, FieldType.STRING));
-        
+
         // DATE can change to DATETIME, STRING
         TYPE_COMPATIBILITY.put(FieldType.DATE, EnumSet.of(
             FieldType.DATE, FieldType.DATETIME, FieldType.STRING));
-        
+
         // DATETIME can change to STRING
         TYPE_COMPATIBILITY.put(FieldType.DATETIME, EnumSet.of(
             FieldType.DATETIME, FieldType.STRING));
-        
+
         // JSON can change to STRING
         TYPE_COMPATIBILITY.put(FieldType.JSON, EnumSet.of(
             FieldType.JSON, FieldType.STRING));
+
+        // --- Phase 2 type compatibility ---
+        TYPE_COMPATIBILITY.put(FieldType.REFERENCE, EnumSet.of(
+            FieldType.REFERENCE, FieldType.LOOKUP, FieldType.STRING));
+        TYPE_COMPATIBILITY.put(FieldType.ARRAY, EnumSet.of(
+            FieldType.ARRAY, FieldType.JSON, FieldType.STRING));
+        TYPE_COMPATIBILITY.put(FieldType.PICKLIST, EnumSet.of(
+            FieldType.PICKLIST, FieldType.STRING));
+        TYPE_COMPATIBILITY.put(FieldType.MULTI_PICKLIST, EnumSet.of(
+            FieldType.MULTI_PICKLIST, FieldType.JSON, FieldType.ARRAY));
+        TYPE_COMPATIBILITY.put(FieldType.CURRENCY, EnumSet.of(
+            FieldType.CURRENCY, FieldType.DOUBLE, FieldType.STRING));
+        TYPE_COMPATIBILITY.put(FieldType.PERCENT, EnumSet.of(
+            FieldType.PERCENT, FieldType.DOUBLE, FieldType.STRING));
+        TYPE_COMPATIBILITY.put(FieldType.AUTO_NUMBER, EnumSet.of(
+            FieldType.AUTO_NUMBER, FieldType.STRING));
+        TYPE_COMPATIBILITY.put(FieldType.PHONE, EnumSet.of(
+            FieldType.PHONE, FieldType.STRING));
+        TYPE_COMPATIBILITY.put(FieldType.EMAIL, EnumSet.of(
+            FieldType.EMAIL, FieldType.STRING));
+        TYPE_COMPATIBILITY.put(FieldType.URL, EnumSet.of(
+            FieldType.URL, FieldType.STRING));
+        TYPE_COMPATIBILITY.put(FieldType.RICH_TEXT, EnumSet.of(
+            FieldType.RICH_TEXT, FieldType.STRING));
+        TYPE_COMPATIBILITY.put(FieldType.ENCRYPTED, EnumSet.of(
+            FieldType.ENCRYPTED, FieldType.STRING));
+        TYPE_COMPATIBILITY.put(FieldType.EXTERNAL_ID, EnumSet.of(
+            FieldType.EXTERNAL_ID, FieldType.STRING));
+        TYPE_COMPATIBILITY.put(FieldType.GEOLOCATION, EnumSet.of(
+            FieldType.GEOLOCATION));
+        TYPE_COMPATIBILITY.put(FieldType.LOOKUP, EnumSet.of(
+            FieldType.LOOKUP, FieldType.REFERENCE, FieldType.STRING));
+        TYPE_COMPATIBILITY.put(FieldType.MASTER_DETAIL, EnumSet.of(
+            FieldType.MASTER_DETAIL, FieldType.LOOKUP));
+        TYPE_COMPATIBILITY.put(FieldType.FORMULA, EnumSet.of(
+            FieldType.FORMULA));
+        TYPE_COMPATIBILITY.put(FieldType.ROLLUP_SUMMARY, EnumSet.of(
+            FieldType.ROLLUP_SUMMARY));
     }
     
     private final JdbcTemplate jdbcTemplate;
@@ -377,25 +415,60 @@ public class SchemaMigrationEngine {
             case DATE -> "DATE";
             case DATETIME -> "TIMESTAMP";
             case JSON -> "JSONB";
+            case REFERENCE -> "VARCHAR(36)";
+            case ARRAY -> "JSONB";
+            case PICKLIST -> "VARCHAR(255)";
+            case MULTI_PICKLIST -> "TEXT[]";
+            case CURRENCY -> "NUMERIC(18,2)";
+            case PERCENT -> "NUMERIC(8,4)";
+            case AUTO_NUMBER -> "VARCHAR(100)";
+            case PHONE -> "VARCHAR(40)";
+            case EMAIL -> "VARCHAR(320)";
+            case URL -> "VARCHAR(2048)";
+            case RICH_TEXT -> "TEXT";
+            case ENCRYPTED -> "BYTEA";
+            case EXTERNAL_ID -> "VARCHAR(255)";
+            case GEOLOCATION -> "DOUBLE PRECISION";
+            case LOOKUP -> "VARCHAR(36)";
+            case MASTER_DETAIL -> "VARCHAR(36)";
+            case FORMULA, ROLLUP_SUMMARY -> null;
         };
     }
     
-    private MigrationAction createAddColumnMigration(String tableName, String collectionName, 
+    private MigrationAction createAddColumnMigration(String tableName, String collectionName,
             FieldDefinition field) {
+        if (!field.type().hasPhysicalColumn()) {
+            // FORMULA and ROLLUP_SUMMARY have no physical column
+            return new MigrationAction(collectionName, MigrationType.ADD_COLUMN,
+                "-- No physical column for computed field: " + field.name());
+        }
+
         StringBuilder sql = new StringBuilder("ALTER TABLE ");
         sql.append(sanitizeIdentifier(tableName));
         sql.append(" ADD COLUMN ");
         sql.append(sanitizeIdentifier(field.name()));
         sql.append(" ");
         sql.append(mapFieldTypeToSql(field.type()));
-        
+
         // Note: We don't add NOT NULL for new columns as existing rows would fail
         // The application layer handles nullability validation
-        
+
         if (field.unique()) {
             sql.append(" UNIQUE");
         }
-        
+
+        // Companion columns
+        if (field.type() == FieldType.CURRENCY) {
+            sql.append("; ALTER TABLE ").append(sanitizeIdentifier(tableName));
+            sql.append(" ADD COLUMN ").append(sanitizeIdentifier(field.name() + "_currency_code"));
+            sql.append(" VARCHAR(3)");
+        }
+        if (field.type() == FieldType.GEOLOCATION) {
+            sql.append("; ALTER TABLE ").append(sanitizeIdentifier(tableName));
+            sql.append(" ADD COLUMN ").append(sanitizeIdentifier(field.name() + "_longitude"));
+            sql.append(" DOUBLE PRECISION");
+        }
+
         return new MigrationAction(collectionName, MigrationType.ADD_COLUMN, sql.toString());
     }
     

@@ -25,57 +25,80 @@
  * - Accessible with keyboard navigation and ARIA attributes
  */
 
-import React, { useEffect, useCallback, useMemo } from 'react';
-import { useForm, useFieldArray, Controller } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { useI18n } from '../../context/I18nContext';
-import { LoadingSpinner } from '../LoadingSpinner';
-import styles from './FieldEditor.module.css';
+import React, { useEffect, useCallback, useMemo } from 'react'
+import { useForm, useFieldArray, Controller } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
+import { useI18n } from '../../context/I18nContext'
+import { LoadingSpinner } from '../LoadingSpinner'
+import styles from './FieldEditor.module.css'
 
 /**
  * Field type enumeration
  */
-export type FieldType = 'string' | 'number' | 'boolean' | 'date' | 'datetime' | 'json' | 'reference';
+export type FieldType =
+  | 'string'
+  | 'number'
+  | 'boolean'
+  | 'date'
+  | 'datetime'
+  | 'json'
+  | 'reference'
+  | 'picklist'
+  | 'multi_picklist'
+  | 'currency'
+  | 'percent'
+  | 'auto_number'
+  | 'phone'
+  | 'email'
+  | 'url'
+  | 'rich_text'
+  | 'encrypted'
+  | 'external_id'
+  | 'geolocation'
+  | 'lookup'
+  | 'master_detail'
+  | 'formula'
+  | 'rollup_summary'
 
 /**
  * Validation rule type enumeration
  */
-export type ValidationRuleType = 'min' | 'max' | 'pattern' | 'email' | 'url' | 'custom';
+export type ValidationRuleType = 'min' | 'max' | 'pattern' | 'email' | 'url' | 'custom'
 
 /**
  * Validation rule interface
  */
 export interface ValidationRule {
-  type: ValidationRuleType;
-  value?: unknown;
-  message?: string;
+  type: ValidationRuleType
+  value?: unknown
+  message?: string
 }
 
 /**
  * Field definition interface
  */
 export interface FieldDefinition {
-  id: string;
-  name: string;
-  displayName?: string;
-  type: FieldType;
-  required: boolean;
-  unique: boolean;
-  indexed: boolean;
-  defaultValue?: unknown;
-  validation?: ValidationRule[];
-  referenceTarget?: string;
-  order: number;
+  id: string
+  name: string
+  displayName?: string
+  type: FieldType
+  required: boolean
+  unique: boolean
+  indexed: boolean
+  defaultValue?: unknown
+  validation?: ValidationRule[]
+  referenceTarget?: string
+  order: number
 }
 
 /**
  * Collection summary for reference field dropdown
  */
 export interface CollectionSummary {
-  id: string;
-  name: string;
-  displayName: string;
+  id: string
+  name: string
+  displayName: string
 }
 
 /**
@@ -83,25 +106,49 @@ export interface CollectionSummary {
  */
 export interface FieldEditorProps {
   /** Collection ID for context */
-  collectionId: string;
+  collectionId: string
   /** Existing field for edit mode */
-  field?: FieldDefinition;
+  field?: FieldDefinition
   /** Available collections for reference field dropdown */
-  collections?: CollectionSummary[];
+  collections?: CollectionSummary[]
   /** Callback when form is submitted */
-  onSave: (field: FieldDefinition) => Promise<void>;
+  onSave: (field: FieldDefinition) => Promise<void>
   /** Callback when form is cancelled */
-  onCancel: () => void;
+  onCancel: () => void
   /** Whether the form is submitting */
-  isSubmitting?: boolean;
+  isSubmitting?: boolean
   /** Test ID */
-  testId?: string;
+  testId?: string
 }
 
 /**
  * All available field types
  */
-export const FIELD_TYPES: FieldType[] = ['string', 'number', 'boolean', 'date', 'datetime', 'json', 'reference'];
+export const FIELD_TYPES: FieldType[] = [
+  'string',
+  'number',
+  'boolean',
+  'date',
+  'datetime',
+  'json',
+  'reference',
+  'picklist',
+  'multi_picklist',
+  'currency',
+  'percent',
+  'auto_number',
+  'phone',
+  'email',
+  'url',
+  'rich_text',
+  'encrypted',
+  'external_id',
+  'geolocation',
+  'lookup',
+  'master_detail',
+  'formula',
+  'rollup_summary',
+]
 
 /**
  * Validation rule types available for each field type
@@ -114,7 +161,23 @@ export const VALIDATION_RULES_BY_TYPE: Record<FieldType, ValidationRuleType[]> =
   datetime: ['min', 'max'],
   json: [],
   reference: [],
-};
+  picklist: [],
+  multi_picklist: [],
+  currency: ['min', 'max'],
+  percent: ['min', 'max'],
+  auto_number: [],
+  phone: ['pattern'],
+  email: ['pattern'],
+  url: ['pattern'],
+  rich_text: ['min', 'max'],
+  encrypted: [],
+  external_id: ['pattern'],
+  geolocation: [],
+  lookup: [],
+  master_detail: [],
+  formula: [],
+  rollup_summary: [],
+}
 
 /**
  * Form validation rule schema
@@ -123,55 +186,80 @@ const validationRuleSchema = z.object({
   type: z.enum(['min', 'max', 'pattern', 'email', 'url', 'custom']),
   value: z.union([z.string(), z.number(), z.null()]).optional(),
   message: z.string().optional(),
-});
+})
 
 /**
  * Zod validation schema for field form
  */
-export const fieldEditorSchema = z.object({
-  name: z
-    .string()
-    .min(1, 'validation.nameRequired')
-    .max(50, 'validation.nameTooLong')
-    .regex(/^[a-z][a-z0-9_]*$/, 'validation.nameFormat'),
-  displayName: z
-    .string()
-    .max(100, 'validation.displayNameTooLong')
-    .optional()
-    .or(z.literal('')),
-  type: z.enum(['string', 'number', 'boolean', 'date', 'datetime', 'json', 'reference'], {
-    message: 'validation.typeRequired',
-  }),
-  required: z.boolean(),
-  unique: z.boolean(),
-  indexed: z.boolean(),
-  defaultValue: z.string().optional().or(z.literal('')),
-  referenceTarget: z.string().optional().or(z.literal('')),
-  validationRules: z.array(validationRuleSchema).optional(),
-}).refine(
-  (data) => {
-    // Reference type requires referenceTarget
-    if (data.type === 'reference' && !data.referenceTarget) {
-      return false;
+export const fieldEditorSchema = z
+  .object({
+    name: z
+      .string()
+      .min(1, 'validation.nameRequired')
+      .max(50, 'validation.nameTooLong')
+      .regex(/^[a-z][a-z0-9_]*$/, 'validation.nameFormat'),
+    displayName: z.string().max(100, 'validation.displayNameTooLong').optional().or(z.literal('')),
+    type: z.enum(
+      [
+        'string',
+        'number',
+        'boolean',
+        'date',
+        'datetime',
+        'json',
+        'reference',
+        'picklist',
+        'multi_picklist',
+        'currency',
+        'percent',
+        'auto_number',
+        'phone',
+        'email',
+        'url',
+        'rich_text',
+        'encrypted',
+        'external_id',
+        'geolocation',
+        'lookup',
+        'master_detail',
+        'formula',
+        'rollup_summary',
+      ],
+      {
+        message: 'validation.typeRequired',
+      }
+    ),
+    required: z.boolean(),
+    unique: z.boolean(),
+    indexed: z.boolean(),
+    defaultValue: z.string().optional().or(z.literal('')),
+    referenceTarget: z.string().optional().or(z.literal('')),
+    validationRules: z.array(validationRuleSchema).optional(),
+  })
+  .refine(
+    (data) => {
+      // Reference type requires referenceTarget
+      if (data.type === 'reference' && !data.referenceTarget) {
+        return false
+      }
+      return true
+    },
+    {
+      message: 'validation.referenceTargetRequired',
+      path: ['referenceTarget'],
     }
-    return true;
-  },
-  {
-    message: 'validation.referenceTargetRequired',
-    path: ['referenceTarget'],
-  }
-);
+  )
 
 /**
  * Type inferred from the Zod schema
  */
-export type FieldEditorFormData = z.infer<typeof fieldEditorSchema>;
+export type FieldEditorFormData = z.infer<typeof fieldEditorSchema>
 
 /**
  * Generate a unique ID for new fields
  */
 function generateFieldId(): string {
-  return `field_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  return `field_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
 }
 
 /**
@@ -197,8 +285,8 @@ export function FieldEditor({
   isSubmitting = false,
   testId = 'field-editor',
 }: FieldEditorProps): React.ReactElement {
-  const { t } = useI18n();
-  const isEditMode = !!field;
+  const { t } = useI18n()
+  const isEditMode = !!field
 
   // Initialize form with React Hook Form and Zod resolver
   const {
@@ -219,28 +307,38 @@ export function FieldEditor({
       indexed: field?.indexed ?? false,
       defaultValue: field?.defaultValue !== undefined ? String(field.defaultValue) : '',
       referenceTarget: field?.referenceTarget ?? '',
-      validationRules: field?.validation?.map(v => ({
-        type: v.type,
-        value: v.value !== undefined ? (typeof v.value === 'number' ? v.value : String(v.value)) : undefined,
-        message: v.message,
-      })) ?? [],
+      validationRules:
+        field?.validation?.map((v) => ({
+          type: v.type,
+          value:
+            v.value !== undefined
+              ? typeof v.value === 'number'
+                ? v.value
+                : String(v.value)
+              : undefined,
+          message: v.message,
+        })) ?? [],
     },
     mode: 'onBlur',
-  });
+  })
 
   // Field array for validation rules
-  const { fields: validationFields, append, remove } = useFieldArray({
+  const {
+    fields: validationFields,
+    append,
+    remove,
+  } = useFieldArray({
     control,
     name: 'validationRules',
-  });
+  })
 
   // Watch field type to show/hide reference target and validation rules
-  const watchedType = watch('type');
+  const watchedType = watch('type')
 
   // Get available validation rules for current field type
   const availableValidationRules = useMemo(() => {
-    return VALIDATION_RULES_BY_TYPE[watchedType] || [];
-  }, [watchedType]);
+    return VALIDATION_RULES_BY_TYPE[watchedType] || []
+  }, [watchedType])
 
   // Reset form when field prop changes (for edit mode)
   useEffect(() => {
@@ -254,59 +352,65 @@ export function FieldEditor({
         indexed: field.indexed,
         defaultValue: field.defaultValue !== undefined ? String(field.defaultValue) : '',
         referenceTarget: field.referenceTarget ?? '',
-        validationRules: field.validation?.map(v => ({
-          type: v.type,
-          value: v.value !== undefined ? (typeof v.value === 'number' ? v.value : String(v.value)) : undefined,
-          message: v.message,
-        })) ?? [],
-      });
+        validationRules:
+          field.validation?.map((v) => ({
+            type: v.type,
+            value:
+              v.value !== undefined
+                ? typeof v.value === 'number'
+                  ? v.value
+                  : String(v.value)
+                : undefined,
+            message: v.message,
+          })) ?? [],
+      })
     }
-  }, [field, reset]);
+  }, [field, reset])
 
   // Handle form submission
   const handleFormSubmit = useCallback(
     async (data: FieldEditorFormData) => {
       // Convert validation rules
       const validationRules: ValidationRule[] = (data.validationRules || [])
-        .filter(rule => rule.type)
-        .map(rule => {
-          const result: ValidationRule = { type: rule.type };
-          
+        .filter((rule) => rule.type)
+        .map((rule) => {
+          const result: ValidationRule = { type: rule.type }
+
           // Convert value based on rule type
           if (rule.value !== undefined && rule.value !== null && rule.value !== '') {
             if (rule.type === 'min' || rule.type === 'max') {
-              result.value = Number(rule.value);
+              result.value = Number(rule.value)
             } else {
-              result.value = rule.value;
+              result.value = rule.value
             }
           }
-          
+
           if (rule.message) {
-            result.message = rule.message;
+            result.message = rule.message
           }
-          
-          return result;
-        });
+
+          return result
+        })
 
       // Parse default value based on field type
-      let parsedDefaultValue: unknown = undefined;
+      let parsedDefaultValue: unknown = undefined
       if (data.defaultValue && data.defaultValue !== '') {
         switch (data.type) {
           case 'number':
-            parsedDefaultValue = Number(data.defaultValue);
-            break;
+            parsedDefaultValue = Number(data.defaultValue)
+            break
           case 'boolean':
-            parsedDefaultValue = data.defaultValue === 'true';
-            break;
+            parsedDefaultValue = data.defaultValue === 'true'
+            break
           case 'json':
             try {
-              parsedDefaultValue = JSON.parse(data.defaultValue);
+              parsedDefaultValue = JSON.parse(data.defaultValue)
             } catch {
-              parsedDefaultValue = data.defaultValue;
+              parsedDefaultValue = data.defaultValue
             }
-            break;
+            break
           default:
-            parsedDefaultValue = data.defaultValue;
+            parsedDefaultValue = data.defaultValue
         }
       }
 
@@ -322,37 +426,40 @@ export function FieldEditor({
         validation: validationRules.length > 0 ? validationRules : undefined,
         referenceTarget: data.type === 'reference' ? data.referenceTarget : undefined,
         order: field?.order ?? 0,
-      };
+      }
 
-      await onSave(fieldData);
+      await onSave(fieldData)
     },
     [field, onSave]
-  );
+  )
 
   // Get translated error message
   const getErrorMessage = useCallback(
     (errorKey: string | undefined): string | undefined => {
-      if (!errorKey) return undefined;
+      if (!errorKey) return undefined
       // Check if it's a translation key
       if (errorKey.startsWith('validation.')) {
-        return t(`fieldEditor.${errorKey}`);
+        return t(`fieldEditor.${errorKey}`)
       }
-      return errorKey;
+      return errorKey
     },
     [t]
-  );
+  )
 
   // Add a new validation rule
   const handleAddValidationRule = useCallback(() => {
     if (availableValidationRules.length > 0) {
-      append({ type: availableValidationRules[0], value: undefined, message: '' });
+      append({ type: availableValidationRules[0], value: undefined, message: '' })
     }
-  }, [append, availableValidationRules]);
+  }, [append, availableValidationRules])
 
   // Check if a validation rule type is already used
-  const isRuleTypeUsed = useCallback((ruleType: ValidationRuleType) => {
-    return validationFields.some(field => field.type === ruleType);
-  }, [validationFields]);
+  const isRuleTypeUsed = useCallback(
+    (ruleType: ValidationRuleType) => {
+      return validationFields.some((field) => field.type === ruleType)
+    },
+    [validationFields]
+  )
 
   return (
     <form
@@ -369,7 +476,9 @@ export function FieldEditor({
       <div className={styles.fieldGroup}>
         <label htmlFor="field-name" className={styles.label}>
           {t('collections.fieldName')}
-          <span className={styles.required} aria-hidden="true">*</span>
+          <span className={styles.required} aria-hidden="true">
+            *
+          </span>
         </label>
         <input
           id="field-name"
@@ -433,7 +542,9 @@ export function FieldEditor({
       <div className={styles.fieldGroup}>
         <label htmlFor="field-type" className={styles.label}>
           {t('collections.fieldType')}
-          <span className={styles.required} aria-hidden="true">*</span>
+          <span className={styles.required} aria-hidden="true">
+            *
+          </span>
         </label>
         <select
           id="field-type"
@@ -468,7 +579,9 @@ export function FieldEditor({
         <div className={styles.fieldGroup}>
           <label htmlFor="field-reference-target" className={styles.label}>
             {t('fieldEditor.referenceTarget')}
-            <span className={styles.required} aria-hidden="true">*</span>
+            <span className={styles.required} aria-hidden="true">
+              *
+            </span>
           </label>
           <select
             id="field-reference-target"
@@ -476,7 +589,11 @@ export function FieldEditor({
             disabled={isSubmitting}
             aria-required="true"
             aria-invalid={!!errors.referenceTarget}
-            aria-describedby={errors.referenceTarget ? 'field-reference-target-error' : 'field-reference-target-hint'}
+            aria-describedby={
+              errors.referenceTarget
+                ? 'field-reference-target-error'
+                : 'field-reference-target-hint'
+            }
             data-testid="field-reference-target-select"
             {...register('referenceTarget')}
           >
@@ -592,7 +709,11 @@ export function FieldEditor({
           )}
 
           {validationFields.map((validationField, index) => (
-            <div key={validationField.id} className={styles.validationRule} data-testid={`validation-rule-${index}`}>
+            <div
+              key={validationField.id}
+              className={styles.validationRule}
+              data-testid={`validation-rule-${index}`}
+            >
               <div className={styles.ruleFields}>
                 <div className={styles.ruleTypeField}>
                   <label htmlFor={`validation-rule-type-${index}`} className={styles.ruleLabel}>
@@ -613,7 +734,9 @@ export function FieldEditor({
                           <option
                             key={ruleType}
                             value={ruleType}
-                            disabled={isRuleTypeUsed(ruleType) && controllerField.value !== ruleType}
+                            disabled={
+                              isRuleTypeUsed(ruleType) && controllerField.value !== ruleType
+                            }
                           >
                             {t(`fields.validation.${ruleType}`)}
                           </option>
@@ -701,13 +824,15 @@ export function FieldEditor({
                 {isEditMode ? t('common.save') : t('common.create')}
               </span>
             </>
+          ) : isEditMode ? (
+            t('common.save')
           ) : (
-            isEditMode ? t('common.save') : t('common.create')
+            t('common.create')
           )}
         </button>
       </div>
     </form>
-  );
+  )
 }
 
-export default FieldEditor;
+export default FieldEditor

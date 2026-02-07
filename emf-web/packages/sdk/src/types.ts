@@ -18,13 +18,37 @@ export interface ResourceMetadata {
  */
 export interface FieldDefinition {
   name: string;
-  type: 'string' | 'number' | 'boolean' | 'date' | 'datetime' | 'json' | 'reference';
+  type:
+    | 'string'
+    | 'number'
+    | 'boolean'
+    | 'date'
+    | 'datetime'
+    | 'json'
+    | 'reference'
+    | 'picklist'
+    | 'multi_picklist'
+    | 'currency'
+    | 'percent'
+    | 'auto_number'
+    | 'phone'
+    | 'email'
+    | 'url'
+    | 'rich_text'
+    | 'encrypted'
+    | 'external_id'
+    | 'geolocation'
+    | 'lookup'
+    | 'master_detail'
+    | 'formula'
+    | 'rollup_summary';
   displayName?: string;
   required?: boolean;
   unique?: boolean;
   validation?: ValidationRule[];
   defaultValue?: unknown;
   referenceTarget?: string;
+  fieldTypeConfig?: Record<string, unknown>;
 }
 
 /**

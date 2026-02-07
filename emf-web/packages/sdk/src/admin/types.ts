@@ -22,6 +22,64 @@ export interface CollectionDefinition {
 }
 
 /**
+ * Supported field types
+ */
+export type FieldType =
+  | 'string'
+  | 'number'
+  | 'boolean'
+  | 'date'
+  | 'datetime'
+  | 'json'
+  | 'reference'
+  | 'picklist'
+  | 'multi_picklist'
+  | 'currency'
+  | 'percent'
+  | 'auto_number'
+  | 'phone'
+  | 'email'
+  | 'url'
+  | 'rich_text'
+  | 'encrypted'
+  | 'external_id'
+  | 'geolocation'
+  | 'lookup'
+  | 'master_detail'
+  | 'formula'
+  | 'rollup_summary';
+
+/**
+ * Type-specific configuration for fields
+ */
+export interface FieldTypeConfig {
+  /** Picklist: global picklist ID */
+  globalPicklistId?: string;
+  /** AutoNumber: prefix string */
+  prefix?: string;
+  /** AutoNumber: zero-padding width */
+  padding?: number;
+  /** Currency: decimal precision (0-6) */
+  precision?: number;
+  /** Currency: default ISO 4217 code */
+  defaultCurrencyCode?: string;
+  /** Formula: expression string */
+  expression?: string;
+  /** Formula: return type */
+  returnType?: string;
+  /** RollupSummary: child collection name */
+  childCollection?: string;
+  /** RollupSummary: aggregate function */
+  aggregateFunction?: 'COUNT' | 'SUM' | 'MIN' | 'MAX' | 'AVG';
+  /** RollupSummary: field to aggregate */
+  aggregateField?: string;
+  /** Geolocation: latitude */
+  latitude?: number;
+  /** Geolocation: longitude */
+  longitude?: number;
+}
+
+/**
  * Field definition
  */
 export interface FieldDefinition {
@@ -29,12 +87,13 @@ export interface FieldDefinition {
   collectionId?: string;
   name: string;
   displayName?: string;
-  type: string;
+  type: FieldType;
   required?: boolean;
   unique?: boolean;
   indexed?: boolean;
   defaultValue?: string;
   referenceTarget?: string;
+  fieldTypeConfig?: FieldTypeConfig;
   order?: number;
   active?: boolean;
   description?: string;

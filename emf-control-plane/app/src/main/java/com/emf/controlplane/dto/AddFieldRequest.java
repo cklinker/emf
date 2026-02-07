@@ -15,8 +15,6 @@ public class AddFieldRequest {
     private String name;
 
     @NotBlank(message = "Field type is required")
-    @Pattern(regexp = "^(string|number|boolean|date|datetime|reference|array|object)$", 
-             message = "Field type must be one of: string, number, boolean, date, datetime, reference, array, object")
     private String type;
 
     private boolean required = false;
@@ -34,6 +32,16 @@ public class AddFieldRequest {
      */
     private String constraints;
 
+    /**
+     * JSON string containing type-specific configuration.
+     * Examples:
+     * - For PICKLIST: {"globalPicklistId": "uuid", "restricted": true}
+     * - For AUTO_NUMBER: {"prefix": "TICKET-", "padding": 4, "startValue": 1}
+     * - For CURRENCY: {"precision": 2, "defaultCurrencyCode": "USD"}
+     * - For FORMULA: {"expression": "Amount * Quantity", "returnType": "DOUBLE"}
+     */
+    private String fieldTypeConfig;
+
     public AddFieldRequest() {
     }
 
@@ -48,6 +56,16 @@ public class AddFieldRequest {
         this.required = required;
         this.description = description;
         this.constraints = constraints;
+    }
+
+    public AddFieldRequest(String name, String type, boolean required, String description,
+                           String constraints, String fieldTypeConfig) {
+        this.name = name;
+        this.type = type;
+        this.required = required;
+        this.description = description;
+        this.constraints = constraints;
+        this.fieldTypeConfig = fieldTypeConfig;
     }
 
     public String getName() {
@@ -88,6 +106,14 @@ public class AddFieldRequest {
 
     public void setConstraints(String constraints) {
         this.constraints = constraints;
+    }
+
+    public String getFieldTypeConfig() {
+        return fieldTypeConfig;
+    }
+
+    public void setFieldTypeConfig(String fieldTypeConfig) {
+        this.fieldTypeConfig = fieldTypeConfig;
     }
 
     @Override

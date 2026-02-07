@@ -49,6 +49,8 @@ function buildZodSchema(fields: FieldDefinition[]): z.ZodObject<Record<string, z
         fieldSchema = z.boolean().optional().default(false);
         break;
       case 'number':
+      case 'currency':
+      case 'percent':
         // Handle number fields - allow empty strings and convert to undefined
         fieldSchema = z.preprocess(
           (val) => {
@@ -66,6 +68,7 @@ function buildZodSchema(fields: FieldDefinition[]): z.ZodObject<Record<string, z
           .refine((val) => !val || !isNaN(Date.parse(val)), { message: 'Invalid date format' });
         break;
       case 'json':
+      case 'geolocation':
         fieldSchema = z.string().refine(
           (val) => {
             if (!val) return true;
@@ -79,29 +82,59 @@ function buildZodSchema(fields: FieldDefinition[]): z.ZodObject<Record<string, z
           { message: 'Invalid JSON format' }
         );
         break;
+      case 'email':
+        fieldSchema = z.string().refine((val) => !val || /^[^@]+@[^@]+\.[^@]+$/.test(val), {
+          message: 'Invalid email format',
+        });
+        break;
+      case 'url':
+        fieldSchema = z.string().refine(
+          (val) => {
+            if (!val) return true;
+            try {
+              new URL(val);
+              return true;
+            } catch {
+              return false;
+            }
+          },
+          { message: 'Invalid URL format' }
+        );
+        break;
       case 'reference':
+      case 'lookup':
+      case 'master_detail':
         fieldSchema = z.string();
         break;
       case 'string':
+      case 'phone':
+      case 'rich_text':
+      case 'encrypted':
+      case 'external_id':
+      case 'picklist':
+      case 'auto_number':
       default:
         fieldSchema = z.string();
         break;
     }
 
+    const isNumericType =
+      field.type === 'number' || field.type === 'currency' || field.type === 'percent';
+
     // Apply validation rules (only for non-number types, as number is handled above)
-    if (field.validation && field.type !== 'number') {
+    if (field.validation && !isNumericType) {
       fieldSchema = applyValidationRules(
         fieldSchema,
         field.validation as Record<string, unknown>,
         field.type
       );
-    } else if (field.validation && field.type === 'number') {
+    } else if (field.validation && isNumericType) {
       // For numbers, we need to apply validation after the preprocess
       // This is handled in the preprocess above
     }
 
     // Handle required/optional for non-number types (number is handled in preprocess)
-    if (!field.required && field.type !== 'number' && field.type !== 'boolean') {
+    if (!field.required && !isNumericType && field.type !== 'boolean') {
       fieldSchema = fieldSchema.optional().or(z.literal(''));
     }
 
@@ -448,12 +481,15 @@ function transformFormData(
 
     switch (field.type) {
       case 'number':
+      case 'currency':
+      case 'percent':
         result[field.name] = value !== '' && value !== undefined ? Number(value) : undefined;
         break;
       case 'boolean':
         result[field.name] = Boolean(value);
         break;
       case 'json':
+      case 'geolocation':
         if (typeof value === 'string' && value) {
           try {
             result[field.name] = JSON.parse(value);
@@ -535,6 +571,8 @@ function renderDefaultFieldInput(
     case 'boolean':
       return <input type="checkbox" {...register(field.name)} {...commonProps} />;
     case 'number':
+    case 'currency':
+    case 'percent':
       return (
         <input type="number" {...register(field.name, { valueAsNumber: true })} {...commonProps} />
       );
@@ -543,6 +581,7 @@ function renderDefaultFieldInput(
     case 'datetime':
       return <input type="datetime-local" {...register(field.name)} {...commonProps} />;
     case 'json':
+    case 'geolocation':
       return (
         <textarea
           {...register(field.name)}
@@ -551,7 +590,15 @@ function renderDefaultFieldInput(
           placeholder="Enter valid JSON"
         />
       );
+    case 'email':
+      return <input type="email" {...register(field.name)} {...commonProps} />;
+    case 'url':
+      return <input type="url" {...register(field.name)} {...commonProps} />;
+    case 'phone':
+      return <input type="tel" {...register(field.name)} {...commonProps} />;
     case 'reference':
+    case 'lookup':
+    case 'master_detail':
       return (
         <input
           type="text"
@@ -560,6 +607,17 @@ function renderDefaultFieldInput(
           placeholder={`Reference to ${field.referenceTarget ?? 'resource'}`}
         />
       );
+    case 'rich_text':
+      return (
+        <textarea
+          {...register(field.name)}
+          {...commonProps}
+          rows={6}
+          placeholder="Enter rich text content"
+        />
+      );
+    case 'encrypted':
+      return <input type="password" {...register(field.name)} {...commonProps} />;
     case 'string':
     default:
       return <input type="text" {...register(field.name)} {...commonProps} />;

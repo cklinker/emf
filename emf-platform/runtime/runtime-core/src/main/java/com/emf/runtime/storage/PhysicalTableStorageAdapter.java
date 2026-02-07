@@ -82,24 +82,54 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         sql.append("created_at TIMESTAMP NOT NULL, ");
         sql.append("updated_at TIMESTAMP NOT NULL");
         
+        List<String> postCreateStatements = new ArrayList<>();
+
         for (FieldDefinition field : definition.fields()) {
+            if (!field.type().hasPhysicalColumn()) {
+                continue; // Skip FORMULA, ROLLUP_SUMMARY
+            }
+
+            String sqlType = mapFieldTypeToSql(field.type());
             sql.append(", ");
-            sql.append(sanitizeIdentifier(field.name())).append(" ");
-            sql.append(mapFieldTypeToSql(field.type()));
-            
+            sql.append(sanitizeIdentifier(field.name())).append(" ").append(sqlType);
+
             if (!field.nullable()) {
                 sql.append(" NOT NULL");
             }
-            
+
             if (field.unique()) {
                 sql.append(" UNIQUE");
             }
+
+            // Companion columns
+            if (field.type() == FieldType.CURRENCY) {
+                sql.append(", ");
+                sql.append(sanitizeIdentifier(field.name() + "_currency_code")).append(" VARCHAR(3)");
+            }
+            if (field.type() == FieldType.GEOLOCATION) {
+                sql.append(", ");
+                sql.append(sanitizeIdentifier(field.name() + "_longitude")).append(" DOUBLE PRECISION");
+            }
+
+            // Unique index for EXTERNAL_ID
+            if (field.type() == FieldType.EXTERNAL_ID) {
+                String tableName2 = getTableName(definition);
+                postCreateStatements.add(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS idx_" + sanitizeIdentifier(tableName2)
+                    + "_" + sanitizeIdentifier(field.name())
+                    + " ON " + sanitizeIdentifier(tableName2) + "(" + sanitizeIdentifier(field.name()) + ")"
+                );
+            }
         }
-        
+
         sql.append(")");
-        
+
         try {
             jdbcTemplate.execute(sql.toString());
+
+            for (String stmt : postCreateStatements) {
+                jdbcTemplate.execute(stmt);
+            }
             
             // Record the migration in history
             migrationEngine.recordMigration(definition.name(), 
@@ -190,12 +220,25 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         
         // Add user-defined fields
         for (FieldDefinition field : definition.fields()) {
+            if (!field.type().hasPhysicalColumn()) {
+                continue; // Skip FORMULA, ROLLUP_SUMMARY
+            }
             if (data.containsKey(field.name())) {
                 columns.add(sanitizeIdentifier(field.name()));
                 values.add(convertValueForStorage(data.get(field.name()), field.type()));
+
+                // Handle companion columns
+                if (field.type() == FieldType.CURRENCY && data.containsKey(field.name() + "_currency_code")) {
+                    columns.add(sanitizeIdentifier(field.name() + "_currency_code"));
+                    values.add(data.get(field.name() + "_currency_code"));
+                }
+                if (field.type() == FieldType.GEOLOCATION && data.get(field.name()) instanceof Map<?,?> geo) {
+                    columns.add(sanitizeIdentifier(field.name() + "_longitude"));
+                    values.add(((Number) geo.get("longitude")).doubleValue());
+                }
             }
         }
-        
+
         String columnList = String.join(", ", columns);
         String placeholders = columns.stream().map(c -> "?").collect(Collectors.joining(", "));
         
@@ -356,6 +399,23 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
             case DATE -> "DATE";
             case DATETIME -> "TIMESTAMP";
             case JSON -> "JSONB";
+            case REFERENCE -> "VARCHAR(36)";
+            case ARRAY -> "JSONB";
+            case PICKLIST -> "VARCHAR(255)";
+            case MULTI_PICKLIST -> "TEXT[]";
+            case CURRENCY -> "NUMERIC(18,2)";
+            case PERCENT -> "NUMERIC(8,4)";
+            case AUTO_NUMBER -> "VARCHAR(100)";
+            case PHONE -> "VARCHAR(40)";
+            case EMAIL -> "VARCHAR(320)";
+            case URL -> "VARCHAR(2048)";
+            case RICH_TEXT -> "TEXT";
+            case ENCRYPTED -> "BYTEA";
+            case EXTERNAL_ID -> "VARCHAR(255)";
+            case GEOLOCATION -> "DOUBLE PRECISION";
+            case LOOKUP -> "VARCHAR(36)";
+            case MASTER_DETAIL -> "VARCHAR(36)";
+            case FORMULA, ROLLUP_SUMMARY -> null;
         };
     }
     
@@ -516,13 +576,13 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         if (value == null) {
             return null;
         }
-        
+
         return switch (type) {
-            case JSON -> {
+            case JSON, ARRAY -> {
                 // Convert Map/List to JSON string for JSONB storage
                 if (value instanceof Map || value instanceof List) {
                     try {
-                        com.fasterxml.jackson.databind.ObjectMapper mapper = 
+                        com.fasterxml.jackson.databind.ObjectMapper mapper =
                             new com.fasterxml.jackson.databind.ObjectMapper();
                         yield mapper.writeValueAsString(value);
                     } catch (Exception e) {
@@ -535,6 +595,19 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
                 // Handle Instant conversion
                 if (value instanceof java.time.Instant instant) {
                     yield java.sql.Timestamp.from(instant);
+                }
+                yield value;
+            }
+            case MULTI_PICKLIST -> {
+                if (value instanceof List<?> list) {
+                    yield list.toArray(new String[0]);
+                }
+                yield value;
+            }
+            case GEOLOCATION -> {
+                // Value is Map with latitude/longitude; store latitude in primary column
+                if (value instanceof Map<?,?> geo) {
+                    yield ((Number) geo.get("latitude")).doubleValue();
                 }
                 yield value;
             }

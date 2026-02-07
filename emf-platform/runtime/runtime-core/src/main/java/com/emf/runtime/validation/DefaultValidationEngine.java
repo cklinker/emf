@@ -149,15 +149,19 @@ public class DefaultValidationEngine implements ValidationEngine {
      */
     private boolean isValidType(Object value, FieldType expectedType) {
         return switch (expectedType) {
-            case STRING -> value instanceof String;
+            case STRING, PHONE, EMAIL, URL, RICH_TEXT, ENCRYPTED, EXTERNAL_ID, PICKLIST -> value instanceof String;
             case INTEGER -> value instanceof Integer || isIntegerCompatible(value);
             case LONG -> value instanceof Long || value instanceof Integer || isLongCompatible(value);
-            case DOUBLE -> value instanceof Double || value instanceof Float || 
+            case DOUBLE, CURRENCY, PERCENT -> value instanceof Double || value instanceof Float ||
                            value instanceof Long || value instanceof Integer || isDoubleCompatible(value);
             case BOOLEAN -> value instanceof Boolean;
             case DATE -> isValidDate(value);
             case DATETIME -> isValidDateTime(value);
-            case JSON -> value instanceof Map || value instanceof List;
+            case JSON, GEOLOCATION -> value instanceof Map || value instanceof List;
+            case REFERENCE, LOOKUP, MASTER_DETAIL -> value instanceof String;
+            case ARRAY, MULTI_PICKLIST -> value instanceof List;
+            case AUTO_NUMBER -> value instanceof String || value instanceof Number;
+            case FORMULA, ROLLUP_SUMMARY -> true; // Computed fields accept any value (ignored)
         };
     }
     

@@ -54,6 +54,13 @@ public class Field extends BaseEntity {
     @Column(name = "description", length = 500)
     private String description;
 
+    @Column(name = "field_type_config", columnDefinition = "jsonb")
+    @JdbcTypeCode(SqlTypes.JSON)
+    private String fieldTypeConfig;
+
+    @Column(name = "auto_number_sequence_name", length = 100)
+    private String autoNumberSequenceName;
+
     public Field() {
         super();
     }
@@ -167,6 +174,22 @@ public class Field extends BaseEntity {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public String getFieldTypeConfig() {
+        return fieldTypeConfig;
+    }
+
+    public void setFieldTypeConfig(String fieldTypeConfig) {
+        this.fieldTypeConfig = fieldTypeConfig;
+    }
+
+    public String getAutoNumberSequenceName() {
+        return autoNumberSequenceName;
+    }
+
+    public void setAutoNumberSequenceName(String autoNumberSequenceName) {
+        this.autoNumberSequenceName = autoNumberSequenceName;
     }
 
     @Override

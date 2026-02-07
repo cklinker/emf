@@ -14,6 +14,7 @@ import com.emf.controlplane.exception.ValidationException;
 import com.emf.controlplane.repository.CollectionRepository;
 import com.emf.controlplane.repository.CollectionVersionRepository;
 import com.emf.controlplane.repository.FieldRepository;
+import com.emf.controlplane.validation.FieldTypeValidatorRegistry;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -46,29 +47,66 @@ public class FieldService {
     private static final Logger log = LoggerFactory.getLogger(FieldService.class);
 
     /**
-     * Valid field types supported by the system.
+     * Legacy type aliases: maps old lowercase names to canonical FieldType names.
      */
-    public static final Set<String> VALID_FIELD_TYPES = Set.of(
-            "string", "number", "boolean", "date", "datetime", "reference", "array", "object"
+    public static final Map<String, String> TYPE_ALIASES = Map.ofEntries(
+            // Legacy aliases (backward compat)
+            Map.entry("string", "STRING"),
+            Map.entry("number", "DOUBLE"),
+            Map.entry("boolean", "BOOLEAN"),
+            Map.entry("date", "DATE"),
+            Map.entry("datetime", "DATETIME"),
+            Map.entry("reference", "REFERENCE"),
+            Map.entry("array", "ARRAY"),
+            Map.entry("object", "JSON"),
+            // All canonical types (accepted as lowercase)
+            Map.entry("integer", "INTEGER"),
+            Map.entry("long", "LONG"),
+            Map.entry("double", "DOUBLE"),
+            Map.entry("json", "JSON"),
+            Map.entry("picklist", "PICKLIST"),
+            Map.entry("multi_picklist", "MULTI_PICKLIST"),
+            Map.entry("auto_number", "AUTO_NUMBER"),
+            Map.entry("currency", "CURRENCY"),
+            Map.entry("percent", "PERCENT"),
+            Map.entry("phone", "PHONE"),
+            Map.entry("email", "EMAIL"),
+            Map.entry("url", "URL"),
+            Map.entry("rich_text", "RICH_TEXT"),
+            Map.entry("encrypted", "ENCRYPTED"),
+            Map.entry("external_id", "EXTERNAL_ID"),
+            Map.entry("geolocation", "GEOLOCATION"),
+            Map.entry("lookup", "LOOKUP"),
+            Map.entry("master_detail", "MASTER_DETAIL"),
+            Map.entry("formula", "FORMULA"),
+            Map.entry("rollup_summary", "ROLLUP_SUMMARY")
     );
+
+    /**
+     * Valid field types supported by the system (for backward compatibility checks).
+     */
+    public static final Set<String> VALID_FIELD_TYPES = TYPE_ALIASES.keySet();
 
     private final FieldRepository fieldRepository;
     private final CollectionRepository collectionRepository;
     private final CollectionVersionRepository versionRepository;
     private final ObjectMapper objectMapper;
     private final ConfigEventPublisher eventPublisher;
+    private final FieldTypeValidatorRegistry fieldTypeValidatorRegistry;
 
     public FieldService(
             FieldRepository fieldRepository,
             CollectionRepository collectionRepository,
             CollectionVersionRepository versionRepository,
             ObjectMapper objectMapper,
-            @Nullable ConfigEventPublisher eventPublisher) {
+            @Nullable ConfigEventPublisher eventPublisher,
+            FieldTypeValidatorRegistry fieldTypeValidatorRegistry) {
         this.fieldRepository = fieldRepository;
         this.collectionRepository = collectionRepository;
         this.versionRepository = versionRepository;
         this.objectMapper = objectMapper;
         this.eventPublisher = eventPublisher;
+        this.fieldTypeValidatorRegistry = fieldTypeValidatorRegistry;
     }
 
     /**
@@ -118,22 +156,32 @@ public class FieldService {
         if (fieldRepository.existsByCollectionIdAndNameAndActiveTrue(collectionId, request.getName())) {
             throw new DuplicateResourceException("Field", "name", request.getName());
         }
-        
-        // Validate field type
-        validateFieldType(request.getType());
-        
+
+        // Resolve type (supports legacy aliases)
+        String canonicalType = resolveFieldType(request.getType());
+
+        // Validate fieldTypeConfig via type-specific validator
+        validateFieldTypeConfig(canonicalType, request.getFieldTypeConfig());
+
         // Validate constraints if provided
         if (request.getConstraints() != null && !request.getConstraints().isBlank()) {
-            validateConstraints(request.getType(), request.getConstraints());
+            validateConstraints(canonicalType.toLowerCase(), request.getConstraints());
         }
-        
+
         // Create the field entity
-        Field field = new Field(request.getName(), request.getType());
+        Field field = new Field(request.getName(), canonicalType);
         field.setRequired(request.isRequired());
         field.setDescription(request.getDescription());
         field.setConstraints(request.getConstraints());
+        field.setFieldTypeConfig(request.getFieldTypeConfig());
         field.setActive(true);
         field.setCollection(collection);
+
+        // For AUTO_NUMBER: set sequence name
+        if ("AUTO_NUMBER".equals(canonicalType)) {
+            String seqName = "seq_" + collection.getName() + "_" + request.getName();
+            field.setAutoNumberSequenceName(seqName);
+        }
         
         // Save the field
         field = fieldRepository.save(field);
@@ -188,8 +236,8 @@ public class FieldService {
         
         // Update type if provided
         if (request.getType() != null) {
-            validateFieldType(request.getType());
-            field.setType(request.getType());
+            String canonicalType = resolveFieldType(request.getType());
+            field.setType(canonicalType);
         }
         
         // Update required if provided
@@ -286,16 +334,35 @@ public class FieldService {
     }
 
     /**
-     * Validates that the field type is one of the supported types.
-     * 
-     * @param type The field type to validate
+     * Resolves a field type input to its canonical name.
+     * Supports legacy lowercase names and new type names.
+     *
+     * @param input The field type string from the request
+     * @return The canonical field type name (e.g., "STRING", "DOUBLE")
      * @throws ValidationException if the type is not valid
      */
-    private void validateFieldType(String type) {
-        if (!VALID_FIELD_TYPES.contains(type)) {
-            throw new ValidationException("type", 
-                    String.format("Invalid field type '%s'. Must be one of: %s", 
-                            type, String.join(", ", VALID_FIELD_TYPES)));
+    public static String resolveFieldType(String input) {
+        String canonical = TYPE_ALIASES.get(input.toLowerCase());
+        if (canonical == null) {
+            throw new ValidationException("type",
+                    String.format("Invalid field type '%s'. Must be one of: %s",
+                            input, String.join(", ", TYPE_ALIASES.keySet())));
+        }
+        return canonical;
+    }
+
+    /**
+     * Validates fieldTypeConfig via the type-specific validator, if one exists.
+     */
+    private void validateFieldTypeConfig(String canonicalType, String fieldTypeConfigJson) {
+        try {
+            JsonNode configNode = fieldTypeConfigJson != null && !fieldTypeConfigJson.isBlank()
+                    ? objectMapper.readTree(fieldTypeConfigJson)
+                    : null;
+            fieldTypeValidatorRegistry.getValidator(canonicalType)
+                    .ifPresent(v -> v.validateConfig(configNode));
+        } catch (JsonProcessingException e) {
+            throw new ValidationException("fieldTypeConfig", "Invalid JSON format: " + e.getMessage());
         }
     }
 

@@ -12,6 +12,7 @@ import com.emf.controlplane.exception.ValidationException;
 import com.emf.controlplane.repository.CollectionRepository;
 import com.emf.controlplane.repository.CollectionVersionRepository;
 import com.emf.controlplane.repository.FieldRepository;
+import com.emf.controlplane.validation.FieldTypeValidatorRegistry;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -60,7 +61,8 @@ class FieldServiceTest {
                 collectionRepository,
                 versionRepository,
                 objectMapper,
-                null  // ConfigEventPublisher is optional in tests
+                null,  // ConfigEventPublisher is optional in tests
+                new FieldTypeValidatorRegistry(java.util.Collections.emptyList())
         );
     }
 
@@ -151,7 +153,7 @@ class FieldServiceTest {
             assertThat(result).isNotNull();
             assertThat(result.getId()).isNotNull();
             assertThat(result.getName()).isEqualTo("email");
-            assertThat(result.getType()).isEqualTo("string");
+            assertThat(result.getType()).isEqualTo("STRING");
             assertThat(result.isRequired()).isTrue();
             assertThat(result.getDescription()).isEqualTo("User email");
             assertThat(result.isActive()).isTrue();
@@ -219,7 +221,8 @@ class FieldServiceTest {
             for (String type : FieldService.VALID_FIELD_TYPES) {
                 AddFieldRequest request = new AddFieldRequest("field_" + type, type);
                 Field result = fieldService.addField(collectionId, request);
-                assertThat(result.getType()).isEqualTo(type);
+                String expectedCanonical = FieldService.TYPE_ALIASES.get(type);
+                assertThat(result.getType()).isEqualTo(expectedCanonical);
             }
         }
 

@@ -246,6 +246,8 @@ vi.mock('./pages', () => ({
   PermissionSetsPage: () => <div data-testid="permission-sets-page">Permission Sets Page</div>,
   SharingSettingsPage: () => <div data-testid="sharing-settings-page">Sharing Settings Page</div>,
   RoleHierarchyPage: () => <div data-testid="role-hierarchy-page">Role Hierarchy Page</div>,
+  SetupAuditTrailPage: () => <div data-testid="audit-trail-page">Audit Trail Page</div>,
+  GovernorLimitsPage: () => <div data-testid="governor-limits-page">Governor Limits Page</div>,
   TenantsPage: () => <div data-testid="tenants-page">Tenants Page</div>,
   TenantDashboardPage: () => <div data-testid="tenant-dashboard-page">Tenant Dashboard Page</div>,
   LoginPage: () => <div data-testid="login-page">Login Page</div>,

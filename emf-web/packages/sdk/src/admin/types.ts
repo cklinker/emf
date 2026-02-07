@@ -545,6 +545,48 @@ export interface RoleHierarchyNode {
 }
 
 /**
+ * Setup audit trail entry
+ */
+export interface SetupAuditTrailEntry {
+  id: string;
+  userId: string;
+  action: 'CREATED' | 'UPDATED' | 'DELETED' | 'ACTIVATED' | 'DEACTIVATED';
+  section: string;
+  entityType: string;
+  entityId?: string;
+  entityName?: string;
+  oldValue?: string;
+  newValue?: string;
+  timestamp: string;
+}
+
+/**
+ * Governor limits status
+ */
+export interface GovernorLimitsStatus {
+  limits: GovernorLimits;
+  apiCallsUsed: number;
+  apiCallsLimit: number;
+  usersUsed: number;
+  usersLimit: number;
+  collectionsUsed: number;
+  collectionsLimit: number;
+}
+
+/**
+ * Governor limits configuration
+ */
+export interface GovernorLimits {
+  apiCallsPerDay: number;
+  storageGb: number;
+  maxUsers: number;
+  maxCollections: number;
+  maxFieldsPerCollection: number;
+  maxWorkflows: number;
+  maxReports: number;
+}
+
+/**
  * Migration plan result
  */
 export interface MigrationPlan {

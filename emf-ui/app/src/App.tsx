@@ -60,6 +60,8 @@ import {
   PermissionSetsPage,
   SharingSettingsPage,
   RoleHierarchyPage,
+  SetupAuditTrailPage,
+  GovernorLimitsPage,
   TenantsPage,
   TenantDashboardPage,
   LoginPage,
@@ -497,6 +499,26 @@ function App({ plugins = [] }: AppProps): React.ReactElement {
                               element={
                                 <ProtectedPageRoute>
                                   <RoleHierarchyPage />
+                                </ProtectedPageRoute>
+                              }
+                            />
+
+                            {/* Audit Trail route */}
+                            <Route
+                              path="/audit-trail"
+                              element={
+                                <ProtectedPageRoute>
+                                  <SetupAuditTrailPage />
+                                </ProtectedPageRoute>
+                              }
+                            />
+
+                            {/* Governor Limits route */}
+                            <Route
+                              path="/governor-limits"
+                              element={
+                                <ProtectedPageRoute>
+                                  <GovernorLimitsPage />
                                 </ProtectedPageRoute>
                               }
                             />

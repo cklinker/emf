@@ -119,6 +119,14 @@ export type { TenantsPageProps, Tenant } from './TenantsPage';
 export { TenantDashboardPage } from './TenantDashboardPage';
 export type { TenantDashboardPageProps } from './TenantDashboardPage';
 
+// UsersPage - User management page
+export { UsersPage } from './UsersPage';
+export type { UsersPageProps } from './UsersPage';
+
+// UserDetailPage - User detail view page
+export { UserDetailPage } from './UserDetailPage';
+export type { UserDetailPageProps } from './UserDetailPage';
+
 // DashboardPage - System health and metrics dashboard
 export { DashboardPage } from './DashboardPage';
 export type {

@@ -54,6 +54,8 @@ import {
   ResourceFormPage,
   PluginsPage,
   ServicesPage,
+  UsersPage,
+  UserDetailPage,
   TenantsPage,
   TenantDashboardPage,
   LoginPage,
@@ -447,6 +449,24 @@ function App({ plugins = [] }: AppProps): React.ReactElement {
                             element={
                               <ProtectedPageRoute>
                                 <PluginsPage />
+                              </ProtectedPageRoute>
+                            }
+                          />
+
+                          {/* User Management routes */}
+                          <Route
+                            path="/users"
+                            element={
+                              <ProtectedPageRoute>
+                                <UsersPage />
+                              </ProtectedPageRoute>
+                            }
+                          />
+                          <Route
+                            path="/users/:id"
+                            element={
+                              <ProtectedPageRoute>
+                                <UserDetailPage />
                               </ProtectedPageRoute>
                             }
                           />

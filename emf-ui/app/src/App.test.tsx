@@ -240,6 +240,8 @@ vi.mock('./pages', () => ({
   ResourceDetailPage: () => <div data-testid="resource-detail-page">Resource Detail Page</div>,
   ResourceFormPage: () => <div data-testid="resource-form-page">Resource Form Page</div>,
   PluginsPage: () => <div data-testid="plugins-page">Plugins Page</div>,
+  UsersPage: () => <div data-testid="users-page">Users Page</div>,
+  UserDetailPage: () => <div data-testid="user-detail-page">User Detail Page</div>,
   TenantsPage: () => <div data-testid="tenants-page">Tenants Page</div>,
   TenantDashboardPage: () => <div data-testid="tenant-dashboard-page">Tenant Dashboard Page</div>,
   LoginPage: () => <div data-testid="login-page">Login Page</div>,
@@ -500,9 +502,27 @@ describe('App', () => {
     it('should render plugins page at /plugins when authenticated', async () => {
       window.history.pushState({}, '', '/plugins');
       render(<App />);
-      
+
       await waitFor(() => {
         expect(screen.getByTestId('plugins-page')).toBeInTheDocument();
+      });
+    });
+
+    it('should render users page at /users when authenticated', async () => {
+      window.history.pushState({}, '', '/users');
+      render(<App />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('users-page')).toBeInTheDocument();
+      });
+    });
+
+    it('should render user detail page at /users/:id when authenticated', async () => {
+      window.history.pushState({}, '', '/users/test-user-123');
+      render(<App />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('user-detail-page')).toBeInTheDocument();
       });
     });
   });
@@ -535,6 +555,8 @@ describe('App', () => {
         '/resources/users/new',
         '/resources/users/123/edit',
         '/plugins',
+        '/users',
+        '/users/test-user-123',
         '/login',
         '/unauthorized',
       ];

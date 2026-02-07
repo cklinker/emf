@@ -8,6 +8,10 @@ import type {
   UIConfig,
   PackageData,
   ExportOptions,
+  PlatformUser,
+  CreatePlatformUserRequest,
+  UpdatePlatformUserRequest,
+  LoginHistoryEntry,
   ImportResult,
   Migration,
   UIPage,
@@ -252,6 +256,65 @@ export class AdminClient {
 
     getLimits: async (id: string): Promise<GovernorLimits> => {
       const response = await this.axios.get<GovernorLimits>(`/platform/tenants/${id}/limits`);
+      return response.data;
+    },
+  };
+
+  /**
+   * User management operations
+   */
+  readonly users = {
+    list: async (
+      filter?: string,
+      status?: string,
+      page = 0,
+      size = 20
+    ): Promise<Page<PlatformUser>> => {
+      const params = new URLSearchParams();
+      if (filter) params.append('filter', filter);
+      if (status) params.append('status', status);
+      params.append('page', page.toString());
+      params.append('size', size.toString());
+      const response = await this.axios.get<Page<PlatformUser>>(
+        `/control/users?${params}`
+      );
+      return response.data;
+    },
+
+    get: async (id: string): Promise<PlatformUser> => {
+      const response = await this.axios.get<PlatformUser>(`/control/users/${id}`);
+      return response.data;
+    },
+
+    create: async (request: CreatePlatformUserRequest): Promise<PlatformUser> => {
+      const response = await this.axios.post<PlatformUser>('/control/users', request);
+      return response.data;
+    },
+
+    update: async (id: string, request: UpdatePlatformUserRequest): Promise<PlatformUser> => {
+      const response = await this.axios.put<PlatformUser>(`/control/users/${id}`, request);
+      return response.data;
+    },
+
+    deactivate: async (id: string): Promise<void> => {
+      await this.axios.post(`/control/users/${id}/deactivate`);
+    },
+
+    activate: async (id: string): Promise<void> => {
+      await this.axios.post(`/control/users/${id}/activate`);
+    },
+
+    getLoginHistory: async (
+      id: string,
+      page = 0,
+      size = 20
+    ): Promise<Page<LoginHistoryEntry>> => {
+      const params = new URLSearchParams();
+      params.append('page', page.toString());
+      params.append('size', size.toString());
+      const response = await this.axios.get<Page<LoginHistoryEntry>>(
+        `/control/users/${id}/login-history?${params}`
+      );
       return response.data;
     },
   };

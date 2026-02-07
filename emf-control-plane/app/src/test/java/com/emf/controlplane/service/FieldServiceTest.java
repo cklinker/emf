@@ -209,20 +209,32 @@ class FieldServiceTest {
             String collectionId = "test-collection-id";
             Collection collection = createTestCollection(collectionId, "Test Collection");
             collection.setCurrentVersion(1);
-            
+
+            // Target collection for LOOKUP/MASTER_DETAIL types
+            Collection targetCollection = createTestCollection("target-collection-id", "Target");
+            targetCollection.setCurrentVersion(1);
+
             when(collectionRepository.findByIdAndActiveTrue(collectionId)).thenReturn(Optional.of(collection));
             when(fieldRepository.existsByCollectionIdAndNameAndActiveTrue(anyString(), anyString())).thenReturn(false);
             when(fieldRepository.save(any(Field.class))).thenAnswer(invocation -> invocation.getArgument(0));
             when(versionRepository.save(any(CollectionVersion.class))).thenAnswer(invocation -> invocation.getArgument(0));
             when(collectionRepository.save(any(Collection.class))).thenAnswer(invocation -> invocation.getArgument(0));
             when(fieldRepository.findByCollectionIdAndActiveTrue(anyString())).thenReturn(Collections.emptyList());
+            when(collectionRepository.findByNameAndActiveTrue("Target")).thenReturn(Optional.of(targetCollection));
+            when(fieldRepository.countMasterDetailFieldsByCollectionId(anyString())).thenReturn(0L);
 
             // When/Then - all valid types should work
             for (String type : FieldService.VALID_FIELD_TYPES) {
-                AddFieldRequest request = new AddFieldRequest("field_" + type, type);
+                AddFieldRequest request;
+                String canonical = FieldService.TYPE_ALIASES.get(type);
+                if ("LOOKUP".equals(canonical) || "MASTER_DETAIL".equals(canonical)) {
+                    request = new AddFieldRequest("field_" + type, type, false, null, null,
+                            "{\"targetCollection\": \"Target\", \"relationshipName\": \"Target\"}");
+                } else {
+                    request = new AddFieldRequest("field_" + type, type);
+                }
                 Field result = fieldService.addField(collectionId, request);
-                String expectedCanonical = FieldService.TYPE_ALIASES.get(type);
-                assertThat(result.getType()).isEqualTo(expectedCanonical);
+                assertThat(result.getType()).isEqualTo(canonical);
             }
         }
 

@@ -61,6 +61,18 @@ public class Field extends BaseEntity {
     @Column(name = "auto_number_sequence_name", length = 100)
     private String autoNumberSequenceName;
 
+    @Column(name = "relationship_type", length = 20)
+    private String relationshipType;
+
+    @Column(name = "relationship_name", length = 100)
+    private String relationshipName;
+
+    @Column(name = "cascade_delete", nullable = false)
+    private boolean cascadeDelete = false;
+
+    @Column(name = "reference_collection_id", length = 36)
+    private String referenceCollectionId;
+
     public Field() {
         super();
     }
@@ -190,6 +202,38 @@ public class Field extends BaseEntity {
 
     public void setAutoNumberSequenceName(String autoNumberSequenceName) {
         this.autoNumberSequenceName = autoNumberSequenceName;
+    }
+
+    public String getRelationshipType() {
+        return relationshipType;
+    }
+
+    public void setRelationshipType(String relationshipType) {
+        this.relationshipType = relationshipType;
+    }
+
+    public String getRelationshipName() {
+        return relationshipName;
+    }
+
+    public void setRelationshipName(String relationshipName) {
+        this.relationshipName = relationshipName;
+    }
+
+    public boolean isCascadeDelete() {
+        return cascadeDelete;
+    }
+
+    public void setCascadeDelete(boolean cascadeDelete) {
+        this.cascadeDelete = cascadeDelete;
+    }
+
+    public String getReferenceCollectionId() {
+        return referenceCollectionId;
+    }
+
+    public void setReferenceCollectionId(String referenceCollectionId) {
+        this.referenceCollectionId = referenceCollectionId;
     }
 
     @Override

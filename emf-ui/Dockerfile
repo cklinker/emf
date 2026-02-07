@@ -18,9 +18,9 @@ COPY emf-web/packages/plugin-sdk/package.json ./emf-web/packages/plugin-sdk/
 WORKDIR /app/emf-web
 RUN npm install
 
-# Copy emf-web source and build
+# Copy emf-web source and build (SDK first — components and plugin-sdk depend on it)
 COPY emf-web/packages ./packages
-RUN npm run build
+RUN npm run build --workspace=packages/sdk && npm run build --workspaces
 
 # Copy emf-ui package files
 WORKDIR /app/emf-ui/app

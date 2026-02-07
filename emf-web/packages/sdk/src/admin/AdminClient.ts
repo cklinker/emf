@@ -29,6 +29,7 @@ import type {
   CreateGlobalPicklistRequest,
   PicklistValueRequest,
   SetDependencyRequest,
+  CollectionRelationships,
 } from './types';
 
 /**
@@ -425,6 +426,18 @@ export class AdminClient {
       await this.axios.delete(
         `/control/picklists/dependencies/${controllingFieldId}/${dependentFieldId}`
       );
+    },
+  };
+
+  /**
+   * Relationship operations
+   */
+  readonly relationships = {
+    getForCollection: async (collectionId: string): Promise<CollectionRelationships> => {
+      const response = await this.axios.get<CollectionRelationships>(
+        `/control/collections/${collectionId}/relationships`
+      );
+      return response.data;
     },
   };
 

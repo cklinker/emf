@@ -37,6 +37,8 @@ export type {
   ImportResult,
   Migration,
   MigrationResult,
+  RelationshipInfo,
+  CollectionRelationships,
 } from './admin/types';
 
 // Authentication

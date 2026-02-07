@@ -171,13 +171,39 @@ public record FieldDefinition(
     
     /**
      * Creates a reference field to another collection.
-     * 
+     *
      * @param name the field name
      * @param targetCollection the target collection name
      * @return a reference field definition
      */
     public static FieldDefinition reference(String name, String targetCollection) {
-        return new FieldDefinition(name, FieldType.STRING, true, false, false, null, null, null, 
+        return new FieldDefinition(name, FieldType.STRING, true, false, false, null, null, null,
             ReferenceConfig.toCollection(targetCollection));
+    }
+
+    /**
+     * Creates a LOOKUP relationship field. Nullable, ON DELETE SET NULL.
+     *
+     * @param name the field name
+     * @param targetCollection the target collection name
+     * @param relationshipName the human-readable relationship name
+     * @return a lookup field definition
+     */
+    public static FieldDefinition lookup(String name, String targetCollection, String relationshipName) {
+        return new FieldDefinition(name, FieldType.LOOKUP, true, false, false, null, null, null,
+            ReferenceConfig.lookup(targetCollection, relationshipName));
+    }
+
+    /**
+     * Creates a MASTER_DETAIL relationship field. Required, ON DELETE CASCADE.
+     *
+     * @param name the field name
+     * @param targetCollection the target collection name
+     * @param relationshipName the human-readable relationship name
+     * @return a master-detail field definition
+     */
+    public static FieldDefinition masterDetail(String name, String targetCollection, String relationshipName) {
+        return new FieldDefinition(name, FieldType.MASTER_DETAIL, false, false, false, null, null, null,
+            ReferenceConfig.masterDetail(targetCollection, relationshipName));
     }
 }

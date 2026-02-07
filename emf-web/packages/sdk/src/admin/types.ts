@@ -515,3 +515,87 @@ export interface SetDependencyRequest {
   dependentFieldId: string;
   mapping: Record<string, string[]>;
 }
+
+// --- Validation Rules (Phase 2 Stream D) ---
+
+/**
+ * Collection-level validation rule using formula evaluation
+ */
+export interface CollectionValidationRule {
+  id: string;
+  collectionId: string;
+  name: string;
+  description?: string;
+  active: boolean;
+  errorConditionFormula: string;
+  errorMessage: string;
+  errorField?: string;
+  evaluateOn: 'CREATE' | 'UPDATE' | 'CREATE_AND_UPDATE';
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Request to create a collection validation rule
+ */
+export interface CreateCollectionValidationRuleRequest {
+  name: string;
+  description?: string;
+  errorConditionFormula: string;
+  errorMessage: string;
+  errorField?: string;
+  evaluateOn?: 'CREATE' | 'UPDATE' | 'CREATE_AND_UPDATE';
+}
+
+/**
+ * Validation error returned when a record fails validation
+ */
+export interface CollectionValidationError {
+  ruleName: string;
+  errorMessage: string;
+  errorField?: string;
+}
+
+// --- Record Types (Phase 2 Stream D) ---
+
+/**
+ * Record type definition
+ */
+export interface RecordType {
+  id: string;
+  collectionId: string;
+  name: string;
+  description?: string;
+  active: boolean;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Request to create a record type
+ */
+export interface CreateRecordTypeRequest {
+  name: string;
+  description?: string;
+  isDefault?: boolean;
+}
+
+/**
+ * Picklist value override for a record type
+ */
+export interface RecordTypePicklistOverride {
+  id: string;
+  fieldId: string;
+  fieldName: string;
+  availableValues: string;
+  defaultValue?: string;
+}
+
+/**
+ * Request to set picklist override for a record type
+ */
+export interface SetPicklistOverrideRequest {
+  availableValues: string[];
+  defaultValue?: string;
+}

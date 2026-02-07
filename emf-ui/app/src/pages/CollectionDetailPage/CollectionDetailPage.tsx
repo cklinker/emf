@@ -23,7 +23,13 @@ import {
   FieldEditor,
   type FieldDefinition as FieldEditorDefinition,
 } from '../../components/FieldEditor'
-import type { Collection, FieldDefinition, CollectionVersion } from '../../types/collections'
+import type {
+  Collection,
+  FieldDefinition,
+  CollectionVersion,
+  CollectionValidationRule,
+  RecordType,
+} from '../../types/collections'
 import styles from './CollectionDetailPage.module.css'
 
 /**
@@ -85,7 +91,9 @@ export function CollectionDetailPage({
   const [editingField, setEditingField] = useState<FieldDefinition | undefined>(undefined)
 
   // Active tab state for sections
-  const [activeTab, setActiveTab] = useState<'fields' | 'authorization' | 'versions'>('fields')
+  const [activeTab, setActiveTab] = useState<
+    'fields' | 'authorization' | 'validationRules' | 'recordTypes' | 'versions'
+  >('fields')
 
   // Fetch collection data
   const {
@@ -116,6 +124,30 @@ export function CollectionDetailPage({
       return response
     },
     enabled: !!collectionId && activeTab === 'versions',
+  })
+
+  // Fetch validation rules
+  const { data: validationRules = [], isLoading: isLoadingRules } = useQuery({
+    queryKey: ['validation-rules', collectionId],
+    queryFn: async () => {
+      const response = await apiClient.get<CollectionValidationRule[]>(
+        `/control/collections/${collectionId}/validation-rules`
+      )
+      return response
+    },
+    enabled: !!collectionId && activeTab === 'validationRules',
+  })
+
+  // Fetch record types
+  const { data: recordTypes = [], isLoading: isLoadingRecordTypes } = useQuery({
+    queryKey: ['record-types', collectionId],
+    queryFn: async () => {
+      const response = await apiClient.get<RecordType[]>(
+        `/control/collections/${collectionId}/record-types`
+      )
+      return response
+    },
+    enabled: !!collectionId && activeTab === 'recordTypes',
   })
 
   // Fetch all collections for reference field dropdown
@@ -211,9 +243,12 @@ export function CollectionDetailPage({
   }, [navigate])
 
   // Handle tab change
-  const handleTabChange = useCallback((tab: 'fields' | 'authorization' | 'versions') => {
-    setActiveTab(tab)
-  }, [])
+  const handleTabChange = useCallback(
+    (tab: 'fields' | 'authorization' | 'validationRules' | 'recordTypes' | 'versions') => {
+      setActiveTab(tab)
+    },
+    []
+  )
 
   // Handle add field action
   const handleAddField = useCallback(() => {
@@ -468,6 +503,30 @@ export function CollectionDetailPage({
         <button
           type="button"
           role="tab"
+          className={`${styles.tab} ${activeTab === 'validationRules' ? styles.tabActive : ''}`}
+          onClick={() => handleTabChange('validationRules')}
+          aria-selected={activeTab === 'validationRules'}
+          aria-controls="validation-rules-panel"
+          id="validation-rules-tab"
+          data-testid="validation-rules-tab"
+        >
+          {t('collections.validationRules')}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          className={`${styles.tab} ${activeTab === 'recordTypes' ? styles.tabActive : ''}`}
+          onClick={() => handleTabChange('recordTypes')}
+          aria-selected={activeTab === 'recordTypes'}
+          aria-controls="record-types-panel"
+          id="record-types-tab"
+          data-testid="record-types-tab"
+        >
+          {t('collections.recordTypes')}
+        </button>
+        <button
+          type="button"
+          role="tab"
           className={`${styles.tab} ${activeTab === 'versions' ? styles.tabActive : ''}`}
           onClick={() => handleTabChange('versions')}
           aria-selected={activeTab === 'versions'}
@@ -688,6 +747,130 @@ export function CollectionDetailPage({
               </div>
             )}
           </div>
+        </section>
+      )}
+
+      {/* Validation Rules Panel */}
+      {activeTab === 'validationRules' && (
+        <section
+          id="validation-rules-panel"
+          role="tabpanel"
+          aria-labelledby="validation-rules-tab"
+          className={styles.tabPanel}
+          data-testid="validation-rules-panel"
+        >
+          <div className={styles.panelHeader}>
+            <h2 className={styles.panelTitle}>{t('collections.validationRules')}</h2>
+          </div>
+          {isLoadingRules ? (
+            <div className={styles.loadingContainer}>
+              <LoadingSpinner size="medium" label={t('common.loading')} />
+            </div>
+          ) : validationRules.length === 0 ? (
+            <div className={styles.emptyState} data-testid="validation-rules-empty">
+              <p>{t('common.noData')}</p>
+            </div>
+          ) : (
+            <div className={styles.tableContainer}>
+              <table
+                className={styles.table}
+                aria-label={t('collections.validationRules')}
+                data-testid="validation-rules-table"
+              >
+                <thead>
+                  <tr>
+                    <th scope="col">{t('common.name')}</th>
+                    <th scope="col">{t('validationRules.formula')}</th>
+                    <th scope="col">{t('validationRules.errorMessage')}</th>
+                    <th scope="col">{t('validationRules.evaluateOn')}</th>
+                    <th scope="col">{t('collections.status')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {validationRules.map((rule, index) => (
+                    <tr key={rule.id} data-testid={`validation-rule-row-${index}`}>
+                      <td className={styles.fieldNameCell}>{rule.name}</td>
+                      <td>
+                        <code className={styles.formulaCode}>{rule.errorConditionFormula}</code>
+                      </td>
+                      <td>{rule.errorMessage}</td>
+                      <td>
+                        <span className={styles.evaluateOnBadge}>{rule.evaluateOn}</span>
+                      </td>
+                      <td>
+                        <span
+                          className={`${styles.statusBadge} ${rule.active ? styles.statusActive : styles.statusInactive}`}
+                        >
+                          {rule.active ? t('collections.active') : t('collections.inactive')}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* Record Types Panel */}
+      {activeTab === 'recordTypes' && (
+        <section
+          id="record-types-panel"
+          role="tabpanel"
+          aria-labelledby="record-types-tab"
+          className={styles.tabPanel}
+          data-testid="record-types-panel"
+        >
+          <div className={styles.panelHeader}>
+            <h2 className={styles.panelTitle}>{t('collections.recordTypes')}</h2>
+          </div>
+          {isLoadingRecordTypes ? (
+            <div className={styles.loadingContainer}>
+              <LoadingSpinner size="medium" label={t('common.loading')} />
+            </div>
+          ) : recordTypes.length === 0 ? (
+            <div className={styles.emptyState} data-testid="record-types-empty">
+              <p>{t('common.noData')}</p>
+            </div>
+          ) : (
+            <div className={styles.tableContainer}>
+              <table
+                className={styles.table}
+                aria-label={t('collections.recordTypes')}
+                data-testid="record-types-table"
+              >
+                <thead>
+                  <tr>
+                    <th scope="col">{t('common.name')}</th>
+                    <th scope="col">{t('collections.description')}</th>
+                    <th scope="col">{t('recordTypes.default')}</th>
+                    <th scope="col">{t('collections.status')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recordTypes.map((rt, index) => (
+                    <tr key={rt.id} data-testid={`record-type-row-${index}`}>
+                      <td className={styles.fieldNameCell}>{rt.name}</td>
+                      <td>{rt.description || '-'}</td>
+                      <td>
+                        {rt.isDefault && (
+                          <span className={styles.defaultBadge}>{t('recordTypes.default')}</span>
+                        )}
+                      </td>
+                      <td>
+                        <span
+                          className={`${styles.statusBadge} ${rt.active ? styles.statusActive : styles.statusInactive}`}
+                        >
+                          {rt.active ? t('collections.active') : t('collections.inactive')}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </section>
       )}
 

@@ -30,6 +30,13 @@ import type {
   PicklistValueRequest,
   SetDependencyRequest,
   CollectionRelationships,
+  CollectionValidationRule,
+  CreateCollectionValidationRuleRequest,
+  CollectionValidationError,
+  RecordType,
+  CreateRecordTypeRequest,
+  RecordTypePicklistOverride,
+  SetPicklistOverrideRequest,
 } from './types';
 
 /**
@@ -438,6 +445,151 @@ export class AdminClient {
         `/control/collections/${collectionId}/relationships`
       );
       return response.data;
+    },
+  };
+
+  /**
+   * Validation rule operations
+   */
+  readonly validationRules = {
+    list: async (collectionId: string): Promise<CollectionValidationRule[]> => {
+      const response = await this.axios.get<CollectionValidationRule[]>(
+        `/control/collections/${collectionId}/validation-rules`
+      );
+      return response.data;
+    },
+
+    create: async (
+      collectionId: string,
+      request: CreateCollectionValidationRuleRequest
+    ): Promise<CollectionValidationRule> => {
+      const response = await this.axios.post<CollectionValidationRule>(
+        `/control/collections/${collectionId}/validation-rules`,
+        request
+      );
+      return response.data;
+    },
+
+    get: async (collectionId: string, ruleId: string): Promise<CollectionValidationRule> => {
+      const response = await this.axios.get<CollectionValidationRule>(
+        `/control/collections/${collectionId}/validation-rules/${ruleId}`
+      );
+      return response.data;
+    },
+
+    update: async (
+      collectionId: string,
+      ruleId: string,
+      request: Partial<CreateCollectionValidationRuleRequest> & { active?: boolean }
+    ): Promise<CollectionValidationRule> => {
+      const response = await this.axios.put<CollectionValidationRule>(
+        `/control/collections/${collectionId}/validation-rules/${ruleId}`,
+        request
+      );
+      return response.data;
+    },
+
+    delete: async (collectionId: string, ruleId: string): Promise<void> => {
+      await this.axios.delete(`/control/collections/${collectionId}/validation-rules/${ruleId}`);
+    },
+
+    activate: async (collectionId: string, ruleId: string): Promise<void> => {
+      await this.axios.post(
+        `/control/collections/${collectionId}/validation-rules/${ruleId}/activate`
+      );
+    },
+
+    deactivate: async (collectionId: string, ruleId: string): Promise<void> => {
+      await this.axios.post(
+        `/control/collections/${collectionId}/validation-rules/${ruleId}/deactivate`
+      );
+    },
+
+    test: async (
+      collectionId: string,
+      testRecord: Record<string, unknown>
+    ): Promise<CollectionValidationError[]> => {
+      const response = await this.axios.post<CollectionValidationError[]>(
+        `/control/collections/${collectionId}/validation-rules/test`,
+        testRecord
+      );
+      return response.data;
+    },
+  };
+
+  /**
+   * Record type operations
+   */
+  readonly recordTypes = {
+    list: async (collectionId: string): Promise<RecordType[]> => {
+      const response = await this.axios.get<RecordType[]>(
+        `/control/collections/${collectionId}/record-types`
+      );
+      return response.data;
+    },
+
+    create: async (collectionId: string, request: CreateRecordTypeRequest): Promise<RecordType> => {
+      const response = await this.axios.post<RecordType>(
+        `/control/collections/${collectionId}/record-types`,
+        request
+      );
+      return response.data;
+    },
+
+    get: async (collectionId: string, recordTypeId: string): Promise<RecordType> => {
+      const response = await this.axios.get<RecordType>(
+        `/control/collections/${collectionId}/record-types/${recordTypeId}`
+      );
+      return response.data;
+    },
+
+    update: async (
+      collectionId: string,
+      recordTypeId: string,
+      request: Partial<CreateRecordTypeRequest> & { active?: boolean }
+    ): Promise<RecordType> => {
+      const response = await this.axios.put<RecordType>(
+        `/control/collections/${collectionId}/record-types/${recordTypeId}`,
+        request
+      );
+      return response.data;
+    },
+
+    delete: async (collectionId: string, recordTypeId: string): Promise<void> => {
+      await this.axios.delete(`/control/collections/${collectionId}/record-types/${recordTypeId}`);
+    },
+
+    getPicklistOverrides: async (
+      collectionId: string,
+      recordTypeId: string
+    ): Promise<RecordTypePicklistOverride[]> => {
+      const response = await this.axios.get<RecordTypePicklistOverride[]>(
+        `/control/collections/${collectionId}/record-types/${recordTypeId}/picklists`
+      );
+      return response.data;
+    },
+
+    setPicklistOverride: async (
+      collectionId: string,
+      recordTypeId: string,
+      fieldId: string,
+      request: SetPicklistOverrideRequest
+    ): Promise<RecordTypePicklistOverride> => {
+      const response = await this.axios.put<RecordTypePicklistOverride>(
+        `/control/collections/${collectionId}/record-types/${recordTypeId}/picklists/${fieldId}`,
+        request
+      );
+      return response.data;
+    },
+
+    removePicklistOverride: async (
+      collectionId: string,
+      recordTypeId: string,
+      fieldId: string
+    ): Promise<void> => {
+      await this.axios.delete(
+        `/control/collections/${collectionId}/record-types/${recordTypeId}/picklists/${fieldId}`
+      );
     },
   };
 

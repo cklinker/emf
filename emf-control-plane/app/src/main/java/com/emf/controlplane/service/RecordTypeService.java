@@ -1,5 +1,6 @@
 package com.emf.controlplane.service;
 
+import com.emf.controlplane.audit.SetupAudited;
 import com.emf.controlplane.dto.CreateRecordTypeRequest;
 import com.emf.controlplane.dto.SetPicklistOverrideRequest;
 import com.emf.controlplane.dto.UpdateRecordTypeRequest;
@@ -55,6 +56,7 @@ public class RecordTypeService {
     }
 
     @Transactional
+    @SetupAudited(section = "Record Types", entityType = "RecordType")
     public RecordType createRecordType(String collectionId, String tenantId,
                                         CreateRecordTypeRequest request) {
         log.info("Creating record type '{}' for collection: {}", request.getName(), collectionId);
@@ -86,6 +88,7 @@ public class RecordTypeService {
     }
 
     @Transactional
+    @SetupAudited(section = "Record Types", entityType = "RecordType")
     public RecordType updateRecordType(String recordTypeId, UpdateRecordTypeRequest request) {
         log.info("Updating record type: {}", recordTypeId);
 
@@ -119,6 +122,7 @@ public class RecordTypeService {
     }
 
     @Transactional
+    @SetupAudited(section = "Record Types", entityType = "RecordType")
     public void deleteRecordType(String recordTypeId) {
         log.info("Deleting record type: {}", recordTypeId);
         RecordType recordType = recordTypeRepository.findById(recordTypeId)

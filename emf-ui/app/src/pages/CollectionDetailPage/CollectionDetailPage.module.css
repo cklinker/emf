@@ -471,6 +471,85 @@
   border-radius: var(--border-radius-sm, 0.25rem);
 }
 
+/* Action Badge for Setup Audit */
+.actionBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--spacing-xs, 0.25rem) var(--spacing-sm, 0.5rem);
+  font-size: var(--font-size-xs, 0.75rem);
+  font-weight: var(--font-weight-medium, 500);
+  border-radius: var(--border-radius-sm, 0.25rem);
+  color: #1e3a5f;
+  background-color: #dbeafe;
+}
+
+.actionBadge[data-action='CREATED'] {
+  color: #065f46;
+  background-color: #d1fae5;
+}
+
+.actionBadge[data-action='DELETED'] {
+  color: #991b1b;
+  background-color: #fee2e2;
+}
+
+.actionBadge[data-action='UPDATED'],
+.actionBadge[data-action='MODIFIED'] {
+  color: #92400e;
+  background-color: #fef3c7;
+}
+
+.actionBadge[data-action='ACTIVATED'] {
+  color: #065f46;
+  background-color: #d1fae5;
+}
+
+.actionBadge[data-action='DEACTIVATED'] {
+  color: #6b7280;
+  background-color: #f3f4f6;
+}
+
+/* Field History Info */
+.infoMessage {
+  padding: var(--spacing-lg, 1.5rem);
+  color: var(--color-text-secondary, #666666);
+}
+
+.infoMessage p {
+  margin: 0 0 var(--spacing-sm, 0.5rem) 0;
+}
+
+.trackedFieldsNote {
+  font-style: italic;
+  font-size: var(--font-size-sm, 0.875rem);
+}
+
+.trackedFieldsList {
+  margin-top: var(--spacing-md, 1rem);
+}
+
+.trackedFieldsList h3 {
+  font-size: var(--font-size-sm, 0.875rem);
+  font-weight: var(--font-weight-semibold, 600);
+  margin: 0 0 var(--spacing-xs, 0.25rem) 0;
+}
+
+.trackedFieldsList ul {
+  list-style: disc;
+  padding-left: var(--spacing-lg, 1.5rem);
+  margin: 0;
+}
+
+.trackedFieldsList li {
+  font-size: var(--font-size-sm, 0.875rem);
+  padding: var(--spacing-xs, 0.25rem) 0;
+}
+
+.emptyNote {
+  color: var(--color-text-tertiary, #999999);
+  font-style: italic;
+}
+
 /* Empty State */
 .emptyState {
   display: flex;

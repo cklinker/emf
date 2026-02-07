@@ -1,5 +1,6 @@
 package com.emf.controlplane.service;
 
+import com.emf.controlplane.audit.SetupAudited;
 import com.emf.controlplane.config.CacheConfig;
 import com.emf.controlplane.dto.AddFieldRequest;
 import com.emf.controlplane.dto.UpdateFieldRequest;
@@ -145,6 +146,7 @@ public class FieldService {
      */
     @Transactional
     @CacheEvict(value = CacheConfig.COLLECTIONS_CACHE, key = "#collectionId")
+    @SetupAudited(section = "Fields", entityType = "Field")
     public Field addField(String collectionId, AddFieldRequest request) {
         log.info("Adding field '{}' to collection: {}", request.getName(), collectionId);
         
@@ -174,6 +176,7 @@ public class FieldService {
         field.setDescription(request.getDescription());
         field.setConstraints(request.getConstraints());
         field.setFieldTypeConfig(request.getFieldTypeConfig());
+        field.setTrackHistory(request.isTrackHistory());
         field.setActive(true);
         field.setCollection(collection);
 
@@ -220,6 +223,7 @@ public class FieldService {
      */
     @Transactional
     @CacheEvict(value = CacheConfig.COLLECTIONS_CACHE, key = "#collectionId")
+    @SetupAudited(section = "Fields", entityType = "Field")
     public Field updateField(String collectionId, String fieldId, UpdateFieldRequest request) {
         log.info("Updating field '{}' in collection: {}", fieldId, collectionId);
         
@@ -255,6 +259,11 @@ public class FieldService {
             field.setDescription(request.getDescription());
         }
         
+        // Update trackHistory if provided
+        if (request.getTrackHistory() != null) {
+            field.setTrackHistory(request.getTrackHistory());
+        }
+
         // Update constraints if provided
         if (request.getConstraints() != null) {
             String effectiveType = request.getType() != null ? request.getType() : field.getType();
@@ -292,6 +301,7 @@ public class FieldService {
      */
     @Transactional
     @CacheEvict(value = CacheConfig.COLLECTIONS_CACHE, key = "#collectionId")
+    @SetupAudited(section = "Fields", entityType = "Field")
     public void deleteField(String collectionId, String fieldId) {
         log.info("Deleting field '{}' from collection: {}", fieldId, collectionId);
         

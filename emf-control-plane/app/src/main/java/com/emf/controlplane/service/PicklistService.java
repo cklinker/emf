@@ -1,5 +1,6 @@
 package com.emf.controlplane.service;
 
+import com.emf.controlplane.audit.SetupAudited;
 import com.emf.controlplane.dto.CreateGlobalPicklistRequest;
 import com.emf.controlplane.dto.PicklistValueRequest;
 import com.emf.controlplane.dto.UpdateGlobalPicklistRequest;
@@ -66,6 +67,7 @@ public class PicklistService {
     }
 
     @Transactional
+    @SetupAudited(section = "Picklists", entityType = "GlobalPicklist")
     public GlobalPicklist createGlobalPicklist(String tenantId, CreateGlobalPicklistRequest request) {
         log.info("Creating global picklist '{}' for tenant: {}", request.getName(), tenantId);
 
@@ -87,6 +89,7 @@ public class PicklistService {
     }
 
     @Transactional
+    @SetupAudited(section = "Picklists", entityType = "GlobalPicklist")
     public GlobalPicklist updateGlobalPicklist(String id, UpdateGlobalPicklistRequest request) {
         log.info("Updating global picklist: {}", id);
 
@@ -113,6 +116,7 @@ public class PicklistService {
     }
 
     @Transactional
+    @SetupAudited(section = "Picklists", entityType = "GlobalPicklist")
     public void deleteGlobalPicklist(String id) {
         log.info("Deleting global picklist: {}", id);
 

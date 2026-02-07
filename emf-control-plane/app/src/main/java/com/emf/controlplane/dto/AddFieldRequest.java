@@ -42,6 +42,8 @@ public class AddFieldRequest {
      */
     private String fieldTypeConfig;
 
+    private boolean trackHistory = false;
+
     public AddFieldRequest() {
     }
 
@@ -114,6 +116,14 @@ public class AddFieldRequest {
 
     public void setFieldTypeConfig(String fieldTypeConfig) {
         this.fieldTypeConfig = fieldTypeConfig;
+    }
+
+    public boolean isTrackHistory() {
+        return trackHistory;
+    }
+
+    public void setTrackHistory(boolean trackHistory) {
+        this.trackHistory = trackHistory;
     }
 
     @Override

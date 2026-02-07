@@ -29,6 +29,7 @@ public class FieldDto {
     private String relationshipName;
     private boolean cascadeDelete;
     private String referenceCollectionId;
+    private boolean trackHistory;
     private Instant createdAt;
     private Instant updatedAt;
 
@@ -39,7 +40,7 @@ public class FieldDto {
                     boolean required, boolean unique, boolean indexed, String defaultValue,
                     String referenceTarget, Integer order, boolean active, String description,
                     String constraints, String relationshipType, String relationshipName,
-                    boolean cascadeDelete, String referenceCollectionId,
+                    boolean cascadeDelete, String referenceCollectionId, boolean trackHistory,
                     Instant createdAt, Instant updatedAt) {
         this.id = id;
         this.collectionId = collectionId;
@@ -59,6 +60,7 @@ public class FieldDto {
         this.relationshipName = relationshipName;
         this.cascadeDelete = cascadeDelete;
         this.referenceCollectionId = referenceCollectionId;
+        this.trackHistory = trackHistory;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
     }
@@ -92,6 +94,7 @@ public class FieldDto {
                 field.getRelationshipName(),
                 field.isCascadeDelete(),
                 field.getReferenceCollectionId(),
+                field.isTrackHistory(),
                 field.getCreatedAt(),
                 field.getUpdatedAt()
         );
@@ -241,6 +244,14 @@ public class FieldDto {
         this.referenceCollectionId = referenceCollectionId;
     }
 
+    public boolean isTrackHistory() {
+        return trackHistory;
+    }
+
+    public void setTrackHistory(boolean trackHistory) {
+        this.trackHistory = trackHistory;
+    }
+
     public Instant getCreatedAt() {
         return createdAt;
     }
@@ -282,6 +293,7 @@ public class FieldDto {
                 indexed == fieldDto.indexed &&
                 active == fieldDto.active &&
                 cascadeDelete == fieldDto.cascadeDelete &&
+                trackHistory == fieldDto.trackHistory &&
                 Objects.equals(id, fieldDto.id) &&
                 Objects.equals(collectionId, fieldDto.collectionId) &&
                 Objects.equals(name, fieldDto.name) &&
@@ -304,6 +316,6 @@ public class FieldDto {
         return Objects.hash(id, collectionId, name, displayName, type, required, unique, indexed,
                            defaultValue, referenceTarget, order, active, description, constraints,
                            relationshipType, relationshipName, cascadeDelete, referenceCollectionId,
-                           createdAt, updatedAt);
+                           trackHistory, createdAt, updatedAt);
     }
 }

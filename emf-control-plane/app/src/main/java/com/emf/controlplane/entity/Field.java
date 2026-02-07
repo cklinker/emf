@@ -73,6 +73,9 @@ public class Field extends BaseEntity {
     @Column(name = "reference_collection_id", length = 36)
     private String referenceCollectionId;
 
+    @Column(name = "track_history")
+    private boolean trackHistory = false;
+
     public Field() {
         super();
     }
@@ -234,6 +237,14 @@ public class Field extends BaseEntity {
 
     public void setReferenceCollectionId(String referenceCollectionId) {
         this.referenceCollectionId = referenceCollectionId;
+    }
+
+    public boolean isTrackHistory() {
+        return trackHistory;
+    }
+
+    public void setTrackHistory(boolean trackHistory) {
+        this.trackHistory = trackHistory;
     }
 
     @Override

@@ -46,6 +46,8 @@ export type {
   CreateRecordTypeRequest,
   RecordTypePicklistOverride,
   SetPicklistOverrideRequest,
+  FieldHistoryEntry,
+  SetupAuditTrailEntry,
 } from './admin/types';
 
 // Authentication

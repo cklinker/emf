@@ -871,3 +871,20 @@ export interface SetPicklistOverrideRequest {
   availableValues: string[];
   defaultValue?: string;
 }
+
+// --- Field History (Phase 2 Stream E) ---
+
+/**
+ * Field history entry tracking a single field change
+ */
+export interface FieldHistoryEntry {
+  id: string;
+  collectionId: string;
+  recordId: string;
+  fieldName: string;
+  oldValue: unknown;
+  newValue: unknown;
+  changedBy: string;
+  changedAt: string;
+  changeSource: 'UI' | 'API' | 'WORKFLOW' | 'SYSTEM' | 'IMPORT';
+}

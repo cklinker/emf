@@ -44,6 +44,7 @@ export interface FieldDefinition {
   relationshipName?: string
   cascadeDelete?: boolean
   referenceCollectionId?: string
+  trackHistory?: boolean
   createdAt?: string
   updatedAt?: string
 }
@@ -160,4 +161,35 @@ export interface RecordTypePicklistOverride {
   fieldName: string
   availableValues: string
   defaultValue?: string
+}
+
+/**
+ * Field history entry
+ */
+export interface FieldHistoryEntry {
+  id: string
+  collectionId: string
+  recordId: string
+  fieldName: string
+  oldValue: unknown
+  newValue: unknown
+  changedBy: string
+  changedAt: string
+  changeSource: 'UI' | 'API' | 'WORKFLOW' | 'SYSTEM' | 'IMPORT'
+}
+
+/**
+ * Setup audit trail entry
+ */
+export interface SetupAuditTrailEntry {
+  id: string
+  userId: string
+  action: 'CREATED' | 'UPDATED' | 'DELETED' | 'ACTIVATED' | 'DEACTIVATED'
+  section: string
+  entityType: string
+  entityId?: string
+  entityName?: string
+  oldValue?: string
+  newValue?: string
+  timestamp: string
 }

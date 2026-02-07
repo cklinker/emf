@@ -76,4 +76,9 @@ public interface FieldRepository extends JpaRepository<Field, String> {
      * Find all active fields that reference a given collection (by referenceCollectionId).
      */
     List<Field> findByReferenceCollectionIdAndActiveTrue(String referenceCollectionId);
+
+    /**
+     * Find all active fields with history tracking enabled for a collection.
+     */
+    List<Field> findByCollectionIdAndTrackHistoryTrueAndActiveTrue(String collectionId);
 }

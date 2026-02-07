@@ -29,6 +29,7 @@ import type {
   CollectionVersion,
   CollectionValidationRule,
   RecordType,
+  SetupAuditTrailEntry,
 } from '../../types/collections'
 import styles from './CollectionDetailPage.module.css'
 
@@ -92,7 +93,13 @@ export function CollectionDetailPage({
 
   // Active tab state for sections
   const [activeTab, setActiveTab] = useState<
-    'fields' | 'authorization' | 'validationRules' | 'recordTypes' | 'versions'
+    | 'fields'
+    | 'authorization'
+    | 'validationRules'
+    | 'recordTypes'
+    | 'fieldHistory'
+    | 'setupAudit'
+    | 'versions'
   >('fields')
 
   // Fetch collection data
@@ -148,6 +155,19 @@ export function CollectionDetailPage({
       return response
     },
     enabled: !!collectionId && activeTab === 'recordTypes',
+  })
+
+  // Fetch setup audit trail
+  const { data: setupAuditPage, isLoading: isLoadingAudit } = useQuery({
+    queryKey: ['setup-audit', collectionId],
+    queryFn: async () => {
+      const response = await apiClient.get<{
+        content: SetupAuditTrailEntry[]
+        totalElements: number
+      }>('/api/audit?size=50')
+      return response
+    },
+    enabled: activeTab === 'setupAudit',
   })
 
   // Fetch all collections for reference field dropdown
@@ -527,6 +547,30 @@ export function CollectionDetailPage({
         <button
           type="button"
           role="tab"
+          className={`${styles.tab} ${activeTab === 'fieldHistory' ? styles.tabActive : ''}`}
+          onClick={() => handleTabChange('fieldHistory')}
+          aria-selected={activeTab === 'fieldHistory'}
+          aria-controls="field-history-panel"
+          id="field-history-tab"
+          data-testid="field-history-tab"
+        >
+          {t('collections.fieldHistory')}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          className={`${styles.tab} ${activeTab === 'setupAudit' ? styles.tabActive : ''}`}
+          onClick={() => handleTabChange('setupAudit')}
+          aria-selected={activeTab === 'setupAudit'}
+          aria-controls="setup-audit-panel"
+          id="setup-audit-tab"
+          data-testid="setup-audit-tab"
+        >
+          {t('collections.setupAudit')}
+        </button>
+        <button
+          type="button"
+          role="tab"
           className={`${styles.tab} ${activeTab === 'versions' ? styles.tabActive : ''}`}
           onClick={() => handleTabChange('versions')}
           aria-selected={activeTab === 'versions'}
@@ -869,6 +913,91 @@ export function CollectionDetailPage({
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* Field History Panel */}
+      {activeTab === 'fieldHistory' && (
+        <section
+          id="field-history-panel"
+          role="tabpanel"
+          aria-labelledby="field-history-tab"
+          className={styles.tabPanel}
+          data-testid="field-history-panel"
+        >
+          <div className={styles.panelHeader}>
+            <h2 className={styles.panelTitle}>{t('collections.fieldHistory')}</h2>
+          </div>
+          <div className={styles.infoMessage}>
+            <p>{t('fieldHistory.description')}</p>
+            <p className={styles.trackedFieldsNote}>{t('fieldHistory.trackedFieldsNote')}</p>
+            {fields && fields.length > 0 && (
+              <div className={styles.trackedFieldsList}>
+                <h3>{t('fieldHistory.trackedFields')}</h3>
+                <ul>
+                  {fields
+                    .filter((f: FieldDefinition) => f.trackHistory)
+                    .map((f: FieldDefinition) => (
+                      <li key={f.id}>{f.name}</li>
+                    ))}
+                  {fields.filter((f: FieldDefinition) => f.trackHistory).length === 0 && (
+                    <li className={styles.emptyNote}>{t('fieldHistory.noTrackedFields')}</li>
+                  )}
+                </ul>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* Setup Audit Panel */}
+      {activeTab === 'setupAudit' && (
+        <section
+          id="setup-audit-panel"
+          role="tabpanel"
+          aria-labelledby="setup-audit-tab"
+          className={styles.tabPanel}
+          data-testid="setup-audit-panel"
+        >
+          <div className={styles.panelHeader}>
+            <h2 className={styles.panelTitle}>{t('collections.setupAudit')}</h2>
+          </div>
+          {isLoadingAudit ? (
+            <LoadingSpinner />
+          ) : setupAuditPage?.content && setupAuditPage.content.length > 0 ? (
+            <div className={styles.tableContainer}>
+              <table className={styles.table} aria-label={t('collections.setupAudit')}>
+                <thead>
+                  <tr>
+                    <th>{t('setupAudit.action')}</th>
+                    <th>{t('setupAudit.section')}</th>
+                    <th>{t('setupAudit.entityType')}</th>
+                    <th>{t('setupAudit.entityName')}</th>
+                    <th>{t('setupAudit.performedAt')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {setupAuditPage.content.map((entry: SetupAuditTrailEntry) => (
+                    <tr key={entry.id}>
+                      <td>
+                        <span className={styles.actionBadge} data-action={entry.action}>
+                          {entry.action}
+                        </span>
+                      </td>
+                      <td>{entry.section}</td>
+                      <td>{entry.entityType}</td>
+                      <td>{entry.entityName || '-'}</td>
+                      <td>{new Date(entry.timestamp).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className={styles.emptyState}>
+              <p>{t('setupAudit.empty')}</p>
             </div>
           )}
         </section>

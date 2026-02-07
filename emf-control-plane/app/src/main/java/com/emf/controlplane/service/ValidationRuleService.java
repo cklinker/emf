@@ -1,5 +1,6 @@
 package com.emf.controlplane.service;
 
+import com.emf.controlplane.audit.SetupAudited;
 import com.emf.controlplane.dto.CreateValidationRuleRequest;
 import com.emf.controlplane.dto.UpdateValidationRuleRequest;
 import com.emf.controlplane.entity.Collection;
@@ -53,6 +54,7 @@ public class ValidationRuleService {
     }
 
     @Transactional
+    @SetupAudited(section = "Validation Rules", entityType = "ValidationRule")
     public ValidationRule createRule(String collectionId, String tenantId,
                                      CreateValidationRuleRequest request) {
         log.info("Creating validation rule '{}' for collection: {}", request.getName(), collectionId);
@@ -104,6 +106,7 @@ public class ValidationRuleService {
     }
 
     @Transactional
+    @SetupAudited(section = "Validation Rules", entityType = "ValidationRule")
     public ValidationRule updateRule(String ruleId, UpdateValidationRuleRequest request) {
         log.info("Updating validation rule: {}", ruleId);
 
@@ -151,6 +154,7 @@ public class ValidationRuleService {
     }
 
     @Transactional
+    @SetupAudited(section = "Validation Rules", entityType = "ValidationRule")
     public void deleteRule(String ruleId) {
         log.info("Deleting validation rule: {}", ruleId);
         ValidationRule rule = validationRuleRepository.findById(ruleId)

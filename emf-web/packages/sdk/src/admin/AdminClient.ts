@@ -57,6 +57,7 @@ import type {
   CreateRecordTypeRequest,
   RecordTypePicklistOverride,
   SetPicklistOverrideRequest,
+  FieldHistoryEntry,
 } from './types';
 
 /**
@@ -610,6 +611,75 @@ export class AdminClient {
       await this.axios.delete(
         `/control/collections/${collectionId}/record-types/${recordTypeId}/picklists/${fieldId}`
       );
+    },
+  };
+
+  /**
+   * Field history operations
+   */
+  readonly fieldHistory = {
+    getRecordHistory: async (
+      collectionId: string,
+      recordId: string,
+      page?: number,
+      size?: number
+    ): Promise<Page<FieldHistoryEntry>> => {
+      const params = new URLSearchParams();
+      if (page !== undefined) params.append('page', String(page));
+      if (size !== undefined) params.append('size', String(size));
+      const query = params.toString();
+      const response = await this.axios.get<Page<FieldHistoryEntry>>(
+        `/control/collections/${collectionId}/records/${recordId}/history${query ? `?${query}` : ''}`
+      );
+      return response.data;
+    },
+
+    getFieldHistory: async (
+      collectionId: string,
+      recordId: string,
+      fieldName: string,
+      page?: number,
+      size?: number
+    ): Promise<Page<FieldHistoryEntry>> => {
+      const params = new URLSearchParams();
+      if (page !== undefined) params.append('page', String(page));
+      if (size !== undefined) params.append('size', String(size));
+      const query = params.toString();
+      const response = await this.axios.get<Page<FieldHistoryEntry>>(
+        `/control/collections/${collectionId}/records/${recordId}/history/${fieldName}${query ? `?${query}` : ''}`
+      );
+      return response.data;
+    },
+
+    getFieldHistoryAcrossRecords: async (
+      collectionId: string,
+      fieldName: string,
+      page?: number,
+      size?: number
+    ): Promise<Page<FieldHistoryEntry>> => {
+      const params = new URLSearchParams();
+      if (page !== undefined) params.append('page', String(page));
+      if (size !== undefined) params.append('size', String(size));
+      const query = params.toString();
+      const response = await this.axios.get<Page<FieldHistoryEntry>>(
+        `/control/collections/${collectionId}/field-history/${fieldName}${query ? `?${query}` : ''}`
+      );
+      return response.data;
+    },
+
+    getUserHistory: async (
+      userId: string,
+      page?: number,
+      size?: number
+    ): Promise<Page<FieldHistoryEntry>> => {
+      const params = new URLSearchParams();
+      if (page !== undefined) params.append('page', String(page));
+      if (size !== undefined) params.append('size', String(size));
+      const query = params.toString();
+      const response = await this.axios.get<Page<FieldHistoryEntry>>(
+        `/control/users/${userId}/field-history${query ? `?${query}` : ''}`
+      );
+      return response.data;
     },
   };
 

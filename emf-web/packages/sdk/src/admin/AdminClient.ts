@@ -70,6 +70,21 @@ import type {
   UserDashboard,
   CreateDashboardRequest,
   ExportRequest,
+  EmailTemplate,
+  EmailLog,
+  CreateEmailTemplateRequest,
+  WorkflowRule,
+  WorkflowExecutionLog,
+  CreateWorkflowRuleRequest,
+  ApprovalProcess,
+  ApprovalInstance,
+  CreateApprovalProcessRequest,
+  FlowDefinition,
+  FlowExecution,
+  CreateFlowRequest,
+  ScheduledJob,
+  JobExecutionLog,
+  CreateScheduledJobRequest,
 } from './types';
 
 /**
@@ -1220,6 +1235,274 @@ export class AdminClient {
         responseType: 'blob',
       });
       return response.data as Blob;
+    },
+  };
+
+  /**
+   * Email template operations
+   */
+  readonly emailTemplates = {
+    list: async (tenantId: string): Promise<EmailTemplate[]> => {
+      const params = new URLSearchParams({ tenantId });
+      const response = await this.axios.get<EmailTemplate[]>(
+        `/control/email-templates?${params.toString()}`
+      );
+      return response.data;
+    },
+
+    get: async (id: string): Promise<EmailTemplate> => {
+      const response = await this.axios.get<EmailTemplate>(`/control/email-templates/${id}`);
+      return response.data;
+    },
+
+    create: async (
+      tenantId: string,
+      userId: string,
+      request: CreateEmailTemplateRequest
+    ): Promise<EmailTemplate> => {
+      const params = new URLSearchParams({ tenantId, userId });
+      const response = await this.axios.post<EmailTemplate>(
+        `/control/email-templates?${params.toString()}`,
+        request
+      );
+      return response.data;
+    },
+
+    update: async (
+      id: string,
+      request: Partial<CreateEmailTemplateRequest>
+    ): Promise<EmailTemplate> => {
+      const response = await this.axios.put<EmailTemplate>(
+        `/control/email-templates/${id}`,
+        request
+      );
+      return response.data;
+    },
+
+    delete: async (id: string): Promise<void> => {
+      await this.axios.delete(`/control/email-templates/${id}`);
+    },
+
+    listLogs: async (tenantId: string, status?: string): Promise<EmailLog[]> => {
+      const params = new URLSearchParams({ tenantId });
+      if (status) params.set('status', status);
+      const response = await this.axios.get<EmailLog[]>(
+        `/control/email-templates/logs?${params.toString()}`
+      );
+      return response.data;
+    },
+  };
+
+  /**
+   * Workflow rule operations
+   */
+  readonly workflowRules = {
+    list: async (tenantId: string): Promise<WorkflowRule[]> => {
+      const params = new URLSearchParams({ tenantId });
+      const response = await this.axios.get<WorkflowRule[]>(
+        `/control/workflow-rules?${params.toString()}`
+      );
+      return response.data;
+    },
+
+    get: async (id: string): Promise<WorkflowRule> => {
+      const response = await this.axios.get<WorkflowRule>(`/control/workflow-rules/${id}`);
+      return response.data;
+    },
+
+    create: async (tenantId: string, request: CreateWorkflowRuleRequest): Promise<WorkflowRule> => {
+      const params = new URLSearchParams({ tenantId });
+      const response = await this.axios.post<WorkflowRule>(
+        `/control/workflow-rules?${params.toString()}`,
+        request
+      );
+      return response.data;
+    },
+
+    update: async (
+      id: string,
+      request: Partial<CreateWorkflowRuleRequest>
+    ): Promise<WorkflowRule> => {
+      const response = await this.axios.put<WorkflowRule>(`/control/workflow-rules/${id}`, request);
+      return response.data;
+    },
+
+    delete: async (id: string): Promise<void> => {
+      await this.axios.delete(`/control/workflow-rules/${id}`);
+    },
+
+    listLogs: async (tenantId: string): Promise<WorkflowExecutionLog[]> => {
+      const params = new URLSearchParams({ tenantId });
+      const response = await this.axios.get<WorkflowExecutionLog[]>(
+        `/control/workflow-rules/logs?${params.toString()}`
+      );
+      return response.data;
+    },
+  };
+
+  /**
+   * Approval process operations
+   */
+  readonly approvals = {
+    listProcesses: async (tenantId: string): Promise<ApprovalProcess[]> => {
+      const params = new URLSearchParams({ tenantId });
+      const response = await this.axios.get<ApprovalProcess[]>(
+        `/control/approvals/processes?${params.toString()}`
+      );
+      return response.data;
+    },
+
+    getProcess: async (id: string): Promise<ApprovalProcess> => {
+      const response = await this.axios.get<ApprovalProcess>(`/control/approvals/processes/${id}`);
+      return response.data;
+    },
+
+    createProcess: async (
+      tenantId: string,
+      request: CreateApprovalProcessRequest
+    ): Promise<ApprovalProcess> => {
+      const params = new URLSearchParams({ tenantId });
+      const response = await this.axios.post<ApprovalProcess>(
+        `/control/approvals/processes?${params.toString()}`,
+        request
+      );
+      return response.data;
+    },
+
+    updateProcess: async (
+      id: string,
+      request: Partial<CreateApprovalProcessRequest>
+    ): Promise<ApprovalProcess> => {
+      const response = await this.axios.put<ApprovalProcess>(
+        `/control/approvals/processes/${id}`,
+        request
+      );
+      return response.data;
+    },
+
+    deleteProcess: async (id: string): Promise<void> => {
+      await this.axios.delete(`/control/approvals/processes/${id}`);
+    },
+
+    listInstances: async (tenantId: string): Promise<ApprovalInstance[]> => {
+      const params = new URLSearchParams({ tenantId });
+      const response = await this.axios.get<ApprovalInstance[]>(
+        `/control/approvals/instances?${params.toString()}`
+      );
+      return response.data;
+    },
+
+    getPendingForUser: async (userId: string): Promise<ApprovalInstance[]> => {
+      const params = new URLSearchParams({ userId });
+      const response = await this.axios.get<ApprovalInstance[]>(
+        `/control/approvals/instances/pending?${params.toString()}`
+      );
+      return response.data;
+    },
+  };
+
+  /**
+   * Flow engine operations
+   */
+  readonly flows = {
+    list: async (tenantId: string): Promise<FlowDefinition[]> => {
+      const params = new URLSearchParams({ tenantId });
+      const response = await this.axios.get<FlowDefinition[]>(
+        `/control/flows?${params.toString()}`
+      );
+      return response.data;
+    },
+
+    get: async (id: string): Promise<FlowDefinition> => {
+      const response = await this.axios.get<FlowDefinition>(`/control/flows/${id}`);
+      return response.data;
+    },
+
+    create: async (
+      tenantId: string,
+      userId: string,
+      request: CreateFlowRequest
+    ): Promise<FlowDefinition> => {
+      const params = new URLSearchParams({ tenantId, userId });
+      const response = await this.axios.post<FlowDefinition>(
+        `/control/flows?${params.toString()}`,
+        request
+      );
+      return response.data;
+    },
+
+    update: async (id: string, request: Partial<CreateFlowRequest>): Promise<FlowDefinition> => {
+      const response = await this.axios.put<FlowDefinition>(`/control/flows/${id}`, request);
+      return response.data;
+    },
+
+    delete: async (id: string): Promise<void> => {
+      await this.axios.delete(`/control/flows/${id}`);
+    },
+
+    listExecutions: async (tenantId: string): Promise<FlowExecution[]> => {
+      const params = new URLSearchParams({ tenantId });
+      const response = await this.axios.get<FlowExecution[]>(
+        `/control/flows/executions?${params.toString()}`
+      );
+      return response.data;
+    },
+
+    getExecution: async (executionId: string): Promise<FlowExecution> => {
+      const response = await this.axios.get<FlowExecution>(
+        `/control/flows/executions/${executionId}`
+      );
+      return response.data;
+    },
+  };
+
+  /**
+   * Scheduled job operations
+   */
+  readonly scheduledJobs = {
+    list: async (tenantId: string): Promise<ScheduledJob[]> => {
+      const params = new URLSearchParams({ tenantId });
+      const response = await this.axios.get<ScheduledJob[]>(
+        `/control/scheduled-jobs?${params.toString()}`
+      );
+      return response.data;
+    },
+
+    get: async (id: string): Promise<ScheduledJob> => {
+      const response = await this.axios.get<ScheduledJob>(`/control/scheduled-jobs/${id}`);
+      return response.data;
+    },
+
+    create: async (
+      tenantId: string,
+      userId: string,
+      request: CreateScheduledJobRequest
+    ): Promise<ScheduledJob> => {
+      const params = new URLSearchParams({ tenantId, userId });
+      const response = await this.axios.post<ScheduledJob>(
+        `/control/scheduled-jobs?${params.toString()}`,
+        request
+      );
+      return response.data;
+    },
+
+    update: async (
+      id: string,
+      request: Partial<CreateScheduledJobRequest>
+    ): Promise<ScheduledJob> => {
+      const response = await this.axios.put<ScheduledJob>(`/control/scheduled-jobs/${id}`, request);
+      return response.data;
+    },
+
+    delete: async (id: string): Promise<void> => {
+      await this.axios.delete(`/control/scheduled-jobs/${id}`);
+    },
+
+    listLogs: async (id: string): Promise<JobExecutionLog[]> => {
+      const response = await this.axios.get<JobExecutionLog[]>(
+        `/control/scheduled-jobs/${id}/logs`
+      );
+      return response.data;
     },
   };
 }

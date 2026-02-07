@@ -69,6 +69,11 @@ import {
   ListViewsPage,
   ReportsPage,
   DashboardsPage,
+  WorkflowRulesPage,
+  ApprovalProcessesPage,
+  FlowsPage,
+  ScheduledJobsPage,
+  EmailTemplatesPage,
   LoginPage,
   UnauthorizedPage,
   NotFoundPage,
@@ -490,6 +495,56 @@ function App({ plugins = [] }: AppProps): React.ReactElement {
                               element={
                                 <ProtectedPageRoute>
                                   <DashboardsPage />
+                                </ProtectedPageRoute>
+                              }
+                            />
+
+                            {/* Workflow Rules route */}
+                            <Route
+                              path="/workflow-rules"
+                              element={
+                                <ProtectedPageRoute>
+                                  <WorkflowRulesPage />
+                                </ProtectedPageRoute>
+                              }
+                            />
+
+                            {/* Approval Processes route */}
+                            <Route
+                              path="/approvals"
+                              element={
+                                <ProtectedPageRoute>
+                                  <ApprovalProcessesPage />
+                                </ProtectedPageRoute>
+                              }
+                            />
+
+                            {/* Flows route */}
+                            <Route
+                              path="/flows"
+                              element={
+                                <ProtectedPageRoute>
+                                  <FlowsPage />
+                                </ProtectedPageRoute>
+                              }
+                            />
+
+                            {/* Scheduled Jobs route */}
+                            <Route
+                              path="/scheduled-jobs"
+                              element={
+                                <ProtectedPageRoute>
+                                  <ScheduledJobsPage />
+                                </ProtectedPageRoute>
+                              }
+                            />
+
+                            {/* Email Templates route */}
+                            <Route
+                              path="/email-templates"
+                              element={
+                                <ProtectedPageRoute>
+                                  <EmailTemplatesPage />
                                 </ProtectedPageRoute>
                               }
                             />

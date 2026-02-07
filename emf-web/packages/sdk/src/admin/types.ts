@@ -1134,3 +1134,279 @@ export interface ExportRequest {
   columns: string[];
   rows: Record<string, unknown>[];
 }
+
+// --- Email Templates (Phase 4 Stream A) ---
+
+export interface EmailTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  subject: string;
+  bodyHtml: string;
+  bodyText?: string;
+  relatedCollectionId?: string;
+  folder?: string;
+  active: boolean;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EmailLog {
+  id: string;
+  templateId?: string;
+  recipientEmail: string;
+  subject: string;
+  status: 'QUEUED' | 'SENT' | 'FAILED';
+  source?: string;
+  sourceId?: string;
+  errorMessage?: string;
+  sentAt?: string;
+  createdAt: string;
+}
+
+export interface CreateEmailTemplateRequest {
+  name: string;
+  description?: string;
+  subject: string;
+  bodyHtml: string;
+  bodyText?: string;
+  relatedCollectionId?: string;
+  folder?: string;
+  active?: boolean;
+}
+
+// --- Workflow Rules (Phase 4 Stream B) ---
+
+export interface WorkflowRule {
+  id: string;
+  collectionId: string;
+  name: string;
+  description?: string;
+  active: boolean;
+  triggerType: 'ON_CREATE' | 'ON_UPDATE' | 'ON_CREATE_OR_UPDATE' | 'ON_DELETE';
+  filterFormula?: string;
+  reEvaluateOnUpdate: boolean;
+  executionOrder: number;
+  actions: WorkflowAction[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WorkflowAction {
+  id: string;
+  actionType:
+    | 'FIELD_UPDATE'
+    | 'EMAIL_ALERT'
+    | 'CREATE_RECORD'
+    | 'INVOKE_SCRIPT'
+    | 'OUTBOUND_MESSAGE'
+    | 'CREATE_TASK'
+    | 'PUBLISH_EVENT';
+  executionOrder: number;
+  config: string;
+  active: boolean;
+}
+
+export interface WorkflowExecutionLog {
+  id: string;
+  workflowRuleId: string;
+  recordId: string;
+  triggerType: string;
+  status: 'SUCCESS' | 'PARTIAL_FAILURE' | 'FAILURE';
+  actionsExecuted: number;
+  errorMessage?: string;
+  executedAt: string;
+  durationMs?: number;
+}
+
+export interface CreateWorkflowRuleRequest {
+  collectionId: string;
+  name: string;
+  description?: string;
+  active?: boolean;
+  triggerType: string;
+  filterFormula?: string;
+  reEvaluateOnUpdate?: boolean;
+  executionOrder?: number;
+  actions?: CreateWorkflowActionRequest[];
+}
+
+export interface CreateWorkflowActionRequest {
+  actionType: string;
+  executionOrder?: number;
+  config: string;
+  active?: boolean;
+}
+
+// --- Approval Processes (Phase 4 Stream C) ---
+
+export interface ApprovalProcess {
+  id: string;
+  collectionId: string;
+  name: string;
+  description?: string;
+  active: boolean;
+  entryCriteria?: string;
+  recordEditability: 'LOCKED' | 'ADMIN_ONLY';
+  initialSubmitterField?: string;
+  onSubmitFieldUpdates: string;
+  onApprovalFieldUpdates: string;
+  onRejectionFieldUpdates: string;
+  onRecallFieldUpdates: string;
+  allowRecall: boolean;
+  executionOrder: number;
+  steps: ApprovalStep[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ApprovalStep {
+  id: string;
+  stepNumber: number;
+  name: string;
+  description?: string;
+  entryCriteria?: string;
+  approverType: 'USER' | 'ROLE' | 'QUEUE' | 'MANAGER_HIERARCHY' | 'RELATED_USER';
+  approverId?: string;
+  approverField?: string;
+  unanimityRequired: boolean;
+  escalationTimeoutHours?: number;
+  escalationAction?: string;
+  onApproveAction: string;
+  onRejectAction: string;
+}
+
+export interface ApprovalInstance {
+  id: string;
+  approvalProcessId: string;
+  approvalProcessName: string;
+  collectionId: string;
+  recordId: string;
+  submittedBy: string;
+  currentStepNumber: number;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'RECALLED';
+  submittedAt: string;
+  completedAt?: string;
+  stepInstances: ApprovalStepInstance[];
+}
+
+export interface ApprovalStepInstance {
+  id: string;
+  stepId: string;
+  assignedTo: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'REASSIGNED';
+  comments?: string;
+  actedAt?: string;
+}
+
+export interface CreateApprovalProcessRequest {
+  collectionId: string;
+  name: string;
+  description?: string;
+  active?: boolean;
+  entryCriteria?: string;
+  recordEditability?: string;
+  initialSubmitterField?: string;
+  onSubmitFieldUpdates?: string;
+  onApprovalFieldUpdates?: string;
+  onRejectionFieldUpdates?: string;
+  onRecallFieldUpdates?: string;
+  allowRecall?: boolean;
+  executionOrder?: number;
+  steps?: CreateApprovalStepRequest[];
+}
+
+export interface CreateApprovalStepRequest {
+  stepNumber: number;
+  name: string;
+  description?: string;
+  entryCriteria?: string;
+  approverType: string;
+  approverId?: string;
+  approverField?: string;
+  unanimityRequired?: boolean;
+  escalationTimeoutHours?: number;
+  escalationAction?: string;
+  onApproveAction?: string;
+  onRejectAction?: string;
+}
+
+// --- Flow Engine (Phase 4 Stream D) ---
+
+export interface FlowDefinition {
+  id: string;
+  name: string;
+  description?: string;
+  flowType: 'RECORD_TRIGGERED' | 'SCHEDULED' | 'AUTOLAUNCHED' | 'SCREEN';
+  active: boolean;
+  version: number;
+  triggerConfig?: string;
+  definition: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FlowExecution {
+  id: string;
+  flowId: string;
+  flowName: string;
+  status: 'RUNNING' | 'COMPLETED' | 'FAILED' | 'WAITING' | 'CANCELLED';
+  startedBy?: string;
+  triggerRecordId?: string;
+  variables: string;
+  currentNodeId?: string;
+  errorMessage?: string;
+  startedAt: string;
+  completedAt?: string;
+}
+
+export interface CreateFlowRequest {
+  name: string;
+  description?: string;
+  flowType: string;
+  active?: boolean;
+  triggerConfig?: string;
+  definition: string;
+}
+
+// --- Scheduled Jobs (Phase 4 Stream E) ---
+
+export interface ScheduledJob {
+  id: string;
+  name: string;
+  description?: string;
+  jobType: 'FLOW' | 'SCRIPT' | 'REPORT_EXPORT';
+  jobReferenceId?: string;
+  cronExpression: string;
+  timezone: string;
+  active: boolean;
+  lastRunAt?: string;
+  lastStatus?: string;
+  nextRunAt?: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface JobExecutionLog {
+  id: string;
+  jobId: string;
+  status: string;
+  recordsProcessed: number;
+  errorMessage?: string;
+  startedAt: string;
+  completedAt?: string;
+  durationMs?: number;
+}
+
+export interface CreateScheduledJobRequest {
+  name: string;
+  description?: string;
+  jobType: string;
+  jobReferenceId?: string;
+  cronExpression: string;
+  timezone?: string;
+  active?: boolean;
+}

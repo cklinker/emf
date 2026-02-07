@@ -23,6 +23,15 @@ import type {
   UpdateTenantRequest,
   GovernorLimits,
   Page,
+  Profile,
+  CreateProfileRequest,
+  UpdateProfileRequest,
+  ObjectPermissionRequest,
+  FieldPermissionRequest,
+  SystemPermissionRequest,
+  PermissionSet,
+  CreatePermissionSetRequest,
+  UpdatePermissionSetRequest,
 } from './types';
 
 /**
@@ -338,6 +347,110 @@ export class AdminClient {
     getRun: async (id: string): Promise<MigrationRun> => {
       const response = await this.axios.get<MigrationRun>(`/control/migrations/runs/${id}`);
       return response.data;
+    },
+  };
+
+  /**
+   * Profile management operations
+   */
+  readonly profiles = {
+    list: async (): Promise<Profile[]> => {
+      const response = await this.axios.get<Profile[]>('/control/profiles');
+      return response.data;
+    },
+
+    get: async (id: string): Promise<Profile> => {
+      const response = await this.axios.get<Profile>(`/control/profiles/${id}`);
+      return response.data;
+    },
+
+    create: async (request: CreateProfileRequest): Promise<Profile> => {
+      const response = await this.axios.post<Profile>('/control/profiles', request);
+      return response.data;
+    },
+
+    update: async (id: string, request: UpdateProfileRequest): Promise<Profile> => {
+      const response = await this.axios.put<Profile>(`/control/profiles/${id}`, request);
+      return response.data;
+    },
+
+    delete: async (id: string): Promise<void> => {
+      await this.axios.delete(`/control/profiles/${id}`);
+    },
+
+    setObjectPermissions: async (
+      id: string,
+      collectionId: string,
+      perms: ObjectPermissionRequest
+    ): Promise<void> => {
+      await this.axios.put(`/control/profiles/${id}/object-permissions/${collectionId}`, perms);
+    },
+
+    setFieldPermissions: async (id: string, perms: FieldPermissionRequest[]): Promise<void> => {
+      await this.axios.put(`/control/profiles/${id}/field-permissions`, perms);
+    },
+
+    setSystemPermissions: async (id: string, perms: SystemPermissionRequest[]): Promise<void> => {
+      await this.axios.put(`/control/profiles/${id}/system-permissions`, perms);
+    },
+  };
+
+  /**
+   * Permission set management operations
+   */
+  readonly permissionSets = {
+    list: async (): Promise<PermissionSet[]> => {
+      const response = await this.axios.get<PermissionSet[]>('/control/permission-sets');
+      return response.data;
+    },
+
+    get: async (id: string): Promise<PermissionSet> => {
+      const response = await this.axios.get<PermissionSet>(`/control/permission-sets/${id}`);
+      return response.data;
+    },
+
+    create: async (request: CreatePermissionSetRequest): Promise<PermissionSet> => {
+      const response = await this.axios.post<PermissionSet>('/control/permission-sets', request);
+      return response.data;
+    },
+
+    update: async (id: string, request: UpdatePermissionSetRequest): Promise<PermissionSet> => {
+      const response = await this.axios.put<PermissionSet>(
+        `/control/permission-sets/${id}`,
+        request
+      );
+      return response.data;
+    },
+
+    delete: async (id: string): Promise<void> => {
+      await this.axios.delete(`/control/permission-sets/${id}`);
+    },
+
+    setObjectPermissions: async (
+      id: string,
+      collectionId: string,
+      perms: ObjectPermissionRequest
+    ): Promise<void> => {
+      await this.axios.put(
+        `/control/permission-sets/${id}/object-permissions/${collectionId}`,
+        perms
+      );
+    },
+
+    setFieldPermissions: async (id: string, perms: FieldPermissionRequest[]): Promise<void> => {
+      await this.axios.put(`/control/permission-sets/${id}/field-permissions`, perms);
+    },
+
+    setSystemPermissions: async (id: string, perms: SystemPermissionRequest[]): Promise<void> => {
+      await this.axios.put(`/control/permission-sets/${id}/system-permissions`, perms);
+    },
+
+    assign: async (id: string, userId: string): Promise<void> => {
+      await this.axios.post(`/control/permission-sets/${id}/assign/${userId}`);
+    },
+
+    unassign: async (id: string, userId: string): Promise<void> => {
+      await this.axios.delete(`/control/permission-sets/${id}/assign/${userId}`);
     },
   };
 }

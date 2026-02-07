@@ -48,6 +48,9 @@ spring:
 # EMF Gateway specific configuration
 emf:
   gateway:
+    # Feature flag: use profile-based permissions instead of legacy role-based policies
+    use-profiles: ${USE_PROFILES:false}
+
     # Control plane connection
     control-plane:
       url: ${CONTROL_PLANE_URL:http://localhost:8080}

@@ -315,6 +315,128 @@ export interface LoginHistoryEntry {
 }
 
 /**
+ * Profile definition
+ */
+export interface Profile {
+  id: string;
+  name: string;
+  description?: string;
+  system: boolean;
+  objectPermissions?: ObjectPermission[];
+  fieldPermissions?: FieldPermissionEntry[];
+  systemPermissions?: SystemPermissionEntry[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Object permission (collection-level CRUD)
+ */
+export interface ObjectPermission {
+  id?: string;
+  collectionId: string;
+  canCreate: boolean;
+  canRead: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
+  canViewAll: boolean;
+  canModifyAll: boolean;
+}
+
+/**
+ * Field permission entry
+ */
+export interface FieldPermissionEntry {
+  id?: string;
+  fieldId: string;
+  visibility: 'VISIBLE' | 'READ_ONLY' | 'HIDDEN';
+}
+
+/**
+ * System permission entry
+ */
+export interface SystemPermissionEntry {
+  id?: string;
+  permissionKey: string;
+  granted: boolean;
+}
+
+/**
+ * Request to create a profile
+ */
+export interface CreateProfileRequest {
+  name: string;
+  description?: string;
+}
+
+/**
+ * Request to update a profile
+ */
+export interface UpdateProfileRequest {
+  name?: string;
+  description?: string;
+}
+
+/**
+ * Request to set object permissions
+ */
+export interface ObjectPermissionRequest {
+  canCreate: boolean;
+  canRead: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
+  canViewAll: boolean;
+  canModifyAll: boolean;
+}
+
+/**
+ * Request to set field permissions
+ */
+export interface FieldPermissionRequest {
+  fieldId: string;
+  visibility: 'VISIBLE' | 'READ_ONLY' | 'HIDDEN';
+}
+
+/**
+ * Request to set system permissions
+ */
+export interface SystemPermissionRequest {
+  permissionKey: string;
+  granted: boolean;
+}
+
+/**
+ * Permission set definition
+ */
+export interface PermissionSet {
+  id: string;
+  name: string;
+  description?: string;
+  system: boolean;
+  objectPermissions?: ObjectPermission[];
+  fieldPermissions?: FieldPermissionEntry[];
+  systemPermissions?: SystemPermissionEntry[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Request to create a permission set
+ */
+export interface CreatePermissionSetRequest {
+  name: string;
+  description?: string;
+}
+
+/**
+ * Request to update a permission set
+ */
+export interface UpdatePermissionSetRequest {
+  name?: string;
+  description?: string;
+}
+
+/**
  * Migration plan result
  */
 export interface MigrationPlan {

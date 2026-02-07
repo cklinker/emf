@@ -56,6 +56,8 @@ import {
   ServicesPage,
   UsersPage,
   UserDetailPage,
+  ProfilesPage,
+  PermissionSetsPage,
   TenantsPage,
   TenantDashboardPage,
   LoginPage,
@@ -457,6 +459,24 @@ function App({ plugins = [] }: AppProps): React.ReactElement {
                               element={
                                 <ProtectedPageRoute>
                                   <UserDetailPage />
+                                </ProtectedPageRoute>
+                              }
+                            />
+
+                            {/* Profile & Permission Set routes */}
+                            <Route
+                              path="/profiles"
+                              element={
+                                <ProtectedPageRoute>
+                                  <ProfilesPage />
+                                </ProtectedPageRoute>
+                              }
+                            />
+                            <Route
+                              path="/permission-sets"
+                              element={
+                                <ProtectedPageRoute>
+                                  <PermissionSetsPage />
                                 </ProtectedPageRoute>
                               }
                             />

@@ -242,6 +242,8 @@ vi.mock('./pages', () => ({
   PluginsPage: () => <div data-testid="plugins-page">Plugins Page</div>,
   UsersPage: () => <div data-testid="users-page">Users Page</div>,
   UserDetailPage: () => <div data-testid="user-detail-page">User Detail Page</div>,
+  ProfilesPage: () => <div data-testid="profiles-page">Profiles Page</div>,
+  PermissionSetsPage: () => <div data-testid="permission-sets-page">Permission Sets Page</div>,
   TenantsPage: () => <div data-testid="tenants-page">Tenants Page</div>,
   TenantDashboardPage: () => <div data-testid="tenant-dashboard-page">Tenant Dashboard Page</div>,
   LoginPage: () => <div data-testid="login-page">Login Page</div>,
@@ -525,6 +527,24 @@ describe('App', () => {
         expect(screen.getByTestId('user-detail-page')).toBeInTheDocument()
       })
     })
+
+    it('should render profiles page at /profiles when authenticated', async () => {
+      window.history.pushState({}, '', '/profiles')
+      render(<App />)
+
+      await waitFor(() => {
+        expect(screen.getByTestId('profiles-page')).toBeInTheDocument()
+      })
+    })
+
+    it('should render permission sets page at /permission-sets when authenticated', async () => {
+      window.history.pushState({}, '', '/permission-sets')
+      render(<App />)
+
+      await waitFor(() => {
+        expect(screen.getByTestId('permission-sets-page')).toBeInTheDocument()
+      })
+    })
   })
 
   describe('Route Configuration', () => {
@@ -557,6 +577,8 @@ describe('App', () => {
         '/plugins',
         '/users',
         '/users/test-user-123',
+        '/profiles',
+        '/permission-sets',
         '/login',
         '/unauthorized',
       ]

@@ -46,7 +46,7 @@ class TenantServiceTest {
     @BeforeEach
     void setUp() {
         objectMapper = new ObjectMapper();
-        tenantService = new TenantService(tenantRepository, objectMapper, null);
+        tenantService = new TenantService(tenantRepository, objectMapper, null, null);
     }
 
     @Nested

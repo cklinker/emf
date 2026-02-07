@@ -611,6 +611,43 @@
       "notFound": "Plugin not found"
     }
   },
+  "profiles": {
+    "title": "Profiles",
+    "createProfile": "Create Profile",
+    "name": "Name",
+    "description": "Description",
+    "createSuccess": "Profile created successfully",
+    "deleteSuccess": "Profile deleted successfully",
+    "permissionsSaved": "Permissions saved successfully",
+    "noProfiles": "No profiles found",
+    "selectProfile": "Select a profile to view its permissions",
+    "objectPermissions": "Object Permissions",
+    "systemPermissions": "System Permissions",
+    "fieldPermissions": "Field Permissions",
+    "noCollections": "No collections available",
+    "collection": "Collection",
+    "create": "Create",
+    "read": "Read",
+    "edit": "Edit",
+    "delete": "Delete",
+    "viewAll": "View All",
+    "modifyAll": "Modify All",
+    "fieldPermissionsInfo": "Field permissions control visibility of individual fields. Set via the API.",
+    "fieldId": "Field",
+    "visibility": "Visibility",
+    "noFieldPermissions": "No field permissions configured"
+  },
+  "permissionSets": {
+    "title": "Permission Sets",
+    "create": "Create Permission Set",
+    "name": "Name",
+    "description": "Description",
+    "createSuccess": "Permission set created successfully",
+    "deleteSuccess": "Permission set deleted successfully",
+    "permissionsSaved": "Permissions saved successfully",
+    "noSets": "No permission sets found",
+    "selectSet": "Select a permission set to view its permissions"
+  },
   "errors": {
     "generic": "An error occurred. Please try again.",
     "network": "Network error. Please check your connection.",

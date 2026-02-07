@@ -35,14 +35,17 @@ public class TenantService {
     private final TenantRepository tenantRepository;
     private final ObjectMapper objectMapper;
     private final TenantSchemaManager tenantSchemaManager;
+    private final DefaultProfileSeeder defaultProfileSeeder;
 
     public TenantService(
             TenantRepository tenantRepository,
             ObjectMapper objectMapper,
-            @Nullable TenantSchemaManager tenantSchemaManager) {
+            @Nullable TenantSchemaManager tenantSchemaManager,
+            @Nullable DefaultProfileSeeder defaultProfileSeeder) {
         this.tenantRepository = tenantRepository;
         this.objectMapper = objectMapper;
         this.tenantSchemaManager = tenantSchemaManager;
+        this.defaultProfileSeeder = defaultProfileSeeder;
     }
 
     /**
@@ -84,7 +87,11 @@ public class TenantService {
         if (tenantSchemaManager != null) {
             tenantSchemaManager.provisionTenant(tenant.getId(), tenant.getSlug());
         }
-        // TODO: C12 — seed default profile after schema provisioning
+
+        // Seed default profiles (System Administrator, Standard User, Read Only, Minimum Access)
+        if (defaultProfileSeeder != null) {
+            defaultProfileSeeder.seedDefaultProfiles(tenant.getId());
+        }
 
         // Transition to ACTIVE after provisioning
         tenant.setStatus("ACTIVE");

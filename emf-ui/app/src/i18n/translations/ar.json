@@ -494,6 +494,43 @@
       "notFound": "الإضافة غير موجودة"
     }
   },
+  "profiles": {
+    "title": "الملفات الشخصية",
+    "createProfile": "إنشاء ملف شخصي",
+    "name": "الاسم",
+    "description": "الوصف",
+    "createSuccess": "تم إنشاء الملف الشخصي بنجاح",
+    "deleteSuccess": "تم حذف الملف الشخصي بنجاح",
+    "permissionsSaved": "تم حفظ الأذونات بنجاح",
+    "noProfiles": "لم يتم العثور على ملفات شخصية",
+    "selectProfile": "اختر ملفاً شخصياً لعرض أذوناته",
+    "objectPermissions": "أذونات الكائنات",
+    "systemPermissions": "أذونات النظام",
+    "fieldPermissions": "أذونات الحقول",
+    "noCollections": "لا توجد مجموعات متاحة",
+    "collection": "المجموعة",
+    "create": "إنشاء",
+    "read": "قراءة",
+    "edit": "تعديل",
+    "delete": "حذف",
+    "viewAll": "عرض الكل",
+    "modifyAll": "تعديل الكل",
+    "fieldPermissionsInfo": "أذونات الحقول تتحكم في رؤية الحقول الفردية. يتم تعيينها عبر واجهة برمجة التطبيقات.",
+    "fieldId": "الحقل",
+    "visibility": "الرؤية",
+    "noFieldPermissions": "لم يتم تكوين أذونات حقول"
+  },
+  "permissionSets": {
+    "title": "مجموعات الأذونات",
+    "create": "إنشاء مجموعة أذونات",
+    "name": "الاسم",
+    "description": "الوصف",
+    "createSuccess": "تم إنشاء مجموعة الأذونات بنجاح",
+    "deleteSuccess": "تم حذف مجموعة الأذونات بنجاح",
+    "permissionsSaved": "تم حفظ الأذونات بنجاح",
+    "noSets": "لم يتم العثور على مجموعات أذونات",
+    "selectSet": "اختر مجموعة أذونات لعرض أذوناتها"
+  },
   "errors": {
     "generic": "حدث خطأ. يرجى المحاولة مرة أخرى.",
     "network": "خطأ في الشبكة. يرجى التحقق من اتصالك.",

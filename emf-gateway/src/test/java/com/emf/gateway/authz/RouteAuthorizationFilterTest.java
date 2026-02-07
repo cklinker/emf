@@ -47,15 +47,19 @@ class RouteAuthorizationFilterTest {
     
     @Mock
     private PolicyEvaluator policyEvaluator;
-    
+
+    @Mock
+    private ProfilePolicyEvaluator profilePolicyEvaluator;
+
     @Mock
     private GatewayFilterChain filterChain;
-    
+
     private RouteAuthorizationFilter filter;
-    
+
     @BeforeEach
     void setUp() {
-        filter = new RouteAuthorizationFilter(routeRegistry, authzConfigCache, policyEvaluator);
+        filter = new RouteAuthorizationFilter(routeRegistry, authzConfigCache, policyEvaluator,
+                profilePolicyEvaluator, false);
         
         // Default behavior: chain continues (lenient to avoid unnecessary stubbing errors)
         lenient().when(filterChain.filter(any(ServerWebExchange.class))).thenReturn(Mono.empty());

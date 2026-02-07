@@ -21,6 +21,14 @@ public interface RoleRepository extends JpaRepository<Role, String> {
 
     List<Role> findByTenantIdOrderByNameAsc(String tenantId);
 
+    // ---- Role hierarchy methods ----
+
+    List<Role> findByParentRoleId(String parentRoleId);
+
+    List<Role> findByTenantIdAndParentRoleIsNull(String tenantId);
+
+    List<Role> findByTenantIdOrderByHierarchyLevelAscNameAsc(String tenantId);
+
     // ---- Legacy methods ----
 
     Optional<Role> findByName(String name);

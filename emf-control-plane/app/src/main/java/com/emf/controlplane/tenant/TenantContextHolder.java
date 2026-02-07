@@ -49,6 +49,18 @@ public final class TenantContextHolder {
     }
 
     /**
+     * Returns the current tenant ID, throwing if not set.
+     * @throws IllegalStateException if no tenant context is set
+     */
+    public static String requireTenantId() {
+        String tenantId = getTenantId();
+        if (tenantId == null) {
+            throw new IllegalStateException("No tenant context set");
+        }
+        return tenantId;
+    }
+
+    /**
      * Clears the tenant context for the current thread.
      * Must be called in a finally block to prevent ThreadLocal leaks.
      */

@@ -244,6 +244,8 @@ vi.mock('./pages', () => ({
   UserDetailPage: () => <div data-testid="user-detail-page">User Detail Page</div>,
   ProfilesPage: () => <div data-testid="profiles-page">Profiles Page</div>,
   PermissionSetsPage: () => <div data-testid="permission-sets-page">Permission Sets Page</div>,
+  SharingSettingsPage: () => <div data-testid="sharing-settings-page">Sharing Settings Page</div>,
+  RoleHierarchyPage: () => <div data-testid="role-hierarchy-page">Role Hierarchy Page</div>,
   TenantsPage: () => <div data-testid="tenants-page">Tenants Page</div>,
   TenantDashboardPage: () => <div data-testid="tenant-dashboard-page">Tenant Dashboard Page</div>,
   LoginPage: () => <div data-testid="login-page">Login Page</div>,
@@ -545,6 +547,24 @@ describe('App', () => {
         expect(screen.getByTestId('permission-sets-page')).toBeInTheDocument()
       })
     })
+
+    it('should render sharing settings page at /sharing when authenticated', async () => {
+      window.history.pushState({}, '', '/sharing')
+      render(<App />)
+
+      await waitFor(() => {
+        expect(screen.getByTestId('sharing-settings-page')).toBeInTheDocument()
+      })
+    })
+
+    it('should render role hierarchy page at /role-hierarchy when authenticated', async () => {
+      window.history.pushState({}, '', '/role-hierarchy')
+      render(<App />)
+
+      await waitFor(() => {
+        expect(screen.getByTestId('role-hierarchy-page')).toBeInTheDocument()
+      })
+    })
   })
 
   describe('Route Configuration', () => {
@@ -579,6 +599,8 @@ describe('App', () => {
         '/users/test-user-123',
         '/profiles',
         '/permission-sets',
+        '/sharing',
+        '/role-hierarchy',
         '/login',
         '/unauthorized',
       ]

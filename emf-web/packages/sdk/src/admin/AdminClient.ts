@@ -32,6 +32,15 @@ import type {
   PermissionSet,
   CreatePermissionSetRequest,
   UpdatePermissionSetRequest,
+  OrgWideDefault,
+  SetOwdRequest,
+  SharingRule,
+  CreateSharingRuleRequest,
+  UpdateSharingRuleRequest,
+  RecordShare,
+  UserGroup,
+  CreateUserGroupRequest,
+  RoleHierarchyNode,
 } from './types';
 
 /**
@@ -451,6 +460,118 @@ export class AdminClient {
 
     unassign: async (id: string, userId: string): Promise<void> => {
       await this.axios.delete(`/control/permission-sets/${id}/assign/${userId}`);
+    },
+  };
+
+  /**
+   * Record-level sharing operations
+   */
+  readonly sharing = {
+    getOwd: async (collectionId: string): Promise<OrgWideDefault> => {
+      const response = await this.axios.get<OrgWideDefault>(`/control/sharing/owd/${collectionId}`);
+      return response.data;
+    },
+
+    setOwd: async (collectionId: string, request: SetOwdRequest): Promise<OrgWideDefault> => {
+      const response = await this.axios.put<OrgWideDefault>(
+        `/control/sharing/owd/${collectionId}`,
+        request
+      );
+      return response.data;
+    },
+
+    listOwds: async (): Promise<OrgWideDefault[]> => {
+      const response = await this.axios.get<OrgWideDefault[]>('/control/sharing/owd');
+      return response.data;
+    },
+
+    listRules: async (collectionId: string): Promise<SharingRule[]> => {
+      const response = await this.axios.get<SharingRule[]>(
+        `/control/sharing/rules/${collectionId}`
+      );
+      return response.data;
+    },
+
+    createRule: async (
+      collectionId: string,
+      request: CreateSharingRuleRequest
+    ): Promise<SharingRule> => {
+      const response = await this.axios.post<SharingRule>(
+        `/control/sharing/rules/${collectionId}`,
+        request
+      );
+      return response.data;
+    },
+
+    updateRule: async (ruleId: string, request: UpdateSharingRuleRequest): Promise<SharingRule> => {
+      const response = await this.axios.put<SharingRule>(
+        `/control/sharing/rules/${ruleId}`,
+        request
+      );
+      return response.data;
+    },
+
+    deleteRule: async (ruleId: string): Promise<void> => {
+      await this.axios.delete(`/control/sharing/rules/${ruleId}`);
+    },
+
+    listRecordShares: async (collectionId: string, recordId: string): Promise<RecordShare[]> => {
+      const response = await this.axios.get<RecordShare[]>(
+        `/control/sharing/records/${collectionId}/${recordId}`
+      );
+      return response.data;
+    },
+  };
+
+  /**
+   * User group operations
+   */
+  readonly groups = {
+    list: async (): Promise<UserGroup[]> => {
+      const response = await this.axios.get<UserGroup[]>('/control/sharing/groups');
+      return response.data;
+    },
+
+    get: async (id: string): Promise<UserGroup> => {
+      const response = await this.axios.get<UserGroup>(`/control/sharing/groups/${id}`);
+      return response.data;
+    },
+
+    create: async (request: CreateUserGroupRequest): Promise<UserGroup> => {
+      const response = await this.axios.post<UserGroup>('/control/sharing/groups', request);
+      return response.data;
+    },
+
+    updateMembers: async (id: string, memberIds: string[]): Promise<UserGroup> => {
+      const response = await this.axios.put<UserGroup>(
+        `/control/sharing/groups/${id}/members`,
+        memberIds
+      );
+      return response.data;
+    },
+
+    delete: async (id: string): Promise<void> => {
+      await this.axios.delete(`/control/sharing/groups/${id}`);
+    },
+  };
+
+  /**
+   * Role hierarchy operations
+   */
+  readonly roleHierarchy = {
+    get: async (): Promise<RoleHierarchyNode[]> => {
+      const response = await this.axios.get<RoleHierarchyNode[]>(
+        '/control/sharing/roles/hierarchy'
+      );
+      return response.data;
+    },
+
+    setParent: async (roleId: string, parentRoleId: string | null): Promise<RoleHierarchyNode> => {
+      const response = await this.axios.put<RoleHierarchyNode>(
+        `/control/sharing/roles/${roleId}/parent`,
+        parentRoleId
+      );
+      return response.data;
     },
   };
 }

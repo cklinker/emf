@@ -58,6 +58,8 @@ import {
   UserDetailPage,
   ProfilesPage,
   PermissionSetsPage,
+  SharingSettingsPage,
+  RoleHierarchyPage,
   TenantsPage,
   TenantDashboardPage,
   LoginPage,
@@ -477,6 +479,24 @@ function App({ plugins = [] }: AppProps): React.ReactElement {
                               element={
                                 <ProtectedPageRoute>
                                   <PermissionSetsPage />
+                                </ProtectedPageRoute>
+                              }
+                            />
+
+                            {/* Sharing Settings routes */}
+                            <Route
+                              path="/sharing"
+                              element={
+                                <ProtectedPageRoute>
+                                  <SharingSettingsPage />
+                                </ProtectedPageRoute>
+                              }
+                            />
+                            <Route
+                              path="/role-hierarchy"
+                              element={
+                                <ProtectedPageRoute>
+                                  <RoleHierarchyPage />
                                 </ProtectedPageRoute>
                               }
                             />

@@ -150,6 +150,14 @@ export type { ProfilesPageProps } from './ProfilesPage'
 export { PermissionSetsPage } from './PermissionSetsPage'
 export type { PermissionSetsPageProps } from './PermissionSetsPage'
 
+// SharingSettingsPage - Record-level sharing settings
+export { SharingSettingsPage } from './SharingSettingsPage'
+export type { SharingSettingsPageProps } from './SharingSettingsPage'
+
+// RoleHierarchyPage - Role hierarchy visualization
+export { RoleHierarchyPage } from './RoleHierarchyPage'
+export type { RoleHierarchyPageProps } from './RoleHierarchyPage'
+
 // NotFoundPage - 404 error page
 export { NotFoundPage } from './NotFoundPage'
 export type { NotFoundPageProps } from './NotFoundPage'

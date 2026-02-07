@@ -29,7 +29,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -292,6 +294,79 @@ public class AuthorizationService {
                 routePolicyDtos,
                 fieldPolicyDtos
         );
+    }
+
+    // ---- Role Hierarchy Methods ----
+
+    /**
+     * Returns all roles for a tenant in hierarchy order.
+     */
+    @Transactional(readOnly = true)
+    public List<Role> getRoleHierarchy(String tenantId) {
+        return roleRepository.findByTenantIdOrderByHierarchyLevelAscNameAsc(tenantId);
+    }
+
+    /**
+     * Returns all role IDs below the given role in the hierarchy (recursive).
+     */
+    @Transactional(readOnly = true)
+    public Set<String> getSubordinateRoleIds(String roleId) {
+        Set<String> subordinates = new java.util.HashSet<>();
+        collectSubordinateRoleIds(roleId, subordinates);
+        return subordinates;
+    }
+
+    private void collectSubordinateRoleIds(String roleId, Set<String> collected) {
+        List<Role> children = roleRepository.findByParentRoleId(roleId);
+        for (Role child : children) {
+            if (collected.add(child.getId())) {
+                collectSubordinateRoleIds(child.getId(), collected);
+            }
+        }
+    }
+
+    /**
+     * Returns the root roles (no parent) for a tenant.
+     */
+    @Transactional(readOnly = true)
+    public List<Role> getRootRoles(String tenantId) {
+        return roleRepository.findByTenantIdAndParentRoleIsNull(tenantId);
+    }
+
+    /**
+     * Updates a role's parent in the hierarchy.
+     */
+    @Transactional
+    public Role updateRoleParent(String roleId, String parentRoleId) {
+        Role role = roleRepository.findById(roleId)
+                .orElseThrow(() -> new ResourceNotFoundException("Role", roleId));
+
+        if (parentRoleId != null) {
+            Role parent = roleRepository.findById(parentRoleId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Role", parentRoleId));
+            role.setParentRole(parent);
+            role.setHierarchyLevel(parent.getHierarchyLevel() + 1);
+        } else {
+            role.setParentRole(null);
+            role.setHierarchyLevel(0);
+        }
+
+        role = roleRepository.save(role);
+
+        // Update child hierarchy levels recursively
+        updateChildHierarchyLevels(role);
+
+        log.info("Updated role '{}' parent to '{}'", roleId, parentRoleId);
+        return role;
+    }
+
+    private void updateChildHierarchyLevels(Role parent) {
+        List<Role> children = roleRepository.findByParentRoleId(parent.getId());
+        for (Role child : children) {
+            child.setHierarchyLevel(parent.getHierarchyLevel() + 1);
+            roleRepository.save(child);
+            updateChildHierarchyLevels(child);
+        }
     }
 
     /**

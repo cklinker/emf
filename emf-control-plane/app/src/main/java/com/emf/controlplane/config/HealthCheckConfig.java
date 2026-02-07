@@ -85,7 +85,7 @@ public class HealthCheckConfig {
             } catch (Exception e) {
                 log.warn("Kafka health check failed: {}", e.getMessage());
                 return Health.down()
-                        .withDetail("error", e.getMessage())
+                        .withDetail("error", e.getMessage() != null ? e.getMessage() : e.getClass().getName())
                         .withException(e)
                         .build();
             }

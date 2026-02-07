@@ -186,6 +186,26 @@ export type { ReportsPageProps } from './ReportsPage'
 export { DashboardsPage } from './DashboardsPage'
 export type { DashboardsPageProps } from './DashboardsPage'
 
+// WorkflowRulesPage - Workflow rules management page
+export { WorkflowRulesPage } from './WorkflowRulesPage'
+export type { WorkflowRulesPageProps } from './WorkflowRulesPage'
+
+// ApprovalProcessesPage - Approval processes management page
+export { ApprovalProcessesPage } from './ApprovalProcessesPage'
+export type { ApprovalProcessesPageProps } from './ApprovalProcessesPage'
+
+// FlowsPage - Flow engine management page
+export { FlowsPage } from './FlowsPage'
+export type { FlowsPageProps } from './FlowsPage'
+
+// ScheduledJobsPage - Scheduled jobs management page
+export { ScheduledJobsPage } from './ScheduledJobsPage'
+export type { ScheduledJobsPageProps } from './ScheduledJobsPage'
+
+// EmailTemplatesPage - Email templates management page
+export { EmailTemplatesPage } from './EmailTemplatesPage'
+export type { EmailTemplatesPageProps } from './EmailTemplatesPage'
+
 // NotFoundPage - 404 error page
 export { NotFoundPage } from './NotFoundPage'
 export type { NotFoundPageProps } from './NotFoundPage'

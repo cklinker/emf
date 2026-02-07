@@ -94,7 +94,7 @@ create_labels() {
         ["Cross-cutting"]="#64748b"
     )
 
-    for label in $(jq -r '.labels.work_streams[]' "${TASKS_FILE}"); do
+    while IFS= read -r label; do
         local color="${stream_colors[${label}]:-#6b7280}"
         local response
         response=$(api POST "/projects/${PROJECT_ID}/labels/" \
@@ -102,7 +102,7 @@ create_labels() {
                 '{name: $name, color: $color}')")
         LABEL_IDS["${label}"]=$(echo "${response}" | jq -r '.id')
         log "  Label: ${label} -> ${LABEL_IDS[${label}]}"
-    done
+    done < <(jq -r '.labels.work_streams[]' "${TASKS_FILE}")
 
     # Phase labels (green-ish colors)
     local -A phase_colors=(
@@ -114,7 +114,7 @@ create_labels() {
         ["Phase 6"]="#0891b2"
     )
 
-    for label in $(jq -r '.labels.phases[]' "${TASKS_FILE}"); do
+    while IFS= read -r label; do
         local color="${phase_colors[${label}]:-#6b7280}"
         local response
         response=$(api POST "/projects/${PROJECT_ID}/labels/" \
@@ -122,7 +122,7 @@ create_labels() {
                 '{name: $name, color: $color}')")
         LABEL_IDS["${label}"]=$(echo "${response}" | jq -r '.id')
         log "  Label: ${label} -> ${LABEL_IDS[${label}]}"
-    done
+    done < <(jq -r '.labels.phases[]' "${TASKS_FILE}")
 }
 
 # --- Step 3: Get Default State ---
@@ -132,12 +132,12 @@ get_default_state() {
     local response
     response=$(api GET "/projects/${PROJECT_ID}/states/")
 
-    # Use the first "Backlog" or "unstarted" state, or fall back to first state
+    # Use the first "Backlog" state, or fall back to first state
     DEFAULT_STATE_ID=$(echo "${response}" | jq -r '
-        (.results // .) |
-        (map(select(.group == "backlog")) | first //
-         map(select(.group == "unstarted")) | first //
-         first) | .id')
+        .results |
+        (map(select(.group == "backlog"))[0] //
+         map(select(.group == "unstarted"))[0] //
+         .[0]) | .id')
 
     log "Default state: ${DEFAULT_STATE_ID}"
 }
@@ -160,14 +160,12 @@ import_tasks() {
 
         # Build label UUID array
         local label_uuids="[]"
-        local task_labels
-        task_labels=$(echo "${task}" | jq -r '.labels[]')
-        for label in ${task_labels}; do
+        while IFS= read -r label; do
             local uuid="${LABEL_IDS[${label}]:-}"
             if [[ -n "${uuid}" ]]; then
                 label_uuids=$(echo "${label_uuids}" | jq --arg id "${uuid}" '. + [$id]')
             fi
-        done
+        done < <(echo "${task}" | jq -r '.labels[]')
 
         # Format description as HTML for Plane
         local desc_html

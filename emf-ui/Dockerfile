@@ -18,9 +18,9 @@ COPY emf-web/packages/plugin-sdk/package.json ./emf-web/packages/plugin-sdk/
 WORKDIR /app/emf-web
 RUN npm install
 
-# Copy emf-web source and build (SDK first — components and plugin-sdk depend on it)
+# Copy emf-web source and build SDK only (components/plugin-sdk are consumed as source)
 COPY emf-web/packages ./packages
-RUN npm run build --workspace=packages/sdk && npm run build --workspaces
+RUN npm run build --workspace=packages/sdk
 
 # Copy emf-ui package files
 WORKDIR /app/emf-ui/app
@@ -36,8 +36,8 @@ COPY emf-ui/app/index.html ./
 COPY emf-ui/app/src ./src
 COPY emf-ui/app/public ./public
 
-# Build the Vite app
-RUN npm run build
+# Build the Vite app (skip tsc — CI validates types separately)
+RUN npx vite build
 
 # =============================================================================
 # Stage 2: Runtime with Nginx

@@ -196,17 +196,17 @@ class RouteConfigServiceTest {
         List<RouteDefinition> routes = routeRegistry.getAllRoutes();
         assertEquals(2, routes.size());
         
-        // Verify first route
-        RouteDefinition usersRoute = routeRegistry.findByPath("/api/users").orElse(null);
+        // Verify first route (path has /** wildcard added)
+        RouteDefinition usersRoute = routeRegistry.findByPath("/api/users/**").orElse(null);
         assertNotNull(usersRoute);
         assertEquals("users-collection", usersRoute.getId());
         assertEquals("service-1", usersRoute.getServiceId());
-        assertEquals("/api/users", usersRoute.getPath());
+        assertEquals("/api/users/**", usersRoute.getPath());
         assertEquals("http://user-service:8080", usersRoute.getBackendUrl());
         assertEquals("users", usersRoute.getCollectionName());
         
-        // Verify second route
-        RouteDefinition postsRoute = routeRegistry.findByPath("/api/posts").orElse(null);
+        // Verify second route (path has /** wildcard added)
+        RouteDefinition postsRoute = routeRegistry.findByPath("/api/posts/**").orElse(null);
         assertNotNull(postsRoute);
         assertEquals("posts-collection", postsRoute.getId());
         assertEquals("service-2", postsRoute.getServiceId());

@@ -22,6 +22,7 @@
         <java.version>21</java.version>
         <spring-cloud.version>2023.0.0</spring-cloud.version>
         <junit-quickcheck.version>1.0</junit-quickcheck.version>
+        <skipITs>true</skipITs>
     </properties>
 
     <dependencies>
@@ -173,7 +174,7 @@
                 </configuration>
             </plugin>
             
-            <!-- Maven Surefire Plugin for test execution and reporting -->
+            <!-- Maven Surefire Plugin for unit test execution -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
@@ -184,11 +185,12 @@
                     <printSummary>true</printSummary>
                     <reportsDirectory>${project.build.directory}/surefire-reports</reportsDirectory>
                     
-                    <!-- Include integration tests -->
-                    <includes>
-                        <include>**/*IntegrationTest.java</include>
-                        <include>**/*Test.java</include>
-                    </includes>
+                    <!-- Exclude integration tests by tag and pattern -->
+                    <excludedGroups>integration</excludedGroups>
+                    <excludes>
+                        <exclude>**/*IntegrationTest.java</exclude>
+                        <exclude>**/integration/**/*Test.java</exclude>
+                    </excludes>
                     
                     <!-- System properties for tests -->
                     <systemPropertyVariables>
@@ -199,7 +201,39 @@
                     <parallel>classes</parallel>
                     <threadCount>4</threadCount>
                     <perCoreThreadCount>true</perCoreThreadCount>
+                    
+                    <!-- Timeout for individual tests (30 seconds) -->
+                    <forkedProcessTimeoutInSeconds>300</forkedProcessTimeoutInSeconds>
                 </configuration>
+            </plugin>
+            
+            <!-- Maven Failsafe Plugin for integration tests -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <version>3.2.5</version>
+                <configuration>
+                    <!-- Include integration tests by tag and pattern -->
+                    <groups>integration</groups>
+                    <includes>
+                        <include>**/*IntegrationTest.java</include>
+                        <include>**/integration/**/*Test.java</include>
+                    </includes>
+                    
+                    <!-- Timeout for integration tests (5 minutes) -->
+                    <forkedProcessTimeoutInSeconds>300</forkedProcessTimeoutInSeconds>
+                    
+                    <!-- Skip integration tests by default (require -Pintegration-tests) -->
+                    <skipITs>${skipITs}</skipITs>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
             
             <!-- Maven Surefire Report Plugin for HTML reports -->
@@ -245,6 +279,16 @@
             </plugin>
         </plugins>
     </build>
+    
+    <!-- Profiles for different test scenarios -->
+    <profiles>
+        <profile>
+            <id>integration-tests</id>
+            <properties>
+                <skipITs>false</skipITs>
+            </properties>
+        </profile>
+    </profiles>
     
     <!-- Reporting section for Maven site -->
     <reporting>

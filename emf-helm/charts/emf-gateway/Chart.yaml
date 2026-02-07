@@ -1,0 +1,21 @@
+apiVersion: v2
+name: emf-gateway
+description: Helm chart for EMF API Gateway - main ingress point with authentication, authorization, and routing
+type: application
+version: 0.1.0
+appVersion: "1.0.0-SNAPSHOT"
+
+keywords:
+  - emf
+  - gateway
+  - api-gateway
+  - authentication
+
+home: https://github.com/cklinker/emf
+sources:
+  - https://github.com/cklinker/emf
+
+maintainers:
+  - name: EMF Team
+
+dependencies: []

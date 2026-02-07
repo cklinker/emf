@@ -1,0 +1,230 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+env:
+  JAVA_VERSION: '21'
+  NODE_VERSION: '18'
+
+jobs:
+  # ===========================================================================
+  # Build shared runtime modules (required by both control-plane and gateway)
+  # ===========================================================================
+  build-runtime:
+    name: Build Runtime Modules
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Build runtime-core and runtime-events
+        run: mvn clean install -DskipTests -f emf-platform/pom.xml -pl runtime/runtime-core,runtime/runtime-events -am -B
+
+      - name: Save Maven local repo
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.m2/repository
+          key: maven-runtime-${{ github.sha }}
+
+  # ===========================================================================
+  # Test Control Plane (unit + integration tests with JaCoCo coverage)
+  # ===========================================================================
+  test-control-plane:
+    name: Test Control Plane
+    needs: build-runtime
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Restore runtime modules
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.m2/repository
+          key: maven-runtime-${{ github.sha }}
+
+      - name: Run tests
+        run: mvn verify -f emf-control-plane/pom.xml -B
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: control-plane-test-results
+          path: emf-control-plane/app/target/surefire-reports/
+          retention-days: 7
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: control-plane-coverage
+          path: emf-control-plane/app/target/site/jacoco/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # ===========================================================================
+  # Test Gateway (unit + integration tests with JaCoCo coverage)
+  # ===========================================================================
+  test-gateway:
+    name: Test Gateway
+    needs: build-runtime
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Restore runtime modules
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.m2/repository
+          key: maven-runtime-${{ github.sha }}
+
+      - name: Run tests
+        run: mvn verify -f emf-gateway/pom.xml -B
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gateway-test-results
+          path: emf-gateway/target/surefire-reports/
+          retention-days: 7
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gateway-coverage
+          path: emf-gateway/target/site/jacoco/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # ===========================================================================
+  # Test Frontend (lint, typecheck, unit tests with coverage)
+  # ===========================================================================
+  test-frontend:
+    name: Test Frontend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: emf-web
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Format check
+        run: npm run format:check
+
+      - name: Run tests with coverage
+        run: npm run test:coverage
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: emf-web/coverage/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # ===========================================================================
+  # Verify Docker images build successfully
+  # ===========================================================================
+  build-check:
+    name: Verify Docker Build (${{ matrix.service.name }})
+    needs: [test-control-plane, test-gateway, test-frontend]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - { name: control-plane, file: emf-control-plane/Dockerfile }
+          - { name: gateway, file: emf-gateway/Dockerfile }
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build ${{ matrix.service.name }}
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ${{ matrix.service.file }}
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+
+  # ===========================================================================
+  # Quality gate - all checks must pass
+  # ===========================================================================
+  quality-gate:
+    name: Quality Gate
+    needs: [test-control-plane, test-gateway, test-frontend, build-check]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check all jobs passed
+        run: |
+          if [[ "${{ needs.test-control-plane.result }}" != "success" ]]; then
+            echo "Control Plane tests failed"
+            exit 1
+          fi
+          if [[ "${{ needs.test-gateway.result }}" != "success" ]]; then
+            echo "Gateway tests failed"
+            exit 1
+          fi
+          if [[ "${{ needs.test-frontend.result }}" != "success" ]]; then
+            echo "Frontend tests failed"
+            exit 1
+          fi
+          if [[ "${{ needs.build-check.result }}" != "success" ]]; then
+            echo "Docker build check failed"
+            exit 1
+          fi
+          echo "All quality gates passed"

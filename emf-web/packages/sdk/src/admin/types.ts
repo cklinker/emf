@@ -1410,3 +1410,218 @@ export interface CreateScheduledJobRequest {
   timezone?: string;
   active?: boolean;
 }
+
+// --- Scripts (Phase 5 Stream A) ---
+
+export interface Script {
+  id: string;
+  tenantId: string;
+  name: string;
+  description?: string;
+  scriptType:
+    | 'BEFORE_TRIGGER'
+    | 'AFTER_TRIGGER'
+    | 'SCHEDULED'
+    | 'API_ENDPOINT'
+    | 'VALIDATION'
+    | 'EVENT_HANDLER'
+    | 'EMAIL_HANDLER';
+  language: string;
+  sourceCode: string;
+  active: boolean;
+  version: number;
+  createdBy: string;
+  triggers: ScriptTrigger[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ScriptTrigger {
+  id: string;
+  collectionId: string;
+  triggerEvent: 'INSERT' | 'UPDATE' | 'DELETE';
+  executionOrder: number;
+  active: boolean;
+}
+
+export interface ScriptExecutionLog {
+  id: string;
+  tenantId: string;
+  scriptId: string;
+  status: 'SUCCESS' | 'FAILURE' | 'TIMEOUT' | 'GOVERNOR_LIMIT';
+  triggerType?: string;
+  recordId?: string;
+  durationMs?: number;
+  cpuMs?: number;
+  queriesExecuted: number;
+  dmlRows: number;
+  callouts: number;
+  errorMessage?: string;
+  logOutput?: string;
+  executedAt: string;
+}
+
+export interface CreateScriptRequest {
+  name: string;
+  description?: string;
+  scriptType: string;
+  language?: string;
+  sourceCode: string;
+  active?: boolean;
+  triggers?: CreateScriptTriggerRequest[];
+}
+
+export interface CreateScriptTriggerRequest {
+  collectionId: string;
+  triggerEvent: string;
+  executionOrder?: number;
+  active?: boolean;
+}
+
+// --- Webhooks (Phase 5 Stream B) ---
+
+export interface Webhook {
+  id: string;
+  tenantId: string;
+  name: string;
+  url: string;
+  events: string;
+  collectionId?: string;
+  filterFormula?: string;
+  headers?: string;
+  secret?: string;
+  active: boolean;
+  retryPolicy?: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WebhookDelivery {
+  id: string;
+  webhookId: string;
+  eventType: string;
+  payload: string;
+  responseStatus?: number;
+  responseBody?: string;
+  attemptCount: number;
+  status: 'PENDING' | 'DELIVERED' | 'FAILED' | 'RETRYING';
+  nextRetryAt?: string;
+  createdAt: string;
+  deliveredAt?: string;
+}
+
+export interface CreateWebhookRequest {
+  name: string;
+  url: string;
+  events: string;
+  collectionId?: string;
+  filterFormula?: string;
+  headers?: string;
+  secret?: string;
+  active?: boolean;
+  retryPolicy?: string;
+}
+
+// --- Connected Apps (Phase 5 Stream C) ---
+
+export interface ConnectedApp {
+  id: string;
+  tenantId: string;
+  name: string;
+  description?: string;
+  clientId: string;
+  redirectUris?: string;
+  scopes?: string;
+  ipRestrictions?: string;
+  rateLimitPerHour: number;
+  active: boolean;
+  lastUsedAt?: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ConnectedAppCreatedResponse extends ConnectedApp {
+  clientSecret: string;
+}
+
+export interface ConnectedAppToken {
+  id: string;
+  connectedAppId: string;
+  scopes: string;
+  issuedAt: string;
+  expiresAt: string;
+  revoked: boolean;
+}
+
+export interface CreateConnectedAppRequest {
+  name: string;
+  description?: string;
+  redirectUris?: string;
+  scopes?: string;
+  ipRestrictions?: string;
+  rateLimitPerHour?: number;
+  active?: boolean;
+}
+
+// --- Bulk Jobs (Phase 5 Stream D) ---
+
+export interface BulkJob {
+  id: string;
+  tenantId: string;
+  collectionId: string;
+  operation: 'INSERT' | 'UPDATE' | 'UPSERT' | 'DELETE';
+  status: 'QUEUED' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'ABORTED';
+  totalRecords: number;
+  processedRecords: number;
+  successRecords: number;
+  errorRecords: number;
+  externalIdField?: string;
+  contentType: string;
+  batchSize: number;
+  createdBy: string;
+  startedAt?: string;
+  completedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BulkJobResult {
+  id: string;
+  bulkJobId: string;
+  recordIndex: number;
+  recordId?: string;
+  status: 'SUCCESS' | 'FAILURE';
+  errorMessage?: string;
+  createdAt: string;
+}
+
+export interface CreateBulkJobRequest {
+  collectionId: string;
+  operation: string;
+  externalIdField?: string;
+  batchSize?: number;
+  records: Record<string, unknown>[];
+}
+
+export interface CompositeSubRequest {
+  method: string;
+  url: string;
+  body?: Record<string, unknown>;
+  referenceId: string;
+}
+
+export interface CompositeRequest {
+  compositeRequest: CompositeSubRequest[];
+}
+
+export interface CompositeSubResponse {
+  referenceId: string;
+  httpStatusCode: number;
+  body: unknown;
+}
+
+export interface CompositeResponse {
+  compositeResponse: CompositeSubResponse[];
+}

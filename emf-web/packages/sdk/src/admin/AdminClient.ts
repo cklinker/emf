@@ -85,6 +85,21 @@ import type {
   ScheduledJob,
   JobExecutionLog,
   CreateScheduledJobRequest,
+  Script,
+  ScriptExecutionLog,
+  CreateScriptRequest,
+  Webhook,
+  WebhookDelivery,
+  CreateWebhookRequest,
+  ConnectedApp,
+  ConnectedAppCreatedResponse,
+  ConnectedAppToken,
+  CreateConnectedAppRequest,
+  BulkJob,
+  BulkJobResult,
+  CreateBulkJobRequest,
+  CompositeRequest,
+  CompositeResponse,
 } from './types';
 
 /**
@@ -1501,6 +1516,217 @@ export class AdminClient {
     listLogs: async (id: string): Promise<JobExecutionLog[]> => {
       const response = await this.axios.get<JobExecutionLog[]>(
         `/control/scheduled-jobs/${id}/logs`
+      );
+      return response.data;
+    },
+  };
+
+  /**
+   * Script operations
+   */
+  readonly scripts = {
+    list: async (tenantId: string): Promise<Script[]> => {
+      const params = new URLSearchParams({ tenantId });
+      const response = await this.axios.get<Script[]>(`/control/scripts?${params.toString()}`);
+      return response.data;
+    },
+
+    get: async (id: string): Promise<Script> => {
+      const response = await this.axios.get<Script>(`/control/scripts/${id}`);
+      return response.data;
+    },
+
+    create: async (
+      tenantId: string,
+      userId: string,
+      request: CreateScriptRequest
+    ): Promise<Script> => {
+      const params = new URLSearchParams({ tenantId, userId });
+      const response = await this.axios.post<Script>(
+        `/control/scripts?${params.toString()}`,
+        request
+      );
+      return response.data;
+    },
+
+    update: async (id: string, request: Partial<CreateScriptRequest>): Promise<Script> => {
+      const response = await this.axios.put<Script>(`/control/scripts/${id}`, request);
+      return response.data;
+    },
+
+    delete: async (id: string): Promise<void> => {
+      await this.axios.delete(`/control/scripts/${id}`);
+    },
+
+    listLogs: async (tenantId: string): Promise<ScriptExecutionLog[]> => {
+      const params = new URLSearchParams({ tenantId });
+      const response = await this.axios.get<ScriptExecutionLog[]>(
+        `/control/scripts/logs?${params.toString()}`
+      );
+      return response.data;
+    },
+
+    listLogsByScript: async (id: string): Promise<ScriptExecutionLog[]> => {
+      const response = await this.axios.get<ScriptExecutionLog[]>(`/control/scripts/${id}/logs`);
+      return response.data;
+    },
+  };
+
+  /**
+   * Webhook operations
+   */
+  readonly webhooks = {
+    list: async (tenantId: string): Promise<Webhook[]> => {
+      const params = new URLSearchParams({ tenantId });
+      const response = await this.axios.get<Webhook[]>(`/control/webhooks?${params.toString()}`);
+      return response.data;
+    },
+
+    get: async (id: string): Promise<Webhook> => {
+      const response = await this.axios.get<Webhook>(`/control/webhooks/${id}`);
+      return response.data;
+    },
+
+    create: async (
+      tenantId: string,
+      userId: string,
+      request: CreateWebhookRequest
+    ): Promise<Webhook> => {
+      const params = new URLSearchParams({ tenantId, userId });
+      const response = await this.axios.post<Webhook>(
+        `/control/webhooks?${params.toString()}`,
+        request
+      );
+      return response.data;
+    },
+
+    update: async (id: string, request: Partial<CreateWebhookRequest>): Promise<Webhook> => {
+      const response = await this.axios.put<Webhook>(`/control/webhooks/${id}`, request);
+      return response.data;
+    },
+
+    delete: async (id: string): Promise<void> => {
+      await this.axios.delete(`/control/webhooks/${id}`);
+    },
+
+    listDeliveries: async (id: string): Promise<WebhookDelivery[]> => {
+      const response = await this.axios.get<WebhookDelivery[]>(
+        `/control/webhooks/${id}/deliveries`
+      );
+      return response.data;
+    },
+  };
+
+  /**
+   * Connected app operations
+   */
+  readonly connectedApps = {
+    list: async (tenantId: string): Promise<ConnectedApp[]> => {
+      const params = new URLSearchParams({ tenantId });
+      const response = await this.axios.get<ConnectedApp[]>(
+        `/control/connected-apps?${params.toString()}`
+      );
+      return response.data;
+    },
+
+    get: async (id: string): Promise<ConnectedApp> => {
+      const response = await this.axios.get<ConnectedApp>(`/control/connected-apps/${id}`);
+      return response.data;
+    },
+
+    create: async (
+      tenantId: string,
+      userId: string,
+      request: CreateConnectedAppRequest
+    ): Promise<ConnectedAppCreatedResponse> => {
+      const params = new URLSearchParams({ tenantId, userId });
+      const response = await this.axios.post<ConnectedAppCreatedResponse>(
+        `/control/connected-apps?${params.toString()}`,
+        request
+      );
+      return response.data;
+    },
+
+    update: async (
+      id: string,
+      request: Partial<CreateConnectedAppRequest>
+    ): Promise<ConnectedApp> => {
+      const response = await this.axios.put<ConnectedApp>(`/control/connected-apps/${id}`, request);
+      return response.data;
+    },
+
+    delete: async (id: string): Promise<void> => {
+      await this.axios.delete(`/control/connected-apps/${id}`);
+    },
+
+    rotateSecret: async (id: string): Promise<ConnectedAppCreatedResponse> => {
+      const response = await this.axios.post<ConnectedAppCreatedResponse>(
+        `/control/connected-apps/${id}/rotate-secret`
+      );
+      return response.data;
+    },
+
+    listTokens: async (id: string): Promise<ConnectedAppToken[]> => {
+      const response = await this.axios.get<ConnectedAppToken[]>(
+        `/control/connected-apps/${id}/tokens`
+      );
+      return response.data;
+    },
+  };
+
+  /**
+   * Bulk job operations
+   */
+  readonly bulkJobs = {
+    list: async (tenantId: string): Promise<BulkJob[]> => {
+      const params = new URLSearchParams({ tenantId });
+      const response = await this.axios.get<BulkJob[]>(`/control/bulk-jobs?${params.toString()}`);
+      return response.data;
+    },
+
+    get: async (id: string): Promise<BulkJob> => {
+      const response = await this.axios.get<BulkJob>(`/control/bulk-jobs/${id}`);
+      return response.data;
+    },
+
+    create: async (
+      tenantId: string,
+      userId: string,
+      request: CreateBulkJobRequest
+    ): Promise<BulkJob> => {
+      const params = new URLSearchParams({ tenantId, userId });
+      const response = await this.axios.post<BulkJob>(
+        `/control/bulk-jobs?${params.toString()}`,
+        request
+      );
+      return response.data;
+    },
+
+    abort: async (id: string): Promise<BulkJob> => {
+      const response = await this.axios.post<BulkJob>(`/control/bulk-jobs/${id}/abort`);
+      return response.data;
+    },
+
+    getResults: async (id: string): Promise<BulkJobResult[]> => {
+      const response = await this.axios.get<BulkJobResult[]>(`/control/bulk-jobs/${id}/results`);
+      return response.data;
+    },
+
+    getErrors: async (id: string): Promise<BulkJobResult[]> => {
+      const response = await this.axios.get<BulkJobResult[]>(`/control/bulk-jobs/${id}/errors`);
+      return response.data;
+    },
+  };
+
+  /**
+   * Composite API operations
+   */
+  readonly composite = {
+    execute: async (tenantId: string, request: CompositeRequest): Promise<CompositeResponse> => {
+      const params = new URLSearchParams({ tenantId });
+      const response = await this.axios.post<CompositeResponse>(
+        `/control/composite?${params.toString()}`,
+        request
       );
       return response.data;
     },

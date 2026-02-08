@@ -33,8 +33,10 @@ const STORAGE_KEYS = {
   NONCE: 'emf_auth_nonce',
   CODE_VERIFIER: 'emf_auth_code_verifier',
   REDIRECT_PATH: 'emf_auth_redirect_path',
+  REDIRECT_URI: 'emf_auth_redirect_uri',
   PROVIDER_ID: 'emf_auth_provider_id',
   CALLBACK_PROCESSED: 'emf_auth_callback_processed',
+  LOGIN_ERROR: 'emf_auth_login_error',
 } as const
 
 // Token refresh buffer (refresh 5 minutes before expiry)
@@ -369,6 +371,9 @@ export function AuthProvider({
       }
 
       try {
+        // Clear any previous login error
+        sessionStorage.removeItem(STORAGE_KEYS.LOGIN_ERROR)
+
         // Fetch discovery document
         const discovery = await fetchDiscoveryDocument(provider.issuer)
 
@@ -380,23 +385,31 @@ export function AuthProvider({
         const state = generateRandomString(32)
         const nonce = generateRandomString(32)
 
-        // Store auth parameters
+        // Store auth parameters (including redirect_uri for exact match during exchange)
         sessionStorage.setItem(STORAGE_KEYS.CODE_VERIFIER, codeVerifier)
         sessionStorage.setItem(STORAGE_KEYS.STATE, state)
         sessionStorage.setItem(STORAGE_KEYS.NONCE, nonce)
         sessionStorage.setItem(STORAGE_KEYS.PROVIDER_ID, selectedProviderId)
         sessionStorage.setItem(STORAGE_KEYS.REDIRECT_PATH, window.location.pathname)
+        sessionStorage.setItem(STORAGE_KEYS.REDIRECT_URI, redirectUri)
 
         // Build authorization URL
         const authUrl = new URL(discovery.authorization_endpoint)
         authUrl.searchParams.set('response_type', 'code')
         authUrl.searchParams.set('client_id', provider.clientId)
-        authUrl.searchParams.set('scope', 'openid profile email roles')
+        authUrl.searchParams.set('scope', 'openid profile email')
         authUrl.searchParams.set('redirect_uri', redirectUri)
         authUrl.searchParams.set('state', state)
         authUrl.searchParams.set('nonce', nonce)
         authUrl.searchParams.set('code_challenge', codeChallenge)
         authUrl.searchParams.set('code_challenge_method', 'S256')
+
+        console.log('[Auth] PKCE parameters:', {
+          codeVerifierLength: codeVerifier.length,
+          codeChallengeLength: codeChallenge.length,
+          codeChallenge,
+          redirectUri,
+        })
 
         // Redirect to authorization endpoint
         window.location.href = authUrl.toString()
@@ -516,13 +529,24 @@ export function AuthProvider({
       const discovery = await fetchDiscoveryDocument(provider.issuer)
       console.log('[Auth] Discovery document loaded, token endpoint:', discovery.token_endpoint)
 
+      // Use the stored redirect_uri (exact match with authorization request)
+      const storedRedirectUri = sessionStorage.getItem(STORAGE_KEYS.REDIRECT_URI) || redirectUri
+
+      console.log('[Auth] Token exchange parameters:', {
+        tokenUrl: discovery.token_endpoint,
+        clientId: provider.clientId,
+        codeLength: code.length,
+        redirectUri: storedRedirectUri,
+        codeVerifierLength: codeVerifier.length,
+      })
+
       // Exchange code for tokens
       const tokenUrl = discovery.token_endpoint
       const params = new URLSearchParams({
         grant_type: 'authorization_code',
         client_id: provider.clientId,
         code,
-        redirect_uri: redirectUri,
+        redirect_uri: storedRedirectUri,
         code_verifier: codeVerifier,
       })
 
@@ -536,9 +560,14 @@ export function AuthProvider({
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        throw new Error(
-          `Token exchange failed: ${errorData.error_description || response.statusText}`
-        )
+        const errorMsg = `Token exchange failed: ${errorData.error_description || errorData.error || response.statusText}`
+        console.error('[Auth] Token exchange error:', {
+          status: response.status,
+          error: errorData.error,
+          errorDescription: errorData.error_description,
+          redirectUri: storedRedirectUri,
+        })
+        throw new Error(errorMsg)
       }
 
       const tokenResponse = (await response.json()) as TokenResponse
@@ -612,6 +641,13 @@ export function AuthProvider({
       setError(null)
 
       try {
+        // Check for previous login error (persisted in sessionStorage)
+        const previousLoginError = sessionStorage.getItem(STORAGE_KEYS.LOGIN_ERROR)
+        if (previousLoginError) {
+          console.log('[Auth] Found previous login error:', previousLoginError)
+          setError(new Error(previousLoginError))
+        }
+
         // Check if this is a callback FIRST, before fetching providers
         const urlParams = new URLSearchParams(window.location.search)
         const code = urlParams.get('code')
@@ -657,13 +693,25 @@ export function AuthProvider({
           } catch (callbackError) {
             // Log the error for debugging
             console.error('[Auth] Callback handling failed:', callbackError)
-            setError(
+            const authErr =
               callbackError instanceof Error ? callbackError : new Error('Authentication failed')
-            )
+            setError(authErr)
+
+            // Store the error in sessionStorage so it persists across page loads
+            // and prevents the auto-login loop
+            sessionStorage.setItem(STORAGE_KEYS.LOGIN_ERROR, authErr.message)
 
             // Clear URL parameters and state to prevent infinite loop
             window.history.replaceState({}, document.title, window.location.pathname)
-            clearAuthStorage()
+            // Clear auth storage but keep the LOGIN_ERROR flag
+            sessionStorage.removeItem(STORAGE_KEYS.STATE)
+            sessionStorage.removeItem(STORAGE_KEYS.NONCE)
+            sessionStorage.removeItem(STORAGE_KEYS.CODE_VERIFIER)
+            sessionStorage.removeItem(STORAGE_KEYS.REDIRECT_URI)
+            sessionStorage.removeItem(STORAGE_KEYS.TOKENS)
+            sessionStorage.removeItem(STORAGE_KEYS.CALLBACK_PROCESSED)
+            sessionStorage.removeItem(STORAGE_KEYS.PROVIDER_ID)
+            sessionStorage.removeItem(STORAGE_KEYS.REDIRECT_PATH)
           }
           setIsLoading(false)
           return

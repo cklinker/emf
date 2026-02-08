@@ -12,7 +12,7 @@
  */
 
 import React, { useCallback } from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 // Context Providers
@@ -104,6 +104,62 @@ const queryClient = new QueryClient({
 export interface AppProps {
   /** Optional plugins to load */
   plugins?: Plugin[]
+}
+
+/**
+ * Auth callback page - shows loading while processing callback, error if it fails
+ */
+function AuthCallbackPage(): React.ReactElement {
+  const { isLoading, error } = useAuth()
+  const navigate = useNavigate()
+
+  if (isLoading) {
+    return <PageLoader fullPage message="Completing authentication..." />
+  }
+
+  if (error) {
+    return (
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: '100vh',
+          padding: '2rem',
+          textAlign: 'center',
+          fontFamily: 'system-ui, -apple-system, sans-serif',
+        }}
+        role="alert"
+      >
+        <h1 style={{ margin: '0 0 1rem', fontSize: '1.5rem', fontWeight: 600 }}>
+          Authentication Failed
+        </h1>
+        <p style={{ margin: '0 0 0.5rem', color: '#666', maxWidth: '500px' }}>{error.message}</p>
+        <button
+          onClick={() => {
+            sessionStorage.removeItem('emf_auth_login_error')
+            navigate('/login')
+          }}
+          style={{
+            marginTop: '1.5rem',
+            padding: '0.75rem 1.5rem',
+            fontSize: '1rem',
+            fontWeight: 500,
+            color: '#fff',
+            backgroundColor: '#0066cc',
+            border: 'none',
+            borderRadius: '0.375rem',
+            cursor: 'pointer',
+          }}
+        >
+          Try Again
+        </button>
+      </div>
+    )
+  }
+
+  return <PageLoader fullPage message="Completing authentication..." />
 }
 
 /**
@@ -283,13 +339,8 @@ function App({ plugins = [] }: AppProps): React.ReactElement {
                             <Route path="/login" element={<LoginPage />} />
                             <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
-                            {/* OAuth callback route - shows loading while AuthContext processes the callback */}
-                            <Route
-                              path="/auth/callback"
-                              element={
-                                <PageLoader fullPage message="Completing authentication..." />
-                              }
-                            />
+                            {/* OAuth callback route - shows loading or error while AuthContext processes the callback */}
+                            <Route path="/auth/callback" element={<AuthCallbackPage />} />
 
                             {/* Dashboard - Home route */}
                             <Route

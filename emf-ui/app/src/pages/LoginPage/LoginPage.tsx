@@ -9,7 +9,7 @@
  * - 2.2: Display provider selection page for multiple providers
  */
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useConfig } from '../../context/ConfigContext'
@@ -55,12 +55,28 @@ export function LoginPage({ title }: LoginPageProps): React.ReactElement {
   // Get OIDC providers from config
   const providers = config?.oidcProviders || []
 
-  // Auto-login if only one provider
+  // Track whether auto-login has been attempted to prevent duplicate calls
+  const autoLoginAttempted = useRef(false)
+
+  // Auto-login if only one provider (skip if there was a previous error)
   useEffect(() => {
-    if (!authLoading && !configLoading && providers.length === 1 && !isAuthenticated) {
-      handleLogin(providers[0].id)
+    if (
+      !authLoading &&
+      !configLoading &&
+      providers.length === 1 &&
+      !isAuthenticated &&
+      !authError &&
+      !autoLoginAttempted.current
+    ) {
+      autoLoginAttempted.current = true
+      // Clear any persisted login error and redirect directly
+      sessionStorage.removeItem('emf_auth_login_error')
+      login(providers[0].id).catch(() => {
+        // Error will be shown via authError from AuthContext
+      })
     }
-  }, [authLoading, configLoading, providers, isAuthenticated])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, configLoading, isAuthenticated, authError])
 
   /**
    * Handle login with a specific provider
@@ -69,6 +85,9 @@ export function LoginPage({ title }: LoginPageProps): React.ReactElement {
     setIsLoggingIn(true)
     setLoginError(null)
     setSelectedProvider(providerId)
+
+    // Clear any persisted login error (user is explicitly retrying)
+    sessionStorage.removeItem('emf_auth_login_error')
 
     try {
       await login(providerId)

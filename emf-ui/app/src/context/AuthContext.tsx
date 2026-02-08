@@ -349,12 +349,23 @@ export function AuthProvider({
    */
   const login = useCallback(
     async (providerId?: string): Promise<void> => {
+      // Guard against concurrent login calls — the async operations (discovery fetch,
+      // PKCE challenge generation) create a window where a second call can overwrite
+      // sessionStorage (state, code_verifier) before the first call's redirect completes.
+      // This causes the state parameter to mismatch on callback.
+      if (sessionStorage.getItem('emf_auth_login_in_progress') === 'true') {
+        console.log('[Auth] Login already in progress, skipping duplicate call')
+        return
+      }
+      sessionStorage.setItem('emf_auth_login_in_progress', 'true')
+
       setError(null)
 
       // If no provider specified and multiple providers available, redirect to selection
       if (!providerId && providers.length > 1) {
         // Store current path for redirect after auth
         sessionStorage.setItem(STORAGE_KEYS.REDIRECT_PATH, window.location.pathname)
+        sessionStorage.removeItem('emf_auth_login_in_progress')
         window.location.href = '/auth/select-provider'
         return
       }
@@ -362,11 +373,13 @@ export function AuthProvider({
       // Use specified provider or the only available one
       const selectedProviderId = providerId || providers[0]?.id
       if (!selectedProviderId) {
+        sessionStorage.removeItem('emf_auth_login_in_progress')
         throw new Error('No OIDC providers configured')
       }
 
       const provider = providers.find((p) => p.id === selectedProviderId)
       if (!provider) {
+        sessionStorage.removeItem('emf_auth_login_in_progress')
         throw new Error(`Provider not found: ${selectedProviderId}`)
       }
 
@@ -374,24 +387,23 @@ export function AuthProvider({
         // Clear any previous login error
         sessionStorage.removeItem(STORAGE_KEYS.LOGIN_ERROR)
 
-        // Fetch discovery document
-        const discovery = await fetchDiscoveryDocument(provider.issuer)
-
-        // Generate PKCE code verifier and challenge
+        // Generate all auth parameters BEFORE any async operations to minimize
+        // the window for race conditions
         const codeVerifier = generateRandomString(64)
-        const codeChallenge = await generateCodeChallenge(codeVerifier)
-
-        // Generate state and nonce
         const state = generateRandomString(32)
         const nonce = generateRandomString(32)
 
-        // Store auth parameters (including redirect_uri for exact match during exchange)
+        // Store auth parameters immediately (before async calls)
         sessionStorage.setItem(STORAGE_KEYS.CODE_VERIFIER, codeVerifier)
         sessionStorage.setItem(STORAGE_KEYS.STATE, state)
         sessionStorage.setItem(STORAGE_KEYS.NONCE, nonce)
         sessionStorage.setItem(STORAGE_KEYS.PROVIDER_ID, selectedProviderId)
         sessionStorage.setItem(STORAGE_KEYS.REDIRECT_PATH, window.location.pathname)
         sessionStorage.setItem(STORAGE_KEYS.REDIRECT_URI, redirectUri)
+
+        // Now do async operations (these are what caused the race condition)
+        const discovery = await fetchDiscoveryDocument(provider.issuer)
+        const codeChallenge = await generateCodeChallenge(codeVerifier)
 
         // Build authorization URL
         const authUrl = new URL(discovery.authorization_endpoint)
@@ -404,9 +416,9 @@ export function AuthProvider({
         authUrl.searchParams.set('code_challenge', codeChallenge)
         authUrl.searchParams.set('code_challenge_method', 'S256')
 
-        console.log('[Auth] PKCE parameters:', {
+        console.log('[Auth] Redirecting to OIDC provider:', {
+          state,
           codeVerifierLength: codeVerifier.length,
-          codeChallengeLength: codeChallenge.length,
           codeChallenge,
           redirectUri,
         })
@@ -414,6 +426,7 @@ export function AuthProvider({
         // Redirect to authorization endpoint
         window.location.href = authUrl.toString()
       } catch (err) {
+        sessionStorage.removeItem('emf_auth_login_in_progress')
         const error = err instanceof Error ? err : new Error('Login failed')
         setError(error)
         throw error
@@ -612,6 +625,7 @@ export function AuthProvider({
       sessionStorage.removeItem(STORAGE_KEYS.STATE)
       sessionStorage.removeItem(STORAGE_KEYS.NONCE)
       sessionStorage.removeItem(STORAGE_KEYS.CODE_VERIFIER)
+      sessionStorage.removeItem('emf_auth_login_in_progress')
 
       // Redirect to original path
       let redirectPath = sessionStorage.getItem(STORAGE_KEYS.REDIRECT_PATH) || '/'
@@ -712,6 +726,7 @@ export function AuthProvider({
             sessionStorage.removeItem(STORAGE_KEYS.CALLBACK_PROCESSED)
             sessionStorage.removeItem(STORAGE_KEYS.PROVIDER_ID)
             sessionStorage.removeItem(STORAGE_KEYS.REDIRECT_PATH)
+            sessionStorage.removeItem('emf_auth_login_in_progress')
           }
           setIsLoading(false)
           return

@@ -19,6 +19,7 @@ public class PrincipalExtractor {
     private static final String SUB_CLAIM = "sub";
     private static final String ROLES_CLAIM = "roles";
     private static final String AUTHORITIES_CLAIM = "authorities";
+    private static final String GROUPS_CLAIM = "groups";
     
     /**
      * Extracts a GatewayPrincipal from a JWT token.
@@ -66,8 +67,8 @@ public class PrincipalExtractor {
     
     /**
      * Extracts roles from the JWT.
-     * Tries "roles" claim first, then falls back to "authorities".
-     * Returns an empty list if neither claim is present.
+     * Tries "roles" claim first, then "authorities", then "groups" (Authentik).
+     * Returns an empty list if no role claims are present.
      *
      * @param jwt the JWT token
      * @return a list of roles, or an empty list if no roles are found
@@ -78,10 +79,15 @@ public class PrincipalExtractor {
         if (!roles.isEmpty()) {
             return roles;
         }
-        
+
         // Fall back to "authorities" claim
         roles = extractRolesFromClaim(jwt, AUTHORITIES_CLAIM);
-        return roles;
+        if (!roles.isEmpty()) {
+            return roles;
+        }
+
+        // Fall back to "groups" claim (used by Authentik and other providers)
+        return extractRolesFromClaim(jwt, GROUPS_CLAIM);
     }
     
     /**

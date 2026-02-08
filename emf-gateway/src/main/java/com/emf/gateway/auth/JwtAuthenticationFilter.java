@@ -34,7 +34,8 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
     private static final String BEARER_PREFIX = "Bearer ";
     private static final String PRINCIPAL_ATTRIBUTE = "gateway.principal";
     private static final String BOOTSTRAP_PATH = "/control/bootstrap";
-    
+    private static final String UI_BOOTSTRAP_PATH = "/control/ui-bootstrap";
+
     private final ReactiveJwtDecoder jwtDecoder;
     private final PrincipalExtractor principalExtractor;
     
@@ -53,8 +54,8 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         String path = exchange.getRequest().getPath().value();
         
-        // Allow unauthenticated access to bootstrap endpoint
-        if (path.equals(BOOTSTRAP_PATH)) {
+        // Allow unauthenticated access to bootstrap endpoints
+        if (path.equals(BOOTSTRAP_PATH) || path.equals(UI_BOOTSTRAP_PATH)) {
             log.debug("Allowing unauthenticated access to bootstrap endpoint: {}", path);
             return chain.filter(exchange);
         }

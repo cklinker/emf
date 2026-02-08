@@ -140,6 +140,11 @@ function clearAuthStorage(): void {
   })
 }
 
+// Module-level guard to prevent concurrent login() calls within the same page load.
+// Using a module variable (not sessionStorage) ensures it resets on page reload,
+// so the callback page gets a clean slate after returning from the IdP.
+let loginInProgress = false
+
 // Create the context with undefined default
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
@@ -198,50 +203,6 @@ export function AuthProvider({
       return []
     }
   }, [])
-
-  /**
-   * Exchange authorization code for tokens
-   */
-  const exchangeCodeForTokens = useCallback(
-    async (code: string, providerId: string, codeVerifier: string): Promise<TokenResponse> => {
-      // Get provider info
-      const provider = providers.find((p) => p.id === providerId)
-      if (!provider) {
-        throw new Error(`Provider not found: ${providerId}`)
-      }
-
-      // Get discovery document
-      const discovery = await fetchDiscoveryDocument(provider.issuer)
-
-      // Exchange code for tokens
-      const tokenUrl = discovery.token_endpoint
-      const params = new URLSearchParams({
-        grant_type: 'authorization_code',
-        client_id: provider.clientId,
-        code,
-        redirect_uri: redirectUri,
-        code_verifier: codeVerifier,
-      })
-
-      const response = await fetch(tokenUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: params.toString(),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(
-          `Token exchange failed: ${errorData.error_description || response.statusText}`
-        )
-      }
-
-      return response.json()
-    },
-    [providers, fetchDiscoveryDocument, redirectUri]
-  )
 
   /**
    * Refresh the access token using the refresh token
@@ -341,15 +302,14 @@ export function AuthProvider({
    */
   const login = useCallback(
     async (providerId?: string): Promise<void> => {
-      // Guard against concurrent login calls — the async operations (discovery fetch,
-      // PKCE challenge generation) create a window where a second call can overwrite
-      // sessionStorage (state, code_verifier) before the first call's redirect completes.
-      // This causes the state parameter to mismatch on callback.
-      if (sessionStorage.getItem('emf_auth_login_in_progress') === 'true') {
+      // Guard against concurrent login calls within the same page load.
+      // Uses a module-level variable (not sessionStorage) so it resets on page reload,
+      // ensuring the callback page gets a clean slate after returning from the IdP.
+      if (loginInProgress) {
         console.log('[Auth] Login already in progress, skipping duplicate call')
         return
       }
-      sessionStorage.setItem('emf_auth_login_in_progress', 'true')
+      loginInProgress = true
 
       setError(null)
 
@@ -357,7 +317,7 @@ export function AuthProvider({
       if (!providerId && providers.length > 1) {
         // Store current path for redirect after auth
         sessionStorage.setItem(STORAGE_KEYS.REDIRECT_PATH, window.location.pathname)
-        sessionStorage.removeItem('emf_auth_login_in_progress')
+        loginInProgress = false
         window.location.href = '/auth/select-provider'
         return
       }
@@ -365,13 +325,13 @@ export function AuthProvider({
       // Use specified provider or the only available one
       const selectedProviderId = providerId || providers[0]?.id
       if (!selectedProviderId) {
-        sessionStorage.removeItem('emf_auth_login_in_progress')
+        loginInProgress = false
         throw new Error('No OIDC providers configured')
       }
 
       const provider = providers.find((p) => p.id === selectedProviderId)
       if (!provider) {
-        sessionStorage.removeItem('emf_auth_login_in_progress')
+        loginInProgress = false
         throw new Error(`Provider not found: ${selectedProviderId}`)
       }
 
@@ -418,7 +378,7 @@ export function AuthProvider({
         // Redirect to authorization endpoint
         window.location.href = authUrl.toString()
       } catch (err) {
-        sessionStorage.removeItem('emf_auth_login_in_progress')
+        loginInProgress = false
         const error = err instanceof Error ? err : new Error('Login failed')
         setError(error)
         throw error
@@ -617,7 +577,6 @@ export function AuthProvider({
       sessionStorage.removeItem(STORAGE_KEYS.STATE)
       sessionStorage.removeItem(STORAGE_KEYS.NONCE)
       sessionStorage.removeItem(STORAGE_KEYS.CODE_VERIFIER)
-      sessionStorage.removeItem('emf_auth_login_in_progress')
 
       // Redirect to original path
       let redirectPath = sessionStorage.getItem(STORAGE_KEYS.REDIRECT_PATH) || '/'
@@ -718,7 +677,6 @@ export function AuthProvider({
             sessionStorage.removeItem(STORAGE_KEYS.CALLBACK_PROCESSED)
             sessionStorage.removeItem(STORAGE_KEYS.PROVIDER_ID)
             sessionStorage.removeItem(STORAGE_KEYS.REDIRECT_PATH)
-            sessionStorage.removeItem('emf_auth_login_in_progress')
           }
           setIsLoading(false)
           return
@@ -799,6 +757,7 @@ export function AuthProvider({
  *
  * @throws Error if used outside of AuthProvider
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth(): AuthContextValue {
   const context = useContext(AuthContext)
   if (context === undefined) {

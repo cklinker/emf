@@ -335,6 +335,7 @@ export function ConfigProvider({
  * }
  * ```
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function useConfig(): ConfigContextValue {
   const context = useContext(ConfigContext)
   if (context === undefined) {

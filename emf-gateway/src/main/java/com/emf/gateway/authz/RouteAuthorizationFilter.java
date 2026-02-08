@@ -58,14 +58,19 @@ public class RouteAuthorizationFilter implements GlobalFilter, Ordered {
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
+        String path = exchange.getRequest().getPath().value();
+
+        // Allow unauthenticated access to bootstrap endpoints
+        if ("/control/bootstrap".equals(path) || "/control/ui-bootstrap".equals(path)) {
+            return chain.filter(exchange);
+        }
+
         GatewayPrincipal principal = JwtAuthenticationFilter.getPrincipal(exchange);
 
         if (principal == null) {
-            log.warn("No principal found in exchange for path: {}", exchange.getRequest().getPath().value());
+            log.warn("No principal found in exchange for path: {}", path);
             return forbidden(exchange, "Authentication required");
         }
-
-        String path = exchange.getRequest().getPath().value();
         HttpMethod method = exchange.getRequest().getMethod();
 
         Optional<RouteDefinition> routeOpt = routeRegistry.findByPath(path);

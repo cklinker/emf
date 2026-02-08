@@ -1,7 +1,11 @@
 package com.emf.controlplane.controller;
 
-import com.emf.controlplane.dto.GatewayBootstrapConfigDto;
+import com.emf.controlplane.dto.*;
+import com.emf.controlplane.entity.UiMenu;
+import com.emf.controlplane.entity.UiPage;
+import com.emf.controlplane.repository.OidcProviderRepository;
 import com.emf.controlplane.service.GatewayBootstrapService;
+import com.emf.controlplane.service.UiConfigService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -12,6 +16,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * REST controller for gateway bootstrap configuration.
@@ -30,9 +37,15 @@ public class GatewayBootstrapController {
     private static final Logger log = LoggerFactory.getLogger(GatewayBootstrapController.class);
 
     private final GatewayBootstrapService gatewayBootstrapService;
+    private final UiConfigService uiConfigService;
+    private final OidcProviderRepository oidcProviderRepository;
 
-    public GatewayBootstrapController(GatewayBootstrapService gatewayBootstrapService) {
+    public GatewayBootstrapController(GatewayBootstrapService gatewayBootstrapService,
+                                      UiConfigService uiConfigService,
+                                      OidcProviderRepository oidcProviderRepository) {
         this.gatewayBootstrapService = gatewayBootstrapService;
+        this.uiConfigService = uiConfigService;
+        this.oidcProviderRepository = oidcProviderRepository;
     }
 
     /**
@@ -58,5 +71,59 @@ public class GatewayBootstrapController {
         GatewayBootstrapConfigDto dto = gatewayBootstrapService.getBootstrapConfig();
         
         return ResponseEntity.ok(dto);
+    }
+
+    /**
+     * Gets the bootstrap configuration for the Admin UI.
+     * Returns all active pages, menus, theme settings, branding, features, and OIDC providers.
+     * This endpoint is accessible without authentication.
+     *
+     * @return Bootstrap configuration for the UI
+     */
+    @GetMapping("/ui-bootstrap")
+    @Operation(
+            summary = "Get UI bootstrap configuration",
+            description = "Returns the initial configuration needed by the Admin UI on startup, " +
+                    "including pages, menus, theme, branding, features, and OIDC providers. " +
+                    "This endpoint is public (no authentication required)."
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Successfully retrieved UI bootstrap configuration")
+    })
+    public ResponseEntity<BootstrapConfigDto> getUiBootstrapConfig() {
+        log.debug("REST request to get UI bootstrap configuration");
+
+        UiConfigService.BootstrapConfig config = uiConfigService.getBootstrapConfig();
+
+        List<UiPageDto> pageDtos = config.getPages().stream()
+                .map(UiPageDto::fromEntity)
+                .collect(Collectors.toList());
+
+        List<UiMenuDto> menuDtos = config.getMenus().stream()
+                .map(UiMenuDto::fromEntity)
+                .collect(Collectors.toList());
+
+        BootstrapConfigDto.ThemeConfig theme = new BootstrapConfigDto.ThemeConfig(
+                "#1976d2", "#dc004e", "Inter, system-ui, sans-serif", "8px"
+        );
+
+        BootstrapConfigDto.BrandingConfig branding = new BootstrapConfigDto.BrandingConfig(
+                "/logo.svg", "EMF Control Plane", "/favicon.ico"
+        );
+
+        BootstrapConfigDto.FeatureFlags features = new BootstrapConfigDto.FeatureFlags(
+                true, true, true, true, true
+        );
+
+        List<BootstrapConfigDto.OidcProviderSummary> oidcProviders = oidcProviderRepository.findByActiveTrue()
+                .stream()
+                .map(p -> new BootstrapConfigDto.OidcProviderSummary(p.getId(), p.getName(), p.getIssuer(), p.getClientId()))
+                .collect(Collectors.toList());
+
+        BootstrapConfigDto bootstrapDto = new BootstrapConfigDto(
+                pageDtos, menuDtos, theme, branding, features, oidcProviders
+        );
+
+        return ResponseEntity.ok(bootstrapDto);
     }
 }

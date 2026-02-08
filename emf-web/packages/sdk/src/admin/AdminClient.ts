@@ -252,7 +252,7 @@ export class AdminClient {
    */
   readonly ui = {
     getBootstrap: async (): Promise<UIConfig> => {
-      const response = await this.axios.get<UIConfig>('/ui/config/bootstrap');
+      const response = await this.axios.get<UIConfig>('/control/ui-bootstrap');
       return response.data;
     },
 

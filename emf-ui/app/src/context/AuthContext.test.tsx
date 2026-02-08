@@ -83,7 +83,7 @@ function createMockFetch(overrides: Record<string, unknown> = {}) {
     const url =
       typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
 
-    if (url.includes('/ui/config/bootstrap')) {
+    if (url.includes('/control/ui-bootstrap')) {
       const config = overrides.bootstrapConfig || mockBootstrapConfig
       return {
         ok: true,
@@ -252,7 +252,7 @@ describe('AuthContext', () => {
       const calls = mockFetch.mock.calls
       const bootstrapCall = calls.find((call) => {
         const url = typeof call[0] === 'string' ? call[0] : call[0]?.url
-        return url?.includes('/ui/config/bootstrap')
+        return url?.includes('/control/ui-bootstrap')
       })
       expect(bootstrapCall).toBeDefined()
     })

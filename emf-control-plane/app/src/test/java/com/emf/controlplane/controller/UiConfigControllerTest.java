@@ -6,7 +6,6 @@ import com.emf.controlplane.entity.UiMenuItem;
 import com.emf.controlplane.entity.UiPage;
 import com.emf.controlplane.exception.DuplicateResourceException;
 import com.emf.controlplane.exception.ResourceNotFoundException;
-import com.emf.controlplane.repository.OidcProviderRepository;
 import com.emf.controlplane.service.UiConfigService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -31,7 +30,6 @@ import static org.mockito.Mockito.*;
  * Tests REST endpoints for UI configuration management.
  *
  * Requirements tested:
- * - 5.1: GET /ui/config/bootstrap returns UI configuration
  * - 5.2: GET /ui/pages returns list of UI pages
  * - 5.3: POST /ui/pages creates new UI page
  * - 5.4: PUT /ui/pages/{id} updates UI page
@@ -44,67 +42,11 @@ class UiConfigControllerTest {
     @Mock
     private UiConfigService uiConfigService;
 
-    @Mock
-    private OidcProviderRepository oidcProviderRepository;
-
     private UiConfigController uiConfigController;
 
     @BeforeEach
     void setUp() {
-        uiConfigController = new UiConfigController(uiConfigService, oidcProviderRepository);
-    }
-
-    @Nested
-    @DisplayName("GET /ui/config/bootstrap")
-    class GetBootstrapConfigTests {
-
-        @Test
-        @DisplayName("should return bootstrap config with pages and menus")
-        void shouldReturnBootstrapConfig() {
-            // Given
-            UiPage page = createTestPage("page-1", "Dashboard", "/dashboard");
-            UiMenu menu = createTestMenu("menu-1", "Main Menu");
-
-            UiConfigService.BootstrapConfig config = new UiConfigService.BootstrapConfig(
-                    List.of(page), List.of(menu)
-            );
-
-            when(uiConfigService.getBootstrapConfig()).thenReturn(config);
-            when(oidcProviderRepository.findByActiveTrue()).thenReturn(Collections.emptyList());
-
-            // When
-            ResponseEntity<BootstrapConfigDto> response = uiConfigController.getBootstrapConfig();
-
-            // Then
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-            assertThat(response.getBody()).isNotNull();
-            assertThat(response.getBody().getPages()).hasSize(1);
-            assertThat(response.getBody().getMenus()).hasSize(1);
-            assertThat(response.getBody().getTheme()).isNotNull();
-            assertThat(response.getBody().getBranding()).isNotNull();
-            assertThat(response.getBody().getFeatures()).isNotNull();
-            assertThat(response.getBody().getOidcProviders()).isNotNull();
-        }
-
-        @Test
-        @DisplayName("should return empty lists when no pages or menus exist")
-        void shouldReturnEmptyListsWhenNoPagesOrMenus() {
-            // Given
-            UiConfigService.BootstrapConfig config = new UiConfigService.BootstrapConfig(
-                    Collections.emptyList(), Collections.emptyList()
-            );
-
-            when(uiConfigService.getBootstrapConfig()).thenReturn(config);
-            when(oidcProviderRepository.findByActiveTrue()).thenReturn(Collections.emptyList());
-
-            // When
-            ResponseEntity<BootstrapConfigDto> response = uiConfigController.getBootstrapConfig();
-
-            // Then
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-            assertThat(response.getBody().getPages()).isEmpty();
-            assertThat(response.getBody().getMenus()).isEmpty();
-        }
+        uiConfigController = new UiConfigController(uiConfigService);
     }
 
     @Nested

@@ -92,7 +92,7 @@ function createMockFetch(
       await new Promise((resolve) => setTimeout(resolve, options.delay))
     }
 
-    if (url.includes('/ui/config/bootstrap')) {
+    if (url.includes('/control/ui-bootstrap')) {
       if (options.shouldFail) {
         return {
           ok: false,
@@ -200,7 +200,7 @@ describe('ConfigContext', () => {
   })
 
   describe('Fetch Bootstrap Configuration (Requirement 1.1)', () => {
-    it('should fetch bootstrap config from /ui/config/bootstrap on mount', async () => {
+    it('should fetch bootstrap config from /control/ui-bootstrap on mount', async () => {
       const mockFetch = createMockFetch()
       global.fetch = mockFetch
 
@@ -211,7 +211,7 @@ describe('ConfigContext', () => {
       })
 
       // Verify fetch was called with correct endpoint
-      expect(mockFetch).toHaveBeenCalledWith('/ui/config/bootstrap')
+      expect(mockFetch).toHaveBeenCalledWith('/control/ui-bootstrap')
     })
 
     it('should use custom bootstrap endpoint when provided', async () => {

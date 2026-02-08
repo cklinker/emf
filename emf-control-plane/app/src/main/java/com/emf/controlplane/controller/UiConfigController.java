@@ -1,10 +1,8 @@
 package com.emf.controlplane.controller;
 
 import com.emf.controlplane.dto.*;
-import com.emf.controlplane.entity.OidcProvider;
 import com.emf.controlplane.entity.UiMenu;
 import com.emf.controlplane.entity.UiPage;
-import com.emf.controlplane.repository.OidcProviderRepository;
 import com.emf.controlplane.service.UiConfigService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -26,12 +24,12 @@ import java.util.stream.Collectors;
 /**
  * REST controller for managing UI configuration.
  *
- * <p>Provides endpoints for bootstrap configuration, pages, and menus.
- * Most endpoints require ADMIN role authorization, except for bootstrap config.
+ * <p>Provides endpoints for managing pages and menus.
+ * All endpoints require ADMIN role authorization.
+ * Bootstrap configuration is served by GatewayBootstrapController at /control/ui-bootstrap.
  *
  * <p>Requirements satisfied:
  * <ul>
- *   <li>5.1: Return bootstrap configuration including pages and menus</li>
  *   <li>5.2: Return list of UI pages</li>
  *   <li>5.3: Create UI page with valid data and return created page</li>
  *   <li>5.4: Update UI page and persist changes</li>
@@ -48,84 +46,9 @@ public class UiConfigController {
     private static final Logger log = LoggerFactory.getLogger(UiConfigController.class);
 
     private final UiConfigService uiConfigService;
-    private final OidcProviderRepository oidcProviderRepository;
 
-    public UiConfigController(UiConfigService uiConfigService, OidcProviderRepository oidcProviderRepository) {
+    public UiConfigController(UiConfigService uiConfigService) {
         this.uiConfigService = uiConfigService;
-        this.oidcProviderRepository = oidcProviderRepository;
-    }
-
-    /**
-     * Gets the bootstrap configuration for the UI.
-     * Returns all active pages, menus, theme settings, branding, features, and OIDC providers.
-     * This endpoint is accessible without authentication.
-     *
-     * @return Bootstrap configuration containing pages, menus, theme, branding, features, and oidcProviders
-     *
-     * Validates: Requirement 5.1
-     */
-    @GetMapping("/config/bootstrap")
-    @Operation(
-            summary = "Get bootstrap configuration",
-            description = "Returns the initial configuration needed by the UI on startup, " +
-                    "including pages, menus, theme, branding, features, and OIDC providers."
-    )
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Successfully retrieved bootstrap configuration")
-    })
-    public ResponseEntity<BootstrapConfigDto> getBootstrapConfig() {
-        log.debug("REST request to get bootstrap configuration");
-
-        UiConfigService.BootstrapConfig config = uiConfigService.getBootstrapConfig();
-
-        List<UiPageDto> pageDtos = config.getPages().stream()
-                .map(UiPageDto::fromEntity)
-                .collect(Collectors.toList());
-
-        List<UiMenuDto> menuDtos = config.getMenus().stream()
-                .map(UiMenuDto::fromEntity)
-                .collect(Collectors.toList());
-
-        // Default theme - can be extended to load from database/config
-        BootstrapConfigDto.ThemeConfig theme = new BootstrapConfigDto.ThemeConfig(
-                "#1976d2",  // primaryColor
-                "#dc004e",  // secondaryColor
-                "Inter, system-ui, sans-serif",  // fontFamily
-                "8px"  // borderRadius
-        );
-
-        // Default branding - can be extended to load from database/config
-        BootstrapConfigDto.BrandingConfig branding = new BootstrapConfigDto.BrandingConfig(
-                "/logo.svg",  // logoUrl
-                "EMF Control Plane",  // applicationName
-                "/favicon.ico"  // faviconUrl
-        );
-
-        // Default features - can be extended to load from database/config
-        BootstrapConfigDto.FeatureFlags features = new BootstrapConfigDto.FeatureFlags(
-                true,   // enableBuilder
-                true,   // enableResourceBrowser
-                true,   // enablePackages
-                true,   // enableMigrations
-                true    // enableDashboard
-        );
-
-        // Get active OIDC providers for login
-        List<BootstrapConfigDto.OidcProviderSummary> oidcProviders = oidcProviderRepository.findByActiveTrue()
-                .stream()
-                .map(p -> new BootstrapConfigDto.OidcProviderSummary(p.getId(), p.getName(), p.getIssuer(), p.getClientId()))
-                .collect(Collectors.toList());
-
-        BootstrapConfigDto dto = new BootstrapConfigDto(
-                pageDtos,
-                menuDtos,
-                theme,
-                branding,
-                features,
-                oidcProviders
-        );
-
-        return ResponseEntity.ok(dto);
     }
 
     /**

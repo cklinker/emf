@@ -108,7 +108,7 @@ const mockVersions: CollectionVersion[] = [
 // Setup MSW server for this test file
 const server = setupServer(
   // Add bootstrap config handler
-  http.get('/ui/config/bootstrap', () => {
+  http.get('/control/ui-bootstrap', () => {
     return HttpResponse.json({
       oidcProviders: [
         {

@@ -188,7 +188,9 @@ export function AuthProvider({
    */
   const fetchProviders = useCallback(async (): Promise<OIDCProviderSummary[]> => {
     try {
-      const response = await fetch('/ui/config/bootstrap')
+      const response = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL || ''}/control/ui-bootstrap`
+      )
       if (!response.ok) {
         // Don't throw - just return empty. ConfigProvider will handle the error display.
         console.warn('[Auth] Bootstrap config unavailable, OIDC providers not loaded')

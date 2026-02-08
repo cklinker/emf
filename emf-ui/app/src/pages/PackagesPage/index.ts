@@ -4,7 +4,7 @@
  * Exports the PackagesPage component and related types.
  */
 
-export { PackagesPage } from './PackagesPage';
+export { PackagesPage } from './PackagesPage'
 export type {
   PackagesPageProps,
   Package,
@@ -14,4 +14,4 @@ export type {
   ImportConflict,
   ImportResult,
   ImportError,
-} from './PackagesPage';
+} from './PackagesPage'

@@ -167,8 +167,9 @@
   border: none;
   border-radius: var(--border-radius, 4px);
   cursor: pointer;
-  transition: background-color 150ms ease-in-out,
-              transform 150ms ease-in-out;
+  transition:
+    background-color 150ms ease-in-out,
+    transform 150ms ease-in-out;
   min-height: 40px;
 }
 
@@ -201,9 +202,10 @@
   border: 1px solid var(--color-border, #e5e7eb);
   border-radius: var(--border-radius, 4px);
   cursor: pointer;
-  transition: background-color 150ms ease-in-out,
-              border-color 150ms ease-in-out,
-              transform 150ms ease-in-out;
+  transition:
+    background-color 150ms ease-in-out,
+    border-color 150ms ease-in-out,
+    transform 150ms ease-in-out;
   min-height: 40px;
 }
 

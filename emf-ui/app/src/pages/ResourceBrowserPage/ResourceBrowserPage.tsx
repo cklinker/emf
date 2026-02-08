@@ -8,24 +8,24 @@
  * - 11.1: Resource browser allows selecting a collection
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { useI18n } from '../../context/I18nContext';
-import { useApi } from '../../context/ApiContext';
-import { LoadingSpinner, ErrorMessage } from '../../components';
-import styles from './ResourceBrowserPage.module.css';
+import React, { useState, useCallback, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { useI18n } from '../../context/I18nContext'
+import { useApi } from '../../context/ApiContext'
+import { LoadingSpinner, ErrorMessage } from '../../components'
+import styles from './ResourceBrowserPage.module.css'
 
 /**
  * Collection summary interface for the resource browser
  */
 export interface CollectionSummary {
-  id: string;
-  name: string;
-  displayName: string;
-  description?: string;
-  active: boolean;
-  fieldCount: number;
+  id: string
+  name: string
+  displayName: string
+  description?: string
+  active: boolean
+  fieldCount: number
 }
 
 /**
@@ -33,7 +33,7 @@ export interface CollectionSummary {
  */
 export interface ResourceBrowserPageProps {
   /** Optional test ID for testing */
-  testId?: string;
+  testId?: string
 }
 
 /**
@@ -43,14 +43,16 @@ export interface ResourceBrowserPageProps {
  * Displays a list of available collections that users can select
  * to view and manage data records.
  */
-export function ResourceBrowserPage({ testId = 'resource-browser-page' }: ResourceBrowserPageProps): React.ReactElement {
-  const navigate = useNavigate();
-  const { t } = useI18n();
+export function ResourceBrowserPage({
+  testId = 'resource-browser-page',
+}: ResourceBrowserPageProps): React.ReactElement {
+  const navigate = useNavigate()
+  const { t } = useI18n()
 
   // Search filter state
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState('')
 
-  const { apiClient } = useApi();
+  const { apiClient } = useApi()
 
   // Fetch collections query
   const {
@@ -61,62 +63,62 @@ export function ResourceBrowserPage({ testId = 'resource-browser-page' }: Resour
   } = useQuery<CollectionSummary[]>({
     queryKey: ['collections-for-browser'],
     queryFn: async () => {
-      const response = await apiClient.get<{ content: CollectionSummary[] }>('/control/collections');
-      console.log('[ResourceBrowserPage] API response:', response);
+      const response = await apiClient.get<{ content: CollectionSummary[] }>('/control/collections')
+      console.log('[ResourceBrowserPage] API response:', response)
       // Extract content array from paginated response
-      return Array.isArray(response?.content) ? response.content : [];
+      return Array.isArray(response?.content) ? response.content : []
     },
-  });
+  })
 
   // Filter to only show active collections
   const activeCollections = useMemo(() => {
     if (!Array.isArray(collections)) {
-      console.log('[ResourceBrowserPage] Collections is not an array:', collections);
-      return [];
+      console.log('[ResourceBrowserPage] Collections is not an array:', collections)
+      return []
     }
-    console.log('[ResourceBrowserPage] Total collections:', collections.length);
-    const filtered = collections.filter((collection) => collection?.active);
-    console.log('[ResourceBrowserPage] Active collections:', filtered.length, filtered);
-    return filtered;
-  }, [collections]);
+    console.log('[ResourceBrowserPage] Total collections:', collections.length)
+    const filtered = collections.filter((collection) => collection?.active)
+    console.log('[ResourceBrowserPage] Active collections:', filtered.length, filtered)
+    return filtered
+  }, [collections])
 
   // Filter collections by search query
   const filteredCollections = useMemo(() => {
     if (!searchQuery.trim()) {
-      return activeCollections;
+      return activeCollections
     }
-    const query = searchQuery.toLowerCase();
+    const query = searchQuery.toLowerCase()
     return activeCollections.filter(
       (collection) =>
         collection?.name?.toLowerCase().includes(query) ||
         collection?.displayName?.toLowerCase().includes(query) ||
         (collection?.description && collection.description.toLowerCase().includes(query))
-    );
-  }, [activeCollections, searchQuery]);
+    )
+  }, [activeCollections, searchQuery])
 
   // Handle search input change
   const handleSearchChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(event.target.value);
-  }, []);
+    setSearchQuery(event.target.value)
+  }, [])
 
   // Handle collection selection - navigate to collection data view
   const handleCollectionSelect = useCallback(
     (collection: CollectionSummary) => {
-      navigate(`/resources/${collection.name}`);
+      navigate(`/resources/${collection.name}`)
     },
     [navigate]
-  );
+  )
 
   // Handle keyboard navigation on collection cards
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent, collection: CollectionSummary) => {
       if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault();
-        handleCollectionSelect(collection);
+        event.preventDefault()
+        handleCollectionSelect(collection)
       }
     },
     [handleCollectionSelect]
-  );
+  )
 
   // Render loading state
   if (isLoading) {
@@ -126,7 +128,7 @@ export function ResourceBrowserPage({ testId = 'resource-browser-page' }: Resour
           <LoadingSpinner size="large" label={t('common.loading')} />
         </div>
       </div>
-    );
+    )
   }
 
   // Render error state
@@ -138,7 +140,7 @@ export function ResourceBrowserPage({ testId = 'resource-browser-page' }: Resour
           onRetry={() => refetch()}
         />
       </div>
-    );
+    )
   }
 
   return (
@@ -220,12 +222,13 @@ export function ResourceBrowserPage({ testId = 'resource-browser-page' }: Resour
       {/* Results count */}
       {filteredCollections.length > 0 && (
         <div className={styles.resultsCount} aria-live="polite" data-testid="results-count">
-          {filteredCollections.length} {filteredCollections.length === 1 ? 'collection' : 'collections'}
+          {filteredCollections.length}{' '}
+          {filteredCollections.length === 1 ? 'collection' : 'collections'}
           {searchQuery && ` matching "${searchQuery}"`}
         </div>
       )}
     </div>
-  );
+  )
 }
 
-export default ResourceBrowserPage;
+export default ResourceBrowserPage

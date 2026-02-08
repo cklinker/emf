@@ -10,17 +10,17 @@
  * - 18.6: Log errors to the console with sufficient detail for debugging
  */
 
-import { Component, type ErrorInfo, type ReactNode, type ReactElement } from 'react';
-import styles from './ErrorBoundary.module.css';
+import { Component, type ErrorInfo, type ReactNode, type ReactElement } from 'react'
+import styles from './ErrorBoundary.module.css'
 
 /**
  * Props for the ErrorBoundary component
  */
 export interface ErrorBoundaryProps {
   /** Child components to render */
-  children: ReactNode;
+  children: ReactNode
   /** Optional custom fallback UI to display when an error occurs */
-  fallback?: ReactNode;
+  fallback?: ReactNode
 }
 
 /**
@@ -28,9 +28,9 @@ export interface ErrorBoundaryProps {
  */
 export interface ErrorBoundaryState {
   /** Whether an error has been caught */
-  hasError: boolean;
+  hasError: boolean
   /** The error that was caught, if any */
-  error: Error | null;
+  error: Error | null
 }
 
 /**
@@ -38,17 +38,17 @@ export interface ErrorBoundaryState {
  */
 export interface ErrorFallbackProps {
   /** The error that was caught */
-  error: Error | null;
+  error: Error | null
   /** Callback to reset the error state */
-  onReset?: () => void;
+  onReset?: () => void
 }
 
 /**
  * Check if we're in development mode
  */
 const isDevelopment = (): boolean => {
-  return process.env.NODE_ENV === 'development' || import.meta.env?.DEV === true;
-};
+  return process.env.NODE_ENV === 'development' || import.meta.env?.DEV === true
+}
 
 /**
  * ErrorFallback Component
@@ -61,26 +61,26 @@ export function ErrorFallback({ error, onReset }: ErrorFallbackProps): ReactElem
    * Handle reload page action
    */
   const handleReload = (): void => {
-    window.location.reload();
-  };
+    window.location.reload()
+  }
 
   /**
    * Handle navigate home action
    */
   const handleGoHome = (): void => {
-    window.location.href = '/';
-  };
+    window.location.href = '/'
+  }
 
   /**
    * Handle try again action (reset error boundary)
    */
   const handleTryAgain = (): void => {
     if (onReset) {
-      onReset();
+      onReset()
     }
-  };
+  }
 
-  const showStackTrace = isDevelopment() && error?.stack;
+  const showStackTrace = isDevelopment() && error?.stack
 
   return (
     <div
@@ -121,12 +121,8 @@ export function ErrorFallback({ error, onReset }: ErrorFallbackProps): ReactElem
         {/* Stack Trace (Development Only) */}
         {showStackTrace && (
           <details className={styles.stackTraceContainer} data-testid="error-stack-trace">
-            <summary className={styles.stackTraceSummary}>
-              View technical details
-            </summary>
-            <pre className={styles.stackTrace}>
-              {error.stack}
-            </pre>
+            <summary className={styles.stackTraceSummary}>View technical details</summary>
+            <pre className={styles.stackTrace}>{error.stack}</pre>
           </details>
         )}
 
@@ -161,12 +157,10 @@ export function ErrorFallback({ error, onReset }: ErrorFallbackProps): ReactElem
         </div>
 
         {/* Help Text */}
-        <p className={styles.helpText}>
-          If this problem persists, please contact support.
-        </p>
+        <p className={styles.helpText}>If this problem persists, please contact support.</p>
       </div>
     </div>
-  );
+  )
 }
 
 /**
@@ -197,11 +191,11 @@ export function ErrorFallback({ error, onReset }: ErrorFallbackProps): ReactElem
  */
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
-    super(props);
+    super(props)
     this.state = {
       hasError: false,
       error: null,
-    };
+    }
   }
 
   /**
@@ -215,7 +209,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     return {
       hasError: true,
       error,
-    };
+    }
   }
 
   /**
@@ -237,11 +231,11 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       },
       componentStack: errorInfo.componentStack,
       timestamp: new Date().toISOString(),
-    });
+    })
 
     // Also log the raw error for easier debugging in console
-    console.error('[ErrorBoundary] Error:', error);
-    console.error('[ErrorBoundary] Component Stack:', errorInfo.componentStack);
+    console.error('[ErrorBoundary] Error:', error)
+    console.error('[ErrorBoundary] Component Stack:', errorInfo.componentStack)
   }
 
   /**
@@ -251,25 +245,25 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     this.setState({
       hasError: false,
       error: null,
-    });
-  };
+    })
+  }
 
   render(): ReactNode {
-    const { hasError, error } = this.state;
-    const { children, fallback } = this.props;
+    const { hasError, error } = this.state
+    const { children, fallback } = this.props
 
     if (hasError) {
       // If a custom fallback is provided, use it
       if (fallback !== undefined) {
-        return fallback;
+        return fallback
       }
 
       // Otherwise, use the default ErrorFallback component
-      return <ErrorFallback error={error} onReset={this.resetError} />;
+      return <ErrorFallback error={error} onReset={this.resetError} />
     }
 
-    return children;
+    return children
   }
 }
 
-export default ErrorBoundary;
+export default ErrorBoundary

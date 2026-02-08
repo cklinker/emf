@@ -1,42 +1,42 @@
 /**
  * Header Component
- * 
+ *
  * Top navigation bar with branding, user menu, and global actions.
  * Displays logo and application name from config, and user menu with logout option.
- * 
+ *
  * Requirements:
  * - 1.5: Apply branding including logo, application name, and favicon
  * - 2.6: Clear tokens and redirect on logout (via onLogout callback)
  */
 
-import { useState, useCallback, useRef, useEffect } from 'react';
-import type { BrandingConfig } from '../../types/config';
-import type { User } from '../../types/auth';
-import { useAppShell } from '../AppShell';
-import styles from './Header.module.css';
+import { useState, useCallback, useRef, useEffect } from 'react'
+import type { BrandingConfig } from '../../types/config'
+import type { User } from '../../types/auth'
+import { useAppShell } from '../AppShell'
+import styles from './Header.module.css'
 
 /**
  * Props for the Header component
  */
 export interface HeaderProps {
   /** Branding configuration with logo, app name */
-  branding: BrandingConfig;
+  branding: BrandingConfig
   /** Current authenticated user, null if not authenticated */
-  user: User | null;
+  user: User | null
   /** Callback when user clicks logout */
-  onLogout: () => void;
+  onLogout: () => void
 }
 
 /**
  * Header component provides the top navigation bar with branding and user menu.
- * 
+ *
  * Features:
  * - Displays application logo and name from branding config
  * - Shows user avatar/initials and name when authenticated
  * - Provides dropdown menu with logout option
  * - Responsive behavior for mobile screens
  * - Accessible with keyboard navigation and ARIA attributes
- * 
+ *
  * @example
  * ```tsx
  * <Header
@@ -47,15 +47,15 @@ export interface HeaderProps {
  * ```
  */
 export function Header({ branding, user, onLogout }: HeaderProps): JSX.Element {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
-  
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+
   // Get screen size from AppShell context for responsive behavior
-  let screenSize: 'mobile' | 'tablet' | 'desktop' = 'desktop';
+  let screenSize: 'mobile' | 'tablet' | 'desktop' = 'desktop'
   try {
-    const appShell = useAppShell();
-    screenSize = appShell.screenSize;
+    const appShell = useAppShell()
+    screenSize = appShell.screenSize
   } catch {
     // AppShell context not available, use default
   }
@@ -64,39 +64,42 @@ export function Header({ branding, user, onLogout }: HeaderProps): JSX.Element {
    * Toggle user menu open/closed
    */
   const toggleMenu = useCallback(() => {
-    setIsMenuOpen((prev) => !prev);
-  }, []);
+    setIsMenuOpen((prev) => !prev)
+  }, [])
 
   /**
    * Close the user menu
    */
   const closeMenu = useCallback(() => {
-    setIsMenuOpen(false);
-  }, []);
+    setIsMenuOpen(false)
+  }, [])
 
   /**
    * Handle logout click
    */
   const handleLogout = useCallback(() => {
-    closeMenu();
-    onLogout();
-  }, [closeMenu, onLogout]);
+    closeMenu()
+    onLogout()
+  }, [closeMenu, onLogout])
 
   /**
    * Handle keyboard navigation in the menu
    */
-  const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
-    if (event.key === 'Escape') {
-      closeMenu();
-      buttonRef.current?.focus();
-    }
-  }, [closeMenu]);
+  const handleKeyDown = useCallback(
+    (event: React.KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        closeMenu()
+        buttonRef.current?.focus()
+      }
+    },
+    [closeMenu]
+  )
 
   /**
    * Close menu when clicking outside
    */
   useEffect(() => {
-    if (!isMenuOpen) return;
+    if (!isMenuOpen) return
 
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -105,41 +108,41 @@ export function Header({ branding, user, onLogout }: HeaderProps): JSX.Element {
         buttonRef.current &&
         !buttonRef.current.contains(event.target as Node)
       ) {
-        closeMenu();
+        closeMenu()
       }
-    };
+    }
 
-    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('mousedown', handleClickOutside)
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isMenuOpen, closeMenu]);
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [isMenuOpen, closeMenu])
 
   /**
    * Get user initials for avatar fallback
    */
   const getUserInitials = (userName?: string, email?: string): string => {
     if (userName) {
-      const parts = userName.split(' ');
+      const parts = userName.split(' ')
       if (parts.length >= 2) {
-        return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+        return `${parts[0][0]}${parts[1][0]}`.toUpperCase()
       }
-      return userName.substring(0, 2).toUpperCase();
+      return userName.substring(0, 2).toUpperCase()
     }
     if (email) {
-      return email.substring(0, 2).toUpperCase();
+      return email.substring(0, 2).toUpperCase()
     }
-    return 'U';
-  };
+    return 'U'
+  }
 
   /**
    * Get display name for user
    */
   const getDisplayName = (userData: User): string => {
-    return userData.name || userData.email || 'User';
-  };
+    return userData.name || userData.email || 'User'
+  }
 
-  const isMobile = screenSize === 'mobile';
+  const isMobile = screenSize === 'mobile'
 
   return (
     <header className={styles.header} data-testid="header" role="banner">
@@ -192,14 +195,14 @@ export function Header({ branding, user, onLogout }: HeaderProps): JSX.Element {
                 </span>
               )}
             </div>
-            
+
             {/* User name (hidden on mobile) */}
             {!isMobile && (
               <span className={styles.userName} data-testid="user-name">
                 {getDisplayName(user)}
               </span>
             )}
-            
+
             {/* Dropdown indicator */}
             <span className={styles.dropdownIcon} aria-hidden="true">
               {isMenuOpen ? '▲' : '▼'}
@@ -221,9 +224,9 @@ export function Header({ branding, user, onLogout }: HeaderProps): JSX.Element {
                 <span className={styles.menuUserName}>{getDisplayName(user)}</span>
                 <span className={styles.menuUserEmail}>{user.email}</span>
               </div>
-              
+
               <div className={styles.menuDivider} role="separator" aria-hidden="true" />
-              
+
               {/* Logout option */}
               <button
                 type="button"
@@ -242,7 +245,7 @@ export function Header({ branding, user, onLogout }: HeaderProps): JSX.Element {
         </div>
       )}
     </header>
-  );
+  )
 }
 
-export default Header;
+export default Header

@@ -14,58 +14,51 @@
  * - 15.7: Format dates, numbers, and currencies according to the selected locale
  */
 
-import React, {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  useCallback,
-  useMemo,
-} from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
 
 // Import translation files
-import enTranslations from '../i18n/translations/en.json';
-import arTranslations from '../i18n/translations/ar.json';
+import enTranslations from '../i18n/translations/en.json'
+import arTranslations from '../i18n/translations/ar.json'
 
 /**
  * Text direction type
  */
-export type TextDirection = 'ltr' | 'rtl';
+export type TextDirection = 'ltr' | 'rtl'
 
 /**
  * Supported locale codes
  */
-export type SupportedLocale = 'en' | 'ar';
+export type SupportedLocale = 'en' | 'ar'
 
 /**
  * Translation dictionary type (nested object with string values)
  */
 export type TranslationDictionary = {
-  [key: string]: string | TranslationDictionary;
-};
+  [key: string]: string | TranslationDictionary
+}
 
 /**
  * I18n context value interface
  */
 export interface I18nContextValue {
   /** Current locale code (e.g., 'en', 'ar') */
-  locale: string;
+  locale: string
   /** Set the current locale */
-  setLocale: (locale: string) => void;
+  setLocale: (locale: string) => void
   /** Translate a key with optional parameter interpolation */
-  t: (key: string, params?: Record<string, string | number>) => string;
+  t: (key: string, params?: Record<string, string | number>) => string
   /** Format a date according to the current locale */
-  formatDate: (date: Date, options?: Intl.DateTimeFormatOptions) => string;
+  formatDate: (date: Date, options?: Intl.DateTimeFormatOptions) => string
   /** Format a number according to the current locale */
-  formatNumber: (num: number, options?: Intl.NumberFormatOptions) => string;
+  formatNumber: (num: number, options?: Intl.NumberFormatOptions) => string
   /** Format a currency value according to the current locale */
-  formatCurrency: (amount: number, currency?: string, options?: Intl.NumberFormatOptions) => string;
+  formatCurrency: (amount: number, currency?: string, options?: Intl.NumberFormatOptions) => string
   /** Current text direction (ltr or rtl) */
-  direction: TextDirection;
+  direction: TextDirection
   /** List of supported locales */
-  supportedLocales: SupportedLocale[];
+  supportedLocales: SupportedLocale[]
   /** Get the display name for a locale */
-  getLocaleDisplayName: (localeCode: string) => string;
+  getLocaleDisplayName: (localeCode: string) => string
 }
 
 /**
@@ -73,27 +66,27 @@ export interface I18nContextValue {
  */
 export interface I18nProviderProps {
   /** Child components to render */
-  children: React.ReactNode;
+  children: React.ReactNode
   /** Optional initial locale (defaults to detected or stored preference) */
-  initialLocale?: string;
+  initialLocale?: string
   /** Optional default currency code (defaults to 'USD') */
-  defaultCurrency?: string;
+  defaultCurrency?: string
 }
 
 // Storage key for locale preference
-const LOCALE_STORAGE_KEY = 'emf_locale';
+const LOCALE_STORAGE_KEY = 'emf_locale'
 
 // Default locale if none detected or stored
-const DEFAULT_LOCALE: SupportedLocale = 'en';
+const DEFAULT_LOCALE: SupportedLocale = 'en'
 
 // Default currency
-const DEFAULT_CURRENCY = 'USD';
+const DEFAULT_CURRENCY = 'USD'
 
 // Supported locales configuration
-const SUPPORTED_LOCALES: SupportedLocale[] = ['en', 'ar'];
+const SUPPORTED_LOCALES: SupportedLocale[] = ['en', 'ar']
 
 // RTL languages
-const RTL_LOCALES: Set<string> = new Set(['ar', 'he', 'fa', 'ur']);
+const RTL_LOCALES: Set<string> = new Set(['ar', 'he', 'fa', 'ur'])
 
 // Locale display names
 const LOCALE_DISPLAY_NAMES: Record<string, string> = {
@@ -102,13 +95,13 @@ const LOCALE_DISPLAY_NAMES: Record<string, string> = {
   he: 'עברית',
   fa: 'فارسی',
   ur: 'اردو',
-};
+}
 
 // Translation dictionaries by locale
 const TRANSLATIONS: Record<string, TranslationDictionary> = {
   en: enTranslations as TranslationDictionary,
   ar: arTranslations as TranslationDictionary,
-};
+}
 
 /**
  * Get the browser's preferred language
@@ -116,30 +109,30 @@ const TRANSLATIONS: Record<string, TranslationDictionary> = {
  */
 function getBrowserLocale(): string | null {
   if (typeof navigator === 'undefined') {
-    return null;
+    return null
   }
 
   // Try navigator.language first (most specific)
-  const browserLang = navigator.language;
+  const browserLang = navigator.language
   if (browserLang) {
     // Extract the language code (e.g., 'en-US' -> 'en')
-    const langCode = browserLang.split('-')[0].toLowerCase();
+    const langCode = browserLang.split('-')[0].toLowerCase()
     if (SUPPORTED_LOCALES.includes(langCode as SupportedLocale)) {
-      return langCode;
+      return langCode
     }
   }
 
   // Try navigator.languages array
   if (navigator.languages && navigator.languages.length > 0) {
     for (const lang of navigator.languages) {
-      const langCode = lang.split('-')[0].toLowerCase();
+      const langCode = lang.split('-')[0].toLowerCase()
       if (SUPPORTED_LOCALES.includes(langCode as SupportedLocale)) {
-        return langCode;
+        return langCode
       }
     }
   }
 
-  return null;
+  return null
 }
 
 /**
@@ -148,17 +141,17 @@ function getBrowserLocale(): string | null {
  */
 function getStoredLocale(): string | null {
   if (typeof window === 'undefined') {
-    return null;
+    return null
   }
   try {
-    const stored = localStorage.getItem(LOCALE_STORAGE_KEY);
+    const stored = localStorage.getItem(LOCALE_STORAGE_KEY)
     if (stored && SUPPORTED_LOCALES.includes(stored as SupportedLocale)) {
-      return stored;
+      return stored
     }
-    return null;
+    return null
   } catch {
     // localStorage may not be available
-    return null;
+    return null
   }
 }
 
@@ -168,13 +161,13 @@ function getStoredLocale(): string | null {
  */
 function storeLocale(locale: string): void {
   if (typeof window === 'undefined') {
-    return;
+    return
   }
   try {
-    localStorage.setItem(LOCALE_STORAGE_KEY, locale);
+    localStorage.setItem(LOCALE_STORAGE_KEY, locale)
   } catch {
     // localStorage may not be available
-    console.warn('[I18n] Failed to persist locale preference');
+    console.warn('[I18n] Failed to persist locale preference')
   }
 }
 
@@ -183,7 +176,7 @@ function storeLocale(locale: string): void {
  * Requirement 15.6: Support right-to-left (RTL) text direction
  */
 function getTextDirection(locale: string): TextDirection {
-  return RTL_LOCALES.has(locale) ? 'rtl' : 'ltr';
+  return RTL_LOCALES.has(locale) ? 'rtl' : 'ltr'
 }
 
 /**
@@ -191,35 +184,32 @@ function getTextDirection(locale: string): TextDirection {
  * e.g., getNestedValue({ a: { b: 'value' } }, 'a.b') => 'value'
  */
 function getNestedValue(obj: TranslationDictionary, path: string): string | undefined {
-  const keys = path.split('.');
-  let current: TranslationDictionary | string | undefined = obj;
+  const keys = path.split('.')
+  let current: TranslationDictionary | string | undefined = obj
 
   for (const key of keys) {
     if (current === undefined || typeof current === 'string') {
-      return undefined;
+      return undefined
     }
-    current = current[key];
+    current = current[key]
   }
 
-  return typeof current === 'string' ? current : undefined;
+  return typeof current === 'string' ? current : undefined
 }
 
 /**
  * Interpolate parameters into a translation string
  * Supports {{param}} syntax
  */
-function interpolate(
-  template: string,
-  params?: Record<string, string | number>
-): string {
+function interpolate(template: string, params?: Record<string, string | number>): string {
   if (!params) {
-    return template;
+    return template
   }
 
   return template.replace(/\{\{(\w+)\}\}/g, (match, key) => {
-    const value = params[key];
-    return value !== undefined ? String(value) : match;
-  });
+    const value = params[key]
+    return value !== undefined ? String(value) : match
+  })
 }
 
 /**
@@ -228,15 +218,15 @@ function interpolate(
  */
 function applyTextDirection(direction: TextDirection): void {
   if (typeof document === 'undefined') {
-    return;
+    return
   }
 
-  const root = document.documentElement;
-  root.setAttribute('dir', direction);
-  root.setAttribute('lang', direction === 'rtl' ? 'ar' : 'en');
-  
+  const root = document.documentElement
+  root.setAttribute('dir', direction)
+  root.setAttribute('lang', direction === 'rtl' ? 'ar' : 'en')
+
   // Also set data attribute for CSS selectors
-  root.setAttribute('data-direction', direction);
+  root.setAttribute('data-direction', direction)
 }
 
 /**
@@ -244,15 +234,15 @@ function applyTextDirection(direction: TextDirection): void {
  */
 function applyLocaleToDocument(locale: string): void {
   if (typeof document === 'undefined') {
-    return;
+    return
   }
 
-  const root = document.documentElement;
-  root.setAttribute('lang', locale);
+  const root = document.documentElement
+  root.setAttribute('lang', locale)
 }
 
 // Create the context with undefined default
-const I18nContext = createContext<I18nContextValue | undefined>(undefined);
+const I18nContext = createContext<I18nContextValue | undefined>(undefined)
 
 /**
  * I18n Provider Component
@@ -275,27 +265,27 @@ export function I18nProvider({
   // Initialize locale from stored preference, browser setting, initial prop, or default
   const [locale, setLocaleState] = useState<string>(() => {
     // Priority: stored preference > initial prop > browser detection > default
-    const stored = getStoredLocale();
+    const stored = getStoredLocale()
     if (stored) {
-      return stored;
+      return stored
     }
     if (initialLocale && SUPPORTED_LOCALES.includes(initialLocale as SupportedLocale)) {
-      return initialLocale;
+      return initialLocale
     }
-    const browserLocale = getBrowserLocale();
+    const browserLocale = getBrowserLocale()
     if (browserLocale) {
-      return browserLocale;
+      return browserLocale
     }
-    return DEFAULT_LOCALE;
-  });
+    return DEFAULT_LOCALE
+  })
 
   // Calculate text direction based on locale
-  const direction = useMemo(() => getTextDirection(locale), [locale]);
+  const direction = useMemo(() => getTextDirection(locale), [locale])
 
   // Get translations for current locale
   const translations = useMemo(() => {
-    return TRANSLATIONS[locale] || TRANSLATIONS[DEFAULT_LOCALE];
-  }, [locale]);
+    return TRANSLATIONS[locale] || TRANSLATIONS[DEFAULT_LOCALE]
+  }, [locale])
 
   /**
    * Set locale and persist to localStorage
@@ -304,12 +294,12 @@ export function I18nProvider({
    */
   const setLocale = useCallback((newLocale: string): void => {
     if (!SUPPORTED_LOCALES.includes(newLocale as SupportedLocale)) {
-      console.warn(`[I18n] Unsupported locale: ${newLocale}`);
-      return;
+      console.warn(`[I18n] Unsupported locale: ${newLocale}`)
+      return
     }
-    setLocaleState(newLocale);
-    storeLocale(newLocale);
-  }, []);
+    setLocaleState(newLocale)
+    storeLocale(newLocale)
+  }, [])
 
   /**
    * Translate a key with optional parameter interpolation
@@ -318,25 +308,25 @@ export function I18nProvider({
    */
   const t = useCallback(
     (key: string, params?: Record<string, string | number>): string => {
-      const translation = getNestedValue(translations, key);
-      
+      const translation = getNestedValue(translations, key)
+
       if (translation === undefined) {
         // Fallback to English if translation not found
-        const fallback = getNestedValue(TRANSLATIONS[DEFAULT_LOCALE], key);
+        const fallback = getNestedValue(TRANSLATIONS[DEFAULT_LOCALE], key)
         if (fallback !== undefined) {
-          console.warn(`[I18n] Missing translation for key "${key}" in locale "${locale}"`);
-          return interpolate(fallback, params);
+          console.warn(`[I18n] Missing translation for key "${key}" in locale "${locale}"`)
+          return interpolate(fallback, params)
         }
-        
+
         // Return the key itself if no translation found
-        console.warn(`[I18n] Translation key not found: "${key}"`);
-        return key;
+        console.warn(`[I18n] Translation key not found: "${key}"`)
+        return key
       }
 
-      return interpolate(translation, params);
+      return interpolate(translation, params)
     },
     [translations, locale]
-  );
+  )
 
   /**
    * Format a date according to the current locale
@@ -345,15 +335,15 @@ export function I18nProvider({
   const formatDate = useCallback(
     (date: Date, options?: Intl.DateTimeFormatOptions): string => {
       try {
-        const formatter = new Intl.DateTimeFormat(locale, options);
-        return formatter.format(date);
+        const formatter = new Intl.DateTimeFormat(locale, options)
+        return formatter.format(date)
       } catch (error) {
-        console.error('[I18n] Error formatting date:', error);
-        return date.toLocaleDateString();
+        console.error('[I18n] Error formatting date:', error)
+        return date.toLocaleDateString()
       }
     },
     [locale]
-  );
+  )
 
   /**
    * Format a number according to the current locale
@@ -362,52 +352,56 @@ export function I18nProvider({
   const formatNumber = useCallback(
     (num: number, options?: Intl.NumberFormatOptions): string => {
       try {
-        const formatter = new Intl.NumberFormat(locale, options);
-        return formatter.format(num);
+        const formatter = new Intl.NumberFormat(locale, options)
+        return formatter.format(num)
       } catch (error) {
-        console.error('[I18n] Error formatting number:', error);
-        return num.toString();
+        console.error('[I18n] Error formatting number:', error)
+        return num.toString()
       }
     },
     [locale]
-  );
+  )
 
   /**
    * Format a currency value according to the current locale
    * Requirement 15.7: Format currencies according to the selected locale
    */
   const formatCurrency = useCallback(
-    (amount: number, currency: string = defaultCurrency, options?: Intl.NumberFormatOptions): string => {
+    (
+      amount: number,
+      currency: string = defaultCurrency,
+      options?: Intl.NumberFormatOptions
+    ): string => {
       try {
         const formatter = new Intl.NumberFormat(locale, {
           style: 'currency',
           currency,
           ...options,
-        });
-        return formatter.format(amount);
+        })
+        return formatter.format(amount)
       } catch (error) {
-        console.error('[I18n] Error formatting currency:', error);
-        return `${currency} ${amount.toFixed(2)}`;
+        console.error('[I18n] Error formatting currency:', error)
+        return `${currency} ${amount.toFixed(2)}`
       }
     },
     [locale, defaultCurrency]
-  );
+  )
 
   /**
    * Get the display name for a locale code
    */
   const getLocaleDisplayName = useCallback((localeCode: string): string => {
-    return LOCALE_DISPLAY_NAMES[localeCode] || localeCode;
-  }, []);
+    return LOCALE_DISPLAY_NAMES[localeCode] || localeCode
+  }, [])
 
   /**
    * Apply text direction when locale changes
    * Requirement 15.6: Support right-to-left (RTL) text direction
    */
   useEffect(() => {
-    applyTextDirection(direction);
-    applyLocaleToDocument(locale);
-  }, [direction, locale]);
+    applyTextDirection(direction)
+    applyLocaleToDocument(locale)
+  }, [direction, locale])
 
   // Memoize context value to prevent unnecessary re-renders
   const contextValue = useMemo<I18nContextValue>(
@@ -422,14 +416,19 @@ export function I18nProvider({
       supportedLocales: SUPPORTED_LOCALES,
       getLocaleDisplayName,
     }),
-    [locale, setLocale, t, formatDate, formatNumber, formatCurrency, direction, getLocaleDisplayName]
-  );
+    [
+      locale,
+      setLocale,
+      t,
+      formatDate,
+      formatNumber,
+      formatCurrency,
+      direction,
+      getLocaleDisplayName,
+    ]
+  )
 
-  return (
-    <I18nContext.Provider value={contextValue}>
-      {children}
-    </I18nContext.Provider>
-  );
+  return <I18nContext.Provider value={contextValue}>{children}</I18nContext.Provider>
 }
 
 /**
@@ -458,15 +457,15 @@ export function I18nProvider({
  * ```
  */
 export function useI18n(): I18nContextValue {
-  const context = useContext(I18nContext);
+  const context = useContext(I18nContext)
   if (context === undefined) {
-    throw new Error('useI18n must be used within an I18nProvider');
+    throw new Error('useI18n must be used within an I18nProvider')
   }
-  return context;
+  return context
 }
 
 // Export the context for testing purposes
-export { I18nContext };
+export { I18nContext }
 
 // Export utility functions for testing
 export {
@@ -479,4 +478,4 @@ export {
   SUPPORTED_LOCALES,
   RTL_LOCALES,
   DEFAULT_LOCALE,
-};
+}

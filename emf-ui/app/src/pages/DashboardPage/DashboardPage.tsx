@@ -14,88 +14,88 @@
  * - 13.7: Dashboard displays health alerts when services are unhealthy
  */
 
-import React, { useMemo, useState, useCallback, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { useI18n } from '../../context/I18nContext';
-import { useApi } from '../../context/ApiContext';
-import { LoadingSpinner, ErrorMessage } from '../../components';
-import styles from './DashboardPage.module.css';
+import React, { useMemo, useState, useCallback, useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { useI18n } from '../../context/I18nContext'
+import { useApi } from '../../context/ApiContext'
+import { LoadingSpinner, ErrorMessage } from '../../components'
+import styles from './DashboardPage.module.css'
 
 /**
  * Health status for a service
  */
 export interface HealthStatus {
-  service: string;
-  status: 'healthy' | 'unhealthy' | 'unknown';
-  details?: string;
-  lastChecked: string;
+  service: string
+  status: 'healthy' | 'unhealthy' | 'unknown'
+  details?: string
+  lastChecked: string
 }
 
 /**
  * Metric data point for time-series data
  */
 export interface MetricDataPoint {
-  timestamp: string;
-  value: number;
+  timestamp: string
+  value: number
 }
 
 /**
  * System metrics data
  */
 export interface SystemMetrics {
-  requestRate: MetricDataPoint[];
-  errorRate: MetricDataPoint[];
-  latencyP50: MetricDataPoint[];
-  latencyP99: MetricDataPoint[];
+  requestRate: MetricDataPoint[]
+  errorRate: MetricDataPoint[]
+  latencyP50: MetricDataPoint[]
+  latencyP99: MetricDataPoint[]
 }
 
 /**
  * Recent error entry
  */
 export interface RecentError {
-  id: string;
-  timestamp: string;
-  level: 'error' | 'warning';
-  message: string;
-  source: string;
-  traceId?: string;
+  id: string
+  timestamp: string
+  level: 'error' | 'warning'
+  message: string
+  source: string
+  traceId?: string
 }
 
 /**
  * Dashboard data from API
  */
 export interface DashboardData {
-  health: HealthStatus[];
-  metrics: SystemMetrics;
-  recentErrors: RecentError[];
+  health: HealthStatus[]
+  metrics: SystemMetrics
+  recentErrors: RecentError[]
 }
 
 /**
  * Time range options for metrics display
  */
-export type TimeRangeValue = '5m' | '15m' | '1h' | '6h' | '24h';
+export type TimeRangeValue = '5m' | '15m' | '1h' | '6h' | '24h'
 
 /**
  * Auto-refresh interval options
  */
-export type RefreshIntervalValue = '10s' | '30s' | '1m' | '5m' | 'off';
+export type RefreshIntervalValue = '10s' | '30s' | '1m' | '5m' | 'off'
 
 /**
  * Time range option configuration
  */
 export interface TimeRangeOption {
-  value: TimeRangeValue;
-  label: string;
-  minutes: number;
+  value: TimeRangeValue
+  label: string
+  minutes: number
 }
 
 /**
  * Refresh interval option configuration
  */
 export interface RefreshIntervalOption {
-  value: RefreshIntervalValue;
-  label: string;
-  milliseconds: number | null;
+  value: RefreshIntervalValue
+  label: string
+  milliseconds: number | null
 }
 
 /**
@@ -103,7 +103,7 @@ export interface RefreshIntervalOption {
  */
 export interface DashboardPageProps {
   /** Optional test ID for testing */
-  testId?: string;
+  testId?: string
 }
 
 /**
@@ -115,7 +115,7 @@ const TIME_RANGE_OPTIONS: TimeRangeOption[] = [
   { value: '1h', label: '1 hour', minutes: 60 },
   { value: '6h', label: '6 hours', minutes: 360 },
   { value: '24h', label: '24 hours', minutes: 1440 },
-];
+]
 
 /**
  * Auto-refresh interval options
@@ -126,44 +126,50 @@ const REFRESH_INTERVAL_OPTIONS: RefreshIntervalOption[] = [
   { value: '1m', label: '1 minute', milliseconds: 60000 },
   { value: '5m', label: '5 minutes', milliseconds: 300000 },
   { value: 'off', label: 'Off', milliseconds: null },
-];
+]
 
 /**
  * HealthCard Component
  * Displays health status for a single service
  */
 interface HealthCardProps {
-  service: string;
-  status: 'healthy' | 'unhealthy' | 'unknown';
-  details?: string;
-  lastChecked: string;
-  testId?: string;
+  service: string
+  status: 'healthy' | 'unhealthy' | 'unknown'
+  details?: string
+  lastChecked: string
+  testId?: string
 }
 
-function HealthCard({ service, status, details, lastChecked, testId }: HealthCardProps): React.ReactElement {
-  const { t, formatDate } = useI18n();
+function HealthCard({
+  service,
+  status,
+  details,
+  lastChecked,
+  testId,
+}: HealthCardProps): React.ReactElement {
+  const { t, formatDate } = useI18n()
 
   const statusLabel = useMemo(() => {
     switch (status) {
       case 'healthy':
-        return t('dashboard.healthy');
+        return t('dashboard.healthy')
       case 'unhealthy':
-        return t('dashboard.unhealthy');
+        return t('dashboard.unhealthy')
       default:
-        return t('dashboard.unknown');
+        return t('dashboard.unknown')
     }
-  }, [status, t]);
+  }, [status, t])
 
   const statusClassName = useMemo(() => {
     switch (status) {
       case 'healthy':
-        return styles.statusHealthy;
+        return styles.statusHealthy
       case 'unhealthy':
-        return styles.statusUnhealthy;
+        return styles.statusUnhealthy
       default:
-        return styles.statusUnknown;
+        return styles.statusUnknown
     }
-  }, [status]);
+  }, [status])
 
   return (
     <div
@@ -181,9 +187,7 @@ function HealthCard({ service, status, details, lastChecked, testId }: HealthCar
           {statusLabel}
         </span>
       </div>
-      {details && (
-        <p className={styles.healthCardDetails}>{details}</p>
-      )}
+      {details && <p className={styles.healthCardDetails}>{details}</p>}
       <p className={styles.healthCardTimestamp}>
         {formatDate(new Date(lastChecked), {
           hour: '2-digit',
@@ -192,7 +196,7 @@ function HealthCard({ service, status, details, lastChecked, testId }: HealthCar
         })}
       </p>
     </div>
-  );
+  )
 }
 
 /**
@@ -200,60 +204,60 @@ function HealthCard({ service, status, details, lastChecked, testId }: HealthCar
  * Displays a single metric with its current value and trend
  */
 interface MetricsCardProps {
-  title: string;
-  data: MetricDataPoint[];
-  unit?: string;
-  testId?: string;
+  title: string
+  data: MetricDataPoint[]
+  unit?: string
+  testId?: string
 }
 
 function MetricsCard({ title, data, unit = '', testId }: MetricsCardProps): React.ReactElement {
-  const { formatNumber } = useI18n();
+  const { formatNumber } = useI18n()
 
   // Calculate current value (latest data point)
   const currentValue = useMemo(() => {
-    if (data.length === 0) return 0;
-    return data[data.length - 1].value;
-  }, [data]);
+    if (data.length === 0) return 0
+    return data[data.length - 1].value
+  }, [data])
 
   // Calculate average value
   const averageValue = useMemo(() => {
-    if (data.length === 0) return 0;
-    const sum = data.reduce((acc, point) => acc + point.value, 0);
-    return sum / data.length;
-  }, [data]);
+    if (data.length === 0) return 0
+    const sum = data.reduce((acc, point) => acc + point.value, 0)
+    return sum / data.length
+  }, [data])
 
   // Calculate trend (comparing last value to average)
   const trend = useMemo(() => {
-    if (data.length < 2) return 'stable';
-    const diff = currentValue - averageValue;
-    const threshold = averageValue * 0.1; // 10% threshold
-    if (diff > threshold) return 'up';
-    if (diff < -threshold) return 'down';
-    return 'stable';
-  }, [currentValue, averageValue, data.length]);
+    if (data.length < 2) return 'stable'
+    const diff = currentValue - averageValue
+    const threshold = averageValue * 0.1 // 10% threshold
+    if (diff > threshold) return 'up'
+    if (diff < -threshold) return 'down'
+    return 'stable'
+  }, [currentValue, averageValue, data.length])
 
   const trendIcon = useMemo(() => {
     switch (trend) {
       case 'up':
-        return '↑';
+        return '↑'
       case 'down':
-        return '↓';
+        return '↓'
       default:
-        return '→';
+        return '→'
     }
-  }, [trend]);
+  }, [trend])
 
   // Simple sparkline visualization using CSS
   const sparklineData = useMemo(() => {
-    if (data.length === 0) return [];
-    const maxValue = Math.max(...data.map(d => d.value));
-    const minValue = Math.min(...data.map(d => d.value));
-    const range = maxValue - minValue || 1;
-    return data.slice(-10).map(d => ({
+    if (data.length === 0) return []
+    const maxValue = Math.max(...data.map((d) => d.value))
+    const minValue = Math.min(...data.map((d) => d.value))
+    const range = maxValue - minValue || 1
+    return data.slice(-10).map((d) => ({
       height: ((d.value - minValue) / range) * 100,
       value: d.value,
-    }));
-  }, [data]);
+    }))
+  }, [data])
 
   return (
     <div
@@ -288,10 +292,11 @@ function MetricsCard({ title, data, unit = '', testId }: MetricsCardProps): Reac
         </div>
       )}
       <p className={styles.metricsCardAverage}>
-        Avg: {formatNumber(averageValue, { maximumFractionDigits: 2 })}{unit}
+        Avg: {formatNumber(averageValue, { maximumFractionDigits: 2 })}
+        {unit}
       </p>
     </div>
-  );
+  )
 }
 
 /**
@@ -299,19 +304,19 @@ function MetricsCard({ title, data, unit = '', testId }: MetricsCardProps): Reac
  * Displays recent errors and warnings
  */
 interface ErrorsListProps {
-  errors: RecentError[];
-  testId?: string;
+  errors: RecentError[]
+  testId?: string
 }
 
 function ErrorsList({ errors, testId }: ErrorsListProps): React.ReactElement {
-  const { t, formatDate } = useI18n();
+  const { t, formatDate } = useI18n()
 
   if (errors.length === 0) {
     return (
       <div className={styles.emptyErrors} data-testid={testId}>
         <p>{t('common.noResults')}</p>
       </div>
-    );
+    )
   }
 
   return (
@@ -355,7 +360,7 @@ function ErrorsList({ errors, testId }: ErrorsListProps): React.ReactElement {
         </li>
       ))}
     </ul>
-  );
+  )
 }
 
 /**
@@ -363,20 +368,24 @@ function ErrorsList({ errors, testId }: ErrorsListProps): React.ReactElement {
  * Allows selecting the time range for metrics display
  */
 interface TimeRangeSelectorProps {
-  value: TimeRangeValue;
-  onChange: (value: TimeRangeValue) => void;
-  testId?: string;
+  value: TimeRangeValue
+  onChange: (value: TimeRangeValue) => void
+  testId?: string
 }
 
-function TimeRangeSelector({ value, onChange, testId }: TimeRangeSelectorProps): React.ReactElement {
-  const { t } = useI18n();
+function TimeRangeSelector({
+  value,
+  onChange,
+  testId,
+}: TimeRangeSelectorProps): React.ReactElement {
+  const { t } = useI18n()
 
   const handleChange = useCallback(
     (event: React.ChangeEvent<HTMLSelectElement>) => {
-      onChange(event.target.value as TimeRangeValue);
+      onChange(event.target.value as TimeRangeValue)
     },
     [onChange]
-  );
+  )
 
   return (
     <div className={styles.controlGroup} data-testid={testId}>
@@ -397,7 +406,7 @@ function TimeRangeSelector({ value, onChange, testId }: TimeRangeSelectorProps):
         ))}
       </select>
     </div>
-  );
+  )
 }
 
 /**
@@ -405,20 +414,24 @@ function TimeRangeSelector({ value, onChange, testId }: TimeRangeSelectorProps):
  * Allows selecting the auto-refresh interval
  */
 interface RefreshIntervalSelectorProps {
-  value: RefreshIntervalValue;
-  onChange: (value: RefreshIntervalValue) => void;
-  testId?: string;
+  value: RefreshIntervalValue
+  onChange: (value: RefreshIntervalValue) => void
+  testId?: string
 }
 
-function RefreshIntervalSelector({ value, onChange, testId }: RefreshIntervalSelectorProps): React.ReactElement {
-  const { t } = useI18n();
+function RefreshIntervalSelector({
+  value,
+  onChange,
+  testId,
+}: RefreshIntervalSelectorProps): React.ReactElement {
+  const { t } = useI18n()
 
   const handleChange = useCallback(
     (event: React.ChangeEvent<HTMLSelectElement>) => {
-      onChange(event.target.value as RefreshIntervalValue);
+      onChange(event.target.value as RefreshIntervalValue)
     },
     [onChange]
-  );
+  )
 
   return (
     <div className={styles.controlGroup} data-testid={testId}>
@@ -439,7 +452,7 @@ function RefreshIntervalSelector({ value, onChange, testId }: RefreshIntervalSel
         ))}
       </select>
     </div>
-  );
+  )
 }
 
 /**
@@ -447,35 +460,30 @@ function RefreshIntervalSelector({ value, onChange, testId }: RefreshIntervalSel
  * Displays alerts when services are unhealthy
  */
 interface HealthAlertsProps {
-  healthStatuses: HealthStatus[];
-  testId?: string;
+  healthStatuses: HealthStatus[]
+  testId?: string
 }
 
 function HealthAlerts({ healthStatuses, testId }: HealthAlertsProps): React.ReactElement | null {
-  const { t } = useI18n();
+  const { t } = useI18n()
 
   // Filter for unhealthy services
   const unhealthyServices = useMemo(() => {
-    return healthStatuses.filter((health) => health.status === 'unhealthy');
-  }, [healthStatuses]);
+    return healthStatuses.filter((health) => health.status === 'unhealthy')
+  }, [healthStatuses])
 
   // Don't render if no unhealthy services
   if (unhealthyServices.length === 0) {
-    return null;
+    return null
   }
 
   return (
-    <div
-      className={styles.healthAlerts}
-      data-testid={testId}
-      role="alert"
-      aria-live="polite"
-    >
+    <div className={styles.healthAlerts} data-testid={testId} role="alert" aria-live="polite">
       <div className={styles.healthAlertsHeader}>
-        <span className={styles.alertIcon} aria-hidden="true">⚠️</span>
-        <h3 className={styles.healthAlertsTitle}>
-          {t('dashboard.healthAlerts')}
-        </h3>
+        <span className={styles.alertIcon} aria-hidden="true">
+          ⚠️
+        </span>
+        <h3 className={styles.healthAlertsTitle}>{t('dashboard.healthAlerts')}</h3>
       </div>
       <ul className={styles.alertsList} role="list">
         {unhealthyServices.map((health) => (
@@ -485,14 +493,12 @@ function HealthAlerts({ healthStatuses, testId }: HealthAlertsProps): React.Reac
             data-testid={`health-alert-${health.service.toLowerCase().replace(/\s+/g, '-')}`}
           >
             <span className={styles.alertServiceName}>{health.service}</span>
-            {health.details && (
-              <span className={styles.alertDetails}>{health.details}</span>
-            )}
+            {health.details && <span className={styles.alertDetails}>{health.details}</span>}
           </li>
         ))}
       </ul>
     </div>
-  );
+  )
 }
 
 /**
@@ -501,19 +507,21 @@ function HealthAlerts({ healthStatuses, testId }: HealthAlertsProps): React.Reac
  * Main dashboard page for monitoring EMF platform health and metrics.
  * Displays health status cards, metrics charts, and recent errors.
  */
-export function DashboardPage({ testId = 'dashboard-page' }: DashboardPageProps): React.ReactElement {
-  const { t } = useI18n();
-  const { apiClient } = useApi();
+export function DashboardPage({
+  testId = 'dashboard-page',
+}: DashboardPageProps): React.ReactElement {
+  const { t } = useI18n()
+  const { apiClient } = useApi()
 
   // State for time range and refresh interval
-  const [timeRange, setTimeRange] = useState<TimeRangeValue>('15m');
-  const [refreshInterval, setRefreshInterval] = useState<RefreshIntervalValue>('30s');
+  const [timeRange, setTimeRange] = useState<TimeRangeValue>('15m')
+  const [refreshInterval, setRefreshInterval] = useState<RefreshIntervalValue>('30s')
 
   // Calculate refresh interval in milliseconds
   const refreshIntervalMs = useMemo(() => {
-    const option = REFRESH_INTERVAL_OPTIONS.find((opt) => opt.value === refreshInterval);
-    return option?.milliseconds ?? false;
-  }, [refreshInterval]);
+    const option = REFRESH_INTERVAL_OPTIONS.find((opt) => opt.value === refreshInterval)
+    return option?.milliseconds ?? false
+  }, [refreshInterval])
 
   // Fetch dashboard data with time range parameter
   const {
@@ -525,30 +533,34 @@ export function DashboardPage({ testId = 'dashboard-page' }: DashboardPageProps)
     queryKey: ['dashboard', timeRange],
     queryFn: () => apiClient.get<DashboardData>(`/control/dashboard?timeRange=${timeRange}`),
     refetchInterval: refreshIntervalMs,
-  });
+  })
 
   // Handle time range change
   const handleTimeRangeChange = useCallback((value: TimeRangeValue) => {
-    setTimeRange(value);
-  }, []);
+    setTimeRange(value)
+  }, [])
 
   // Handle refresh interval change
   const handleRefreshIntervalChange = useCallback((value: RefreshIntervalValue) => {
-    setRefreshInterval(value);
-  }, []);
+    setRefreshInterval(value)
+  }, [])
 
   // Default health statuses for the four main services
   const healthStatuses = useMemo(() => {
     if (!dashboardData?.health) {
       return [
-        { service: 'Control Plane', status: 'unknown' as const, lastChecked: new Date().toISOString() },
+        {
+          service: 'Control Plane',
+          status: 'unknown' as const,
+          lastChecked: new Date().toISOString(),
+        },
         { service: 'Database', status: 'unknown' as const, lastChecked: new Date().toISOString() },
         { service: 'Kafka', status: 'unknown' as const, lastChecked: new Date().toISOString() },
         { service: 'Redis', status: 'unknown' as const, lastChecked: new Date().toISOString() },
-      ];
+      ]
     }
-    return dashboardData.health;
-  }, [dashboardData?.health]);
+    return dashboardData.health
+  }, [dashboardData?.health])
 
   // Default metrics
   const metrics = useMemo(() => {
@@ -558,15 +570,15 @@ export function DashboardPage({ testId = 'dashboard-page' }: DashboardPageProps)
         errorRate: [],
         latencyP50: [],
         latencyP99: [],
-      };
+      }
     }
-    return dashboardData.metrics;
-  }, [dashboardData?.metrics]);
+    return dashboardData.metrics
+  }, [dashboardData?.metrics])
 
   // Recent errors
   const recentErrors = useMemo(() => {
-    return dashboardData?.recentErrors || [];
-  }, [dashboardData?.recentErrors]);
+    return dashboardData?.recentErrors || []
+  }, [dashboardData?.recentErrors])
 
   // Render loading state
   if (isLoading) {
@@ -576,7 +588,7 @@ export function DashboardPage({ testId = 'dashboard-page' }: DashboardPageProps)
           <LoadingSpinner size="large" label={t('common.loading')} />
         </div>
       </div>
-    );
+    )
   }
 
   // Render error state
@@ -588,7 +600,7 @@ export function DashboardPage({ testId = 'dashboard-page' }: DashboardPageProps)
           onRetry={() => refetch()}
         />
       </div>
-    );
+    )
   }
 
   return (
@@ -611,10 +623,7 @@ export function DashboardPage({ testId = 'dashboard-page' }: DashboardPageProps)
       </header>
 
       {/* Health Alerts Section */}
-      <HealthAlerts
-        healthStatuses={healthStatuses}
-        testId="health-alerts"
-      />
+      <HealthAlerts healthStatuses={healthStatuses} testId="health-alerts" />
 
       {/* System Health Section */}
       <section className={styles.section} aria-labelledby="health-heading">
@@ -676,7 +685,7 @@ export function DashboardPage({ testId = 'dashboard-page' }: DashboardPageProps)
         <ErrorsList errors={recentErrors} testId="errors-list" />
       </section>
     </div>
-  );
+  )
 }
 
-export default DashboardPage;
+export default DashboardPage

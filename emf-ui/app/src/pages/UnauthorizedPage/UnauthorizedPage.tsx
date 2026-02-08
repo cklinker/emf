@@ -4,20 +4,20 @@
  * Displays when a user attempts to access a resource they don't have permission for.
  */
 
-import React from 'react';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { useI18n } from '../../context/I18nContext';
-import { useAuth } from '../../context/AuthContext';
-import styles from './UnauthorizedPage.module.css';
+import React from 'react'
+import { useNavigate, useLocation, Link } from 'react-router-dom'
+import { useI18n } from '../../context/I18nContext'
+import { useAuth } from '../../context/AuthContext'
+import styles from './UnauthorizedPage.module.css'
 
 /**
  * Props for the UnauthorizedPage component
  */
 export interface UnauthorizedPageProps {
   /** Optional custom title */
-  title?: string;
+  title?: string
   /** Optional custom message */
-  message?: string;
+  message?: string
 }
 
 /**
@@ -26,33 +26,30 @@ export interface UnauthorizedPageProps {
  * Shows an error message when the user lacks required permissions.
  * Provides options to go back, go home, or log out.
  */
-export function UnauthorizedPage({
-  title,
-  message,
-}: UnauthorizedPageProps): React.ReactElement {
-  const { t } = useI18n();
-  const { logout, user } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
+export function UnauthorizedPage({ title, message }: UnauthorizedPageProps): React.ReactElement {
+  const { t } = useI18n()
+  const { logout, user } = useAuth()
+  const navigate = useNavigate()
+  const location = useLocation()
 
   // Get required permissions from location state
   const state = location.state as {
-    from?: { pathname: string };
-    requiredRoles?: string[];
-    requiredPolicies?: string[];
-  } | null;
+    from?: { pathname: string }
+    requiredRoles?: string[]
+    requiredPolicies?: string[]
+  } | null
 
   const handleGoBack = () => {
-    navigate(-1);
-  };
+    navigate(-1)
+  }
 
   const handleGoHome = () => {
-    navigate('/');
-  };
+    navigate('/')
+  }
 
   const handleLogout = async () => {
-    await logout();
-  };
+    await logout()
+  }
 
   return (
     <div className={styles.unauthorizedPage} data-testid="unauthorized-page">
@@ -63,14 +60,10 @@ export function UnauthorizedPage({
         </div>
 
         {/* Title */}
-        <h1 className={styles.title}>
-          {title || t('unauthorized.title')}
-        </h1>
+        <h1 className={styles.title}>{title || t('unauthorized.title')}</h1>
 
         {/* Message */}
-        <p className={styles.message}>
-          {message || t('unauthorized.message')}
-        </p>
+        <p className={styles.message}>{message || t('unauthorized.message')}</p>
 
         {/* User info */}
         {user && (
@@ -108,25 +101,13 @@ export function UnauthorizedPage({
 
         {/* Actions */}
         <div className={styles.actions}>
-          <button
-            type="button"
-            className={styles.primaryButton}
-            onClick={handleGoHome}
-          >
+          <button type="button" className={styles.primaryButton} onClick={handleGoHome}>
             {t('unauthorized.goHome')}
           </button>
-          <button
-            type="button"
-            className={styles.secondaryButton}
-            onClick={handleGoBack}
-          >
+          <button type="button" className={styles.secondaryButton} onClick={handleGoBack}>
             {t('unauthorized.goBack')}
           </button>
-          <button
-            type="button"
-            className={styles.textButton}
-            onClick={handleLogout}
-          >
+          <button type="button" className={styles.textButton} onClick={handleLogout}>
             {t('unauthorized.logout')}
           </button>
         </div>
@@ -140,7 +121,7 @@ export function UnauthorizedPage({
         </p>
       </div>
     </div>
-  );
+  )
 }
 
-export default UnauthorizedPage;
+export default UnauthorizedPage

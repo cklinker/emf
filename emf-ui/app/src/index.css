@@ -26,7 +26,7 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  
+
   /* Focus indicator variables - used throughout the application */
   --color-focus: #0066cc;
   --color-focus-ring: #0066cc;
@@ -63,7 +63,9 @@ button {
   font-family: inherit;
   background-color: #1a1a1a;
   cursor: pointer;
-  transition: border-color 0.25s, background-color 0.25s;
+  transition:
+    border-color 0.25s,
+    background-color 0.25s;
 }
 button:hover {
   border-color: #646cff;

@@ -1,11 +1,11 @@
 /**
  * API Service Wrappers
- * 
+ *
  * This module exports all API service wrappers for communicating with the backend.
  * Services wrap @emf/sdk functionality and provide application-specific API methods.
  */
 
-export * from './apiClient';
+export * from './apiClient'
 
 // Export service modules as they are implemented
 // Example exports:

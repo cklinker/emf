@@ -22,41 +22,41 @@
  * - Accessible with keyboard navigation and ARIA attributes
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
-import { useI18n } from '../../context/I18nContext';
-import { ConfirmDialog } from '../ConfirmDialog';
-import { LoadingSpinner } from '../LoadingSpinner';
-import styles from './FieldsPanel.module.css';
+import React, { useState, useCallback, useMemo } from 'react'
+import { useI18n } from '../../context/I18nContext'
+import { ConfirmDialog } from '../ConfirmDialog'
+import { LoadingSpinner } from '../LoadingSpinner'
+import styles from './FieldsPanel.module.css'
 
 /**
  * Field type enumeration
  */
-export type FieldType = 'string' | 'number' | 'boolean' | 'date' | 'datetime' | 'json' | 'reference';
+export type FieldType = 'string' | 'number' | 'boolean' | 'date' | 'datetime' | 'json' | 'reference'
 
 /**
  * Validation rule interface
  */
 export interface ValidationRule {
-  type: 'min' | 'max' | 'pattern' | 'email' | 'url' | 'custom';
-  value?: unknown;
-  message?: string;
+  type: 'min' | 'max' | 'pattern' | 'email' | 'url' | 'custom'
+  value?: unknown
+  message?: string
 }
 
 /**
  * Field definition interface
  */
 export interface FieldDefinition {
-  id: string;
-  name: string;
-  displayName?: string;
-  type: FieldType;
-  required: boolean;
-  unique: boolean;
-  indexed: boolean;
-  defaultValue?: unknown;
-  validation?: ValidationRule[];
-  referenceTarget?: string;
-  order: number;
+  id: string
+  name: string
+  displayName?: string
+  type: FieldType
+  required: boolean
+  unique: boolean
+  indexed: boolean
+  defaultValue?: unknown
+  validation?: ValidationRule[]
+  referenceTarget?: string
+  order: number
 }
 
 /**
@@ -64,19 +64,19 @@ export interface FieldDefinition {
  */
 export interface FieldsPanelProps {
   /** Array of field definitions to display */
-  fields: FieldDefinition[];
+  fields: FieldDefinition[]
   /** Callback when add field button is clicked */
-  onAdd: () => void;
+  onAdd: () => void
   /** Callback when edit button is clicked for a field */
-  onEdit: (field: FieldDefinition) => void;
+  onEdit: (field: FieldDefinition) => void
   /** Callback when delete is confirmed for a field */
-  onDelete: (field: FieldDefinition) => void;
+  onDelete: (field: FieldDefinition) => void
   /** Callback when fields are reordered via drag-and-drop */
-  onReorder: (fields: FieldDefinition[]) => void;
+  onReorder: (fields: FieldDefinition[]) => void
   /** Whether the panel is in a loading state */
-  isLoading?: boolean;
+  isLoading?: boolean
   /** Test ID for the component */
-  testId?: string;
+  testId?: string
 }
 
 /**
@@ -91,8 +91,8 @@ function getFieldTypeIcon(type: FieldType): string {
     datetime: '🕐',
     json: '{}',
     reference: '🔗',
-  };
-  return icons[type] || '?';
+  }
+  return icons[type] || '?'
 }
 
 /**
@@ -122,143 +122,155 @@ export function FieldsPanel({
   isLoading = false,
   testId = 'fields-panel',
 }: FieldsPanelProps): React.ReactElement {
-  const { t } = useI18n();
-  
+  const { t } = useI18n()
+
   // State for delete confirmation dialog
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [fieldToDelete, setFieldToDelete] = useState<FieldDefinition | null>(null);
-  
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [fieldToDelete, setFieldToDelete] = useState<FieldDefinition | null>(null)
+
   // State for drag-and-drop
-  const [draggedFieldId, setDraggedFieldId] = useState<string | null>(null);
-  const [dragOverFieldId, setDragOverFieldId] = useState<string | null>(null);
+  const [draggedFieldId, setDraggedFieldId] = useState<string | null>(null)
+  const [dragOverFieldId, setDragOverFieldId] = useState<string | null>(null)
 
   // Sort fields by order
   const sortedFields = useMemo(() => {
-    return [...fields].sort((a, b) => a.order - b.order);
-  }, [fields]);
+    return [...fields].sort((a, b) => a.order - b.order)
+  }, [fields])
 
   /**
    * Handle delete button click - open confirmation dialog
    */
   const handleDeleteClick = useCallback((field: FieldDefinition) => {
-    setFieldToDelete(field);
-    setDeleteDialogOpen(true);
-  }, []);
+    setFieldToDelete(field)
+    setDeleteDialogOpen(true)
+  }, [])
 
   /**
    * Handle delete confirmation
    */
   const handleDeleteConfirm = useCallback(() => {
     if (fieldToDelete) {
-      onDelete(fieldToDelete);
+      onDelete(fieldToDelete)
     }
-    setDeleteDialogOpen(false);
-    setFieldToDelete(null);
-  }, [fieldToDelete, onDelete]);
+    setDeleteDialogOpen(false)
+    setFieldToDelete(null)
+  }, [fieldToDelete, onDelete])
 
   /**
    * Handle delete cancellation
    */
   const handleDeleteCancel = useCallback(() => {
-    setDeleteDialogOpen(false);
-    setFieldToDelete(null);
-  }, []);
+    setDeleteDialogOpen(false)
+    setFieldToDelete(null)
+  }, [])
 
   /**
    * Handle drag start
    */
-  const handleDragStart = useCallback((e: React.DragEvent<HTMLDivElement>, field: FieldDefinition) => {
-    setDraggedFieldId(field.id);
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', field.id);
-    
-    // Add a slight delay to allow the drag image to be captured
-    const target = e.currentTarget;
-    setTimeout(() => {
-      target.classList.add(styles.dragging);
-    }, 0);
-  }, []);
+  const handleDragStart = useCallback(
+    (e: React.DragEvent<HTMLDivElement>, field: FieldDefinition) => {
+      setDraggedFieldId(field.id)
+      e.dataTransfer.effectAllowed = 'move'
+      e.dataTransfer.setData('text/plain', field.id)
+
+      // Add a slight delay to allow the drag image to be captured
+      const target = e.currentTarget
+      setTimeout(() => {
+        target.classList.add(styles.dragging)
+      }, 0)
+    },
+    []
+  )
 
   /**
    * Handle drag end
    */
   const handleDragEnd = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.currentTarget.classList.remove(styles.dragging);
-    setDraggedFieldId(null);
-    setDragOverFieldId(null);
-  }, []);
+    e.currentTarget.classList.remove(styles.dragging)
+    setDraggedFieldId(null)
+    setDragOverFieldId(null)
+  }, [])
 
   /**
    * Handle drag over
    */
-  const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>, field: FieldDefinition) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    
-    if (draggedFieldId && draggedFieldId !== field.id) {
-      setDragOverFieldId(field.id);
-    }
-  }, [draggedFieldId]);
+  const handleDragOver = useCallback(
+    (e: React.DragEvent<HTMLDivElement>, field: FieldDefinition) => {
+      e.preventDefault()
+      e.dataTransfer.dropEffect = 'move'
+
+      if (draggedFieldId && draggedFieldId !== field.id) {
+        setDragOverFieldId(field.id)
+      }
+    },
+    [draggedFieldId]
+  )
 
   /**
    * Handle drag leave
    */
   const handleDragLeave = useCallback(() => {
-    setDragOverFieldId(null);
-  }, []);
+    setDragOverFieldId(null)
+  }, [])
 
   /**
    * Handle drop - reorder fields
    */
-  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>, targetField: FieldDefinition) => {
-    e.preventDefault();
-    
-    if (!draggedFieldId || draggedFieldId === targetField.id) {
-      setDragOverFieldId(null);
-      return;
-    }
+  const handleDrop = useCallback(
+    (e: React.DragEvent<HTMLDivElement>, targetField: FieldDefinition) => {
+      e.preventDefault()
 
-    const draggedIndex = sortedFields.findIndex(f => f.id === draggedFieldId);
-    const targetIndex = sortedFields.findIndex(f => f.id === targetField.id);
+      if (!draggedFieldId || draggedFieldId === targetField.id) {
+        setDragOverFieldId(null)
+        return
+      }
 
-    if (draggedIndex === -1 || targetIndex === -1) {
-      setDragOverFieldId(null);
-      return;
-    }
+      const draggedIndex = sortedFields.findIndex((f) => f.id === draggedFieldId)
+      const targetIndex = sortedFields.findIndex((f) => f.id === targetField.id)
 
-    // Create new array with reordered fields
-    const newFields = [...sortedFields];
-    const [draggedField] = newFields.splice(draggedIndex, 1);
-    newFields.splice(targetIndex, 0, draggedField);
+      if (draggedIndex === -1 || targetIndex === -1) {
+        setDragOverFieldId(null)
+        return
+      }
 
-    // Update order values
-    const reorderedFields = newFields.map((field, index) => ({
-      ...field,
-      order: index,
-    }));
+      // Create new array with reordered fields
+      const newFields = [...sortedFields]
+      const [draggedField] = newFields.splice(draggedIndex, 1)
+      newFields.splice(targetIndex, 0, draggedField)
 
-    onReorder(reorderedFields);
-    setDragOverFieldId(null);
-  }, [draggedFieldId, sortedFields, onReorder]);
+      // Update order values
+      const reorderedFields = newFields.map((field, index) => ({
+        ...field,
+        order: index,
+      }))
+
+      onReorder(reorderedFields)
+      setDragOverFieldId(null)
+    },
+    [draggedFieldId, sortedFields, onReorder]
+  )
 
   /**
    * Handle keyboard reordering
    */
-  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>, field: FieldDefinition, index: number) => {
-    if (e.key === 'ArrowUp' && e.altKey && index > 0) {
-      e.preventDefault();
-      const newFields = [...sortedFields];
-      [newFields[index - 1], newFields[index]] = [newFields[index], newFields[index - 1]];
-      const reorderedFields = newFields.map((f, i) => ({ ...f, order: i }));
-      onReorder(reorderedFields);
-    } else if (e.key === 'ArrowDown' && e.altKey && index < sortedFields.length - 1) {
-      e.preventDefault();
-      const newFields = [...sortedFields];
-      [newFields[index], newFields[index + 1]] = [newFields[index + 1], newFields[index]];
-      const reorderedFields = newFields.map((f, i) => ({ ...f, order: i }));
-      onReorder(reorderedFields);
-    }
-  }, [sortedFields, onReorder]);
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>, field: FieldDefinition, index: number) => {
+      if (e.key === 'ArrowUp' && e.altKey && index > 0) {
+        e.preventDefault()
+        const newFields = [...sortedFields]
+        ;[newFields[index - 1], newFields[index]] = [newFields[index], newFields[index - 1]]
+        const reorderedFields = newFields.map((f, i) => ({ ...f, order: i }))
+        onReorder(reorderedFields)
+      } else if (e.key === 'ArrowDown' && e.altKey && index < sortedFields.length - 1) {
+        e.preventDefault()
+        const newFields = [...sortedFields]
+        ;[newFields[index], newFields[index + 1]] = [newFields[index + 1], newFields[index]]
+        const reorderedFields = newFields.map((f, i) => ({ ...f, order: i }))
+        onReorder(reorderedFields)
+      }
+    },
+    [sortedFields, onReorder]
+  )
 
   // Render loading state
   if (isLoading) {
@@ -271,7 +283,7 @@ export function FieldsPanel({
           <LoadingSpinner size="medium" label={t('common.loading')} />
         </div>
       </div>
-    );
+    )
   }
 
   // Render empty state
@@ -287,7 +299,9 @@ export function FieldsPanel({
             data-testid={`${testId}-add-button`}
             aria-label={t('collections.addField')}
           >
-            <span className={styles.addIcon} aria-hidden="true">+</span>
+            <span className={styles.addIcon} aria-hidden="true">
+              +
+            </span>
             {t('collections.addField')}
           </button>
         </div>
@@ -296,7 +310,7 @@ export function FieldsPanel({
           <p className={styles.emptyHint}>{t('fieldsPanel.addFieldHint')}</p>
         </div>
       </div>
-    );
+    )
   }
 
   return (
@@ -310,12 +324,14 @@ export function FieldsPanel({
           data-testid={`${testId}-add-button`}
           aria-label={t('collections.addField')}
         >
-          <span className={styles.addIcon} aria-hidden="true">+</span>
+          <span className={styles.addIcon} aria-hidden="true">
+            +
+          </span>
           {t('collections.addField')}
         </button>
       </div>
 
-      <div 
+      <div
         className={styles.fieldList}
         role="list"
         aria-label={t('fieldsPanel.fieldListLabel')}
@@ -337,14 +353,18 @@ export function FieldsPanel({
             data-testid={`${testId}-field-${field.id}`}
             aria-label={t('fieldsPanel.fieldItemLabel', { name: field.displayName || field.name })}
           >
-            <div className={styles.dragHandle} aria-hidden="true" data-testid={`${testId}-drag-handle-${field.id}`}>
+            <div
+              className={styles.dragHandle}
+              aria-hidden="true"
+              data-testid={`${testId}-drag-handle-${field.id}`}
+            >
               <span className={styles.dragIcon}>⋮⋮</span>
             </div>
 
             <div className={styles.fieldInfo}>
               <div className={styles.fieldMain}>
-                <span 
-                  className={styles.fieldTypeIcon} 
+                <span
+                  className={styles.fieldTypeIcon}
                   title={t(`fields.types.${field.type}`)}
                   aria-label={t(`fields.types.${field.type}`)}
                 >
@@ -354,22 +374,22 @@ export function FieldsPanel({
                   {field.name}
                 </span>
                 {field.displayName && field.displayName !== field.name && (
-                  <span className={styles.fieldDisplayName} data-testid={`${testId}-field-display-name-${field.id}`}>
+                  <span
+                    className={styles.fieldDisplayName}
+                    data-testid={`${testId}-field-display-name-${field.id}`}
+                  >
                     ({field.displayName})
                   </span>
                 )}
               </div>
 
               <div className={styles.fieldMeta}>
-                <span 
-                  className={styles.fieldType}
-                  data-testid={`${testId}-field-type-${field.id}`}
-                >
+                <span className={styles.fieldType} data-testid={`${testId}-field-type-${field.id}`}>
                   {t(`fields.types.${field.type}`)}
                 </span>
-                
+
                 {field.required && (
-                  <span 
+                  <span
                     className={`${styles.badge} ${styles.requiredBadge}`}
                     title={t('fields.validation.required')}
                     data-testid={`${testId}-field-required-${field.id}`}
@@ -377,9 +397,9 @@ export function FieldsPanel({
                     {t('fields.validation.required')}
                   </span>
                 )}
-                
+
                 {field.unique && (
-                  <span 
+                  <span
                     className={`${styles.badge} ${styles.uniqueBadge}`}
                     title={t('fields.validation.unique')}
                     data-testid={`${testId}-field-unique-${field.id}`}
@@ -387,9 +407,9 @@ export function FieldsPanel({
                     {t('fields.validation.unique')}
                   </span>
                 )}
-                
+
                 {field.indexed && (
-                  <span 
+                  <span
                     className={`${styles.badge} ${styles.indexedBadge}`}
                     title={t('fields.validation.indexed')}
                     data-testid={`${testId}-field-indexed-${field.id}`}
@@ -399,7 +419,7 @@ export function FieldsPanel({
                 )}
 
                 {field.type === 'reference' && field.referenceTarget && (
-                  <span 
+                  <span
                     className={styles.referenceTarget}
                     data-testid={`${testId}-field-reference-${field.id}`}
                   >
@@ -448,7 +468,7 @@ export function FieldsPanel({
         id="delete-field-dialog"
       />
     </div>
-  );
+  )
 }
 
-export default FieldsPanel;
+export default FieldsPanel

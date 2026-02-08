@@ -164,7 +164,9 @@
   border: 1px solid var(--color-border, #d1d5db);
   border-radius: var(--border-radius-sm, 0.25rem);
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
 }
 
 .bulkButton:hover {
@@ -203,7 +205,9 @@
   background-color: var(--color-surface-primary, #ffffff);
   border: 1px solid var(--color-border, #d1d5db);
   border-radius: var(--border-radius-md, 0.375rem);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
 .exportSection {
@@ -268,7 +272,9 @@
   border: 1px solid var(--color-border, #d1d5db);
   border-radius: var(--border-radius-md, 0.375rem);
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
 }
 
 .filterToggle:hover {
@@ -327,7 +333,9 @@
   background-color: var(--color-surface-primary, #ffffff);
   border: 1px solid var(--color-border, #d1d5db);
   border-radius: var(--border-radius-md, 0.375rem);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .filterSelect:focus,
@@ -363,7 +371,9 @@
   border: 1px solid var(--color-border, #d1d5db);
   border-radius: var(--border-radius-md, 0.375rem);
   cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
 }
 
 .removeFilterButton:hover {
@@ -392,7 +402,9 @@
   border: 1px dashed var(--color-border, #d1d5db);
   border-radius: var(--border-radius-md, 0.375rem);
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
 }
 
 .addFilterButton:hover {
@@ -464,7 +476,9 @@
   border: 1px solid var(--color-border, #d1d5db);
   border-radius: var(--border-radius-md, 0.375rem);
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
 }
 
 .columnSelectorButton:hover {
@@ -490,7 +504,9 @@
   background-color: var(--color-surface-primary, #ffffff);
   border: 1px solid var(--color-border, #d1d5db);
   border-radius: var(--border-radius-md, 0.375rem);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
 .columnOption {
@@ -627,7 +643,9 @@
   border: 1px solid var(--color-border, #d1d5db);
   border-radius: var(--border-radius-sm, 0.25rem);
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
 }
 
 .actionButton:hover {
@@ -718,7 +736,9 @@
   border: 1px solid var(--color-border, #d1d5db);
   border-radius: var(--border-radius-md, 0.375rem);
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
 }
 
 .paginationButton:hover:not(:disabled) {

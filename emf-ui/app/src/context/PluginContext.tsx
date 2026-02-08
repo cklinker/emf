@@ -22,7 +22,7 @@ import React, {
   useMemo,
   useRef,
   type ComponentType,
-} from 'react';
+} from 'react'
 import type {
   Plugin,
   PluginInitContext,
@@ -30,30 +30,30 @@ import type {
   PluginStatus,
   FieldRendererProps,
   PageComponentProps,
-} from '../types/plugin';
+} from '../types/plugin'
 
 /**
  * Plugin context value interface
  */
 export interface PluginContextValue {
   /** Map of field type to renderer component */
-  fieldRenderers: Map<string, ComponentType<FieldRendererProps>>;
+  fieldRenderers: Map<string, ComponentType<FieldRendererProps>>
   /** Map of component name to page component */
-  pageComponents: Map<string, ComponentType<PageComponentProps>>;
+  pageComponents: Map<string, ComponentType<PageComponentProps>>
   /** Register a custom field renderer */
-  registerFieldRenderer: (type: string, renderer: ComponentType<FieldRendererProps>) => void;
+  registerFieldRenderer: (type: string, renderer: ComponentType<FieldRendererProps>) => void
   /** Register a custom page component */
-  registerPageComponent: (name: string, component: ComponentType<PageComponentProps>) => void;
+  registerPageComponent: (name: string, component: ComponentType<PageComponentProps>) => void
   /** Get a field renderer by type */
-  getFieldRenderer: (type: string) => ComponentType<FieldRendererProps> | undefined;
+  getFieldRenderer: (type: string) => ComponentType<FieldRendererProps> | undefined
   /** Get a page component by name */
-  getPageComponent: (name: string) => ComponentType<PageComponentProps> | undefined;
+  getPageComponent: (name: string) => ComponentType<PageComponentProps> | undefined
   /** List of loaded plugins with their status */
-  plugins: LoadedPlugin[];
+  plugins: LoadedPlugin[]
   /** Whether plugins are currently being loaded */
-  isLoading: boolean;
+  isLoading: boolean
   /** Errors that occurred during plugin loading */
-  errors: Array<{ pluginId: string; error: string }>;
+  errors: Array<{ pluginId: string; error: string }>
 }
 
 /**
@@ -61,17 +61,17 @@ export interface PluginContextValue {
  */
 export interface PluginProviderProps {
   /** Child components to render */
-  children: React.ReactNode;
+  children: React.ReactNode
   /** Array of plugins to load */
-  plugins?: Plugin[];
+  plugins?: Plugin[]
   /** Optional function to get current locale (for plugin context) */
-  getLocale?: () => string;
+  getLocale?: () => string
   /** Optional function to get current theme mode (for plugin context) */
-  getThemeMode?: () => 'light' | 'dark';
+  getThemeMode?: () => 'light' | 'dark'
 }
 
 // Create the context with undefined default
-const PluginContext = createContext<PluginContextValue | undefined>(undefined);
+const PluginContext = createContext<PluginContextValue | undefined>(undefined)
 
 /**
  * Plugin Provider Component
@@ -95,22 +95,22 @@ export function PluginProvider({
   getThemeMode = () => 'light',
 }: PluginProviderProps): React.ReactElement {
   // Component registry state
-  const [fieldRenderers, setFieldRenderers] = useState<Map<string, ComponentType<FieldRendererProps>>>(
-    new Map()
-  );
-  const [pageComponents, setPageComponents] = useState<Map<string, ComponentType<PageComponentProps>>>(
-    new Map()
-  );
+  const [fieldRenderers, setFieldRenderers] = useState<
+    Map<string, ComponentType<FieldRendererProps>>
+  >(new Map())
+  const [pageComponents, setPageComponents] = useState<
+    Map<string, ComponentType<PageComponentProps>>
+  >(new Map())
 
   // Plugin loading state
-  const [loadedPlugins, setLoadedPlugins] = useState<LoadedPlugin[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [errors, setErrors] = useState<Array<{ pluginId: string; error: string }>>([]);
+  const [loadedPlugins, setLoadedPlugins] = useState<LoadedPlugin[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [errors, setErrors] = useState<Array<{ pluginId: string; error: string }>>([])
 
   // Track if we've already initialized to prevent double loading
-  const initializedRef = useRef(false);
+  const initializedRef = useRef(false)
   // Track loaded plugin IDs for cleanup
-  const loadedPluginIdsRef = useRef<Set<string>>(new Set());
+  const loadedPluginIdsRef = useRef<Set<string>>(new Set())
 
   /**
    * Register a custom field renderer
@@ -119,14 +119,14 @@ export function PluginProvider({
   const registerFieldRenderer = useCallback(
     (type: string, renderer: ComponentType<FieldRendererProps>) => {
       setFieldRenderers((prev) => {
-        const next = new Map(prev);
-        next.set(type, renderer);
-        return next;
-      });
-      console.info(`[Plugin] Registered field renderer for type: ${type}`);
+        const next = new Map(prev)
+        next.set(type, renderer)
+        return next
+      })
+      console.info(`[Plugin] Registered field renderer for type: ${type}`)
     },
     []
-  );
+  )
 
   /**
    * Register a custom page component
@@ -135,34 +135,34 @@ export function PluginProvider({
   const registerPageComponent = useCallback(
     (name: string, component: ComponentType<PageComponentProps>) => {
       setPageComponents((prev) => {
-        const next = new Map(prev);
-        next.set(name, component);
-        return next;
-      });
-      console.info(`[Plugin] Registered page component: ${name}`);
+        const next = new Map(prev)
+        next.set(name, component)
+        return next
+      })
+      console.info(`[Plugin] Registered page component: ${name}`)
     },
     []
-  );
+  )
 
   /**
    * Get a field renderer by type
    */
   const getFieldRenderer = useCallback(
     (type: string): ComponentType<FieldRendererProps> | undefined => {
-      return fieldRenderers.get(type);
+      return fieldRenderers.get(type)
     },
     [fieldRenderers]
-  );
+  )
 
   /**
    * Get a page component by name
    */
   const getPageComponent = useCallback(
     (name: string): ComponentType<PageComponentProps> | undefined => {
-      return pageComponents.get(name);
+      return pageComponents.get(name)
     },
     [pageComponents]
-  );
+  )
 
   /**
    * Load a single plugin
@@ -173,22 +173,22 @@ export function PluginProvider({
       const loadedPlugin: LoadedPlugin = {
         plugin,
         status: 'loading' as PluginStatus,
-      };
+      }
 
       try {
-        console.info(`[Plugin] Loading plugin: ${plugin.id} (${plugin.name} v${plugin.version})`);
+        console.info(`[Plugin] Loading plugin: ${plugin.id} (${plugin.name} v${plugin.version})`)
 
         // Register static field renderers if provided
         if (plugin.fieldRenderers) {
           for (const [type, renderer] of Object.entries(plugin.fieldRenderers)) {
-            registerFieldRenderer(type, renderer);
+            registerFieldRenderer(type, renderer)
           }
         }
 
         // Register static page components if provided
         if (plugin.pageComponents) {
           for (const [name, component] of Object.entries(plugin.pageComponents)) {
-            registerPageComponent(name, component);
+            registerPageComponent(name, component)
           }
         }
 
@@ -200,25 +200,25 @@ export function PluginProvider({
             registerPageComponent,
             getLocale,
             getThemeMode,
-          };
-          await plugin.onLoad(context);
+          }
+          await plugin.onLoad(context)
         }
 
-        loadedPlugin.status = 'loaded';
-        loadedPluginIdsRef.current.add(plugin.id);
-        console.info(`[Plugin] Successfully loaded plugin: ${plugin.id}`);
+        loadedPlugin.status = 'loaded'
+        loadedPluginIdsRef.current.add(plugin.id)
+        console.info(`[Plugin] Successfully loaded plugin: ${plugin.id}`)
       } catch (err) {
         // Requirement 12.7: Handle plugin load failures gracefully
-        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-        loadedPlugin.status = 'error';
-        loadedPlugin.error = errorMessage;
-        console.error(`[Plugin] Failed to load plugin ${plugin.id}:`, err);
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error'
+        loadedPlugin.status = 'error'
+        loadedPlugin.error = errorMessage
+        console.error(`[Plugin] Failed to load plugin ${plugin.id}:`, err)
       }
 
-      return loadedPlugin;
+      return loadedPlugin
     },
     [registerFieldRenderer, registerPageComponent, getLocale, getThemeMode]
-  );
+  )
 
   /**
    * Unload a plugin
@@ -227,14 +227,14 @@ export function PluginProvider({
   const unloadPlugin = useCallback(async (plugin: Plugin): Promise<void> => {
     try {
       if (plugin.onUnload) {
-        console.info(`[Plugin] Unloading plugin: ${plugin.id}`);
-        await plugin.onUnload();
-        console.info(`[Plugin] Successfully unloaded plugin: ${plugin.id}`);
+        console.info(`[Plugin] Unloading plugin: ${plugin.id}`)
+        await plugin.onUnload()
+        console.info(`[Plugin] Successfully unloaded plugin: ${plugin.id}`)
       }
     } catch (err) {
-      console.error(`[Plugin] Error unloading plugin ${plugin.id}:`, err);
+      console.error(`[Plugin] Error unloading plugin ${plugin.id}:`, err)
     }
-  }, []);
+  }, [])
 
   /**
    * Initialize all plugins
@@ -243,36 +243,36 @@ export function PluginProvider({
    */
   const initializePlugins = useCallback(async () => {
     if (plugins.length === 0) {
-      setIsLoading(false);
-      return;
+      setIsLoading(false)
+      return
     }
 
-    setIsLoading(true);
-    setErrors([]);
+    setIsLoading(true)
+    setErrors([])
 
-    const results: LoadedPlugin[] = [];
-    const loadErrors: Array<{ pluginId: string; error: string }> = [];
+    const results: LoadedPlugin[] = []
+    const loadErrors: Array<{ pluginId: string; error: string }> = []
 
     // Load plugins sequentially to maintain order and prevent race conditions
     for (const plugin of plugins) {
-      const result = await loadPlugin(plugin);
-      results.push(result);
+      const result = await loadPlugin(plugin)
+      results.push(result)
 
       if (result.status === 'error' && result.error) {
-        loadErrors.push({ pluginId: plugin.id, error: result.error });
+        loadErrors.push({ pluginId: plugin.id, error: result.error })
       }
     }
 
-    setLoadedPlugins(results);
-    setErrors(loadErrors);
-    setIsLoading(false);
+    setLoadedPlugins(results)
+    setErrors(loadErrors)
+    setIsLoading(false)
 
-    const successCount = results.filter((r) => r.status === 'loaded').length;
-    const failCount = results.filter((r) => r.status === 'error').length;
+    const successCount = results.filter((r) => r.status === 'loaded').length
+    const failCount = results.filter((r) => r.status === 'error').length
     console.info(
       `[Plugin] Plugin initialization complete: ${successCount} loaded, ${failCount} failed`
-    );
-  }, [plugins, loadPlugin]);
+    )
+  }, [plugins, loadPlugin])
 
   /**
    * Initialize plugins on mount
@@ -280,25 +280,25 @@ export function PluginProvider({
   useEffect(() => {
     // Prevent double initialization in React StrictMode
     if (initializedRef.current) {
-      return;
+      return
     }
-    initializedRef.current = true;
+    initializedRef.current = true
 
-    initializePlugins();
+    initializePlugins()
 
     // Cleanup: unload plugins on unmount
     return () => {
       const cleanup = async () => {
         for (const loadedPlugin of loadedPlugins) {
           if (loadedPlugin.status === 'loaded') {
-            await unloadPlugin(loadedPlugin.plugin);
+            await unloadPlugin(loadedPlugin.plugin)
           }
         }
-      };
-      cleanup();
-    };
+      }
+      cleanup()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [])
 
   // Memoize context value to prevent unnecessary re-renders
   const contextValue = useMemo<PluginContextValue>(
@@ -324,11 +324,9 @@ export function PluginProvider({
       isLoading,
       errors,
     ]
-  );
+  )
 
-  return (
-    <PluginContext.Provider value={contextValue}>{children}</PluginContext.Provider>
-  );
+  return <PluginContext.Provider value={contextValue}>{children}</PluginContext.Provider>
 }
 
 /**
@@ -353,12 +351,12 @@ export function PluginProvider({
  * ```
  */
 export function usePlugins(): PluginContextValue {
-  const context = useContext(PluginContext);
+  const context = useContext(PluginContext)
   if (context === undefined) {
-    throw new Error('usePlugins must be used within a PluginProvider');
+    throw new Error('usePlugins must be used within a PluginProvider')
   }
-  return context;
+  return context
 }
 
 // Export the context for testing purposes
-export { PluginContext };
+export { PluginContext }

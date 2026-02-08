@@ -13,43 +13,43 @@
  * - 3.11: Soft-delete collection and remove from list
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useI18n } from '../../context/I18nContext';
-import { useApi } from '../../context/ApiContext';
-import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components';
-import styles from './CollectionsPage.module.css';
+import React, { useState, useCallback, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useI18n } from '../../context/I18nContext'
+import { useApi } from '../../context/ApiContext'
+import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
+import styles from './CollectionsPage.module.css'
 
 /**
  * Collection interface matching the API response
  */
 export interface Collection {
-  id: string;
-  name: string;
-  displayName: string;
-  description?: string;
-  storageMode: 'PHYSICAL_TABLE' | 'JSONB';
-  active: boolean;
-  currentVersion: number;
-  createdAt: string;
-  updatedAt: string;
+  id: string
+  name: string
+  displayName: string
+  description?: string
+  storageMode: 'PHYSICAL_TABLE' | 'JSONB'
+  active: boolean
+  currentVersion: number
+  createdAt: string
+  updatedAt: string
 }
 
 /**
  * Filter state for collections
  */
 interface CollectionFilters {
-  name: string;
-  status: 'all' | 'active' | 'inactive';
+  name: string
+  status: 'all' | 'active' | 'inactive'
 }
 
 /**
  * Sort state for collections
  */
 interface CollectionSort {
-  field: 'name' | 'createdAt' | 'updatedAt';
-  direction: 'asc' | 'desc';
+  field: 'name' | 'createdAt' | 'updatedAt'
+  direction: 'asc' | 'desc'
 }
 
 /**
@@ -57,16 +57,16 @@ interface CollectionSort {
  */
 export interface CollectionsPageProps {
   /** Optional test ID for testing */
-  testId?: string;
+  testId?: string
 }
 
 // API response type for paginated collections
 interface PageResponse<T> {
-  content: T[];
-  totalElements: number;
-  totalPages: number;
-  size: number;
-  number: number;
+  content: T[]
+  totalElements: number
+  totalPages: number
+  size: number
+  number: number
 }
 
 /**
@@ -75,32 +75,34 @@ interface PageResponse<T> {
  * Main page for managing collections in the EMF Admin UI.
  * Provides listing, filtering, sorting, and CRUD operations.
  */
-export function CollectionsPage({ testId = 'collections-page' }: CollectionsPageProps): React.ReactElement {
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const { t, formatDate } = useI18n();
-  const { apiClient } = useApi();
-  const { showToast } = useToast();
+export function CollectionsPage({
+  testId = 'collections-page',
+}: CollectionsPageProps): React.ReactElement {
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const { t, formatDate } = useI18n()
+  const { apiClient } = useApi()
+  const { showToast } = useToast()
 
   // Filter state
   const [filters, setFilters] = useState<CollectionFilters>({
     name: '',
     status: 'all',
-  });
+  })
 
   // Sort state
   const [sort, setSort] = useState<CollectionSort>({
     field: 'name',
     direction: 'asc',
-  });
+  })
 
   // Pagination state
-  const [page, setPage] = useState(1);
-  const pageSize = 10;
+  const [page, setPage] = useState(1)
+  const pageSize = 10
 
   // Delete confirmation dialog state
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [collectionToDelete, setCollectionToDelete] = useState<Collection | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [collectionToDelete, setCollectionToDelete] = useState<Collection | null>(null)
 
   // Fetch collections query
   const {
@@ -111,147 +113,162 @@ export function CollectionsPage({ testId = 'collections-page' }: CollectionsPage
   } = useQuery({
     queryKey: ['collections'],
     queryFn: () => apiClient.get<PageResponse<Collection>>('/control/collections?size=1000'),
-  });
+  })
 
   // Extract collections from paginated response
   const collections = useMemo(() => {
-    return collectionsPage?.content || [];
-  }, [collectionsPage]);
+    return collectionsPage?.content || []
+  }, [collectionsPage])
 
   // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: (id: string) => apiClient.delete(`/control/collections/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['collections'] });
-      showToast(t('success.deleted', { item: t('collections.title') }), 'success');
-      setDeleteDialogOpen(false);
-      setCollectionToDelete(null);
+      queryClient.invalidateQueries({ queryKey: ['collections'] })
+      showToast(t('success.deleted', { item: t('collections.title') }), 'success')
+      setDeleteDialogOpen(false)
+      setCollectionToDelete(null)
     },
     onError: (error: Error) => {
-      showToast(error.message || t('errors.generic'), 'error');
+      showToast(error.message || t('errors.generic'), 'error')
     },
-  });
+  })
 
   // Filter collections
   const filteredCollections = useMemo(() => {
     return collections.filter((collection) => {
       // Filter by name
-      if (filters.name && !collection.name.toLowerCase().includes(filters.name.toLowerCase()) &&
-          !collection.displayName.toLowerCase().includes(filters.name.toLowerCase())) {
-        return false;
+      if (
+        filters.name &&
+        !collection.name.toLowerCase().includes(filters.name.toLowerCase()) &&
+        !collection.displayName.toLowerCase().includes(filters.name.toLowerCase())
+      ) {
+        return false
       }
 
       // Filter by status
       if (filters.status === 'active' && !collection.active) {
-        return false;
+        return false
       }
       if (filters.status === 'inactive' && collection.active) {
-        return false;
+        return false
       }
 
-      return true;
-    });
-  }, [collections, filters]);
+      return true
+    })
+  }, [collections, filters])
 
   // Sort collections
   const sortedCollections = useMemo(() => {
     return [...filteredCollections].sort((a, b) => {
-      let comparison = 0;
+      let comparison = 0
 
       switch (sort.field) {
         case 'name':
-          comparison = a.name.localeCompare(b.name);
-          break;
+          comparison = a.name.localeCompare(b.name)
+          break
         case 'createdAt':
-          comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-          break;
+          comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+          break
         case 'updatedAt':
-          comparison = new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
-          break;
+          comparison = new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime()
+          break
       }
 
-      return sort.direction === 'asc' ? comparison : -comparison;
-    });
-  }, [filteredCollections, sort]);
+      return sort.direction === 'asc' ? comparison : -comparison
+    })
+  }, [filteredCollections, sort])
 
   // Paginate collections
   const paginatedCollections = useMemo(() => {
-    const startIndex = (page - 1) * pageSize;
-    return sortedCollections.slice(startIndex, startIndex + pageSize);
-  }, [sortedCollections, page, pageSize]);
+    const startIndex = (page - 1) * pageSize
+    return sortedCollections.slice(startIndex, startIndex + pageSize)
+  }, [sortedCollections, page, pageSize])
 
   // Calculate total pages
-  const totalPages = Math.ceil(sortedCollections.length / pageSize);
+  const totalPages = Math.ceil(sortedCollections.length / pageSize)
 
   // Handle filter change
   const handleNameFilterChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    setFilters((prev) => ({ ...prev, name: event.target.value }));
-    setPage(1); // Reset to first page when filtering
-  }, []);
+    setFilters((prev) => ({ ...prev, name: event.target.value }))
+    setPage(1) // Reset to first page when filtering
+  }, [])
 
   const handleStatusFilterChange = useCallback((event: React.ChangeEvent<HTMLSelectElement>) => {
-    setFilters((prev) => ({ ...prev, status: event.target.value as CollectionFilters['status'] }));
-    setPage(1); // Reset to first page when filtering
-  }, []);
+    setFilters((prev) => ({ ...prev, status: event.target.value as CollectionFilters['status'] }))
+    setPage(1) // Reset to first page when filtering
+  }, [])
 
   // Handle sort change
   const handleSortChange = useCallback((field: CollectionSort['field']) => {
     setSort((prev) => ({
       field,
       direction: prev.field === field && prev.direction === 'asc' ? 'desc' : 'asc',
-    }));
-  }, []);
+    }))
+  }, [])
 
   // Handle create action
   const handleCreate = useCallback(() => {
-    navigate('/collections/new');
-  }, [navigate]);
+    navigate('/collections/new')
+  }, [navigate])
 
   // Handle edit action
-  const handleEdit = useCallback((collection: Collection) => {
-    navigate(`/collections/${collection.id}/edit`);
-  }, [navigate]);
+  const handleEdit = useCallback(
+    (collection: Collection) => {
+      navigate(`/collections/${collection.id}/edit`)
+    },
+    [navigate]
+  )
 
   // Handle view/detail action
-  const handleView = useCallback((collection: Collection) => {
-    navigate(`/collections/${collection.id}`);
-  }, [navigate]);
+  const handleView = useCallback(
+    (collection: Collection) => {
+      navigate(`/collections/${collection.id}`)
+    },
+    [navigate]
+  )
 
   // Handle delete action - open confirmation dialog
   const handleDeleteClick = useCallback((collection: Collection) => {
-    setCollectionToDelete(collection);
-    setDeleteDialogOpen(true);
-  }, []);
+    setCollectionToDelete(collection)
+    setDeleteDialogOpen(true)
+  }, [])
 
   // Handle delete confirmation
   const handleDeleteConfirm = useCallback(() => {
     if (collectionToDelete) {
-      deleteMutation.mutate(collectionToDelete.id);
+      deleteMutation.mutate(collectionToDelete.id)
     }
-  }, [collectionToDelete, deleteMutation]);
+  }, [collectionToDelete, deleteMutation])
 
   // Handle delete cancel
   const handleDeleteCancel = useCallback(() => {
-    setDeleteDialogOpen(false);
-    setCollectionToDelete(null);
-  }, []);
+    setDeleteDialogOpen(false)
+    setCollectionToDelete(null)
+  }, [])
 
   // Handle page change
   const handlePageChange = useCallback((newPage: number) => {
-    setPage(newPage);
-  }, []);
+    setPage(newPage)
+  }, [])
 
   // Get sort indicator
-  const getSortIndicator = useCallback((field: CollectionSort['field']) => {
-    if (sort.field !== field) return null;
-    return sort.direction === 'asc' ? ' ↑' : ' ↓';
-  }, [sort]);
+  const getSortIndicator = useCallback(
+    (field: CollectionSort['field']) => {
+      if (sort.field !== field) return null
+      return sort.direction === 'asc' ? ' ↑' : ' ↓'
+    },
+    [sort]
+  )
 
   // Get aria-sort value
-  const getAriaSort = useCallback((field: CollectionSort['field']): 'ascending' | 'descending' | 'none' => {
-    if (sort.field !== field) return 'none';
-    return sort.direction === 'asc' ? 'ascending' : 'descending';
-  }, [sort]);
+  const getAriaSort = useCallback(
+    (field: CollectionSort['field']): 'ascending' | 'descending' | 'none' => {
+      if (sort.field !== field) return 'none'
+      return sort.direction === 'asc' ? 'ascending' : 'descending'
+    },
+    [sort]
+  )
 
   // Render loading state
   if (isLoading) {
@@ -261,7 +278,7 @@ export function CollectionsPage({ testId = 'collections-page' }: CollectionsPage
           <LoadingSpinner size="large" label={t('common.loading')} />
         </div>
       </div>
-    );
+    )
   }
 
   // Render error state
@@ -273,7 +290,7 @@ export function CollectionsPage({ testId = 'collections-page' }: CollectionsPage
           onRetry={() => refetch()}
         />
       </div>
-    );
+    )
   }
 
   return (
@@ -351,8 +368,8 @@ export function CollectionsPage({ testId = 'collections-page' }: CollectionsPage
                     onClick={() => handleSortChange('name')}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        handleSortChange('name');
+                        e.preventDefault()
+                        handleSortChange('name')
                       }
                     }}
                     tabIndex={0}
@@ -377,8 +394,8 @@ export function CollectionsPage({ testId = 'collections-page' }: CollectionsPage
                     onClick={() => handleSortChange('createdAt')}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        handleSortChange('createdAt');
+                        e.preventDefault()
+                        handleSortChange('createdAt')
                       }
                     }}
                     tabIndex={0}
@@ -397,8 +414,8 @@ export function CollectionsPage({ testId = 'collections-page' }: CollectionsPage
                     onClick={() => handleSortChange('updatedAt')}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        handleSortChange('updatedAt');
+                        e.preventDefault()
+                        handleSortChange('updatedAt')
                       }
                     }}
                     tabIndex={0}
@@ -503,9 +520,7 @@ export function CollectionsPage({ testId = 'collections-page' }: CollectionsPage
               </button>
               <span className={styles.paginationInfo} aria-live="polite">
                 Page {page} of {totalPages}
-                <span className={styles.paginationTotal}>
-                  {' '}({sortedCollections.length} total)
-                </span>
+                <span className={styles.paginationTotal}> ({sortedCollections.length} total)</span>
               </span>
               <button
                 type="button"
@@ -533,7 +548,7 @@ export function CollectionsPage({ testId = 'collections-page' }: CollectionsPage
         variant="danger"
       />
     </div>
-  );
+  )
 }
 
-export default CollectionsPage;
+export default CollectionsPage

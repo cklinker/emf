@@ -1,6 +1,6 @@
 /**
  * AppShell Constants
- * 
+ *
  * Shared constants for the AppShell component.
  */
 
@@ -13,9 +13,9 @@
 export const BREAKPOINTS = {
   mobile: 768,
   tablet: 1024,
-} as const;
+} as const
 
 /**
  * Screen size categories
  */
-export type ScreenSize = 'mobile' | 'tablet' | 'desktop';
+export type ScreenSize = 'mobile' | 'tablet' | 'desktop'

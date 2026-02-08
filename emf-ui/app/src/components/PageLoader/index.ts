@@ -5,16 +5,11 @@
  * for consistent loading states across the application.
  */
 
-export {
-  PageLoader,
-  Skeleton,
-  ContentLoader,
-  default,
-} from './PageLoader';
+export { PageLoader, Skeleton, ContentLoader, default } from './PageLoader'
 
 export type {
   PageLoaderProps,
   SkeletonProps,
   SkeletonVariant,
   ContentLoaderProps,
-} from './PageLoader';
+} from './PageLoader'

@@ -1,2 +1,2 @@
-export { UnauthorizedPage } from './UnauthorizedPage';
-export type { UnauthorizedPageProps } from './UnauthorizedPage';
+export { UnauthorizedPage } from './UnauthorizedPage'
+export type { UnauthorizedPageProps } from './UnauthorizedPage'

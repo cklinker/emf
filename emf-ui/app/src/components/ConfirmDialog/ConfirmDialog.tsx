@@ -22,41 +22,41 @@
  * - Reduced motion support
  */
 
-import React, { useEffect, useRef, useCallback } from 'react';
-import { useI18n } from '../../context/I18nContext';
-import styles from './ConfirmDialog.module.css';
+import React, { useEffect, useRef, useCallback } from 'react'
+import { useI18n } from '../../context/I18nContext'
+import styles from './ConfirmDialog.module.css'
 
 /**
  * ConfirmDialog variant type
  */
-export type ConfirmDialogVariant = 'default' | 'danger';
+export type ConfirmDialogVariant = 'default' | 'danger'
 
 /**
  * Props for the ConfirmDialog component
  */
 export interface ConfirmDialogProps {
   /** Whether the dialog is open */
-  open: boolean;
+  open: boolean
   /** Dialog title */
-  title: string;
+  title: string
   /** Dialog message/description */
-  message: string;
+  message: string
   /** Label for the confirm button (defaults to "Confirm") */
-  confirmLabel?: string;
+  confirmLabel?: string
   /** Label for the cancel button (defaults to "Cancel") */
-  cancelLabel?: string;
+  cancelLabel?: string
   /** Callback when confirm button is clicked */
-  onConfirm: () => void;
+  onConfirm: () => void
   /** Callback when cancel button is clicked or dialog is dismissed */
-  onCancel: () => void;
+  onCancel: () => void
   /** Visual variant - 'danger' shows red confirm button for destructive actions */
-  variant?: ConfirmDialogVariant;
+  variant?: ConfirmDialogVariant
   /** Whether clicking outside the dialog closes it (default: true) */
-  closeOnOverlayClick?: boolean;
+  closeOnOverlayClick?: boolean
   /** Whether pressing Escape closes the dialog (default: true) */
-  closeOnEscape?: boolean;
+  closeOnEscape?: boolean
   /** ID for the dialog element (for accessibility) */
-  id?: string;
+  id?: string
 }
 
 /**
@@ -70,9 +70,9 @@ function getFocusableElements(container: HTMLElement): HTMLElement[] {
     'textarea:not([disabled])',
     'a[href]',
     '[tabindex]:not([tabindex="-1"])',
-  ].join(', ');
+  ].join(', ')
 
-  return Array.from(container.querySelectorAll<HTMLElement>(focusableSelectors));
+  return Array.from(container.querySelectorAll<HTMLElement>(focusableSelectors))
 }
 
 /**
@@ -108,58 +108,58 @@ export function ConfirmDialog({
   closeOnEscape = true,
   id,
 }: ConfirmDialogProps): React.ReactElement | null {
-  const { t } = useI18n();
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const previousActiveElement = useRef<HTMLElement | null>(null);
+  const { t } = useI18n()
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const previousActiveElement = useRef<HTMLElement | null>(null)
 
   // Default labels with i18n support
-  const resolvedConfirmLabel = confirmLabel ?? t('common.confirm');
-  const resolvedCancelLabel = cancelLabel ?? t('common.cancel');
+  const resolvedConfirmLabel = confirmLabel ?? t('common.confirm')
+  const resolvedCancelLabel = cancelLabel ?? t('common.cancel')
 
   // Generate unique IDs for accessibility
-  const dialogId = id ?? 'confirm-dialog';
-  const titleId = `${dialogId}-title`;
-  const descriptionId = `${dialogId}-description`;
+  const dialogId = id ?? 'confirm-dialog'
+  const titleId = `${dialogId}-title`
+  const descriptionId = `${dialogId}-description`
 
   /**
    * Handle keyboard events for focus trap and escape key
    */
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
-      if (!open) return;
+      if (!open) return
 
       // Handle Escape key
       if (event.key === 'Escape' && closeOnEscape) {
-        event.preventDefault();
-        onCancel();
-        return;
+        event.preventDefault()
+        onCancel()
+        return
       }
 
       // Handle Tab key for focus trap
       if (event.key === 'Tab' && dialogRef.current) {
-        const focusableElements = getFocusableElements(dialogRef.current);
-        if (focusableElements.length === 0) return;
+        const focusableElements = getFocusableElements(dialogRef.current)
+        if (focusableElements.length === 0) return
 
-        const firstElement = focusableElements[0];
-        const lastElement = focusableElements[focusableElements.length - 1];
+        const firstElement = focusableElements[0]
+        const lastElement = focusableElements[focusableElements.length - 1]
 
         if (event.shiftKey) {
           // Shift + Tab: if on first element, move to last
           if (document.activeElement === firstElement) {
-            event.preventDefault();
-            lastElement.focus();
+            event.preventDefault()
+            lastElement.focus()
           }
         } else {
           // Tab: if on last element, move to first
           if (document.activeElement === lastElement) {
-            event.preventDefault();
-            firstElement.focus();
+            event.preventDefault()
+            firstElement.focus()
           }
         }
       }
     },
     [open, closeOnEscape, onCancel]
-  );
+  )
 
   /**
    * Handle overlay click
@@ -168,25 +168,25 @@ export function ConfirmDialog({
     (event: React.MouseEvent<HTMLDivElement>) => {
       // Only close if clicking directly on the overlay, not the dialog content
       if (event.target === event.currentTarget && closeOnOverlayClick) {
-        onCancel();
+        onCancel()
       }
     },
     [closeOnOverlayClick, onCancel]
-  );
+  )
 
   /**
    * Handle confirm button click
    */
   const handleConfirm = useCallback(() => {
-    onConfirm();
-  }, [onConfirm]);
+    onConfirm()
+  }, [onConfirm])
 
   /**
    * Handle cancel button click
    */
   const handleCancel = useCallback(() => {
-    onCancel();
-  }, [onCancel]);
+    onCancel()
+  }, [onCancel])
 
   /**
    * Set up focus management and keyboard listeners when dialog opens/closes
@@ -194,50 +194,50 @@ export function ConfirmDialog({
   useEffect(() => {
     if (open) {
       // Store the currently focused element to restore later
-      previousActiveElement.current = document.activeElement as HTMLElement;
+      previousActiveElement.current = document.activeElement as HTMLElement
 
       // Focus the dialog or first focusable element
       if (dialogRef.current) {
-        const focusableElements = getFocusableElements(dialogRef.current);
+        const focusableElements = getFocusableElements(dialogRef.current)
         if (focusableElements.length > 0) {
           // Focus the cancel button by default (safer option)
           const cancelButton = dialogRef.current.querySelector<HTMLElement>(
             '[data-testid="confirm-dialog-cancel"]'
-          );
+          )
           if (cancelButton) {
-            cancelButton.focus();
+            cancelButton.focus()
           } else {
-            focusableElements[0].focus();
+            focusableElements[0].focus()
           }
         } else {
-          dialogRef.current.focus();
+          dialogRef.current.focus()
         }
       }
 
       // Add keyboard event listener
-      document.addEventListener('keydown', handleKeyDown);
+      document.addEventListener('keydown', handleKeyDown)
 
       // Prevent body scroll when dialog is open
-      document.body.style.overflow = 'hidden';
+      document.body.style.overflow = 'hidden'
     } else {
       // Restore focus to previously focused element
       if (previousActiveElement.current) {
-        previousActiveElement.current.focus();
+        previousActiveElement.current.focus()
       }
 
       // Restore body scroll
-      document.body.style.overflow = '';
+      document.body.style.overflow = ''
     }
 
     return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-      document.body.style.overflow = '';
-    };
-  }, [open, handleKeyDown]);
+      document.removeEventListener('keydown', handleKeyDown)
+      document.body.style.overflow = ''
+    }
+  }, [open, handleKeyDown])
 
   // Don't render anything if not open
   if (!open) {
-    return null;
+    return null
   }
 
   return (
@@ -283,7 +283,7 @@ export function ConfirmDialog({
         </div>
       </div>
     </div>
-  );
+  )
 }
 
-export default ConfirmDialog;
+export default ConfirmDialog

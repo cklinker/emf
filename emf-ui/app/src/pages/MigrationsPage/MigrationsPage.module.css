@@ -296,7 +296,9 @@
 .modalContent {
   background-color: var(--color-surface-primary, #ffffff);
   border-radius: var(--border-radius-lg, 0.5rem);
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  box-shadow:
+    0 20px 25px -5px rgba(0, 0, 0, 0.1),
+    0 10px 10px -5px rgba(0, 0, 0, 0.04);
   max-width: 700px;
   width: 100%;
   max-height: 90vh;
@@ -332,7 +334,9 @@
   border: none;
   border-radius: var(--border-radius-full, 50%);
   cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
 }
 
 .closeButton:hover {
@@ -589,7 +593,6 @@
   background-color: rgba(0, 0, 0, 0.7);
 }
 
-
 /* Migration Planning Styles */
 
 /* Header with button */
@@ -713,7 +716,9 @@
   border: 1px solid var(--color-border, #d1d5db);
   border-radius: var(--border-radius-md, 0.375rem);
   cursor: pointer;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .formSelect:hover:not(:disabled) {
@@ -776,7 +781,9 @@
   border: 1px solid var(--color-border, #d1d5db);
   border-radius: var(--border-radius-md, 0.375rem);
   cursor: pointer;
-  transition: background-color 0.2s ease, border-color 0.2s ease;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease;
 }
 
 .secondaryButton:hover:not(:disabled) {
@@ -823,7 +830,6 @@
     transition: none;
   }
 }
-
 
 /* Migration Execution Styles - Requirements 10.5, 10.6, 10.7 */
 
@@ -946,7 +952,9 @@
   background-color: var(--color-surface-secondary, #f5f5f5);
   border: 1px solid var(--color-border, #d1d5db);
   border-radius: var(--border-radius-md, 0.375rem);
-  transition: border-color 0.2s ease, background-color 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease;
 }
 
 .stepProgressItem.stepCompleted {

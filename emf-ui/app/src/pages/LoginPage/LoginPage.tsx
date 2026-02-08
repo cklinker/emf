@@ -9,21 +9,21 @@
  * - 2.2: Display provider selection page for multiple providers
  */
 
-import React, { useEffect, useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
-import { useConfig } from '../../context/ConfigContext';
-import { useI18n } from '../../context/I18nContext';
-import { LoadingSpinner } from '../../components/LoadingSpinner';
-import { ErrorMessage } from '../../components/ErrorMessage';
-import styles from './LoginPage.module.css';
+import React, { useEffect, useState } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { useAuth } from '../../context/AuthContext'
+import { useConfig } from '../../context/ConfigContext'
+import { useI18n } from '../../context/I18nContext'
+import { LoadingSpinner } from '../../components/LoadingSpinner'
+import { ErrorMessage } from '../../components/ErrorMessage'
+import styles from './LoginPage.module.css'
 
 /**
  * Props for the LoginPage component
  */
 export interface LoginPageProps {
   /** Optional custom title */
-  title?: string;
+  title?: string
 }
 
 /**
@@ -33,50 +33,50 @@ export interface LoginPageProps {
  * Shows provider selection when multiple providers are configured.
  */
 export function LoginPage({ title }: LoginPageProps): React.ReactElement {
-  const { isAuthenticated, isLoading: authLoading, login, error: authError } = useAuth();
-  const { config, isLoading: configLoading } = useConfig();
-  const { t } = useI18n();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
-  const [loginError, setLoginError] = useState<Error | null>(null);
-  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const { isAuthenticated, isLoading: authLoading, login, error: authError } = useAuth()
+  const { config, isLoading: configLoading } = useConfig()
+  const { t } = useI18n()
+  const navigate = useNavigate()
+  const location = useLocation()
+  const [selectedProvider, setSelectedProvider] = useState<string | null>(null)
+  const [loginError, setLoginError] = useState<Error | null>(null)
+  const [isLoggingIn, setIsLoggingIn] = useState(false)
 
   // Get the redirect path from location state
-  const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/';
+  const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/'
 
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated && !authLoading) {
-      navigate(from, { replace: true });
+      navigate(from, { replace: true })
     }
-  }, [isAuthenticated, authLoading, navigate, from]);
+  }, [isAuthenticated, authLoading, navigate, from])
 
   // Get OIDC providers from config
-  const providers = config?.oidcProviders || [];
+  const providers = config?.oidcProviders || []
 
   // Auto-login if only one provider
   useEffect(() => {
     if (!authLoading && !configLoading && providers.length === 1 && !isAuthenticated) {
-      handleLogin(providers[0].id);
+      handleLogin(providers[0].id)
     }
-  }, [authLoading, configLoading, providers, isAuthenticated]);
+  }, [authLoading, configLoading, providers, isAuthenticated])
 
   /**
    * Handle login with a specific provider
    */
   const handleLogin = async (providerId: string) => {
-    setIsLoggingIn(true);
-    setLoginError(null);
-    setSelectedProvider(providerId);
+    setIsLoggingIn(true)
+    setLoginError(null)
+    setSelectedProvider(providerId)
 
     try {
-      await login(providerId);
+      await login(providerId)
     } catch (err) {
-      setLoginError(err instanceof Error ? err : new Error('Login failed'));
-      setIsLoggingIn(false);
+      setLoginError(err instanceof Error ? err : new Error('Login failed'))
+      setIsLoggingIn(false)
     }
-  };
+  }
 
   // Show loading while checking auth or config
   if (authLoading || configLoading) {
@@ -86,11 +86,11 @@ export function LoginPage({ title }: LoginPageProps): React.ReactElement {
           <LoadingSpinner size="large" label={t('login.checking')} />
         </div>
       </div>
-    );
+    )
   }
 
   // Show error if auth error occurred
-  const error = loginError || authError;
+  const error = loginError || authError
 
   return (
     <div className={styles.loginPage} data-testid="login-page">
@@ -115,9 +115,9 @@ export function LoginPage({ title }: LoginPageProps): React.ReactElement {
             <ErrorMessage
               error={error}
               onRetry={() => {
-                setLoginError(null);
+                setLoginError(null)
                 if (selectedProvider) {
-                  handleLogin(selectedProvider);
+                  handleLogin(selectedProvider)
                 }
               }}
             />
@@ -162,7 +162,7 @@ export function LoginPage({ title }: LoginPageProps): React.ReactElement {
         </footer>
       </div>
     </div>
-  );
+  )
 }
 
-export default LoginPage;
+export default LoginPage

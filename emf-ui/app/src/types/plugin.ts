@@ -5,26 +5,26 @@
  * Plugins can register custom field renderers and page components.
  */
 
-import type { ComponentType } from 'react';
+import type { ComponentType } from 'react'
 
 /**
  * Props passed to custom field renderers
  */
 export interface FieldRendererProps {
   /** The field name */
-  name: string;
+  name: string
   /** The field value */
-  value: unknown;
+  value: unknown
   /** Callback to update the field value */
-  onChange: (value: unknown) => void;
+  onChange: (value: unknown) => void
   /** Whether the field is disabled */
-  disabled?: boolean;
+  disabled?: boolean
   /** Whether the field is read-only */
-  readOnly?: boolean;
+  readOnly?: boolean
   /** Validation error message */
-  error?: string;
+  error?: string
   /** Additional field metadata */
-  metadata?: Record<string, unknown>;
+  metadata?: Record<string, unknown>
 }
 
 /**
@@ -32,9 +32,9 @@ export interface FieldRendererProps {
  */
 export interface PageComponentProps {
   /** Component configuration from page builder */
-  config?: Record<string, unknown>;
+  config?: Record<string, unknown>
   /** Additional props passed from parent */
-  [key: string]: unknown;
+  [key: string]: unknown
 }
 
 /**
@@ -42,13 +42,13 @@ export interface PageComponentProps {
  */
 export interface PluginInitContext {
   /** Register a custom field renderer */
-  registerFieldRenderer: (type: string, renderer: ComponentType<FieldRendererProps>) => void;
+  registerFieldRenderer: (type: string, renderer: ComponentType<FieldRendererProps>) => void
   /** Register a custom page component */
-  registerPageComponent: (name: string, component: ComponentType<PageComponentProps>) => void;
+  registerPageComponent: (name: string, component: ComponentType<PageComponentProps>) => void
   /** Get the current locale */
-  getLocale: () => string;
+  getLocale: () => string
   /** Get the current theme mode */
-  getThemeMode: () => 'light' | 'dark';
+  getThemeMode: () => 'light' | 'dark'
 }
 
 /**
@@ -56,36 +56,36 @@ export interface PluginInitContext {
  */
 export interface Plugin {
   /** Unique plugin identifier */
-  id: string;
+  id: string
   /** Human-readable plugin name */
-  name: string;
+  name: string
   /** Plugin version (semver) */
-  version: string;
+  version: string
   /** Called when the plugin is loaded and initialized */
-  onLoad?: (context: PluginInitContext) => Promise<void>;
+  onLoad?: (context: PluginInitContext) => Promise<void>
   /** Called when the plugin is being unloaded */
-  onUnload?: () => Promise<void>;
+  onUnload?: () => Promise<void>
   /** Map of field type to renderer component */
-  fieldRenderers?: Record<string, ComponentType<FieldRendererProps>>;
+  fieldRenderers?: Record<string, ComponentType<FieldRendererProps>>
   /** Map of component name to page component */
-  pageComponents?: Record<string, ComponentType<PageComponentProps>>;
+  pageComponents?: Record<string, ComponentType<PageComponentProps>>
 }
 
 /**
  * Plugin load status
  */
-export type PluginStatus = 'pending' | 'loading' | 'loaded' | 'error';
+export type PluginStatus = 'pending' | 'loading' | 'loaded' | 'error'
 
 /**
  * Information about a loaded plugin
  */
 export interface LoadedPlugin {
   /** The plugin instance */
-  plugin: Plugin;
+  plugin: Plugin
   /** Current load status */
-  status: PluginStatus;
+  status: PluginStatus
   /** Error message if loading failed */
-  error?: string;
+  error?: string
 }
 
 /**
@@ -93,7 +93,7 @@ export interface LoadedPlugin {
  */
 export interface ComponentRegistry {
   /** Map of field type to renderer component */
-  fieldRenderers: Map<string, ComponentType<FieldRendererProps>>;
+  fieldRenderers: Map<string, ComponentType<FieldRendererProps>>
   /** Map of component name to page component */
-  pageComponents: Map<string, ComponentType<PageComponentProps>>;
+  pageComponents: Map<string, ComponentType<PageComponentProps>>
 }

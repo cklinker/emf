@@ -16,29 +16,29 @@
  * - Accessible with proper ARIA attributes
  */
 
-import React from 'react';
-import { LoadingSpinner } from '../LoadingSpinner';
-import styles from './PageLoader.module.css';
+import React from 'react'
+import { LoadingSpinner } from '../LoadingSpinner'
+import styles from './PageLoader.module.css'
 
 /**
  * Skeleton variant types
  */
-export type SkeletonVariant = 'text' | 'card' | 'table' | 'form' | 'header' | 'list';
+export type SkeletonVariant = 'text' | 'card' | 'table' | 'form' | 'header' | 'list'
 
 /**
  * Props for the PageLoader component
  */
 export interface PageLoaderProps {
   /** Loading message to display */
-  message?: string;
+  message?: string
   /** Size of the spinner */
-  size?: 'small' | 'medium' | 'large';
+  size?: 'small' | 'medium' | 'large'
   /** Whether to show as full page overlay */
-  fullPage?: boolean;
+  fullPage?: boolean
   /** Optional custom class name */
-  className?: string;
+  className?: string
   /** Optional test ID for testing purposes */
-  'data-testid'?: string;
+  'data-testid'?: string
 }
 
 /**
@@ -46,17 +46,17 @@ export interface PageLoaderProps {
  */
 export interface SkeletonProps {
   /** Type of skeleton to display */
-  variant?: SkeletonVariant;
+  variant?: SkeletonVariant
   /** Number of skeleton items to display (for list/table variants) */
-  count?: number;
+  count?: number
   /** Width of the skeleton (CSS value) */
-  width?: string;
+  width?: string
   /** Height of the skeleton (CSS value) */
-  height?: string;
+  height?: string
   /** Optional custom class name */
-  className?: string;
+  className?: string
   /** Optional test ID for testing purposes */
-  'data-testid'?: string;
+  'data-testid'?: string
 }
 
 /**
@@ -64,19 +64,19 @@ export interface SkeletonProps {
  */
 export interface ContentLoaderProps {
   /** Whether content is loading */
-  isLoading: boolean;
+  isLoading: boolean
   /** Content to display when not loading */
-  children: React.ReactNode;
+  children: React.ReactNode
   /** Skeleton variant to show while loading */
-  skeleton?: SkeletonVariant;
+  skeleton?: SkeletonVariant
   /** Number of skeleton items */
-  skeletonCount?: number;
+  skeletonCount?: number
   /** Loading message for screen readers */
-  loadingMessage?: string;
+  loadingMessage?: string
   /** Optional custom class name */
-  className?: string;
+  className?: string
   /** Optional test ID for testing purposes */
-  'data-testid'?: string;
+  'data-testid'?: string
 }
 
 /**
@@ -104,7 +104,9 @@ export function PageLoader({
     styles.pageLoader,
     fullPage ? styles.fullPage : styles.inline,
     className,
-  ].filter(Boolean).join(' ');
+  ]
+    .filter(Boolean)
+    .join(' ')
 
   return (
     <div
@@ -115,14 +117,10 @@ export function PageLoader({
       data-testid={testId}
     >
       <div className={styles.loaderContent}>
-        <LoadingSpinner
-          size={size}
-          label={message}
-          data-testid={`${testId}-spinner`}
-        />
+        <LoadingSpinner size={size} label={message} data-testid={`${testId}-spinner`} />
       </div>
     </div>
-  );
+  )
 }
 
 /**
@@ -153,10 +151,10 @@ export function Skeleton({
   const style: React.CSSProperties = {
     ...(width && { width }),
     ...(height && { height }),
-  };
+  }
 
   const renderSkeletonItem = (index: number) => {
-    const itemTestId = count > 1 ? `${testId}-item-${index}` : testId;
+    const itemTestId = count > 1 ? `${testId}-item-${index}` : testId
 
     switch (variant) {
       case 'text':
@@ -168,7 +166,7 @@ export function Skeleton({
             data-testid={itemTestId}
             aria-hidden="true"
           />
-        );
+        )
 
       case 'card':
         return (
@@ -186,7 +184,7 @@ export function Skeleton({
               <div className={styles.skeletonLine} style={{ width: '70%' }} />
             </div>
           </div>
-        );
+        )
 
       case 'table':
         return (
@@ -202,7 +200,7 @@ export function Skeleton({
             <div className={styles.skeletonCell} style={{ width: '25%' }} />
             <div className={styles.skeletonCell} style={{ width: '15%' }} />
           </div>
-        );
+        )
 
       case 'form':
         return (
@@ -218,7 +216,7 @@ export function Skeleton({
               <div className={styles.skeletonInput} />
             </div>
           </div>
-        );
+        )
 
       case 'header':
         return (
@@ -232,7 +230,7 @@ export function Skeleton({
             <div className={styles.skeletonTitle} />
             <div className={styles.skeletonSubtitle} />
           </div>
-        );
+        )
 
       case 'list':
         return (
@@ -249,7 +247,7 @@ export function Skeleton({
               <div className={styles.skeletonLine} style={{ width: '50%' }} />
             </div>
           </div>
-        );
+        )
 
       default:
         return (
@@ -260,14 +258,11 @@ export function Skeleton({
             data-testid={itemTestId}
             aria-hidden="true"
           />
-        );
+        )
     }
-  };
+  }
 
-  const containerClasses = [
-    styles.skeletonContainer,
-    className,
-  ].filter(Boolean).join(' ');
+  const containerClasses = [styles.skeletonContainer, className].filter(Boolean).join(' ')
 
   return (
     <div
@@ -279,7 +274,7 @@ export function Skeleton({
       <span className={styles.srOnly}>Loading...</span>
       {Array.from({ length: count }, (_, index) => renderSkeletonItem(index))}
     </div>
-  );
+  )
 }
 
 /**
@@ -306,31 +301,19 @@ export function ContentLoader({
 }: ContentLoaderProps): React.ReactElement {
   if (isLoading) {
     return (
-      <div
-        className={className}
-        data-testid={testId}
-        aria-busy="true"
-      >
+      <div className={className} data-testid={testId} aria-busy="true">
         <span className={styles.srOnly}>{loadingMessage}</span>
-        <Skeleton
-          variant={skeleton}
-          count={skeletonCount}
-          data-testid={`${testId}-skeleton`}
-        />
+        <Skeleton variant={skeleton} count={skeletonCount} data-testid={`${testId}-skeleton`} />
       </div>
-    );
+    )
   }
 
   return (
-    <div
-      className={className}
-      data-testid={testId}
-      aria-busy="false"
-    >
+    <div className={className} data-testid={testId} aria-busy="false">
       {children}
     </div>
-  );
+  )
 }
 
 // Export default for convenience
-export default PageLoader;
+export default PageLoader

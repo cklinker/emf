@@ -13,51 +13,51 @@
  * - Display service metadata (name, environment, base path, database URL)
  */
 
-import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useI18n } from '../../context/I18nContext';
-import { useApi } from '../../context/ApiContext';
-import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components';
-import styles from './ServicesPage.module.css';
+import React, { useState, useCallback, useEffect, useRef } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useI18n } from '../../context/I18nContext'
+import { useApi } from '../../context/ApiContext'
+import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
+import styles from './ServicesPage.module.css'
 
 /**
  * Service interface matching the API response
  */
 export interface Service {
-  id: string;
-  name: string;
-  displayName: string;
-  description: string;
-  basePath: string;
-  environment: string;
-  databaseUrl: string;
-  active: boolean;
-  createdAt: string;
-  updatedAt: string;
+  id: string
+  name: string
+  displayName: string
+  description: string
+  basePath: string
+  environment: string
+  databaseUrl: string
+  active: boolean
+  createdAt: string
+  updatedAt: string
 }
 
 /**
  * Form data for creating/editing a service
  */
 interface ServiceFormData {
-  name: string;
-  displayName: string;
-  description: string;
-  basePath: string;
-  environment: string;
-  databaseUrl: string;
+  name: string
+  displayName: string
+  description: string
+  basePath: string
+  environment: string
+  databaseUrl: string
 }
 
 /**
  * Form validation errors
  */
 interface FormErrors {
-  name?: string;
-  displayName?: string;
-  description?: string;
-  basePath?: string;
-  environment?: string;
-  databaseUrl?: string;
+  name?: string
+  displayName?: string
+  description?: string
+  basePath?: string
+  environment?: string
+  databaseUrl?: string
 }
 
 /**
@@ -65,52 +65,52 @@ interface FormErrors {
  */
 export interface ServicesPageProps {
   /** Optional test ID for testing */
-  testId?: string;
+  testId?: string
 }
 
 /**
  * Validate service form data
  */
 function validateForm(data: ServiceFormData, t: (key: string) => string): FormErrors {
-  const errors: FormErrors = {};
+  const errors: FormErrors = {}
 
   // Name validation
   if (!data.name.trim()) {
-    errors.name = t('services.validation.nameRequired');
+    errors.name = t('services.validation.nameRequired')
   } else if (data.name.length > 100) {
-    errors.name = t('services.validation.nameTooLong');
+    errors.name = t('services.validation.nameTooLong')
   } else if (!/^[a-z0-9-]+$/.test(data.name)) {
-    errors.name = t('services.validation.nameInvalid');
+    errors.name = t('services.validation.nameInvalid')
   }
 
   // Display name validation
   if (data.displayName && data.displayName.length > 100) {
-    errors.displayName = t('services.validation.displayNameTooLong');
+    errors.displayName = t('services.validation.displayNameTooLong')
   }
 
   // Description validation
   if (data.description && data.description.length > 500) {
-    errors.description = t('services.validation.descriptionTooLong');
+    errors.description = t('services.validation.descriptionTooLong')
   }
 
   // Base path validation
   if (data.basePath && data.basePath.length > 100) {
-    errors.basePath = t('services.validation.basePathTooLong');
+    errors.basePath = t('services.validation.basePathTooLong')
   } else if (data.basePath && !/^\/[a-z0-9/-]*$/.test(data.basePath)) {
-    errors.basePath = t('services.validation.basePathInvalid');
+    errors.basePath = t('services.validation.basePathInvalid')
   }
 
   // Environment validation
   if (data.environment && data.environment.length > 50) {
-    errors.environment = t('services.validation.environmentTooLong');
+    errors.environment = t('services.validation.environmentTooLong')
   }
 
   // Database URL validation
   if (data.databaseUrl && data.databaseUrl.length > 500) {
-    errors.databaseUrl = t('services.validation.databaseUrlTooLong');
+    errors.databaseUrl = t('services.validation.databaseUrlTooLong')
   }
 
-  return errors;
+  return errors
 }
 
 /**
@@ -119,15 +119,20 @@ function validateForm(data: ServiceFormData, t: (key: string) => string): FormEr
  * Modal form for creating and editing services.
  */
 interface ServiceFormProps {
-  service?: Service;
-  onSubmit: (data: ServiceFormData) => void;
-  onCancel: () => void;
-  isSubmitting: boolean;
+  service?: Service
+  onSubmit: (data: ServiceFormData) => void
+  onCancel: () => void
+  isSubmitting: boolean
 }
 
-function ServiceForm({ service, onSubmit, onCancel, isSubmitting }: ServiceFormProps): React.ReactElement {
-  const { t } = useI18n();
-  const isEditing = !!service;
+function ServiceForm({
+  service,
+  onSubmit,
+  onCancel,
+  isSubmitting,
+}: ServiceFormProps): React.ReactElement {
+  const { t } = useI18n()
+  const isEditing = !!service
   const [formData, setFormData] = useState<ServiceFormData>({
     name: service?.name ?? '',
     displayName: service?.displayName ?? '',
@@ -135,54 +140,73 @@ function ServiceForm({ service, onSubmit, onCancel, isSubmitting }: ServiceFormP
     basePath: service?.basePath ?? '/api',
     environment: service?.environment ?? '',
     databaseUrl: service?.databaseUrl ?? '',
-  });
-  const [errors, setErrors] = useState<FormErrors>({});
-  const [touched, setTouched] = useState<Record<string, boolean>>({});
-  const nameInputRef = useRef<HTMLInputElement>(null);
+  })
+  const [errors, setErrors] = useState<FormErrors>({})
+  const [touched, setTouched] = useState<Record<string, boolean>>({})
+  const nameInputRef = useRef<HTMLInputElement>(null)
 
   // Focus name input on mount
   useEffect(() => {
-    nameInputRef.current?.focus();
-  }, []);
+    nameInputRef.current?.focus()
+  }, [])
 
-  const handleChange = useCallback((field: keyof ServiceFormData, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-    // Clear error when user starts typing
-    if (errors[field]) {
-      setErrors((prev) => ({ ...prev, [field]: undefined }));
-    }
-  }, [errors]);
+  const handleChange = useCallback(
+    (field: keyof ServiceFormData, value: string) => {
+      setFormData((prev) => ({ ...prev, [field]: value }))
+      // Clear error when user starts typing
+      if (errors[field]) {
+        setErrors((prev) => ({ ...prev, [field]: undefined }))
+      }
+    },
+    [errors]
+  )
 
-  const handleBlur = useCallback((field: keyof ServiceFormData) => {
-    setTouched((prev) => ({ ...prev, [field]: true }));
-    // Validate on blur
-    const validationErrors = validateForm(formData, t);
-    if (validationErrors[field]) {
-      setErrors((prev) => ({ ...prev, [field]: validationErrors[field] }));
-    }
-  }, [formData, t]);
+  const handleBlur = useCallback(
+    (field: keyof ServiceFormData) => {
+      setTouched((prev) => ({ ...prev, [field]: true }))
+      // Validate on blur
+      const validationErrors = validateForm(formData, t)
+      if (validationErrors[field]) {
+        setErrors((prev) => ({ ...prev, [field]: validationErrors[field] }))
+      }
+    },
+    [formData, t]
+  )
 
-  const handleSubmit = useCallback((e: React.FormEvent) => {
-    e.preventDefault();
-    
-    // Validate all fields
-    const validationErrors = validateForm(formData, t);
-    setErrors(validationErrors);
-    setTouched({ name: true, displayName: true, description: true, basePath: true, environment: true, databaseUrl: true });
+  const handleSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault()
 
-    // If no errors, submit
-    if (Object.keys(validationErrors).length === 0) {
-      onSubmit(formData);
-    }
-  }, [formData, onSubmit, t]);
+      // Validate all fields
+      const validationErrors = validateForm(formData, t)
+      setErrors(validationErrors)
+      setTouched({
+        name: true,
+        displayName: true,
+        description: true,
+        basePath: true,
+        environment: true,
+        databaseUrl: true,
+      })
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      onCancel();
-    }
-  }, [onCancel]);
+      // If no errors, submit
+      if (Object.keys(validationErrors).length === 0) {
+        onSubmit(formData)
+      }
+    },
+    [formData, onSubmit, t]
+  )
 
-  const title = isEditing ? t('services.editService') : t('services.addService');
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onCancel()
+      }
+    },
+    [onCancel]
+  )
+
+  const title = isEditing ? t('services.editService') : t('services.addService')
 
   return (
     <div
@@ -219,7 +243,9 @@ function ServiceForm({ service, onSubmit, onCancel, isSubmitting }: ServiceFormP
             <div className={styles.formGroup}>
               <label htmlFor="service-name" className={styles.formLabel}>
                 {t('services.serviceName')}
-                <span className={styles.required} aria-hidden="true">*</span>
+                <span className={styles.required} aria-hidden="true">
+                  *
+                </span>
               </label>
               <input
                 ref={nameInputRef}
@@ -310,7 +336,9 @@ function ServiceForm({ service, onSubmit, onCancel, isSubmitting }: ServiceFormP
                 onBlur={() => handleBlur('basePath')}
                 placeholder="/api"
                 aria-invalid={touched.basePath && !!errors.basePath}
-                aria-describedby={errors.basePath ? 'service-base-path-error' : 'service-base-path-hint'}
+                aria-describedby={
+                  errors.basePath ? 'service-base-path-error' : 'service-base-path-hint'
+                }
                 disabled={isSubmitting}
                 data-testid="service-base-path-input"
               />
@@ -398,18 +426,18 @@ function ServiceForm({ service, onSubmit, onCancel, isSubmitting }: ServiceFormP
         </div>
       </div>
     </div>
-  );
+  )
 }
 
 /**
  * Status Badge Component
  */
 interface StatusBadgeProps {
-  active: boolean;
+  active: boolean
 }
 
 function StatusBadge({ active }: StatusBadgeProps): React.ReactElement {
-  const { t } = useI18n();
+  const { t } = useI18n()
   return (
     <span
       className={`${styles.statusBadge} ${active ? styles.statusActive : styles.statusInactive}`}
@@ -417,7 +445,7 @@ function StatusBadge({ active }: StatusBadgeProps): React.ReactElement {
     >
       {active ? t('collections.active') : t('collections.inactive')}
     </span>
-  );
+  )
 }
 
 /**
@@ -427,18 +455,18 @@ function StatusBadge({ active }: StatusBadgeProps): React.ReactElement {
  * Provides listing and CRUD operations for services.
  */
 export function ServicesPage({ testId = 'services-page' }: ServicesPageProps): React.ReactElement {
-  const queryClient = useQueryClient();
-  const { t, formatDate } = useI18n();
-  const { apiClient } = useApi();
-  const { showToast } = useToast();
+  const queryClient = useQueryClient()
+  const { t, formatDate } = useI18n()
+  const { apiClient } = useApi()
+  const { showToast } = useToast()
 
   // Modal state
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingService, setEditingService] = useState<Service | undefined>(undefined);
+  const [isFormOpen, setIsFormOpen] = useState(false)
+  const [editingService, setEditingService] = useState<Service | undefined>(undefined)
 
   // Delete confirmation dialog state
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [serviceToDelete, setServiceToDelete] = useState<Service | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [serviceToDelete, setServiceToDelete] = useState<Service | null>(null)
 
   // Fetch services query
   const {
@@ -449,97 +477,99 @@ export function ServicesPage({ testId = 'services-page' }: ServicesPageProps): R
   } = useQuery({
     queryKey: ['services'],
     queryFn: () => apiClient.get<{ content: Service[] }>('/control/services'),
-  });
+  })
 
-  const services = servicesPage?.content ?? [];
+  const services = servicesPage?.content ?? []
 
   // Create mutation
   const createMutation = useMutation({
-    mutationFn: (data: ServiceFormData) => 
-      apiClient.post<Service>('/control/services', data),
+    mutationFn: (data: ServiceFormData) => apiClient.post<Service>('/control/services', data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['services'] });
-      showToast(t('success.created', { item: t('navigation.services') }), 'success');
-      handleCloseForm();
+      queryClient.invalidateQueries({ queryKey: ['services'] })
+      showToast(t('success.created', { item: t('navigation.services') }), 'success')
+      handleCloseForm()
     },
     onError: (error: Error) => {
-      showToast(error.message || t('errors.generic'), 'error');
+      showToast(error.message || t('errors.generic'), 'error')
     },
-  });
+  })
 
   // Update mutation
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: ServiceFormData }) => 
+    mutationFn: ({ id, data }: { id: string; data: ServiceFormData }) =>
       apiClient.put<Service>(`/control/services/${id}`, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['services'] });
-      showToast(t('success.updated', { item: t('navigation.services') }), 'success');
-      handleCloseForm();
+      queryClient.invalidateQueries({ queryKey: ['services'] })
+      showToast(t('success.updated', { item: t('navigation.services') }), 'success')
+      handleCloseForm()
     },
     onError: (error: Error) => {
-      showToast(error.message || t('errors.generic'), 'error');
+      showToast(error.message || t('errors.generic'), 'error')
     },
-  });
+  })
 
   // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: (id: string) => apiClient.delete(`/control/services/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['services'] });
-      showToast(t('success.deleted', { item: t('navigation.services') }), 'success');
-      setDeleteDialogOpen(false);
-      setServiceToDelete(null);
+      queryClient.invalidateQueries({ queryKey: ['services'] })
+      showToast(t('success.deleted', { item: t('navigation.services') }), 'success')
+      setDeleteDialogOpen(false)
+      setServiceToDelete(null)
     },
     onError: (error: Error) => {
-      showToast(error.message || t('errors.generic'), 'error');
+      showToast(error.message || t('errors.generic'), 'error')
     },
-  });
+  })
 
   // Handle create action
   const handleCreate = useCallback(() => {
-    setEditingService(undefined);
-    setIsFormOpen(true);
-  }, []);
+    setEditingService(undefined)
+    setIsFormOpen(true)
+  }, [])
 
   // Handle edit action
   const handleEdit = useCallback((service: Service) => {
-    setEditingService(service);
-    setIsFormOpen(true);
-  }, []);
+    setEditingService(service)
+    setIsFormOpen(true)
+  }, [])
 
   // Handle close form
   const handleCloseForm = useCallback(() => {
-    setIsFormOpen(false);
-    setEditingService(undefined);
-  }, []);
+    setIsFormOpen(false)
+    setEditingService(undefined)
+  }, [])
 
   // Handle form submit
-  const handleFormSubmit = useCallback((data: ServiceFormData) => {
-    if (editingService) {
-      updateMutation.mutate({ id: editingService.id, data });
-    } else {
-      createMutation.mutate(data);
-    }
-  }, [editingService, createMutation, updateMutation]);
+  const handleFormSubmit = useCallback(
+    (data: ServiceFormData) => {
+      if (editingService) {
+        updateMutation.mutate({ id: editingService.id, data })
+      } else {
+        createMutation.mutate(data)
+      }
+    },
+    [editingService, createMutation, updateMutation]
+  )
 
   // Handle delete action - open confirmation dialog
   const handleDeleteClick = useCallback((service: Service) => {
-    setServiceToDelete(service);
-    setDeleteDialogOpen(true);
-  }, []);
+    setServiceToDelete(service)
+    setDeleteDialogOpen(true)
+  }, [])
 
   // Handle delete confirmation
   const handleDeleteConfirm = useCallback(() => {
     if (serviceToDelete) {
-      deleteMutation.mutate(serviceToDelete.id);
+      deleteMutation.mutate(serviceToDelete.id)
     }
-  }, [serviceToDelete, deleteMutation]);
+  }, [serviceToDelete, deleteMutation])
 
   // Handle delete cancel
   const handleDeleteCancel = useCallback(() => {
-    setDeleteDialogOpen(false);
-    setServiceToDelete(null);
-  }, []);
+    setDeleteDialogOpen(false)
+    setServiceToDelete(null)
+  }, [])
 
   // Render loading state
   if (isLoading) {
@@ -549,7 +579,7 @@ export function ServicesPage({ testId = 'services-page' }: ServicesPageProps): R
           <LoadingSpinner size="large" label={t('common.loading')} />
         </div>
       </div>
-    );
+    )
   }
 
   // Render error state
@@ -561,10 +591,10 @@ export function ServicesPage({ testId = 'services-page' }: ServicesPageProps): R
           onRetry={() => refetch()}
         />
       </div>
-    );
+    )
   }
 
-  const isSubmitting = createMutation.isPending || updateMutation.isPending;
+  const isSubmitting = createMutation.isPending || updateMutation.isPending
 
   return (
     <div className={styles.container} data-testid={testId}>
@@ -701,7 +731,7 @@ export function ServicesPage({ testId = 'services-page' }: ServicesPageProps): R
         variant="danger"
       />
     </div>
-  );
+  )
 }
 
-export default ServicesPage;
+export default ServicesPage

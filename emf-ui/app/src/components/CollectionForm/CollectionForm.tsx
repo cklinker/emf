@@ -11,51 +11,51 @@
  * - 3.9: Pre-populate form with current values in edit mode
  */
 
-import React, { useEffect, useCallback } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { useI18n } from '../../context/I18nContext';
-import { LoadingSpinner } from '../LoadingSpinner';
-import styles from './CollectionForm.module.css';
+import React, { useEffect, useCallback } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
+import { useI18n } from '../../context/I18nContext'
+import { LoadingSpinner } from '../LoadingSpinner'
+import styles from './CollectionForm.module.css'
 
 /**
  * Storage mode options for collections
  */
-export type StorageMode = 'PHYSICAL_TABLE' | 'JSONB';
+export type StorageMode = 'PHYSICAL_TABLE' | 'JSONB'
 
 /**
  * Collection data for the form
  */
 export interface CollectionFormData {
   /** Service ID that owns this collection */
-  serviceId: string;
+  serviceId: string
   /** Collection name (alphanumeric, underscores, lowercase) */
-  name: string;
+  name: string
   /** Display name for the collection */
-  displayName: string;
+  displayName: string
   /** Optional description */
-  description?: string;
+  description?: string
   /** Storage mode for the collection */
-  storageMode: StorageMode;
+  storageMode: StorageMode
   /** Whether the collection is active */
-  active: boolean;
+  active: boolean
 }
 
 /**
  * Full collection interface for edit mode
  */
 export interface Collection {
-  id: string;
-  serviceId: string;
-  name: string;
-  displayName: string;
-  description?: string;
-  storageMode: StorageMode;
-  active: boolean;
-  currentVersion: number;
-  createdAt: string;
-  updatedAt: string;
+  id: string
+  serviceId: string
+  name: string
+  displayName: string
+  description?: string
+  storageMode: StorageMode
+  active: boolean
+  currentVersion: number
+  createdAt: string
+  updatedAt: string
 }
 
 /**
@@ -63,24 +63,24 @@ export interface Collection {
  */
 export interface CollectionFormProps {
   /** Existing collection data for edit mode */
-  collection?: Collection;
+  collection?: Collection
   /** Available services to choose from */
-  services?: Array<{ id: string; name: string }>;
+  services?: Array<{ id: string; name: string }>
   /** Whether services are loading */
-  servicesLoading?: boolean;
+  servicesLoading?: boolean
   /** Callback when form is submitted successfully */
-  onSubmit: (data: CollectionFormData) => Promise<void>;
+  onSubmit: (data: CollectionFormData) => Promise<void>
   /** Callback when form is cancelled */
-  onCancel: () => void;
+  onCancel: () => void
   /** Whether the form is in a loading/submitting state */
-  isSubmitting?: boolean;
+  isSubmitting?: boolean
   /** Optional test ID for testing */
-  testId?: string;
+  testId?: string
 }
 
 /**
  * Zod validation schema for collection form
- * 
+ *
  * Name validation:
  * - Required
  * - 1-50 characters
@@ -88,9 +88,7 @@ export interface CollectionFormProps {
  * - Must start with a letter
  */
 export const collectionFormSchema = z.object({
-  serviceId: z
-    .string()
-    .min(1, 'validation.serviceRequired'),
+  serviceId: z.string().min(1, 'validation.serviceRequired'),
   name: z
     .string()
     .min(1, 'validation.nameRequired')
@@ -100,21 +98,17 @@ export const collectionFormSchema = z.object({
     .string()
     .min(1, 'validation.displayNameRequired')
     .max(100, 'validation.displayNameTooLong'),
-  description: z
-    .string()
-    .max(500, 'validation.descriptionTooLong')
-    .optional()
-    .or(z.literal('')),
+  description: z.string().max(500, 'validation.descriptionTooLong').optional().or(z.literal('')),
   storageMode: z.enum(['PHYSICAL_TABLE', 'JSONB'], {
     errorMap: () => ({ message: 'validation.storageModeRequired' }),
   }),
   active: z.boolean(),
-});
+})
 
 /**
  * Type inferred from the Zod schema
  */
-export type CollectionFormSchema = z.infer<typeof collectionFormSchema>;
+export type CollectionFormSchema = z.infer<typeof collectionFormSchema>
 
 /**
  * CollectionForm Component
@@ -137,8 +131,8 @@ export function CollectionForm({
   isSubmitting = false,
   testId = 'collection-form',
 }: CollectionFormProps): React.ReactElement {
-  const { t } = useI18n();
-  const isEditMode = !!collection;
+  const { t } = useI18n()
+  const isEditMode = !!collection
 
   // Initialize form with React Hook Form and Zod resolver
   const {
@@ -157,7 +151,7 @@ export function CollectionForm({
       active: collection?.active ?? true,
     },
     mode: 'onBlur',
-  });
+  })
 
   // Reset form when collection prop changes (for edit mode)
   useEffect(() => {
@@ -169,9 +163,9 @@ export function CollectionForm({
         description: collection.description ?? '',
         storageMode: collection.storageMode,
         active: collection.active,
-      });
+      })
     }
-  }, [collection, reset]);
+  }, [collection, reset])
 
   // Handle form submission
   const handleFormSubmit = useCallback(
@@ -183,24 +177,24 @@ export function CollectionForm({
         description: data.description || undefined,
         storageMode: data.storageMode,
         active: data.active,
-      };
-      await onSubmit(formData);
+      }
+      await onSubmit(formData)
     },
     [onSubmit]
-  );
+  )
 
   // Get translated error message
   const getErrorMessage = useCallback(
     (errorKey: string | undefined): string | undefined => {
-      if (!errorKey) return undefined;
+      if (!errorKey) return undefined
       // Check if it's a translation key
       if (errorKey.startsWith('validation.')) {
-        return t(`collectionForm.${errorKey}`);
+        return t(`collectionForm.${errorKey}`)
       }
-      return errorKey;
+      return errorKey
     },
     [t]
-  );
+  )
 
   return (
     <form
@@ -213,7 +207,9 @@ export function CollectionForm({
       <div className={styles.fieldGroup}>
         <label htmlFor="collection-service" className={styles.label}>
           {t('collections.service')}
-          <span className={styles.required} aria-hidden="true">*</span>
+          <span className={styles.required} aria-hidden="true">
+            *
+          </span>
         </label>
         <select
           id="collection-service"
@@ -225,7 +221,9 @@ export function CollectionForm({
           data-testid="collection-service-select"
           {...register('serviceId')}
         >
-          <option value="">{servicesLoading ? t('common.loading') : t('collections.selectService')}</option>
+          <option value="">
+            {servicesLoading ? t('common.loading') : t('collections.selectService')}
+          </option>
           {services.map((service) => (
             <option key={service.id} value={service.id}>
               {service.name}
@@ -248,7 +246,9 @@ export function CollectionForm({
       <div className={styles.fieldGroup}>
         <label htmlFor="collection-name" className={styles.label}>
           {t('collections.collectionName')}
-          <span className={styles.required} aria-hidden="true">*</span>
+          <span className={styles.required} aria-hidden="true">
+            *
+          </span>
         </label>
         <input
           id="collection-name"
@@ -258,7 +258,7 @@ export function CollectionForm({
           disabled={isEditMode || isSubmitting}
           aria-required="true"
           aria-invalid={!!errors.name}
-          aria-describedby={errors.name ? 'name-error' : (!isEditMode ? 'name-hint' : undefined)}
+          aria-describedby={errors.name ? 'name-error' : !isEditMode ? 'name-hint' : undefined}
           data-testid="collection-name-input"
           {...register('name')}
         />
@@ -283,7 +283,9 @@ export function CollectionForm({
       <div className={styles.fieldGroup}>
         <label htmlFor="collection-display-name" className={styles.label}>
           {t('collections.displayName')}
-          <span className={styles.required} aria-hidden="true">*</span>
+          <span className={styles.required} aria-hidden="true">
+            *
+          </span>
         </label>
         <input
           id="collection-display-name"
@@ -342,7 +344,9 @@ export function CollectionForm({
       <div className={styles.fieldGroup}>
         <label htmlFor="collection-storage-mode" className={styles.label}>
           {t('collections.storageMode')}
-          <span className={styles.required} aria-hidden="true">*</span>
+          <span className={styles.required} aria-hidden="true">
+            *
+          </span>
         </label>
         <select
           id="collection-storage-mode"
@@ -350,7 +354,13 @@ export function CollectionForm({
           disabled={isEditMode || isSubmitting}
           aria-required="true"
           aria-invalid={!!errors.storageMode}
-          aria-describedby={errors.storageMode ? 'storage-mode-error' : (!isEditMode ? 'storage-mode-hint' : undefined)}
+          aria-describedby={
+            errors.storageMode
+              ? 'storage-mode-error'
+              : !isEditMode
+                ? 'storage-mode-hint'
+                : undefined
+          }
           data-testid="collection-storage-mode-select"
           {...register('storageMode')}
         >
@@ -419,13 +429,15 @@ export function CollectionForm({
                 {isEditMode ? t('common.save') : t('common.create')}
               </span>
             </>
+          ) : isEditMode ? (
+            t('common.save')
           ) : (
-            isEditMode ? t('common.save') : t('common.create')
+            t('common.create')
           )}
         </button>
       </div>
     </form>
-  );
+  )
 }
 
-export default CollectionForm;
+export default CollectionForm

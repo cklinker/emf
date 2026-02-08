@@ -5,21 +5,21 @@
  * Wraps the CollectionForm component with page layout.
  */
 
-import React, { useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { useI18n } from '../../context/I18nContext';
-import { useApi } from '../../context/ApiContext';
-import { CollectionForm, LoadingSpinner, ErrorMessage } from '../../components';
-import type { Collection, CollectionFormData } from '../../components/CollectionForm/CollectionForm';
-import styles from './CollectionFormPage.module.css';
+import React, { useCallback } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { useI18n } from '../../context/I18nContext'
+import { useApi } from '../../context/ApiContext'
+import { CollectionForm, LoadingSpinner, ErrorMessage } from '../../components'
+import type { Collection, CollectionFormData } from '../../components/CollectionForm/CollectionForm'
+import styles from './CollectionFormPage.module.css'
 
 /**
  * Props for CollectionFormPage component
  */
 export interface CollectionFormPageProps {
   /** Optional test ID for testing */
-  testId?: string;
+  testId?: string
 }
 
 /**
@@ -27,68 +27,78 @@ export interface CollectionFormPageProps {
  *
  * Page for creating or editing collections.
  */
-export function CollectionFormPage({ testId = 'collection-form-page' }: CollectionFormPageProps): React.ReactElement {
-  const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
-  const { t } = useI18n();
-  const { apiClient } = useApi();
+export function CollectionFormPage({
+  testId = 'collection-form-page',
+}: CollectionFormPageProps): React.ReactElement {
+  const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
+  const { t } = useI18n()
+  const { apiClient } = useApi()
 
-  const isEditMode = Boolean(id);
+  const isEditMode = Boolean(id)
 
   // Fetch available services
   const { data: servicesData, isLoading: servicesLoading } = useQuery({
     queryKey: ['services'],
-    queryFn: () => apiClient.get<{ content: Array<{ id: string; name: string }> }>('/control/services?size=100'),
-  });
+    queryFn: () =>
+      apiClient.get<{ content: Array<{ id: string; name: string }> }>('/control/services?size=100'),
+  })
 
   // Fetch existing collection if in edit mode
-  const { data: collection, isLoading, error } = useQuery({
+  const {
+    data: collection,
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ['collection', id],
     queryFn: () => apiClient.get<Collection>(`/control/collections/${id}`),
     enabled: isEditMode,
-  });
+  })
 
   // Handle form submission
-  const handleSubmit = useCallback(async (data: CollectionFormData) => {
-    if (isEditMode && id) {
-      // Update existing collection - only name and description can be updated
-      const requestData = {
-        name: data.name,
-        description: data.description || '',
-      };
-      await apiClient.put(`/control/collections/${id}`, requestData);
-      navigate(`/collections/${id}`);
-    } else {
-      // Create new collection - backend expects serviceId, name, and description
-      const requestData = {
-        serviceId: data.serviceId,
-        name: data.name,
-        description: data.description || '',
-      };
-      
-      const created = await apiClient.post<{
-        id: string;
-        name: string;
-        description: string;
-        active: boolean;
-        currentVersion: number;
-        createdAt: string;
-        updatedAt: string;
-      }>('/control/collections', requestData);
-      
-      console.log('Created collection:', created);
-      navigate(`/collections/${created.id}`);
-    }
-  }, [apiClient, navigate, isEditMode, id]);
+  const handleSubmit = useCallback(
+    async (data: CollectionFormData) => {
+      if (isEditMode && id) {
+        // Update existing collection - only name and description can be updated
+        const requestData = {
+          name: data.name,
+          description: data.description || '',
+        }
+        await apiClient.put(`/control/collections/${id}`, requestData)
+        navigate(`/collections/${id}`)
+      } else {
+        // Create new collection - backend expects serviceId, name, and description
+        const requestData = {
+          serviceId: data.serviceId,
+          name: data.name,
+          description: data.description || '',
+        }
+
+        const created = await apiClient.post<{
+          id: string
+          name: string
+          description: string
+          active: boolean
+          currentVersion: number
+          createdAt: string
+          updatedAt: string
+        }>('/control/collections', requestData)
+
+        console.log('Created collection:', created)
+        navigate(`/collections/${created.id}`)
+      }
+    },
+    [apiClient, navigate, isEditMode, id]
+  )
 
   // Handle cancel
   const handleCancel = useCallback(() => {
     if (isEditMode && id) {
-      navigate(`/collections/${id}`);
+      navigate(`/collections/${id}`)
     } else {
-      navigate('/collections');
+      navigate('/collections')
     }
-  }, [navigate, isEditMode, id]);
+  }, [navigate, isEditMode, id])
 
   // Show loading state while fetching collection in edit mode
   if (isEditMode && isLoading) {
@@ -98,7 +108,7 @@ export function CollectionFormPage({ testId = 'collection-form-page' }: Collecti
           <LoadingSpinner size="large" label={t('common.loading')} />
         </div>
       </div>
-    );
+    )
   }
 
   // Show error state if fetch failed
@@ -110,7 +120,7 @@ export function CollectionFormPage({ testId = 'collection-form-page' }: Collecti
           onRetry={() => navigate('/collections')}
         />
       </div>
-    );
+    )
   }
 
   return (
@@ -131,7 +141,7 @@ export function CollectionFormPage({ testId = 'collection-form-page' }: Collecti
         />
       </div>
     </div>
-  );
+  )
 }
 
-export default CollectionFormPage;
+export default CollectionFormPage

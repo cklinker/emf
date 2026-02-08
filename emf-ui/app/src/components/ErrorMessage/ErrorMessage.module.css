@@ -186,7 +186,9 @@
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.15s ease, opacity 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    opacity 0.15s ease;
   flex-shrink: 0;
   align-self: flex-start;
 }

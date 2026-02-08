@@ -1,9 +1,9 @@
 /**
  * AppShell Component
- * 
+ *
  * The main layout wrapper providing consistent structure for the application.
  * Includes header, sidebar, and main content areas with responsive behavior.
- * 
+ *
  * Requirements:
  * - 14.2: All interactive elements are keyboard accessible
  * - 17.1: Adapt layout for desktop screens (1024px and above)
@@ -11,37 +11,37 @@
  * - 17.3: Adapt layout for mobile screens (below 768px)
  */
 
-import { 
-  useState, 
-  useEffect, 
-  useCallback, 
-  createContext, 
+import {
+  useState,
+  useEffect,
+  useCallback,
+  createContext,
   useContext,
   useRef,
-  type ReactNode 
-} from 'react';
-import { useTheme } from '../../context/ThemeContext';
-import { useEscapeKey } from '../../hooks/useKeyboardShortcuts';
-import { SkipLinks } from '../SkipLinks';
-import { BREAKPOINTS, type ScreenSize } from './constants';
-import styles from './AppShell.module.css';
+  type ReactNode,
+} from 'react'
+import { useTheme } from '../../context/ThemeContext'
+import { useEscapeKey } from '../../hooks/useKeyboardShortcuts'
+import { SkipLinks } from '../SkipLinks'
+import { BREAKPOINTS, type ScreenSize } from './constants'
+import styles from './AppShell.module.css'
 
 /**
  * AppShell context value for child components
  */
 export interface AppShellContextValue {
   /** Current screen size category */
-  screenSize: ScreenSize;
+  screenSize: ScreenSize
   /** Whether the sidebar is collapsed (desktop/tablet) */
-  sidebarCollapsed: boolean;
+  sidebarCollapsed: boolean
   /** Whether the mobile sidebar is open */
-  sidebarOpen: boolean;
+  sidebarOpen: boolean
   /** Toggle sidebar collapsed state (desktop/tablet) */
-  toggleSidebar: () => void;
+  toggleSidebar: () => void
   /** Toggle mobile sidebar open state */
-  toggleMobileSidebar: () => void;
+  toggleMobileSidebar: () => void
   /** Close mobile sidebar */
-  closeMobileSidebar: () => void;
+  closeMobileSidebar: () => void
 }
 
 /**
@@ -49,23 +49,23 @@ export interface AppShellContextValue {
  */
 export interface AppShellProps {
   /** Main content to render in the content area */
-  children: ReactNode;
+  children: ReactNode
   /** Optional header component to render */
-  header?: ReactNode;
+  header?: ReactNode
   /** Optional sidebar component to render */
-  sidebar?: ReactNode;
+  sidebar?: ReactNode
   /** Initial collapsed state for sidebar (default: false) */
-  initialSidebarCollapsed?: boolean;
+  initialSidebarCollapsed?: boolean
 }
 
 // Create context for AppShell state
-const AppShellContext = createContext<AppShellContextValue | undefined>(undefined);
+const AppShellContext = createContext<AppShellContextValue | undefined>(undefined)
 
 /**
  * Hook to access AppShell context
- * 
+ *
  * @throws Error if used outside of AppShell
- * 
+ *
  * @example
  * ```tsx
  * function MyComponent() {
@@ -75,11 +75,11 @@ const AppShellContext = createContext<AppShellContextValue | undefined>(undefine
  * ```
  */
 export function useAppShell(): AppShellContextValue {
-  const context = useContext(AppShellContext);
+  const context = useContext(AppShellContext)
   if (context === undefined) {
-    throw new Error('useAppShell must be used within an AppShell');
+    throw new Error('useAppShell must be used within an AppShell')
   }
-  return context;
+  return context
 }
 
 /**
@@ -87,25 +87,25 @@ export function useAppShell(): AppShellContextValue {
  */
 function getScreenSize(width: number): ScreenSize {
   if (width < BREAKPOINTS.mobile) {
-    return 'mobile';
+    return 'mobile'
   }
   if (width < BREAKPOINTS.tablet) {
-    return 'tablet';
+    return 'tablet'
   }
-  return 'desktop';
+  return 'desktop'
 }
 
 /**
  * AppShell provides the main application layout structure.
  * It handles responsive layout changes and sidebar collapse state.
- * 
+ *
  * Features:
  * - Responsive layout with desktop, tablet, and mobile breakpoints
  * - Collapsible sidebar for desktop/tablet
  * - Slide-out sidebar for mobile with overlay
  * - Integration with ThemeContext for styling
  * - Accessible navigation with proper ARIA attributes
- * 
+ *
  * @example
  * ```tsx
  * <AppShell
@@ -116,29 +116,29 @@ function getScreenSize(width: number): ScreenSize {
  * </AppShell>
  * ```
  */
-export function AppShell({ 
-  children, 
-  header, 
+export function AppShell({
+  children,
+  header,
   sidebar,
   initialSidebarCollapsed = false,
 }: AppShellProps) {
   // Get theme context for styling integration
-  const { resolvedMode, colors } = useTheme();
-  
+  const { resolvedMode, colors } = useTheme()
+
   // Ref for focus management
-  const mainContentRef = useRef<HTMLElement>(null);
-  
+  const mainContentRef = useRef<HTMLElement>(null)
+
   // Screen size state
   const [screenSize, setScreenSize] = useState<ScreenSize>(() => {
     if (typeof window === 'undefined') {
-      return 'desktop';
+      return 'desktop'
     }
-    return getScreenSize(window.innerWidth);
-  });
-  
+    return getScreenSize(window.innerWidth)
+  })
+
   // Sidebar state
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(initialSidebarCollapsed);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(initialSidebarCollapsed)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   /**
    * Handle window resize to update screen size
@@ -146,93 +146,99 @@ export function AppShell({
    */
   useEffect(() => {
     if (typeof window === 'undefined') {
-      return;
+      return
     }
 
     const handleResize = () => {
-      const newScreenSize = getScreenSize(window.innerWidth);
-      setScreenSize(newScreenSize);
-      
+      const newScreenSize = getScreenSize(window.innerWidth)
+      setScreenSize(newScreenSize)
+
       // Close mobile sidebar when resizing to larger screen
       if (newScreenSize !== 'mobile' && sidebarOpen) {
-        setSidebarOpen(false);
+        setSidebarOpen(false)
       }
-    };
+    }
 
     // Add resize listener
-    window.addEventListener('resize', handleResize);
-    
+    window.addEventListener('resize', handleResize)
+
     // Initial check
-    handleResize();
+    handleResize()
 
     return () => {
-      window.removeEventListener('resize', handleResize);
-    };
-  }, [sidebarOpen]);
+      window.removeEventListener('resize', handleResize)
+    }
+  }, [sidebarOpen])
 
   /**
    * Toggle sidebar collapsed state (desktop/tablet)
    */
   const toggleSidebar = useCallback(() => {
-    setSidebarCollapsed((prev) => !prev);
-  }, []);
+    setSidebarCollapsed((prev) => !prev)
+  }, [])
 
   /**
    * Toggle mobile sidebar open state
    */
   const toggleMobileSidebar = useCallback(() => {
-    setSidebarOpen((prev) => !prev);
-  }, []);
+    setSidebarOpen((prev) => !prev)
+  }, [])
 
   /**
    * Close mobile sidebar
    */
   const closeMobileSidebar = useCallback(() => {
-    setSidebarOpen(false);
-  }, []);
+    setSidebarOpen(false)
+  }, [])
 
   /**
    * Handle Escape key to close mobile sidebar
    * Requirement 14.2: Keyboard accessibility
    */
-  useEscapeKey(closeMobileSidebar, sidebarOpen);
+  useEscapeKey(closeMobileSidebar, sidebarOpen)
 
   /**
    * Prevent body scroll when mobile sidebar is open
    */
   useEffect(() => {
     if (typeof document === 'undefined') {
-      return;
+      return
     }
 
     if (sidebarOpen && screenSize === 'mobile') {
-      document.body.style.overflow = 'hidden';
+      document.body.style.overflow = 'hidden'
     } else {
-      document.body.style.overflow = '';
+      document.body.style.overflow = ''
     }
 
     return () => {
-      document.body.style.overflow = '';
-    };
-  }, [sidebarOpen, screenSize]);
+      document.body.style.overflow = ''
+    }
+  }, [sidebarOpen, screenSize])
 
   // Build class names
   const appShellClasses = [
     styles.appShell,
     styles[`appShell--${screenSize}`],
     styles[`appShell--${resolvedMode}`],
-  ].filter(Boolean).join(' ');
+  ]
+    .filter(Boolean)
+    .join(' ')
 
   const sidebarClasses = [
     styles.sidebar,
     sidebarCollapsed && screenSize !== 'mobile' ? styles['sidebar--collapsed'] : '',
     sidebarOpen && screenSize === 'mobile' ? styles['sidebar--open'] : '',
-  ].filter(Boolean).join(' ');
+  ]
+    .filter(Boolean)
+    .join(' ')
 
   const contentClasses = [
     styles.content,
     sidebarCollapsed && screenSize !== 'mobile' ? styles['content--expanded'] : '',
-  ].filter(Boolean).join(' ');
+  ]
+    .filter(Boolean)
+    .join(' ')
 
   // Context value
   const contextValue: AppShellContextValue = {
@@ -242,21 +248,23 @@ export function AppShell({
     toggleSidebar,
     toggleMobileSidebar,
     closeMobileSidebar,
-  };
+  }
 
   return (
     <AppShellContext.Provider value={contextValue}>
-      <div 
+      <div
         className={appShellClasses}
         data-screen-size={screenSize}
         data-theme={resolvedMode}
-        style={{
-          '--app-shell-primary': colors.primary,
-          '--app-shell-background': colors.background,
-          '--app-shell-surface': colors.surface,
-          '--app-shell-text': colors.text,
-          '--app-shell-border': colors.border,
-        } as React.CSSProperties}
+        style={
+          {
+            '--app-shell-primary': colors.primary,
+            '--app-shell-background': colors.background,
+            '--app-shell-surface': colors.surface,
+            '--app-shell-text': colors.text,
+            '--app-shell-border': colors.border,
+          } as React.CSSProperties
+        }
       >
         {/* Skip links for keyboard navigation - must be first focusable elements */}
         <SkipLinks />
@@ -272,7 +280,7 @@ export function AppShell({
         <div className={styles.main}>
           {/* Mobile overlay */}
           {screenSize === 'mobile' && sidebarOpen && (
-            <div 
+            <div
               className={styles.overlay}
               onClick={closeMobileSidebar}
               aria-hidden="true"
@@ -281,16 +289,16 @@ export function AppShell({
           )}
 
           {/* Sidebar slot */}
-          <aside 
+          <aside
             id="main-navigation"
-            className={sidebarClasses} 
+            className={sidebarClasses}
             aria-label="Main navigation"
             aria-hidden={screenSize === 'mobile' && !sidebarOpen}
           >
             {/* Sidebar toggle button (desktop/tablet) */}
             {screenSize !== 'mobile' && (
-              <button 
-                type="button" 
+              <button
+                type="button"
                 onClick={toggleSidebar}
                 aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
                 aria-expanded={!sidebarCollapsed}
@@ -302,18 +310,16 @@ export function AppShell({
                 </span>
               </button>
             )}
-            
+
             {/* Sidebar content */}
-            <div className={styles.sidebarContent}>
-              {sidebar}
-            </div>
+            <div className={styles.sidebarContent}>{sidebar}</div>
           </aside>
 
           {/* Main content */}
-          <main 
+          <main
             ref={mainContentRef}
-            className={contentClasses} 
-            role="main" 
+            className={contentClasses}
+            role="main"
             id="main-content"
             tabIndex={-1}
           >
@@ -323,8 +329,8 @@ export function AppShell({
 
         {/* Mobile menu toggle button (fixed position) */}
         {screenSize === 'mobile' && (
-          <button 
-            type="button" 
+          <button
+            type="button"
             onClick={toggleMobileSidebar}
             aria-label={sidebarOpen ? 'Close navigation menu' : 'Open navigation menu'}
             aria-expanded={sidebarOpen}
@@ -339,10 +345,10 @@ export function AppShell({
         )}
       </div>
     </AppShellContext.Provider>
-  );
+  )
 }
 
 // Export context for testing
-export { AppShellContext };
+export { AppShellContext }
 
-export default AppShell;
+export default AppShell

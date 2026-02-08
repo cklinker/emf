@@ -20,77 +20,77 @@
  * - 12.5: Use registered custom page components when rendering pages
  */
 
-import React, { useState, useCallback, useEffect, useRef, type ComponentType } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useI18n } from '../../context/I18nContext';
-import { useApi } from '../../context/ApiContext';
-import { usePlugins } from '../../context/PluginContext';
-import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components';
-import type { PageComponentProps } from '../../types/plugin';
-import styles from './PageBuilderPage.module.css';
+import React, { useState, useCallback, useEffect, useRef, type ComponentType } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useI18n } from '../../context/I18nContext'
+import { useApi } from '../../context/ApiContext'
+import { usePlugins } from '../../context/PluginContext'
+import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
+import type { PageComponentProps } from '../../types/plugin'
+import styles from './PageBuilderPage.module.css'
 
 /**
  * UI Page interface matching the API response
  */
 export interface UIPage {
-  id: string;
-  name: string;
-  path: string;
-  title: string;
-  layout: PageLayout;
-  components: PageComponent[];
-  policies?: string[];
-  published: boolean;
-  createdAt: string;
-  updatedAt: string;
+  id: string
+  name: string
+  path: string
+  title: string
+  layout: PageLayout
+  components: PageComponent[]
+  policies?: string[]
+  published: boolean
+  createdAt: string
+  updatedAt: string
 }
 
 /**
  * Page layout configuration
  */
 export interface PageLayout {
-  type: 'single' | 'sidebar' | 'grid';
-  config?: Record<string, unknown>;
+  type: 'single' | 'sidebar' | 'grid'
+  config?: Record<string, unknown>
 }
 
 /**
  * Page component definition
  */
 export interface PageComponent {
-  id: string;
-  type: string;
-  props: Record<string, unknown>;
-  children?: PageComponent[];
-  position: ComponentPosition;
+  id: string
+  type: string
+  props: Record<string, unknown>
+  children?: PageComponent[]
+  position: ComponentPosition
 }
 
 /**
  * Component position on the canvas
  */
 export interface ComponentPosition {
-  row: number;
-  column: number;
-  width: number;
-  height: number;
+  row: number
+  column: number
+  width: number
+  height: number
 }
 
 /**
  * Form data for creating/editing a page
  */
 interface PageFormData {
-  name: string;
-  path: string;
-  title: string;
-  layoutType: 'single' | 'sidebar' | 'grid';
+  name: string
+  path: string
+  title: string
+  layoutType: 'single' | 'sidebar' | 'grid'
 }
 
 /**
  * Form validation errors
  */
 interface FormErrors {
-  name?: string;
-  path?: string;
-  title?: string;
+  name?: string
+  path?: string
+  title?: string
 }
 
 /**
@@ -105,63 +105,63 @@ const AVAILABLE_COMPONENTS = [
   { type: 'table', label: 'Table', icon: '⊞' },
   { type: 'card', label: 'Card', icon: '▢' },
   { type: 'container', label: 'Container', icon: '◻' },
-];
+]
 
 /**
  * Props for PageBuilderPage component
  */
 export interface PageBuilderPageProps {
   /** Optional page ID for editing an existing page */
-  pageId?: string;
+  pageId?: string
   /** Optional test ID for testing */
-  testId?: string;
+  testId?: string
 }
 
 /**
  * Validate page form data
  */
 function validateForm(data: PageFormData, t: (key: string) => string): FormErrors {
-  const errors: FormErrors = {};
+  const errors: FormErrors = {}
 
   if (!data.name.trim()) {
-    errors.name = t('builder.pages.validation.nameRequired');
+    errors.name = t('builder.pages.validation.nameRequired')
   } else if (data.name.length > 50) {
-    errors.name = t('builder.pages.validation.nameTooLong');
+    errors.name = t('builder.pages.validation.nameTooLong')
   } else if (!/^[a-z][a-z0-9_]*$/.test(data.name)) {
-    errors.name = t('builder.pages.validation.nameFormat');
+    errors.name = t('builder.pages.validation.nameFormat')
   }
 
   if (!data.path.trim()) {
-    errors.path = t('builder.pages.validation.pathRequired');
+    errors.path = t('builder.pages.validation.pathRequired')
   } else if (!data.path.startsWith('/')) {
-    errors.path = t('builder.pages.validation.pathFormat');
+    errors.path = t('builder.pages.validation.pathFormat')
   }
 
   if (!data.title.trim()) {
-    errors.title = t('builder.pages.validation.titleRequired');
+    errors.title = t('builder.pages.validation.titleRequired')
   } else if (data.title.length > 100) {
-    errors.title = t('builder.pages.validation.titleTooLong');
+    errors.title = t('builder.pages.validation.titleTooLong')
   }
 
-  return errors;
+  return errors
 }
 
 /**
  * Generate a unique ID for components
  */
 function generateId(): string {
-  return `comp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  return `comp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 }
 
 /**
  * Status Badge Component
  */
 interface StatusBadgeProps {
-  published: boolean;
+  published: boolean
 }
 
 function StatusBadge({ published }: StatusBadgeProps): React.ReactElement {
-  const { t } = useI18n();
+  const { t } = useI18n()
   return (
     <span
       className={`${styles.statusBadge} ${published ? styles.statusPublished : styles.statusDraft}`}
@@ -169,19 +169,22 @@ function StatusBadge({ published }: StatusBadgeProps): React.ReactElement {
     >
       {published ? t('builder.pages.published') : t('builder.pages.draft')}
     </span>
-  );
+  )
 }
 
 /**
  * Component Palette Component
  */
 interface ComponentPaletteProps {
-  onDragStart: (componentType: string) => void;
-  onAddComponent: (componentType: string) => void;
+  onDragStart: (componentType: string) => void
+  onAddComponent: (componentType: string) => void
 }
 
-function ComponentPalette({ onDragStart, onAddComponent }: ComponentPaletteProps): React.ReactElement {
-  const { t } = useI18n();
+function ComponentPalette({
+  onDragStart,
+  onAddComponent,
+}: ComponentPaletteProps): React.ReactElement {
+  const { t } = useI18n()
 
   return (
     <div className={styles.palette} data-testid="component-palette">
@@ -204,19 +207,19 @@ function ComponentPalette({ onDragStart, onAddComponent }: ComponentPaletteProps
         ))}
       </div>
     </div>
-  );
+  )
 }
 
 /**
  * Property Panel Component
  */
 interface PropertyPanelProps {
-  component: PageComponent | null;
-  onChange: (updates: Partial<PageComponent>) => void;
+  component: PageComponent | null
+  onChange: (updates: Partial<PageComponent>) => void
 }
 
 function PropertyPanel({ component, onChange }: PropertyPanelProps): React.ReactElement {
-  const { t } = useI18n();
+  const { t } = useI18n()
 
   if (!component) {
     return (
@@ -224,14 +227,14 @@ function PropertyPanel({ component, onChange }: PropertyPanelProps): React.React
         <h3 className={styles.propertyTitle}>{t('builder.pages.properties')}</h3>
         <p className={styles.propertyEmpty}>{t('builder.pages.selectComponent')}</p>
       </div>
-    );
+    )
   }
 
   const handlePropChange = (key: string, value: unknown) => {
     onChange({
       props: { ...component.props, [key]: value },
-    });
-  };
+    })
+  }
 
   return (
     <div className={styles.propertyPanel} data-testid="property-panel">
@@ -242,7 +245,9 @@ function PropertyPanel({ component, onChange }: PropertyPanelProps): React.React
           <span className={styles.propertyValue}>{component.type}</span>
         </div>
         <div className={styles.propertyGroup}>
-          <label className={styles.propertyLabel} htmlFor="prop-id">ID</label>
+          <label className={styles.propertyLabel} htmlFor="prop-id">
+            ID
+          </label>
           <input
             id="prop-id"
             type="text"
@@ -255,7 +260,9 @@ function PropertyPanel({ component, onChange }: PropertyPanelProps): React.React
         {component.type === 'heading' && (
           <>
             <div className={styles.propertyGroup}>
-              <label className={styles.propertyLabel} htmlFor="prop-text">Text</label>
+              <label className={styles.propertyLabel} htmlFor="prop-text">
+                Text
+              </label>
               <input
                 id="prop-text"
                 type="text"
@@ -267,7 +274,9 @@ function PropertyPanel({ component, onChange }: PropertyPanelProps): React.React
               />
             </div>
             <div className={styles.propertyGroup}>
-              <label className={styles.propertyLabel} htmlFor="prop-level">Level</label>
+              <label className={styles.propertyLabel} htmlFor="prop-level">
+                Level
+              </label>
               <select
                 id="prop-level"
                 className={styles.propertySelect}
@@ -285,7 +294,9 @@ function PropertyPanel({ component, onChange }: PropertyPanelProps): React.React
         )}
         {component.type === 'text' && (
           <div className={styles.propertyGroup}>
-            <label className={styles.propertyLabel} htmlFor="prop-content">Content</label>
+            <label className={styles.propertyLabel} htmlFor="prop-content">
+              Content
+            </label>
             <textarea
               id="prop-content"
               className={styles.propertyTextarea}
@@ -300,7 +311,9 @@ function PropertyPanel({ component, onChange }: PropertyPanelProps): React.React
         {component.type === 'button' && (
           <>
             <div className={styles.propertyGroup}>
-              <label className={styles.propertyLabel} htmlFor="prop-label">Label</label>
+              <label className={styles.propertyLabel} htmlFor="prop-label">
+                Label
+              </label>
               <input
                 id="prop-label"
                 type="text"
@@ -312,7 +325,9 @@ function PropertyPanel({ component, onChange }: PropertyPanelProps): React.React
               />
             </div>
             <div className={styles.propertyGroup}>
-              <label className={styles.propertyLabel} htmlFor="prop-variant">Variant</label>
+              <label className={styles.propertyLabel} htmlFor="prop-variant">
+                Variant
+              </label>
               <select
                 id="prop-variant"
                 className={styles.propertySelect}
@@ -330,7 +345,9 @@ function PropertyPanel({ component, onChange }: PropertyPanelProps): React.React
         {component.type === 'image' && (
           <>
             <div className={styles.propertyGroup}>
-              <label className={styles.propertyLabel} htmlFor="prop-src">Source URL</label>
+              <label className={styles.propertyLabel} htmlFor="prop-src">
+                Source URL
+              </label>
               <input
                 id="prop-src"
                 type="text"
@@ -342,7 +359,9 @@ function PropertyPanel({ component, onChange }: PropertyPanelProps): React.React
               />
             </div>
             <div className={styles.propertyGroup}>
-              <label className={styles.propertyLabel} htmlFor="prop-alt">Alt Text</label>
+              <label className={styles.propertyLabel} htmlFor="prop-alt">
+                Alt Text
+              </label>
               <input
                 id="prop-alt"
                 type="text"
@@ -357,7 +376,7 @@ function PropertyPanel({ component, onChange }: PropertyPanelProps): React.React
         )}
       </div>
     </div>
-  );
+  )
 }
 
 /**
@@ -366,40 +385,53 @@ function PropertyPanel({ component, onChange }: PropertyPanelProps): React.React
  * Requirement 12.5: Use registered custom page components when rendering pages
  */
 interface PreviewProps {
-  page: UIPage | null;
-  components: PageComponent[];
-  onClose: () => void;
-  getPageComponent?: (name: string) => ComponentType<PageComponentProps> | undefined;
+  page: UIPage | null
+  components: PageComponent[]
+  onClose: () => void
+  getPageComponent?: (name: string) => ComponentType<PageComponentProps> | undefined
 }
 
-function Preview({ page, components, onClose, getPageComponent }: PreviewProps): React.ReactElement {
-  const { t } = useI18n();
+function Preview({
+  page,
+  components,
+  onClose,
+  getPageComponent,
+}: PreviewProps): React.ReactElement {
+  const { t } = useI18n()
 
   const renderPreviewComponent = (comp: PageComponent): React.ReactNode => {
     // Requirement 12.5: Check for custom page component first
-    const CustomComponent = getPageComponent?.(comp.type);
+    const CustomComponent = getPageComponent?.(comp.type)
     if (CustomComponent) {
       return (
-        <div key={comp.id} className={styles.previewCustomComponent} data-testid={`preview-custom-${comp.id}`}>
+        <div
+          key={comp.id}
+          className={styles.previewCustomComponent}
+          data-testid={`preview-custom-${comp.id}`}
+        >
           <CustomComponent config={comp.props} />
         </div>
-      );
+      )
     }
 
     // Fall back to default component rendering
     switch (comp.type) {
       case 'heading': {
-        const level = (comp.props.level as string) || 'h1';
-        const text = (comp.props.text as string) || 'Heading';
-        const HeadingTag = level as keyof JSX.IntrinsicElements;
-        return <HeadingTag key={comp.id} className={styles.previewHeadingElement}>{text}</HeadingTag>;
+        const level = (comp.props.level as string) || 'h1'
+        const text = (comp.props.text as string) || 'Heading'
+        const HeadingTag = level as keyof JSX.IntrinsicElements
+        return (
+          <HeadingTag key={comp.id} className={styles.previewHeadingElement}>
+            {text}
+          </HeadingTag>
+        )
       }
       case 'text':
         return (
           <p key={comp.id} className={styles.previewTextElement}>
             {(comp.props.content as string) || 'Text content'}
           </p>
-        );
+        )
       case 'button':
         return (
           <button
@@ -410,7 +442,7 @@ function Preview({ page, components, onClose, getPageComponent }: PreviewProps):
           >
             {(comp.props.label as string) || 'Button'}
           </button>
-        );
+        )
       case 'image':
         return (
           <div key={comp.id} className={styles.previewImageElement}>
@@ -427,7 +459,7 @@ function Preview({ page, components, onClose, getPageComponent }: PreviewProps):
               </div>
             )}
           </div>
-        );
+        )
       case 'form':
         return (
           <div key={comp.id} className={styles.previewFormElement}>
@@ -436,7 +468,7 @@ function Preview({ page, components, onClose, getPageComponent }: PreviewProps):
               <span>Form Component</span>
             </div>
           </div>
-        );
+        )
       case 'table':
         return (
           <div key={comp.id} className={styles.previewTableElement}>
@@ -445,7 +477,7 @@ function Preview({ page, components, onClose, getPageComponent }: PreviewProps):
               <span>Table Component</span>
             </div>
           </div>
-        );
+        )
       case 'card':
         return (
           <div key={comp.id} className={styles.previewCardElement}>
@@ -454,7 +486,7 @@ function Preview({ page, components, onClose, getPageComponent }: PreviewProps):
               <span>Card Component</span>
             </div>
           </div>
-        );
+        )
       case 'container':
         return (
           <div key={comp.id} className={styles.previewContainerElement}>
@@ -465,15 +497,15 @@ function Preview({ page, components, onClose, getPageComponent }: PreviewProps):
               </div>
             )}
           </div>
-        );
+        )
       default:
         return (
           <div key={comp.id} className={styles.previewUnknownElement}>
             Unknown component: {comp.type}
           </div>
-        );
+        )
     }
-  };
+  }
 
   return (
     <div className={styles.previewOverlay} data-testid="preview-overlay">
@@ -498,9 +530,7 @@ function Preview({ page, components, onClose, getPageComponent }: PreviewProps):
               <p>{t('builder.pages.canvasEmpty')}</p>
             </div>
           ) : (
-            <div className={styles.previewPage}>
-              {components.map(renderPreviewComponent)}
-            </div>
+            <div className={styles.previewPage}>{components.map(renderPreviewComponent)}</div>
           )}
         </div>
         <footer className={styles.previewFooter}>
@@ -518,7 +548,7 @@ function Preview({ page, components, onClose, getPageComponent }: PreviewProps):
         </footer>
       </div>
     </div>
-  );
+  )
 }
 
 /**
@@ -526,50 +556,57 @@ function Preview({ page, components, onClose, getPageComponent }: PreviewProps):
  * Requirement 12.5: Use registered custom page components when rendering pages
  */
 interface CanvasProps {
-  components: PageComponent[];
-  selectedId: string | null;
-  onSelect: (id: string | null) => void;
-  onDrop: (componentType: string) => void;
-  onDelete: (id: string) => void;
-  getPageComponent?: (name: string) => ComponentType<PageComponentProps> | undefined;
+  components: PageComponent[]
+  selectedId: string | null
+  onSelect: (id: string | null) => void
+  onDrop: (componentType: string) => void
+  onDelete: (id: string) => void
+  getPageComponent?: (name: string) => ComponentType<PageComponentProps> | undefined
 }
 
-function Canvas({ components, selectedId, onSelect, onDrop, onDelete, getPageComponent }: CanvasProps): React.ReactElement {
-  const { t } = useI18n();
-  const [isDragOver, setIsDragOver] = useState(false);
+function Canvas({
+  components,
+  selectedId,
+  onSelect,
+  onDrop,
+  onDelete,
+  getPageComponent,
+}: CanvasProps): React.ReactElement {
+  const { t } = useI18n()
+  const [isDragOver, setIsDragOver] = useState(false)
 
   const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(true);
-  };
+    e.preventDefault()
+    setIsDragOver(true)
+  }
 
   const handleDragLeave = () => {
-    setIsDragOver(false);
-  };
+    setIsDragOver(false)
+  }
 
   const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
-    const componentType = e.dataTransfer.getData('componentType');
+    e.preventDefault()
+    setIsDragOver(false)
+    const componentType = e.dataTransfer.getData('componentType')
     if (componentType) {
-      onDrop(componentType);
+      onDrop(componentType)
     }
-  };
+  }
 
   const handleKeyDown = (e: React.KeyboardEvent, componentId: string) => {
     if (e.key === 'Delete' || e.key === 'Backspace') {
-      e.preventDefault();
-      onDelete(componentId);
+      e.preventDefault()
+      onDelete(componentId)
     }
-  };
+  }
 
   const renderComponent = (comp: PageComponent) => {
-    const isSelected = selectedId === comp.id;
-    
+    const isSelected = selectedId === comp.id
+
     // Requirement 12.5: Check for custom page component
-    const CustomComponent = getPageComponent?.(comp.type);
-    const isCustomComponent = !!CustomComponent;
-    
+    const CustomComponent = getPageComponent?.(comp.type)
+    const isCustomComponent = !!CustomComponent
+
     return (
       <div
         key={comp.id}
@@ -586,14 +623,18 @@ function Canvas({ components, selectedId, onSelect, onDrop, onDelete, getPageCom
         <div className={styles.componentHeader}>
           <span className={styles.componentType}>
             {comp.type}
-            {isCustomComponent && <span className={styles.customBadge} data-testid={`custom-badge-${comp.id}`}>Custom</span>}
+            {isCustomComponent && (
+              <span className={styles.customBadge} data-testid={`custom-badge-${comp.id}`}>
+                Custom
+              </span>
+            )}
           </span>
           <button
             type="button"
             className={styles.componentDeleteBtn}
             onClick={(e) => {
-              e.stopPropagation();
-              onDelete(comp.id);
+              e.stopPropagation()
+              onDelete(comp.id)
             }}
             aria-label={`Delete ${comp.type} component`}
             data-testid={`delete-component-${comp.id}`}
@@ -604,33 +645,34 @@ function Canvas({ components, selectedId, onSelect, onDrop, onDelete, getPageCom
         <div className={styles.componentPreview}>
           {isCustomComponent ? (
             // Render custom component preview
-            <div className={styles.customComponentPreview} data-testid={`custom-preview-${comp.id}`}>
+            <div
+              className={styles.customComponentPreview}
+              data-testid={`custom-preview-${comp.id}`}
+            >
               <CustomComponent config={comp.props} />
             </div>
           ) : (
             // Default component previews
             <>
               {comp.type === 'heading' && (
-                <span className={styles.previewHeading}>{(comp.props.text as string) || 'Heading'}</span>
+                <span className={styles.previewHeading}>
+                  {(comp.props.text as string) || 'Heading'}
+                </span>
               )}
               {comp.type === 'text' && (
-                <span className={styles.previewText}>{(comp.props.content as string) || 'Text content'}</span>
+                <span className={styles.previewText}>
+                  {(comp.props.content as string) || 'Text content'}
+                </span>
               )}
               {comp.type === 'button' && (
-                <span className={styles.previewButton}>{(comp.props.label as string) || 'Button'}</span>
+                <span className={styles.previewButton}>
+                  {(comp.props.label as string) || 'Button'}
+                </span>
               )}
-              {comp.type === 'image' && (
-                <span className={styles.previewImage}>🖼 Image</span>
-              )}
-              {comp.type === 'form' && (
-                <span className={styles.previewForm}>📝 Form</span>
-              )}
-              {comp.type === 'table' && (
-                <span className={styles.previewTable}>⊞ Table</span>
-              )}
-              {comp.type === 'card' && (
-                <span className={styles.previewCard}>▢ Card</span>
-              )}
+              {comp.type === 'image' && <span className={styles.previewImage}>🖼 Image</span>}
+              {comp.type === 'form' && <span className={styles.previewForm}>📝 Form</span>}
+              {comp.type === 'table' && <span className={styles.previewTable}>⊞ Table</span>}
+              {comp.type === 'card' && <span className={styles.previewCard}>▢ Card</span>}
               {comp.type === 'container' && (
                 <span className={styles.previewContainer}>◻ Container</span>
               )}
@@ -638,8 +680,8 @@ function Canvas({ components, selectedId, onSelect, onDrop, onDelete, getPageCom
           )}
         </div>
       </div>
-    );
-  };
+    )
+  }
 
   return (
     <div
@@ -663,69 +705,81 @@ function Canvas({ components, selectedId, onSelect, onDrop, onDelete, getPageCom
         </div>
       )}
     </div>
-  );
+  )
 }
 
 /**
  * Page Form Component - for creating/editing page configuration
  */
 interface PageFormProps {
-  page?: UIPage;
-  onSubmit: (data: PageFormData) => void;
-  onCancel: () => void;
-  isSubmitting: boolean;
+  page?: UIPage
+  onSubmit: (data: PageFormData) => void
+  onCancel: () => void
+  isSubmitting: boolean
 }
 
 function PageForm({ page, onSubmit, onCancel, isSubmitting }: PageFormProps): React.ReactElement {
-  const { t } = useI18n();
-  const isEditing = !!page;
+  const { t } = useI18n()
+  const isEditing = !!page
   const [formData, setFormData] = useState<PageFormData>({
     name: page?.name ?? '',
     path: page?.path ?? '/',
     title: page?.title ?? '',
     layoutType: page?.layout?.type ?? 'single',
-  });
-  const [errors, setErrors] = useState<FormErrors>({});
-  const [touched, setTouched] = useState<Record<string, boolean>>({});
-  const nameInputRef = useRef<HTMLInputElement>(null);
+  })
+  const [errors, setErrors] = useState<FormErrors>({})
+  const [touched, setTouched] = useState<Record<string, boolean>>({})
+  const nameInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    nameInputRef.current?.focus();
-  }, []);
+    nameInputRef.current?.focus()
+  }, [])
 
-  const handleChange = useCallback((field: keyof PageFormData, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-    if (errors[field as keyof FormErrors]) {
-      setErrors((prev) => ({ ...prev, [field]: undefined }));
-    }
-  }, [errors]);
+  const handleChange = useCallback(
+    (field: keyof PageFormData, value: string) => {
+      setFormData((prev) => ({ ...prev, [field]: value }))
+      if (errors[field as keyof FormErrors]) {
+        setErrors((prev) => ({ ...prev, [field]: undefined }))
+      }
+    },
+    [errors]
+  )
 
-  const handleBlur = useCallback((field: keyof PageFormData) => {
-    setTouched((prev) => ({ ...prev, [field]: true }));
-    const validationErrors = validateForm(formData, t);
-    if (validationErrors[field as keyof FormErrors]) {
-      setErrors((prev) => ({ ...prev, [field]: validationErrors[field as keyof FormErrors] }));
-    }
-  }, [formData, t]);
+  const handleBlur = useCallback(
+    (field: keyof PageFormData) => {
+      setTouched((prev) => ({ ...prev, [field]: true }))
+      const validationErrors = validateForm(formData, t)
+      if (validationErrors[field as keyof FormErrors]) {
+        setErrors((prev) => ({ ...prev, [field]: validationErrors[field as keyof FormErrors] }))
+      }
+    },
+    [formData, t]
+  )
 
-  const handleSubmit = useCallback((e: React.FormEvent) => {
-    e.preventDefault();
-    const validationErrors = validateForm(formData, t);
-    setErrors(validationErrors);
-    setTouched({ name: true, path: true, title: true });
+  const handleSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault()
+      const validationErrors = validateForm(formData, t)
+      setErrors(validationErrors)
+      setTouched({ name: true, path: true, title: true })
 
-    if (Object.keys(validationErrors).length === 0) {
-      onSubmit(formData);
-    }
-  }, [formData, onSubmit, t]);
+      if (Object.keys(validationErrors).length === 0) {
+        onSubmit(formData)
+      }
+    },
+    [formData, onSubmit, t]
+  )
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      onCancel();
-    }
-  }, [onCancel]);
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onCancel()
+      }
+    },
+    [onCancel]
+  )
 
-  const title = isEditing ? t('builder.pages.editPage') : t('builder.pages.createPage');
+  const title = isEditing ? t('builder.pages.editPage') : t('builder.pages.createPage')
 
   return (
     <div
@@ -743,7 +797,9 @@ function PageForm({ page, onSubmit, onCancel, isSubmitting }: PageFormProps): Re
         data-testid="page-form-modal"
       >
         <div className={styles.modalHeader}>
-          <h2 id="page-form-title" className={styles.modalTitle}>{title}</h2>
+          <h2 id="page-form-title" className={styles.modalTitle}>
+            {title}
+          </h2>
           <button
             type="button"
             className={styles.modalCloseButton}
@@ -759,7 +815,9 @@ function PageForm({ page, onSubmit, onCancel, isSubmitting }: PageFormProps): Re
             <div className={styles.formGroup}>
               <label htmlFor="page-name" className={styles.formLabel}>
                 {t('builder.pages.pageName')}
-                <span className={styles.required} aria-hidden="true">*</span>
+                <span className={styles.required} aria-hidden="true">
+                  *
+                </span>
               </label>
               <input
                 ref={nameInputRef}
@@ -789,7 +847,9 @@ function PageForm({ page, onSubmit, onCancel, isSubmitting }: PageFormProps): Re
             <div className={styles.formGroup}>
               <label htmlFor="page-path" className={styles.formLabel}>
                 {t('builder.pages.pagePath')}
-                <span className={styles.required} aria-hidden="true">*</span>
+                <span className={styles.required} aria-hidden="true">
+                  *
+                </span>
               </label>
               <input
                 id="page-path"
@@ -818,7 +878,9 @@ function PageForm({ page, onSubmit, onCancel, isSubmitting }: PageFormProps): Re
             <div className={styles.formGroup}>
               <label htmlFor="page-title" className={styles.formLabel}>
                 {t('builder.pages.pageTitle')}
-                <span className={styles.required} aria-hidden="true">*</span>
+                <span className={styles.required} aria-hidden="true">
+                  *
+                </span>
               </label>
               <input
                 id="page-title"
@@ -882,7 +944,7 @@ function PageForm({ page, onSubmit, onCancel, isSubmitting }: PageFormProps): Re
         </div>
       </div>
     </div>
-  );
+  )
 }
 
 /**
@@ -890,38 +952,41 @@ function PageForm({ page, onSubmit, onCancel, isSubmitting }: PageFormProps): Re
  *
  * Main page for building and editing UI pages in the EMF Admin UI.
  * Provides a visual editor with component palette, canvas, and property panel.
- * 
+ *
  * Requirement 12.5: Integrates with plugin system to use custom page components
  */
-export function PageBuilderPage({ pageId, testId = 'page-builder-page' }: PageBuilderPageProps): React.ReactElement {
-  const queryClient = useQueryClient();
-  const { t, formatDate } = useI18n();
-  const { apiClient } = useApi();
-  const { showToast } = useToast();
-  
+export function PageBuilderPage({
+  pageId,
+  testId = 'page-builder-page',
+}: PageBuilderPageProps): React.ReactElement {
+  const queryClient = useQueryClient()
+  const { t, formatDate } = useI18n()
+  const { apiClient } = useApi()
+  const { showToast } = useToast()
+
   // Requirement 12.5: Get custom page components from plugin system
-  const { getPageComponent } = usePlugins();
+  const { getPageComponent } = usePlugins()
 
   // View mode: 'list' shows all pages, 'editor' shows the page editor
-  const [viewMode, setViewMode] = useState<'list' | 'editor'>(pageId ? 'editor' : 'list');
-  const [editingPageId, setEditingPageId] = useState<string | null>(pageId ?? null);
+  const [viewMode, setViewMode] = useState<'list' | 'editor'>(pageId ? 'editor' : 'list')
+  const [editingPageId, setEditingPageId] = useState<string | null>(pageId ?? null)
 
   // Form modal state
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingPage, setEditingPage] = useState<UIPage | undefined>(undefined);
+  const [isFormOpen, setIsFormOpen] = useState(false)
+  const [editingPage, setEditingPage] = useState<UIPage | undefined>(undefined)
 
   // Delete confirmation dialog state
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [pageToDelete, setPageToDelete] = useState<UIPage | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [pageToDelete, setPageToDelete] = useState<UIPage | null>(null)
 
   // Editor state
-  const [components, setComponents] = useState<PageComponent[]>([]);
-  const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
-  const [draggedComponentType, setDraggedComponentType] = useState<string | null>(null);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  
+  const [components, setComponents] = useState<PageComponent[]>([])
+  const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null)
+  const [draggedComponentType, setDraggedComponentType] = useState<string | null>(null)
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+
   // Preview mode state (Requirement 7.7)
-  const [isPreviewMode, setIsPreviewMode] = useState(false);
+  const [isPreviewMode, setIsPreviewMode] = useState(false)
 
   // Fetch all pages query
   const {
@@ -933,283 +998,296 @@ export function PageBuilderPage({ pageId, testId = 'page-builder-page' }: PageBu
     queryKey: ['ui-pages'],
     queryFn: () => apiClient.get<UIPage[]>('/ui/pages'),
     enabled: viewMode === 'list',
-  });
+  })
 
   // Fetch single page query for editing
-  const {
-    data: currentPage,
-    isLoading: isLoadingPage,
-  } = useQuery({
+  const { data: currentPage, isLoading: isLoadingPage } = useQuery({
     queryKey: ['ui-page', editingPageId],
     queryFn: () => apiClient.get<UIPage>(`/ui/pages/${editingPageId}`),
     enabled: viewMode === 'editor' && !!editingPageId,
-  });
+  })
 
   // Update components when page data loads
   useEffect(() => {
     if (currentPage) {
-      setComponents(currentPage.components || []);
-      setHasUnsavedChanges(false);
+      setComponents(currentPage.components || [])
+      setHasUnsavedChanges(false)
     }
-  }, [currentPage]);
+  }, [currentPage])
 
   // Create mutation
   const createMutation = useMutation({
     mutationFn: (data: Partial<UIPage>) => apiClient.post<UIPage>('/ui/pages', data),
     onSuccess: (newPage) => {
-      queryClient.invalidateQueries({ queryKey: ['ui-pages'] });
-      showToast(t('success.created', { item: t('builder.pages.page') }), 'success');
-      handleCloseForm();
+      queryClient.invalidateQueries({ queryKey: ['ui-pages'] })
+      showToast(t('success.created', { item: t('builder.pages.page') }), 'success')
+      handleCloseForm()
       // Open the editor for the new page
-      setEditingPageId(newPage.id);
-      setComponents([]);
-      setViewMode('editor');
+      setEditingPageId(newPage.id)
+      setComponents([])
+      setViewMode('editor')
     },
     onError: (error: Error) => {
-      showToast(error.message || t('errors.generic'), 'error');
+      showToast(error.message || t('errors.generic'), 'error')
     },
-  });
+  })
 
   // Update mutation
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<UIPage> }) => 
+    mutationFn: ({ id, data }: { id: string; data: Partial<UIPage> }) =>
       apiClient.put<UIPage>(`/ui/pages/${id}`, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ui-pages'] });
-      queryClient.invalidateQueries({ queryKey: ['ui-page', editingPageId] });
-      showToast(t('success.updated', { item: t('builder.pages.page') }), 'success');
-      setHasUnsavedChanges(false);
-      handleCloseForm();
+      queryClient.invalidateQueries({ queryKey: ['ui-pages'] })
+      queryClient.invalidateQueries({ queryKey: ['ui-page', editingPageId] })
+      showToast(t('success.updated', { item: t('builder.pages.page') }), 'success')
+      setHasUnsavedChanges(false)
+      handleCloseForm()
     },
     onError: (error: Error) => {
-      showToast(error.message || t('errors.generic'), 'error');
+      showToast(error.message || t('errors.generic'), 'error')
     },
-  });
+  })
 
   // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: (id: string) => apiClient.delete(`/ui/pages/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ui-pages'] });
-      showToast(t('success.deleted', { item: t('builder.pages.page') }), 'success');
-      setDeleteDialogOpen(false);
-      setPageToDelete(null);
+      queryClient.invalidateQueries({ queryKey: ['ui-pages'] })
+      showToast(t('success.deleted', { item: t('builder.pages.page') }), 'success')
+      setDeleteDialogOpen(false)
+      setPageToDelete(null)
       if (editingPageId === pageToDelete?.id) {
-        setViewMode('list');
-        setEditingPageId(null);
+        setViewMode('list')
+        setEditingPageId(null)
       }
     },
     onError: (error: Error) => {
-      showToast(error.message || t('errors.generic'), 'error');
+      showToast(error.message || t('errors.generic'), 'error')
     },
-  });
+  })
 
   // Publish mutation (Requirement 7.9)
   const publishMutation = useMutation({
     mutationFn: (id: string) => apiClient.post<UIPage>(`/ui/pages/${id}/publish`, {}),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ui-pages'] });
-      queryClient.invalidateQueries({ queryKey: ['ui-page', editingPageId] });
-      showToast(t('builder.pages.publishSuccess') || 'Page published successfully', 'success');
+      queryClient.invalidateQueries({ queryKey: ['ui-pages'] })
+      queryClient.invalidateQueries({ queryKey: ['ui-page', editingPageId] })
+      showToast(t('builder.pages.publishSuccess') || 'Page published successfully', 'success')
     },
     onError: (error: Error) => {
-      showToast(error.message || t('errors.generic'), 'error');
+      showToast(error.message || t('errors.generic'), 'error')
     },
-  });
+  })
 
   // Unpublish mutation
   const unpublishMutation = useMutation({
     mutationFn: (id: string) => apiClient.post<UIPage>(`/ui/pages/${id}/unpublish`, {}),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ui-pages'] });
-      queryClient.invalidateQueries({ queryKey: ['ui-page', editingPageId] });
-      showToast(t('builder.pages.unpublishSuccess') || 'Page unpublished successfully', 'success');
+      queryClient.invalidateQueries({ queryKey: ['ui-pages'] })
+      queryClient.invalidateQueries({ queryKey: ['ui-page', editingPageId] })
+      showToast(t('builder.pages.unpublishSuccess') || 'Page unpublished successfully', 'success')
     },
     onError: (error: Error) => {
-      showToast(error.message || t('errors.generic'), 'error');
+      showToast(error.message || t('errors.generic'), 'error')
     },
-  });
+  })
 
   // Duplicate mutation (Requirement 7.10)
   const duplicateMutation = useMutation({
     mutationFn: (id: string) => apiClient.post<UIPage>(`/ui/pages/${id}/duplicate`, {}),
     onSuccess: (newPage) => {
-      queryClient.invalidateQueries({ queryKey: ['ui-pages'] });
-      showToast(t('builder.pages.duplicateSuccess') || 'Page duplicated successfully', 'success');
+      queryClient.invalidateQueries({ queryKey: ['ui-pages'] })
+      showToast(t('builder.pages.duplicateSuccess') || 'Page duplicated successfully', 'success')
       // Open the editor for the duplicated page
-      setEditingPageId(newPage.id);
-      setComponents(newPage.components || []);
-      setViewMode('editor');
+      setEditingPageId(newPage.id)
+      setComponents(newPage.components || [])
+      setViewMode('editor')
     },
     onError: (error: Error) => {
-      showToast(error.message || t('errors.generic'), 'error');
+      showToast(error.message || t('errors.generic'), 'error')
     },
-  });
+  })
 
   // Handle create action
   const handleCreate = useCallback(() => {
-    setEditingPage(undefined);
-    setIsFormOpen(true);
-  }, []);
+    setEditingPage(undefined)
+    setIsFormOpen(true)
+  }, [])
 
   // Handle edit page config
   const handleEditConfig = useCallback((page: UIPage) => {
-    setEditingPage(page);
-    setIsFormOpen(true);
-  }, []);
+    setEditingPage(page)
+    setIsFormOpen(true)
+  }, [])
 
   // Handle close form
   const handleCloseForm = useCallback(() => {
-    setIsFormOpen(false);
-    setEditingPage(undefined);
-  }, []);
+    setIsFormOpen(false)
+    setEditingPage(undefined)
+  }, [])
 
   // Handle form submit
-  const handleFormSubmit = useCallback((data: PageFormData) => {
-    const pageData: Partial<UIPage> = {
-      name: data.name,
-      path: data.path,
-      title: data.title,
-      layout: { type: data.layoutType },
-    };
+  const handleFormSubmit = useCallback(
+    (data: PageFormData) => {
+      const pageData: Partial<UIPage> = {
+        name: data.name,
+        path: data.path,
+        title: data.title,
+        layout: { type: data.layoutType },
+      }
 
-    if (editingPage) {
-      updateMutation.mutate({ id: editingPage.id, data: pageData });
-    } else {
-      createMutation.mutate({
-        ...pageData,
-        components: [],
-        published: false,
-      });
-    }
-  }, [editingPage, createMutation, updateMutation]);
+      if (editingPage) {
+        updateMutation.mutate({ id: editingPage.id, data: pageData })
+      } else {
+        createMutation.mutate({
+          ...pageData,
+          components: [],
+          published: false,
+        })
+      }
+    },
+    [editingPage, createMutation, updateMutation]
+  )
 
   // Handle delete action
   const handleDeleteClick = useCallback((page: UIPage) => {
-    setPageToDelete(page);
-    setDeleteDialogOpen(true);
-  }, []);
+    setPageToDelete(page)
+    setDeleteDialogOpen(true)
+  }, [])
 
   // Handle delete confirmation
   const handleDeleteConfirm = useCallback(() => {
     if (pageToDelete) {
-      deleteMutation.mutate(pageToDelete.id);
+      deleteMutation.mutate(pageToDelete.id)
     }
-  }, [pageToDelete, deleteMutation]);
+  }, [pageToDelete, deleteMutation])
 
   // Handle delete cancel
   const handleDeleteCancel = useCallback(() => {
-    setDeleteDialogOpen(false);
-    setPageToDelete(null);
-  }, []);
+    setDeleteDialogOpen(false)
+    setPageToDelete(null)
+  }, [])
 
   // Handle opening page editor
   const handleOpenEditor = useCallback((page: UIPage) => {
-    setEditingPageId(page.id);
-    setViewMode('editor');
-  }, []);
+    setEditingPageId(page.id)
+    setViewMode('editor')
+  }, [])
 
   // Handle back to list
   const handleBackToList = useCallback(() => {
     if (hasUnsavedChanges) {
       // Could show a confirmation dialog here
     }
-    setViewMode('list');
-    setEditingPageId(null);
-    setComponents([]);
-    setSelectedComponentId(null);
-    setHasUnsavedChanges(false);
-  }, [hasUnsavedChanges]);
+    setViewMode('list')
+    setEditingPageId(null)
+    setComponents([])
+    setSelectedComponentId(null)
+    setHasUnsavedChanges(false)
+  }, [hasUnsavedChanges])
 
   // Handle component drag start
   const handleDragStart = useCallback((componentType: string) => {
-    setDraggedComponentType(componentType);
-  }, []);
+    setDraggedComponentType(componentType)
+  }, [])
 
   // Handle adding component
-  const handleAddComponent = useCallback((componentType: string) => {
-    const newComponent: PageComponent = {
-      id: generateId(),
-      type: componentType,
-      props: {},
-      position: { row: components.length, column: 0, width: 12, height: 1 },
-    };
-    setComponents((prev) => [...prev, newComponent]);
-    setSelectedComponentId(newComponent.id);
-    setHasUnsavedChanges(true);
-  }, [components.length]);
+  const handleAddComponent = useCallback(
+    (componentType: string) => {
+      const newComponent: PageComponent = {
+        id: generateId(),
+        type: componentType,
+        props: {},
+        position: { row: components.length, column: 0, width: 12, height: 1 },
+      }
+      setComponents((prev) => [...prev, newComponent])
+      setSelectedComponentId(newComponent.id)
+      setHasUnsavedChanges(true)
+    },
+    [components.length]
+  )
 
   // Handle component drop on canvas
-  const handleCanvasDrop = useCallback((componentType: string) => {
-    handleAddComponent(componentType);
-    setDraggedComponentType(null);
-  }, [handleAddComponent]);
+  const handleCanvasDrop = useCallback(
+    (componentType: string) => {
+      handleAddComponent(componentType)
+      setDraggedComponentType(null)
+    },
+    [handleAddComponent]
+  )
 
   // Handle component selection
   const handleSelectComponent = useCallback((id: string | null) => {
-    setSelectedComponentId(id);
-  }, []);
+    setSelectedComponentId(id)
+  }, [])
 
   // Handle component property change
-  const handleComponentChange = useCallback((updates: Partial<PageComponent>) => {
-    if (!selectedComponentId) return;
-    setComponents((prev) =>
-      prev.map((comp) =>
-        comp.id === selectedComponentId ? { ...comp, ...updates } : comp
+  const handleComponentChange = useCallback(
+    (updates: Partial<PageComponent>) => {
+      if (!selectedComponentId) return
+      setComponents((prev) =>
+        prev.map((comp) => (comp.id === selectedComponentId ? { ...comp, ...updates } : comp))
       )
-    );
-    setHasUnsavedChanges(true);
-  }, [selectedComponentId]);
+      setHasUnsavedChanges(true)
+    },
+    [selectedComponentId]
+  )
 
   // Handle component delete
-  const handleDeleteComponent = useCallback((id: string) => {
-    setComponents((prev) => prev.filter((comp) => comp.id !== id));
-    if (selectedComponentId === id) {
-      setSelectedComponentId(null);
-    }
-    setHasUnsavedChanges(true);
-  }, [selectedComponentId]);
+  const handleDeleteComponent = useCallback(
+    (id: string) => {
+      setComponents((prev) => prev.filter((comp) => comp.id !== id))
+      if (selectedComponentId === id) {
+        setSelectedComponentId(null)
+      }
+      setHasUnsavedChanges(true)
+    },
+    [selectedComponentId]
+  )
 
   // Handle save page
   const handleSavePage = useCallback(() => {
-    if (!editingPageId) return;
+    if (!editingPageId) return
     updateMutation.mutate({
       id: editingPageId,
       data: { components },
-    });
-  }, [editingPageId, components, updateMutation]);
+    })
+  }, [editingPageId, components, updateMutation])
 
   // Handle preview mode toggle (Requirement 7.7)
   const handleTogglePreview = useCallback(() => {
-    setIsPreviewMode((prev) => !prev);
-  }, []);
+    setIsPreviewMode((prev) => !prev)
+  }, [])
 
   // Handle close preview
   const handleClosePreview = useCallback(() => {
-    setIsPreviewMode(false);
-  }, []);
+    setIsPreviewMode(false)
+  }, [])
 
   // Handle publish page (Requirement 7.9)
   const handlePublishPage = useCallback(() => {
-    if (!editingPageId) return;
-    publishMutation.mutate(editingPageId);
-  }, [editingPageId, publishMutation]);
+    if (!editingPageId) return
+    publishMutation.mutate(editingPageId)
+  }, [editingPageId, publishMutation])
 
   // Handle unpublish page
   const handleUnpublishPage = useCallback(() => {
-    if (!editingPageId) return;
-    unpublishMutation.mutate(editingPageId);
-  }, [editingPageId, unpublishMutation]);
+    if (!editingPageId) return
+    unpublishMutation.mutate(editingPageId)
+  }, [editingPageId, unpublishMutation])
 
   // Handle duplicate page (Requirement 7.10)
-  const handleDuplicatePage = useCallback((pageId: string) => {
-    duplicateMutation.mutate(pageId);
-  }, [duplicateMutation]);
+  const handleDuplicatePage = useCallback(
+    (pageId: string) => {
+      duplicateMutation.mutate(pageId)
+    },
+    [duplicateMutation]
+  )
 
-  const selectedComponent = components.find((c) => c.id === selectedComponentId) || null;
-  const isSubmitting = createMutation.isPending || updateMutation.isPending;
-  const isPublishing = publishMutation.isPending || unpublishMutation.isPending;
-  const isDuplicating = duplicateMutation.isPending;
+  const selectedComponent = components.find((c) => c.id === selectedComponentId) || null
+  const isSubmitting = createMutation.isPending || updateMutation.isPending
+  const isPublishing = publishMutation.isPending || unpublishMutation.isPending
+  const isDuplicating = duplicateMutation.isPending
 
   // Render loading state
   if (viewMode === 'list' && isLoadingPages) {
@@ -1219,7 +1297,7 @@ export function PageBuilderPage({ pageId, testId = 'page-builder-page' }: PageBu
           <LoadingSpinner size="large" label={t('common.loading')} />
         </div>
       </div>
-    );
+    )
   }
 
   // Render error state
@@ -1231,7 +1309,7 @@ export function PageBuilderPage({ pageId, testId = 'page-builder-page' }: PageBu
           onRetry={() => refetchPages()}
         />
       </div>
-    );
+    )
   }
 
   // Render editor view
@@ -1253,9 +1331,7 @@ export function PageBuilderPage({ pageId, testId = 'page-builder-page' }: PageBu
               {currentPage?.title || t('builder.pages.newPage')}
               {hasUnsavedChanges && <span className={styles.unsavedIndicator}>*</span>}
             </h1>
-            {currentPage && (
-              <StatusBadge published={currentPage.published} />
-            )}
+            {currentPage && <StatusBadge published={currentPage.published} />}
           </div>
           <div className={styles.editorHeaderRight}>
             {/* Preview button (Requirement 7.7) */}
@@ -1291,7 +1367,9 @@ export function PageBuilderPage({ pageId, testId = 'page-builder-page' }: PageBu
                     aria-label={t('builder.pages.unpublish') || 'Unpublish'}
                     data-testid="unpublish-page-button"
                   >
-                    {isPublishing ? t('common.loading') : (t('builder.pages.unpublish') || 'Unpublish')}
+                    {isPublishing
+                      ? t('common.loading')
+                      : t('builder.pages.unpublish') || 'Unpublish'}
                   </button>
                 ) : (
                   <button
@@ -1329,10 +1407,7 @@ export function PageBuilderPage({ pageId, testId = 'page-builder-page' }: PageBu
         </header>
 
         <div className={styles.editorLayout}>
-          <ComponentPalette
-            onDragStart={handleDragStart}
-            onAddComponent={handleAddComponent}
-          />
+          <ComponentPalette onDragStart={handleDragStart} onAddComponent={handleAddComponent} />
           <Canvas
             components={components}
             selectedId={selectedComponentId}
@@ -1341,10 +1416,7 @@ export function PageBuilderPage({ pageId, testId = 'page-builder-page' }: PageBu
             onDelete={handleDeleteComponent}
             getPageComponent={getPageComponent}
           />
-          <PropertyPanel
-            component={selectedComponent}
-            onChange={handleComponentChange}
-          />
+          <PropertyPanel component={selectedComponent} onChange={handleComponentChange} />
         </div>
 
         {/* Preview mode overlay (Requirement 7.7, 12.5) */}
@@ -1366,7 +1438,7 @@ export function PageBuilderPage({ pageId, testId = 'page-builder-page' }: PageBu
           />
         )}
       </div>
-    );
+    )
   }
 
   // Render list view
@@ -1399,12 +1471,24 @@ export function PageBuilderPage({ pageId, testId = 'page-builder-page' }: PageBu
           >
             <thead>
               <tr role="row">
-                <th role="columnheader" scope="col">{t('builder.pages.pageName')}</th>
-                <th role="columnheader" scope="col">{t('builder.pages.pagePath')}</th>
-                <th role="columnheader" scope="col">{t('builder.pages.pageTitle')}</th>
-                <th role="columnheader" scope="col">{t('collections.status')}</th>
-                <th role="columnheader" scope="col">{t('collections.updated')}</th>
-                <th role="columnheader" scope="col">{t('common.actions')}</th>
+                <th role="columnheader" scope="col">
+                  {t('builder.pages.pageName')}
+                </th>
+                <th role="columnheader" scope="col">
+                  {t('builder.pages.pagePath')}
+                </th>
+                <th role="columnheader" scope="col">
+                  {t('builder.pages.pageTitle')}
+                </th>
+                <th role="columnheader" scope="col">
+                  {t('collections.status')}
+                </th>
+                <th role="columnheader" scope="col">
+                  {t('collections.updated')}
+                </th>
+                <th role="columnheader" scope="col">
+                  {t('common.actions')}
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -1499,7 +1583,7 @@ export function PageBuilderPage({ pageId, testId = 'page-builder-page' }: PageBu
         variant="danger"
       />
     </div>
-  );
+  )
 }
 
-export default PageBuilderPage;
+export default PageBuilderPage

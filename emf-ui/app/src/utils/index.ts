@@ -1,6 +1,6 @@
 /**
  * Utility Functions
- * 
+ *
  * This module exports all utility functions used throughout the application.
  * Utilities include: formatting, validation helpers, storage helpers, etc.
  */
@@ -14,8 +14,8 @@ export {
   getRedirectPath,
   filterAuthorizedPages,
   canAccessRoute,
-} from './routeGuards';
-export type { AuthorizationResult } from './routeGuards';
+} from './routeGuards'
+export type { AuthorizationResult } from './routeGuards'
 
 // Export utility functions as they are implemented
 // Example exports:

@@ -8,23 +8,23 @@
  * - 12.6: Provide a plugin configuration interface for managing plugin settings
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
-import { usePlugins } from '../../context/PluginContext';
-import { useI18n } from '../../context/I18nContext';
-import { LoadingSpinner } from '../../components';
-import type { LoadedPlugin, PluginStatus } from '../../types/plugin';
-import styles from './PluginsPage.module.css';
+import React, { useState, useCallback, useMemo } from 'react'
+import { usePlugins } from '../../context/PluginContext'
+import { useI18n } from '../../context/I18nContext'
+import { LoadingSpinner } from '../../components'
+import type { LoadedPlugin, PluginStatus } from '../../types/plugin'
+import styles from './PluginsPage.module.css'
 
 /**
  * Plugin settings interface for plugins that provide configuration
  */
 export interface PluginSettings {
   /** Plugin ID */
-  pluginId: string;
+  pluginId: string
   /** Settings component provided by the plugin */
-  SettingsComponent?: React.ComponentType<PluginSettingsProps>;
+  SettingsComponent?: React.ComponentType<PluginSettingsProps>
   /** Current settings values */
-  values?: Record<string, unknown>;
+  values?: Record<string, unknown>
 }
 
 /**
@@ -32,11 +32,11 @@ export interface PluginSettings {
  */
 export interface PluginSettingsProps {
   /** Current settings values */
-  values: Record<string, unknown>;
+  values: Record<string, unknown>
   /** Callback to update settings */
-  onChange: (values: Record<string, unknown>) => void;
+  onChange: (values: Record<string, unknown>) => void
   /** Whether settings are being saved */
-  isSaving?: boolean;
+  isSaving?: boolean
 }
 
 /**
@@ -44,7 +44,7 @@ export interface PluginSettingsProps {
  */
 export interface PluginsPageProps {
   /** Optional test ID for testing */
-  testId?: string;
+  testId?: string
 }
 
 /**
@@ -53,15 +53,15 @@ export interface PluginsPageProps {
 function getStatusText(status: PluginStatus, t: (key: string) => string): string {
   switch (status) {
     case 'loaded':
-      return t('plugins.status.loaded');
+      return t('plugins.status.loaded')
     case 'loading':
-      return t('plugins.status.loading');
+      return t('plugins.status.loading')
     case 'error':
-      return t('plugins.status.error');
+      return t('plugins.status.error')
     case 'pending':
-      return t('plugins.status.pending');
+      return t('plugins.status.pending')
     default:
-      return status;
+      return status
   }
 }
 
@@ -71,13 +71,13 @@ function getStatusText(status: PluginStatus, t: (key: string) => string): string
  * Displays a single plugin with its details and actions.
  */
 interface PluginCardProps {
-  loadedPlugin: LoadedPlugin;
-  isSelected: boolean;
-  isEnabled: boolean;
-  onSelect: () => void;
-  onToggleEnabled: () => void;
-  onViewSettings: () => void;
-  hasSettings: boolean;
+  loadedPlugin: LoadedPlugin
+  isSelected: boolean
+  isEnabled: boolean
+  onSelect: () => void
+  onToggleEnabled: () => void
+  onViewSettings: () => void
+  hasSettings: boolean
 }
 
 function PluginCard({
@@ -89,40 +89,40 @@ function PluginCard({
   onViewSettings,
   hasSettings,
 }: PluginCardProps): React.ReactElement {
-  const { t } = useI18n();
-  const { plugin, status, error } = loadedPlugin;
+  const { t } = useI18n()
+  const { plugin, status, error } = loadedPlugin
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        onSelect();
+        e.preventDefault()
+        onSelect()
       }
     },
     [onSelect]
-  );
+  )
 
   const handleToggleClick = useCallback(
     (e: React.MouseEvent) => {
-      e.stopPropagation();
-      onToggleEnabled();
+      e.stopPropagation()
+      onToggleEnabled()
     },
     [onToggleEnabled]
-  );
+  )
 
   const handleSettingsClick = useCallback(
     (e: React.MouseEvent) => {
-      e.stopPropagation();
-      onViewSettings();
+      e.stopPropagation()
+      onViewSettings()
     },
     [onViewSettings]
-  );
+  )
 
-  const statusClassName = `${styles.statusBadge} ${styles[status]}`;
-  const cardClassName = `${styles.pluginCard} ${isSelected ? styles.selected : ''}`;
+  const statusClassName = `${styles.statusBadge} ${styles[status]}`
+  const cardClassName = `${styles.pluginCard} ${isSelected ? styles.selected : ''}`
   const toggleClassName = `${styles.toggle} ${isEnabled ? styles.enabled : ''} ${
     status === 'loading' ? styles.disabled : ''
-  }`;
+  }`
 
   return (
     <article
@@ -192,7 +192,7 @@ function PluginCard({
         </div>
       </div>
     </article>
-  );
+  )
 }
 
 /**
@@ -201,10 +201,10 @@ function PluginCard({
  * Displays detailed information about a selected plugin.
  */
 interface PluginDetailsPanelProps {
-  loadedPlugin: LoadedPlugin;
-  registeredFieldRenderers: string[];
-  registeredPageComponents: string[];
-  onClose: () => void;
+  loadedPlugin: LoadedPlugin
+  registeredFieldRenderers: string[]
+  registeredPageComponents: string[]
+  onClose: () => void
 }
 
 function PluginDetailsPanel({
@@ -213,8 +213,8 @@ function PluginDetailsPanel({
   registeredPageComponents,
   onClose,
 }: PluginDetailsPanelProps): React.ReactElement {
-  const { t } = useI18n();
-  const { plugin, status, error } = loadedPlugin;
+  const { t } = useI18n()
+  const { plugin, status, error } = loadedPlugin
 
   return (
     <aside
@@ -305,7 +305,7 @@ function PluginDetailsPanel({
         </div>
       </div>
     </aside>
-  );
+  )
 }
 
 /**
@@ -315,77 +315,75 @@ function PluginDetailsPanel({
  * Displays installed plugins, their status, and provides configuration options.
  */
 export function PluginsPage({ testId = 'plugins-page' }: PluginsPageProps): React.ReactElement {
-  const { t } = useI18n();
-  const { plugins, isLoading, errors, fieldRenderers, pageComponents } = usePlugins();
+  const { t } = useI18n()
+  const { plugins, isLoading, errors, fieldRenderers, pageComponents } = usePlugins()
 
   // Track enabled state for each plugin (in a real app, this would be persisted)
-  const [enabledPlugins, setEnabledPlugins] = useState<Set<string>>(new Set());
+  const [enabledPlugins, setEnabledPlugins] = useState<Set<string>>(new Set())
 
   // Update enabled plugins when plugins load
   React.useEffect(() => {
-    const loadedPluginIds = plugins
-      .filter((p) => p.status === 'loaded')
-      .map((p) => p.plugin.id);
-    setEnabledPlugins(new Set(loadedPluginIds));
-  }, [plugins]);
+    const loadedPluginIds = plugins.filter((p) => p.status === 'loaded').map((p) => p.plugin.id)
+    setEnabledPlugins(new Set(loadedPluginIds))
+  }, [plugins])
 
   // Track selected plugin for details panel
-  const [selectedPluginId, setSelectedPluginId] = useState<string | null>(null);
+  const [selectedPluginId, setSelectedPluginId] = useState<string | null>(null)
 
   // Get the selected plugin
   const selectedPlugin = useMemo(() => {
-    if (!selectedPluginId) return null;
-    return plugins.find((p) => p.plugin.id === selectedPluginId) ?? null;
-  }, [plugins, selectedPluginId]);
+    if (!selectedPluginId) return null
+    return plugins.find((p) => p.plugin.id === selectedPluginId) ?? null
+  }, [plugins, selectedPluginId])
 
   // Get registered components for the selected plugin
   const registeredFieldRenderers = useMemo(() => {
-    if (!selectedPlugin) return [];
-    const pluginFieldRenderers = selectedPlugin.plugin.fieldRenderers;
-    if (!pluginFieldRenderers) return [];
-    return Object.keys(pluginFieldRenderers);
-  }, [selectedPlugin]);
+    if (!selectedPlugin) return []
+    const pluginFieldRenderers = selectedPlugin.plugin.fieldRenderers
+    if (!pluginFieldRenderers) return []
+    return Object.keys(pluginFieldRenderers)
+  }, [selectedPlugin])
 
   const registeredPageComponents = useMemo(() => {
-    if (!selectedPlugin) return [];
-    const pluginPageComponents = selectedPlugin.plugin.pageComponents;
-    if (!pluginPageComponents) return [];
-    return Object.keys(pluginPageComponents);
-  }, [selectedPlugin]);
+    if (!selectedPlugin) return []
+    const pluginPageComponents = selectedPlugin.plugin.pageComponents
+    if (!pluginPageComponents) return []
+    return Object.keys(pluginPageComponents)
+  }, [selectedPlugin])
 
   // Handle plugin selection
   const handleSelectPlugin = useCallback((pluginId: string) => {
-    setSelectedPluginId((prev) => (prev === pluginId ? null : pluginId));
-  }, []);
+    setSelectedPluginId((prev) => (prev === pluginId ? null : pluginId))
+  }, [])
 
   // Handle toggle enabled
   const handleToggleEnabled = useCallback((pluginId: string) => {
     setEnabledPlugins((prev) => {
-      const next = new Set(prev);
+      const next = new Set(prev)
       if (next.has(pluginId)) {
-        next.delete(pluginId);
+        next.delete(pluginId)
       } else {
-        next.add(pluginId);
+        next.add(pluginId)
       }
-      return next;
-    });
-  }, []);
+      return next
+    })
+  }, [])
 
   // Handle view settings
   const handleViewSettings = useCallback((pluginId: string) => {
-    setSelectedPluginId(pluginId);
-  }, []);
+    setSelectedPluginId(pluginId)
+  }, [])
 
   // Handle close details panel
   const handleCloseDetails = useCallback(() => {
-    setSelectedPluginId(null);
-  }, []);
+    setSelectedPluginId(null)
+  }, [])
 
   // Count statistics
-  const loadedCount = plugins.filter((p) => p.status === 'loaded').length;
-  const errorCount = plugins.filter((p) => p.status === 'error').length;
-  const totalFieldRenderers = fieldRenderers.size;
-  const totalPageComponents = pageComponents.size;
+  const loadedCount = plugins.filter((p) => p.status === 'loaded').length
+  const errorCount = plugins.filter((p) => p.status === 'error').length
+  const totalFieldRenderers = fieldRenderers.size
+  const totalPageComponents = pageComponents.size
 
   // Render loading state
   if (isLoading) {
@@ -395,7 +393,7 @@ export function PluginsPage({ testId = 'plugins-page' }: PluginsPageProps): Reac
           <LoadingSpinner size="large" label={t('common.loading')} />
         </div>
       </div>
-    );
+    )
   }
 
   return (
@@ -405,7 +403,10 @@ export function PluginsPage({ testId = 'plugins-page' }: PluginsPageProps): Reac
         <h1 className={styles.title}>{t('navigation.plugins')}</h1>
         <div className={styles.headerInfo}>
           <span data-testid="plugins-count">
-            {t('plugins.loadedCount', { count: String(loadedCount), total: String(plugins.length) })}
+            {t('plugins.loadedCount', {
+              count: String(loadedCount),
+              total: String(plugins.length),
+            })}
           </span>
           {totalFieldRenderers > 0 && (
             <span data-testid="field-renderers-count">
@@ -468,7 +469,7 @@ export function PluginsPage({ testId = 'plugins-page' }: PluginsPageProps): Reac
         </div>
       )}
     </div>
-  );
+  )
 }
 
-export default PluginsPage;
+export default PluginsPage

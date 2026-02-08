@@ -8,138 +8,156 @@
  * - A13: Tenant Administration UI
  */
 
-import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useI18n } from '../../context/I18nContext';
-import { useApi } from '../../context/ApiContext';
-import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components';
-import styles from './TenantsPage.module.css';
+import React, { useState, useCallback, useEffect, useRef } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useI18n } from '../../context/I18nContext'
+import { useApi } from '../../context/ApiContext'
+import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
+import styles from './TenantsPage.module.css'
 
 /**
  * Tenant interface matching the API response
  */
 export interface Tenant {
-  id: string;
-  slug: string;
-  name: string;
-  edition: string;
-  status: string;
-  settings?: string;
-  limits?: string;
-  createdAt: string;
-  updatedAt: string;
+  id: string
+  slug: string
+  name: string
+  edition: string
+  status: string
+  settings?: string
+  limits?: string
+  createdAt: string
+  updatedAt: string
 }
 
 /**
  * Form data for creating/editing a tenant
  */
 interface TenantFormData {
-  slug: string;
-  name: string;
-  edition: string;
+  slug: string
+  name: string
+  edition: string
 }
 
 /**
  * Form validation errors
  */
 interface FormErrors {
-  slug?: string;
-  name?: string;
-  edition?: string;
+  slug?: string
+  name?: string
+  edition?: string
 }
 
 /**
  * Props for TenantsPage component
  */
 export interface TenantsPageProps {
-  testId?: string;
+  testId?: string
 }
 
-const VALID_EDITIONS = ['FREE', 'PROFESSIONAL', 'ENTERPRISE', 'UNLIMITED'];
+const VALID_EDITIONS = ['FREE', 'PROFESSIONAL', 'ENTERPRISE', 'UNLIMITED']
 
 function validateForm(data: TenantFormData, isEditing: boolean): FormErrors {
-  const errors: FormErrors = {};
+  const errors: FormErrors = {}
 
   if (!isEditing) {
     if (!data.slug.trim()) {
-      errors.slug = 'Tenant slug is required';
+      errors.slug = 'Tenant slug is required'
     } else if (data.slug.length > 50) {
-      errors.slug = 'Slug must be 50 characters or less';
+      errors.slug = 'Slug must be 50 characters or less'
     } else if (!/^[a-z][a-z0-9-]*$/.test(data.slug)) {
-      errors.slug = 'Slug must be lowercase, start with a letter, and contain only letters, numbers, and hyphens';
+      errors.slug =
+        'Slug must be lowercase, start with a letter, and contain only letters, numbers, and hyphens'
     }
   }
 
   if (!data.name.trim()) {
-    errors.name = 'Tenant name is required';
+    errors.name = 'Tenant name is required'
   } else if (data.name.length > 100) {
-    errors.name = 'Name must be 100 characters or less';
+    errors.name = 'Name must be 100 characters or less'
   }
 
   if (!VALID_EDITIONS.includes(data.edition)) {
-    errors.edition = 'Invalid edition';
+    errors.edition = 'Invalid edition'
   }
 
-  return errors;
+  return errors
 }
 
 /**
  * TenantForm Component — Modal form for creating and editing tenants.
  */
 interface TenantFormProps {
-  tenant?: Tenant;
-  onSubmit: (data: TenantFormData) => void;
-  onCancel: () => void;
-  isSubmitting: boolean;
+  tenant?: Tenant
+  onSubmit: (data: TenantFormData) => void
+  onCancel: () => void
+  isSubmitting: boolean
 }
 
-function TenantForm({ tenant, onSubmit, onCancel, isSubmitting }: TenantFormProps): React.ReactElement {
-  const isEditing = !!tenant;
+function TenantForm({
+  tenant,
+  onSubmit,
+  onCancel,
+  isSubmitting,
+}: TenantFormProps): React.ReactElement {
+  const isEditing = !!tenant
   const [formData, setFormData] = useState<TenantFormData>({
     slug: tenant?.slug ?? '',
     name: tenant?.name ?? '',
     edition: tenant?.edition ?? 'PROFESSIONAL',
-  });
-  const [errors, setErrors] = useState<FormErrors>({});
-  const [touched, setTouched] = useState<Record<string, boolean>>({});
-  const nameInputRef = useRef<HTMLInputElement>(null);
+  })
+  const [errors, setErrors] = useState<FormErrors>({})
+  const [touched, setTouched] = useState<Record<string, boolean>>({})
+  const nameInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    nameInputRef.current?.focus();
-  }, []);
+    nameInputRef.current?.focus()
+  }, [])
 
-  const handleChange = useCallback((field: keyof TenantFormData, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-    if (errors[field]) {
-      setErrors((prev) => ({ ...prev, [field]: undefined }));
-    }
-  }, [errors]);
+  const handleChange = useCallback(
+    (field: keyof TenantFormData, value: string) => {
+      setFormData((prev) => ({ ...prev, [field]: value }))
+      if (errors[field]) {
+        setErrors((prev) => ({ ...prev, [field]: undefined }))
+      }
+    },
+    [errors]
+  )
 
-  const handleBlur = useCallback((field: keyof TenantFormData) => {
-    setTouched((prev) => ({ ...prev, [field]: true }));
-    const validationErrors = validateForm(formData, isEditing);
-    if (validationErrors[field]) {
-      setErrors((prev) => ({ ...prev, [field]: validationErrors[field] }));
-    }
-  }, [formData, isEditing]);
+  const handleBlur = useCallback(
+    (field: keyof TenantFormData) => {
+      setTouched((prev) => ({ ...prev, [field]: true }))
+      const validationErrors = validateForm(formData, isEditing)
+      if (validationErrors[field]) {
+        setErrors((prev) => ({ ...prev, [field]: validationErrors[field] }))
+      }
+    },
+    [formData, isEditing]
+  )
 
-  const handleSubmit = useCallback((e: React.FormEvent) => {
-    e.preventDefault();
-    const validationErrors = validateForm(formData, isEditing);
-    setErrors(validationErrors);
-    setTouched({ slug: true, name: true, edition: true });
-    if (Object.keys(validationErrors).length === 0) {
-      onSubmit(formData);
-    }
-  }, [formData, onSubmit, isEditing]);
+  const handleSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault()
+      const validationErrors = validateForm(formData, isEditing)
+      setErrors(validationErrors)
+      setTouched({ slug: true, name: true, edition: true })
+      if (Object.keys(validationErrors).length === 0) {
+        onSubmit(formData)
+      }
+    },
+    [formData, onSubmit, isEditing]
+  )
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      onCancel();
-    }
-  }, [onCancel]);
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onCancel()
+      }
+    },
+    [onCancel]
+  )
 
-  const title = isEditing ? 'Edit Tenant' : 'Create Tenant';
+  const title = isEditing ? 'Edit Tenant' : 'Create Tenant'
 
   return (
     <div
@@ -157,7 +175,9 @@ function TenantForm({ tenant, onSubmit, onCancel, isSubmitting }: TenantFormProp
         data-testid="tenant-form-modal"
       >
         <div className={styles.modalHeader}>
-          <h2 id="tenant-form-title" className={styles.modalTitle}>{title}</h2>
+          <h2 id="tenant-form-title" className={styles.modalTitle}>
+            {title}
+          </h2>
           <button
             type="button"
             className={styles.modalCloseButton}
@@ -174,7 +194,9 @@ function TenantForm({ tenant, onSubmit, onCancel, isSubmitting }: TenantFormProp
               <div className={styles.formGroup}>
                 <label htmlFor="tenant-slug" className={styles.formLabel}>
                   Slug
-                  <span className={styles.required} aria-hidden="true">*</span>
+                  <span className={styles.required} aria-hidden="true">
+                    *
+                  </span>
                 </label>
                 <input
                   id="tenant-slug"
@@ -190,7 +212,9 @@ function TenantForm({ tenant, onSubmit, onCancel, isSubmitting }: TenantFormProp
                   data-testid="tenant-slug-input"
                 />
                 {touched.slug && errors.slug && (
-                  <span className={styles.formError} role="alert">{errors.slug}</span>
+                  <span className={styles.formError} role="alert">
+                    {errors.slug}
+                  </span>
                 )}
               </div>
             )}
@@ -198,7 +222,9 @@ function TenantForm({ tenant, onSubmit, onCancel, isSubmitting }: TenantFormProp
             <div className={styles.formGroup}>
               <label htmlFor="tenant-name" className={styles.formLabel}>
                 Name
-                <span className={styles.required} aria-hidden="true">*</span>
+                <span className={styles.required} aria-hidden="true">
+                  *
+                </span>
               </label>
               <input
                 ref={nameInputRef}
@@ -215,7 +241,9 @@ function TenantForm({ tenant, onSubmit, onCancel, isSubmitting }: TenantFormProp
                 data-testid="tenant-name-input"
               />
               {touched.name && errors.name && (
-                <span className={styles.formError} role="alert">{errors.name}</span>
+                <span className={styles.formError} role="alert">
+                  {errors.name}
+                </span>
               )}
             </div>
 
@@ -232,7 +260,9 @@ function TenantForm({ tenant, onSubmit, onCancel, isSubmitting }: TenantFormProp
                 data-testid="tenant-edition-select"
               >
                 {VALID_EDITIONS.map((edition) => (
-                  <option key={edition} value={edition}>{edition}</option>
+                  <option key={edition} value={edition}>
+                    {edition}
+                  </option>
                 ))}
               </select>
             </div>
@@ -260,7 +290,7 @@ function TenantForm({ tenant, onSubmit, onCancel, isSubmitting }: TenantFormProp
         </div>
       </div>
     </div>
-  );
+  )
 }
 
 /**
@@ -268,12 +298,15 @@ function TenantForm({ tenant, onSubmit, onCancel, isSubmitting }: TenantFormProp
  */
 function StatusBadge({ status }: { status: string }): React.ReactElement {
   const className = `${styles.statusBadge} ${
-    status === 'ACTIVE' ? styles.statusActive :
-    status === 'SUSPENDED' ? styles.statusSuspended :
-    status === 'PROVISIONING' ? styles.statusProvisioning :
-    styles.statusDefault
-  }`;
-  return <span className={className}>{status}</span>;
+    status === 'ACTIVE'
+      ? styles.statusActive
+      : status === 'SUSPENDED'
+        ? styles.statusSuspended
+        : status === 'PROVISIONING'
+          ? styles.statusProvisioning
+          : styles.statusDefault
+  }`
+  return <span className={className}>{status}</span>
 }
 
 /**
@@ -282,16 +315,16 @@ function StatusBadge({ status }: { status: string }): React.ReactElement {
  * Main page for managing tenants in the EMF Platform Admin UI.
  */
 export function TenantsPage({ testId = 'tenants-page' }: TenantsPageProps): React.ReactElement {
-  const queryClient = useQueryClient();
-  const { formatDate } = useI18n();
-  const { apiClient } = useApi();
-  const { showToast } = useToast();
+  const queryClient = useQueryClient()
+  const { formatDate } = useI18n()
+  const { apiClient } = useApi()
+  const { showToast } = useToast()
 
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingTenant, setEditingTenant] = useState<Tenant | undefined>(undefined);
-  const [suspendDialogOpen, setSuspendDialogOpen] = useState(false);
-  const [activateDialogOpen, setActivateDialogOpen] = useState(false);
-  const [targetTenant, setTargetTenant] = useState<Tenant | null>(null);
+  const [isFormOpen, setIsFormOpen] = useState(false)
+  const [editingTenant, setEditingTenant] = useState<Tenant | undefined>(undefined)
+  const [suspendDialogOpen, setSuspendDialogOpen] = useState(false)
+  const [activateDialogOpen, setActivateDialogOpen] = useState(false)
+  const [targetTenant, setTargetTenant] = useState<Tenant | null>(null)
 
   // Fetch tenants
   const {
@@ -301,12 +334,13 @@ export function TenantsPage({ testId = 'tenants-page' }: TenantsPageProps): Reac
     refetch,
   } = useQuery({
     queryKey: ['tenants'],
-    queryFn: () => apiClient.get<{ content: Tenant[]; totalElements: number }>(
-      '/platform/tenants?page=0&size=100'
-    ),
-  });
+    queryFn: () =>
+      apiClient.get<{ content: Tenant[]; totalElements: number }>(
+        '/platform/tenants?page=0&size=100'
+      ),
+  })
 
-  const tenants = tenantsPage?.content ?? [];
+  const tenants = tenantsPage?.content ?? []
 
   // Create mutation
   const createMutation = useMutation({
@@ -317,14 +351,14 @@ export function TenantsPage({ testId = 'tenants-page' }: TenantsPageProps): Reac
         edition: data.edition,
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tenants'] });
-      showToast('Tenant created successfully.', 'success');
-      handleCloseForm();
+      queryClient.invalidateQueries({ queryKey: ['tenants'] })
+      showToast('Tenant created successfully.', 'success')
+      handleCloseForm()
     },
     onError: (error: Error) => {
-      showToast(error.message || 'Failed to create tenant.', 'error');
+      showToast(error.message || 'Failed to create tenant.', 'error')
     },
-  });
+  })
 
   // Update mutation
   const updateMutation = useMutation({
@@ -334,87 +368,90 @@ export function TenantsPage({ testId = 'tenants-page' }: TenantsPageProps): Reac
         edition: data.edition,
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tenants'] });
-      showToast('Tenant updated successfully.', 'success');
-      handleCloseForm();
+      queryClient.invalidateQueries({ queryKey: ['tenants'] })
+      showToast('Tenant updated successfully.', 'success')
+      handleCloseForm()
     },
     onError: (error: Error) => {
-      showToast(error.message || 'Failed to update tenant.', 'error');
+      showToast(error.message || 'Failed to update tenant.', 'error')
     },
-  });
+  })
 
   // Suspend mutation
   const suspendMutation = useMutation({
     mutationFn: (id: string) => apiClient.post(`/platform/tenants/${id}/suspend`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tenants'] });
-      showToast('Tenant suspended.', 'success');
-      setSuspendDialogOpen(false);
-      setTargetTenant(null);
+      queryClient.invalidateQueries({ queryKey: ['tenants'] })
+      showToast('Tenant suspended.', 'success')
+      setSuspendDialogOpen(false)
+      setTargetTenant(null)
     },
     onError: (error: Error) => {
-      showToast(error.message || 'Failed to suspend tenant.', 'error');
+      showToast(error.message || 'Failed to suspend tenant.', 'error')
     },
-  });
+  })
 
   // Activate mutation
   const activateMutation = useMutation({
     mutationFn: (id: string) => apiClient.post(`/platform/tenants/${id}/activate`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tenants'] });
-      showToast('Tenant activated.', 'success');
-      setActivateDialogOpen(false);
-      setTargetTenant(null);
+      queryClient.invalidateQueries({ queryKey: ['tenants'] })
+      showToast('Tenant activated.', 'success')
+      setActivateDialogOpen(false)
+      setTargetTenant(null)
     },
     onError: (error: Error) => {
-      showToast(error.message || 'Failed to activate tenant.', 'error');
+      showToast(error.message || 'Failed to activate tenant.', 'error')
     },
-  });
+  })
 
   const handleCreate = useCallback(() => {
-    setEditingTenant(undefined);
-    setIsFormOpen(true);
-  }, []);
+    setEditingTenant(undefined)
+    setIsFormOpen(true)
+  }, [])
 
   const handleEdit = useCallback((tenant: Tenant) => {
-    setEditingTenant(tenant);
-    setIsFormOpen(true);
-  }, []);
+    setEditingTenant(tenant)
+    setIsFormOpen(true)
+  }, [])
 
   const handleCloseForm = useCallback(() => {
-    setIsFormOpen(false);
-    setEditingTenant(undefined);
-  }, []);
+    setIsFormOpen(false)
+    setEditingTenant(undefined)
+  }, [])
 
-  const handleFormSubmit = useCallback((data: TenantFormData) => {
-    if (editingTenant) {
-      updateMutation.mutate({ id: editingTenant.id, data });
-    } else {
-      createMutation.mutate(data);
-    }
-  }, [editingTenant, createMutation, updateMutation]);
+  const handleFormSubmit = useCallback(
+    (data: TenantFormData) => {
+      if (editingTenant) {
+        updateMutation.mutate({ id: editingTenant.id, data })
+      } else {
+        createMutation.mutate(data)
+      }
+    },
+    [editingTenant, createMutation, updateMutation]
+  )
 
   const handleSuspendClick = useCallback((tenant: Tenant) => {
-    setTargetTenant(tenant);
-    setSuspendDialogOpen(true);
-  }, []);
+    setTargetTenant(tenant)
+    setSuspendDialogOpen(true)
+  }, [])
 
   const handleActivateClick = useCallback((tenant: Tenant) => {
-    setTargetTenant(tenant);
-    setActivateDialogOpen(true);
-  }, []);
+    setTargetTenant(tenant)
+    setActivateDialogOpen(true)
+  }, [])
 
   const handleSuspendConfirm = useCallback(() => {
     if (targetTenant) {
-      suspendMutation.mutate(targetTenant.id);
+      suspendMutation.mutate(targetTenant.id)
     }
-  }, [targetTenant, suspendMutation]);
+  }, [targetTenant, suspendMutation])
 
   const handleActivateConfirm = useCallback(() => {
     if (targetTenant) {
-      activateMutation.mutate(targetTenant.id);
+      activateMutation.mutate(targetTenant.id)
     }
-  }, [targetTenant, activateMutation]);
+  }, [targetTenant, activateMutation])
 
   if (isLoading) {
     return (
@@ -423,7 +460,7 @@ export function TenantsPage({ testId = 'tenants-page' }: TenantsPageProps): Reac
           <LoadingSpinner size="large" label="Loading tenants..." />
         </div>
       </div>
-    );
+    )
   }
 
   if (error) {
@@ -434,10 +471,10 @@ export function TenantsPage({ testId = 'tenants-page' }: TenantsPageProps): Reac
           onRetry={() => refetch()}
         />
       </div>
-    );
+    )
   }
 
-  const isSubmitting = createMutation.isPending || updateMutation.isPending;
+  const isSubmitting = createMutation.isPending || updateMutation.isPending
 
   return (
     <div className={styles.container} data-testid={testId}>
@@ -468,12 +505,24 @@ export function TenantsPage({ testId = 'tenants-page' }: TenantsPageProps): Reac
           >
             <thead>
               <tr role="row">
-                <th role="columnheader" scope="col">Slug</th>
-                <th role="columnheader" scope="col">Name</th>
-                <th role="columnheader" scope="col">Edition</th>
-                <th role="columnheader" scope="col">Status</th>
-                <th role="columnheader" scope="col">Created</th>
-                <th role="columnheader" scope="col">Actions</th>
+                <th role="columnheader" scope="col">
+                  Slug
+                </th>
+                <th role="columnheader" scope="col">
+                  Name
+                </th>
+                <th role="columnheader" scope="col">
+                  Edition
+                </th>
+                <th role="columnheader" scope="col">
+                  Status
+                </th>
+                <th role="columnheader" scope="col">
+                  Created
+                </th>
+                <th role="columnheader" scope="col">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -484,10 +533,14 @@ export function TenantsPage({ testId = 'tenants-page' }: TenantsPageProps): Reac
                   className={styles.tableRow}
                   data-testid={`tenant-row-${index}`}
                 >
-                  <td role="gridcell" className={styles.nameCell}>{tenant.slug}</td>
+                  <td role="gridcell" className={styles.nameCell}>
+                    {tenant.slug}
+                  </td>
                   <td role="gridcell">{tenant.name}</td>
                   <td role="gridcell">{tenant.edition}</td>
-                  <td role="gridcell"><StatusBadge status={tenant.status} /></td>
+                  <td role="gridcell">
+                    <StatusBadge status={tenant.status} />
+                  </td>
                   <td role="gridcell" className={styles.dateCell}>
                     {formatDate(new Date(tenant.createdAt), {
                       year: 'numeric',
@@ -552,7 +605,10 @@ export function TenantsPage({ testId = 'tenants-page' }: TenantsPageProps): Reac
         confirmLabel="Suspend"
         cancelLabel="Cancel"
         onConfirm={handleSuspendConfirm}
-        onCancel={() => { setSuspendDialogOpen(false); setTargetTenant(null); }}
+        onCancel={() => {
+          setSuspendDialogOpen(false)
+          setTargetTenant(null)
+        }}
         variant="danger"
       />
 
@@ -563,10 +619,13 @@ export function TenantsPage({ testId = 'tenants-page' }: TenantsPageProps): Reac
         confirmLabel="Activate"
         cancelLabel="Cancel"
         onConfirm={handleActivateConfirm}
-        onCancel={() => { setActivateDialogOpen(false); setTargetTenant(null); }}
+        onCancel={() => {
+          setActivateDialogOpen(false)
+          setTargetTenant(null)
+        }}
       />
     </div>
-  );
+  )
 }
 
-export default TenantsPage;
+export default TenantsPage

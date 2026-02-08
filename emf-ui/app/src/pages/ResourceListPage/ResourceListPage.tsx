@@ -13,19 +13,19 @@
  * - 11.12: Resource browser supports exporting selected records
  */
 
-import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useI18n } from '../../context/I18nContext';
-import { useApi } from '../../context/ApiContext';
-import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components';
-import styles from './ResourceListPage.module.css';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
+import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useI18n } from '../../context/I18nContext'
+import { useApi } from '../../context/ApiContext'
+import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
+import styles from './ResourceListPage.module.css'
 
 /**
  * Export format type
  * Requirement 11.12: Support CSV and JSON export formats
  */
-export type ExportFormat = 'csv' | 'json';
+export type ExportFormat = 'csv' | 'json'
 
 /**
  * Escape a value for CSV format
@@ -33,26 +33,25 @@ export type ExportFormat = 'csv' | 'json';
  */
 export function escapeCSVValue(value: unknown): string {
   if (value === null || value === undefined) {
-    return '';
+    return ''
   }
-  
-  const stringValue = typeof value === 'object' 
-    ? JSON.stringify(value) 
-    : String(value);
-  
+
+  const stringValue = typeof value === 'object' ? JSON.stringify(value) : String(value)
+
   // Check if the value needs to be quoted
-  const needsQuoting = stringValue.includes(',') || 
-                       stringValue.includes('"') || 
-                       stringValue.includes('\n') ||
-                       stringValue.includes('\r');
-  
+  const needsQuoting =
+    stringValue.includes(',') ||
+    stringValue.includes('"') ||
+    stringValue.includes('\n') ||
+    stringValue.includes('\r')
+
   if (needsQuoting) {
     // Escape double quotes by doubling them
-    const escaped = stringValue.replace(/"/g, '""');
-    return `"${escaped}"`;
+    const escaped = stringValue.replace(/"/g, '""')
+    return `"${escaped}"`
   }
-  
-  return stringValue;
+
+  return stringValue
 }
 
 /**
@@ -65,29 +64,29 @@ export function recordsToCSV(
   includeId: boolean = true
 ): string {
   // Build headers
-  const headers: string[] = [];
+  const headers: string[] = []
   if (includeId) {
-    headers.push('id');
+    headers.push('id')
   }
-  fields.forEach(field => {
-    headers.push(field.displayName || field.name);
-  });
-  
+  fields.forEach((field) => {
+    headers.push(field.displayName || field.name)
+  })
+
   // Build rows
-  const rows: string[] = [headers.map(escapeCSVValue).join(',')];
-  
-  records.forEach(record => {
-    const values: string[] = [];
+  const rows: string[] = [headers.map(escapeCSVValue).join(',')]
+
+  records.forEach((record) => {
+    const values: string[] = []
     if (includeId) {
-      values.push(escapeCSVValue(record.id));
+      values.push(escapeCSVValue(record.id))
     }
-    fields.forEach(field => {
-      values.push(escapeCSVValue(record[field.name]));
-    });
-    rows.push(values.join(','));
-  });
-  
-  return rows.join('\n');
+    fields.forEach((field) => {
+      values.push(escapeCSVValue(record[field.name]))
+    })
+    rows.push(values.join(','))
+  })
+
+  return rows.join('\n')
 }
 
 /**
@@ -95,51 +94,51 @@ export function recordsToCSV(
  * Requirement 11.12: Export selected records to JSON
  */
 export function recordsToJSON(records: Resource[]): string {
-  return JSON.stringify(records, null, 2);
+  return JSON.stringify(records, null, 2)
 }
 
 /**
  * Trigger a file download in the browser
  */
 export function downloadFile(content: string, filename: string, mimeType: string): void {
-  const blob = new Blob([content], { type: mimeType });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  const blob = new Blob([content], { type: mimeType })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
 }
 
 /**
  * Field definition interface for collection schema
  */
 export interface FieldDefinition {
-  id: string;
-  name: string;
-  displayName?: string;
-  type: 'string' | 'number' | 'boolean' | 'date' | 'datetime' | 'json' | 'reference';
-  required: boolean;
+  id: string
+  name: string
+  displayName?: string
+  type: 'string' | 'number' | 'boolean' | 'date' | 'datetime' | 'json' | 'reference'
+  required: boolean
 }
 
 /**
  * Collection schema interface
  */
 export interface CollectionSchema {
-  id: string;
-  name: string;
-  displayName: string;
-  fields: FieldDefinition[];
+  id: string
+  name: string
+  displayName: string
+  fields: FieldDefinition[]
 }
 
 /**
  * Resource record interface
  */
 export interface Resource {
-  id: string;
-  [key: string]: unknown;
+  id: string
+  [key: string]: unknown
 }
 
 /**
@@ -147,34 +146,43 @@ export interface Resource {
  * Requirement 11.4, 11.5: Support multiple filter conditions with operators
  */
 export interface FilterCondition {
-  id: string;
-  field: string;
-  operator: FilterOperator;
-  value: string;
+  id: string
+  field: string
+  operator: FilterOperator
+  value: string
 }
 
 /**
  * Filter operator type
  * Requirement 11.5: Support filter operators
  */
-export type FilterOperator = 'equals' | 'not_equals' | 'contains' | 'starts_with' | 'ends_with' | 'greater_than' | 'less_than' | 'greater_than_or_equal' | 'less_than_or_equal';
+export type FilterOperator =
+  | 'equals'
+  | 'not_equals'
+  | 'contains'
+  | 'starts_with'
+  | 'ends_with'
+  | 'greater_than'
+  | 'less_than'
+  | 'greater_than_or_equal'
+  | 'less_than_or_equal'
 
 /**
  * Sort state interface
  */
 interface SortState {
-  field: string;
-  direction: 'asc' | 'desc';
+  field: string
+  direction: 'asc' | 'desc'
 }
 
 /**
  * Paginated response interface
  */
 interface PaginatedResponse {
-  data: Resource[];
-  total: number;
-  page: number;
-  pageSize: number;
+  data: Resource[]
+  total: number
+  page: number
+  pageSize: number
 }
 
 /**
@@ -182,7 +190,7 @@ interface PaginatedResponse {
  */
 export interface ResourceListPageProps {
   /** Optional test ID for testing */
-  testId?: string;
+  testId?: string
 }
 
 // Filter operators with labels
@@ -196,75 +204,89 @@ const FILTER_OPERATORS: { value: FilterOperator; label: string }[] = [
   { value: 'less_than', label: 'Less Than' },
   { value: 'greater_than_or_equal', label: 'Greater Than or Equal' },
   { value: 'less_than_or_equal', label: 'Less Than or Equal' },
-];
+]
 
 // Page size options
-const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100]
 
 // Generate unique ID for filter conditions
-let filterIdCounter = 0;
+let filterIdCounter = 0
 function generateFilterId(): string {
-  return `filter-${++filterIdCounter}`;
+  return `filter-${++filterIdCounter}`
 }
 
 // API functions using apiClient
-async function fetchCollectionSchema(apiClient: any, collectionName: string): Promise<CollectionSchema> {
-  console.log('[fetchCollectionSchema] Fetching collection by name:', collectionName);
-  
+async function fetchCollectionSchema(
+  apiClient: any,
+  collectionName: string
+): Promise<CollectionSchema> {
+  console.log('[fetchCollectionSchema] Fetching collection by name:', collectionName)
+
   // First, fetch all collections to find the one with matching name
-  const response = await apiClient.get<{ content: any[] }>('/control/collections');
-  console.log('[fetchCollectionSchema] Collections response:', response);
-  
-  const collections = response?.content || [];
-  console.log('[fetchCollectionSchema] Collections array:', collections);
-  
-  const collection = collections.find((c: any) => c.name === collectionName);
-  console.log('[fetchCollectionSchema] Found collection:', collection);
-  
+  const response = await apiClient.get<{ content: any[] }>('/control/collections')
+  console.log('[fetchCollectionSchema] Collections response:', response)
+
+  const collections = response?.content || []
+  console.log('[fetchCollectionSchema] Collections array:', collections)
+
+  const collection = collections.find((c: any) => c.name === collectionName)
+  console.log('[fetchCollectionSchema] Found collection:', collection)
+
   if (!collection) {
-    throw new Error(`Collection '${collectionName}' not found`);
+    throw new Error(`Collection '${collectionName}' not found`)
   }
-  
+
   // Now fetch the full collection details by ID
-  const schema = await apiClient.get(`/control/collections/${collection.id}`);
-  console.log('[fetchCollectionSchema] Collection schema:', schema);
-  return schema;
+  const schema = await apiClient.get(`/control/collections/${collection.id}`)
+  console.log('[fetchCollectionSchema] Collection schema:', schema)
+  return schema
 }
 
 interface FetchResourcesParams {
-  collectionName: string;
-  page: number;
-  pageSize: number;
-  sort?: SortState;
-  filters?: FilterCondition[];
+  collectionName: string
+  page: number
+  pageSize: number
+  sort?: SortState
+  filters?: FilterCondition[]
 }
 
-async function fetchResources(apiClient: any, params: FetchResourcesParams): Promise<PaginatedResponse> {
-  const { collectionName, page, pageSize, sort, filters } = params;
-  
+async function fetchResources(
+  apiClient: any,
+  params: FetchResourcesParams
+): Promise<PaginatedResponse> {
+  const { collectionName, page, pageSize, sort, filters } = params
+
   // Build query parameters
-  const queryParams = new URLSearchParams();
-  queryParams.set('page', String(page));
-  queryParams.set('pageSize', String(pageSize));
-  
+  const queryParams = new URLSearchParams()
+  queryParams.set('page', String(page))
+  queryParams.set('pageSize', String(pageSize))
+
   if (sort) {
-    queryParams.set('sortField', sort.field);
-    queryParams.set('sortDirection', sort.direction);
+    queryParams.set('sortField', sort.field)
+    queryParams.set('sortDirection', sort.direction)
   }
-  
+
   if (filters && filters.length > 0) {
-    queryParams.set('filters', JSON.stringify(filters));
+    queryParams.set('filters', JSON.stringify(filters))
   }
-  
-  return apiClient.get(`/api/${collectionName}?${queryParams.toString()}`);
+
+  return apiClient.get(`/api/${collectionName}?${queryParams.toString()}`)
 }
 
-async function deleteResource(apiClient: any, collectionName: string, resourceId: string): Promise<void> {
-  return apiClient.delete(`/api/${collectionName}/${resourceId}`);
+async function deleteResource(
+  apiClient: any,
+  collectionName: string,
+  resourceId: string
+): Promise<void> {
+  return apiClient.delete(`/api/${collectionName}/${resourceId}`)
 }
 
-async function deleteResources(apiClient: any, collectionName: string, resourceIds: string[]): Promise<void> {
-  return apiClient.post(`/api/${collectionName}/bulk-delete`, { ids: resourceIds });
+async function deleteResources(
+  apiClient: any,
+  collectionName: string,
+  resourceIds: string[]
+): Promise<void> {
+  return apiClient.post(`/api/${collectionName}/bulk-delete`, { ids: resourceIds })
 }
 
 /**
@@ -273,41 +295,43 @@ async function deleteResources(apiClient: any, collectionName: string, resourceI
  * Main page for displaying and managing resources in a collection.
  * Provides listing, filtering, sorting, column selection, and bulk operations.
  */
-export function ResourceListPage({ testId = 'resource-list-page' }: ResourceListPageProps): React.ReactElement {
-  const { collection: collectionName } = useParams<{ collection: string }>();
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const { t, formatDate } = useI18n();
-  const { apiClient } = useApi();
-  const { showToast } = useToast();
+export function ResourceListPage({
+  testId = 'resource-list-page',
+}: ResourceListPageProps): React.ReactElement {
+  const { collection: collectionName } = useParams<{ collection: string }>()
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const { t, formatDate } = useI18n()
+  const { apiClient } = useApi()
+  const { showToast } = useToast()
 
   // Pagination state
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
 
   // Sort state
-  const [sort, setSort] = useState<SortState | undefined>(undefined);
+  const [sort, setSort] = useState<SortState | undefined>(undefined)
 
   // Filter state - Requirement 11.3, 11.4
-  const [filters, setFilters] = useState<FilterCondition[]>([]);
-  const [pendingFilters, setPendingFilters] = useState<FilterCondition[]>([]);
-  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState<FilterCondition[]>([])
+  const [pendingFilters, setPendingFilters] = useState<FilterCondition[]>([])
+  const [showFilters, setShowFilters] = useState(false)
 
   // Column visibility state - Requirement 11.5 (column selection)
-  const [visibleColumns, setVisibleColumns] = useState<Set<string>>(new Set());
-  const [showColumnSelector, setShowColumnSelector] = useState(false);
+  const [visibleColumns, setVisibleColumns] = useState<Set<string>>(new Set())
+  const [showColumnSelector, setShowColumnSelector] = useState(false)
 
   // Bulk selection state - Requirement 11.11
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
   // Delete confirmation dialog state
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [resourceToDelete, setResourceToDelete] = useState<Resource | null>(null);
-  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [resourceToDelete, setResourceToDelete] = useState<Resource | null>(null)
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false)
 
   // Export dropdown state - Requirement 11.12
-  const [showExportDropdown, setShowExportDropdown] = useState(false);
-  const exportDropdownRef = useRef<HTMLDivElement>(null);
+  const [showExportDropdown, setShowExportDropdown] = useState(false)
+  const exportDropdownRef = useRef<HTMLDivElement>(null)
 
   // Fetch collection schema
   const {
@@ -318,19 +342,19 @@ export function ResourceListPage({ testId = 'resource-list-page' }: ResourceList
     queryKey: ['collection-schema', collectionName],
     queryFn: () => fetchCollectionSchema(apiClient, collectionName!),
     enabled: !!collectionName,
-  });
+  })
 
   // Initialize visible columns when schema loads
   useEffect(() => {
     if (schema && visibleColumns.size === 0) {
       // Show first 5 fields by default plus id
-      const defaultColumns = new Set<string>(['id']);
+      const defaultColumns = new Set<string>(['id'])
       schema.fields.slice(0, 5).forEach((field) => {
-        defaultColumns.add(field.name);
-      });
-      setVisibleColumns(defaultColumns);
+        defaultColumns.add(field.name)
+      })
+      setVisibleColumns(defaultColumns)
     }
-  }, [schema, visibleColumns.size]);
+  }, [schema, visibleColumns.size])
 
   // Fetch resources - Requirement 11.2
   const {
@@ -349,312 +373,353 @@ export function ResourceListPage({ testId = 'resource-list-page' }: ResourceList
         filters,
       }),
     enabled: !!collectionName && !!schema,
-  });
+  })
 
   // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: ({ id }: { id: string }) => deleteResource(apiClient, collectionName!, id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['resources', collectionName] });
-      showToast(t('success.deleted', { item: t('resources.record') }), 'success');
-      setDeleteDialogOpen(false);
-      setResourceToDelete(null);
+      queryClient.invalidateQueries({ queryKey: ['resources', collectionName] })
+      showToast(t('success.deleted', { item: t('resources.record') }), 'success')
+      setDeleteDialogOpen(false)
+      setResourceToDelete(null)
     },
     onError: (error: Error) => {
-      showToast(error.message || t('errors.generic'), 'error');
+      showToast(error.message || t('errors.generic'), 'error')
     },
-  });
+  })
 
   // Bulk delete mutation - Requirement 11.11
   const bulkDeleteMutation = useMutation({
     mutationFn: (ids: string[]) => deleteResources(apiClient, collectionName!, ids),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['resources', collectionName] });
-      showToast(t('success.deleted', { item: `${selectedIds.size} records` }), 'success');
-      setBulkDeleteDialogOpen(false);
-      setSelectedIds(new Set());
+      queryClient.invalidateQueries({ queryKey: ['resources', collectionName] })
+      showToast(t('success.deleted', { item: `${selectedIds.size} records` }), 'success')
+      setBulkDeleteDialogOpen(false)
+      setSelectedIds(new Set())
     },
     onError: (error: Error) => {
-      showToast(error.message || t('errors.generic'), 'error');
+      showToast(error.message || t('errors.generic'), 'error')
     },
-  });
+  })
 
   // Get visible fields for table columns
   const visibleFields = useMemo(() => {
-    if (!schema) return [];
-    return schema.fields.filter((field) => visibleColumns.has(field.name));
-  }, [schema, visibleColumns]);
+    if (!schema) return []
+    return schema.fields.filter((field) => visibleColumns.has(field.name))
+  }, [schema, visibleColumns])
 
   // Calculate total pages
   const totalPages = useMemo(() => {
-    if (!resourcesData) return 0;
-    return Math.ceil(resourcesData.total / pageSize);
-  }, [resourcesData, pageSize]);
+    if (!resourcesData) return 0
+    return Math.ceil(resourcesData.total / pageSize)
+  }, [resourcesData, pageSize])
 
   // Check if all visible records are selected
   const allSelected = useMemo(() => {
-    if (!resourcesData || resourcesData.data.length === 0) return false;
-    return resourcesData.data.every((resource) => selectedIds.has(resource.id));
-  }, [resourcesData, selectedIds]);
+    if (!resourcesData || resourcesData.data.length === 0) return false
+    return resourcesData.data.every((resource) => selectedIds.has(resource.id))
+  }, [resourcesData, selectedIds])
 
   // Handle sort change - Requirement 11.4 (column sorting)
   const handleSortChange = useCallback((field: string) => {
     setSort((prev) => {
       if (prev?.field === field) {
-        return prev.direction === 'asc'
-          ? { field, direction: 'desc' }
-          : undefined;
+        return prev.direction === 'asc' ? { field, direction: 'desc' } : undefined
       }
-      return { field, direction: 'asc' };
-    });
-    setPage(1);
-  }, []);
+      return { field, direction: 'asc' }
+    })
+    setPage(1)
+  }, [])
 
   // Handle page change
   const handlePageChange = useCallback((newPage: number) => {
-    setPage(newPage);
-    setSelectedIds(new Set()); // Clear selection on page change
-  }, []);
+    setPage(newPage)
+    setSelectedIds(new Set()) // Clear selection on page change
+  }, [])
 
   // Handle page size change
   const handlePageSizeChange = useCallback((event: React.ChangeEvent<HTMLSelectElement>) => {
-    setPageSize(Number(event.target.value));
-    setPage(1);
-    setSelectedIds(new Set());
-  }, []);
+    setPageSize(Number(event.target.value))
+    setPage(1)
+    setSelectedIds(new Set())
+  }, [])
 
   // Filter handlers - Requirement 11.3, 11.4, 11.5
   const handleToggleFilters = useCallback(() => {
-    setShowFilters((prev) => !prev);
+    setShowFilters((prev) => !prev)
     if (!showFilters) {
-      setPendingFilters(filters);
+      setPendingFilters(filters)
     }
-  }, [showFilters, filters]);
+  }, [showFilters, filters])
 
   const handleAddFilter = useCallback(() => {
-    if (!schema || schema.fields.length === 0) return;
+    if (!schema || schema.fields.length === 0) return
     const newFilter: FilterCondition = {
       id: generateFilterId(),
       field: schema.fields[0].name,
       operator: 'equals',
       value: '',
-    };
-    setPendingFilters((prev) => [...prev, newFilter]);
-  }, [schema]);
+    }
+    setPendingFilters((prev) => [...prev, newFilter])
+  }, [schema])
 
   const handleRemoveFilter = useCallback((filterId: string) => {
-    setPendingFilters((prev) => prev.filter((f) => f.id !== filterId));
-  }, []);
+    setPendingFilters((prev) => prev.filter((f) => f.id !== filterId))
+  }, [])
 
   const handleFilterFieldChange = useCallback((filterId: string, field: string) => {
-    setPendingFilters((prev) =>
-      prev.map((f) => (f.id === filterId ? { ...f, field } : f))
-    );
-  }, []);
+    setPendingFilters((prev) => prev.map((f) => (f.id === filterId ? { ...f, field } : f)))
+  }, [])
 
   const handleFilterOperatorChange = useCallback((filterId: string, operator: FilterOperator) => {
-    setPendingFilters((prev) =>
-      prev.map((f) => (f.id === filterId ? { ...f, operator } : f))
-    );
-  }, []);
+    setPendingFilters((prev) => prev.map((f) => (f.id === filterId ? { ...f, operator } : f)))
+  }, [])
 
   const handleFilterValueChange = useCallback((filterId: string, value: string) => {
-    setPendingFilters((prev) =>
-      prev.map((f) => (f.id === filterId ? { ...f, value } : f))
-    );
-  }, []);
+    setPendingFilters((prev) => prev.map((f) => (f.id === filterId ? { ...f, value } : f)))
+  }, [])
 
   const handleApplyFilters = useCallback(() => {
-    setFilters(pendingFilters.filter((f) => f.value.trim() !== ''));
-    setPage(1);
-    setSelectedIds(new Set());
-  }, [pendingFilters]);
+    setFilters(pendingFilters.filter((f) => f.value.trim() !== ''))
+    setPage(1)
+    setSelectedIds(new Set())
+  }, [pendingFilters])
 
   const handleClearFilters = useCallback(() => {
-    setPendingFilters([]);
-    setFilters([]);
-    setPage(1);
-    setSelectedIds(new Set());
-  }, []);
+    setPendingFilters([])
+    setFilters([])
+    setPage(1)
+    setSelectedIds(new Set())
+  }, [])
 
   // Column visibility handlers
   const handleToggleColumnSelector = useCallback(() => {
-    setShowColumnSelector((prev) => !prev);
-  }, []);
+    setShowColumnSelector((prev) => !prev)
+  }, [])
 
   const handleToggleColumn = useCallback((fieldName: string) => {
     setVisibleColumns((prev) => {
-      const next = new Set(prev);
+      const next = new Set(prev)
       if (next.has(fieldName)) {
-        next.delete(fieldName);
+        next.delete(fieldName)
       } else {
-        next.add(fieldName);
+        next.add(fieldName)
       }
-      return next;
-    });
-  }, []);
+      return next
+    })
+  }, [])
 
   // Selection handlers - Requirement 11.11
   const handleSelectAll = useCallback(() => {
-    if (!resourcesData) return;
+    if (!resourcesData) return
     if (allSelected) {
-      setSelectedIds(new Set());
+      setSelectedIds(new Set())
     } else {
-      setSelectedIds(new Set(resourcesData.data.map((r) => r.id)));
+      setSelectedIds(new Set(resourcesData.data.map((r) => r.id)))
     }
-  }, [resourcesData, allSelected]);
+  }, [resourcesData, allSelected])
 
   const handleSelectRow = useCallback((resourceId: string) => {
     setSelectedIds((prev) => {
-      const next = new Set(prev);
+      const next = new Set(prev)
       if (next.has(resourceId)) {
-        next.delete(resourceId);
+        next.delete(resourceId)
       } else {
-        next.add(resourceId);
+        next.add(resourceId)
       }
-      return next;
-    });
-  }, []);
+      return next
+    })
+  }, [])
 
   // Navigation handlers
   const handleCreate = useCallback(() => {
-    navigate(`/resources/${collectionName}/new`);
-  }, [navigate, collectionName]);
+    navigate(`/resources/${collectionName}/new`)
+  }, [navigate, collectionName])
 
-  const handleView = useCallback((resource: Resource) => {
-    navigate(`/resources/${collectionName}/${resource.id}`);
-  }, [navigate, collectionName]);
+  const handleView = useCallback(
+    (resource: Resource) => {
+      navigate(`/resources/${collectionName}/${resource.id}`)
+    },
+    [navigate, collectionName]
+  )
 
-  const handleEdit = useCallback((resource: Resource) => {
-    navigate(`/resources/${collectionName}/${resource.id}/edit`);
-  }, [navigate, collectionName]);
+  const handleEdit = useCallback(
+    (resource: Resource) => {
+      navigate(`/resources/${collectionName}/${resource.id}/edit`)
+    },
+    [navigate, collectionName]
+  )
 
   // Delete handlers
   const handleDeleteClick = useCallback((resource: Resource) => {
-    setResourceToDelete(resource);
-    setDeleteDialogOpen(true);
-  }, []);
+    setResourceToDelete(resource)
+    setDeleteDialogOpen(true)
+  }, [])
 
   const handleDeleteConfirm = useCallback(() => {
     if (resourceToDelete) {
-      deleteMutation.mutate({ id: resourceToDelete.id });
+      deleteMutation.mutate({ id: resourceToDelete.id })
     }
-  }, [resourceToDelete, deleteMutation]);
+  }, [resourceToDelete, deleteMutation])
 
   const handleDeleteCancel = useCallback(() => {
-    setDeleteDialogOpen(false);
-    setResourceToDelete(null);
-  }, []);
+    setDeleteDialogOpen(false)
+    setResourceToDelete(null)
+  }, [])
 
   // Bulk delete handlers - Requirement 11.11
   const handleBulkDeleteClick = useCallback(() => {
-    setBulkDeleteDialogOpen(true);
-  }, []);
+    setBulkDeleteDialogOpen(true)
+  }, [])
 
   const handleBulkDeleteConfirm = useCallback(() => {
-    bulkDeleteMutation.mutate(Array.from(selectedIds));
-  }, [bulkDeleteMutation, selectedIds]);
+    bulkDeleteMutation.mutate(Array.from(selectedIds))
+  }, [bulkDeleteMutation, selectedIds])
 
   const handleBulkDeleteCancel = useCallback(() => {
-    setBulkDeleteDialogOpen(false);
-  }, []);
+    setBulkDeleteDialogOpen(false)
+  }, [])
 
   // Export handlers - Requirement 11.12
   const handleToggleExportDropdown = useCallback(() => {
-    setShowExportDropdown((prev) => !prev);
-  }, []);
+    setShowExportDropdown((prev) => !prev)
+  }, [])
 
-  const handleExportSelected = useCallback((format: ExportFormat) => {
-    if (!schema || !resourcesData) return;
-    
-    // Get selected records
-    const selectedRecords = resourcesData.data.filter((r) => selectedIds.has(r.id));
-    if (selectedRecords.length === 0) return;
-    
-    const timestamp = new Date().toISOString().slice(0, 10);
-    const filename = `${collectionName}-export-${timestamp}`;
-    
-    if (format === 'csv') {
-      const csv = recordsToCSV(selectedRecords, visibleFields, visibleColumns.has('id'));
-      downloadFile(csv, `${filename}.csv`, 'text/csv;charset=utf-8');
-      showToast(t('resources.exportSuccess', { count: selectedRecords.length, format: 'CSV' }), 'success');
-    } else {
-      const json = recordsToJSON(selectedRecords);
-      downloadFile(json, `${filename}.json`, 'application/json');
-      showToast(t('resources.exportSuccess', { count: selectedRecords.length, format: 'JSON' }), 'success');
-    }
-    
-    setShowExportDropdown(false);
-  }, [schema, resourcesData, selectedIds, collectionName, visibleFields, visibleColumns, showToast, t]);
+  const handleExportSelected = useCallback(
+    (format: ExportFormat) => {
+      if (!schema || !resourcesData) return
 
-  const handleExportAll = useCallback((format: ExportFormat) => {
-    if (!schema || !resourcesData) return;
-    
-    const records = resourcesData.data;
-    if (records.length === 0) return;
-    
-    const timestamp = new Date().toISOString().slice(0, 10);
-    const filename = `${collectionName}-export-${timestamp}`;
-    
-    if (format === 'csv') {
-      const csv = recordsToCSV(records, visibleFields, visibleColumns.has('id'));
-      downloadFile(csv, `${filename}.csv`, 'text/csv;charset=utf-8');
-      showToast(t('resources.exportSuccess', { count: records.length, format: 'CSV' }), 'success');
-    } else {
-      const json = recordsToJSON(records);
-      downloadFile(json, `${filename}.json`, 'application/json');
-      showToast(t('resources.exportSuccess', { count: records.length, format: 'JSON' }), 'success');
-    }
-    
-    setShowExportDropdown(false);
-  }, [schema, resourcesData, collectionName, visibleFields, visibleColumns, showToast, t]);
+      // Get selected records
+      const selectedRecords = resourcesData.data.filter((r) => selectedIds.has(r.id))
+      if (selectedRecords.length === 0) return
+
+      const timestamp = new Date().toISOString().slice(0, 10)
+      const filename = `${collectionName}-export-${timestamp}`
+
+      if (format === 'csv') {
+        const csv = recordsToCSV(selectedRecords, visibleFields, visibleColumns.has('id'))
+        downloadFile(csv, `${filename}.csv`, 'text/csv;charset=utf-8')
+        showToast(
+          t('resources.exportSuccess', { count: selectedRecords.length, format: 'CSV' }),
+          'success'
+        )
+      } else {
+        const json = recordsToJSON(selectedRecords)
+        downloadFile(json, `${filename}.json`, 'application/json')
+        showToast(
+          t('resources.exportSuccess', { count: selectedRecords.length, format: 'JSON' }),
+          'success'
+        )
+      }
+
+      setShowExportDropdown(false)
+    },
+    [
+      schema,
+      resourcesData,
+      selectedIds,
+      collectionName,
+      visibleFields,
+      visibleColumns,
+      showToast,
+      t,
+    ]
+  )
+
+  const handleExportAll = useCallback(
+    (format: ExportFormat) => {
+      if (!schema || !resourcesData) return
+
+      const records = resourcesData.data
+      if (records.length === 0) return
+
+      const timestamp = new Date().toISOString().slice(0, 10)
+      const filename = `${collectionName}-export-${timestamp}`
+
+      if (format === 'csv') {
+        const csv = recordsToCSV(records, visibleFields, visibleColumns.has('id'))
+        downloadFile(csv, `${filename}.csv`, 'text/csv;charset=utf-8')
+        showToast(t('resources.exportSuccess', { count: records.length, format: 'CSV' }), 'success')
+      } else {
+        const json = recordsToJSON(records)
+        downloadFile(json, `${filename}.json`, 'application/json')
+        showToast(
+          t('resources.exportSuccess', { count: records.length, format: 'JSON' }),
+          'success'
+        )
+      }
+
+      setShowExportDropdown(false)
+    },
+    [schema, resourcesData, collectionName, visibleFields, visibleColumns, showToast, t]
+  )
 
   // Close export dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (exportDropdownRef.current && !exportDropdownRef.current.contains(event.target as Node)) {
-        setShowExportDropdown(false);
+        setShowExportDropdown(false)
       }
-    };
-    
-    if (showExportDropdown) {
-      document.addEventListener('mousedown', handleClickOutside);
     }
-    
+
+    if (showExportDropdown) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showExportDropdown]);
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showExportDropdown])
 
   // Get sort indicator
-  const getSortIndicator = useCallback((field: string) => {
-    if (sort?.field !== field) return null;
-    return sort.direction === 'asc' ? ' ↑' : ' ↓';
-  }, [sort]);
+  const getSortIndicator = useCallback(
+    (field: string) => {
+      if (sort?.field !== field) return null
+      return sort.direction === 'asc' ? ' ↑' : ' ↓'
+    },
+    [sort]
+  )
 
   // Get aria-sort value
-  const getAriaSort = useCallback((field: string): 'ascending' | 'descending' | 'none' => {
-    if (sort?.field !== field) return 'none';
-    return sort.direction === 'asc' ? 'ascending' : 'descending';
-  }, [sort]);
+  const getAriaSort = useCallback(
+    (field: string): 'ascending' | 'descending' | 'none' => {
+      if (sort?.field !== field) return 'none'
+      return sort.direction === 'asc' ? 'ascending' : 'descending'
+    },
+    [sort]
+  )
 
   // Format cell value based on field type
-  const formatCellValue = useCallback((value: unknown, field: FieldDefinition): string => {
-    if (value === null || value === undefined) return '-';
-    
-    switch (field.type) {
-      case 'boolean':
-        return value ? t('common.yes') : t('common.no');
-      case 'date':
-        return formatDate(new Date(value as string), { year: 'numeric', month: 'short', day: 'numeric' });
-      case 'datetime':
-        return formatDate(new Date(value as string), { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-      case 'json':
-        return typeof value === 'object' ? JSON.stringify(value) : String(value);
-      default:
-        return String(value);
-    }
-  }, [t, formatDate]);
+  const formatCellValue = useCallback(
+    (value: unknown, field: FieldDefinition): string => {
+      if (value === null || value === undefined) return '-'
+
+      switch (field.type) {
+        case 'boolean':
+          return value ? t('common.yes') : t('common.no')
+        case 'date':
+          return formatDate(new Date(value as string), {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+          })
+        case 'datetime':
+          return formatDate(new Date(value as string), {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          })
+        case 'json':
+          return typeof value === 'object' ? JSON.stringify(value) : String(value)
+        default:
+          return String(value)
+      }
+    },
+    [t, formatDate]
+  )
 
   // Loading state
   if (schemaLoading) {
@@ -664,7 +729,7 @@ export function ResourceListPage({ testId = 'resource-list-page' }: ResourceList
           <LoadingSpinner size="large" label={t('common.loading')} />
         </div>
       </div>
-    );
+    )
   }
 
   // Error state
@@ -673,10 +738,12 @@ export function ResourceListPage({ testId = 'resource-list-page' }: ResourceList
       <div className={styles.container} data-testid={testId}>
         <ErrorMessage
           error={schemaError instanceof Error ? schemaError : new Error(t('errors.generic'))}
-          onRetry={() => queryClient.invalidateQueries({ queryKey: ['collection-schema', collectionName] })}
+          onRetry={() =>
+            queryClient.invalidateQueries({ queryKey: ['collection-schema', collectionName] })
+          }
         />
       </div>
-    );
+    )
   }
 
   if (!schema) {
@@ -684,11 +751,11 @@ export function ResourceListPage({ testId = 'resource-list-page' }: ResourceList
       <div className={styles.container} data-testid={testId}>
         <ErrorMessage error={new Error(t('errors.notFound'))} />
       </div>
-    );
+    )
   }
 
-  const resources = resourcesData?.data ?? [];
-  const totalCount = resourcesData?.total ?? 0;
+  const resources = resourcesData?.data ?? []
+  const totalCount = resourcesData?.total ?? 0
 
   return (
     <div className={styles.container} data-testid={testId}>
@@ -699,7 +766,9 @@ export function ResourceListPage({ testId = 'resource-list-page' }: ResourceList
             <Link to="/resources" className={styles.breadcrumbLink}>
               {t('resources.title')}
             </Link>
-            <span className={styles.breadcrumbSeparator} aria-hidden="true">/</span>
+            <span className={styles.breadcrumbSeparator} aria-hidden="true">
+              /
+            </span>
             <span>{schema.displayName}</span>
           </nav>
           <h1 className={styles.title}>{schema.displayName}</h1>
@@ -726,7 +795,7 @@ export function ResourceListPage({ testId = 'resource-list-page' }: ResourceList
               <span className={styles.selectedCount}>
                 {selectedIds.size} {t('common.selected')}
               </span>
-              
+
               {/* Export Dropdown - Requirement 11.12 */}
               <div className={styles.exportDropdownContainer} ref={exportDropdownRef}>
                 <button
@@ -748,7 +817,9 @@ export function ResourceListPage({ testId = 'resource-list-page' }: ResourceList
                     data-testid="export-dropdown"
                   >
                     <div className={styles.exportSection}>
-                      <span className={styles.exportSectionLabel}>{t('resources.exportSelectedLabel', { count: selectedIds.size })}</span>
+                      <span className={styles.exportSectionLabel}>
+                        {t('resources.exportSelectedLabel', { count: selectedIds.size })}
+                      </span>
                       <button
                         type="button"
                         className={styles.exportOption}
@@ -770,7 +841,11 @@ export function ResourceListPage({ testId = 'resource-list-page' }: ResourceList
                     </div>
                     <div className={styles.exportDivider} />
                     <div className={styles.exportSection}>
-                      <span className={styles.exportSectionLabel}>{t('resources.exportAllVisible', { count: resourcesData?.data.length ?? 0 })}</span>
+                      <span className={styles.exportSectionLabel}>
+                        {t('resources.exportAllVisible', {
+                          count: resourcesData?.data.length ?? 0,
+                        })}
+                      </span>
                       <button
                         type="button"
                         className={styles.exportOption}
@@ -793,7 +868,7 @@ export function ResourceListPage({ testId = 'resource-list-page' }: ResourceList
                   </div>
                 )}
               </div>
-              
+
               <button
                 type="button"
                 className={`${styles.bulkButton} ${styles.bulkDeleteButton}`}
@@ -872,16 +947,16 @@ export function ResourceListPage({ testId = 'resource-list-page' }: ResourceList
 
       {/* Filter Builder - Requirements 11.3, 11.4, 11.5 */}
       {showFilters && (
-        <div
-          id="filter-builder"
-          className={styles.filterBuilder}
-          data-testid="filter-builder"
-        >
+        <div id="filter-builder" className={styles.filterBuilder} data-testid="filter-builder">
           {pendingFilters.length === 0 ? (
             <p>{t('common.noResults')}</p>
           ) : (
             pendingFilters.map((filter) => (
-              <div key={filter.id} className={styles.filterRow} data-testid={`filter-row-${filter.id}`}>
+              <div
+                key={filter.id}
+                className={styles.filterRow}
+                data-testid={`filter-row-${filter.id}`}
+              >
                 {/* Field Selector */}
                 <select
                   className={`${styles.filterSelect} ${styles.filterFieldSelect}`}
@@ -901,7 +976,9 @@ export function ResourceListPage({ testId = 'resource-list-page' }: ResourceList
                 <select
                   className={`${styles.filterSelect} ${styles.filterOperatorSelect}`}
                   value={filter.operator}
-                  onChange={(e) => handleFilterOperatorChange(filter.id, e.target.value as FilterOperator)}
+                  onChange={(e) =>
+                    handleFilterOperatorChange(filter.id, e.target.value as FilterOperator)
+                  }
                   aria-label="Filter operator"
                   data-testid={`filter-operator-${filter.id}`}
                 >
@@ -1014,8 +1091,8 @@ export function ResourceListPage({ testId = 'resource-list-page' }: ResourceList
                       onClick={() => handleSortChange('id')}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          handleSortChange('id');
+                          e.preventDefault()
+                          handleSortChange('id')
                         }
                       }}
                       tabIndex={0}
@@ -1039,8 +1116,8 @@ export function ResourceListPage({ testId = 'resource-list-page' }: ResourceList
                       onClick={() => handleSortChange(field.name)}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          handleSortChange(field.name);
+                          e.preventDefault()
+                          handleSortChange(field.name)
                         }
                       }}
                       tabIndex={0}
@@ -1063,7 +1140,7 @@ export function ResourceListPage({ testId = 'resource-list-page' }: ResourceList
 
               <tbody>
                 {resources.map((resource, index) => {
-                  const isSelected = selectedIds.has(resource.id);
+                  const isSelected = selectedIds.has(resource.id)
                   return (
                     <tr
                       key={resource.id}
@@ -1134,7 +1211,7 @@ export function ResourceListPage({ testId = 'resource-list-page' }: ResourceList
                         </div>
                       </td>
                     </tr>
-                  );
+                  )
                 })}
               </tbody>
             </table>
@@ -1223,7 +1300,7 @@ export function ResourceListPage({ testId = 'resource-list-page' }: ResourceList
         variant="danger"
       />
     </div>
-  );
+  )
 }
 
-export default ResourceListPage;
+export default ResourceListPage

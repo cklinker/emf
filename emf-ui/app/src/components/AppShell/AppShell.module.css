@@ -26,19 +26,19 @@
   --app-shell-sidebar-collapsed-width: 64px;
   --app-shell-sidebar-tablet-width: 220px;
   --app-shell-sidebar-mobile-width: 280px;
-  
+
   /* Spacing */
   --app-shell-spacing-xs: 4px;
   --app-shell-spacing-sm: 8px;
   --app-shell-spacing-md: 16px;
   --app-shell-spacing-lg: 24px;
   --app-shell-spacing-xl: 32px;
-  
+
   /* Transitions */
   --app-shell-transition-fast: 150ms ease-in-out;
   --app-shell-transition-normal: 200ms ease-in-out;
   --app-shell-transition-slow: 300ms ease-in-out;
-  
+
   /* Z-index layers */
   --app-shell-z-header: 100;
   --app-shell-z-sidebar: 200;
@@ -108,8 +108,9 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  transition: width var(--app-shell-transition-normal),
-              transform var(--app-shell-transition-normal);
+  transition:
+    width var(--app-shell-transition-normal),
+    transform var(--app-shell-transition-normal);
 }
 
 .sidebarContent {
@@ -187,8 +188,9 @@
   border-radius: var(--border-radius, 4px);
   cursor: pointer;
   color: var(--app-shell-text, var(--color-text, #1a1a1a));
-  transition: background-color var(--app-shell-transition-fast),
-              border-color var(--app-shell-transition-fast);
+  transition:
+    background-color var(--app-shell-transition-fast),
+    border-color var(--app-shell-transition-fast);
 }
 
 .toggleButton:hover {
@@ -225,9 +227,10 @@
   cursor: pointer;
   color: var(--color-text-inverse, #ffffff);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  transition: background-color var(--app-shell-transition-fast),
-              transform var(--app-shell-transition-fast),
-              box-shadow var(--app-shell-transition-fast);
+  transition:
+    background-color var(--app-shell-transition-fast),
+    transform var(--app-shell-transition-fast),
+    box-shadow var(--app-shell-transition-fast);
 }
 
 .mobileToggleButton:hover {
@@ -360,7 +363,7 @@
   .overlay {
     transition: none;
   }
-  
+
   .mobileToggleButton:hover,
   .mobileToggleButton:active {
     transform: none;
@@ -376,11 +379,11 @@
   .mobileToggleButton {
     border: 2px solid currentColor;
   }
-  
+
   .sidebar {
     border-right: 2px solid currentColor;
   }
-  
+
   .header {
     border-bottom: 2px solid currentColor;
   }
@@ -397,12 +400,12 @@
   .overlay {
     display: none !important;
   }
-  
+
   .content {
     padding: 0;
     overflow: visible;
   }
-  
+
   .appShell {
     min-height: auto;
   }

@@ -6,4 +6,4 @@ export {
   type LiveRegionPoliteness,
   type LiveRegionContextValue,
   type LiveRegionProviderProps,
-} from './LiveRegion';
+} from './LiveRegion'

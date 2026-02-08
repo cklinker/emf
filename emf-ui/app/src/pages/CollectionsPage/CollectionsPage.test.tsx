@@ -20,22 +20,22 @@
  * - 3.11: Soft-delete collection and remove from list
  */
 
-import React from 'react';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createTestWrapper, setupAuthMocks, wrapFetchMock } from '../../test/testUtils';
-import { CollectionsPage, Collection } from './CollectionsPage';
+import React from 'react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { createTestWrapper, setupAuthMocks, wrapFetchMock } from '../../test/testUtils'
+import { CollectionsPage, Collection } from './CollectionsPage'
 
 // Mock navigate function
-const mockNavigate = vi.fn();
+const mockNavigate = vi.fn()
 vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual('react-router-dom');
+  const actual = await vi.importActual('react-router-dom')
   return {
     ...actual,
     useNavigate: () => mockNavigate,
-  };
-});
+  }
+})
 
 // Mock collections data
 const mockCollections: Collection[] = [
@@ -72,10 +72,10 @@ const mockCollections: Collection[] = [
     createdAt: '2024-01-05T09:00:00Z',
     updatedAt: '2024-01-12T11:00:00Z',
   },
-];
+]
 
 // Mock fetch function with proper Response objects
-const mockFetch = vi.fn();
+const mockFetch = vi.fn()
 
 // Helper to create a proper Response-like object
 function createMockResponse(data: unknown, ok = true, status = 200): Response {
@@ -84,7 +84,9 @@ function createMockResponse(data: unknown, ok = true, status = 200): Response {
     status,
     json: () => Promise.resolve(data),
     text: () => Promise.resolve(JSON.stringify(data)),
-    clone: function() { return this; },
+    clone: function () {
+      return this
+    },
     headers: new Headers(),
     redirected: false,
     statusText: ok ? 'OK' : 'Error',
@@ -96,29 +98,29 @@ function createMockResponse(data: unknown, ok = true, status = 200): Response {
     blob: () => Promise.resolve(new Blob()),
     formData: () => Promise.resolve(new FormData()),
     bytes: () => Promise.resolve(new Uint8Array()),
-  } as Response;
+  } as Response
 }
 
-global.fetch = mockFetch;
+global.fetch = mockFetch
 
 /**
  * Create a wrapper component with all required providers
  */
 
 describe('CollectionsPage', () => {
-  let cleanupAuthMocks: () => void;
+  let cleanupAuthMocks: () => void
 
   beforeEach(() => {
-    cleanupAuthMocks = setupAuthMocks();
-    mockFetch.mockReset();
-    wrapFetchMock(mockFetch);
-    mockNavigate.mockReset();
-  });
+    cleanupAuthMocks = setupAuthMocks()
+    mockFetch.mockReset()
+    wrapFetchMock(mockFetch)
+    mockNavigate.mockReset()
+  })
 
   afterEach(() => {
-    cleanupAuthMocks();
-    vi.clearAllMocks();
-  });
+    cleanupAuthMocks()
+    vi.clearAllMocks()
+  })
 
   describe('Loading State', () => {
     it('should display loading spinner while fetching collections', async () => {
@@ -127,403 +129,462 @@ describe('CollectionsPage', () => {
         () =>
           new Promise((resolve) =>
             setTimeout(
-              () => resolve(createMockResponse({ content: mockCollections, totalElements: mockCollections.length, totalPages: 1, size: 1000, number: 0 })),
+              () =>
+                resolve(
+                  createMockResponse({
+                    content: mockCollections,
+                    totalElements: mockCollections.length,
+                    totalPages: 1,
+                    size: 1000,
+                    number: 0,
+                  })
+                ),
               100
             )
           )
-      );
+      )
 
-      render(<CollectionsPage />, { wrapper: createTestWrapper() });
+      render(<CollectionsPage />, { wrapper: createTestWrapper() })
 
       // Look for the loading spinner component specifically
-      expect(screen.getByRole('status')).toBeInTheDocument();
-    });
-  });
+      expect(screen.getByRole('status')).toBeInTheDocument()
+    })
+  })
 
   describe('Error State', () => {
     it('should display error message when fetch fails', async () => {
-      mockFetch.mockResolvedValue(createMockResponse(null, false, 500));
+      mockFetch.mockResolvedValue(createMockResponse(null, false, 500))
 
-      render(<CollectionsPage />, { wrapper: createTestWrapper() });
+      render(<CollectionsPage />, { wrapper: createTestWrapper() })
 
       await waitFor(() => {
-        expect(screen.getByText(/API request failed/i)).toBeInTheDocument();
-      });
-    });
+        expect(screen.getByText(/API request failed/i)).toBeInTheDocument()
+      })
+    })
 
     it('should display retry button on error', async () => {
-      mockFetch.mockResolvedValue(createMockResponse(null, false, 500));
+      mockFetch.mockResolvedValue(createMockResponse(null, false, 500))
 
-      render(<CollectionsPage />, { wrapper: createTestWrapper() });
+      render(<CollectionsPage />, { wrapper: createTestWrapper() })
 
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
-      });
-    });
-  });
+        expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument()
+      })
+    })
+  })
 
   describe('Collections List Display', () => {
     beforeEach(() => {
-      mockFetch.mockResolvedValue(createMockResponse({ content: mockCollections, totalElements: mockCollections.length, totalPages: 1, size: 1000, number: 0 }));
-    });
+      mockFetch.mockResolvedValue(
+        createMockResponse({
+          content: mockCollections,
+          totalElements: mockCollections.length,
+          totalPages: 1,
+          size: 1000,
+          number: 0,
+        })
+      )
+    })
 
     it('should display all collections in the table', async () => {
-      render(<CollectionsPage />, { wrapper: createTestWrapper() });
+      render(<CollectionsPage />, { wrapper: createTestWrapper() })
 
       await waitFor(() => {
-        expect(screen.getByText('users')).toBeInTheDocument();
-        expect(screen.getByText('products')).toBeInTheDocument();
-        expect(screen.getByText('orders')).toBeInTheDocument();
-      });
-    });
+        expect(screen.getByText('users')).toBeInTheDocument()
+        expect(screen.getByText('products')).toBeInTheDocument()
+        expect(screen.getByText('orders')).toBeInTheDocument()
+      })
+    })
 
     it('should display collection display names', async () => {
-      render(<CollectionsPage />, { wrapper: createTestWrapper() });
+      render(<CollectionsPage />, { wrapper: createTestWrapper() })
 
       await waitFor(() => {
-        expect(screen.getByText('Users')).toBeInTheDocument();
-        expect(screen.getByText('Products')).toBeInTheDocument();
-        expect(screen.getByText('Orders')).toBeInTheDocument();
-      });
-    });
+        expect(screen.getByText('Users')).toBeInTheDocument()
+        expect(screen.getByText('Products')).toBeInTheDocument()
+        expect(screen.getByText('Orders')).toBeInTheDocument()
+      })
+    })
 
     it('should display status badges for each collection', async () => {
-      render(<CollectionsPage />, { wrapper: createTestWrapper() });
+      render(<CollectionsPage />, { wrapper: createTestWrapper() })
 
       await waitFor(() => {
         // Get status badges by test ID pattern
-        const statusBadges = screen.getAllByTestId(/status-badge-/);
-        expect(statusBadges.length).toBe(3); // 3 collections = 3 badges
-        
+        const statusBadges = screen.getAllByTestId(/status-badge-/)
+        expect(statusBadges.length).toBe(3) // 3 collections = 3 badges
+
         // Check that we have the right mix of active/inactive
-        const activeCount = statusBadges.filter(badge => badge.textContent === 'Active').length;
-        const inactiveCount = statusBadges.filter(badge => badge.textContent === 'Inactive').length;
-        expect(activeCount).toBe(2);
-        expect(inactiveCount).toBe(1);
-      });
-    });
+        const activeCount = statusBadges.filter((badge) => badge.textContent === 'Active').length
+        const inactiveCount = statusBadges.filter(
+          (badge) => badge.textContent === 'Inactive'
+        ).length
+        expect(activeCount).toBe(2)
+        expect(inactiveCount).toBe(1)
+      })
+    })
 
     it('should display page title', async () => {
-      render(<CollectionsPage />, { wrapper: createTestWrapper() });
+      render(<CollectionsPage />, { wrapper: createTestWrapper() })
 
       await waitFor(() => {
-        expect(screen.getByRole('heading', { name: /collections/i })).toBeInTheDocument();
-      });
-    });
-  });
+        expect(screen.getByRole('heading', { name: /collections/i })).toBeInTheDocument()
+      })
+    })
+  })
 
   describe('Filtering', () => {
     beforeEach(() => {
-      mockFetch.mockResolvedValue(createMockResponse({ content: mockCollections, totalElements: mockCollections.length, totalPages: 1, size: 1000, number: 0 }));
-    });
+      mockFetch.mockResolvedValue(
+        createMockResponse({
+          content: mockCollections,
+          totalElements: mockCollections.length,
+          totalPages: 1,
+          size: 1000,
+          number: 0,
+        })
+      )
+    })
 
     it('should filter collections by name', async () => {
-      const user = userEvent.setup();
-      render(<CollectionsPage />, { wrapper: createTestWrapper() });
+      const user = userEvent.setup()
+      render(<CollectionsPage />, { wrapper: createTestWrapper() })
 
       await waitFor(() => {
-        expect(screen.getByText('users')).toBeInTheDocument();
-      });
+        expect(screen.getByText('users')).toBeInTheDocument()
+      })
 
-      const nameFilter = screen.getByTestId('name-filter');
-      await user.type(nameFilter, 'user');
+      const nameFilter = screen.getByTestId('name-filter')
+      await user.type(nameFilter, 'user')
 
       await waitFor(() => {
-        expect(screen.getByText('users')).toBeInTheDocument();
-        expect(screen.queryByText('products')).not.toBeInTheDocument();
-        expect(screen.queryByText('orders')).not.toBeInTheDocument();
-      });
-    });
+        expect(screen.getByText('users')).toBeInTheDocument()
+        expect(screen.queryByText('products')).not.toBeInTheDocument()
+        expect(screen.queryByText('orders')).not.toBeInTheDocument()
+      })
+    })
 
     it('should filter collections by display name', async () => {
-      const user = userEvent.setup();
-      render(<CollectionsPage />, { wrapper: createTestWrapper() });
+      const user = userEvent.setup()
+      render(<CollectionsPage />, { wrapper: createTestWrapper() })
 
       await waitFor(() => {
-        expect(screen.getByText('users')).toBeInTheDocument();
-      });
+        expect(screen.getByText('users')).toBeInTheDocument()
+      })
 
-      const nameFilter = screen.getByTestId('name-filter');
-      await user.type(nameFilter, 'Product');
+      const nameFilter = screen.getByTestId('name-filter')
+      await user.type(nameFilter, 'Product')
 
       await waitFor(() => {
-        expect(screen.queryByText('users')).not.toBeInTheDocument();
-        expect(screen.getByText('products')).toBeInTheDocument();
-        expect(screen.queryByText('orders')).not.toBeInTheDocument();
-      });
-    });
+        expect(screen.queryByText('users')).not.toBeInTheDocument()
+        expect(screen.getByText('products')).toBeInTheDocument()
+        expect(screen.queryByText('orders')).not.toBeInTheDocument()
+      })
+    })
 
     it('should filter collections by active status', async () => {
-      const user = userEvent.setup();
-      render(<CollectionsPage />, { wrapper: createTestWrapper() });
+      const user = userEvent.setup()
+      render(<CollectionsPage />, { wrapper: createTestWrapper() })
 
       await waitFor(() => {
-        expect(screen.getByText('users')).toBeInTheDocument();
-      });
+        expect(screen.getByText('users')).toBeInTheDocument()
+      })
 
-      const statusFilter = screen.getByTestId('status-filter');
-      await user.selectOptions(statusFilter, 'active');
+      const statusFilter = screen.getByTestId('status-filter')
+      await user.selectOptions(statusFilter, 'active')
 
       await waitFor(() => {
-        expect(screen.getByText('users')).toBeInTheDocument();
-        expect(screen.getByText('products')).toBeInTheDocument();
-        expect(screen.queryByText('orders')).not.toBeInTheDocument();
-      });
-    });
+        expect(screen.getByText('users')).toBeInTheDocument()
+        expect(screen.getByText('products')).toBeInTheDocument()
+        expect(screen.queryByText('orders')).not.toBeInTheDocument()
+      })
+    })
 
     it('should filter collections by inactive status', async () => {
-      const user = userEvent.setup();
-      render(<CollectionsPage />, { wrapper: createTestWrapper() });
+      const user = userEvent.setup()
+      render(<CollectionsPage />, { wrapper: createTestWrapper() })
 
       await waitFor(() => {
-        expect(screen.getByText('users')).toBeInTheDocument();
-      });
+        expect(screen.getByText('users')).toBeInTheDocument()
+      })
 
-      const statusFilter = screen.getByTestId('status-filter');
-      await user.selectOptions(statusFilter, 'inactive');
+      const statusFilter = screen.getByTestId('status-filter')
+      await user.selectOptions(statusFilter, 'inactive')
 
       await waitFor(() => {
-        expect(screen.queryByText('users')).not.toBeInTheDocument();
-        expect(screen.queryByText('products')).not.toBeInTheDocument();
-        expect(screen.getByText('orders')).toBeInTheDocument();
-      });
-    });
+        expect(screen.queryByText('users')).not.toBeInTheDocument()
+        expect(screen.queryByText('products')).not.toBeInTheDocument()
+        expect(screen.getByText('orders')).toBeInTheDocument()
+      })
+    })
 
     it('should show empty state when no collections match filter', async () => {
-      const user = userEvent.setup();
-      render(<CollectionsPage />, { wrapper: createTestWrapper() });
+      const user = userEvent.setup()
+      render(<CollectionsPage />, { wrapper: createTestWrapper() })
 
       await waitFor(() => {
-        expect(screen.getByText('users')).toBeInTheDocument();
-      });
+        expect(screen.getByText('users')).toBeInTheDocument()
+      })
 
-      const nameFilter = screen.getByTestId('name-filter');
-      await user.type(nameFilter, 'nonexistent');
+      const nameFilter = screen.getByTestId('name-filter')
+      await user.type(nameFilter, 'nonexistent')
 
       await waitFor(() => {
-        expect(screen.getByTestId('empty-state')).toBeInTheDocument();
-      });
-    });
-  });
+        expect(screen.getByTestId('empty-state')).toBeInTheDocument()
+      })
+    })
+  })
 
   describe('Sorting', () => {
     beforeEach(() => {
-      mockFetch.mockResolvedValue(createMockResponse({ content: mockCollections, totalElements: mockCollections.length, totalPages: 1, size: 1000, number: 0 }));
-    });
+      mockFetch.mockResolvedValue(
+        createMockResponse({
+          content: mockCollections,
+          totalElements: mockCollections.length,
+          totalPages: 1,
+          size: 1000,
+          number: 0,
+        })
+      )
+    })
 
     it('should sort collections by name ascending by default', async () => {
-      render(<CollectionsPage />, { wrapper: createTestWrapper() });
+      render(<CollectionsPage />, { wrapper: createTestWrapper() })
 
       await waitFor(() => {
-        const rows = screen.getAllByTestId(/collection-row-/);
-        expect(rows.length).toBe(3);
-      });
+        const rows = screen.getAllByTestId(/collection-row-/)
+        expect(rows.length).toBe(3)
+      })
 
       // Check order: orders, products, users (alphabetical)
-      const rows = screen.getAllByTestId(/collection-row-/);
-      expect(within(rows[0]).getByText('orders')).toBeInTheDocument();
-      expect(within(rows[1]).getByText('products')).toBeInTheDocument();
-      expect(within(rows[2]).getByText('users')).toBeInTheDocument();
-    });
+      const rows = screen.getAllByTestId(/collection-row-/)
+      expect(within(rows[0]).getByText('orders')).toBeInTheDocument()
+      expect(within(rows[1]).getByText('products')).toBeInTheDocument()
+      expect(within(rows[2]).getByText('users')).toBeInTheDocument()
+    })
 
     it('should toggle sort direction when clicking same column header', async () => {
-      const user = userEvent.setup();
-      render(<CollectionsPage />, { wrapper: createTestWrapper() });
+      const user = userEvent.setup()
+      render(<CollectionsPage />, { wrapper: createTestWrapper() })
 
       await waitFor(() => {
-        expect(screen.getByText('users')).toBeInTheDocument();
-      });
+        expect(screen.getByText('users')).toBeInTheDocument()
+      })
 
-      const nameHeader = screen.getByTestId('header-name');
-      await user.click(nameHeader);
+      const nameHeader = screen.getByTestId('header-name')
+      await user.click(nameHeader)
 
       // After clicking, should be descending
       await waitFor(() => {
-        const rows = screen.getAllByTestId(/collection-row-/);
-        expect(within(rows[0]).getByText('users')).toBeInTheDocument();
-        expect(within(rows[1]).getByText('products')).toBeInTheDocument();
-        expect(within(rows[2]).getByText('orders')).toBeInTheDocument();
-      });
-    });
+        const rows = screen.getAllByTestId(/collection-row-/)
+        expect(within(rows[0]).getByText('users')).toBeInTheDocument()
+        expect(within(rows[1]).getByText('products')).toBeInTheDocument()
+        expect(within(rows[2]).getByText('orders')).toBeInTheDocument()
+      })
+    })
 
     it('should sort by created date when clicking created header', async () => {
-      const user = userEvent.setup();
-      render(<CollectionsPage />, { wrapper: createTestWrapper() });
+      const user = userEvent.setup()
+      render(<CollectionsPage />, { wrapper: createTestWrapper() })
 
       await waitFor(() => {
-        expect(screen.getByText('users')).toBeInTheDocument();
-      });
+        expect(screen.getByText('users')).toBeInTheDocument()
+      })
 
-      const createdHeader = screen.getByTestId('header-created');
-      await user.click(createdHeader);
+      const createdHeader = screen.getByTestId('header-created')
+      await user.click(createdHeader)
 
       // Should sort by createdAt ascending
       await waitFor(() => {
-        const rows = screen.getAllByTestId(/collection-row-/);
+        const rows = screen.getAllByTestId(/collection-row-/)
         // orders (Jan 5), products (Jan 10), users (Jan 15)
-        expect(within(rows[0]).getByText('orders')).toBeInTheDocument();
-        expect(within(rows[1]).getByText('products')).toBeInTheDocument();
-        expect(within(rows[2]).getByText('users')).toBeInTheDocument();
-      });
-    });
+        expect(within(rows[0]).getByText('orders')).toBeInTheDocument()
+        expect(within(rows[1]).getByText('products')).toBeInTheDocument()
+        expect(within(rows[2]).getByText('users')).toBeInTheDocument()
+      })
+    })
 
     it('should sort by updated date when clicking updated header', async () => {
-      const user = userEvent.setup();
-      render(<CollectionsPage />, { wrapper: createTestWrapper() });
+      const user = userEvent.setup()
+      render(<CollectionsPage />, { wrapper: createTestWrapper() })
 
       await waitFor(() => {
-        expect(screen.getByText('users')).toBeInTheDocument();
-      });
+        expect(screen.getByText('users')).toBeInTheDocument()
+      })
 
-      const updatedHeader = screen.getByTestId('header-updated');
-      await user.click(updatedHeader);
+      const updatedHeader = screen.getByTestId('header-updated')
+      await user.click(updatedHeader)
 
       // Should sort by updatedAt ascending
       await waitFor(() => {
-        const rows = screen.getAllByTestId(/collection-row-/);
+        const rows = screen.getAllByTestId(/collection-row-/)
         // orders (Jan 12), products (Jan 18), users (Jan 20)
-        expect(within(rows[0]).getByText('orders')).toBeInTheDocument();
-        expect(within(rows[1]).getByText('products')).toBeInTheDocument();
-        expect(within(rows[2]).getByText('users')).toBeInTheDocument();
-      });
-    });
+        expect(within(rows[0]).getByText('orders')).toBeInTheDocument()
+        expect(within(rows[1]).getByText('products')).toBeInTheDocument()
+        expect(within(rows[2]).getByText('users')).toBeInTheDocument()
+      })
+    })
 
     it('should display sort indicator on sorted column', async () => {
-      render(<CollectionsPage />, { wrapper: createTestWrapper() });
+      render(<CollectionsPage />, { wrapper: createTestWrapper() })
 
       await waitFor(() => {
-        expect(screen.getByText('users')).toBeInTheDocument();
-      });
+        expect(screen.getByText('users')).toBeInTheDocument()
+      })
 
-      const nameHeader = screen.getByTestId('header-name');
-      expect(nameHeader).toHaveAttribute('aria-sort', 'ascending');
-    });
-  });
+      const nameHeader = screen.getByTestId('header-name')
+      expect(nameHeader).toHaveAttribute('aria-sort', 'ascending')
+    })
+  })
 
   describe('Actions', () => {
     beforeEach(() => {
-      mockFetch.mockResolvedValue(createMockResponse({ content: mockCollections, totalElements: mockCollections.length, totalPages: 1, size: 1000, number: 0 }));
-    });
+      mockFetch.mockResolvedValue(
+        createMockResponse({
+          content: mockCollections,
+          totalElements: mockCollections.length,
+          totalPages: 1,
+          size: 1000,
+          number: 0,
+        })
+      )
+    })
 
     it('should navigate to create page when clicking create button', async () => {
-      const user = userEvent.setup();
-      render(<CollectionsPage />, { wrapper: createTestWrapper() });
+      const user = userEvent.setup()
+      render(<CollectionsPage />, { wrapper: createTestWrapper() })
 
       await waitFor(() => {
-        expect(screen.getByText('users')).toBeInTheDocument();
-      });
+        expect(screen.getByText('users')).toBeInTheDocument()
+      })
 
-      const createButton = screen.getByTestId('create-collection-button');
-      await user.click(createButton);
+      const createButton = screen.getByTestId('create-collection-button')
+      await user.click(createButton)
 
-      expect(mockNavigate).toHaveBeenCalledWith('/collections/new');
-    });
+      expect(mockNavigate).toHaveBeenCalledWith('/collections/new')
+    })
 
     it('should navigate to edit page when clicking edit button', async () => {
-      const user = userEvent.setup();
-      render(<CollectionsPage />, { wrapper: createTestWrapper() });
+      const user = userEvent.setup()
+      render(<CollectionsPage />, { wrapper: createTestWrapper() })
 
       await waitFor(() => {
-        expect(screen.getByText('users')).toBeInTheDocument();
-      });
+        expect(screen.getByText('users')).toBeInTheDocument()
+      })
 
       // Find the edit button for the first row (orders after sorting)
-      const editButton = screen.getByTestId('edit-button-0');
-      await user.click(editButton);
+      const editButton = screen.getByTestId('edit-button-0')
+      await user.click(editButton)
 
-      expect(mockNavigate).toHaveBeenCalledWith('/collections/3/edit');
-    });
+      expect(mockNavigate).toHaveBeenCalledWith('/collections/3/edit')
+    })
 
     it('should navigate to detail page when clicking on a row', async () => {
-      const user = userEvent.setup();
-      render(<CollectionsPage />, { wrapper: createTestWrapper() });
+      const user = userEvent.setup()
+      render(<CollectionsPage />, { wrapper: createTestWrapper() })
 
       await waitFor(() => {
-        expect(screen.getByText('users')).toBeInTheDocument();
-      });
+        expect(screen.getByText('users')).toBeInTheDocument()
+      })
 
-      const row = screen.getByTestId('collection-row-0');
-      await user.click(row);
+      const row = screen.getByTestId('collection-row-0')
+      await user.click(row)
 
-      expect(mockNavigate).toHaveBeenCalledWith('/collections/3');
-    });
+      expect(mockNavigate).toHaveBeenCalledWith('/collections/3')
+    })
 
     it('should open delete confirmation dialog when clicking delete button', async () => {
-      const user = userEvent.setup();
-      render(<CollectionsPage />, { wrapper: createTestWrapper() });
+      const user = userEvent.setup()
+      render(<CollectionsPage />, { wrapper: createTestWrapper() })
 
       await waitFor(() => {
-        expect(screen.getByText('users')).toBeInTheDocument();
-      });
+        expect(screen.getByText('users')).toBeInTheDocument()
+      })
 
-      const deleteButton = screen.getByTestId('delete-button-0');
-      await user.click(deleteButton);
+      const deleteButton = screen.getByTestId('delete-button-0')
+      await user.click(deleteButton)
 
       await waitFor(() => {
-        expect(screen.getByTestId('confirm-dialog')).toBeInTheDocument();
-        expect(screen.getByText(/are you sure you want to delete/i)).toBeInTheDocument();
-      });
-    });
+        expect(screen.getByTestId('confirm-dialog')).toBeInTheDocument()
+        expect(screen.getByText(/are you sure you want to delete/i)).toBeInTheDocument()
+      })
+    })
 
     it('should close delete dialog when clicking cancel', async () => {
-      const user = userEvent.setup();
-      render(<CollectionsPage />, { wrapper: createTestWrapper() });
+      const user = userEvent.setup()
+      render(<CollectionsPage />, { wrapper: createTestWrapper() })
 
       await waitFor(() => {
-        expect(screen.getByText('users')).toBeInTheDocument();
-      });
+        expect(screen.getByText('users')).toBeInTheDocument()
+      })
 
-      const deleteButton = screen.getByTestId('delete-button-0');
-      await user.click(deleteButton);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('confirm-dialog')).toBeInTheDocument();
-      });
-
-      const cancelButton = screen.getByTestId('confirm-dialog-cancel');
-      await user.click(cancelButton);
+      const deleteButton = screen.getByTestId('delete-button-0')
+      await user.click(deleteButton)
 
       await waitFor(() => {
-        expect(screen.queryByTestId('confirm-dialog')).not.toBeInTheDocument();
-      });
-    });
+        expect(screen.getByTestId('confirm-dialog')).toBeInTheDocument()
+      })
+
+      const cancelButton = screen.getByTestId('confirm-dialog-cancel')
+      await user.click(cancelButton)
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('confirm-dialog')).not.toBeInTheDocument()
+      })
+    })
 
     it('should call delete API when confirming deletion', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup()
       // First call returns collections
-      mockFetch.mockResolvedValue(createMockResponse({ content: mockCollections, totalElements: mockCollections.length, totalPages: 1, size: 1000, number: 0 }));
+      mockFetch.mockResolvedValue(
+        createMockResponse({
+          content: mockCollections,
+          totalElements: mockCollections.length,
+          totalPages: 1,
+          size: 1000,
+          number: 0,
+        })
+      )
 
-      render(<CollectionsPage />, { wrapper: createTestWrapper() });
+      render(<CollectionsPage />, { wrapper: createTestWrapper() })
 
       await waitFor(() => {
-        expect(screen.getByText('users')).toBeInTheDocument();
-      });
+        expect(screen.getByText('users')).toBeInTheDocument()
+      })
 
       // Clear mock calls after initial load
-      mockFetch.mockClear();
-      
+      mockFetch.mockClear()
+
       // Mock the delete response, then the refetch
       mockFetch
         .mockResolvedValueOnce(createMockResponse(null)) // DELETE response
-        .mockResolvedValue(createMockResponse({ content: mockCollections.filter(c => c.name !== 'orders'), totalElements: 2, totalPages: 1, size: 1000, number: 0 })); // Refetch
+        .mockResolvedValue(
+          createMockResponse({
+            content: mockCollections.filter((c) => c.name !== 'orders'),
+            totalElements: 2,
+            totalPages: 1,
+            size: 1000,
+            number: 0,
+          })
+        ) // Refetch
 
       // Click delete on the first row (orders after sorting)
-      const deleteButton = screen.getByTestId('delete-button-0');
-      await user.click(deleteButton);
+      const deleteButton = screen.getByTestId('delete-button-0')
+      await user.click(deleteButton)
 
       await waitFor(() => {
-        expect(screen.getByTestId('confirm-dialog')).toBeInTheDocument();
-      });
+        expect(screen.getByTestId('confirm-dialog')).toBeInTheDocument()
+      })
 
-      const confirmButton = screen.getByTestId('confirm-dialog-confirm');
-      await user.click(confirmButton);
+      const confirmButton = screen.getByTestId('confirm-dialog-confirm')
+      await user.click(confirmButton)
 
       // Wait for the success toast to appear (indicates delete was successful)
       await waitFor(() => {
-        expect(screen.getByText(/deleted successfully/i)).toBeInTheDocument();
-      });
-    });
-  });
+        expect(screen.getByText(/deleted successfully/i)).toBeInTheDocument()
+      })
+    })
+  })
 
   describe('Pagination', () => {
     it('should display pagination when there are more items than page size', async () => {
@@ -537,18 +598,26 @@ describe('CollectionsPage', () => {
         currentVersion: 1,
         createdAt: new Date(2024, 0, i + 1).toISOString(),
         updatedAt: new Date(2024, 0, i + 1).toISOString(),
-      }));
+      }))
 
-      mockFetch.mockResolvedValue(createMockResponse({ content: manyCollections, totalElements: manyCollections.length, totalPages: 2, size: 1000, number: 0 }));
+      mockFetch.mockResolvedValue(
+        createMockResponse({
+          content: manyCollections,
+          totalElements: manyCollections.length,
+          totalPages: 2,
+          size: 1000,
+          number: 0,
+        })
+      )
 
-      render(<CollectionsPage />, { wrapper: createTestWrapper() });
+      render(<CollectionsPage />, { wrapper: createTestWrapper() })
 
       await waitFor(() => {
-        expect(screen.getByTestId('pagination')).toBeInTheDocument();
-      });
+        expect(screen.getByTestId('pagination')).toBeInTheDocument()
+      })
 
-      expect(screen.getByText(/page 1 of 2/i)).toBeInTheDocument();
-    });
+      expect(screen.getByText(/page 1 of 2/i)).toBeInTheDocument()
+    })
 
     it('should navigate to next page when clicking next button', async () => {
       const manyCollections: Collection[] = Array.from({ length: 15 }, (_, i) => ({
@@ -560,24 +629,32 @@ describe('CollectionsPage', () => {
         currentVersion: 1,
         createdAt: new Date(2024, 0, i + 1).toISOString(),
         updatedAt: new Date(2024, 0, i + 1).toISOString(),
-      }));
+      }))
 
-      mockFetch.mockResolvedValue(createMockResponse({ content: manyCollections, totalElements: manyCollections.length, totalPages: 2, size: 1000, number: 0 }));
+      mockFetch.mockResolvedValue(
+        createMockResponse({
+          content: manyCollections,
+          totalElements: manyCollections.length,
+          totalPages: 2,
+          size: 1000,
+          number: 0,
+        })
+      )
 
-      const user = userEvent.setup();
-      render(<CollectionsPage />, { wrapper: createTestWrapper() });
+      const user = userEvent.setup()
+      render(<CollectionsPage />, { wrapper: createTestWrapper() })
 
       await waitFor(() => {
-        expect(screen.getByTestId('pagination')).toBeInTheDocument();
-      });
+        expect(screen.getByTestId('pagination')).toBeInTheDocument()
+      })
 
-      const nextButton = screen.getByRole('button', { name: /next/i });
-      await user.click(nextButton);
+      const nextButton = screen.getByRole('button', { name: /next/i })
+      await user.click(nextButton)
 
       await waitFor(() => {
-        expect(screen.getByText(/page 2 of 2/i)).toBeInTheDocument();
-      });
-    });
+        expect(screen.getByText(/page 2 of 2/i)).toBeInTheDocument()
+      })
+    })
 
     it('should disable previous button on first page', async () => {
       const manyCollections: Collection[] = Array.from({ length: 15 }, (_, i) => ({
@@ -589,19 +666,27 @@ describe('CollectionsPage', () => {
         currentVersion: 1,
         createdAt: new Date(2024, 0, i + 1).toISOString(),
         updatedAt: new Date(2024, 0, i + 1).toISOString(),
-      }));
+      }))
 
-      mockFetch.mockResolvedValue(createMockResponse({ content: manyCollections, totalElements: manyCollections.length, totalPages: 2, size: 1000, number: 0 }));
+      mockFetch.mockResolvedValue(
+        createMockResponse({
+          content: manyCollections,
+          totalElements: manyCollections.length,
+          totalPages: 2,
+          size: 1000,
+          number: 0,
+        })
+      )
 
-      render(<CollectionsPage />, { wrapper: createTestWrapper() });
+      render(<CollectionsPage />, { wrapper: createTestWrapper() })
 
       await waitFor(() => {
-        expect(screen.getByTestId('pagination')).toBeInTheDocument();
-      });
+        expect(screen.getByTestId('pagination')).toBeInTheDocument()
+      })
 
-      const prevButton = screen.getByRole('button', { name: /previous/i });
-      expect(prevButton).toBeDisabled();
-    });
+      const prevButton = screen.getByRole('button', { name: /previous/i })
+      expect(prevButton).toBeDisabled()
+    })
 
     it('should disable next button on last page', async () => {
       const manyCollections: Collection[] = Array.from({ length: 15 }, (_, i) => ({
@@ -613,83 +698,99 @@ describe('CollectionsPage', () => {
         currentVersion: 1,
         createdAt: new Date(2024, 0, i + 1).toISOString(),
         updatedAt: new Date(2024, 0, i + 1).toISOString(),
-      }));
+      }))
 
-      mockFetch.mockResolvedValue(createMockResponse({ content: manyCollections, totalElements: manyCollections.length, totalPages: 2, size: 1000, number: 0 }));
+      mockFetch.mockResolvedValue(
+        createMockResponse({
+          content: manyCollections,
+          totalElements: manyCollections.length,
+          totalPages: 2,
+          size: 1000,
+          number: 0,
+        })
+      )
 
-      const user = userEvent.setup();
-      render(<CollectionsPage />, { wrapper: createTestWrapper() });
+      const user = userEvent.setup()
+      render(<CollectionsPage />, { wrapper: createTestWrapper() })
 
       await waitFor(() => {
-        expect(screen.getByTestId('pagination')).toBeInTheDocument();
-      });
+        expect(screen.getByTestId('pagination')).toBeInTheDocument()
+      })
 
-      const nextButton = screen.getByRole('button', { name: /next/i });
-      await user.click(nextButton);
+      const nextButton = screen.getByRole('button', { name: /next/i })
+      await user.click(nextButton)
 
       await waitFor(() => {
-        expect(nextButton).toBeDisabled();
-      });
-    });
-  });
+        expect(nextButton).toBeDisabled()
+      })
+    })
+  })
 
   describe('Accessibility', () => {
     beforeEach(() => {
-      mockFetch.mockResolvedValue(createMockResponse({ content: mockCollections, totalElements: mockCollections.length, totalPages: 1, size: 1000, number: 0 }));
-    });
+      mockFetch.mockResolvedValue(
+        createMockResponse({
+          content: mockCollections,
+          totalElements: mockCollections.length,
+          totalPages: 1,
+          size: 1000,
+          number: 0,
+        })
+      )
+    })
 
     it('should have accessible table structure', async () => {
-      render(<CollectionsPage />, { wrapper: createTestWrapper() });
+      render(<CollectionsPage />, { wrapper: createTestWrapper() })
 
       await waitFor(() => {
-        expect(screen.getByRole('grid')).toBeInTheDocument();
-      });
+        expect(screen.getByRole('grid')).toBeInTheDocument()
+      })
 
-      expect(screen.getByRole('grid')).toHaveAttribute('aria-label', 'Collections');
-    });
+      expect(screen.getByRole('grid')).toHaveAttribute('aria-label', 'Collections')
+    })
 
     it('should have accessible filter controls', async () => {
-      render(<CollectionsPage />, { wrapper: createTestWrapper() });
+      render(<CollectionsPage />, { wrapper: createTestWrapper() })
 
       await waitFor(() => {
-        expect(screen.getByText('users')).toBeInTheDocument();
-      });
+        expect(screen.getByText('users')).toBeInTheDocument()
+      })
 
-      const nameFilter = screen.getByTestId('name-filter');
-      expect(nameFilter).toHaveAttribute('aria-label');
+      const nameFilter = screen.getByTestId('name-filter')
+      expect(nameFilter).toHaveAttribute('aria-label')
 
-      const statusFilter = screen.getByTestId('status-filter');
-      expect(statusFilter).toHaveAttribute('aria-label');
-    });
+      const statusFilter = screen.getByTestId('status-filter')
+      expect(statusFilter).toHaveAttribute('aria-label')
+    })
 
     it('should have accessible action buttons', async () => {
-      render(<CollectionsPage />, { wrapper: createTestWrapper() });
+      render(<CollectionsPage />, { wrapper: createTestWrapper() })
 
       await waitFor(() => {
-        expect(screen.getByText('users')).toBeInTheDocument();
-      });
+        expect(screen.getByText('users')).toBeInTheDocument()
+      })
 
-      const editButton = screen.getByTestId('edit-button-0');
-      expect(editButton).toHaveAttribute('aria-label');
+      const editButton = screen.getByTestId('edit-button-0')
+      expect(editButton).toHaveAttribute('aria-label')
 
-      const deleteButton = screen.getByTestId('delete-button-0');
-      expect(deleteButton).toHaveAttribute('aria-label');
-    });
+      const deleteButton = screen.getByTestId('delete-button-0')
+      expect(deleteButton).toHaveAttribute('aria-label')
+    })
 
     it('should support keyboard navigation for sorting', async () => {
-      render(<CollectionsPage />, { wrapper: createTestWrapper() });
+      render(<CollectionsPage />, { wrapper: createTestWrapper() })
 
       await waitFor(() => {
-        expect(screen.getByText('users')).toBeInTheDocument();
-      });
+        expect(screen.getByText('users')).toBeInTheDocument()
+      })
 
-      const nameHeader = screen.getByTestId('header-name');
-      nameHeader.focus();
-      fireEvent.keyDown(nameHeader, { key: 'Enter' });
+      const nameHeader = screen.getByTestId('header-name')
+      nameHeader.focus()
+      fireEvent.keyDown(nameHeader, { key: 'Enter' })
 
       await waitFor(() => {
-        expect(nameHeader).toHaveAttribute('aria-sort', 'descending');
-      });
-    });
-  });
-});
+        expect(nameHeader).toHaveAttribute('aria-sort', 'descending')
+      })
+    })
+  })
+})

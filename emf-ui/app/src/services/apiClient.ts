@@ -10,19 +10,19 @@
  */
 
 export interface ApiClientConfig {
-  baseUrl?: string;
-  getAccessToken: () => Promise<string | null>;
-  onUnauthorized?: () => void;
+  baseUrl?: string
+  getAccessToken: () => Promise<string | null>
+  onUnauthorized?: () => void
 }
 
 export class ApiClient {
-  private config: ApiClientConfig;
+  private config: ApiClientConfig
 
   constructor(config: ApiClientConfig) {
     this.config = {
       baseUrl: config.baseUrl || '',
       ...config,
-    };
+    }
   }
 
   /**
@@ -30,30 +30,30 @@ export class ApiClient {
    */
   async fetch(url: string, options: RequestInit = {}): Promise<Response> {
     // Get access token
-    const token = await this.config.getAccessToken();
+    const token = await this.config.getAccessToken()
 
     // Prepare headers
-    const headers = new Headers(options.headers);
+    const headers = new Headers(options.headers)
     if (token) {
-      headers.set('Authorization', `Bearer ${token}`);
+      headers.set('Authorization', `Bearer ${token}`)
     }
     if (!headers.has('Content-Type') && options.body && typeof options.body === 'string') {
-      headers.set('Content-Type', 'application/json');
+      headers.set('Content-Type', 'application/json')
     }
 
     // Make request
-    const fullUrl = url.startsWith('http') ? url : `${this.config.baseUrl}${url}`;
+    const fullUrl = url.startsWith('http') ? url : `${this.config.baseUrl}${url}`
     const response = await fetch(fullUrl, {
       ...options,
       headers,
-    });
+    })
 
     // Handle 401 Unauthorized
     if (response.status === 401 && this.config.onUnauthorized) {
-      this.config.onUnauthorized();
+      this.config.onUnauthorized()
     }
 
-    return response;
+    return response
   }
 
   /**
@@ -63,13 +63,13 @@ export class ApiClient {
     const response = await this.fetch(url, {
       ...options,
       method: 'GET',
-    });
+    })
 
     if (!response.ok) {
-      throw new Error(`API request failed: ${response.statusText}`);
+      throw new Error(`API request failed: ${response.statusText}`)
     }
 
-    return response.json();
+    return response.json()
   }
 
   /**
@@ -80,13 +80,13 @@ export class ApiClient {
       ...options,
       method: 'POST',
       body: data ? JSON.stringify(data) : undefined,
-    });
+    })
 
     if (!response.ok) {
-      throw new Error(`API request failed: ${response.statusText}`);
+      throw new Error(`API request failed: ${response.statusText}`)
     }
 
-    return response.json();
+    return response.json()
   }
 
   /**
@@ -97,13 +97,13 @@ export class ApiClient {
       ...options,
       method: 'PUT',
       body: data ? JSON.stringify(data) : undefined,
-    });
+    })
 
     if (!response.ok) {
-      throw new Error(`API request failed: ${response.statusText}`);
+      throw new Error(`API request failed: ${response.statusText}`)
     }
 
-    return response.json();
+    return response.json()
   }
 
   /**
@@ -114,13 +114,13 @@ export class ApiClient {
       ...options,
       method: 'PATCH',
       body: data ? JSON.stringify(data) : undefined,
-    });
+    })
 
     if (!response.ok) {
-      throw new Error(`API request failed: ${response.statusText}`);
+      throw new Error(`API request failed: ${response.statusText}`)
     }
 
-    return response.json();
+    return response.json()
   }
 
   /**
@@ -130,18 +130,18 @@ export class ApiClient {
     const response = await this.fetch(url, {
       ...options,
       method: 'DELETE',
-    });
+    })
 
     if (!response.ok) {
-      throw new Error(`API request failed: ${response.statusText}`);
+      throw new Error(`API request failed: ${response.statusText}`)
     }
 
     // Handle 204 No Content
     if (response.status === 204) {
-      return undefined as T;
+      return undefined as T
     }
 
-    return response.json();
+    return response.json()
   }
 }
 
@@ -149,5 +149,5 @@ export class ApiClient {
  * Create an API client instance
  */
 export function createApiClient(config: ApiClientConfig): ApiClient {
-  return new ApiClient(config);
+  return new ApiClient(config)
 }

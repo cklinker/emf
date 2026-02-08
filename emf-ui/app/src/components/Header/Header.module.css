@@ -81,8 +81,9 @@
   border-radius: var(--border-radius, 4px);
   cursor: pointer;
   color: var(--app-shell-text, var(--color-text, #1a1a1a));
-  transition: background-color 150ms ease-in-out,
-              border-color 150ms ease-in-out;
+  transition:
+    background-color 150ms ease-in-out,
+    border-color 150ms ease-in-out;
 }
 
 .userButton:hover {

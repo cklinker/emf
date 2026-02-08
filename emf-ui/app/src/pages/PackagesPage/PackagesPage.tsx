@@ -10,94 +10,94 @@
  * - 9.10: Display package history showing previous exports and imports
  */
 
-import React, { useState, useCallback, useRef } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useI18n } from '../../context/I18nContext';
-import { useApi } from '../../context/ApiContext';
-import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components';
-import styles from './PackagesPage.module.css';
+import React, { useState, useCallback, useRef } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useI18n } from '../../context/I18nContext'
+import { useApi } from '../../context/ApiContext'
+import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
+import styles from './PackagesPage.module.css'
 
 /**
  * Package interface matching the API response
  */
 export interface Package {
-  id: string;
-  name: string;
-  version: string;
-  items: PackageItem[];
-  createdAt: string;
-  type: 'export' | 'import';
-  status: 'success' | 'failed' | 'pending';
+  id: string
+  name: string
+  version: string
+  items: PackageItem[]
+  createdAt: string
+  type: 'export' | 'import'
+  status: 'success' | 'failed' | 'pending'
 }
 
 /**
  * Package item interface
  */
 export interface PackageItem {
-  type: 'collection' | 'role' | 'policy' | 'page' | 'menu';
-  id: string;
-  name: string;
-  content?: unknown;
+  type: 'collection' | 'role' | 'policy' | 'page' | 'menu'
+  id: string
+  name: string
+  content?: unknown
 }
 
 /**
  * Export options interface
  */
 export interface ExportOptions {
-  name: string;
-  version: string;
-  description?: string;
-  collectionIds: string[];
-  roleIds: string[];
-  policyIds: string[];
-  uiPageIds: string[];
-  uiMenuIds: string[];
+  name: string
+  version: string
+  description?: string
+  collectionIds: string[]
+  roleIds: string[]
+  policyIds: string[]
+  uiPageIds: string[]
+  uiMenuIds: string[]
 }
 
 /**
  * Import preview interface
  */
 export interface ImportPreview {
-  creates: PackageItem[];
-  updates: PackageItem[];
-  conflicts: ImportConflict[];
+  creates: PackageItem[]
+  updates: PackageItem[]
+  conflicts: ImportConflict[]
 }
 
 /**
  * Import conflict interface
  */
 export interface ImportConflict {
-  item: PackageItem;
-  existingItem: PackageItem;
-  resolution?: 'skip' | 'overwrite';
+  item: PackageItem
+  existingItem: PackageItem
+  resolution?: 'skip' | 'overwrite'
 }
 
 /**
  * Import result interface
  */
 export interface ImportResult {
-  success: boolean;
-  created: number;
-  updated: number;
-  skipped: number;
-  errors: ImportError[];
+  success: boolean
+  created: number
+  updated: number
+  skipped: number
+  errors: ImportError[]
 }
 
 /**
  * Import error interface
  */
 export interface ImportError {
-  item: PackageItem;
-  message: string;
+  item: PackageItem
+  message: string
 }
 
 /**
  * Selectable item for export
  */
 interface SelectableItem {
-  id: string;
-  name: string;
-  type: string;
+  id: string
+  name: string
+  type: string
 }
 
 /**
@@ -105,105 +105,109 @@ interface SelectableItem {
  */
 export interface PackagesPageProps {
   /** Optional test ID for testing */
-  testId?: string;
+  testId?: string
 }
 
 // API functions using apiClient
 async function fetchPackageHistory(apiClient: any): Promise<Package[]> {
-  return apiClient.get('/control/packages/history');
+  return apiClient.get('/control/packages/history')
 }
 
 async function fetchCollections(apiClient: any): Promise<SelectableItem[]> {
-  const data = await apiClient.get('/control/collections?size=1000');
+  const data = await apiClient.get('/control/collections?size=1000')
   // Handle paginated response from Spring
-  const collections = data.content || data;
+  const collections = data.content || data
   return collections.map((c: { id: string; name: string }) => ({
     id: c.id,
     name: c.name,
     type: 'collection',
-  }));
+  }))
 }
 
 async function fetchRoles(apiClient: any): Promise<SelectableItem[]> {
-  const data = await apiClient.get('/control/roles?size=1000');
+  const data = await apiClient.get('/control/roles?size=1000')
   // Handle paginated response from Spring
-  const roles = data.content || data;
+  const roles = data.content || data
   return roles.map((r: { id: string; name: string }) => ({
     id: r.id,
     name: r.name,
     type: 'role',
-  }));
+  }))
 }
 
 async function fetchPolicies(apiClient: any): Promise<SelectableItem[]> {
-  const data = await apiClient.get('/control/policies?size=1000');
+  const data = await apiClient.get('/control/policies?size=1000')
   // Handle paginated response from Spring
-  const policies = data.content || data;
+  const policies = data.content || data
   return policies.map((p: { id: string; name: string }) => ({
     id: p.id,
     name: p.name,
     type: 'policy',
-  }));
+  }))
 }
 
 async function fetchPages(apiClient: any): Promise<SelectableItem[]> {
-  const data = await apiClient.get('/ui/pages?size=1000');
+  const data = await apiClient.get('/ui/pages?size=1000')
   // Handle paginated response from Spring
-  const pages = data.content || data;
+  const pages = data.content || data
   return pages.map((p: { id: string; name: string }) => ({
     id: p.id,
     name: p.name,
     type: 'page',
-  }));
+  }))
 }
 
 async function fetchMenus(apiClient: any): Promise<SelectableItem[]> {
-  const data = await apiClient.get('/ui/menus?size=1000');
+  const data = await apiClient.get('/ui/menus?size=1000')
   // Handle paginated response from Spring
-  const menus = data.content || data;
+  const menus = data.content || data
   return menus.map((m: { id: string; name: string }) => ({
     id: m.id,
     name: m.name,
     type: 'menu',
-  }));
+  }))
 }
 
 async function exportPackage(apiClient: any, options: ExportOptions): Promise<Blob> {
-  return apiClient.post('/control/packages/export', options, { responseType: 'blob' });
+  return apiClient.post('/control/packages/export', options, { responseType: 'blob' })
 }
 
 async function previewImport(apiClient: any, file: File): Promise<ImportPreview> {
-  const formData = new FormData();
-  formData.append('file', file);
-  return apiClient.post('/control/packages/import/preview', formData);
+  const formData = new FormData()
+  formData.append('file', file)
+  return apiClient.post('/control/packages/import/preview', formData)
 }
 
-async function executeImport(apiClient: any, file: File, dryRun: boolean = false): Promise<ImportResult> {
-  const formData = new FormData();
-  formData.append('file', file);
-  formData.append('dryRun', String(dryRun));
-  return apiClient.post('/control/packages/import', formData);
+async function executeImport(
+  apiClient: any,
+  file: File,
+  dryRun: boolean = false
+): Promise<ImportResult> {
+  const formData = new FormData()
+  formData.append('file', file)
+  formData.append('dryRun', String(dryRun))
+  return apiClient.post('/control/packages/import', formData)
 }
 
 /**
  * Tab type for the packages page
  */
-type TabType = 'export' | 'import' | 'history';
+type TabType = 'export' | 'import' | 'history'
 
 /**
  * Status Badge Component
  */
 interface StatusBadgeProps {
-  status: 'success' | 'failed' | 'pending';
+  status: 'success' | 'failed' | 'pending'
 }
 
 function StatusBadge({ status }: StatusBadgeProps): React.ReactElement {
-  const { t } = useI18n();
+  const { t } = useI18n()
   const statusLabels: Record<string, string> = {
     success: t('packages.statusSuccess'),
     failed: t('packages.statusFailed'),
     pending: t('packages.statusPending'),
-  };
+  }
   return (
     <span
       className={`${styles.statusBadge} ${styles[`status${status.charAt(0).toUpperCase() + status.slice(1)}`]}`}
@@ -211,18 +215,18 @@ function StatusBadge({ status }: StatusBadgeProps): React.ReactElement {
     >
       {statusLabels[status] || status}
     </span>
-  );
+  )
 }
 
 /**
  * Type Badge Component
  */
 interface TypeBadgeProps {
-  type: 'export' | 'import';
+  type: 'export' | 'import'
 }
 
 function TypeBadge({ type }: TypeBadgeProps): React.ReactElement {
-  const { t } = useI18n();
+  const { t } = useI18n()
   return (
     <span
       className={`${styles.typeBadge} ${styles[`type${type.charAt(0).toUpperCase() + type.slice(1)}`]}`}
@@ -230,18 +234,18 @@ function TypeBadge({ type }: TypeBadgeProps): React.ReactElement {
     >
       {type === 'export' ? t('packages.export') : t('packages.import')}
     </span>
-  );
+  )
 }
 
 /**
  * Item Selection Component for Export
  */
 interface ItemSelectionProps {
-  title: string;
-  items: SelectableItem[];
-  selectedIds: string[];
-  onSelectionChange: (ids: string[]) => void;
-  isLoading: boolean;
+  title: string
+  items: SelectableItem[]
+  selectedIds: string[]
+  onSelectionChange: (ids: string[]) => void
+  isLoading: boolean
 }
 
 function ItemSelection({
@@ -251,26 +255,26 @@ function ItemSelection({
   onSelectionChange,
   isLoading,
 }: ItemSelectionProps): React.ReactElement {
-  const { t } = useI18n();
+  const { t } = useI18n()
 
   const handleToggle = useCallback(
     (id: string) => {
       if (selectedIds.includes(id)) {
-        onSelectionChange(selectedIds.filter((i) => i !== id));
+        onSelectionChange(selectedIds.filter((i) => i !== id))
       } else {
-        onSelectionChange([...selectedIds, id]);
+        onSelectionChange([...selectedIds, id])
       }
     },
     [selectedIds, onSelectionChange]
-  );
+  )
 
   const handleSelectAll = useCallback(() => {
     if (selectedIds.length === items.length) {
-      onSelectionChange([]);
+      onSelectionChange([])
     } else {
-      onSelectionChange(items.map((i) => i.id));
+      onSelectionChange(items.map((i) => i.id))
     }
-  }, [items, selectedIds, onSelectionChange]);
+  }, [items, selectedIds, onSelectionChange])
 
   if (isLoading) {
     return (
@@ -280,7 +284,7 @@ function ItemSelection({
           <LoadingSpinner size="small" />
         </div>
       </div>
-    );
+    )
   }
 
   return (
@@ -316,7 +320,7 @@ function ItemSelection({
         </div>
       )}
     </div>
-  );
+  )
 }
 
 /**
@@ -324,75 +328,75 @@ function ItemSelection({
  * Requirement 9.1: Display export options
  */
 interface ExportPanelProps {
-  onExportComplete: () => void;
+  onExportComplete: () => void
 }
 
 function ExportPanel({ onExportComplete }: ExportPanelProps): React.ReactElement {
-  const { t } = useI18n();
-  const { apiClient } = useApi();
-  const { showToast } = useToast();
-  const [packageName, setPackageName] = useState<string>('');
-  const [packageVersion, setPackageVersion] = useState<string>('1.0.0');
-  const [packageDescription, setPackageDescription] = useState<string>('');
-  const [selectedCollections, setSelectedCollections] = useState<string[]>([]);
-  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
-  const [selectedPolicies, setSelectedPolicies] = useState<string[]>([]);
-  const [selectedPages, setSelectedPages] = useState<string[]>([]);
-  const [selectedMenus, setSelectedMenus] = useState<string[]>([]);
+  const { t } = useI18n()
+  const { apiClient } = useApi()
+  const { showToast } = useToast()
+  const [packageName, setPackageName] = useState<string>('')
+  const [packageVersion, setPackageVersion] = useState<string>('1.0.0')
+  const [packageDescription, setPackageDescription] = useState<string>('')
+  const [selectedCollections, setSelectedCollections] = useState<string[]>([])
+  const [selectedRoles, setSelectedRoles] = useState<string[]>([])
+  const [selectedPolicies, setSelectedPolicies] = useState<string[]>([])
+  const [selectedPages, setSelectedPages] = useState<string[]>([])
+  const [selectedMenus, setSelectedMenus] = useState<string[]>([])
 
   const { data: collections = [], isLoading: collectionsLoading } = useQuery({
     queryKey: ['export-collections'],
     queryFn: () => fetchCollections(apiClient),
-  });
+  })
 
   const { data: roles = [], isLoading: rolesLoading } = useQuery({
     queryKey: ['export-roles'],
     queryFn: () => fetchRoles(apiClient),
-  });
+  })
 
   const { data: policies = [], isLoading: policiesLoading } = useQuery({
     queryKey: ['export-policies'],
     queryFn: () => fetchPolicies(apiClient),
-  });
+  })
 
   const { data: pages = [], isLoading: pagesLoading } = useQuery({
     queryKey: ['export-pages'],
     queryFn: () => fetchPages(apiClient),
-  });
+  })
 
   const { data: menus = [], isLoading: menusLoading } = useQuery({
     queryKey: ['export-menus'],
     queryFn: () => fetchMenus(apiClient),
-  });
+  })
 
   const exportMutation = useMutation({
     mutationFn: (options: ExportOptions) => exportPackage(apiClient, options),
     onSuccess: (blob) => {
       // Download the file
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${packageName}-${packageVersion}.json`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      showToast(t('packages.exportSuccess'), 'success');
-      onExportComplete();
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${packageName}-${packageVersion}.json`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      showToast(t('packages.exportSuccess'), 'success')
+      onExportComplete()
     },
     onError: (error: Error) => {
-      showToast(error.message, 'error');
+      showToast(error.message, 'error')
     },
-  });
+  })
 
   const hasSelection =
     selectedCollections.length > 0 ||
     selectedRoles.length > 0 ||
     selectedPolicies.length > 0 ||
     selectedPages.length > 0 ||
-    selectedMenus.length > 0;
+    selectedMenus.length > 0
 
-  const canExport = packageName.trim() !== '' && packageVersion.trim() !== '' && hasSelection;
+  const canExport = packageName.trim() !== '' && packageVersion.trim() !== '' && hasSelection
 
   const handleExport = useCallback(() => {
     exportMutation.mutate({
@@ -404,8 +408,18 @@ function ExportPanel({ onExportComplete }: ExportPanelProps): React.ReactElement
       policyIds: selectedPolicies,
       uiPageIds: selectedPages,
       uiMenuIds: selectedMenus,
-    });
-  }, [packageName, packageVersion, packageDescription, selectedCollections, selectedRoles, selectedPolicies, selectedPages, selectedMenus, exportMutation]);
+    })
+  }, [
+    packageName,
+    packageVersion,
+    packageDescription,
+    selectedCollections,
+    selectedRoles,
+    selectedPolicies,
+    selectedPages,
+    selectedMenus,
+    exportMutation,
+  ])
 
   return (
     <div className={styles.panel} data-testid="export-panel">
@@ -505,7 +519,7 @@ function ExportPanel({ onExportComplete }: ExportPanelProps): React.ReactElement
         </button>
       </div>
     </div>
-  );
+  )
 }
 
 /**
@@ -513,93 +527,94 @@ function ExportPanel({ onExportComplete }: ExportPanelProps): React.ReactElement
  * Requirement 9.1: Display import options
  */
 interface ImportPanelProps {
-  onImportComplete: () => void;
+  onImportComplete: () => void
 }
 
 function ImportPanel({ onImportComplete }: ImportPanelProps): React.ReactElement {
-  const { t } = useI18n();
-  const { apiClient } = useApi();
-  const { showToast } = useToast();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<ImportPreview | null>(null);
-  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const { t } = useI18n()
+  const { apiClient } = useApi()
+  const { showToast } = useToast()
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [preview, setPreview] = useState<ImportPreview | null>(null)
+  const [importResult, setImportResult] = useState<ImportResult | null>(null)
 
   const previewMutation = useMutation({
     mutationFn: (file: File) => previewImport(apiClient, file),
     onSuccess: (data) => {
-      setPreview(data);
+      setPreview(data)
     },
     onError: (error: Error) => {
-      showToast(error.message, 'error');
+      showToast(error.message, 'error')
     },
-  });
+  })
 
   const importMutation = useMutation({
-    mutationFn: ({ file, dryRun }: { file: File; dryRun: boolean }) => executeImport(apiClient, file, dryRun),
+    mutationFn: ({ file, dryRun }: { file: File; dryRun: boolean }) =>
+      executeImport(apiClient, file, dryRun),
     onSuccess: (data, variables) => {
-      setImportResult(data);
+      setImportResult(data)
       if (!variables.dryRun && data.success) {
-        showToast(t('packages.importSuccess'), 'success');
-        onImportComplete();
+        showToast(t('packages.importSuccess'), 'success')
+        onImportComplete()
       }
     },
     onError: (error: Error) => {
-      showToast(error.message, 'error');
+      showToast(error.message, 'error')
     },
-  });
+  })
 
   const handleFileSelect = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
+      const file = e.target.files?.[0]
       if (file) {
-        setSelectedFile(file);
-        setPreview(null);
-        setImportResult(null);
-        previewMutation.mutate(file);
+        setSelectedFile(file)
+        setPreview(null)
+        setImportResult(null)
+        previewMutation.mutate(file)
       }
     },
     [previewMutation]
-  );
+  )
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
-      e.preventDefault();
-      const file = e.dataTransfer.files?.[0];
+      e.preventDefault()
+      const file = e.dataTransfer.files?.[0]
       if (file && file.name.endsWith('.json')) {
-        setSelectedFile(file);
-        setPreview(null);
-        setImportResult(null);
-        previewMutation.mutate(file);
+        setSelectedFile(file)
+        setPreview(null)
+        setImportResult(null)
+        previewMutation.mutate(file)
       }
     },
     [previewMutation]
-  );
+  )
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-  }, []);
+    e.preventDefault()
+  }, [])
 
   const handleDryRun = useCallback(() => {
     if (selectedFile) {
-      importMutation.mutate({ file: selectedFile, dryRun: true });
+      importMutation.mutate({ file: selectedFile, dryRun: true })
     }
-  }, [selectedFile, importMutation]);
+  }, [selectedFile, importMutation])
 
   const handleImport = useCallback(() => {
     if (selectedFile) {
-      importMutation.mutate({ file: selectedFile, dryRun: false });
+      importMutation.mutate({ file: selectedFile, dryRun: false })
     }
-  }, [selectedFile, importMutation]);
+  }, [selectedFile, importMutation])
 
   const handleReset = useCallback(() => {
-    setSelectedFile(null);
-    setPreview(null);
-    setImportResult(null);
+    setSelectedFile(null)
+    setPreview(null)
+    setImportResult(null)
     if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+      fileInputRef.current.value = ''
     }
-  }, []);
+  }, [])
 
   return (
     <div className={styles.panel} data-testid="import-panel">
@@ -633,8 +648,8 @@ function ImportPanel({ onImportComplete }: ImportPanelProps): React.ReactElement
               type="button"
               className={styles.clearFileButton}
               onClick={(e) => {
-                e.stopPropagation();
-                handleReset();
+                e.stopPropagation()
+                handleReset()
               }}
               aria-label={t('common.clear')}
               data-testid="clear-file-button"
@@ -683,12 +698,20 @@ function ImportPanel({ onImportComplete }: ImportPanelProps): React.ReactElement
           data-testid="import-result"
         >
           <h4 className={styles.resultTitle}>
-            {importResult.success ? t('packages.importResultSuccess') : t('packages.importResultFailed')}
+            {importResult.success
+              ? t('packages.importResultSuccess')
+              : t('packages.importResultFailed')}
           </h4>
           <div className={styles.resultStats}>
-            <span>{t('packages.created')}: {importResult.created}</span>
-            <span>{t('packages.updated')}: {importResult.updated}</span>
-            <span>{t('packages.skipped')}: {importResult.skipped}</span>
+            <span>
+              {t('packages.created')}: {importResult.created}
+            </span>
+            <span>
+              {t('packages.updated')}: {importResult.updated}
+            </span>
+            <span>
+              {t('packages.skipped')}: {importResult.skipped}
+            </span>
           </div>
           {importResult.errors.length > 0 && (
             <div className={styles.resultErrors}>
@@ -723,7 +746,7 @@ function ImportPanel({ onImportComplete }: ImportPanelProps): React.ReactElement
         </button>
       </div>
     </div>
-  );
+  )
 }
 
 /**
@@ -731,42 +754,47 @@ function ImportPanel({ onImportComplete }: ImportPanelProps): React.ReactElement
  * Requirement 9.10: Display package history
  */
 interface HistoryPanelProps {
-  packages: Package[];
-  isLoading: boolean;
-  error: Error | null;
-  onRetry: () => void;
+  packages: Package[]
+  isLoading: boolean
+  error: Error | null
+  onRetry: () => void
 }
 
-function HistoryPanel({ packages, isLoading, error, onRetry }: HistoryPanelProps): React.ReactElement {
-  const { t, formatDate } = useI18n();
+function HistoryPanel({
+  packages,
+  isLoading,
+  error,
+  onRetry,
+}: HistoryPanelProps): React.ReactElement {
+  const { t, formatDate } = useI18n()
 
   if (isLoading) {
     return (
       <div className={styles.loadingContainer}>
         <LoadingSpinner label={t('common.loading')} />
       </div>
-    );
+    )
   }
 
   if (error) {
     // Check if it's a 404 error (endpoint not implemented)
-    const errorMessage = error.message || '';
-    const isNotImplemented = errorMessage.includes('404') || errorMessage.includes('Not Found');
-    
+    const errorMessage = error.message || ''
+    const isNotImplemented = errorMessage.includes('404') || errorMessage.includes('Not Found')
+
     if (isNotImplemented) {
       return (
         <div className={styles.emptyState} data-testid="history-not-available">
           <p>{t('packages.historyNotAvailable')}</p>
           <p className={styles.emptyStateHint}>{t('packages.historyNotAvailableHint')}</p>
         </div>
-      );
+      )
     }
-    
+
     return (
       <div className={styles.errorContainer}>
         <ErrorMessage error={error} onRetry={onRetry} />
       </div>
-    );
+    )
   }
 
   if (packages.length === 0) {
@@ -775,7 +803,7 @@ function HistoryPanel({ packages, isLoading, error, onRetry }: HistoryPanelProps
         <p>{t('packages.noHistory')}</p>
         <p className={styles.emptyStateHint}>{t('packages.noHistoryHint')}</p>
       </div>
-    );
+    )
   }
 
   return (
@@ -815,7 +843,7 @@ function HistoryPanel({ packages, isLoading, error, onRetry }: HistoryPanelProps
         </tbody>
       </table>
     </div>
-  );
+  )
 }
 
 /**
@@ -828,10 +856,10 @@ function HistoryPanel({ packages, isLoading, error, onRetry }: HistoryPanelProps
  * - 9.10: Display package history
  */
 export function PackagesPage({ testId }: PackagesPageProps): React.ReactElement {
-  const { t } = useI18n();
-  const { apiClient } = useApi();
-  const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<TabType>('export');
+  const { t } = useI18n()
+  const { apiClient } = useApi()
+  const queryClient = useQueryClient()
+  const [activeTab, setActiveTab] = useState<TabType>('export')
 
   const {
     data: packages = [],
@@ -843,17 +871,17 @@ export function PackagesPage({ testId }: PackagesPageProps): React.ReactElement 
     queryFn: () => fetchPackageHistory(apiClient),
     enabled: activeTab === 'history', // Only fetch when history tab is active
     retry: false, // Don't retry if endpoint doesn't exist
-  });
+  })
 
   const handleExportComplete = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ['package-history'] });
-    setActiveTab('history');
-  }, [queryClient]);
+    queryClient.invalidateQueries({ queryKey: ['package-history'] })
+    setActiveTab('history')
+  }, [queryClient])
 
   const handleImportComplete = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ['package-history'] });
-    setActiveTab('history');
-  }, [queryClient]);
+    queryClient.invalidateQueries({ queryKey: ['package-history'] })
+    setActiveTab('history')
+  }, [queryClient])
 
   return (
     <div className={styles.container} data-testid={testId || 'packages-page'}>
@@ -920,7 +948,7 @@ export function PackagesPage({ testId }: PackagesPageProps): React.ReactElement 
         )}
       </div>
     </div>
-  );
+  )
 }
 
-export default PackagesPage;
+export default PackagesPage

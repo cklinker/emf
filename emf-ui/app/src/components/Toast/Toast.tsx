@@ -25,28 +25,28 @@ import React, {
   useMemo,
   useEffect,
   useRef,
-} from 'react';
-import styles from './Toast.module.css';
+} from 'react'
+import styles from './Toast.module.css'
 
 /**
  * Toast type variants
  */
-export type ToastType = 'success' | 'error' | 'warning' | 'info';
+export type ToastType = 'success' | 'error' | 'warning' | 'info'
 
 /**
  * Individual toast data
  */
 export interface ToastData {
   /** Unique identifier for the toast */
-  id: string;
+  id: string
   /** Message to display */
-  message: string;
+  message: string
   /** Type of toast (determines styling and icon) */
-  type: ToastType;
+  type: ToastType
   /** Duration in milliseconds before auto-dismiss (0 = no auto-dismiss) */
-  duration: number;
+  duration: number
   /** Timestamp when toast was created */
-  createdAt: number;
+  createdAt: number
 }
 
 /**
@@ -54,13 +54,13 @@ export interface ToastData {
  */
 export interface ToastProps {
   /** Message to display */
-  message: string;
+  message: string
   /** Type of toast (determines styling and icon) */
-  type: ToastType;
+  type: ToastType
   /** Duration in milliseconds before auto-dismiss */
-  duration?: number;
+  duration?: number
   /** Callback when toast is closed */
-  onClose: () => void;
+  onClose: () => void
 }
 
 /**
@@ -68,13 +68,13 @@ export interface ToastProps {
  */
 export interface ToastContextValue {
   /** Show a new toast notification */
-  showToast: (message: string, type: ToastType, duration?: number) => string;
+  showToast: (message: string, type: ToastType, duration?: number) => string
   /** Hide a specific toast by ID */
-  hideToast: (id: string) => void;
+  hideToast: (id: string) => void
   /** Hide all toasts */
-  hideAllToasts: () => void;
+  hideAllToasts: () => void
   /** Current list of active toasts */
-  toasts: ToastData[];
+  toasts: ToastData[]
 }
 
 /**
@@ -82,28 +82,34 @@ export interface ToastContextValue {
  */
 export interface ToastProviderProps {
   /** Child components to render */
-  children: React.ReactNode;
+  children: React.ReactNode
   /** Default duration for toasts in milliseconds (default: 5000) */
-  defaultDuration?: number;
+  defaultDuration?: number
   /** Maximum number of toasts to display at once (default: 5) */
-  maxToasts?: number;
+  maxToasts?: number
   /** Position of the toast container */
-  position?: 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left' | 'top-center' | 'bottom-center';
+  position?:
+    | 'top-right'
+    | 'top-left'
+    | 'bottom-right'
+    | 'bottom-left'
+    | 'top-center'
+    | 'bottom-center'
 }
 
 // Default values
-const DEFAULT_DURATION = 5000;
-const DEFAULT_MAX_TOASTS = 5;
-const DEFAULT_POSITION = 'top-right';
+const DEFAULT_DURATION = 5000
+const DEFAULT_MAX_TOASTS = 5
+const DEFAULT_POSITION = 'top-right'
 
 // Create the context with undefined default
-const ToastContext = createContext<ToastContextValue | undefined>(undefined);
+const ToastContext = createContext<ToastContextValue | undefined>(undefined)
 
 /**
  * Generate a unique ID for toasts
  */
 function generateToastId(): string {
-  return `toast-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+  return `toast-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
 }
 
 /**
@@ -112,15 +118,15 @@ function generateToastId(): string {
 function getToastIcon(type: ToastType): string {
   switch (type) {
     case 'success':
-      return '✓';
+      return '✓'
     case 'error':
-      return '✕';
+      return '✕'
     case 'warning':
-      return '⚠';
+      return '⚠'
     case 'info':
-      return 'ℹ';
+      return 'ℹ'
     default:
-      return 'ℹ';
+      return 'ℹ'
   }
 }
 
@@ -130,7 +136,7 @@ function getToastIcon(type: ToastType): string {
 function getAriaRole(type: ToastType): 'alert' | 'status' {
   // Use 'alert' for error and warning (more urgent)
   // Use 'status' for success and info (less urgent)
-  return type === 'error' || type === 'warning' ? 'alert' : 'status';
+  return type === 'error' || type === 'warning' ? 'alert' : 'status'
 }
 
 /**
@@ -139,7 +145,7 @@ function getAriaRole(type: ToastType): 'alert' | 'status' {
 function getAriaLive(type: ToastType): 'assertive' | 'polite' {
   // Use 'assertive' for error and warning (interrupt user)
   // Use 'polite' for success and info (wait for user to finish)
-  return type === 'error' || type === 'warning' ? 'assertive' : 'polite';
+  return type === 'error' || type === 'warning' ? 'assertive' : 'polite'
 }
 
 /**
@@ -154,46 +160,46 @@ export function Toast({
   duration = DEFAULT_DURATION,
   onClose,
 }: ToastProps): React.ReactElement {
-  const [isExiting, setIsExiting] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isExiting, setIsExiting] = useState(false)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Handle close with exit animation
   const handleClose = useCallback(() => {
-    setIsExiting(true);
+    setIsExiting(true)
     // Wait for exit animation to complete before calling onClose
     setTimeout(() => {
-      onClose();
-    }, 200); // Match CSS animation duration
-  }, [onClose]);
+      onClose()
+    }, 200) // Match CSS animation duration
+  }, [onClose])
 
   // Set up auto-dismiss timer
   useEffect(() => {
     if (duration > 0) {
       timerRef.current = setTimeout(() => {
-        handleClose();
-      }, duration);
+        handleClose()
+      }, duration)
     }
 
     return () => {
       if (timerRef.current) {
-        clearTimeout(timerRef.current);
+        clearTimeout(timerRef.current)
       }
-    };
-  }, [duration, handleClose]);
+    }
+  }, [duration, handleClose])
 
   // Handle keyboard events
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent) => {
       if (event.key === 'Escape') {
-        handleClose();
+        handleClose()
       }
     },
     [handleClose]
-  );
+  )
 
-  const icon = getToastIcon(type);
-  const role = getAriaRole(type);
-  const ariaLive = getAriaLive(type);
+  const icon = getToastIcon(type)
+  const role = getAriaRole(type)
+  const ariaLive = getAriaLive(type)
 
   return (
     <div
@@ -220,7 +226,7 @@ export function Toast({
         <span aria-hidden="true">×</span>
       </button>
     </div>
-  );
+  )
 }
 
 /**
@@ -234,12 +240,12 @@ function ToastContainer({
   onClose,
   position = DEFAULT_POSITION,
 }: {
-  toasts: ToastData[];
-  onClose: (id: string) => void;
-  position?: ToastProviderProps['position'];
+  toasts: ToastData[]
+  onClose: (id: string) => void
+  position?: ToastProviderProps['position']
 }): React.ReactElement | null {
   if (toasts.length === 0) {
-    return null;
+    return null
   }
 
   return (
@@ -258,7 +264,7 @@ function ToastContainer({
         />
       ))}
     </div>
-  );
+  )
 }
 
 /**
@@ -280,7 +286,7 @@ export function ToastProvider({
   maxToasts = DEFAULT_MAX_TOASTS,
   position = DEFAULT_POSITION,
 }: ToastProviderProps): React.ReactElement {
-  const [toasts, setToasts] = useState<ToastData[]>([]);
+  const [toasts, setToasts] = useState<ToastData[]>([])
 
   /**
    * Show a new toast notification
@@ -288,43 +294,43 @@ export function ToastProvider({
    */
   const showToast = useCallback(
     (message: string, type: ToastType, duration?: number): string => {
-      const id = generateToastId();
+      const id = generateToastId()
       const newToast: ToastData = {
         id,
         message,
         type,
         duration: duration ?? defaultDuration,
         createdAt: Date.now(),
-      };
+      }
 
       setToasts((currentToasts) => {
         // Add new toast and limit to maxToasts
-        const updatedToasts = [...currentToasts, newToast];
+        const updatedToasts = [...currentToasts, newToast]
         if (updatedToasts.length > maxToasts) {
           // Remove oldest toasts to stay within limit
-          return updatedToasts.slice(-maxToasts);
+          return updatedToasts.slice(-maxToasts)
         }
-        return updatedToasts;
-      });
+        return updatedToasts
+      })
 
-      return id;
+      return id
     },
     [defaultDuration, maxToasts]
-  );
+  )
 
   /**
    * Hide a specific toast by ID
    */
   const hideToast = useCallback((id: string): void => {
-    setToasts((currentToasts) => currentToasts.filter((toast) => toast.id !== id));
-  }, []);
+    setToasts((currentToasts) => currentToasts.filter((toast) => toast.id !== id))
+  }, [])
 
   /**
    * Hide all toasts
    */
   const hideAllToasts = useCallback((): void => {
-    setToasts([]);
-  }, []);
+    setToasts([])
+  }, [])
 
   // Memoize context value to prevent unnecessary re-renders
   const contextValue = useMemo<ToastContextValue>(
@@ -335,14 +341,14 @@ export function ToastProvider({
       toasts,
     }),
     [showToast, hideToast, hideAllToasts, toasts]
-  );
+  )
 
   return (
     <ToastContext.Provider value={contextValue}>
       {children}
       <ToastContainer toasts={toasts} onClose={hideToast} position={position} />
     </ToastContext.Provider>
-  );
+  )
 }
 
 /**
@@ -373,15 +379,15 @@ export function ToastProvider({
  * ```
  */
 export function useToast(): ToastContextValue {
-  const context = useContext(ToastContext);
+  const context = useContext(ToastContext)
   if (context === undefined) {
-    throw new Error('useToast must be used within a ToastProvider');
+    throw new Error('useToast must be used within a ToastProvider')
   }
-  return context;
+  return context
 }
 
 // Export the context for testing purposes
-export { ToastContext };
+export { ToastContext }
 
 // Export default duration for testing
-export { DEFAULT_DURATION, DEFAULT_MAX_TOASTS };
+export { DEFAULT_DURATION, DEFAULT_MAX_TOASTS }

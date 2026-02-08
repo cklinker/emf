@@ -13,73 +13,73 @@
  * - 6.9: Display provider status (connected/disconnected)
  */
 
-import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useI18n } from '../../context/I18nContext';
-import { useApi } from '../../context/ApiContext';
-import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components';
-import styles from './OIDCProvidersPage.module.css';
+import React, { useState, useCallback, useEffect, useRef } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useI18n } from '../../context/I18nContext'
+import { useApi } from '../../context/ApiContext'
+import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
+import styles from './OIDCProvidersPage.module.css'
 
 /**
  * OIDC Provider interface matching the API response
  */
 export interface OIDCProvider {
-  id: string;
-  name: string;
-  issuer: string;
-  clientId: string;
-  scopes: string[];
-  active: boolean;
-  createdAt: string;
-  updatedAt: string;
+  id: string
+  name: string
+  issuer: string
+  clientId: string
+  scopes: string[]
+  active: boolean
+  createdAt: string
+  updatedAt: string
   // Claim mapping fields (Requirements 6.1, 6.2)
-  rolesClaim?: string;
-  rolesMapping?: string;
-  emailClaim?: string;
-  usernameClaim?: string;
-  nameClaim?: string;
+  rolesClaim?: string
+  rolesMapping?: string
+  emailClaim?: string
+  usernameClaim?: string
+  nameClaim?: string
 }
 
 /**
  * Form data for creating/editing an OIDC provider
  */
 interface OIDCProviderFormData {
-  name: string;
-  issuer: string;
-  clientId: string;
-  clientSecret: string;
-  scopes: string;
+  name: string
+  issuer: string
+  clientId: string
+  clientSecret: string
+  scopes: string
   // Claim mapping fields (Requirements 6.1, 6.2)
-  rolesClaim?: string;
-  rolesMapping?: string;
-  emailClaim?: string;
-  usernameClaim?: string;
-  nameClaim?: string;
+  rolesClaim?: string
+  rolesMapping?: string
+  emailClaim?: string
+  usernameClaim?: string
+  nameClaim?: string
 }
 
 /**
  * Form validation errors
  */
 interface FormErrors {
-  name?: string;
-  issuer?: string;
-  clientId?: string;
-  clientSecret?: string;
-  scopes?: string;
+  name?: string
+  issuer?: string
+  clientId?: string
+  clientSecret?: string
+  scopes?: string
   // Claim mapping error fields (Requirement 6.6)
-  rolesClaim?: string;
-  rolesMapping?: string;
-  emailClaim?: string;
-  usernameClaim?: string;
-  nameClaim?: string;
+  rolesClaim?: string
+  rolesMapping?: string
+  emailClaim?: string
+  usernameClaim?: string
+  nameClaim?: string
 }
 
 /**
  * Test connection result
  */
 interface TestConnectionResult {
-  success: boolean;
-  message: string;
+  success: boolean
+  message: string
 }
 
 /**
@@ -87,74 +87,78 @@ interface TestConnectionResult {
  */
 export interface OIDCProvidersPageProps {
   /** Optional test ID for testing */
-  testId?: string;
+  testId?: string
 }
 
 /**
  * Validate OIDC provider form data
  */
-function validateForm(data: OIDCProviderFormData, t: (key: string) => string, isEditing: boolean): FormErrors {
-  const errors: FormErrors = {};
+function validateForm(
+  data: OIDCProviderFormData,
+  t: (key: string) => string,
+  isEditing: boolean
+): FormErrors {
+  const errors: FormErrors = {}
 
   // Name validation
   if (!data.name.trim()) {
-    errors.name = t('oidc.validation.nameRequired');
+    errors.name = t('oidc.validation.nameRequired')
   } else if (data.name.length > 100) {
-    errors.name = t('oidc.validation.nameTooLong');
+    errors.name = t('oidc.validation.nameTooLong')
   }
 
   // Issuer URL validation
   if (!data.issuer.trim()) {
-    errors.issuer = t('oidc.validation.issuerRequired');
+    errors.issuer = t('oidc.validation.issuerRequired')
   } else {
     try {
-      new URL(data.issuer);
+      new URL(data.issuer)
     } catch {
-      errors.issuer = t('oidc.validation.issuerInvalid');
+      errors.issuer = t('oidc.validation.issuerInvalid')
     }
   }
 
   // Client ID validation
   if (!data.clientId.trim()) {
-    errors.clientId = t('oidc.validation.clientIdRequired');
+    errors.clientId = t('oidc.validation.clientIdRequired')
   } else if (data.clientId.length > 255) {
-    errors.clientId = t('oidc.validation.clientIdTooLong');
+    errors.clientId = t('oidc.validation.clientIdTooLong')
   }
 
   // Client Secret validation (required only for new providers)
   if (!isEditing && !data.clientSecret.trim()) {
-    errors.clientSecret = t('oidc.validation.clientSecretRequired');
+    errors.clientSecret = t('oidc.validation.clientSecretRequired')
   }
 
   // Scopes validation
   if (!data.scopes.trim()) {
-    errors.scopes = t('oidc.validation.scopesRequired');
+    errors.scopes = t('oidc.validation.scopesRequired')
   }
 
   // Roles mapping JSON validation (Requirement 6.5)
   if (data.rolesMapping && data.rolesMapping.trim()) {
     try {
-      JSON.parse(data.rolesMapping);
+      JSON.parse(data.rolesMapping)
     } catch {
-      errors.rolesMapping = t('oidc.validation.rolesMappingInvalidJson');
+      errors.rolesMapping = t('oidc.validation.rolesMappingInvalidJson')
     }
   }
 
   // Claim path length validations (Requirement 6.6)
   if (data.rolesClaim && data.rolesClaim.length > 200) {
-    errors.rolesClaim = t('oidc.validation.claimPathTooLong');
+    errors.rolesClaim = t('oidc.validation.claimPathTooLong')
   }
   if (data.emailClaim && data.emailClaim.length > 200) {
-    errors.emailClaim = t('oidc.validation.claimPathTooLong');
+    errors.emailClaim = t('oidc.validation.claimPathTooLong')
   }
   if (data.usernameClaim && data.usernameClaim.length > 200) {
-    errors.usernameClaim = t('oidc.validation.claimPathTooLong');
+    errors.usernameClaim = t('oidc.validation.claimPathTooLong')
   }
   if (data.nameClaim && data.nameClaim.length > 200) {
-    errors.nameClaim = t('oidc.validation.claimPathTooLong');
+    errors.nameClaim = t('oidc.validation.claimPathTooLong')
   }
 
-  return errors;
+  return errors
 }
 
 /**
@@ -163,15 +167,20 @@ function validateForm(data: OIDCProviderFormData, t: (key: string) => string, is
  * Modal form for creating and editing OIDC providers.
  */
 interface OIDCProviderFormProps {
-  provider?: OIDCProvider;
-  onSubmit: (data: OIDCProviderFormData) => void;
-  onCancel: () => void;
-  isSubmitting: boolean;
+  provider?: OIDCProvider
+  onSubmit: (data: OIDCProviderFormData) => void
+  onCancel: () => void
+  isSubmitting: boolean
 }
 
-function OIDCProviderForm({ provider, onSubmit, onCancel, isSubmitting }: OIDCProviderFormProps): React.ReactElement {
-  const { t } = useI18n();
-  const isEditing = !!provider;
+function OIDCProviderForm({
+  provider,
+  onSubmit,
+  onCancel,
+  isSubmitting,
+}: OIDCProviderFormProps): React.ReactElement {
+  const { t } = useI18n()
+  const isEditing = !!provider
   const [formData, setFormData] = useState<OIDCProviderFormData>({
     name: provider?.name ?? '',
     issuer: provider?.issuer ?? '',
@@ -184,54 +193,66 @@ function OIDCProviderForm({ provider, onSubmit, onCancel, isSubmitting }: OIDCPr
     emailClaim: provider?.emailClaim ?? '',
     usernameClaim: provider?.usernameClaim ?? '',
     nameClaim: provider?.nameClaim ?? '',
-  });
-  const [errors, setErrors] = useState<FormErrors>({});
-  const [touched, setTouched] = useState<Record<string, boolean>>({});
-  const nameInputRef = useRef<HTMLInputElement>(null);
+  })
+  const [errors, setErrors] = useState<FormErrors>({})
+  const [touched, setTouched] = useState<Record<string, boolean>>({})
+  const nameInputRef = useRef<HTMLInputElement>(null)
 
   // Focus name input on mount
   useEffect(() => {
-    nameInputRef.current?.focus();
-  }, []);
+    nameInputRef.current?.focus()
+  }, [])
 
-  const handleChange = useCallback((field: keyof OIDCProviderFormData, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-    // Clear error when user starts typing
-    if (errors[field]) {
-      setErrors((prev) => ({ ...prev, [field]: undefined }));
-    }
-  }, [errors]);
+  const handleChange = useCallback(
+    (field: keyof OIDCProviderFormData, value: string) => {
+      setFormData((prev) => ({ ...prev, [field]: value }))
+      // Clear error when user starts typing
+      if (errors[field]) {
+        setErrors((prev) => ({ ...prev, [field]: undefined }))
+      }
+    },
+    [errors]
+  )
 
-  const handleBlur = useCallback((field: keyof OIDCProviderFormData) => {
-    setTouched((prev) => ({ ...prev, [field]: true }));
-    // Validate on blur
-    const validationErrors = validateForm(formData, t, isEditing);
-    if (validationErrors[field]) {
-      setErrors((prev) => ({ ...prev, [field]: validationErrors[field] }));
-    }
-  }, [formData, t, isEditing]);
+  const handleBlur = useCallback(
+    (field: keyof OIDCProviderFormData) => {
+      setTouched((prev) => ({ ...prev, [field]: true }))
+      // Validate on blur
+      const validationErrors = validateForm(formData, t, isEditing)
+      if (validationErrors[field]) {
+        setErrors((prev) => ({ ...prev, [field]: validationErrors[field] }))
+      }
+    },
+    [formData, t, isEditing]
+  )
 
-  const handleSubmit = useCallback((e: React.FormEvent) => {
-    e.preventDefault();
-    
-    // Validate all fields
-    const validationErrors = validateForm(formData, t, isEditing);
-    setErrors(validationErrors);
-    setTouched({ name: true, issuer: true, clientId: true, clientSecret: true, scopes: true });
+  const handleSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault()
 
-    // If no errors, submit
-    if (Object.keys(validationErrors).length === 0) {
-      onSubmit(formData);
-    }
-  }, [formData, onSubmit, t, isEditing]);
+      // Validate all fields
+      const validationErrors = validateForm(formData, t, isEditing)
+      setErrors(validationErrors)
+      setTouched({ name: true, issuer: true, clientId: true, clientSecret: true, scopes: true })
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      onCancel();
-    }
-  }, [onCancel]);
+      // If no errors, submit
+      if (Object.keys(validationErrors).length === 0) {
+        onSubmit(formData)
+      }
+    },
+    [formData, onSubmit, t, isEditing]
+  )
 
-  const title = isEditing ? t('oidc.editProvider') : t('oidc.addProvider');
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onCancel()
+      }
+    },
+    [onCancel]
+  )
+
+  const title = isEditing ? t('oidc.editProvider') : t('oidc.addProvider')
 
   return (
     <div
@@ -268,7 +289,9 @@ function OIDCProviderForm({ provider, onSubmit, onCancel, isSubmitting }: OIDCPr
             <div className={styles.formGroup}>
               <label htmlFor="oidc-name" className={styles.formLabel}>
                 {t('oidc.providerName')}
-                <span className={styles.required} aria-hidden="true">*</span>
+                <span className={styles.required} aria-hidden="true">
+                  *
+                </span>
               </label>
               <input
                 ref={nameInputRef}
@@ -296,7 +319,9 @@ function OIDCProviderForm({ provider, onSubmit, onCancel, isSubmitting }: OIDCPr
             <div className={styles.formGroup}>
               <label htmlFor="oidc-issuer" className={styles.formLabel}>
                 {t('oidc.issuer')}
-                <span className={styles.required} aria-hidden="true">*</span>
+                <span className={styles.required} aria-hidden="true">
+                  *
+                </span>
               </label>
               <input
                 id="oidc-issuer"
@@ -326,7 +351,9 @@ function OIDCProviderForm({ provider, onSubmit, onCancel, isSubmitting }: OIDCPr
             <div className={styles.formGroup}>
               <label htmlFor="oidc-client-id" className={styles.formLabel}>
                 {t('oidc.clientId')}
-                <span className={styles.required} aria-hidden="true">*</span>
+                <span className={styles.required} aria-hidden="true">
+                  *
+                </span>
               </label>
               <input
                 id="oidc-client-id"
@@ -353,7 +380,11 @@ function OIDCProviderForm({ provider, onSubmit, onCancel, isSubmitting }: OIDCPr
             <div className={styles.formGroup}>
               <label htmlFor="oidc-client-secret" className={styles.formLabel}>
                 {t('oidc.clientSecret')}
-                {!isEditing && <span className={styles.required} aria-hidden="true">*</span>}
+                {!isEditing && (
+                  <span className={styles.required} aria-hidden="true">
+                    *
+                  </span>
+                )}
               </label>
               <input
                 id="oidc-client-secret"
@@ -362,10 +393,16 @@ function OIDCProviderForm({ provider, onSubmit, onCancel, isSubmitting }: OIDCPr
                 value={formData.clientSecret}
                 onChange={(e) => handleChange('clientSecret', e.target.value)}
                 onBlur={() => handleBlur('clientSecret')}
-                placeholder={isEditing ? t('oidc.clientSecretPlaceholderEdit') : t('oidc.clientSecretPlaceholder')}
+                placeholder={
+                  isEditing
+                    ? t('oidc.clientSecretPlaceholderEdit')
+                    : t('oidc.clientSecretPlaceholder')
+                }
                 aria-required={!isEditing}
                 aria-invalid={touched.clientSecret && !!errors.clientSecret}
-                aria-describedby={errors.clientSecret ? 'oidc-client-secret-error' : 'oidc-client-secret-hint'}
+                aria-describedby={
+                  errors.clientSecret ? 'oidc-client-secret-error' : 'oidc-client-secret-hint'
+                }
                 disabled={isSubmitting}
                 data-testid="oidc-client-secret-input"
               />
@@ -383,7 +420,9 @@ function OIDCProviderForm({ provider, onSubmit, onCancel, isSubmitting }: OIDCPr
             <div className={styles.formGroup}>
               <label htmlFor="oidc-scopes" className={styles.formLabel}>
                 {t('oidc.scopes')}
-                <span className={styles.required} aria-hidden="true">*</span>
+                <span className={styles.required} aria-hidden="true">
+                  *
+                </span>
               </label>
               <input
                 id="oidc-scopes"
@@ -568,18 +607,18 @@ function OIDCProviderForm({ provider, onSubmit, onCancel, isSubmitting }: OIDCPr
         </div>
       </div>
     </div>
-  );
+  )
 }
 
 /**
  * Status Badge Component
  */
 interface StatusBadgeProps {
-  active: boolean;
+  active: boolean
 }
 
 function StatusBadge({ active }: StatusBadgeProps): React.ReactElement {
-  const { t } = useI18n();
+  const { t } = useI18n()
   return (
     <span
       className={`${styles.statusBadge} ${active ? styles.statusActive : styles.statusInactive}`}
@@ -587,7 +626,7 @@ function StatusBadge({ active }: StatusBadgeProps): React.ReactElement {
     >
       {active ? t('collections.active') : t('collections.inactive')}
     </span>
-  );
+  )
 }
 
 /**
@@ -596,22 +635,24 @@ function StatusBadge({ active }: StatusBadgeProps): React.ReactElement {
  * Main page for managing OIDC providers in the EMF Admin UI.
  * Provides listing and CRUD operations for OIDC providers.
  */
-export function OIDCProvidersPage({ testId = 'oidc-providers-page' }: OIDCProvidersPageProps): React.ReactElement {
-  const queryClient = useQueryClient();
-  const { t, formatDate } = useI18n();
-  const { apiClient } = useApi();
-  const { showToast } = useToast();
+export function OIDCProvidersPage({
+  testId = 'oidc-providers-page',
+}: OIDCProvidersPageProps): React.ReactElement {
+  const queryClient = useQueryClient()
+  const { t, formatDate } = useI18n()
+  const { apiClient } = useApi()
+  const { showToast } = useToast()
 
   // Modal state
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingProvider, setEditingProvider] = useState<OIDCProvider | undefined>(undefined);
+  const [isFormOpen, setIsFormOpen] = useState(false)
+  const [editingProvider, setEditingProvider] = useState<OIDCProvider | undefined>(undefined)
 
   // Delete confirmation dialog state
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [providerToDelete, setProviderToDelete] = useState<OIDCProvider | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [providerToDelete, setProviderToDelete] = useState<OIDCProvider | null>(null)
 
   // Test connection state
-  const [testingProviderId, setTestingProviderId] = useState<string | null>(null);
+  const [testingProviderId, setTestingProviderId] = useState<string | null>(null)
 
   // Fetch OIDC providers query
   const {
@@ -622,140 +663,153 @@ export function OIDCProvidersPage({ testId = 'oidc-providers-page' }: OIDCProvid
   } = useQuery({
     queryKey: ['oidc-providers'],
     queryFn: () => apiClient.get<OIDCProvider[]>('/control/oidc/providers'),
-  });
+  })
 
   // Create mutation
   const createMutation = useMutation({
     mutationFn: (data: OIDCProviderFormData) => {
       const payload: any = {
         ...data,
-        scopes: data.scopes.split(',').map((s) => s.trim()).filter(Boolean),
-      };
+        scopes: data.scopes
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean),
+      }
       // Only include claim fields if they have values (Requirement 12.2)
-      if (data.rolesClaim?.trim()) payload.rolesClaim = data.rolesClaim.trim();
-      if (data.rolesMapping?.trim()) payload.rolesMapping = data.rolesMapping.trim();
-      if (data.emailClaim?.trim()) payload.emailClaim = data.emailClaim.trim();
-      if (data.usernameClaim?.trim()) payload.usernameClaim = data.usernameClaim.trim();
-      if (data.nameClaim?.trim()) payload.nameClaim = data.nameClaim.trim();
-      return apiClient.post<OIDCProvider>('/control/oidc/providers', payload);
+      if (data.rolesClaim?.trim()) payload.rolesClaim = data.rolesClaim.trim()
+      if (data.rolesMapping?.trim()) payload.rolesMapping = data.rolesMapping.trim()
+      if (data.emailClaim?.trim()) payload.emailClaim = data.emailClaim.trim()
+      if (data.usernameClaim?.trim()) payload.usernameClaim = data.usernameClaim.trim()
+      if (data.nameClaim?.trim()) payload.nameClaim = data.nameClaim.trim()
+      return apiClient.post<OIDCProvider>('/control/oidc/providers', payload)
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['oidc-providers'] });
-      showToast(t('success.created', { item: t('navigation.oidcProviders') }), 'success');
-      handleCloseForm();
+      queryClient.invalidateQueries({ queryKey: ['oidc-providers'] })
+      showToast(t('success.created', { item: t('navigation.oidcProviders') }), 'success')
+      handleCloseForm()
     },
     onError: (error: Error) => {
-      showToast(error.message || t('errors.generic'), 'error');
+      showToast(error.message || t('errors.generic'), 'error')
     },
-  });
+  })
 
   // Update mutation
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: OIDCProviderFormData }) => {
       const payload: any = {
         ...data,
-        scopes: data.scopes.split(',').map((s) => s.trim()).filter(Boolean),
-      };
+        scopes: data.scopes
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean),
+      }
       // Only include claim fields if they have values (Requirement 12.2)
-      if (data.rolesClaim?.trim()) payload.rolesClaim = data.rolesClaim.trim();
-      if (data.rolesMapping?.trim()) payload.rolesMapping = data.rolesMapping.trim();
-      if (data.emailClaim?.trim()) payload.emailClaim = data.emailClaim.trim();
-      if (data.usernameClaim?.trim()) payload.usernameClaim = data.usernameClaim.trim();
-      if (data.nameClaim?.trim()) payload.nameClaim = data.nameClaim.trim();
-      return apiClient.put<OIDCProvider>(`/control/oidc/providers/${id}`, payload);
+      if (data.rolesClaim?.trim()) payload.rolesClaim = data.rolesClaim.trim()
+      if (data.rolesMapping?.trim()) payload.rolesMapping = data.rolesMapping.trim()
+      if (data.emailClaim?.trim()) payload.emailClaim = data.emailClaim.trim()
+      if (data.usernameClaim?.trim()) payload.usernameClaim = data.usernameClaim.trim()
+      if (data.nameClaim?.trim()) payload.nameClaim = data.nameClaim.trim()
+      return apiClient.put<OIDCProvider>(`/control/oidc/providers/${id}`, payload)
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['oidc-providers'] });
-      showToast(t('success.updated', { item: t('navigation.oidcProviders') }), 'success');
-      handleCloseForm();
+      queryClient.invalidateQueries({ queryKey: ['oidc-providers'] })
+      showToast(t('success.updated', { item: t('navigation.oidcProviders') }), 'success')
+      handleCloseForm()
     },
     onError: (error: Error) => {
-      showToast(error.message || t('errors.generic'), 'error');
+      showToast(error.message || t('errors.generic'), 'error')
     },
-  });
+  })
 
   // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: (id: string) => apiClient.delete(`/control/oidc/providers/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['oidc-providers'] });
-      showToast(t('success.deleted', { item: t('navigation.oidcProviders') }), 'success');
-      setDeleteDialogOpen(false);
-      setProviderToDelete(null);
+      queryClient.invalidateQueries({ queryKey: ['oidc-providers'] })
+      showToast(t('success.deleted', { item: t('navigation.oidcProviders') }), 'success')
+      setDeleteDialogOpen(false)
+      setProviderToDelete(null)
     },
     onError: (error: Error) => {
-      showToast(error.message || t('errors.generic'), 'error');
+      showToast(error.message || t('errors.generic'), 'error')
     },
-  });
+  })
 
   // Test connection mutation
   const testConnectionMutation = useMutation({
-    mutationFn: (id: string) => apiClient.post<TestConnectionResult>(`/control/oidc/providers/${id}/test`, {}),
+    mutationFn: (id: string) =>
+      apiClient.post<TestConnectionResult>(`/control/oidc/providers/${id}/test`, {}),
     onSuccess: (result) => {
       if (result.success) {
-        showToast(t('oidc.connectionSuccess'), 'success');
+        showToast(t('oidc.connectionSuccess'), 'success')
       } else {
-        showToast(`${t('oidc.connectionFailed')}: ${result.message}`, 'error');
+        showToast(`${t('oidc.connectionFailed')}: ${result.message}`, 'error')
       }
-      setTestingProviderId(null);
+      setTestingProviderId(null)
     },
     onError: (error: Error) => {
-      showToast(`${t('oidc.connectionFailed')}: ${error.message}`, 'error');
-      setTestingProviderId(null);
+      showToast(`${t('oidc.connectionFailed')}: ${error.message}`, 'error')
+      setTestingProviderId(null)
     },
-  });
+  })
 
   // Handle create action
   const handleCreate = useCallback(() => {
-    setEditingProvider(undefined);
-    setIsFormOpen(true);
-  }, []);
+    setEditingProvider(undefined)
+    setIsFormOpen(true)
+  }, [])
 
   // Handle edit action
   const handleEdit = useCallback((provider: OIDCProvider) => {
-    setEditingProvider(provider);
-    setIsFormOpen(true);
-  }, []);
+    setEditingProvider(provider)
+    setIsFormOpen(true)
+  }, [])
 
   // Handle close form
   const handleCloseForm = useCallback(() => {
-    setIsFormOpen(false);
-    setEditingProvider(undefined);
-  }, []);
+    setIsFormOpen(false)
+    setEditingProvider(undefined)
+  }, [])
 
   // Handle form submit
-  const handleFormSubmit = useCallback((data: OIDCProviderFormData) => {
-    if (editingProvider) {
-      updateMutation.mutate({ id: editingProvider.id, data });
-    } else {
-      createMutation.mutate(data);
-    }
-  }, [editingProvider, createMutation, updateMutation]);
+  const handleFormSubmit = useCallback(
+    (data: OIDCProviderFormData) => {
+      if (editingProvider) {
+        updateMutation.mutate({ id: editingProvider.id, data })
+      } else {
+        createMutation.mutate(data)
+      }
+    },
+    [editingProvider, createMutation, updateMutation]
+  )
 
   // Handle delete action - open confirmation dialog
   const handleDeleteClick = useCallback((provider: OIDCProvider) => {
-    setProviderToDelete(provider);
-    setDeleteDialogOpen(true);
-  }, []);
+    setProviderToDelete(provider)
+    setDeleteDialogOpen(true)
+  }, [])
 
   // Handle delete confirmation
   const handleDeleteConfirm = useCallback(() => {
     if (providerToDelete) {
-      deleteMutation.mutate(providerToDelete.id);
+      deleteMutation.mutate(providerToDelete.id)
     }
-  }, [providerToDelete, deleteMutation]);
+  }, [providerToDelete, deleteMutation])
 
   // Handle delete cancel
   const handleDeleteCancel = useCallback(() => {
-    setDeleteDialogOpen(false);
-    setProviderToDelete(null);
-  }, []);
+    setDeleteDialogOpen(false)
+    setProviderToDelete(null)
+  }, [])
 
   // Handle test connection
-  const handleTestConnection = useCallback((provider: OIDCProvider) => {
-    setTestingProviderId(provider.id);
-    testConnectionMutation.mutate(provider.id);
-  }, [testConnectionMutation]);
+  const handleTestConnection = useCallback(
+    (provider: OIDCProvider) => {
+      setTestingProviderId(provider.id)
+      testConnectionMutation.mutate(provider.id)
+    },
+    [testConnectionMutation]
+  )
 
   // Render loading state
   if (isLoading) {
@@ -765,7 +819,7 @@ export function OIDCProvidersPage({ testId = 'oidc-providers-page' }: OIDCProvid
           <LoadingSpinner size="large" label={t('common.loading')} />
         </div>
       </div>
-    );
+    )
   }
 
   // Render error state
@@ -777,10 +831,10 @@ export function OIDCProvidersPage({ testId = 'oidc-providers-page' }: OIDCProvid
           onRetry={() => refetch()}
         />
       </div>
-    );
+    )
   }
 
-  const isSubmitting = createMutation.isPending || updateMutation.isPending;
+  const isSubmitting = createMutation.isPending || updateMutation.isPending
 
   return (
     <div className={styles.container} data-testid={testId}>
@@ -872,7 +926,9 @@ export function OIDCProvidersPage({ testId = 'oidc-providers-page' }: OIDCProvid
                         aria-label={`${t('oidc.testConnection')} ${provider.name}`}
                         data-testid={`test-button-${index}`}
                       >
-                        {testingProviderId === provider.id ? t('common.loading') : t('oidc.testConnection')}
+                        {testingProviderId === provider.id
+                          ? t('common.loading')
+                          : t('oidc.testConnection')}
                       </button>
                       <button
                         type="button"
@@ -923,7 +979,7 @@ export function OIDCProvidersPage({ testId = 'oidc-providers-page' }: OIDCProvid
         variant="danger"
       />
     </div>
-  );
+  )
 }
 
-export default OIDCProvidersPage;
+export default OIDCProvidersPage

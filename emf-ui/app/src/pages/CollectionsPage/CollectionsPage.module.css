@@ -106,7 +106,9 @@
   background-color: var(--color-surface-primary, #ffffff);
   border: 1px solid var(--color-border, #d1d5db);
   border-radius: var(--border-radius-md, 0.375rem);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .filterInput:focus,
@@ -235,7 +237,9 @@
   border: 1px solid var(--color-border, #d1d5db);
   border-radius: var(--border-radius-sm, 0.25rem);
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
 }
 
 .actionButton:hover {
@@ -294,7 +298,9 @@
   border: 1px solid var(--color-border, #d1d5db);
   border-radius: var(--border-radius-md, 0.375rem);
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
 }
 
 .paginationButton:hover:not(:disabled) {

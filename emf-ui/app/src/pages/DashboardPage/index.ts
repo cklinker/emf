@@ -4,7 +4,7 @@
  * Exports the DashboardPage component and related types.
  */
 
-export { DashboardPage } from './DashboardPage';
+export { DashboardPage } from './DashboardPage'
 export type {
   DashboardPageProps,
   DashboardData,
@@ -12,4 +12,4 @@ export type {
   MetricDataPoint,
   SystemMetrics,
   RecentError,
-} from './DashboardPage';
+} from './DashboardPage'

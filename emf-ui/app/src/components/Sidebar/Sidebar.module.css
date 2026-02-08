@@ -110,8 +110,9 @@
   text-decoration: none;
   text-align: left;
   cursor: pointer;
-  transition: background-color 150ms ease-in-out,
-              color 150ms ease-in-out;
+  transition:
+    background-color 150ms ease-in-out,
+    color 150ms ease-in-out;
 }
 
 .menuItemContent:hover {

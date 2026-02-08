@@ -11,7 +11,7 @@ export {
   ToastContext,
   DEFAULT_DURATION,
   DEFAULT_MAX_TOASTS,
-} from './Toast';
+} from './Toast'
 
 export type {
   ToastType,
@@ -19,4 +19,4 @@ export type {
   ToastProps,
   ToastContextValue,
   ToastProviderProps,
-} from './Toast';
+} from './Toast'

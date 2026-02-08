@@ -8,93 +8,96 @@
  * - A14: Tenant Dashboard UI
  */
 
-import React, { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { useI18n } from '../../context/I18nContext';
-import { useApi } from '../../context/ApiContext';
-import { LoadingSpinner, ErrorMessage } from '../../components';
-import styles from './TenantDashboardPage.module.css';
+import React, { useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { useI18n } from '../../context/I18nContext'
+import { useApi } from '../../context/ApiContext'
+import { LoadingSpinner, ErrorMessage } from '../../components'
+import styles from './TenantDashboardPage.module.css'
 
 /**
  * Governor limits for the current tenant
  */
 interface GovernorLimits {
-  apiCallsPerDay: number;
-  storageGb: number;
-  maxUsers: number;
-  maxCollections: number;
-  maxFieldsPerCollection: number;
-  maxWorkflows: number;
-  maxReports: number;
+  apiCallsPerDay: number
+  storageGb: number
+  maxUsers: number
+  maxCollections: number
+  maxFieldsPerCollection: number
+  maxWorkflows: number
+  maxReports: number
 }
 
 /**
  * Usage statistics for the current tenant
  */
 interface TenantUsage {
-  apiCallsToday: number;
-  storageUsedGb: number;
-  activeUsers: number;
-  collectionsCount: number;
+  apiCallsToday: number
+  storageUsedGb: number
+  activeUsers: number
+  collectionsCount: number
 }
 
 /**
  * Dashboard data from the tenant-scoped API
  */
 interface TenantDashboardData {
-  limits: GovernorLimits;
-  usage: TenantUsage;
+  limits: GovernorLimits
+  usage: TenantUsage
 }
 
 /**
  * Props for TenantDashboardPage component
  */
 export interface TenantDashboardPageProps {
-  testId?: string;
+  testId?: string
 }
 
 /**
  * UsageCard Component — displays a single metric against its limit.
  */
 interface UsageCardProps {
-  title: string;
-  current: number;
-  limit: number;
-  unit?: string;
-  testId?: string;
+  title: string
+  current: number
+  limit: number
+  unit?: string
+  testId?: string
 }
 
-function UsageCard({ title, current, limit, unit = '', testId }: UsageCardProps): React.ReactElement {
-  const percentage = limit > 0 ? Math.min((current / limit) * 100, 100) : 0;
+function UsageCard({
+  title,
+  current,
+  limit,
+  unit = '',
+  testId,
+}: UsageCardProps): React.ReactElement {
+  const percentage = limit > 0 ? Math.min((current / limit) * 100, 100) : 0
 
   const barClass = useMemo(() => {
-    if (percentage >= 90) return styles.barCritical;
-    if (percentage >= 75) return styles.barWarning;
-    return styles.barNormal;
-  }, [percentage]);
+    if (percentage >= 90) return styles.barCritical
+    if (percentage >= 75) return styles.barWarning
+    return styles.barNormal
+  }, [percentage])
 
   return (
     <div className={styles.usageCard} data-testid={testId} role="article" aria-label={title}>
       <h3 className={styles.usageCardTitle}>{title}</h3>
       <div className={styles.usageValues}>
         <span className={styles.usageCurrent}>
-          {current.toLocaleString()}{unit}
+          {current.toLocaleString()}
+          {unit}
         </span>
         <span className={styles.usageLimit}>
-          / {limit.toLocaleString()}{unit}
+          / {limit.toLocaleString()}
+          {unit}
         </span>
       </div>
       <div className={styles.usageBarContainer} aria-hidden="true">
-        <div
-          className={`${styles.usageBar} ${barClass}`}
-          style={{ width: `${percentage}%` }}
-        />
+        <div className={`${styles.usageBar} ${barClass}`} style={{ width: `${percentage}%` }} />
       </div>
-      <span className={styles.usagePercentage}>
-        {percentage.toFixed(1)}% used
-      </span>
+      <span className={styles.usagePercentage}>{percentage.toFixed(1)}% used</span>
     </div>
-  );
+  )
 }
 
 /**
@@ -102,9 +105,11 @@ function UsageCard({ title, current, limit, unit = '', testId }: UsageCardProps)
  *
  * Displays per-tenant usage metrics against governor limits.
  */
-export function TenantDashboardPage({ testId = 'tenant-dashboard-page' }: TenantDashboardPageProps): React.ReactElement {
-  const { t } = useI18n();
-  const { apiClient } = useApi();
+export function TenantDashboardPage({
+  testId = 'tenant-dashboard-page',
+}: TenantDashboardPageProps): React.ReactElement {
+  const { t } = useI18n()
+  const { apiClient } = useApi()
 
   const {
     data: dashboardData,
@@ -115,7 +120,7 @@ export function TenantDashboardPage({ testId = 'tenant-dashboard-page' }: Tenant
     queryKey: ['tenant-dashboard'],
     queryFn: () => apiClient.get<TenantDashboardData>('/control/dashboard'),
     refetchInterval: 60000, // Refresh every minute
-  });
+  })
 
   // Default values when data hasn't loaded yet
   const limits = dashboardData?.limits ?? {
@@ -126,14 +131,14 @@ export function TenantDashboardPage({ testId = 'tenant-dashboard-page' }: Tenant
     maxFieldsPerCollection: 500,
     maxWorkflows: 50,
     maxReports: 200,
-  };
+  }
 
   const usage = dashboardData?.usage ?? {
     apiCallsToday: 0,
     storageUsedGb: 0,
     activeUsers: 0,
     collectionsCount: 0,
-  };
+  }
 
   if (isLoading) {
     return (
@@ -142,7 +147,7 @@ export function TenantDashboardPage({ testId = 'tenant-dashboard-page' }: Tenant
           <LoadingSpinner size="large" label={t('common.loading')} />
         </div>
       </div>
-    );
+    )
   }
 
   if (error) {
@@ -153,7 +158,7 @@ export function TenantDashboardPage({ testId = 'tenant-dashboard-page' }: Tenant
           onRetry={() => refetch()}
         />
       </div>
-    );
+    )
   }
 
   return (
@@ -163,7 +168,9 @@ export function TenantDashboardPage({ testId = 'tenant-dashboard-page' }: Tenant
       </header>
 
       <section className={styles.section} aria-labelledby="usage-heading">
-        <h2 id="usage-heading" className={styles.sectionTitle}>Usage & Limits</h2>
+        <h2 id="usage-heading" className={styles.sectionTitle}>
+          Usage & Limits
+        </h2>
         <div className={styles.usageGrid} data-testid="usage-cards">
           <UsageCard
             title="API Calls Today"
@@ -194,7 +201,9 @@ export function TenantDashboardPage({ testId = 'tenant-dashboard-page' }: Tenant
       </section>
 
       <section className={styles.section} aria-labelledby="limits-heading">
-        <h2 id="limits-heading" className={styles.sectionTitle}>Governor Limits</h2>
+        <h2 id="limits-heading" className={styles.sectionTitle}>
+          Governor Limits
+        </h2>
         <div className={styles.limitsTable}>
           <table className={styles.table} role="grid" aria-label="Governor Limits">
             <thead>
@@ -204,19 +213,40 @@ export function TenantDashboardPage({ testId = 'tenant-dashboard-page' }: Tenant
               </tr>
             </thead>
             <tbody>
-              <tr><td>API Calls / Day</td><td>{limits.apiCallsPerDay.toLocaleString()}</td></tr>
-              <tr><td>Storage</td><td>{limits.storageGb} GB</td></tr>
-              <tr><td>Max Users</td><td>{limits.maxUsers.toLocaleString()}</td></tr>
-              <tr><td>Max Collections</td><td>{limits.maxCollections.toLocaleString()}</td></tr>
-              <tr><td>Max Fields / Collection</td><td>{limits.maxFieldsPerCollection.toLocaleString()}</td></tr>
-              <tr><td>Max Workflows</td><td>{limits.maxWorkflows.toLocaleString()}</td></tr>
-              <tr><td>Max Reports</td><td>{limits.maxReports.toLocaleString()}</td></tr>
+              <tr>
+                <td>API Calls / Day</td>
+                <td>{limits.apiCallsPerDay.toLocaleString()}</td>
+              </tr>
+              <tr>
+                <td>Storage</td>
+                <td>{limits.storageGb} GB</td>
+              </tr>
+              <tr>
+                <td>Max Users</td>
+                <td>{limits.maxUsers.toLocaleString()}</td>
+              </tr>
+              <tr>
+                <td>Max Collections</td>
+                <td>{limits.maxCollections.toLocaleString()}</td>
+              </tr>
+              <tr>
+                <td>Max Fields / Collection</td>
+                <td>{limits.maxFieldsPerCollection.toLocaleString()}</td>
+              </tr>
+              <tr>
+                <td>Max Workflows</td>
+                <td>{limits.maxWorkflows.toLocaleString()}</td>
+              </tr>
+              <tr>
+                <td>Max Reports</td>
+                <td>{limits.maxReports.toLocaleString()}</td>
+              </tr>
             </tbody>
           </table>
         </div>
       </section>
     </div>
-  );
+  )
 }
 
-export default TenantDashboardPage;
+export default TenantDashboardPage

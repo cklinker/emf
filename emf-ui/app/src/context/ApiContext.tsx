@@ -5,19 +5,19 @@
  * Automatically includes Bearer tokens in all requests.
  */
 
-import React, { createContext, useContext, useMemo } from 'react';
-import { ApiClient, createApiClient } from '../services/apiClient';
-import { useAuth } from './AuthContext';
+import React, { createContext, useContext, useMemo } from 'react'
+import { ApiClient, createApiClient } from '../services/apiClient'
+import { useAuth } from './AuthContext'
 
 interface ApiContextValue {
-  apiClient: ApiClient;
+  apiClient: ApiClient
 }
 
-const ApiContext = createContext<ApiContextValue | undefined>(undefined);
+const ApiContext = createContext<ApiContextValue | undefined>(undefined)
 
 export interface ApiProviderProps {
-  children: React.ReactNode;
-  baseUrl?: string;
+  children: React.ReactNode
+  baseUrl?: string
 }
 
 /**
@@ -26,7 +26,7 @@ export interface ApiProviderProps {
  * Wraps the application to provide an authenticated API client.
  */
 export function ApiProvider({ children, baseUrl = '' }: ApiProviderProps): React.ReactElement {
-  const { getAccessToken, login } = useAuth();
+  const { getAccessToken, login } = useAuth()
 
   const apiClient = useMemo(
     () =>
@@ -35,21 +35,21 @@ export function ApiProvider({ children, baseUrl = '' }: ApiProviderProps): React
         getAccessToken,
         onUnauthorized: () => {
           // On 401, trigger re-authentication
-          console.warn('[API] Received 401 Unauthorized, triggering re-authentication');
-          login();
+          console.warn('[API] Received 401 Unauthorized, triggering re-authentication')
+          login()
         },
       }),
     [baseUrl, getAccessToken, login]
-  );
+  )
 
   const contextValue = useMemo<ApiContextValue>(
     () => ({
       apiClient,
     }),
     [apiClient]
-  );
+  )
 
-  return <ApiContext.Provider value={contextValue}>{children}</ApiContext.Provider>;
+  return <ApiContext.Provider value={contextValue}>{children}</ApiContext.Provider>
 }
 
 /**
@@ -58,9 +58,9 @@ export function ApiProvider({ children, baseUrl = '' }: ApiProviderProps): React
  * @throws Error if used outside of ApiProvider
  */
 export function useApi(): ApiContextValue {
-  const context = useContext(ApiContext);
+  const context = useContext(ApiContext)
   if (context === undefined) {
-    throw new Error('useApi must be used within an ApiProvider');
+    throw new Error('useApi must be used within an ApiProvider')
   }
-  return context;
+  return context
 }

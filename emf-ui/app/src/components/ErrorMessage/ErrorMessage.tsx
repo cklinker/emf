@@ -18,40 +18,40 @@
  * - Reduced motion support
  */
 
-import React, { useMemo } from 'react';
-import { useI18n } from '../../context/I18nContext';
-import styles from './ErrorMessage.module.css';
+import React, { useMemo } from 'react'
+import { useI18n } from '../../context/I18nContext'
+import styles from './ErrorMessage.module.css'
 
 /**
  * Error type variants
  */
-export type ErrorType = 'network' | 'validation' | 'generic' | 'notFound' | 'forbidden' | 'server';
+export type ErrorType = 'network' | 'validation' | 'generic' | 'notFound' | 'forbidden' | 'server'
 
 /**
  * Display variant for the error message
  */
-export type ErrorVariant = 'default' | 'compact' | 'inline';
+export type ErrorVariant = 'default' | 'compact' | 'inline'
 
 /**
  * Props for the ErrorMessage component
  */
 export interface ErrorMessageProps {
   /** Error to display - can be an Error object or a string message */
-  error: Error | string;
+  error: Error | string
   /** Optional callback when retry button is clicked */
-  onRetry?: () => void;
+  onRetry?: () => void
   /** Type of error (affects styling and default message) */
-  type?: ErrorType;
+  type?: ErrorType
   /** Display variant */
-  variant?: ErrorVariant;
+  variant?: ErrorVariant
   /** Optional custom class name for additional styling */
-  className?: string;
+  className?: string
   /** Optional test ID for testing purposes */
-  'data-testid'?: string;
+  'data-testid'?: string
   /** Optional custom title for the error */
-  title?: string;
+  title?: string
   /** Whether to show the error icon */
-  showIcon?: boolean;
+  showIcon?: boolean
 }
 
 /**
@@ -59,17 +59,17 @@ export interface ErrorMessageProps {
  */
 function getErrorMessage(error: Error | string): string {
   if (typeof error === 'string') {
-    return error;
+    return error
   }
-  return error.message || 'An unknown error occurred';
+  return error.message || 'An unknown error occurred'
 }
 
 /**
  * Detect error type from error object
  */
 function detectErrorType(error: Error | string): ErrorType {
-  const message = getErrorMessage(error).toLowerCase();
-  
+  const message = getErrorMessage(error).toLowerCase()
+
   // Check for network-related errors
   if (
     message.includes('network') ||
@@ -78,23 +78,23 @@ function detectErrorType(error: Error | string): ErrorType {
     message.includes('fetch') ||
     message.includes('offline')
   ) {
-    return 'network';
+    return 'network'
   }
-  
+
   // Check for validation errors
   if (
     message.includes('validation') ||
     message.includes('invalid') ||
     message.includes('required')
   ) {
-    return 'validation';
+    return 'validation'
   }
-  
+
   // Check for not found errors
   if (message.includes('not found') || message.includes('404')) {
-    return 'notFound';
+    return 'notFound'
   }
-  
+
   // Check for forbidden/unauthorized errors
   if (
     message.includes('forbidden') ||
@@ -103,15 +103,15 @@ function detectErrorType(error: Error | string): ErrorType {
     message.includes('403') ||
     message.includes('401')
   ) {
-    return 'forbidden';
+    return 'forbidden'
   }
-  
+
   // Check for server errors
   if (message.includes('server') || message.includes('500')) {
-    return 'server';
+    return 'server'
   }
-  
-  return 'generic';
+
+  return 'generic'
 }
 
 /**
@@ -120,18 +120,18 @@ function detectErrorType(error: Error | string): ErrorType {
 function getErrorIcon(type: ErrorType): string {
   switch (type) {
     case 'network':
-      return '⚡'; // Lightning bolt for network issues
+      return '⚡' // Lightning bolt for network issues
     case 'validation':
-      return '⚠'; // Warning for validation
+      return '⚠' // Warning for validation
     case 'notFound':
-      return '🔍'; // Magnifying glass for not found
+      return '🔍' // Magnifying glass for not found
     case 'forbidden':
-      return '🔒'; // Lock for forbidden
+      return '🔒' // Lock for forbidden
     case 'server':
-      return '🖥'; // Computer for server errors
+      return '🖥' // Computer for server errors
     case 'generic':
     default:
-      return '✕'; // X for generic errors
+      return '✕' // X for generic errors
   }
 }
 
@@ -173,52 +173,49 @@ export function ErrorMessage({
   title,
   showIcon = true,
 }: ErrorMessageProps): React.ReactElement {
-  const { t } = useI18n();
-  
+  const { t } = useI18n()
+
   // Get the error message
-  const message = useMemo(() => getErrorMessage(error), [error]);
-  
+  const message = useMemo(() => getErrorMessage(error), [error])
+
   // Detect or use provided error type
-  const errorType = useMemo(() => type || detectErrorType(error), [type, error]);
-  
+  const errorType = useMemo(() => type || detectErrorType(error), [type, error])
+
   // Get the icon for this error type
-  const icon = useMemo(() => getErrorIcon(errorType), [errorType]);
-  
+  const icon = useMemo(() => getErrorIcon(errorType), [errorType])
+
   // Get the default title based on error type
   const displayTitle = useMemo(() => {
-    if (title) return title;
-    
+    if (title) return title
+
     switch (errorType) {
       case 'network':
-        return t('errors.network');
+        return t('errors.network')
       case 'validation':
-        return t('errors.validation');
+        return t('errors.validation')
       case 'notFound':
-        return t('errors.notFound');
+        return t('errors.notFound')
       case 'forbidden':
-        return t('errors.forbidden');
+        return t('errors.forbidden')
       case 'server':
-        return t('errors.serverError');
+        return t('errors.serverError')
       case 'generic':
       default:
-        return t('common.error');
+        return t('common.error')
     }
-  }, [title, errorType, t]);
-  
+  }, [title, errorType, t])
+
   // Determine if retry should be shown (typically for network/server errors)
   const showRetry = useMemo(() => {
-    if (!onRetry) return false;
+    if (!onRetry) return false
     // Show retry for network and server errors by default
-    return errorType === 'network' || errorType === 'server' || errorType === 'generic';
-  }, [onRetry, errorType]);
-  
+    return errorType === 'network' || errorType === 'server' || errorType === 'generic'
+  }, [onRetry, errorType])
+
   // Combine class names
-  const containerClasses = [
-    styles.container,
-    styles[variant],
-    styles[errorType],
-    className,
-  ].filter(Boolean).join(' ');
+  const containerClasses = [styles.container, styles[variant], styles[errorType], className]
+    .filter(Boolean)
+    .join(' ')
 
   return (
     <div
@@ -231,15 +228,11 @@ export function ErrorMessage({
     >
       {/* Error icon */}
       {showIcon && (
-        <span
-          className={styles.icon}
-          aria-hidden="true"
-          data-testid={`${testId}-icon`}
-        >
+        <span className={styles.icon} aria-hidden="true" data-testid={`${testId}-icon`}>
           {icon}
         </span>
       )}
-      
+
       {/* Error content */}
       <div className={styles.content}>
         {/* Title (only shown in default variant) */}
@@ -248,13 +241,13 @@ export function ErrorMessage({
             {displayTitle}
           </h3>
         )}
-        
+
         {/* Error message */}
         <p className={styles.message} data-testid={`${testId}-message`}>
           {message}
         </p>
       </div>
-      
+
       {/* Retry button */}
       {showRetry && onRetry && (
         <button
@@ -271,8 +264,8 @@ export function ErrorMessage({
         </button>
       )}
     </div>
-  );
+  )
 }
 
 // Export default for convenience
-export default ErrorMessage;
+export default ErrorMessage

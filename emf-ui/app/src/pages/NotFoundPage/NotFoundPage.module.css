@@ -91,7 +91,9 @@
   font-size: var(--font-size-md, 1rem);
   font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.2s, border-color 0.2s;
+  transition:
+    background-color 0.2s,
+    border-color 0.2s;
 }
 
 .secondaryButton:hover {

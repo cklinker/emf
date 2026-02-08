@@ -12,37 +12,37 @@
  * - 5.5: Delete role with confirmation dialog
  */
 
-import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useI18n } from '../../context/I18nContext';
-import { useApi } from '../../context/ApiContext';
-import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components';
-import styles from './RolesPage.module.css';
+import React, { useState, useCallback, useEffect, useRef } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useI18n } from '../../context/I18nContext'
+import { useApi } from '../../context/ApiContext'
+import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
+import styles from './RolesPage.module.css'
 
 /**
  * Role interface matching the API response
  */
 export interface Role {
-  id: string;
-  name: string;
-  description?: string;
-  createdAt: string;
+  id: string
+  name: string
+  description?: string
+  createdAt: string
 }
 
 /**
  * Form data for creating/editing a role
  */
 interface RoleFormData {
-  name: string;
-  description: string;
+  name: string
+  description: string
 }
 
 /**
  * Form validation errors
  */
 interface FormErrors {
-  name?: string;
-  description?: string;
+  name?: string
+  description?: string
 }
 
 /**
@@ -50,30 +50,30 @@ interface FormErrors {
  */
 export interface RolesPageProps {
   /** Optional test ID for testing */
-  testId?: string;
+  testId?: string
 }
 
 /**
  * Validate role form data
  */
 function validateForm(data: RoleFormData, t: (key: string) => string): FormErrors {
-  const errors: FormErrors = {};
+  const errors: FormErrors = {}
 
   // Name validation
   if (!data.name.trim()) {
-    errors.name = t('roles.validation.nameRequired');
+    errors.name = t('roles.validation.nameRequired')
   } else if (data.name.length > 50) {
-    errors.name = t('roles.validation.nameTooLong');
+    errors.name = t('roles.validation.nameTooLong')
   } else if (!/^[a-z][a-z0-9_]*$/.test(data.name)) {
-    errors.name = t('roles.validation.nameFormat');
+    errors.name = t('roles.validation.nameFormat')
   }
 
   // Description validation (optional but has max length)
   if (data.description && data.description.length > 500) {
-    errors.description = t('roles.validation.descriptionTooLong');
+    errors.description = t('roles.validation.descriptionTooLong')
   }
 
-  return errors;
+  return errors
 }
 
 /**
@@ -82,66 +82,78 @@ function validateForm(data: RoleFormData, t: (key: string) => string): FormError
  * Modal form for creating and editing roles.
  */
 interface RoleFormProps {
-  role?: Role;
-  onSubmit: (data: RoleFormData) => void;
-  onCancel: () => void;
-  isSubmitting: boolean;
+  role?: Role
+  onSubmit: (data: RoleFormData) => void
+  onCancel: () => void
+  isSubmitting: boolean
 }
 
 function RoleForm({ role, onSubmit, onCancel, isSubmitting }: RoleFormProps): React.ReactElement {
-  const { t } = useI18n();
+  const { t } = useI18n()
   const [formData, setFormData] = useState<RoleFormData>({
     name: role?.name ?? '',
     description: role?.description ?? '',
-  });
-  const [errors, setErrors] = useState<FormErrors>({});
-  const [touched, setTouched] = useState<Record<string, boolean>>({});
-  const nameInputRef = useRef<HTMLInputElement>(null);
+  })
+  const [errors, setErrors] = useState<FormErrors>({})
+  const [touched, setTouched] = useState<Record<string, boolean>>({})
+  const nameInputRef = useRef<HTMLInputElement>(null)
 
   // Focus name input on mount
   useEffect(() => {
-    nameInputRef.current?.focus();
-  }, []);
+    nameInputRef.current?.focus()
+  }, [])
 
-  const handleChange = useCallback((field: keyof RoleFormData, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-    // Clear error when user starts typing
-    if (errors[field]) {
-      setErrors((prev) => ({ ...prev, [field]: undefined }));
-    }
-  }, [errors]);
+  const handleChange = useCallback(
+    (field: keyof RoleFormData, value: string) => {
+      setFormData((prev) => ({ ...prev, [field]: value }))
+      // Clear error when user starts typing
+      if (errors[field]) {
+        setErrors((prev) => ({ ...prev, [field]: undefined }))
+      }
+    },
+    [errors]
+  )
 
-  const handleBlur = useCallback((field: keyof RoleFormData) => {
-    setTouched((prev) => ({ ...prev, [field]: true }));
-    // Validate on blur
-    const validationErrors = validateForm(formData, t);
-    if (validationErrors[field]) {
-      setErrors((prev) => ({ ...prev, [field]: validationErrors[field] }));
-    }
-  }, [formData, t]);
+  const handleBlur = useCallback(
+    (field: keyof RoleFormData) => {
+      setTouched((prev) => ({ ...prev, [field]: true }))
+      // Validate on blur
+      const validationErrors = validateForm(formData, t)
+      if (validationErrors[field]) {
+        setErrors((prev) => ({ ...prev, [field]: validationErrors[field] }))
+      }
+    },
+    [formData, t]
+  )
 
-  const handleSubmit = useCallback((e: React.FormEvent) => {
-    e.preventDefault();
-    
-    // Validate all fields
-    const validationErrors = validateForm(formData, t);
-    setErrors(validationErrors);
-    setTouched({ name: true, description: true });
+  const handleSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault()
 
-    // If no errors, submit
-    if (Object.keys(validationErrors).length === 0) {
-      onSubmit(formData);
-    }
-  }, [formData, onSubmit, t]);
+      // Validate all fields
+      const validationErrors = validateForm(formData, t)
+      setErrors(validationErrors)
+      setTouched({ name: true, description: true })
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      onCancel();
-    }
-  }, [onCancel]);
+      // If no errors, submit
+      if (Object.keys(validationErrors).length === 0) {
+        onSubmit(formData)
+      }
+    },
+    [formData, onSubmit, t]
+  )
 
-  const isEditing = !!role;
-  const title = isEditing ? t('authorization.editRole') : t('authorization.createRole');
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onCancel()
+      }
+    },
+    [onCancel]
+  )
+
+  const isEditing = !!role
+  const title = isEditing ? t('authorization.editRole') : t('authorization.createRole')
 
   return (
     <div
@@ -178,7 +190,9 @@ function RoleForm({ role, onSubmit, onCancel, isSubmitting }: RoleFormProps): Re
             <div className={styles.formGroup}>
               <label htmlFor="role-name" className={styles.formLabel}>
                 {t('authorization.roleName')}
-                <span className={styles.required} aria-hidden="true">*</span>
+                <span className={styles.required} aria-hidden="true">
+                  *
+                </span>
               </label>
               <input
                 ref={nameInputRef}
@@ -250,7 +264,7 @@ function RoleForm({ role, onSubmit, onCancel, isSubmitting }: RoleFormProps): Re
         </div>
       </div>
     </div>
-  );
+  )
 }
 
 /**
@@ -260,18 +274,18 @@ function RoleForm({ role, onSubmit, onCancel, isSubmitting }: RoleFormProps): Re
  * Provides listing and CRUD operations for roles.
  */
 export function RolesPage({ testId = 'roles-page' }: RolesPageProps): React.ReactElement {
-  const queryClient = useQueryClient();
-  const { t, formatDate } = useI18n();
-  const { apiClient } = useApi();
-  const { showToast } = useToast();
+  const queryClient = useQueryClient()
+  const { t, formatDate } = useI18n()
+  const { apiClient } = useApi()
+  const { showToast } = useToast()
 
   // Modal state
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingRole, setEditingRole] = useState<Role | undefined>(undefined);
+  const [isFormOpen, setIsFormOpen] = useState(false)
+  const [editingRole, setEditingRole] = useState<Role | undefined>(undefined)
 
   // Delete confirmation dialog state
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [roleToDelete, setRoleToDelete] = useState<Role | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [roleToDelete, setRoleToDelete] = useState<Role | null>(null)
 
   // Fetch roles query
   const {
@@ -282,94 +296,97 @@ export function RolesPage({ testId = 'roles-page' }: RolesPageProps): React.Reac
   } = useQuery({
     queryKey: ['roles'],
     queryFn: () => apiClient.get<Role[]>('/control/roles'),
-  });
+  })
 
   // Create mutation
   const createMutation = useMutation({
     mutationFn: (data: RoleFormData) => apiClient.post<Role>('/control/roles', data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['roles'] });
-      showToast(t('success.created', { item: t('navigation.roles') }), 'success');
-      handleCloseForm();
+      queryClient.invalidateQueries({ queryKey: ['roles'] })
+      showToast(t('success.created', { item: t('navigation.roles') }), 'success')
+      handleCloseForm()
     },
     onError: (error: Error) => {
-      showToast(error.message || t('errors.generic'), 'error');
+      showToast(error.message || t('errors.generic'), 'error')
     },
-  });
+  })
 
   // Update mutation
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: RoleFormData }) => 
+    mutationFn: ({ id, data }: { id: string; data: RoleFormData }) =>
       apiClient.put<Role>(`/control/roles/${id}`, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['roles'] });
-      showToast(t('success.updated', { item: t('navigation.roles') }), 'success');
-      handleCloseForm();
+      queryClient.invalidateQueries({ queryKey: ['roles'] })
+      showToast(t('success.updated', { item: t('navigation.roles') }), 'success')
+      handleCloseForm()
     },
     onError: (error: Error) => {
-      showToast(error.message || t('errors.generic'), 'error');
+      showToast(error.message || t('errors.generic'), 'error')
     },
-  });
+  })
 
   // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: (id: string) => apiClient.delete(`/control/roles/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['roles'] });
-      showToast(t('success.deleted', { item: t('navigation.roles') }), 'success');
-      setDeleteDialogOpen(false);
-      setRoleToDelete(null);
+      queryClient.invalidateQueries({ queryKey: ['roles'] })
+      showToast(t('success.deleted', { item: t('navigation.roles') }), 'success')
+      setDeleteDialogOpen(false)
+      setRoleToDelete(null)
     },
     onError: (error: Error) => {
-      showToast(error.message || t('errors.generic'), 'error');
+      showToast(error.message || t('errors.generic'), 'error')
     },
-  });
+  })
 
   // Handle create action
   const handleCreate = useCallback(() => {
-    setEditingRole(undefined);
-    setIsFormOpen(true);
-  }, []);
+    setEditingRole(undefined)
+    setIsFormOpen(true)
+  }, [])
 
   // Handle edit action
   const handleEdit = useCallback((role: Role) => {
-    setEditingRole(role);
-    setIsFormOpen(true);
-  }, []);
+    setEditingRole(role)
+    setIsFormOpen(true)
+  }, [])
 
   // Handle close form
   const handleCloseForm = useCallback(() => {
-    setIsFormOpen(false);
-    setEditingRole(undefined);
-  }, []);
+    setIsFormOpen(false)
+    setEditingRole(undefined)
+  }, [])
 
   // Handle form submit
-  const handleFormSubmit = useCallback((data: RoleFormData) => {
-    if (editingRole) {
-      updateMutation.mutate({ id: editingRole.id, data });
-    } else {
-      createMutation.mutate(data);
-    }
-  }, [editingRole, createMutation, updateMutation]);
+  const handleFormSubmit = useCallback(
+    (data: RoleFormData) => {
+      if (editingRole) {
+        updateMutation.mutate({ id: editingRole.id, data })
+      } else {
+        createMutation.mutate(data)
+      }
+    },
+    [editingRole, createMutation, updateMutation]
+  )
 
   // Handle delete action - open confirmation dialog
   const handleDeleteClick = useCallback((role: Role) => {
-    setRoleToDelete(role);
-    setDeleteDialogOpen(true);
-  }, []);
+    setRoleToDelete(role)
+    setDeleteDialogOpen(true)
+  }, [])
 
   // Handle delete confirmation
   const handleDeleteConfirm = useCallback(() => {
     if (roleToDelete) {
-      deleteMutation.mutate(roleToDelete.id);
+      deleteMutation.mutate(roleToDelete.id)
     }
-  }, [roleToDelete, deleteMutation]);
+  }, [roleToDelete, deleteMutation])
 
   // Handle delete cancel
   const handleDeleteCancel = useCallback(() => {
-    setDeleteDialogOpen(false);
-    setRoleToDelete(null);
-  }, []);
+    setDeleteDialogOpen(false)
+    setRoleToDelete(null)
+  }, [])
 
   // Render loading state
   if (isLoading) {
@@ -379,7 +396,7 @@ export function RolesPage({ testId = 'roles-page' }: RolesPageProps): React.Reac
           <LoadingSpinner size="large" label={t('common.loading')} />
         </div>
       </div>
-    );
+    )
   }
 
   // Render error state
@@ -391,10 +408,10 @@ export function RolesPage({ testId = 'roles-page' }: RolesPageProps): React.Reac
           onRetry={() => refetch()}
         />
       </div>
-    );
+    )
   }
 
-  const isSubmitting = createMutation.isPending || updateMutation.isPending;
+  const isSubmitting = createMutation.isPending || updateMutation.isPending
 
   return (
     <div className={styles.container} data-testid={testId}>
@@ -513,7 +530,7 @@ export function RolesPage({ testId = 'roles-page' }: RolesPageProps): React.Reac
         variant="danger"
       />
     </div>
-  );
+  )
 }
 
-export default RolesPage;
+export default RolesPage

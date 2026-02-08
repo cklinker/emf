@@ -10,40 +10,40 @@
  * - 5.8: Edit and delete policy actions
  */
 
-import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useI18n } from '../../context/I18nContext';
-import { useApi } from '../../context/ApiContext';
-import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components';
-import styles from './PoliciesPage.module.css';
+import React, { useState, useCallback, useEffect, useRef } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useI18n } from '../../context/I18nContext'
+import { useApi } from '../../context/ApiContext'
+import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
+import styles from './PoliciesPage.module.css'
 
 /**
  * Policy interface matching the API response
  */
 export interface Policy {
-  id: string;
-  name: string;
-  description?: string;
-  expression: string;
-  createdAt: string;
+  id: string
+  name: string
+  description?: string
+  expression: string
+  createdAt: string
 }
 
 /**
  * Form data for creating/editing a policy
  */
 interface PolicyFormData {
-  name: string;
-  description: string;
-  expression: string;
+  name: string
+  description: string
+  expression: string
 }
 
 /**
  * Form validation errors
  */
 interface FormErrors {
-  name?: string;
-  description?: string;
-  expression?: string;
+  name?: string
+  description?: string
+  expression?: string
 }
 
 /**
@@ -51,37 +51,37 @@ interface FormErrors {
  */
 export interface PoliciesPageProps {
   /** Optional test ID for testing */
-  testId?: string;
+  testId?: string
 }
 
 /**
  * Validate policy form data
  */
 function validateForm(data: PolicyFormData, t: (key: string) => string): FormErrors {
-  const errors: FormErrors = {};
+  const errors: FormErrors = {}
 
   // Name validation
   if (!data.name.trim()) {
-    errors.name = t('policies.validation.nameRequired');
+    errors.name = t('policies.validation.nameRequired')
   } else if (data.name.length > 50) {
-    errors.name = t('policies.validation.nameTooLong');
+    errors.name = t('policies.validation.nameTooLong')
   } else if (!/^[a-z][a-z0-9_]*$/.test(data.name)) {
-    errors.name = t('policies.validation.nameFormat');
+    errors.name = t('policies.validation.nameFormat')
   }
 
   // Description validation (optional but has max length)
   if (data.description && data.description.length > 500) {
-    errors.description = t('policies.validation.descriptionTooLong');
+    errors.description = t('policies.validation.descriptionTooLong')
   }
 
   // Expression validation
   if (!data.expression.trim()) {
-    errors.expression = t('policies.validation.expressionRequired');
+    errors.expression = t('policies.validation.expressionRequired')
   } else if (data.expression.length > 2000) {
-    errors.expression = t('policies.validation.expressionTooLong');
+    errors.expression = t('policies.validation.expressionTooLong')
   }
 
-  return errors;
+  return errors
 }
 
 /**
@@ -90,67 +90,84 @@ function validateForm(data: PolicyFormData, t: (key: string) => string): FormErr
  * Modal form for creating and editing policies.
  */
 interface PolicyFormProps {
-  policy?: Policy;
-  onSubmit: (data: PolicyFormData) => void;
-  onCancel: () => void;
-  isSubmitting: boolean;
+  policy?: Policy
+  onSubmit: (data: PolicyFormData) => void
+  onCancel: () => void
+  isSubmitting: boolean
 }
 
-function PolicyForm({ policy, onSubmit, onCancel, isSubmitting }: PolicyFormProps): React.ReactElement {
-  const { t } = useI18n();
+function PolicyForm({
+  policy,
+  onSubmit,
+  onCancel,
+  isSubmitting,
+}: PolicyFormProps): React.ReactElement {
+  const { t } = useI18n()
   const [formData, setFormData] = useState<PolicyFormData>({
     name: policy?.name ?? '',
     description: policy?.description ?? '',
     expression: policy?.expression ?? '',
-  });
-  const [errors, setErrors] = useState<FormErrors>({});
-  const [touched, setTouched] = useState<Record<string, boolean>>({});
-  const nameInputRef = useRef<HTMLInputElement>(null);
+  })
+  const [errors, setErrors] = useState<FormErrors>({})
+  const [touched, setTouched] = useState<Record<string, boolean>>({})
+  const nameInputRef = useRef<HTMLInputElement>(null)
 
   // Focus name input on mount
   useEffect(() => {
-    nameInputRef.current?.focus();
-  }, []);
+    nameInputRef.current?.focus()
+  }, [])
 
-  const handleChange = useCallback((field: keyof PolicyFormData, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-    // Clear error when user starts typing
-    if (errors[field]) {
-      setErrors((prev) => ({ ...prev, [field]: undefined }));
-    }
-  }, [errors]);
+  const handleChange = useCallback(
+    (field: keyof PolicyFormData, value: string) => {
+      setFormData((prev) => ({ ...prev, [field]: value }))
+      // Clear error when user starts typing
+      if (errors[field]) {
+        setErrors((prev) => ({ ...prev, [field]: undefined }))
+      }
+    },
+    [errors]
+  )
 
-  const handleBlur = useCallback((field: keyof PolicyFormData) => {
-    setTouched((prev) => ({ ...prev, [field]: true }));
-    // Validate on blur
-    const validationErrors = validateForm(formData, t);
-    if (validationErrors[field]) {
-      setErrors((prev) => ({ ...prev, [field]: validationErrors[field] }));
-    }
-  }, [formData, t]);
+  const handleBlur = useCallback(
+    (field: keyof PolicyFormData) => {
+      setTouched((prev) => ({ ...prev, [field]: true }))
+      // Validate on blur
+      const validationErrors = validateForm(formData, t)
+      if (validationErrors[field]) {
+        setErrors((prev) => ({ ...prev, [field]: validationErrors[field] }))
+      }
+    },
+    [formData, t]
+  )
 
-  const handleSubmit = useCallback((e: React.FormEvent) => {
-    e.preventDefault();
-    
-    // Validate all fields
-    const validationErrors = validateForm(formData, t);
-    setErrors(validationErrors);
-    setTouched({ name: true, description: true, expression: true });
+  const handleSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault()
 
-    // If no errors, submit
-    if (Object.keys(validationErrors).length === 0) {
-      onSubmit(formData);
-    }
-  }, [formData, onSubmit, t]);
+      // Validate all fields
+      const validationErrors = validateForm(formData, t)
+      setErrors(validationErrors)
+      setTouched({ name: true, description: true, expression: true })
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      onCancel();
-    }
-  }, [onCancel]);
+      // If no errors, submit
+      if (Object.keys(validationErrors).length === 0) {
+        onSubmit(formData)
+      }
+    },
+    [formData, onSubmit, t]
+  )
 
-  const isEditing = !!policy;
-  const title = isEditing ? t('authorization.editPolicy') : t('authorization.createPolicy');
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onCancel()
+      }
+    },
+    [onCancel]
+  )
+
+  const isEditing = !!policy
+  const title = isEditing ? t('authorization.editPolicy') : t('authorization.createPolicy')
 
   return (
     <div
@@ -187,7 +204,9 @@ function PolicyForm({ policy, onSubmit, onCancel, isSubmitting }: PolicyFormProp
             <div className={styles.formGroup}>
               <label htmlFor="policy-name" className={styles.formLabel}>
                 {t('authorization.policyName')}
-                <span className={styles.required} aria-hidden="true">*</span>
+                <span className={styles.required} aria-hidden="true">
+                  *
+                </span>
               </label>
               <input
                 ref={nameInputRef}
@@ -239,7 +258,9 @@ function PolicyForm({ policy, onSubmit, onCancel, isSubmitting }: PolicyFormProp
             <div className={styles.formGroup}>
               <label htmlFor="policy-expression" className={styles.formLabel}>
                 {t('policies.expression')}
-                <span className={styles.required} aria-hidden="true">*</span>
+                <span className={styles.required} aria-hidden="true">
+                  *
+                </span>
               </label>
               <textarea
                 id="policy-expression"
@@ -250,7 +271,9 @@ function PolicyForm({ policy, onSubmit, onCancel, isSubmitting }: PolicyFormProp
                 placeholder={t('policies.expressionPlaceholder')}
                 aria-required="true"
                 aria-invalid={touched.expression && !!errors.expression}
-                aria-describedby={errors.expression ? 'policy-expression-error' : 'policy-expression-hint'}
+                aria-describedby={
+                  errors.expression ? 'policy-expression-error' : 'policy-expression-hint'
+                }
                 disabled={isSubmitting}
                 data-testid="policy-expression-input"
               />
@@ -288,7 +311,7 @@ function PolicyForm({ policy, onSubmit, onCancel, isSubmitting }: PolicyFormProp
         </div>
       </div>
     </div>
-  );
+  )
 }
 
 /**
@@ -298,18 +321,18 @@ function PolicyForm({ policy, onSubmit, onCancel, isSubmitting }: PolicyFormProp
  * Provides listing and CRUD operations for policies.
  */
 export function PoliciesPage({ testId = 'policies-page' }: PoliciesPageProps): React.ReactElement {
-  const queryClient = useQueryClient();
-  const { t, formatDate } = useI18n();
-  const { apiClient } = useApi();
-  const { showToast } = useToast();
+  const queryClient = useQueryClient()
+  const { t, formatDate } = useI18n()
+  const { apiClient } = useApi()
+  const { showToast } = useToast()
 
   // Modal state
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingPolicy, setEditingPolicy] = useState<Policy | undefined>(undefined);
+  const [isFormOpen, setIsFormOpen] = useState(false)
+  const [editingPolicy, setEditingPolicy] = useState<Policy | undefined>(undefined)
 
   // Delete confirmation dialog state
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [policyToDelete, setPolicyToDelete] = useState<Policy | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [policyToDelete, setPolicyToDelete] = useState<Policy | null>(null)
 
   // Fetch policies query
   const {
@@ -320,94 +343,97 @@ export function PoliciesPage({ testId = 'policies-page' }: PoliciesPageProps): R
   } = useQuery({
     queryKey: ['policies'],
     queryFn: () => apiClient.get<Policy[]>('/control/policies'),
-  });
+  })
 
   // Create mutation
   const createMutation = useMutation({
     mutationFn: (data: PolicyFormData) => apiClient.post<Policy>('/control/policies', data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['policies'] });
-      showToast(t('success.created', { item: t('navigation.policies') }), 'success');
-      handleCloseForm();
+      queryClient.invalidateQueries({ queryKey: ['policies'] })
+      showToast(t('success.created', { item: t('navigation.policies') }), 'success')
+      handleCloseForm()
     },
     onError: (error: Error) => {
-      showToast(error.message || t('errors.generic'), 'error');
+      showToast(error.message || t('errors.generic'), 'error')
     },
-  });
+  })
 
   // Update mutation
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: PolicyFormData }) => 
+    mutationFn: ({ id, data }: { id: string; data: PolicyFormData }) =>
       apiClient.put<Policy>(`/control/policies/${id}`, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['policies'] });
-      showToast(t('success.updated', { item: t('navigation.policies') }), 'success');
-      handleCloseForm();
+      queryClient.invalidateQueries({ queryKey: ['policies'] })
+      showToast(t('success.updated', { item: t('navigation.policies') }), 'success')
+      handleCloseForm()
     },
     onError: (error: Error) => {
-      showToast(error.message || t('errors.generic'), 'error');
+      showToast(error.message || t('errors.generic'), 'error')
     },
-  });
+  })
 
   // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: (id: string) => apiClient.delete(`/control/policies/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['policies'] });
-      showToast(t('success.deleted', { item: t('navigation.policies') }), 'success');
-      setDeleteDialogOpen(false);
-      setPolicyToDelete(null);
+      queryClient.invalidateQueries({ queryKey: ['policies'] })
+      showToast(t('success.deleted', { item: t('navigation.policies') }), 'success')
+      setDeleteDialogOpen(false)
+      setPolicyToDelete(null)
     },
     onError: (error: Error) => {
-      showToast(error.message || t('errors.generic'), 'error');
+      showToast(error.message || t('errors.generic'), 'error')
     },
-  });
+  })
 
   // Handle create action
   const handleCreate = useCallback(() => {
-    setEditingPolicy(undefined);
-    setIsFormOpen(true);
-  }, []);
+    setEditingPolicy(undefined)
+    setIsFormOpen(true)
+  }, [])
 
   // Handle edit action
   const handleEdit = useCallback((policy: Policy) => {
-    setEditingPolicy(policy);
-    setIsFormOpen(true);
-  }, []);
+    setEditingPolicy(policy)
+    setIsFormOpen(true)
+  }, [])
 
   // Handle close form
   const handleCloseForm = useCallback(() => {
-    setIsFormOpen(false);
-    setEditingPolicy(undefined);
-  }, []);
+    setIsFormOpen(false)
+    setEditingPolicy(undefined)
+  }, [])
 
   // Handle form submit
-  const handleFormSubmit = useCallback((data: PolicyFormData) => {
-    if (editingPolicy) {
-      updateMutation.mutate({ id: editingPolicy.id, data });
-    } else {
-      createMutation.mutate(data);
-    }
-  }, [editingPolicy, createMutation, updateMutation]);
+  const handleFormSubmit = useCallback(
+    (data: PolicyFormData) => {
+      if (editingPolicy) {
+        updateMutation.mutate({ id: editingPolicy.id, data })
+      } else {
+        createMutation.mutate(data)
+      }
+    },
+    [editingPolicy, createMutation, updateMutation]
+  )
 
   // Handle delete action - open confirmation dialog
   const handleDeleteClick = useCallback((policy: Policy) => {
-    setPolicyToDelete(policy);
-    setDeleteDialogOpen(true);
-  }, []);
+    setPolicyToDelete(policy)
+    setDeleteDialogOpen(true)
+  }, [])
 
   // Handle delete confirmation
   const handleDeleteConfirm = useCallback(() => {
     if (policyToDelete) {
-      deleteMutation.mutate(policyToDelete.id);
+      deleteMutation.mutate(policyToDelete.id)
     }
-  }, [policyToDelete, deleteMutation]);
+  }, [policyToDelete, deleteMutation])
 
   // Handle delete cancel
   const handleDeleteCancel = useCallback(() => {
-    setDeleteDialogOpen(false);
-    setPolicyToDelete(null);
-  }, []);
+    setDeleteDialogOpen(false)
+    setPolicyToDelete(null)
+  }, [])
 
   // Render loading state
   if (isLoading) {
@@ -417,7 +443,7 @@ export function PoliciesPage({ testId = 'policies-page' }: PoliciesPageProps): R
           <LoadingSpinner size="large" label={t('common.loading')} />
         </div>
       </div>
-    );
+    )
   }
 
   // Render error state
@@ -429,10 +455,10 @@ export function PoliciesPage({ testId = 'policies-page' }: PoliciesPageProps): R
           onRetry={() => refetch()}
         />
       </div>
-    );
+    )
   }
 
-  const isSubmitting = createMutation.isPending || updateMutation.isPending;
+  const isSubmitting = createMutation.isPending || updateMutation.isPending
 
   return (
     <div className={styles.container} data-testid={testId}>
@@ -557,7 +583,7 @@ export function PoliciesPage({ testId = 'policies-page' }: PoliciesPageProps): R
         variant="danger"
       />
     </div>
-  );
+  )
 }
 
-export default PoliciesPage;
+export default PoliciesPage

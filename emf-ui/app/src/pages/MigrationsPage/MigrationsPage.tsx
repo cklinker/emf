@@ -17,90 +17,90 @@
  * - 10.8: Display status, duration, and step details for each run
  */
 
-import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useI18n } from '../../context/I18nContext';
-import { useApi } from '../../context/ApiContext';
-import { LoadingSpinner, ErrorMessage } from '../../components';
-import styles from './MigrationsPage.module.css';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useI18n } from '../../context/I18nContext'
+import { useApi } from '../../context/ApiContext'
+import { LoadingSpinner, ErrorMessage } from '../../components'
+import styles from './MigrationsPage.module.css'
 
 /**
  * Migration run status type
  */
-export type MigrationStatus = 'pending' | 'running' | 'completed' | 'failed' | 'rolled_back';
+export type MigrationStatus = 'pending' | 'running' | 'completed' | 'failed' | 'rolled_back'
 
 /**
  * Migration step result interface
  */
 export interface MigrationStepResult {
-  stepOrder: number;
-  operation: string;
-  status: 'pending' | 'running' | 'completed' | 'failed';
-  details?: Record<string, unknown>;
-  startedAt?: string;
-  completedAt?: string;
-  error?: string;
+  stepOrder: number
+  operation: string
+  status: 'pending' | 'running' | 'completed' | 'failed'
+  details?: Record<string, unknown>
+  startedAt?: string
+  completedAt?: string
+  error?: string
 }
 
 /**
  * Migration run interface matching the API response
  */
 export interface MigrationRun {
-  id: string;
-  planId: string;
-  collectionId: string;
-  collectionName: string;
-  fromVersion: number;
-  toVersion: number;
-  status: MigrationStatus;
-  steps: MigrationStepResult[];
-  startedAt?: string;
-  completedAt?: string;
-  error?: string;
+  id: string
+  planId: string
+  collectionId: string
+  collectionName: string
+  fromVersion: number
+  toVersion: number
+  status: MigrationStatus
+  steps: MigrationStepResult[]
+  startedAt?: string
+  completedAt?: string
+  error?: string
 }
 
 /**
  * Migration step interface for planning
  */
 export interface MigrationStep {
-  order: number;
-  operation: 'ADD_FIELD' | 'REMOVE_FIELD' | 'MODIFY_FIELD' | 'ADD_INDEX' | 'REMOVE_INDEX';
-  details: Record<string, unknown>;
-  reversible: boolean;
+  order: number
+  operation: 'ADD_FIELD' | 'REMOVE_FIELD' | 'MODIFY_FIELD' | 'ADD_INDEX' | 'REMOVE_INDEX'
+  details: Record<string, unknown>
+  reversible: boolean
 }
 
 /**
  * Migration risk interface
  */
 export interface MigrationRisk {
-  level: 'low' | 'medium' | 'high';
-  description: string;
+  level: 'low' | 'medium' | 'high'
+  description: string
 }
 
 /**
  * Migration plan interface
  */
 export interface MigrationPlan {
-  id: string;
-  collectionId: string;
-  collectionName: string;
-  fromVersion: number;
-  toVersion: number;
-  steps: MigrationStep[];
-  estimatedDuration: number;
-  estimatedRecordsAffected: number;
-  risks: MigrationRisk[];
+  id: string
+  collectionId: string
+  collectionName: string
+  fromVersion: number
+  toVersion: number
+  steps: MigrationStep[]
+  estimatedDuration: number
+  estimatedRecordsAffected: number
+  risks: MigrationRisk[]
 }
 
 /**
  * Collection summary for selection
  */
 export interface CollectionSummary {
-  id: string;
-  name: string;
-  displayName: string;
-  currentVersion: number;
-  availableVersions: number[];
+  id: string
+  name: string
+  displayName: string
+  currentVersion: number
+  availableVersions: number[]
 }
 
 /**
@@ -108,55 +108,56 @@ export interface CollectionSummary {
  */
 export interface MigrationsPageProps {
   /** Optional test ID for testing */
-  testId?: string;
+  testId?: string
 }
 
 // API functions using apiClient
 async function fetchMigrationHistory(apiClient: any): Promise<MigrationRun[]> {
-  return apiClient.get('/control/migrations');
+  return apiClient.get('/control/migrations')
 }
 
 async function fetchMigrationDetails(apiClient: any, id: string): Promise<MigrationRun> {
-  return apiClient.get(`/control/migrations/${id}`);
+  return apiClient.get(`/control/migrations/${id}`)
 }
 
 async function fetchCollectionsForMigration(apiClient: any): Promise<CollectionSummary[]> {
   // The API returns a paginated response, so we need to extract the content array
-  const response = await apiClient.get('/control/collections?size=1000');
-  
+  const response = await apiClient.get('/control/collections?size=1000')
+
   // Handle paginated response structure
   if (response && response.content && Array.isArray(response.content)) {
     // Map the collection DTOs to CollectionSummary format
     return Promise.all(
       response.content.map(async (collection: any) => {
         // Fetch versions for each collection
-        const versions = await apiClient.get(`/control/collections/${collection.id}/versions`);
-        const versionNumbers = Array.isArray(versions) 
-          ? versions.map((v: any) => v.version)
-          : [];
-        
+        const versions = await apiClient.get(`/control/collections/${collection.id}/versions`)
+        const versionNumbers = Array.isArray(versions) ? versions.map((v: any) => v.version) : []
+
         return {
           id: collection.id,
           name: collection.name,
           displayName: collection.displayName || collection.name,
           currentVersion: collection.currentVersion || 1,
           availableVersions: versionNumbers.length > 0 ? versionNumbers : [1],
-        };
+        }
       })
-    );
+    )
   }
-  
+
   // Fallback to empty array if response structure is unexpected
-  return [];
+  return []
 }
 
 interface CreateMigrationPlanRequest {
-  collectionId: string;
-  targetVersion: number;
+  collectionId: string
+  targetVersion: number
 }
 
-async function createMigrationPlan(apiClient: any, request: CreateMigrationPlanRequest): Promise<MigrationPlan> {
-  return apiClient.post('/control/migrations/plan', request);
+async function createMigrationPlan(
+  apiClient: any,
+  request: CreateMigrationPlanRequest
+): Promise<MigrationPlan> {
+  return apiClient.post('/control/migrations/plan', request)
 }
 
 /**
@@ -164,16 +165,19 @@ async function createMigrationPlan(apiClient: any, request: CreateMigrationPlanR
  * Requirement 10.5: Migration execution shows real-time progress
  */
 export interface ExecuteMigrationRequest {
-  planId: string;
+  planId: string
 }
 
 export interface ExecuteMigrationResponse {
-  runId: string;
-  status: MigrationStatus;
+  runId: string
+  status: MigrationStatus
 }
 
-async function executeMigration(apiClient: any, request: ExecuteMigrationRequest): Promise<ExecuteMigrationResponse> {
-  return apiClient.post('/control/migrations/execute', request);
+async function executeMigration(
+  apiClient: any,
+  request: ExecuteMigrationRequest
+): Promise<ExecuteMigrationResponse> {
+  return apiClient.post('/control/migrations/execute', request)
 }
 
 /**
@@ -181,34 +185,34 @@ async function executeMigration(apiClient: any, request: ExecuteMigrationRequest
  * Requirement 10.7: Migration execution offers rollback option on failure
  */
 async function rollbackMigration(apiClient: any, runId: string): Promise<MigrationRun> {
-  return apiClient.post(`/control/migrations/${runId}/rollback`, {});
+  return apiClient.post(`/control/migrations/${runId}/rollback`, {})
 }
 
 /**
  * Get migration run status for polling
  */
 async function getMigrationRunStatus(apiClient: any, runId: string): Promise<MigrationRun> {
-  return apiClient.get(`/control/migrations/${runId}`);
+  return apiClient.get(`/control/migrations/${runId}`)
 }
 
 /**
  * Status Badge Component
  */
 interface StatusBadgeProps {
-  status: MigrationStatus;
+  status: MigrationStatus
 }
 
 function StatusBadge({ status }: StatusBadgeProps): React.ReactElement {
-  const { t } = useI18n();
+  const { t } = useI18n()
   const statusLabels: Record<MigrationStatus, string> = {
     pending: t('migrations.status.pending'),
     running: t('migrations.status.running'),
     completed: t('migrations.status.completed'),
     failed: t('migrations.status.failed'),
     rolled_back: t('migrations.status.rolledBack'),
-  };
+  }
 
-  const statusClass = status.replace('_', '');
+  const statusClass = status.replace('_', '')
   return (
     <span
       className={`${styles.statusBadge} ${styles[`status${statusClass.charAt(0).toUpperCase() + statusClass.slice(1)}`]}`}
@@ -216,24 +220,24 @@ function StatusBadge({ status }: StatusBadgeProps): React.ReactElement {
     >
       {statusLabels[status] || status}
     </span>
-  );
+  )
 }
 
 /**
  * Step Status Badge Component
  */
 interface StepStatusBadgeProps {
-  status: 'pending' | 'running' | 'completed' | 'failed';
+  status: 'pending' | 'running' | 'completed' | 'failed'
 }
 
 function StepStatusBadge({ status }: StepStatusBadgeProps): React.ReactElement {
-  const { t } = useI18n();
+  const { t } = useI18n()
   const statusLabels: Record<string, string> = {
     pending: t('migrations.status.pending'),
     running: t('migrations.status.running'),
     completed: t('migrations.status.completed'),
     failed: t('migrations.status.failed'),
-  };
+  }
 
   return (
     <span
@@ -242,7 +246,7 @@ function StepStatusBadge({ status }: StepStatusBadgeProps): React.ReactElement {
     >
       {statusLabels[status] || status}
     </span>
-  );
+  )
 }
 
 /**
@@ -250,16 +254,16 @@ function StepStatusBadge({ status }: StepStatusBadgeProps): React.ReactElement {
  * Requirement 10.4: Display estimated impact and risks
  */
 interface RiskBadgeProps {
-  level: 'low' | 'medium' | 'high';
+  level: 'low' | 'medium' | 'high'
 }
 
 function RiskBadge({ level }: RiskBadgeProps): React.ReactElement {
-  const { t } = useI18n();
+  const { t } = useI18n()
   const levelLabels: Record<string, string> = {
     low: t('migrations.riskLevels.low'),
     medium: t('migrations.riskLevels.medium'),
     high: t('migrations.riskLevels.high'),
-  };
+  }
 
   return (
     <span
@@ -268,7 +272,7 @@ function RiskBadge({ level }: RiskBadgeProps): React.ReactElement {
     >
       {levelLabels[level] || level}
     </span>
-  );
+  )
 }
 
 /**
@@ -276,31 +280,35 @@ function RiskBadge({ level }: RiskBadgeProps): React.ReactElement {
  * Requirements 10.3, 10.4: Display migration steps and estimated impact/risks
  */
 interface MigrationPlanDisplayProps {
-  plan: MigrationPlan;
-  onClose: () => void;
-  onExecute: (plan: MigrationPlan) => void;
+  plan: MigrationPlan
+  onClose: () => void
+  onExecute: (plan: MigrationPlan) => void
 }
 
-function MigrationPlanDisplay({ plan, onClose, onExecute }: MigrationPlanDisplayProps): React.ReactElement {
-  const { t } = useI18n();
+function MigrationPlanDisplay({
+  plan,
+  onClose,
+  onExecute,
+}: MigrationPlanDisplayProps): React.ReactElement {
+  const { t } = useI18n()
 
   const formatDuration = (seconds: number): string => {
     if (seconds < 60) {
-      return `${seconds}s`;
+      return `${seconds}s`
     } else if (seconds < 3600) {
-      const minutes = Math.floor(seconds / 60);
-      const secs = seconds % 60;
-      return secs > 0 ? `${minutes}m ${secs}s` : `${minutes}m`;
+      const minutes = Math.floor(seconds / 60)
+      const secs = seconds % 60
+      return secs > 0 ? `${minutes}m ${secs}s` : `${minutes}m`
     } else {
-      const hours = Math.floor(seconds / 3600);
-      const minutes = Math.floor((seconds % 3600) / 60);
-      return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+      const hours = Math.floor(seconds / 3600)
+      const minutes = Math.floor((seconds % 3600) / 60)
+      return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`
     }
-  };
+  }
 
   const handleExecute = () => {
-    onExecute(plan);
-  };
+    onExecute(plan)
+  }
 
   return (
     <div
@@ -311,11 +319,7 @@ function MigrationPlanDisplay({ plan, onClose, onExecute }: MigrationPlanDisplay
       aria-labelledby="migration-plan-title"
       data-testid="migration-plan-modal"
     >
-      <div
-        className={styles.modalContent}
-        onClick={(e) => e.stopPropagation()}
-        role="document"
-      >
+      <div className={styles.modalContent} onClick={(e) => e.stopPropagation()} role="document">
         <div className={styles.modalHeader}>
           <h2 id="migration-plan-title" className={styles.modalTitle}>
             {t('migrations.planDetails')}
@@ -348,9 +352,7 @@ function MigrationPlanDisplay({ plan, onClose, onExecute }: MigrationPlanDisplay
               </div>
               <div className={styles.detailItem}>
                 <span className={styles.detailLabel}>{t('migrations.estimatedDuration')}</span>
-                <span className={styles.detailValue}>
-                  {formatDuration(plan.estimatedDuration)}
-                </span>
+                <span className={styles.detailValue}>{formatDuration(plan.estimatedDuration)}</span>
               </div>
               <div className={styles.detailItem}>
                 <span className={styles.detailLabel}>{t('migrations.recordsAffected')}</span>
@@ -419,11 +421,7 @@ function MigrationPlanDisplay({ plan, onClose, onExecute }: MigrationPlanDisplay
             ) : (
               <div className={styles.risksList} data-testid="plan-risks-list">
                 {plan.risks.map((risk, index) => (
-                  <div
-                    key={index}
-                    className={styles.riskItem}
-                    data-testid={`plan-risk-${index}`}
-                  >
+                  <div key={index} className={styles.riskItem} data-testid={`plan-risk-${index}`}>
                     <RiskBadge level={risk.level} />
                     <span className={styles.riskDescription}>{risk.description}</span>
                   </div>
@@ -453,7 +451,7 @@ function MigrationPlanDisplay({ plan, onClose, onExecute }: MigrationPlanDisplay
         </div>
       </div>
     </div>
-  );
+  )
 }
 
 /**
@@ -461,113 +459,115 @@ function MigrationPlanDisplay({ plan, onClose, onExecute }: MigrationPlanDisplay
  * Requirements 10.5, 10.6, 10.7: Execute migration with progress tracking, error handling, and rollback
  */
 interface MigrationExecutionModalProps {
-  plan: MigrationPlan;
-  onClose: () => void;
-  onComplete: () => void;
+  plan: MigrationPlan
+  onClose: () => void
+  onComplete: () => void
 }
 
-function MigrationExecutionModal({ plan, onClose, onComplete }: MigrationExecutionModalProps): React.ReactElement {
-  const { t } = useI18n();
-  const { apiClient } = useApi();
-  const queryClient = useQueryClient();
-  const [runId, setRunId] = useState<string | null>(null);
-  const [currentRun, setCurrentRun] = useState<MigrationRun | null>(null);
-  const [isPolling, setIsPolling] = useState(false);
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+function MigrationExecutionModal({
+  plan,
+  onClose,
+  onComplete,
+}: MigrationExecutionModalProps): React.ReactElement {
+  const { t } = useI18n()
+  const { apiClient } = useApi()
+  const queryClient = useQueryClient()
+  const [runId, setRunId] = useState<string | null>(null)
+  const [currentRun, setCurrentRun] = useState<MigrationRun | null>(null)
+  const [isPolling, setIsPolling] = useState(false)
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   // Execute migration mutation
   const executeMutation = useMutation({
     mutationFn: (request: ExecuteMigrationRequest) => executeMigration(apiClient, request),
     onSuccess: (response) => {
-      setRunId(response.runId);
-      setIsPolling(true);
+      setRunId(response.runId)
+      setIsPolling(true)
     },
     onError: () => {
       // Error is handled in the UI
     },
-  });
+  })
 
   // Rollback mutation - Requirement 10.7
   const rollbackMutation = useMutation({
     mutationFn: (runId: string) => rollbackMigration(apiClient, runId),
     onSuccess: (run) => {
-      setCurrentRun(run);
-      queryClient.invalidateQueries({ queryKey: ['migration-history'] });
+      setCurrentRun(run)
+      queryClient.invalidateQueries({ queryKey: ['migration-history'] })
     },
     onError: () => {
       // Error is handled in the UI
     },
-  });
+  })
 
   // Poll for migration status - Requirement 10.5
   useEffect(() => {
-    if (!isPolling || !runId) return;
+    if (!isPolling || !runId) return
 
     const pollStatus = async () => {
       try {
-        const run = await getMigrationRunStatus(apiClient, runId);
-        setCurrentRun(run);
+        const run = await getMigrationRunStatus(apiClient, runId)
+        setCurrentRun(run)
 
         // Stop polling when migration is complete or failed
         if (run.status === 'completed' || run.status === 'failed' || run.status === 'rolled_back') {
-          setIsPolling(false);
-          queryClient.invalidateQueries({ queryKey: ['migration-history'] });
+          setIsPolling(false)
+          queryClient.invalidateQueries({ queryKey: ['migration-history'] })
         }
       } catch {
         // Continue polling on error
       }
-    };
+    }
 
     // Initial poll
-    pollStatus();
+    pollStatus()
 
     // Set up polling interval
-    pollingIntervalRef.current = setInterval(pollStatus, 1000);
+    pollingIntervalRef.current = setInterval(pollStatus, 1000)
 
     return () => {
       if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
+        clearInterval(pollingIntervalRef.current)
       }
-    };
-  }, [isPolling, runId, queryClient]);
+    }
+  }, [isPolling, runId, queryClient])
 
   // Start execution when modal opens
   useEffect(() => {
     if (!runId && !executeMutation.isPending && !executeMutation.isError) {
-      executeMutation.mutate({ planId: plan.id });
+      executeMutation.mutate({ planId: plan.id })
     }
-  }, [plan.id, runId, executeMutation]);
+  }, [plan.id, runId, executeMutation])
 
   const handleRollback = () => {
     if (runId) {
-      rollbackMutation.mutate(runId);
+      rollbackMutation.mutate(runId)
     }
-  };
+  }
 
   const handleClose = () => {
     if (pollingIntervalRef.current) {
-      clearInterval(pollingIntervalRef.current);
+      clearInterval(pollingIntervalRef.current)
     }
     if (currentRun?.status === 'completed') {
-      onComplete();
+      onComplete()
     }
-    onClose();
-  };
+    onClose()
+  }
 
   // Calculate progress percentage
   const progressPercentage = useMemo(() => {
-    if (!currentRun || currentRun.steps.length === 0) return 0;
-    const completedSteps = currentRun.steps.filter(
-      (s) => s.status === 'completed'
-    ).length;
-    return Math.round((completedSteps / currentRun.steps.length) * 100);
-  }, [currentRun]);
+    if (!currentRun || currentRun.steps.length === 0) return 0
+    const completedSteps = currentRun.steps.filter((s) => s.status === 'completed').length
+    return Math.round((completedSteps / currentRun.steps.length) * 100)
+  }, [currentRun])
 
   // Determine if rollback is available - Requirement 10.7
-  const canRollback = currentRun?.status === 'failed' && !rollbackMutation.isPending;
+  const canRollback = currentRun?.status === 'failed' && !rollbackMutation.isPending
 
   // Determine current step
-  const currentStep = currentRun?.steps.find((s) => s.status === 'running');
+  const currentStep = currentRun?.steps.find((s) => s.status === 'running')
 
   return (
     <div
@@ -577,10 +577,7 @@ function MigrationExecutionModal({ plan, onClose, onComplete }: MigrationExecuti
       aria-labelledby="migration-execution-title"
       data-testid="migration-execution-modal"
     >
-      <div
-        className={styles.modalContent}
-        role="document"
-      >
+      <div className={styles.modalContent} role="document">
         <div className={styles.modalHeader}>
           <h2 id="migration-execution-title" className={styles.modalTitle}>
             {t('migrations.executingMigration')}
@@ -618,7 +615,7 @@ function MigrationExecutionModal({ plan, onClose, onComplete }: MigrationExecuti
           {(isPolling || currentRun) && (
             <div className={styles.detailsSection} data-testid="execution-progress-section">
               <h3 className={styles.detailsSectionTitle}>{t('migrations.progress')}</h3>
-              
+
               {/* Progress Bar */}
               <div className={styles.progressContainer} data-testid="progress-container">
                 <div className={styles.progressBar}>
@@ -688,7 +685,10 @@ function MigrationExecutionModal({ plan, onClose, onComplete }: MigrationExecuti
                         <StepStatusBadge status={step.status} />
                       </div>
                       {step.error && (
-                        <div className={styles.stepProgressError} data-testid={`step-error-${step.stepOrder}`}>
+                        <div
+                          className={styles.stepProgressError}
+                          data-testid={`step-error-${step.stepOrder}`}
+                        >
                           {step.error}
                         </div>
                       )}
@@ -738,7 +738,7 @@ function MigrationExecutionModal({ plan, onClose, onComplete }: MigrationExecuti
               {rollbackMutation.isPending ? t('common.loading') : t('migrations.rollback')}
             </button>
           )}
-          
+
           <button
             type="button"
             className={styles.primaryButton}
@@ -746,14 +746,18 @@ function MigrationExecutionModal({ plan, onClose, onComplete }: MigrationExecuti
             disabled={isPolling && currentRun?.status === 'running'}
             data-testid="close-execution-button"
           >
-            {currentRun?.status === 'completed' ? t('common.close') : 
-             currentRun?.status === 'failed' || currentRun?.status === 'rolled_back' ? t('common.close') :
-             isPolling ? t('migrations.executing') : t('common.close')}
+            {currentRun?.status === 'completed'
+              ? t('common.close')
+              : currentRun?.status === 'failed' || currentRun?.status === 'rolled_back'
+                ? t('common.close')
+                : isPolling
+                  ? t('migrations.executing')
+                  : t('common.close')}
           </button>
         </div>
       </div>
     </div>
-  );
+  )
 }
 
 /**
@@ -761,15 +765,18 @@ function MigrationExecutionModal({ plan, onClose, onComplete }: MigrationExecuti
  * Requirements 10.2, 10.3, 10.4: Plan migration with schema selection
  */
 interface MigrationPlanningFormProps {
-  onClose: () => void;
-  onPlanCreated: (plan: MigrationPlan) => void;
+  onClose: () => void
+  onPlanCreated: (plan: MigrationPlan) => void
 }
 
-function MigrationPlanningForm({ onClose, onPlanCreated }: MigrationPlanningFormProps): React.ReactElement {
-  const { t } = useI18n();
-  const { apiClient } = useApi();
-  const [selectedCollectionId, setSelectedCollectionId] = useState<string>('');
-  const [targetVersion, setTargetVersion] = useState<number | ''>('');
+function MigrationPlanningForm({
+  onClose,
+  onPlanCreated,
+}: MigrationPlanningFormProps): React.ReactElement {
+  const { t } = useI18n()
+  const { apiClient } = useApi()
+  const [selectedCollectionId, setSelectedCollectionId] = useState<string>('')
+  const [targetVersion, setTargetVersion] = useState<number | ''>('')
 
   const {
     data: collections = [],
@@ -778,51 +785,51 @@ function MigrationPlanningForm({ onClose, onPlanCreated }: MigrationPlanningForm
   } = useQuery({
     queryKey: ['collections-for-migration'],
     queryFn: () => fetchCollectionsForMigration(apiClient),
-  });
+  })
 
   const planMutation = useMutation({
     mutationFn: (request: CreateMigrationPlanRequest) => createMigrationPlan(apiClient, request),
     onSuccess: (plan) => {
-      onPlanCreated(plan);
+      onPlanCreated(plan)
     },
-  });
+  })
 
   // Ensure collections is always an array
-  const collectionsArray = Array.isArray(collections) ? collections : [];
+  const collectionsArray = Array.isArray(collections) ? collections : []
 
   const selectedCollection = useMemo(() => {
-    return collectionsArray.find((c) => c.id === selectedCollectionId);
-  }, [collectionsArray, selectedCollectionId]);
+    return collectionsArray.find((c) => c.id === selectedCollectionId)
+  }, [collectionsArray, selectedCollectionId])
 
   const availableTargetVersions = useMemo(() => {
-    if (!selectedCollection) return [];
+    if (!selectedCollection) return []
     // Filter versions that are different from current version
     return selectedCollection.availableVersions.filter(
       (v) => v !== selectedCollection.currentVersion
-    );
-  }, [selectedCollection]);
+    )
+  }, [selectedCollection])
 
   const handleCollectionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedCollectionId(e.target.value);
-    setTargetVersion('');
-  };
+    setSelectedCollectionId(e.target.value)
+    setTargetVersion('')
+  }
 
   const handleTargetVersionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = e.target.value;
-    setTargetVersion(value === '' ? '' : parseInt(value, 10));
-  };
+    const value = e.target.value
+    setTargetVersion(value === '' ? '' : parseInt(value, 10))
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+    e.preventDefault()
     if (selectedCollectionId && targetVersion !== '') {
       planMutation.mutate({
         collectionId: selectedCollectionId,
         targetVersion: targetVersion as number,
-      });
+      })
     }
-  };
+  }
 
-  const isFormValid = selectedCollectionId !== '' && targetVersion !== '';
+  const isFormValid = selectedCollectionId !== '' && targetVersion !== ''
 
   return (
     <div
@@ -833,11 +840,7 @@ function MigrationPlanningForm({ onClose, onPlanCreated }: MigrationPlanningForm
       aria-labelledby="plan-migration-title"
       data-testid="plan-migration-modal"
     >
-      <div
-        className={styles.modalContent}
-        onClick={(e) => e.stopPropagation()}
-        role="document"
-      >
+      <div className={styles.modalContent} onClick={(e) => e.stopPropagation()} role="document">
         <div className={styles.modalHeader}>
           <h2 id="plan-migration-title" className={styles.modalTitle}>
             {t('migrations.planMigration')}
@@ -936,8 +939,8 @@ function MigrationPlanningForm({ onClose, onPlanCreated }: MigrationPlanningForm
                   <div className={styles.selectionSummary} data-testid="selection-summary">
                     <span className={styles.summaryLabel}>{t('migrations.plannedChange')}:</span>
                     <span className={styles.summaryValue}>
-                      {selectedCollection.displayName || selectedCollection.name}:{' '}
-                      v{selectedCollection.currentVersion} → v{targetVersion}
+                      {selectedCollection.displayName || selectedCollection.name}: v
+                      {selectedCollection.currentVersion} → v{targetVersion}
                     </span>
                   </div>
                 )}
@@ -973,27 +976,27 @@ function MigrationPlanningForm({ onClose, onPlanCreated }: MigrationPlanningForm
         </form>
       </div>
     </div>
-  );
+  )
 }
 
 /**
  * Calculate duration between two dates
  */
 function calculateDuration(startedAt?: string, completedAt?: string): string {
-  if (!startedAt) return '-';
-  
-  const start = new Date(startedAt);
-  const end = completedAt ? new Date(completedAt) : new Date();
-  const durationMs = end.getTime() - start.getTime();
-  
+  if (!startedAt) return '-'
+
+  const start = new Date(startedAt)
+  const end = completedAt ? new Date(completedAt) : new Date()
+  const durationMs = end.getTime() - start.getTime()
+
   if (durationMs < 1000) {
-    return `${durationMs}ms`;
+    return `${durationMs}ms`
   } else if (durationMs < 60000) {
-    return `${(durationMs / 1000).toFixed(1)}s`;
+    return `${(durationMs / 1000).toFixed(1)}s`
   } else {
-    const minutes = Math.floor(durationMs / 60000);
-    const seconds = Math.floor((durationMs % 60000) / 1000);
-    return `${minutes}m ${seconds}s`;
+    const minutes = Math.floor(durationMs / 60000)
+    const seconds = Math.floor((durationMs % 60000) / 1000)
+    return `${minutes}m ${seconds}s`
   }
 }
 
@@ -1002,13 +1005,16 @@ function calculateDuration(startedAt?: string, completedAt?: string): string {
  * Requirement 10.8: Display step details for each run
  */
 interface MigrationRunDetailsProps {
-  migrationId: string;
-  onClose: () => void;
+  migrationId: string
+  onClose: () => void
 }
 
-function MigrationRunDetails({ migrationId, onClose }: MigrationRunDetailsProps): React.ReactElement {
-  const { t, formatDate } = useI18n();
-  const { apiClient } = useApi();
+function MigrationRunDetails({
+  migrationId,
+  onClose,
+}: MigrationRunDetailsProps): React.ReactElement {
+  const { t, formatDate } = useI18n()
+  const { apiClient } = useApi()
 
   const {
     data: migration,
@@ -1017,16 +1023,16 @@ function MigrationRunDetails({ migrationId, onClose }: MigrationRunDetailsProps)
   } = useQuery({
     queryKey: ['migration-details', migrationId],
     queryFn: () => fetchMigrationDetails(apiClient, migrationId),
-  });
+  })
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose();
+        onClose()
       }
     },
     [onClose]
-  );
+  )
 
   return (
     <div
@@ -1038,11 +1044,7 @@ function MigrationRunDetails({ migrationId, onClose }: MigrationRunDetailsProps)
       aria-labelledby="migration-details-title"
       data-testid="migration-details-modal"
     >
-      <div
-        className={styles.modalContent}
-        onClick={(e) => e.stopPropagation()}
-        role="document"
-      >
+      <div className={styles.modalContent} onClick={(e) => e.stopPropagation()} role="document">
         <div className={styles.modalHeader}>
           <h2 id="migration-details-title" className={styles.modalTitle}>
             {t('migrations.runDetails')}
@@ -1161,7 +1163,9 @@ function MigrationRunDetails({ migrationId, onClose }: MigrationRunDetailsProps)
                               <div key={key} className={styles.stepDetailItem}>
                                 <span className={styles.stepDetailKey}>{key}:</span>
                                 <span className={styles.stepDetailValue}>
-                                  {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                                  {typeof value === 'object'
+                                    ? JSON.stringify(value)
+                                    : String(value)}
                                 </span>
                               </div>
                             ))}
@@ -1175,7 +1179,9 @@ function MigrationRunDetails({ migrationId, onClose }: MigrationRunDetailsProps)
                         )}
                         {step.startedAt && (
                           <div className={styles.stepTiming}>
-                            <span className={styles.stepTimingLabel}>{t('migrations.duration')}:</span>
+                            <span className={styles.stepTimingLabel}>
+                              {t('migrations.duration')}:
+                            </span>
                             <span className={styles.stepTimingValue}>
                               {calculateDuration(step.startedAt, step.completedAt)}
                             </span>
@@ -1202,7 +1208,7 @@ function MigrationRunDetails({ migrationId, onClose }: MigrationRunDetailsProps)
         </div>
       </div>
     </div>
-  );
+  )
 }
 
 /**
@@ -1210,15 +1216,15 @@ function MigrationRunDetails({ migrationId, onClose }: MigrationRunDetailsProps)
  * Requirement 10.1: Display migration history showing all migration runs
  */
 interface MigrationHistoryTableProps {
-  migrations: MigrationRun[];
-  onViewDetails: (id: string) => void;
+  migrations: MigrationRun[]
+  onViewDetails: (id: string) => void
 }
 
 function MigrationHistoryTable({
   migrations,
   onViewDetails,
 }: MigrationHistoryTableProps): React.ReactElement {
-  const { t, formatDate } = useI18n();
+  const { t, formatDate } = useI18n()
 
   if (migrations.length === 0) {
     return (
@@ -1226,7 +1232,7 @@ function MigrationHistoryTable({
         <p>{t('migrations.noHistory')}</p>
         <p className={styles.emptyStateHint}>{t('migrations.noHistoryHint')}</p>
       </div>
-    );
+    )
   }
 
   return (
@@ -1288,7 +1294,7 @@ function MigrationHistoryTable({
         </tbody>
       </table>
     </div>
-  );
+  )
 }
 
 /**
@@ -1307,13 +1313,13 @@ function MigrationHistoryTable({
  * - 10.8: Display status, duration, and step details for each run
  */
 export function MigrationsPage({ testId }: MigrationsPageProps): React.ReactElement {
-  const { t } = useI18n();
-  const { apiClient } = useApi();
-  const queryClient = useQueryClient();
-  const [selectedMigrationId, setSelectedMigrationId] = useState<string | null>(null);
-  const [showPlanningForm, setShowPlanningForm] = useState(false);
-  const [currentPlan, setCurrentPlan] = useState<MigrationPlan | null>(null);
-  const [executingPlan, setExecutingPlan] = useState<MigrationPlan | null>(null);
+  const { t } = useI18n()
+  const { apiClient } = useApi()
+  const queryClient = useQueryClient()
+  const [selectedMigrationId, setSelectedMigrationId] = useState<string | null>(null)
+  const [showPlanningForm, setShowPlanningForm] = useState(false)
+  const [currentPlan, setCurrentPlan] = useState<MigrationPlan | null>(null)
+  const [executingPlan, setExecutingPlan] = useState<MigrationPlan | null>(null)
 
   const {
     data: migrations = [],
@@ -1323,49 +1329,49 @@ export function MigrationsPage({ testId }: MigrationsPageProps): React.ReactElem
   } = useQuery({
     queryKey: ['migration-history'],
     queryFn: () => fetchMigrationHistory(apiClient),
-  });
+  })
 
   const handleViewDetails = useCallback((id: string) => {
-    setSelectedMigrationId(id);
-  }, []);
+    setSelectedMigrationId(id)
+  }, [])
 
   const handleCloseDetails = useCallback(() => {
-    setSelectedMigrationId(null);
-  }, []);
+    setSelectedMigrationId(null)
+  }, [])
 
   const handleOpenPlanningForm = useCallback(() => {
-    setShowPlanningForm(true);
-  }, []);
+    setShowPlanningForm(true)
+  }, [])
 
   const handleClosePlanningForm = useCallback(() => {
-    setShowPlanningForm(false);
-  }, []);
+    setShowPlanningForm(false)
+  }, [])
 
   const handlePlanCreated = useCallback((plan: MigrationPlan) => {
-    setShowPlanningForm(false);
-    setCurrentPlan(plan);
-  }, []);
+    setShowPlanningForm(false)
+    setCurrentPlan(plan)
+  }, [])
 
   const handleClosePlanDisplay = useCallback(() => {
-    setCurrentPlan(null);
-  }, []);
+    setCurrentPlan(null)
+  }, [])
 
   // Handle execute migration from plan display
   const handleExecuteMigration = useCallback((plan: MigrationPlan) => {
-    setCurrentPlan(null);
-    setExecutingPlan(plan);
-  }, []);
+    setCurrentPlan(null)
+    setExecutingPlan(plan)
+  }, [])
 
   // Handle close execution modal
   const handleCloseExecution = useCallback(() => {
-    setExecutingPlan(null);
-  }, []);
+    setExecutingPlan(null)
+  }, [])
 
   // Handle execution complete
   const handleExecutionComplete = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ['migration-history'] });
-    setExecutingPlan(null);
-  }, [queryClient]);
+    queryClient.invalidateQueries({ queryKey: ['migration-history'] })
+    setExecutingPlan(null)
+  }, [queryClient])
 
   return (
     <div className={styles.container} data-testid={testId || 'migrations-page'}>
@@ -1399,18 +1405,12 @@ export function MigrationsPage({ testId }: MigrationsPageProps): React.ReactElem
         )}
 
         {!isLoading && !error && (
-          <MigrationHistoryTable
-            migrations={migrations}
-            onViewDetails={handleViewDetails}
-          />
+          <MigrationHistoryTable migrations={migrations} onViewDetails={handleViewDetails} />
         )}
       </div>
 
       {selectedMigrationId && (
-        <MigrationRunDetails
-          migrationId={selectedMigrationId}
-          onClose={handleCloseDetails}
-        />
+        <MigrationRunDetails migrationId={selectedMigrationId} onClose={handleCloseDetails} />
       )}
 
       {showPlanningForm && (
@@ -1436,7 +1436,7 @@ export function MigrationsPage({ testId }: MigrationsPageProps): React.ReactElem
         />
       )}
     </div>
-  );
+  )
 }
 
-export default MigrationsPage;
+export default MigrationsPage

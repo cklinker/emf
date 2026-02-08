@@ -39,7 +39,7 @@
 .fadeslide {
   opacity: 0;
   transform: translateY(8px);
-  transition: 
+  transition:
     opacity var(--transition-duration, 200ms) ease-out,
     transform var(--transition-duration, 200ms) ease-out;
 }

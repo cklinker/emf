@@ -14,15 +14,15 @@
  * - 11.10: Resource browser allows deleting resources with confirmation
  */
 
-import React from 'react';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { MemoryRouter, Routes, Route, BrowserRouter } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { AuthWrapper, setupAuthMocks, wrapFetchMock } from '../../test/testUtils';
-import { ResourceDetailPage } from './ResourceDetailPage';
-import type { CollectionSchema, Resource } from './ResourceDetailPage';
+import React from 'react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { MemoryRouter, Routes, Route, BrowserRouter } from 'react-router-dom'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { AuthWrapper, setupAuthMocks, wrapFetchMock } from '../../test/testUtils'
+import { ResourceDetailPage } from './ResourceDetailPage'
+import type { CollectionSchema, Resource } from './ResourceDetailPage'
 
 // Mock the I18nContext
 vi.mock('../../context/I18nContext', () => ({
@@ -55,12 +55,14 @@ vi.mock('../../context/I18nContext', () => ({
         'fields.types.reference': 'Reference',
         'errors.generic': 'An error occurred',
         'errors.notFound': 'Not found',
-        'success.deleted': params?.item ? `${params.item} deleted successfully` : 'Deleted successfully',
-      };
-      return translations[key] || key;
+        'success.deleted': params?.item
+          ? `${params.item} deleted successfully`
+          : 'Deleted successfully',
+      }
+      return translations[key] || key
     },
     formatDate: (date: Date, options?: Intl.DateTimeFormatOptions) => {
-      return date.toLocaleDateString('en-US', options);
+      return date.toLocaleDateString('en-US', options)
     },
     formatNumber: (num: number) => num.toLocaleString('en-US'),
     direction: 'ltr' as const,
@@ -68,10 +70,10 @@ vi.mock('../../context/I18nContext', () => ({
     setLocale: vi.fn(),
   }),
   I18nProvider: ({ children }: { children: React.ReactNode }) => children,
-}));
+}))
 
 // Mock the Toast hook
-const mockShowToast = vi.fn();
+const mockShowToast = vi.fn()
 vi.mock('../../components', () => ({
   useToast: () => ({
     showToast: mockShowToast,
@@ -83,14 +85,14 @@ vi.mock('../../components', () => ({
     onConfirm,
     onCancel,
   }: {
-    open: boolean;
-    title: string;
-    message: string;
-    confirmLabel?: string;
-    cancelLabel?: string;
-    onConfirm: () => void;
-    onCancel: () => void;
-    variant?: string;
+    open: boolean
+    title: string
+    message: string
+    confirmLabel?: string
+    cancelLabel?: string
+    onConfirm: () => void
+    onCancel: () => void
+    variant?: string
   }) =>
     open ? (
       <div data-testid="confirm-dialog" role="dialog">
@@ -103,29 +105,23 @@ vi.mock('../../components', () => ({
   LoadingSpinner: ({ label }: { label?: string; size?: string }) => (
     <div data-testid="loading-spinner">{label || 'Loading...'}</div>
   ),
-  ErrorMessage: ({
-    error,
-    onRetry,
-  }: {
-    error: Error;
-    onRetry?: () => void;
-  }) => (
+  ErrorMessage: ({ error, onRetry }: { error: Error; onRetry?: () => void }) => (
     <div data-testid="error-message">
       <p>{error.message}</p>
       {onRetry && <button onClick={onRetry}>Retry</button>}
     </div>
   ),
-}));
+}))
 
 // Mock navigate
-const mockNavigate = vi.fn();
+const mockNavigate = vi.fn()
 vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual('react-router-dom');
+  const actual = await vi.importActual('react-router-dom')
   return {
     ...actual,
     useNavigate: () => mockNavigate,
-  };
-});
+  }
+})
 
 // Sample test data
 const mockSchema: CollectionSchema = {
@@ -140,9 +136,16 @@ const mockSchema: CollectionSchema = {
     { id: 'f5', name: 'birthDate', displayName: 'Birth Date', type: 'date', required: false },
     { id: 'f6', name: 'lastLogin', displayName: 'Last Login', type: 'datetime', required: false },
     { id: 'f7', name: 'metadata', displayName: 'Metadata', type: 'json', required: false },
-    { id: 'f8', name: 'organizationId', displayName: 'Organization', type: 'reference', required: false, referenceTarget: 'organizations' },
+    {
+      id: 'f8',
+      name: 'organizationId',
+      displayName: 'Organization',
+      type: 'reference',
+      required: false,
+      referenceTarget: 'organizations',
+    },
   ],
-};
+}
 
 const mockResource: Resource = {
   id: 'res-123',
@@ -156,7 +159,7 @@ const mockResource: Resource = {
   organizationId: 'org-456',
   createdAt: '2024-01-01T00:00:00Z',
   updatedAt: '2024-01-15T12:00:00Z',
-};
+}
 
 // Helper to create a fresh QueryClient for each test
 function createTestQueryClient() {
@@ -167,16 +170,13 @@ function createTestQueryClient() {
         gcTime: 0,
       },
     },
-  });
+  })
 }
 
 // Helper to render with providers
 function renderWithProviders(
   ui: React.ReactElement,
-  {
-    route = '/resources/users/res-123',
-    queryClient = createTestQueryClient(),
-  } = {}
+  { route = '/resources/users/res-123', queryClient = createTestQueryClient() } = {}
 ) {
   return render(
     <QueryClientProvider client={queryClient}>
@@ -190,68 +190,70 @@ function renderWithProviders(
         </AuthWrapper>
       </MemoryRouter>
     </QueryClientProvider>
-  );
+  )
 }
 
 describe('ResourceDetailPage', () => {
-  let cleanupAuthMocks: () => void;
+  let cleanupAuthMocks: () => void
 
   beforeEach(() => {
-    cleanupAuthMocks = setupAuthMocks();
-    vi.clearAllMocks();
-  });
+    cleanupAuthMocks = setupAuthMocks()
+    vi.clearAllMocks()
+  })
 
   afterEach(() => {
-    cleanupAuthMocks();
-    vi.restoreAllMocks();
-  });
+    cleanupAuthMocks()
+    vi.restoreAllMocks()
+  })
 
   describe('Loading State', () => {
     it('should display loading spinner while fetching data', async () => {
       // Mock fetch to delay response
-      const mockFetch = vi.fn().mockImplementation(() =>
-        new Promise(() => {}) // Never resolves
-      );
-      wrapFetchMock(mockFetch);
+      const mockFetch = vi.fn().mockImplementation(
+        () => new Promise(() => {}) // Never resolves
+      )
+      wrapFetchMock(mockFetch)
 
-      renderWithProviders(<ResourceDetailPage />);
+      renderWithProviders(<ResourceDetailPage />)
 
-      expect(screen.getByTestId('loading-spinner')).toBeInTheDocument();
-    });
-  });
+      expect(screen.getByTestId('loading-spinner')).toBeInTheDocument()
+    })
+  })
 
   describe('Error States', () => {
     it('should display error message when schema fetch fails', async () => {
-      const mockFetch = vi.fn().mockRejectedValueOnce(
-        new Error('Failed to fetch collection schema')
-      );
-      wrapFetchMock(mockFetch);
+      const mockFetch = vi
+        .fn()
+        .mockRejectedValueOnce(new Error('Failed to fetch collection schema'))
+      wrapFetchMock(mockFetch)
 
-      renderWithProviders(<ResourceDetailPage />);
+      renderWithProviders(<ResourceDetailPage />)
 
       await waitFor(() => {
-        expect(screen.getByTestId('error-message')).toBeInTheDocument();
-      });
-    });
+        expect(screen.getByTestId('error-message')).toBeInTheDocument()
+      })
+    })
 
     it('should display error message when resource fetch fails', async () => {
-      const mockFetch = vi.fn()
+      const mockFetch = vi
+        .fn()
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve(mockSchema),
         })
-        .mockRejectedValueOnce(new Error('Failed to fetch resource'));
-      wrapFetchMock(mockFetch);
+        .mockRejectedValueOnce(new Error('Failed to fetch resource'))
+      wrapFetchMock(mockFetch)
 
-      renderWithProviders(<ResourceDetailPage />);
+      renderWithProviders(<ResourceDetailPage />)
 
       await waitFor(() => {
-        expect(screen.getByTestId('error-message')).toBeInTheDocument();
-      });
-    });
+        expect(screen.getByTestId('error-message')).toBeInTheDocument()
+      })
+    })
 
     it('should display not found error when resource returns 404', async () => {
-      const mockFetch = vi.fn()
+      const mockFetch = vi
+        .fn()
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve(mockSchema),
@@ -259,20 +261,21 @@ describe('ResourceDetailPage', () => {
         .mockResolvedValueOnce({
           ok: false,
           status: 404,
-        });
-      wrapFetchMock(mockFetch);
+        })
+      wrapFetchMock(mockFetch)
 
-      renderWithProviders(<ResourceDetailPage />);
+      renderWithProviders(<ResourceDetailPage />)
 
       await waitFor(() => {
-        expect(screen.getByTestId('error-message')).toBeInTheDocument();
-      });
-    });
-  });
+        expect(screen.getByTestId('error-message')).toBeInTheDocument()
+      })
+    })
+  })
 
   describe('Successful Data Display', () => {
     beforeEach(() => {
-      const mockFetch = vi.fn()
+      const mockFetch = vi
+        .fn()
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve(mockSchema),
@@ -280,105 +283,106 @@ describe('ResourceDetailPage', () => {
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve(mockResource),
-        });
-      wrapFetchMock(mockFetch);
-    });
+        })
+      wrapFetchMock(mockFetch)
+    })
 
     it('should display the page title', async () => {
-      renderWithProviders(<ResourceDetailPage />);
+      renderWithProviders(<ResourceDetailPage />)
 
       await waitFor(() => {
-        expect(screen.getByTestId('resource-title')).toHaveTextContent('View Record');
-      });
-    });
+        expect(screen.getByTestId('resource-title')).toHaveTextContent('View Record')
+      })
+    })
 
     it('should display the resource ID', async () => {
-      renderWithProviders(<ResourceDetailPage />);
+      renderWithProviders(<ResourceDetailPage />)
 
       await waitFor(() => {
-        expect(screen.getByTestId('resource-id')).toHaveTextContent('res-123');
-      });
-    });
+        expect(screen.getByTestId('resource-id')).toHaveTextContent('res-123')
+      })
+    })
 
     it('should display breadcrumb navigation', async () => {
-      renderWithProviders(<ResourceDetailPage />);
+      renderWithProviders(<ResourceDetailPage />)
 
       await waitFor(() => {
-        expect(screen.getByText('Resource Browser')).toBeInTheDocument();
-        expect(screen.getByText('Users')).toBeInTheDocument();
-      });
-    });
+        expect(screen.getByText('Resource Browser')).toBeInTheDocument()
+        expect(screen.getByText('Users')).toBeInTheDocument()
+      })
+    })
 
     it('should display all field values - Requirement 11.8', async () => {
-      renderWithProviders(<ResourceDetailPage />);
+      renderWithProviders(<ResourceDetailPage />)
 
       await waitFor(() => {
-        expect(screen.getByTestId('fields-grid')).toBeInTheDocument();
-      });
+        expect(screen.getByTestId('fields-grid')).toBeInTheDocument()
+      })
 
       // Check string field
-      expect(screen.getByTestId('field-value-name')).toHaveTextContent('John Doe');
-      expect(screen.getByTestId('field-value-email')).toHaveTextContent('john@example.com');
+      expect(screen.getByTestId('field-value-name')).toHaveTextContent('John Doe')
+      expect(screen.getByTestId('field-value-email')).toHaveTextContent('john@example.com')
 
       // Check number field
-      expect(screen.getByTestId('field-value-age')).toHaveTextContent('30');
+      expect(screen.getByTestId('field-value-age')).toHaveTextContent('30')
 
       // Check boolean field
-      expect(screen.getByTestId('field-value-active')).toHaveTextContent('Yes');
+      expect(screen.getByTestId('field-value-active')).toHaveTextContent('Yes')
 
       // Check reference field
-      expect(screen.getByTestId('field-value-organizationId')).toHaveTextContent('org-456');
-    });
+      expect(screen.getByTestId('field-value-organizationId')).toHaveTextContent('org-456')
+    })
 
     it('should display field type badges', async () => {
-      renderWithProviders(<ResourceDetailPage />);
+      renderWithProviders(<ResourceDetailPage />)
 
       await waitFor(() => {
-        expect(screen.getByTestId('fields-grid')).toBeInTheDocument();
-      });
+        expect(screen.getByTestId('fields-grid')).toBeInTheDocument()
+      })
 
       // Check that field types are displayed
-      expect(screen.getAllByText('String').length).toBeGreaterThan(0);
-      expect(screen.getByText('Number')).toBeInTheDocument();
-      expect(screen.getByText('Boolean')).toBeInTheDocument();
-    });
+      expect(screen.getAllByText('String').length).toBeGreaterThan(0)
+      expect(screen.getByText('Number')).toBeInTheDocument()
+      expect(screen.getByText('Boolean')).toBeInTheDocument()
+    })
 
     it('should display metadata section with timestamps', async () => {
-      renderWithProviders(<ResourceDetailPage />);
+      renderWithProviders(<ResourceDetailPage />)
 
       await waitFor(() => {
-        expect(screen.getByTestId('created-at')).toBeInTheDocument();
-        expect(screen.getByTestId('updated-at')).toBeInTheDocument();
-      });
-    });
+        expect(screen.getByTestId('created-at')).toBeInTheDocument()
+        expect(screen.getByTestId('updated-at')).toBeInTheDocument()
+      })
+    })
 
     it('should format JSON fields properly', async () => {
-      renderWithProviders(<ResourceDetailPage />);
+      renderWithProviders(<ResourceDetailPage />)
 
       await waitFor(() => {
-        const jsonField = screen.getByTestId('field-value-metadata');
-        expect(jsonField).toBeInTheDocument();
+        const jsonField = screen.getByTestId('field-value-metadata')
+        expect(jsonField).toBeInTheDocument()
         // JSON should be formatted
-        expect(jsonField.textContent).toContain('role');
-        expect(jsonField.textContent).toContain('admin');
-      });
-    });
+        expect(jsonField.textContent).toContain('role')
+        expect(jsonField.textContent).toContain('admin')
+      })
+    })
 
     it('should render reference fields as links', async () => {
-      renderWithProviders(<ResourceDetailPage />);
+      renderWithProviders(<ResourceDetailPage />)
 
       await waitFor(() => {
-        const referenceField = screen.getByTestId('field-value-organizationId');
-        const link = referenceField.querySelector('a');
-        expect(link).toBeInTheDocument();
-        expect(link).toHaveAttribute('href', '/resources/organizations/org-456');
-      });
-    });
-  });
+        const referenceField = screen.getByTestId('field-value-organizationId')
+        const link = referenceField.querySelector('a')
+        expect(link).toBeInTheDocument()
+        expect(link).toHaveAttribute('href', '/resources/organizations/org-456')
+      })
+    })
+  })
 
   describe('Navigation', () => {
     beforeEach(() => {
-      const mockFetch = vi.fn()
+      const mockFetch = vi
+        .fn()
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve(mockSchema),
@@ -386,40 +390,41 @@ describe('ResourceDetailPage', () => {
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve(mockResource),
-        });
-      wrapFetchMock(mockFetch);
-    });
+        })
+      wrapFetchMock(mockFetch)
+    })
 
     it('should navigate back to list when back button is clicked', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<ResourceDetailPage />);
+      const user = userEvent.setup()
+      renderWithProviders(<ResourceDetailPage />)
 
       await waitFor(() => {
-        expect(screen.getByTestId('back-button')).toBeInTheDocument();
-      });
+        expect(screen.getByTestId('back-button')).toBeInTheDocument()
+      })
 
-      await user.click(screen.getByTestId('back-button'));
+      await user.click(screen.getByTestId('back-button'))
 
-      expect(mockNavigate).toHaveBeenCalledWith('/resources/users');
-    });
+      expect(mockNavigate).toHaveBeenCalledWith('/resources/users')
+    })
 
     it('should navigate to edit page when edit button is clicked', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<ResourceDetailPage />);
+      const user = userEvent.setup()
+      renderWithProviders(<ResourceDetailPage />)
 
       await waitFor(() => {
-        expect(screen.getByTestId('edit-button')).toBeInTheDocument();
-      });
+        expect(screen.getByTestId('edit-button')).toBeInTheDocument()
+      })
 
-      await user.click(screen.getByTestId('edit-button'));
+      await user.click(screen.getByTestId('edit-button'))
 
-      expect(mockNavigate).toHaveBeenCalledWith('/resources/users/res-123/edit');
-    });
-  });
+      expect(mockNavigate).toHaveBeenCalledWith('/resources/users/res-123/edit')
+    })
+  })
 
   describe('Delete Functionality - Requirement 11.10', () => {
     beforeEach(() => {
-      const mockFetch = vi.fn()
+      const mockFetch = vi
+        .fn()
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve(mockSchema),
@@ -427,44 +432,45 @@ describe('ResourceDetailPage', () => {
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve(mockResource),
-        });
-      wrapFetchMock(mockFetch);
-    });
+        })
+      wrapFetchMock(mockFetch)
+    })
 
     it('should open confirmation dialog when delete button is clicked', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<ResourceDetailPage />);
+      const user = userEvent.setup()
+      renderWithProviders(<ResourceDetailPage />)
 
       await waitFor(() => {
-        expect(screen.getByTestId('delete-button')).toBeInTheDocument();
-      });
+        expect(screen.getByTestId('delete-button')).toBeInTheDocument()
+      })
 
-      await user.click(screen.getByTestId('delete-button'));
+      await user.click(screen.getByTestId('delete-button'))
 
-      expect(screen.getByTestId('confirm-dialog')).toBeInTheDocument();
-      expect(screen.getByText('Delete Record')).toBeInTheDocument();
-    });
+      expect(screen.getByTestId('confirm-dialog')).toBeInTheDocument()
+      expect(screen.getByText('Delete Record')).toBeInTheDocument()
+    })
 
     it('should close dialog when cancel is clicked', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<ResourceDetailPage />);
+      const user = userEvent.setup()
+      renderWithProviders(<ResourceDetailPage />)
 
       await waitFor(() => {
-        expect(screen.getByTestId('delete-button')).toBeInTheDocument();
-      });
+        expect(screen.getByTestId('delete-button')).toBeInTheDocument()
+      })
 
-      await user.click(screen.getByTestId('delete-button'));
-      expect(screen.getByTestId('confirm-dialog')).toBeInTheDocument();
+      await user.click(screen.getByTestId('delete-button'))
+      expect(screen.getByTestId('confirm-dialog')).toBeInTheDocument()
 
-      await user.click(screen.getByText('Cancel'));
-      expect(screen.queryByTestId('confirm-dialog')).not.toBeInTheDocument();
-    });
+      await user.click(screen.getByText('Cancel'))
+      expect(screen.queryByTestId('confirm-dialog')).not.toBeInTheDocument()
+    })
 
     it('should delete resource and navigate when confirmed', async () => {
-      const user = userEvent.setup();
-      
+      const user = userEvent.setup()
+
       // Set up complete mock including delete response
-      const mockFetch = vi.fn()
+      const mockFetch = vi
+        .fn()
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve(mockSchema),
@@ -476,32 +482,30 @@ describe('ResourceDetailPage', () => {
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve({}),
-        });
-      wrapFetchMock(mockFetch);
+        })
+      wrapFetchMock(mockFetch)
 
-      renderWithProviders(<ResourceDetailPage />);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('delete-button')).toBeInTheDocument();
-      });
-
-      await user.click(screen.getByTestId('delete-button'));
-      await user.click(screen.getByText('Confirm'));
+      renderWithProviders(<ResourceDetailPage />)
 
       await waitFor(() => {
-        expect(mockShowToast).toHaveBeenCalledWith(
-          'Record deleted successfully',
-          'success'
-        );
-        expect(mockNavigate).toHaveBeenCalledWith('/resources/users');
-      });
-    });
+        expect(screen.getByTestId('delete-button')).toBeInTheDocument()
+      })
+
+      await user.click(screen.getByTestId('delete-button'))
+      await user.click(screen.getByText('Confirm'))
+
+      await waitFor(() => {
+        expect(mockShowToast).toHaveBeenCalledWith('Record deleted successfully', 'success')
+        expect(mockNavigate).toHaveBeenCalledWith('/resources/users')
+      })
+    })
 
     it('should show error toast when delete fails', async () => {
-      const user = userEvent.setup();
-      
+      const user = userEvent.setup()
+
       // Set up complete mock including failed delete response
-      const mockFetch = vi.fn()
+      const mockFetch = vi
+        .fn()
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve(mockSchema),
@@ -510,28 +514,23 @@ describe('ResourceDetailPage', () => {
           ok: true,
           json: () => Promise.resolve(mockResource),
         })
-        .mockRejectedValueOnce(
-          new Error('Failed to delete resource')
-        );
-      wrapFetchMock(mockFetch);
+        .mockRejectedValueOnce(new Error('Failed to delete resource'))
+      wrapFetchMock(mockFetch)
 
-      renderWithProviders(<ResourceDetailPage />);
+      renderWithProviders(<ResourceDetailPage />)
 
       await waitFor(() => {
-        expect(screen.getByTestId('delete-button')).toBeInTheDocument();
-      });
+        expect(screen.getByTestId('delete-button')).toBeInTheDocument()
+      })
 
-      await user.click(screen.getByTestId('delete-button'));
-      await user.click(screen.getByText('Confirm'));
+      await user.click(screen.getByTestId('delete-button'))
+      await user.click(screen.getByText('Confirm'))
 
       await waitFor(() => {
-        expect(mockShowToast).toHaveBeenCalledWith(
-          'Failed to delete resource',
-          'error'
-        );
-      });
-    });
-  });
+        expect(mockShowToast).toHaveBeenCalledWith('Failed to delete resource', 'error')
+      })
+    })
+  })
 
   describe('Empty/Null Field Values', () => {
     it('should display placeholder for null values', async () => {
@@ -540,9 +539,10 @@ describe('ResourceDetailPage', () => {
         name: 'Test User',
         email: null as unknown as string,
         age: undefined as unknown as number,
-      };
+      }
 
-      const mockFetch = vi.fn()
+      const mockFetch = vi
+        .fn()
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve(mockSchema),
@@ -550,29 +550,30 @@ describe('ResourceDetailPage', () => {
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve(resourceWithNulls),
-        });
-      wrapFetchMock(mockFetch);
+        })
+      wrapFetchMock(mockFetch)
 
-      renderWithProviders(<ResourceDetailPage />);
+      renderWithProviders(<ResourceDetailPage />)
 
       await waitFor(() => {
-        expect(screen.getByTestId('fields-grid')).toBeInTheDocument();
-      });
+        expect(screen.getByTestId('fields-grid')).toBeInTheDocument()
+      })
 
       // Null/undefined values should show placeholder
-      expect(screen.getByTestId('field-value-email')).toHaveTextContent('-');
-      expect(screen.getByTestId('field-value-age')).toHaveTextContent('-');
-    });
-  });
+      expect(screen.getByTestId('field-value-email')).toHaveTextContent('-')
+      expect(screen.getByTestId('field-value-age')).toHaveTextContent('-')
+    })
+  })
 
   describe('Boolean Field Display', () => {
     it('should display "No" for false boolean values', async () => {
       const resourceWithFalse: Resource = {
         ...mockResource,
         active: false,
-      };
+      }
 
-      const mockFetch = vi.fn()
+      const mockFetch = vi
+        .fn()
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve(mockSchema),
@@ -580,20 +581,21 @@ describe('ResourceDetailPage', () => {
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve(resourceWithFalse),
-        });
-      wrapFetchMock(mockFetch);
+        })
+      wrapFetchMock(mockFetch)
 
-      renderWithProviders(<ResourceDetailPage />);
+      renderWithProviders(<ResourceDetailPage />)
 
       await waitFor(() => {
-        expect(screen.getByTestId('field-value-active')).toHaveTextContent('No');
-      });
-    });
-  });
+        expect(screen.getByTestId('field-value-active')).toHaveTextContent('No')
+      })
+    })
+  })
 
   describe('Props Override', () => {
     it('should use props over route params when provided', async () => {
-      const mockFetch = vi.fn()
+      const mockFetch = vi
+        .fn()
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve({ ...mockSchema, name: 'products', displayName: 'Products' }),
@@ -601,31 +603,29 @@ describe('ResourceDetailPage', () => {
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve({ ...mockResource, id: 'prod-789' }),
-        });
-      wrapFetchMock(mockFetch);
+        })
+      wrapFetchMock(mockFetch)
 
       render(
         <QueryClientProvider client={createTestQueryClient()}>
           <BrowserRouter>
             <AuthWrapper>
-              <ResourceDetailPage
-                collectionName="products"
-                resourceId="prod-789"
-              />
+              <ResourceDetailPage collectionName="products" resourceId="prod-789" />
             </AuthWrapper>
           </BrowserRouter>
         </QueryClientProvider>
-      );
+      )
 
       await waitFor(() => {
-        expect(screen.getByTestId('resource-id')).toHaveTextContent('prod-789');
-      });
-    });
-  });
+        expect(screen.getByTestId('resource-id')).toHaveTextContent('prod-789')
+      })
+    })
+  })
 
   describe('Accessibility', () => {
     beforeEach(() => {
-      const mockFetch = vi.fn()
+      const mockFetch = vi
+        .fn()
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve(mockSchema),
@@ -633,38 +633,38 @@ describe('ResourceDetailPage', () => {
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve(mockResource),
-        });
-      wrapFetchMock(mockFetch);
-    });
+        })
+      wrapFetchMock(mockFetch)
+    })
 
     it('should have proper aria labels on buttons', async () => {
-      renderWithProviders(<ResourceDetailPage />);
+      renderWithProviders(<ResourceDetailPage />)
 
       await waitFor(() => {
-        expect(screen.getByTestId('back-button')).toHaveAttribute('aria-label', 'Back');
-        expect(screen.getByTestId('edit-button')).toHaveAttribute('aria-label', 'Edit Record');
-        expect(screen.getByTestId('delete-button')).toHaveAttribute('aria-label', 'Delete Record');
-      });
-    });
+        expect(screen.getByTestId('back-button')).toHaveAttribute('aria-label', 'Back')
+        expect(screen.getByTestId('edit-button')).toHaveAttribute('aria-label', 'Edit Record')
+        expect(screen.getByTestId('delete-button')).toHaveAttribute('aria-label', 'Delete Record')
+      })
+    })
 
     it('should have proper breadcrumb navigation', async () => {
-      renderWithProviders(<ResourceDetailPage />);
+      renderWithProviders(<ResourceDetailPage />)
 
       await waitFor(() => {
-        const breadcrumb = screen.getByRole('navigation', { name: 'Breadcrumb' });
-        expect(breadcrumb).toBeInTheDocument();
-      });
-    });
+        const breadcrumb = screen.getByRole('navigation', { name: 'Breadcrumb' })
+        expect(breadcrumb).toBeInTheDocument()
+      })
+    })
 
     it('should have proper section headings', async () => {
-      renderWithProviders(<ResourceDetailPage />);
+      renderWithProviders(<ResourceDetailPage />)
 
       await waitFor(() => {
-        expect(screen.getByRole('heading', { name: 'View Record' })).toBeInTheDocument();
-        expect(screen.getByRole('heading', { name: 'ID' })).toBeInTheDocument();
-        expect(screen.getByRole('heading', { name: 'Fields' })).toBeInTheDocument();
-        expect(screen.getByRole('heading', { name: 'Metadata' })).toBeInTheDocument();
-      });
-    });
-  });
-});
+        expect(screen.getByRole('heading', { name: 'View Record' })).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: 'ID' })).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: 'Fields' })).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: 'Metadata' })).toBeInTheDocument()
+      })
+    })
+  })
+})

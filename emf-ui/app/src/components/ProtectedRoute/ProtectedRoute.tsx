@@ -9,29 +9,29 @@
  * - 2.2: Display provider selection page for multiple providers
  */
 
-import React from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
-import { LoadingSpinner } from '../LoadingSpinner';
+import React from 'react'
+import { Navigate, useLocation } from 'react-router-dom'
+import { useAuth } from '../../context/AuthContext'
+import { LoadingSpinner } from '../LoadingSpinner'
 
 /**
  * Props for the ProtectedRoute component
  */
 export interface ProtectedRouteProps {
   /** Child components to render when authenticated and authorized */
-  children: React.ReactNode;
+  children: React.ReactNode
   /** Optional policies required to access this route */
-  requiredPolicies?: string[];
+  requiredPolicies?: string[]
   /** Optional roles required to access this route */
-  requiredRoles?: string[];
+  requiredRoles?: string[]
   /** Custom redirect path for unauthenticated users (defaults to /login) */
-  loginPath?: string;
+  loginPath?: string
   /** Custom redirect path for unauthorized users (defaults to /unauthorized) */
-  unauthorizedPath?: string;
+  unauthorizedPath?: string
   /** Custom loading component */
-  loadingComponent?: React.ReactNode;
+  loadingComponent?: React.ReactNode
   /** Callback when authorization check fails */
-  onUnauthorized?: () => void;
+  onUnauthorized?: () => void
 }
 
 /**
@@ -42,12 +42,12 @@ export function hasRequiredRoles(
   requiredRoles: string[]
 ): boolean {
   if (!requiredRoles || requiredRoles.length === 0) {
-    return true;
+    return true
   }
   if (!userRoles || userRoles.length === 0) {
-    return false;
+    return false
   }
-  return requiredRoles.some((role) => userRoles.includes(role));
+  return requiredRoles.some((role) => userRoles.includes(role))
 }
 
 /**
@@ -60,12 +60,12 @@ export function hasRequiredPolicies(
   requiredPolicies: string[]
 ): boolean {
   if (!requiredPolicies || requiredPolicies.length === 0) {
-    return true;
+    return true
   }
   if (!userPolicies || userPolicies.length === 0) {
-    return false;
+    return false
   }
-  return requiredPolicies.some((policy) => userPolicies.includes(policy));
+  return requiredPolicies.some((policy) => userPolicies.includes(policy))
 }
 
 /**
@@ -102,8 +102,8 @@ export function ProtectedRoute({
   loadingComponent,
   onUnauthorized,
 }: ProtectedRouteProps): React.ReactElement {
-  const { user, isAuthenticated, isLoading } = useAuth();
-  const location = useLocation();
+  const { user, isAuthenticated, isLoading } = useAuth()
+  const location = useLocation()
 
   // Show loading state while checking authentication
   if (isLoading) {
@@ -122,7 +122,7 @@ export function ProtectedRoute({
       >
         {loadingComponent || <LoadingSpinner size="large" label="Checking authentication..." />}
       </div>
-    );
+    )
   }
 
   // Redirect to login if not authenticated
@@ -136,26 +136,26 @@ export function ProtectedRoute({
         replace
         data-testid="protected-route-redirect-login"
       />
-    );
+    )
   }
 
   // Check role-based authorization
-  const hasRoles = hasRequiredRoles(user?.roles, requiredRoles);
-  
+  const hasRoles = hasRequiredRoles(user?.roles, requiredRoles)
+
   // Check policy-based authorization
   // Note: User policies would typically come from claims or a separate authorization check
-  const userPolicies = (user?.claims?.policies as string[]) || [];
-  const hasPolicies = hasRequiredPolicies(userPolicies, requiredPolicies);
+  const userPolicies = (user?.claims?.policies as string[]) || []
+  const hasPolicies = hasRequiredPolicies(userPolicies, requiredPolicies)
 
   // Redirect to unauthorized page if user lacks required permissions
   if (!hasRoles || !hasPolicies) {
     if (onUnauthorized) {
-      onUnauthorized();
+      onUnauthorized()
     }
     return (
       <Navigate
         to={unauthorizedPath}
-        state={{ 
+        state={{
           from: location,
           requiredRoles: requiredRoles.length > 0 ? requiredRoles : undefined,
           requiredPolicies: requiredPolicies.length > 0 ? requiredPolicies : undefined,
@@ -163,11 +163,11 @@ export function ProtectedRoute({
         replace
         data-testid="protected-route-redirect-unauthorized"
       />
-    );
+    )
   }
 
   // User is authenticated and authorized, render children
-  return <>{children}</>;
+  return <>{children}</>
 }
 
-export default ProtectedRoute;
+export default ProtectedRoute

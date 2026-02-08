@@ -12,6 +12,6 @@
   width: 100%;
 }
 
-.loadingContainer[data-fullscreen="true"] {
+.loadingContainer[data-fullscreen='true'] {
   min-height: 100vh;
 }

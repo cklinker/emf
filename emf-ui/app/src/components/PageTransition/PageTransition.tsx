@@ -16,28 +16,28 @@
  * - Configurable animation duration
  */
 
-import React, { useEffect, useState, useRef } from 'react';
-import styles from './PageTransition.module.css';
+import React, { useEffect, useState, useRef } from 'react'
+import styles from './PageTransition.module.css'
 
 /**
  * Animation type options
  */
-export type TransitionType = 'fade' | 'fade-slide' | 'none';
+export type TransitionType = 'fade' | 'fade-slide' | 'none'
 
 /**
  * Props for the PageTransition component
  */
 export interface PageTransitionProps {
   /** Content to wrap with transition animation */
-  children: React.ReactNode;
+  children: React.ReactNode
   /** Type of transition animation */
-  type?: TransitionType;
+  type?: TransitionType
   /** Duration of the transition in milliseconds */
-  duration?: number;
+  duration?: number
   /** Optional custom class name */
-  className?: string;
+  className?: string
   /** Optional test ID for testing purposes */
-  'data-testid'?: string;
+  'data-testid'?: string
 }
 
 /**
@@ -47,34 +47,34 @@ function usePrefersReducedMotion(): boolean {
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(() => {
     // Check if window is available (SSR safety)
     if (typeof window === 'undefined') {
-      return false;
+      return false
     }
-    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
-    return mediaQuery.matches;
-  });
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
+    return mediaQuery.matches
+  })
 
   useEffect(() => {
     if (typeof window === 'undefined') {
-      return;
+      return
     }
 
-    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
-    
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
+
     const handleChange = (event: MediaQueryListEvent) => {
-      setPrefersReducedMotion(event.matches);
-    };
+      setPrefersReducedMotion(event.matches)
+    }
 
     // Modern browsers
     if (mediaQuery.addEventListener) {
-      mediaQuery.addEventListener('change', handleChange);
-      return () => mediaQuery.removeEventListener('change', handleChange);
+      mediaQuery.addEventListener('change', handleChange)
+      return () => mediaQuery.removeEventListener('change', handleChange)
     }
     // Legacy browsers
-    mediaQuery.addListener(handleChange);
-    return () => mediaQuery.removeListener(handleChange);
-  }, []);
+    mediaQuery.addListener(handleChange)
+    return () => mediaQuery.removeListener(handleChange)
+  }, [])
 
-  return prefersReducedMotion;
+  return prefersReducedMotion
 }
 
 /**
@@ -107,24 +107,24 @@ export function PageTransition({
   className,
   'data-testid': testId = 'page-transition',
 }: PageTransitionProps): React.ReactElement {
-  const [isVisible, setIsVisible] = useState(false);
-  const prefersReducedMotion = usePrefersReducedMotion();
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [isVisible, setIsVisible] = useState(false)
+  const prefersReducedMotion = usePrefersReducedMotion()
+  const containerRef = useRef<HTMLDivElement>(null)
 
   // Trigger animation on mount
   useEffect(() => {
     // Use requestAnimationFrame to ensure the initial state is rendered first
     const frameId = requestAnimationFrame(() => {
-      setIsVisible(true);
-    });
+      setIsVisible(true)
+    })
 
     return () => {
-      cancelAnimationFrame(frameId);
-    };
-  }, []);
+      cancelAnimationFrame(frameId)
+    }
+  }, [])
 
   // Determine effective transition type based on reduced motion preference
-  const effectiveType = prefersReducedMotion ? 'none' : type;
+  const effectiveType = prefersReducedMotion ? 'none' : type
 
   // Build class names
   const containerClasses = [
@@ -132,12 +132,14 @@ export function PageTransition({
     styles[effectiveType.replace('-', '')], // 'fade-slide' -> 'fadeslide'
     isVisible ? styles.visible : styles.hidden,
     className,
-  ].filter(Boolean).join(' ');
+  ]
+    .filter(Boolean)
+    .join(' ')
 
   // Set CSS custom property for duration
   const style: React.CSSProperties = {
     '--transition-duration': `${duration}ms`,
-  } as React.CSSProperties;
+  } as React.CSSProperties
 
   return (
     <div
@@ -150,11 +152,11 @@ export function PageTransition({
     >
       {children}
     </div>
-  );
+  )
 }
 
 // Export the hook for external use
-export { usePrefersReducedMotion };
+export { usePrefersReducedMotion }
 
 // Export default for convenience
-export default PageTransition;
+export default PageTransition

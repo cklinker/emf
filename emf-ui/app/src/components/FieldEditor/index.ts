@@ -4,7 +4,12 @@
  * Exports the FieldEditor component and related types.
  */
 
-export { FieldEditor, fieldEditorSchema, FIELD_TYPES, VALIDATION_RULES_BY_TYPE } from './FieldEditor';
+export {
+  FieldEditor,
+  fieldEditorSchema,
+  FIELD_TYPES,
+  VALIDATION_RULES_BY_TYPE,
+} from './FieldEditor'
 export type {
   FieldEditorProps,
   FieldEditorFormData,
@@ -13,5 +18,5 @@ export type {
   ValidationRule,
   ValidationRuleType,
   CollectionSummary,
-} from './FieldEditor';
-export { default } from './FieldEditor';
+} from './FieldEditor'
+export { default } from './FieldEditor'

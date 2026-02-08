@@ -108,7 +108,9 @@
   border-bottom: 1px solid var(--color-border, #e0e0e0);
   background-color: var(--color-surface, #ffffff);
   cursor: grab;
-  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    background-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .fieldItem:last-child {
@@ -262,7 +264,9 @@
   border: 1px solid transparent;
   border-radius: var(--border-radius-sm, 4px);
   cursor: pointer;
-  transition: background-color 0.2s ease, border-color 0.2s ease;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease;
 }
 
 .actionButton:hover {

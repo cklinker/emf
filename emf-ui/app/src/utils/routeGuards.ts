@@ -9,21 +9,21 @@
  * - 2.2: Display provider selection page for multiple providers
  */
 
-import type { User } from '../types/auth';
-import type { PageConfig } from '../types/config';
+import type { User } from '../types/auth'
+import type { PageConfig } from '../types/config'
 
 /**
  * Authorization check result
  */
 export interface AuthorizationResult {
   /** Whether the user is authorized */
-  authorized: boolean;
+  authorized: boolean
   /** Reason for denial if not authorized */
-  reason?: 'unauthenticated' | 'missing_role' | 'missing_policy';
+  reason?: 'unauthenticated' | 'missing_role' | 'missing_policy'
   /** Missing roles if authorization failed due to roles */
-  missingRoles?: string[];
+  missingRoles?: string[]
   /** Missing policies if authorization failed due to policies */
-  missingPolicies?: string[];
+  missingPolicies?: string[]
 }
 
 /**
@@ -42,33 +42,29 @@ export function checkPageAuthorization(
     return {
       authorized: false,
       reason: 'unauthenticated',
-    };
+    }
   }
 
   // If no policies are defined, allow access
   if (!pageConfig.policies || pageConfig.policies.length === 0) {
-    return { authorized: true };
+    return { authorized: true }
   }
 
   // Get user's policies from claims
-  const userPolicies = (user.claims?.policies as string[]) || [];
+  const userPolicies = (user.claims?.policies as string[]) || []
 
   // Check if user has any of the required policies
-  const hasPolicy = pageConfig.policies.some((policy) =>
-    userPolicies.includes(policy)
-  );
+  const hasPolicy = pageConfig.policies.some((policy) => userPolicies.includes(policy))
 
   if (!hasPolicy) {
     return {
       authorized: false,
       reason: 'missing_policy',
-      missingPolicies: pageConfig.policies.filter(
-        (policy) => !userPolicies.includes(policy)
-      ),
-    };
+      missingPolicies: pageConfig.policies.filter((policy) => !userPolicies.includes(policy)),
+    }
   }
 
-  return { authorized: true };
+  return { authorized: true }
 }
 
 /**
@@ -87,29 +83,29 @@ export function checkRoleAuthorization(
     return {
       authorized: false,
       reason: 'unauthenticated',
-    };
+    }
   }
 
   // If no roles are required, allow access
   if (!requiredRoles || requiredRoles.length === 0) {
-    return { authorized: true };
+    return { authorized: true }
   }
 
   // Get user's roles
-  const userRoles = user.roles || [];
+  const userRoles = user.roles || []
 
   // Check if user has any of the required roles
-  const hasRole = requiredRoles.some((role) => userRoles.includes(role));
+  const hasRole = requiredRoles.some((role) => userRoles.includes(role))
 
   if (!hasRole) {
     return {
       authorized: false,
       reason: 'missing_role',
       missingRoles: requiredRoles.filter((role) => !userRoles.includes(role)),
-    };
+    }
   }
 
-  return { authorized: true };
+  return { authorized: true }
 }
 
 /**
@@ -128,33 +124,29 @@ export function checkPolicyAuthorization(
     return {
       authorized: false,
       reason: 'unauthenticated',
-    };
+    }
   }
 
   // If no policies are required, allow access
   if (!requiredPolicies || requiredPolicies.length === 0) {
-    return { authorized: true };
+    return { authorized: true }
   }
 
   // Get user's policies from claims
-  const userPolicies = (user.claims?.policies as string[]) || [];
+  const userPolicies = (user.claims?.policies as string[]) || []
 
   // Check if user has any of the required policies
-  const hasPolicy = requiredPolicies.some((policy) =>
-    userPolicies.includes(policy)
-  );
+  const hasPolicy = requiredPolicies.some((policy) => userPolicies.includes(policy))
 
   if (!hasPolicy) {
     return {
       authorized: false,
       reason: 'missing_policy',
-      missingPolicies: requiredPolicies.filter(
-        (policy) => !userPolicies.includes(policy)
-      ),
-    };
+      missingPolicies: requiredPolicies.filter((policy) => !userPolicies.includes(policy)),
+    }
   }
 
-  return { authorized: true };
+  return { authorized: true }
 }
 
 /**
@@ -175,22 +167,22 @@ export function checkAuthorization(
     return {
       authorized: false,
       reason: 'unauthenticated',
-    };
+    }
   }
 
   // Check roles
-  const roleResult = checkRoleAuthorization(user, requiredRoles);
+  const roleResult = checkRoleAuthorization(user, requiredRoles)
   if (!roleResult.authorized && roleResult.reason === 'missing_role') {
-    return roleResult;
+    return roleResult
   }
 
   // Check policies
-  const policyResult = checkPolicyAuthorization(user, requiredPolicies);
+  const policyResult = checkPolicyAuthorization(user, requiredPolicies)
   if (!policyResult.authorized && policyResult.reason === 'missing_policy') {
-    return policyResult;
+    return policyResult
   }
 
-  return { authorized: true };
+  return { authorized: true }
 }
 
 /**
@@ -207,14 +199,14 @@ export function getRedirectPath(
   unauthorizedPath: string = '/unauthorized'
 ): string {
   if (result.authorized) {
-    return '';
+    return ''
   }
 
   if (result.reason === 'unauthenticated') {
-    return loginPath;
+    return loginPath
   }
 
-  return unauthorizedPath;
+  return unauthorizedPath
 }
 
 /**
@@ -224,18 +216,15 @@ export function getRedirectPath(
  * @param user - The current user
  * @returns Array of pages the user is authorized to access
  */
-export function filterAuthorizedPages(
-  pages: PageConfig[],
-  user: User | null
-): PageConfig[] {
+export function filterAuthorizedPages(pages: PageConfig[], user: User | null): PageConfig[] {
   if (!user) {
-    return [];
+    return []
   }
 
   return pages.filter((page) => {
-    const result = checkPageAuthorization(user, page);
-    return result.authorized;
-  });
+    const result = checkPageAuthorization(user, page)
+    return result.authorized
+  })
 }
 
 /**
@@ -252,12 +241,12 @@ export function canAccessRoute(
   user: User | null
 ): AuthorizationResult {
   // Find the page config for this path
-  const pageConfig = pages.find((page) => page.path === path);
+  const pageConfig = pages.find((page) => page.path === path)
 
   // If no page config found, assume public access
   if (!pageConfig) {
-    return { authorized: true };
+    return { authorized: true }
   }
 
-  return checkPageAuthorization(user, pageConfig);
+  return checkPageAuthorization(user, pageConfig)
 }

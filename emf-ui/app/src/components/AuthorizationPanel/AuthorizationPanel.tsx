@@ -18,62 +18,62 @@
  * - Accessible with keyboard navigation and ARIA attributes
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
-import { useI18n } from '../../context/I18nContext';
-import { LoadingSpinner } from '../LoadingSpinner';
-import styles from './AuthorizationPanel.module.css';
+import React, { useState, useCallback, useMemo } from 'react'
+import { useI18n } from '../../context/I18nContext'
+import { LoadingSpinner } from '../LoadingSpinner'
+import styles from './AuthorizationPanel.module.css'
 
 /**
  * Operation types for route-level authorization
  */
-export type RouteOperation = 'create' | 'read' | 'update' | 'delete' | 'list';
+export type RouteOperation = 'create' | 'read' | 'update' | 'delete' | 'list'
 
 /**
  * Operation types for field-level authorization
  */
-export type FieldOperation = 'read' | 'write';
+export type FieldOperation = 'read' | 'write'
 
 /**
  * Policy summary for dropdown selection
  */
 export interface PolicySummary {
-  id: string;
-  name: string;
-  description?: string;
+  id: string
+  name: string
+  description?: string
 }
 
 /**
  * Route policy configuration
  */
 export interface RoutePolicyConfig {
-  operation: RouteOperation;
-  policyId: string | null;
+  operation: RouteOperation
+  policyId: string | null
 }
 
 /**
  * Field policy configuration
  */
 export interface FieldPolicyConfig {
-  fieldName: string;
-  operation: FieldOperation;
-  policyId: string | null;
+  fieldName: string
+  operation: FieldOperation
+  policyId: string | null
 }
 
 /**
  * Field definition for field-level authorization
  */
 export interface FieldDefinition {
-  id: string;
-  name: string;
-  displayName?: string;
+  id: string
+  name: string
+  displayName?: string
 }
 
 /**
  * Collection authorization configuration
  */
 export interface CollectionAuthz {
-  routePolicies: RoutePolicyConfig[];
-  fieldPolicies: FieldPolicyConfig[];
+  routePolicies: RoutePolicyConfig[]
+  fieldPolicies: FieldPolicyConfig[]
 }
 
 /**
@@ -81,36 +81,36 @@ export interface CollectionAuthz {
  */
 export interface AuthorizationPanelProps {
   /** Collection ID for context */
-  collectionId: string;
+  collectionId: string
   /** Collection name for display */
-  collectionName: string;
+  collectionName: string
   /** Fields in the collection for field-level authorization */
-  fields: FieldDefinition[];
+  fields: FieldDefinition[]
   /** Available policies for selection */
-  policies: PolicySummary[];
+  policies: PolicySummary[]
   /** Current authorization configuration */
-  authz?: CollectionAuthz;
+  authz?: CollectionAuthz
   /** Callback when route policy changes */
-  onRouteAuthzChange: (routePolicies: RoutePolicyConfig[]) => void;
+  onRouteAuthzChange: (routePolicies: RoutePolicyConfig[]) => void
   /** Callback when field policy changes */
-  onFieldAuthzChange: (fieldPolicies: FieldPolicyConfig[]) => void;
+  onFieldAuthzChange: (fieldPolicies: FieldPolicyConfig[]) => void
   /** Whether the panel is in a loading state */
-  isLoading?: boolean;
+  isLoading?: boolean
   /** Whether the panel is in a saving state */
-  isSaving?: boolean;
+  isSaving?: boolean
   /** Test ID for the component */
-  testId?: string;
+  testId?: string
 }
 
 /**
  * All route operations
  */
-export const ROUTE_OPERATIONS: RouteOperation[] = ['create', 'read', 'update', 'delete', 'list'];
+export const ROUTE_OPERATIONS: RouteOperation[] = ['create', 'read', 'update', 'delete', 'list']
 
 /**
  * All field operations
  */
-export const FIELD_OPERATIONS: FieldOperation[] = ['read', 'write'];
+export const FIELD_OPERATIONS: FieldOperation[] = ['read', 'write']
 
 /**
  * Get the icon for an operation
@@ -123,8 +123,8 @@ function getOperationIcon(operation: RouteOperation | FieldOperation): string {
     delete: '🗑️',
     list: '📋',
     write: '✏️',
-  };
-  return icons[operation] || '•';
+  }
+  return icons[operation] || '•'
 }
 
 /**
@@ -159,96 +159,111 @@ export function AuthorizationPanel({
   isSaving = false,
   testId = 'authorization-panel',
 }: AuthorizationPanelProps): React.ReactElement {
-  const { t } = useI18n();
-  
+  const { t } = useI18n()
+
   // State for expanded field sections
-  const [expandedFields, setExpandedFields] = useState<Set<string>>(new Set());
+  const [expandedFields, setExpandedFields] = useState<Set<string>>(new Set())
 
   // Get current route policy for an operation
-  const getRoutePolicy = useCallback((operation: RouteOperation): string | null => {
-    const config = authz?.routePolicies?.find(p => p.operation === operation);
-    return config?.policyId ?? null;
-  }, [authz]);
+  const getRoutePolicy = useCallback(
+    (operation: RouteOperation): string | null => {
+      const config = authz?.routePolicies?.find((p) => p.operation === operation)
+      return config?.policyId ?? null
+    },
+    [authz]
+  )
 
   // Get current field policy for a field and operation
-  const getFieldPolicy = useCallback((fieldName: string, operation: FieldOperation): string | null => {
-    const config = authz?.fieldPolicies?.find(
-      p => p.fieldName === fieldName && p.operation === operation
-    );
-    return config?.policyId ?? null;
-  }, [authz]);
+  const getFieldPolicy = useCallback(
+    (fieldName: string, operation: FieldOperation): string | null => {
+      const config = authz?.fieldPolicies?.find(
+        (p) => p.fieldName === fieldName && p.operation === operation
+      )
+      return config?.policyId ?? null
+    },
+    [authz]
+  )
 
   // Handle route policy change
-  const handleRouteAuthzChange = useCallback((operation: RouteOperation, policyId: string | null) => {
-    const currentPolicies = authz?.routePolicies ?? [];
-    const existingIndex = currentPolicies.findIndex(p => p.operation === operation);
-    
-    let newPolicies: RoutePolicyConfig[];
-    if (existingIndex >= 0) {
-      // Update existing
-      newPolicies = [...currentPolicies];
-      newPolicies[existingIndex] = { operation, policyId };
-    } else {
-      // Add new
-      newPolicies = [...currentPolicies, { operation, policyId }];
-    }
-    
-    // Remove entries with null policyId
-    newPolicies = newPolicies.filter(p => p.policyId !== null);
-    
-    onRouteAuthzChange(newPolicies);
-  }, [authz, onRouteAuthzChange]);
+  const handleRouteAuthzChange = useCallback(
+    (operation: RouteOperation, policyId: string | null) => {
+      const currentPolicies = authz?.routePolicies ?? []
+      const existingIndex = currentPolicies.findIndex((p) => p.operation === operation)
+
+      let newPolicies: RoutePolicyConfig[]
+      if (existingIndex >= 0) {
+        // Update existing
+        newPolicies = [...currentPolicies]
+        newPolicies[existingIndex] = { operation, policyId }
+      } else {
+        // Add new
+        newPolicies = [...currentPolicies, { operation, policyId }]
+      }
+
+      // Remove entries with null policyId
+      newPolicies = newPolicies.filter((p) => p.policyId !== null)
+
+      onRouteAuthzChange(newPolicies)
+    },
+    [authz, onRouteAuthzChange]
+  )
 
   // Handle field policy change
-  const handleFieldAuthzChange = useCallback((fieldName: string, operation: FieldOperation, policyId: string | null) => {
-    const currentPolicies = authz?.fieldPolicies ?? [];
-    const existingIndex = currentPolicies.findIndex(
-      p => p.fieldName === fieldName && p.operation === operation
-    );
-    
-    let newPolicies: FieldPolicyConfig[];
-    if (existingIndex >= 0) {
-      // Update existing
-      newPolicies = [...currentPolicies];
-      newPolicies[existingIndex] = { fieldName, operation, policyId };
-    } else {
-      // Add new
-      newPolicies = [...currentPolicies, { fieldName, operation, policyId }];
-    }
-    
-    // Remove entries with null policyId
-    newPolicies = newPolicies.filter(p => p.policyId !== null);
-    
-    onFieldAuthzChange(newPolicies);
-  }, [authz, onFieldAuthzChange]);
+  const handleFieldAuthzChange = useCallback(
+    (fieldName: string, operation: FieldOperation, policyId: string | null) => {
+      const currentPolicies = authz?.fieldPolicies ?? []
+      const existingIndex = currentPolicies.findIndex(
+        (p) => p.fieldName === fieldName && p.operation === operation
+      )
+
+      let newPolicies: FieldPolicyConfig[]
+      if (existingIndex >= 0) {
+        // Update existing
+        newPolicies = [...currentPolicies]
+        newPolicies[existingIndex] = { fieldName, operation, policyId }
+      } else {
+        // Add new
+        newPolicies = [...currentPolicies, { fieldName, operation, policyId }]
+      }
+
+      // Remove entries with null policyId
+      newPolicies = newPolicies.filter((p) => p.policyId !== null)
+
+      onFieldAuthzChange(newPolicies)
+    },
+    [authz, onFieldAuthzChange]
+  )
 
   // Toggle field expansion
   const toggleFieldExpansion = useCallback((fieldId: string) => {
-    setExpandedFields(prev => {
-      const newSet = new Set(prev);
+    setExpandedFields((prev) => {
+      const newSet = new Set(prev)
       if (newSet.has(fieldId)) {
-        newSet.delete(fieldId);
+        newSet.delete(fieldId)
       } else {
-        newSet.add(fieldId);
+        newSet.add(fieldId)
       }
-      return newSet;
-    });
-  }, []);
+      return newSet
+    })
+  }, [])
 
   // Check if a field has any policies configured
-  const hasFieldPolicies = useCallback((fieldName: string): boolean => {
-    return authz?.fieldPolicies?.some(p => p.fieldName === fieldName && p.policyId) ?? false;
-  }, [authz]);
+  const hasFieldPolicies = useCallback(
+    (fieldName: string): boolean => {
+      return authz?.fieldPolicies?.some((p) => p.fieldName === fieldName && p.policyId) ?? false
+    },
+    [authz]
+  )
 
   // Count configured route policies
   const configuredRoutePoliciesCount = useMemo(() => {
-    return authz?.routePolicies?.filter(p => p.policyId).length ?? 0;
-  }, [authz]);
+    return authz?.routePolicies?.filter((p) => p.policyId).length ?? 0
+  }, [authz])
 
   // Count configured field policies
   const configuredFieldPoliciesCount = useMemo(() => {
-    return authz?.fieldPolicies?.filter(p => p.policyId).length ?? 0;
-  }, [authz]);
+    return authz?.fieldPolicies?.filter((p) => p.policyId).length ?? 0
+  }, [authz])
 
   // Render loading state
   if (isLoading) {
@@ -261,7 +276,7 @@ export function AuthorizationPanel({
           <LoadingSpinner size="medium" label={t('common.loading')} />
         </div>
       </div>
-    );
+    )
   }
 
   return (
@@ -279,12 +294,14 @@ export function AuthorizationPanel({
 
       {/* Authorization Hint */}
       <div className={styles.hint} data-testid={`${testId}-hint`}>
-        <span className={styles.hintIcon} aria-hidden="true">💡</span>
+        <span className={styles.hintIcon} aria-hidden="true">
+          💡
+        </span>
         <p className={styles.hintText}>{t('authorizationPanel.hint')}</p>
       </div>
 
       {/* Route-Level Authorization Section */}
-      <section 
+      <section
         className={styles.section}
         aria-labelledby="route-authz-heading"
         data-testid={`${testId}-route-section`}
@@ -294,21 +311,21 @@ export function AuthorizationPanel({
             {t('authorization.routeAuthorization')}
           </h4>
           <span className={styles.badge} data-testid={`${testId}-route-count`}>
-            {t('authorizationPanel.configuredCount', { count: String(configuredRoutePoliciesCount) })}
+            {t('authorizationPanel.configuredCount', {
+              count: String(configuredRoutePoliciesCount),
+            })}
           </span>
         </div>
-        
-        <p className={styles.sectionDescription}>
-          {t('authorizationPanel.routeDescription')}
-        </p>
 
-        <div 
+        <p className={styles.sectionDescription}>{t('authorizationPanel.routeDescription')}</p>
+
+        <div
           className={styles.operationsList}
           role="list"
           aria-label={t('authorizationPanel.routeOperationsLabel')}
         >
           {ROUTE_OPERATIONS.map((operation) => (
-            <div 
+            <div
               key={operation}
               className={styles.operationItem}
               role="listitem"
@@ -318,10 +335,7 @@ export function AuthorizationPanel({
                 <span className={styles.operationIcon} aria-hidden="true">
                   {getOperationIcon(operation)}
                 </span>
-                <label 
-                  htmlFor={`route-policy-${operation}`}
-                  className={styles.operationLabel}
-                >
+                <label htmlFor={`route-policy-${operation}`} className={styles.operationLabel}>
                   {t(`authorization.operations.${operation}`)}
                 </label>
               </div>
@@ -329,10 +343,7 @@ export function AuthorizationPanel({
                 id={`route-policy-${operation}`}
                 className={styles.policySelect}
                 value={getRoutePolicy(operation) ?? ''}
-                onChange={(e) => handleRouteAuthzChange(
-                  operation, 
-                  e.target.value || null
-                )}
+                onChange={(e) => handleRouteAuthzChange(operation, e.target.value || null)}
                 disabled={isSaving}
                 aria-describedby={`route-policy-${operation}-hint`}
                 data-testid={`${testId}-route-${operation}-select`}
@@ -344,11 +355,10 @@ export function AuthorizationPanel({
                   </option>
                 ))}
               </select>
-              <span 
-                id={`route-policy-${operation}-hint`}
-                className={styles.visuallyHidden}
-              >
-                {t('authorizationPanel.selectPolicyHint', { operation: t(`authorization.operations.${operation}`) })}
+              <span id={`route-policy-${operation}-hint`} className={styles.visuallyHidden}>
+                {t('authorizationPanel.selectPolicyHint', {
+                  operation: t(`authorization.operations.${operation}`),
+                })}
               </span>
             </div>
           ))}
@@ -356,7 +366,7 @@ export function AuthorizationPanel({
       </section>
 
       {/* Field-Level Authorization Section */}
-      <section 
+      <section
         className={styles.section}
         aria-labelledby="field-authz-heading"
         data-testid={`${testId}-field-section`}
@@ -366,30 +376,30 @@ export function AuthorizationPanel({
             {t('authorization.fieldAuthorization')}
           </h4>
           <span className={styles.badge} data-testid={`${testId}-field-count`}>
-            {t('authorizationPanel.configuredCount', { count: String(configuredFieldPoliciesCount) })}
+            {t('authorizationPanel.configuredCount', {
+              count: String(configuredFieldPoliciesCount),
+            })}
           </span>
         </div>
-        
-        <p className={styles.sectionDescription}>
-          {t('authorizationPanel.fieldDescription')}
-        </p>
+
+        <p className={styles.sectionDescription}>{t('authorizationPanel.fieldDescription')}</p>
 
         {fields.length === 0 ? (
           <div className={styles.emptyState} data-testid={`${testId}-no-fields`}>
             <p>{t('authorizationPanel.noFields')}</p>
           </div>
         ) : (
-          <div 
+          <div
             className={styles.fieldsList}
             role="list"
             aria-label={t('authorizationPanel.fieldListLabel')}
           >
             {fields.map((field) => {
-              const isExpanded = expandedFields.has(field.id);
-              const hasPolicies = hasFieldPolicies(field.name);
-              
+              const isExpanded = expandedFields.has(field.id)
+              const hasPolicies = hasFieldPolicies(field.name)
+
               return (
-                <div 
+                <div
                   key={field.id}
                   className={`${styles.fieldItem} ${isExpanded ? styles.expanded : ''}`}
                   role="listitem"
@@ -403,22 +413,18 @@ export function AuthorizationPanel({
                     aria-controls={`field-authz-${field.id}`}
                     data-testid={`${testId}-field-${field.id}-toggle`}
                   >
-                    <span 
+                    <span
                       className={`${styles.expandIcon} ${isExpanded ? styles.rotated : ''}`}
                       aria-hidden="true"
                     >
                       ▶
                     </span>
-                    <span className={styles.fieldName}>
-                      {field.displayName || field.name}
-                    </span>
+                    <span className={styles.fieldName}>{field.displayName || field.name}</span>
                     {field.displayName && field.displayName !== field.name && (
-                      <span className={styles.fieldTechnicalName}>
-                        ({field.name})
-                      </span>
+                      <span className={styles.fieldTechnicalName}>({field.name})</span>
                     )}
                     {hasPolicies && (
-                      <span 
+                      <span
                         className={styles.configuredBadge}
                         title={t('authorizationPanel.hasConfiguredPolicies')}
                         aria-label={t('authorizationPanel.hasConfiguredPolicies')}
@@ -427,15 +433,15 @@ export function AuthorizationPanel({
                       </span>
                     )}
                   </button>
-                  
+
                   {isExpanded && (
-                    <div 
+                    <div
                       id={`field-authz-${field.id}`}
                       className={styles.fieldOperations}
                       data-testid={`${testId}-field-${field.id}-operations`}
                     >
                       {FIELD_OPERATIONS.map((operation) => (
-                        <div 
+                        <div
                           key={operation}
                           className={styles.fieldOperationItem}
                           data-testid={`${testId}-field-${field.id}-${operation}`}
@@ -444,7 +450,7 @@ export function AuthorizationPanel({
                             <span className={styles.operationIcon} aria-hidden="true">
                               {getOperationIcon(operation)}
                             </span>
-                            <label 
+                            <label
                               htmlFor={`field-policy-${field.id}-${operation}`}
                               className={styles.operationLabel}
                             >
@@ -455,11 +461,9 @@ export function AuthorizationPanel({
                             id={`field-policy-${field.id}-${operation}`}
                             className={styles.policySelect}
                             value={getFieldPolicy(field.name, operation) ?? ''}
-                            onChange={(e) => handleFieldAuthzChange(
-                              field.name,
-                              operation, 
-                              e.target.value || null
-                            )}
+                            onChange={(e) =>
+                              handleFieldAuthzChange(field.name, operation, e.target.value || null)
+                            }
                             disabled={isSaving}
                             data-testid={`${testId}-field-${field.id}-${operation}-select`}
                           >
@@ -475,7 +479,7 @@ export function AuthorizationPanel({
                     </div>
                   )}
                 </div>
-              );
+              )
             })}
           </div>
         )}
@@ -484,12 +488,14 @@ export function AuthorizationPanel({
       {/* No Policies Warning */}
       {policies.length === 0 && (
         <div className={styles.warningBanner} data-testid={`${testId}-no-policies-warning`}>
-          <span className={styles.warningIcon} aria-hidden="true">⚠️</span>
+          <span className={styles.warningIcon} aria-hidden="true">
+            ⚠️
+          </span>
           <p className={styles.warningText}>{t('authorizationPanel.noPoliciesWarning')}</p>
         </div>
       )}
     </div>
-  );
+  )
 }
 
-export default AuthorizationPanel;
+export default AuthorizationPanel

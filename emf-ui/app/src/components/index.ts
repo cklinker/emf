@@ -1,74 +1,87 @@
 /**
  * Shared UI Components
- * 
+ *
  * This module exports all shared UI components used throughout the application.
  * Components include: Header, Sidebar, Toast, ConfirmDialog, LoadingSpinner, ErrorMessage, etc.
  */
 
 // Export shared components
-export { AppShell, useAppShell } from './AppShell';
-export type { AppShellProps, AppShellContextValue } from './AppShell';
-export { BREAKPOINTS } from './AppShell';
-export type { ScreenSize } from './AppShell';
+export { AppShell, useAppShell } from './AppShell'
+export type { AppShellProps, AppShellContextValue } from './AppShell'
+export { BREAKPOINTS } from './AppShell'
+export type { ScreenSize } from './AppShell'
 
 // Header component
-export { Header } from './Header';
-export type { HeaderProps } from './Header';
+export { Header } from './Header'
+export type { HeaderProps } from './Header'
 
 // Sidebar component
-export { Sidebar } from './Sidebar';
-export type { SidebarProps } from './Sidebar';
+export { Sidebar } from './Sidebar'
+export type { SidebarProps } from './Sidebar'
 
 // ErrorBoundary component
-export { ErrorBoundary, ErrorFallback } from './ErrorBoundary';
-export type { ErrorBoundaryProps, ErrorBoundaryState, ErrorFallbackProps } from './ErrorBoundary';
+export { ErrorBoundary, ErrorFallback } from './ErrorBoundary'
+export type { ErrorBoundaryProps, ErrorBoundaryState, ErrorFallbackProps } from './ErrorBoundary'
 
 // Toast notification system
-export { Toast, ToastProvider, useToast, ToastContext, DEFAULT_DURATION, DEFAULT_MAX_TOASTS } from './Toast';
-export type { ToastType, ToastData, ToastProps, ToastContextValue, ToastProviderProps } from './Toast';
+export {
+  Toast,
+  ToastProvider,
+  useToast,
+  ToastContext,
+  DEFAULT_DURATION,
+  DEFAULT_MAX_TOASTS,
+} from './Toast'
+export type {
+  ToastType,
+  ToastData,
+  ToastProps,
+  ToastContextValue,
+  ToastProviderProps,
+} from './Toast'
 
 // ConfirmDialog component
-export { ConfirmDialog } from './ConfirmDialog';
-export type { ConfirmDialogProps, ConfirmDialogVariant } from './ConfirmDialog';
+export { ConfirmDialog } from './ConfirmDialog'
+export type { ConfirmDialogProps, ConfirmDialogVariant } from './ConfirmDialog'
 
 // LoadingSpinner component
-export { LoadingSpinner } from './LoadingSpinner';
-export type { LoadingSpinnerProps, SpinnerSize } from './LoadingSpinner';
+export { LoadingSpinner } from './LoadingSpinner'
+export type { LoadingSpinnerProps, SpinnerSize } from './LoadingSpinner'
 
 // ErrorMessage component
-export { ErrorMessage } from './ErrorMessage';
-export type { ErrorMessageProps, ErrorType, ErrorVariant } from './ErrorMessage';
+export { ErrorMessage } from './ErrorMessage'
+export type { ErrorMessageProps, ErrorType, ErrorVariant } from './ErrorMessage'
 
 // CollectionForm component
-export { CollectionForm, collectionFormSchema } from './CollectionForm';
+export { CollectionForm, collectionFormSchema } from './CollectionForm'
 export type {
   CollectionFormProps,
   CollectionFormData,
   CollectionFormSchema,
   Collection as CollectionFormCollection,
   StorageMode,
-} from './CollectionForm';
+} from './CollectionForm'
 
 // FieldsPanel component
-export { FieldsPanel } from './FieldsPanel';
-export type {
-  FieldsPanelProps,
-  FieldDefinition,
-  FieldType,
-  ValidationRule,
-} from './FieldsPanel';
+export { FieldsPanel } from './FieldsPanel'
+export type { FieldsPanelProps, FieldDefinition, FieldType, ValidationRule } from './FieldsPanel'
 
 // FieldEditor component
-export { FieldEditor, fieldEditorSchema, FIELD_TYPES, VALIDATION_RULES_BY_TYPE } from './FieldEditor';
+export {
+  FieldEditor,
+  fieldEditorSchema,
+  FIELD_TYPES,
+  VALIDATION_RULES_BY_TYPE,
+} from './FieldEditor'
 export type {
   FieldEditorProps,
   FieldEditorFormData,
   ValidationRuleType,
   CollectionSummary,
-} from './FieldEditor';
+} from './FieldEditor'
 
 // AuthorizationPanel component
-export { AuthorizationPanel, ROUTE_OPERATIONS, FIELD_OPERATIONS } from './AuthorizationPanel';
+export { AuthorizationPanel, ROUTE_OPERATIONS, FIELD_OPERATIONS } from './AuthorizationPanel'
 export type {
   AuthorizationPanelProps,
   RouteOperation,
@@ -78,30 +91,30 @@ export type {
   FieldPolicyConfig,
   FieldDefinition as AuthorizationFieldDefinition,
   CollectionAuthz,
-} from './AuthorizationPanel';
+} from './AuthorizationPanel'
 
 // LiveRegion component for screen reader announcements
-export { LiveRegion, LiveRegionProvider, useAnnounce } from './LiveRegion';
+export { LiveRegion, LiveRegionProvider, useAnnounce } from './LiveRegion'
 export type {
   LiveRegionProps,
   LiveRegionPoliteness,
   LiveRegionContextValue,
   LiveRegionProviderProps,
-} from './LiveRegion';
+} from './LiveRegion'
 
 // ProtectedRoute component for route guards
-export { ProtectedRoute, hasRequiredRoles, hasRequiredPolicies } from './ProtectedRoute';
-export type { ProtectedRouteProps } from './ProtectedRoute';
+export { ProtectedRoute, hasRequiredRoles, hasRequiredPolicies } from './ProtectedRoute'
+export type { ProtectedRouteProps } from './ProtectedRoute'
 
 // PageTransition component for page animations
-export { PageTransition, usePrefersReducedMotion } from './PageTransition';
-export type { PageTransitionProps, TransitionType } from './PageTransition';
+export { PageTransition, usePrefersReducedMotion } from './PageTransition'
+export type { PageTransitionProps, TransitionType } from './PageTransition'
 
 // PageLoader component for loading states
-export { PageLoader, Skeleton, ContentLoader } from './PageLoader';
+export { PageLoader, Skeleton, ContentLoader } from './PageLoader'
 export type {
   PageLoaderProps,
   SkeletonProps,
   SkeletonVariant,
   ContentLoaderProps,
-} from './PageLoader';
+} from './PageLoader'

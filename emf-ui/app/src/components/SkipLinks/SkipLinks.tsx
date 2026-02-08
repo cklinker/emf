@@ -1,12 +1,12 @@
 /**
  * SkipLinks Component
- * 
+ *
  * Provides skip navigation links for keyboard users to bypass repetitive content.
  * These links are visually hidden but become visible when focused.
- * 
+ *
  * Requirements:
  * - 14.2: All interactive elements are keyboard accessible
- * 
+ *
  * Features:
  * - Skip to main content
  * - Skip to navigation
@@ -14,17 +14,17 @@
  * - Accessible to screen readers
  */
 
-import React from 'react';
-import styles from './SkipLinks.module.css';
+import React from 'react'
+import styles from './SkipLinks.module.css'
 
 /**
  * Skip link target definition
  */
 export interface SkipLinkTarget {
   /** Unique identifier for the target element (without #) */
-  id: string;
+  id: string
   /** Label for the skip link */
-  label: string;
+  label: string
 }
 
 /**
@@ -32,7 +32,7 @@ export interface SkipLinkTarget {
  */
 export interface SkipLinksProps {
   /** Custom skip link targets (optional, uses defaults if not provided) */
-  targets?: SkipLinkTarget[];
+  targets?: SkipLinkTarget[]
 }
 
 /**
@@ -41,20 +41,20 @@ export interface SkipLinksProps {
 const DEFAULT_TARGETS: SkipLinkTarget[] = [
   { id: 'main-content', label: 'Skip to main content' },
   { id: 'main-navigation', label: 'Skip to navigation' },
-];
+]
 
 /**
  * SkipLinks component provides accessible skip navigation for keyboard users.
- * 
+ *
  * The links are visually hidden but appear when focused via keyboard navigation.
  * This allows keyboard users to quickly skip to important sections of the page
  * without having to tab through all navigation items.
- * 
+ *
  * @example
  * ```tsx
  * // Using default targets
  * <SkipLinks />
- * 
+ *
  * // Using custom targets
  * <SkipLinks
  *   targets={[
@@ -70,23 +70,23 @@ export function SkipLinks({ targets = DEFAULT_TARGETS }: SkipLinksProps): React.
    * Focuses the target element after navigation
    */
   const handleClick = (event: React.MouseEvent<HTMLAnchorElement>, targetId: string) => {
-    const targetElement = document.getElementById(targetId);
-    
+    const targetElement = document.getElementById(targetId)
+
     if (targetElement) {
       // Ensure the target is focusable
       if (!targetElement.hasAttribute('tabindex')) {
-        targetElement.setAttribute('tabindex', '-1');
+        targetElement.setAttribute('tabindex', '-1')
       }
-      
+
       // Focus the target element
-      targetElement.focus();
-      
+      targetElement.focus()
+
       // Scroll into view smoothly (if available)
       if (typeof targetElement.scrollIntoView === 'function') {
-        targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' })
       }
     }
-  };
+  }
 
   return (
     <nav className={styles.skipLinks} aria-label="Skip links" data-testid="skip-links">
@@ -102,7 +102,7 @@ export function SkipLinks({ targets = DEFAULT_TARGETS }: SkipLinksProps): React.
         </a>
       ))}
     </nav>
-  );
+  )
 }
 
-export default SkipLinks;
+export default SkipLinks

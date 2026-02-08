@@ -16,62 +16,61 @@
  * - 8.8: Display menu preview
  */
 
-import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useI18n } from '../../context/I18nContext';
-import { useApi } from '../../context/ApiContext';
-import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components';
-import styles from './MenuBuilderPage.module.css';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useI18n } from '../../context/I18nContext'
+import { useApi } from '../../context/ApiContext'
+import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
+import styles from './MenuBuilderPage.module.css'
 
 /**
  * UI Menu interface matching the API response
  */
 export interface UIMenu {
-  id: string;
-  name: string;
-  items: UIMenuItem[];
-  createdAt: string;
-  updatedAt: string;
+  id: string
+  name: string
+  items: UIMenuItem[]
+  createdAt: string
+  updatedAt: string
 }
 
 /**
  * UI Menu Item interface
  */
 export interface UIMenuItem {
-  id: string;
-  label: string;
-  path?: string;
-  icon?: string;
-  order: number;
-  children?: UIMenuItem[];
-  policies?: string[];
+  id: string
+  label: string
+  path?: string
+  icon?: string
+  order: number
+  children?: UIMenuItem[]
+  policies?: string[]
 }
-
 
 /**
  * Form data for creating/editing a menu
  */
 interface MenuFormData {
-  name: string;
+  name: string
 }
 
 /**
  * Form data for creating/editing a menu item
  */
 interface MenuItemFormData {
-  label: string;
-  path: string;
-  icon: string;
-  policies: string[];
+  label: string
+  path: string
+  icon: string
+  policies: string[]
 }
 
 /**
  * Form validation errors
  */
 interface FormErrors {
-  name?: string;
-  label?: string;
-  path?: string;
+  name?: string
+  label?: string
+  path?: string
 }
 
 /**
@@ -79,39 +78,39 @@ interface FormErrors {
  */
 export interface MenuBuilderPageProps {
   /** Optional menu ID for editing an existing menu */
-  menuId?: string;
+  menuId?: string
   /** Optional test ID for testing */
-  testId?: string;
+  testId?: string
 }
 
 // API functions using apiClient
 async function fetchMenus(apiClient: any): Promise<UIMenu[]> {
-  return apiClient.get('/ui/menus');
+  return apiClient.get('/ui/menus')
 }
 
 async function fetchMenu(apiClient: any, id: string): Promise<UIMenu> {
-  return apiClient.get(`/ui/menus/${id}`);
+  return apiClient.get(`/ui/menus/${id}`)
 }
 
 async function createMenu(apiClient: any, data: Partial<UIMenu>): Promise<UIMenu> {
-  return apiClient.post('/ui/menus', data);
+  return apiClient.post('/ui/menus', data)
 }
 
 async function updateMenu(apiClient: any, id: string, data: Partial<UIMenu>): Promise<UIMenu> {
-  return apiClient.put(`/ui/menus/${id}`, data);
+  return apiClient.put(`/ui/menus/${id}`, data)
 }
 
 async function deleteMenu(apiClient: any, id: string): Promise<void> {
-  return apiClient.delete(`/ui/menus/${id}`);
+  return apiClient.delete(`/ui/menus/${id}`)
 }
 
 /**
  * Policy interface for access control
  */
 interface Policy {
-  id: string;
-  name: string;
-  description?: string;
+  id: string
+  name: string
+  description?: string
 }
 
 /**
@@ -119,55 +118,54 @@ interface Policy {
  */
 async function fetchPolicies(apiClient: any): Promise<Policy[]> {
   try {
-    return await apiClient.get('/control/policies');
+    return await apiClient.get('/control/policies')
   } catch {
     // Return empty array if policies endpoint fails - policies are optional
-    return [];
+    return []
   }
 }
-
 
 /**
  * Validate menu form data
  */
 function validateMenuForm(data: MenuFormData, t: (key: string) => string): FormErrors {
-  const errors: FormErrors = {};
+  const errors: FormErrors = {}
 
   if (!data.name.trim()) {
-    errors.name = t('builder.menus.validation.nameRequired');
+    errors.name = t('builder.menus.validation.nameRequired')
   } else if (data.name.length > 50) {
-    errors.name = t('builder.menus.validation.nameTooLong');
+    errors.name = t('builder.menus.validation.nameTooLong')
   } else if (!/^[a-z][a-z0-9_]*$/.test(data.name)) {
-    errors.name = t('builder.menus.validation.nameFormat');
+    errors.name = t('builder.menus.validation.nameFormat')
   }
 
-  return errors;
+  return errors
 }
 
 /**
  * Validate menu item form data
  */
 function validateMenuItemForm(data: MenuItemFormData, t: (key: string) => string): FormErrors {
-  const errors: FormErrors = {};
+  const errors: FormErrors = {}
 
   if (!data.label.trim()) {
-    errors.label = t('builder.menus.validation.labelRequired');
+    errors.label = t('builder.menus.validation.labelRequired')
   } else if (data.label.length > 100) {
-    errors.label = t('builder.menus.validation.labelTooLong');
+    errors.label = t('builder.menus.validation.labelTooLong')
   }
 
   if (data.path && !data.path.startsWith('/')) {
-    errors.path = t('builder.menus.validation.pathFormat');
+    errors.path = t('builder.menus.validation.pathFormat')
   }
 
-  return errors;
+  return errors
 }
 
 /**
  * Generate a unique ID for menu items
  */
 function generateId(): string {
-  return `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  return `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 }
 
 /**
@@ -186,66 +184,77 @@ const AVAILABLE_ICONS = [
   { value: 'key', label: '🔑 Key' },
   { value: 'database', label: '🗄️ Database' },
   { value: 'code', label: '💻 Code' },
-];
-
+]
 
 /**
  * Menu Form Component - for creating/editing menu configuration
  */
 interface MenuFormProps {
-  menu?: UIMenu;
-  onSubmit: (data: MenuFormData) => void;
-  onCancel: () => void;
-  isSubmitting: boolean;
+  menu?: UIMenu
+  onSubmit: (data: MenuFormData) => void
+  onCancel: () => void
+  isSubmitting: boolean
 }
 
 function MenuForm({ menu, onSubmit, onCancel, isSubmitting }: MenuFormProps): React.ReactElement {
-  const { t } = useI18n();
-  const isEditing = !!menu;
+  const { t } = useI18n()
+  const isEditing = !!menu
   const [formData, setFormData] = useState<MenuFormData>({
     name: menu?.name ?? '',
-  });
-  const [errors, setErrors] = useState<FormErrors>({});
-  const [touched, setTouched] = useState<Record<string, boolean>>({});
-  const nameInputRef = useRef<HTMLInputElement>(null);
+  })
+  const [errors, setErrors] = useState<FormErrors>({})
+  const [touched, setTouched] = useState<Record<string, boolean>>({})
+  const nameInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    nameInputRef.current?.focus();
-  }, []);
+    nameInputRef.current?.focus()
+  }, [])
 
-  const handleChange = useCallback((field: keyof MenuFormData, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-    if (errors[field as keyof FormErrors]) {
-      setErrors((prev) => ({ ...prev, [field]: undefined }));
-    }
-  }, [errors]);
+  const handleChange = useCallback(
+    (field: keyof MenuFormData, value: string) => {
+      setFormData((prev) => ({ ...prev, [field]: value }))
+      if (errors[field as keyof FormErrors]) {
+        setErrors((prev) => ({ ...prev, [field]: undefined }))
+      }
+    },
+    [errors]
+  )
 
-  const handleBlur = useCallback((field: keyof MenuFormData) => {
-    setTouched((prev) => ({ ...prev, [field]: true }));
-    const validationErrors = validateMenuForm(formData, t);
-    if (validationErrors[field as keyof FormErrors]) {
-      setErrors((prev) => ({ ...prev, [field]: validationErrors[field as keyof FormErrors] }));
-    }
-  }, [formData, t]);
+  const handleBlur = useCallback(
+    (field: keyof MenuFormData) => {
+      setTouched((prev) => ({ ...prev, [field]: true }))
+      const validationErrors = validateMenuForm(formData, t)
+      if (validationErrors[field as keyof FormErrors]) {
+        setErrors((prev) => ({ ...prev, [field]: validationErrors[field as keyof FormErrors] }))
+      }
+    },
+    [formData, t]
+  )
 
-  const handleSubmit = useCallback((e: React.FormEvent) => {
-    e.preventDefault();
-    const validationErrors = validateMenuForm(formData, t);
-    setErrors(validationErrors);
-    setTouched({ name: true });
+  const handleSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault()
+      const validationErrors = validateMenuForm(formData, t)
+      setErrors(validationErrors)
+      setTouched({ name: true })
 
-    if (Object.keys(validationErrors).length === 0) {
-      onSubmit(formData);
-    }
-  }, [formData, onSubmit, t]);
+      if (Object.keys(validationErrors).length === 0) {
+        onSubmit(formData)
+      }
+    },
+    [formData, onSubmit, t]
+  )
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      onCancel();
-    }
-  }, [onCancel]);
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onCancel()
+      }
+    },
+    [onCancel]
+  )
 
-  const title = isEditing ? t('builder.menus.editMenu') : t('builder.menus.createMenu');
+  const title = isEditing ? t('builder.menus.editMenu') : t('builder.menus.createMenu')
 
   return (
     <div
@@ -263,7 +272,9 @@ function MenuForm({ menu, onSubmit, onCancel, isSubmitting }: MenuFormProps): Re
         data-testid="menu-form-modal"
       >
         <div className={styles.modalHeader}>
-          <h2 id="menu-form-title" className={styles.modalTitle}>{title}</h2>
+          <h2 id="menu-form-title" className={styles.modalTitle}>
+            {title}
+          </h2>
           <button
             type="button"
             className={styles.modalCloseButton}
@@ -279,7 +290,9 @@ function MenuForm({ menu, onSubmit, onCancel, isSubmitting }: MenuFormProps): Re
             <div className={styles.formGroup}>
               <label htmlFor="menu-name" className={styles.formLabel}>
                 {t('builder.menus.menuName')}
-                <span className={styles.required} aria-hidden="true">*</span>
+                <span className={styles.required} aria-hidden="true">
+                  *
+                </span>
               </label>
               <input
                 ref={nameInputRef}
@@ -329,81 +342,98 @@ function MenuForm({ menu, onSubmit, onCancel, isSubmitting }: MenuFormProps): Re
         </div>
       </div>
     </div>
-  );
+  )
 }
-
 
 /**
  * Menu Item Form Component - for creating/editing menu items
  */
 interface MenuItemFormProps {
-  item?: UIMenuItem;
-  onSubmit: (data: MenuItemFormData) => void;
-  onCancel: () => void;
-  isSubmitting: boolean;
-  availablePolicies: Policy[];
+  item?: UIMenuItem
+  onSubmit: (data: MenuItemFormData) => void
+  onCancel: () => void
+  isSubmitting: boolean
+  availablePolicies: Policy[]
 }
 
-function MenuItemForm({ item, onSubmit, onCancel, isSubmitting, availablePolicies }: MenuItemFormProps): React.ReactElement {
-  const { t } = useI18n();
-  const isEditing = !!item;
+function MenuItemForm({
+  item,
+  onSubmit,
+  onCancel,
+  isSubmitting,
+  availablePolicies,
+}: MenuItemFormProps): React.ReactElement {
+  const { t } = useI18n()
+  const isEditing = !!item
   const [formData, setFormData] = useState<MenuItemFormData>({
     label: item?.label ?? '',
     path: item?.path ?? '',
     icon: item?.icon ?? '',
     policies: item?.policies ?? [],
-  });
-  const [errors, setErrors] = useState<FormErrors>({});
-  const [touched, setTouched] = useState<Record<string, boolean>>({});
-  const labelInputRef = useRef<HTMLInputElement>(null);
+  })
+  const [errors, setErrors] = useState<FormErrors>({})
+  const [touched, setTouched] = useState<Record<string, boolean>>({})
+  const labelInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    labelInputRef.current?.focus();
-  }, []);
+    labelInputRef.current?.focus()
+  }, [])
 
-  const handleChange = useCallback((field: keyof MenuItemFormData, value: string | string[]) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-    if (errors[field as keyof FormErrors]) {
-      setErrors((prev) => ({ ...prev, [field]: undefined }));
-    }
-  }, [errors]);
+  const handleChange = useCallback(
+    (field: keyof MenuItemFormData, value: string | string[]) => {
+      setFormData((prev) => ({ ...prev, [field]: value }))
+      if (errors[field as keyof FormErrors]) {
+        setErrors((prev) => ({ ...prev, [field]: undefined }))
+      }
+    },
+    [errors]
+  )
 
-  const handleBlur = useCallback((field: keyof MenuItemFormData) => {
-    setTouched((prev) => ({ ...prev, [field]: true }));
-    const validationErrors = validateMenuItemForm(formData, t);
-    if (validationErrors[field as keyof FormErrors]) {
-      setErrors((prev) => ({ ...prev, [field]: validationErrors[field as keyof FormErrors] }));
-    }
-  }, [formData, t]);
+  const handleBlur = useCallback(
+    (field: keyof MenuItemFormData) => {
+      setTouched((prev) => ({ ...prev, [field]: true }))
+      const validationErrors = validateMenuItemForm(formData, t)
+      if (validationErrors[field as keyof FormErrors]) {
+        setErrors((prev) => ({ ...prev, [field]: validationErrors[field as keyof FormErrors] }))
+      }
+    },
+    [formData, t]
+  )
 
   const handlePolicyToggle = useCallback((policyId: string) => {
     setFormData((prev) => {
-      const currentPolicies = prev.policies || [];
+      const currentPolicies = prev.policies || []
       const newPolicies = currentPolicies.includes(policyId)
         ? currentPolicies.filter((id) => id !== policyId)
-        : [...currentPolicies, policyId];
-      return { ...prev, policies: newPolicies };
-    });
-  }, []);
+        : [...currentPolicies, policyId]
+      return { ...prev, policies: newPolicies }
+    })
+  }, [])
 
-  const handleSubmit = useCallback((e: React.FormEvent) => {
-    e.preventDefault();
-    const validationErrors = validateMenuItemForm(formData, t);
-    setErrors(validationErrors);
-    setTouched({ label: true, path: true });
+  const handleSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault()
+      const validationErrors = validateMenuItemForm(formData, t)
+      setErrors(validationErrors)
+      setTouched({ label: true, path: true })
 
-    if (Object.keys(validationErrors).length === 0) {
-      onSubmit(formData);
-    }
-  }, [formData, onSubmit, t]);
+      if (Object.keys(validationErrors).length === 0) {
+        onSubmit(formData)
+      }
+    },
+    [formData, onSubmit, t]
+  )
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      onCancel();
-    }
-  }, [onCancel]);
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onCancel()
+      }
+    },
+    [onCancel]
+  )
 
-  const title = isEditing ? t('builder.menus.editItem') : t('builder.menus.addItem');
+  const title = isEditing ? t('builder.menus.editItem') : t('builder.menus.addItem')
 
   return (
     <div
@@ -421,7 +451,9 @@ function MenuItemForm({ item, onSubmit, onCancel, isSubmitting, availablePolicie
         data-testid="menu-item-form-modal"
       >
         <div className={styles.modalHeader}>
-          <h2 id="menu-item-form-title" className={styles.modalTitle}>{title}</h2>
+          <h2 id="menu-item-form-title" className={styles.modalTitle}>
+            {title}
+          </h2>
           <button
             type="button"
             className={styles.modalCloseButton}
@@ -437,7 +469,9 @@ function MenuItemForm({ item, onSubmit, onCancel, isSubmitting, availablePolicie
             <div className={styles.formGroup}>
               <label htmlFor="item-label" className={styles.formLabel}>
                 {t('builder.menus.itemLabel')}
-                <span className={styles.required} aria-hidden="true">*</span>
+                <span className={styles.required} aria-hidden="true">
+                  *
+                </span>
               </label>
               <input
                 ref={labelInputRef}
@@ -509,16 +543,18 @@ function MenuItemForm({ item, onSubmit, onCancel, isSubmitting, availablePolicie
             </div>
 
             <div className={styles.formGroup}>
-              <label className={styles.formLabel}>
-                {t('builder.menus.accessPolicies')}
-              </label>
+              <label className={styles.formLabel}>{t('builder.menus.accessPolicies')}</label>
               <div className={styles.policiesContainer} data-testid="policies-container">
                 {availablePolicies.length === 0 ? (
                   <p className={styles.noPolicies} data-testid="no-policies-message">
                     {t('builder.menus.noPolicies')}
                   </p>
                 ) : (
-                  <div className={styles.policiesList} role="group" aria-label={t('builder.menus.accessPolicies')}>
+                  <div
+                    className={styles.policiesList}
+                    role="group"
+                    aria-label={t('builder.menus.accessPolicies')}
+                  >
                     {availablePolicies.map((policy) => (
                       <label
                         key={policy.id}
@@ -541,9 +577,7 @@ function MenuItemForm({ item, onSubmit, onCancel, isSubmitting, availablePolicie
                   </div>
                 )}
               </div>
-              <span className={styles.formHint}>
-                {t('builder.menus.accessPoliciesHint')}
-              </span>
+              <span className={styles.formHint}>{t('builder.menus.accessPoliciesHint')}</span>
             </div>
 
             <div className={styles.formActions}>
@@ -569,9 +603,8 @@ function MenuItemForm({ item, onSubmit, onCancel, isSubmitting, availablePolicie
         </div>
       </div>
     </div>
-  );
+  )
 }
-
 
 /**
  * Menu Tree Item Component - renders a single menu item with children
@@ -579,17 +612,17 @@ function MenuItemForm({ item, onSubmit, onCancel, isSubmitting, availablePolicie
  * Supports nested items (Requirement 8.5)
  */
 interface MenuTreeItemProps {
-  item: UIMenuItem;
-  depth: number;
-  onEdit: (item: UIMenuItem) => void;
-  onDelete: (itemId: string) => void;
-  onAddChild: (parentId: string) => void;
-  onDragStart: (e: React.DragEvent, itemId: string) => void;
-  onDragOver: (e: React.DragEvent, itemId: string) => void;
-  onDrop: (e: React.DragEvent, targetId: string) => void;
-  onDragEnd: () => void;
-  dragOverId: string | null;
-  isDragging: boolean;
+  item: UIMenuItem
+  depth: number
+  onEdit: (item: UIMenuItem) => void
+  onDelete: (itemId: string) => void
+  onAddChild: (parentId: string) => void
+  onDragStart: (e: React.DragEvent, itemId: string) => void
+  onDragOver: (e: React.DragEvent, itemId: string) => void
+  onDrop: (e: React.DragEvent, targetId: string) => void
+  onDragEnd: () => void
+  dragOverId: string | null
+  isDragging: boolean
 }
 
 function MenuTreeItem({
@@ -605,10 +638,10 @@ function MenuTreeItem({
   dragOverId,
   isDragging,
 }: MenuTreeItemProps): React.ReactElement {
-  const { t } = useI18n();
-  const [isExpanded, setIsExpanded] = useState(true);
-  const hasChildren = item.children && item.children.length > 0;
-  const isDragOver = dragOverId === item.id;
+  const { t } = useI18n()
+  const [isExpanded, setIsExpanded] = useState(true)
+  const hasChildren = item.children && item.children.length > 0
+  const isDragOver = dragOverId === item.id
 
   const getIconEmoji = (iconName?: string): string => {
     const iconMap: Record<string, string> = {
@@ -623,9 +656,9 @@ function MenuTreeItem({
       key: '🔑',
       database: '🗄️',
       code: '💻',
-    };
-    return iconMap[iconName || ''] || '📌';
-  };
+    }
+    return iconMap[iconName || ''] || '📌'
+  }
 
   return (
     <div className={styles.treeItemContainer}>
@@ -715,20 +748,19 @@ function MenuTreeItem({
         </div>
       )}
     </div>
-  );
+  )
 }
-
 
 /**
  * Menu Tree View Component - displays menu items in a tree structure
  * Requirement 8.3: Menu editor with tree view for items
  */
 interface MenuTreeViewProps {
-  items: UIMenuItem[];
-  onEdit: (item: UIMenuItem) => void;
-  onDelete: (itemId: string) => void;
-  onAddChild: (parentId: string | null) => void;
-  onReorder: (draggedId: string, targetId: string) => void;
+  items: UIMenuItem[]
+  onEdit: (item: UIMenuItem) => void
+  onDelete: (itemId: string) => void
+  onAddChild: (parentId: string | null) => void
+  onReorder: (draggedId: string, targetId: string) => void
 }
 
 function MenuTreeView({
@@ -738,42 +770,51 @@ function MenuTreeView({
   onAddChild,
   onReorder,
 }: MenuTreeViewProps): React.ReactElement {
-  const { t } = useI18n();
-  const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
-  const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const { t } = useI18n()
+  const [draggedItemId, setDraggedItemId] = useState<string | null>(null)
+  const [dragOverId, setDragOverId] = useState<string | null>(null)
 
   const handleDragStart = useCallback((e: React.DragEvent, itemId: string) => {
-    e.dataTransfer.setData('text/plain', itemId);
-    e.dataTransfer.effectAllowed = 'move';
-    setDraggedItemId(itemId);
-  }, []);
+    e.dataTransfer.setData('text/plain', itemId)
+    e.dataTransfer.effectAllowed = 'move'
+    setDraggedItemId(itemId)
+  }, [])
 
-  const handleDragOver = useCallback((e: React.DragEvent, itemId: string) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    if (draggedItemId !== itemId) {
-      setDragOverId(itemId);
-    }
-  }, [draggedItemId]);
+  const handleDragOver = useCallback(
+    (e: React.DragEvent, itemId: string) => {
+      e.preventDefault()
+      e.dataTransfer.dropEffect = 'move'
+      if (draggedItemId !== itemId) {
+        setDragOverId(itemId)
+      }
+    },
+    [draggedItemId]
+  )
 
-  const handleDrop = useCallback((e: React.DragEvent, targetId: string) => {
-    e.preventDefault();
-    const draggedId = e.dataTransfer.getData('text/plain');
-    if (draggedId && draggedId !== targetId) {
-      onReorder(draggedId, targetId);
-    }
-    setDraggedItemId(null);
-    setDragOverId(null);
-  }, [onReorder]);
+  const handleDrop = useCallback(
+    (e: React.DragEvent, targetId: string) => {
+      e.preventDefault()
+      const draggedId = e.dataTransfer.getData('text/plain')
+      if (draggedId && draggedId !== targetId) {
+        onReorder(draggedId, targetId)
+      }
+      setDraggedItemId(null)
+      setDragOverId(null)
+    },
+    [onReorder]
+  )
 
   const handleDragEnd = useCallback(() => {
-    setDraggedItemId(null);
-    setDragOverId(null);
-  }, []);
+    setDraggedItemId(null)
+    setDragOverId(null)
+  }, [])
 
-  const handleAddChildWrapper = useCallback((parentId: string) => {
-    onAddChild(parentId);
-  }, [onAddChild]);
+  const handleAddChildWrapper = useCallback(
+    (parentId: string) => {
+      onAddChild(parentId)
+    },
+    [onAddChild]
+  )
 
   if (items.length === 0) {
     return (
@@ -781,7 +822,7 @@ function MenuTreeView({
         <p>{t('builder.menus.noItems')}</p>
         <p className={styles.treeEmptyHint}>{t('builder.menus.addItemHint')}</p>
       </div>
-    );
+    )
   }
 
   return (
@@ -808,22 +849,21 @@ function MenuTreeView({
         />
       ))}
     </div>
-  );
+  )
 }
-
 
 /**
  * Menu Preview Component - displays the menu as it will appear
  * Requirement 8.8: Display menu preview
  */
 interface MenuPreviewProps {
-  menu: UIMenu | null;
-  items: UIMenuItem[];
-  availablePolicies: Policy[];
+  menu: UIMenu | null
+  items: UIMenuItem[]
+  availablePolicies: Policy[]
 }
 
 function MenuPreview({ menu, items, availablePolicies }: MenuPreviewProps): React.ReactElement {
-  const { t } = useI18n();
+  const { t } = useI18n()
 
   const getIconEmoji = (iconName?: string): string => {
     const iconMap: Record<string, string> = {
@@ -838,22 +878,27 @@ function MenuPreview({ menu, items, availablePolicies }: MenuPreviewProps): Reac
       key: '🔑',
       database: '🗄️',
       code: '💻',
-    };
-    return iconMap[iconName || ''] || '📌';
-  };
+    }
+    return iconMap[iconName || ''] || '📌'
+  }
 
   const getPolicyNames = (policyIds?: string[]): string[] => {
-    if (!policyIds || policyIds.length === 0) return [];
+    if (!policyIds || policyIds.length === 0) return []
     return policyIds
       .map((id) => availablePolicies.find((p) => p.id === id)?.name)
-      .filter((name): name is string => !!name);
-  };
+      .filter((name): name is string => !!name)
+  }
 
   const renderPreviewItem = (item: UIMenuItem, depth: number = 0): React.ReactNode => {
-    const policyNames = getPolicyNames(item.policies);
-    
+    const policyNames = getPolicyNames(item.policies)
+
     return (
-      <div key={item.id} className={styles.previewItem} style={{ paddingLeft: `${depth * 16}px` }} data-testid={`preview-item-${item.id}`}>
+      <div
+        key={item.id}
+        className={styles.previewItem}
+        style={{ paddingLeft: `${depth * 16}px` }}
+        data-testid={`preview-item-${item.id}`}
+      >
         <div className={styles.previewItemMain}>
           <span className={styles.previewIcon}>{getIconEmoji(item.icon)}</span>
           <span className={styles.previewLabel}>{item.label}</span>
@@ -866,9 +911,7 @@ function MenuPreview({ menu, items, availablePolicies }: MenuPreviewProps): Reac
         {policyNames.length > 0 && (
           <div className={styles.previewPolicies} data-testid={`preview-policies-${item.id}`}>
             <span className={styles.previewPoliciesIcon}>🔒</span>
-            <span className={styles.previewPoliciesText}>
-              {policyNames.join(', ')}
-            </span>
+            <span className={styles.previewPoliciesText}>{policyNames.join(', ')}</span>
           </div>
         )}
         {item.children && item.children.length > 0 && (
@@ -877,8 +920,8 @@ function MenuPreview({ menu, items, availablePolicies }: MenuPreviewProps): Reac
           </div>
         )}
       </div>
-    );
-  };
+    )
+  }
 
   return (
     <div className={styles.preview} data-testid="menu-preview">
@@ -893,9 +936,8 @@ function MenuPreview({ menu, items, availablePolicies }: MenuPreviewProps): Reac
         )}
       </div>
     </div>
-  );
+  )
 }
-
 
 /**
  * Helper function to find and update an item in the tree
@@ -907,16 +949,16 @@ function updateItemInTree(
 ): UIMenuItem[] {
   return items.map((item) => {
     if (item.id === itemId) {
-      return updater(item);
+      return updater(item)
     }
     if (item.children && item.children.length > 0) {
       return {
         ...item,
         children: updateItemInTree(item.children, itemId, updater),
-      };
+      }
     }
-    return item;
-  });
+    return item
+  })
 }
 
 /**
@@ -930,35 +972,31 @@ function removeItemFromTree(items: UIMenuItem[], itemId: string): UIMenuItem[] {
         return {
           ...item,
           children: removeItemFromTree(item.children, itemId),
-        };
+        }
       }
-      return item;
-    });
+      return item
+    })
 }
 
 /**
  * Helper function to add a child item to a parent
  */
-function addChildToItem(
-  items: UIMenuItem[],
-  parentId: string,
-  newItem: UIMenuItem
-): UIMenuItem[] {
+function addChildToItem(items: UIMenuItem[], parentId: string, newItem: UIMenuItem): UIMenuItem[] {
   return items.map((item) => {
     if (item.id === parentId) {
       return {
         ...item,
         children: [...(item.children || []), newItem],
-      };
+      }
     }
     if (item.children && item.children.length > 0) {
       return {
         ...item,
         children: addChildToItem(item.children, parentId, newItem),
-      };
+      }
     }
-    return item;
-  });
+    return item
+  })
 }
 
 /**
@@ -967,62 +1005,57 @@ function addChildToItem(
 function findItemInTree(items: UIMenuItem[], itemId: string): UIMenuItem | null {
   for (const item of items) {
     if (item.id === itemId) {
-      return item;
+      return item
     }
     if (item.children && item.children.length > 0) {
-      const found = findItemInTree(item.children, itemId);
-      if (found) return found;
+      const found = findItemInTree(item.children, itemId)
+      if (found) return found
     }
   }
-  return null;
+  return null
 }
 
 /**
  * Helper function to move an item in the tree (for drag-and-drop)
  */
-function moveItemInTree(
-  items: UIMenuItem[],
-  draggedId: string,
-  targetId: string
-): UIMenuItem[] {
+function moveItemInTree(items: UIMenuItem[], draggedId: string, targetId: string): UIMenuItem[] {
   // Find the dragged item
-  const draggedItem = findItemInTree(items, draggedId);
-  if (!draggedItem) return items;
+  const draggedItem = findItemInTree(items, draggedId)
+  if (!draggedItem) return items
 
   // Remove the dragged item from its current position
-  let newItems = removeItemFromTree(items, draggedId);
+  let newItems = removeItemFromTree(items, draggedId)
 
   // Find the target item and insert the dragged item after it
   const insertAfter = (arr: UIMenuItem[], targetId: string, item: UIMenuItem): UIMenuItem[] => {
-    const result: UIMenuItem[] = [];
+    const result: UIMenuItem[] = []
     for (const current of arr) {
-      result.push(current);
+      result.push(current)
       if (current.id === targetId) {
-        result.push(item);
+        result.push(item)
       } else if (current.children && current.children.length > 0) {
-        const updatedChildren = insertAfter(current.children, targetId, item);
+        const updatedChildren = insertAfter(current.children, targetId, item)
         if (updatedChildren !== current.children) {
-          result[result.length - 1] = { ...current, children: updatedChildren };
+          result[result.length - 1] = { ...current, children: updatedChildren }
         }
       }
     }
-    return result;
-  };
+    return result
+  }
 
-  newItems = insertAfter(newItems, targetId, draggedItem);
-  
+  newItems = insertAfter(newItems, targetId, draggedItem)
+
   // Update order values
   const updateOrders = (arr: UIMenuItem[]): UIMenuItem[] => {
     return arr.map((item, index) => ({
       ...item,
       order: index,
       children: item.children ? updateOrders(item.children) : undefined,
-    }));
-  };
+    }))
+  }
 
-  return updateOrders(newItems);
+  return updateOrders(newItems)
 }
-
 
 /**
  * MenuBuilderPage Component
@@ -1030,33 +1063,36 @@ function moveItemInTree(
  * Main page for building and editing navigation menus in the EMF Admin UI.
  * Provides a tree view editor with drag-and-drop reordering and nested item support.
  */
-export function MenuBuilderPage({ menuId, testId = 'menu-builder-page' }: MenuBuilderPageProps): React.ReactElement {
-  const { apiClient } = useApi();
-  const queryClient = useQueryClient();
-  const { t, formatDate } = useI18n();
-  const { showToast } = useToast();
+export function MenuBuilderPage({
+  menuId,
+  testId = 'menu-builder-page',
+}: MenuBuilderPageProps): React.ReactElement {
+  const { apiClient } = useApi()
+  const queryClient = useQueryClient()
+  const { t, formatDate } = useI18n()
+  const { showToast } = useToast()
 
   // View mode: 'list' shows all menus, 'editor' shows the menu editor
-  const [viewMode, setViewMode] = useState<'list' | 'editor'>(menuId ? 'editor' : 'list');
-  const [editingMenuId, setEditingMenuId] = useState<string | null>(menuId ?? null);
+  const [viewMode, setViewMode] = useState<'list' | 'editor'>(menuId ? 'editor' : 'list')
+  const [editingMenuId, setEditingMenuId] = useState<string | null>(menuId ?? null)
 
   // Form modal state
-  const [isMenuFormOpen, setIsMenuFormOpen] = useState(false);
-  const [editingMenu, setEditingMenu] = useState<UIMenu | undefined>(undefined);
+  const [isMenuFormOpen, setIsMenuFormOpen] = useState(false)
+  const [editingMenu, setEditingMenu] = useState<UIMenu | undefined>(undefined)
 
   // Menu item form state
-  const [isItemFormOpen, setIsItemFormOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<UIMenuItem | undefined>(undefined);
-  const [parentItemId, setParentItemId] = useState<string | null>(null);
+  const [isItemFormOpen, setIsItemFormOpen] = useState(false)
+  const [editingItem, setEditingItem] = useState<UIMenuItem | undefined>(undefined)
+  const [parentItemId, setParentItemId] = useState<string | null>(null)
 
   // Delete confirmation dialog state
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [menuToDelete, setMenuToDelete] = useState<UIMenu | null>(null);
-  const [itemToDelete, setItemToDelete] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [menuToDelete, setMenuToDelete] = useState<UIMenu | null>(null)
+  const [itemToDelete, setItemToDelete] = useState<string | null>(null)
 
   // Editor state
-  const [menuItems, setMenuItems] = useState<UIMenuItem[]>([]);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [menuItems, setMenuItems] = useState<UIMenuItem[]>([])
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
 
   // Fetch all menus query - always enabled so we have menu data in editor mode
   const {
@@ -1067,248 +1103,253 @@ export function MenuBuilderPage({ menuId, testId = 'menu-builder-page' }: MenuBu
   } = useQuery({
     queryKey: ['ui-menus'],
     queryFn: () => fetchMenus(apiClient),
-  });
+  })
 
   // Fetch available policies for access control (Requirement 8.6)
   const { data: availablePolicies = [] } = useQuery({
     queryKey: ['policies'],
     queryFn: () => fetchPolicies(apiClient),
     enabled: viewMode === 'editor',
-  });
+  })
 
   // Fetch single menu query for editing - get from the menus list
   const currentMenu = useMemo(() => {
-    if (!editingMenuId || !menus) return undefined;
-    return menus.find(m => m.id === editingMenuId);
-  }, [editingMenuId, menus]);
+    if (!editingMenuId || !menus) return undefined
+    return menus.find((m) => m.id === editingMenuId)
+  }, [editingMenuId, menus])
 
-  const isLoadingMenu = isLoadingMenus;
+  const isLoadingMenu = isLoadingMenus
 
   // Update menu items when menu data loads
   useEffect(() => {
     if (currentMenu) {
-      setMenuItems(currentMenu.items || []);
-      setHasUnsavedChanges(false);
+      setMenuItems(currentMenu.items || [])
+      setHasUnsavedChanges(false)
     }
-  }, [currentMenu]);
+  }, [currentMenu])
 
   // Create menu mutation
   const createMenuMutation = useMutation({
     mutationFn: (data: Partial<UIMenu>) => createMenu(apiClient, data),
     onSuccess: (newMenu) => {
-      queryClient.invalidateQueries({ queryKey: ['ui-menus'] });
-      showToast(t('success.created', { item: t('builder.menus.menu') }), 'success');
-      handleCloseMenuForm();
+      queryClient.invalidateQueries({ queryKey: ['ui-menus'] })
+      showToast(t('success.created', { item: t('builder.menus.menu') }), 'success')
+      handleCloseMenuForm()
       // Open the editor for the new menu
-      setEditingMenuId(newMenu.id);
-      setMenuItems([]);
-      setViewMode('editor');
+      setEditingMenuId(newMenu.id)
+      setMenuItems([])
+      setViewMode('editor')
     },
     onError: (error: Error) => {
-      showToast(error.message || t('errors.generic'), 'error');
+      showToast(error.message || t('errors.generic'), 'error')
     },
-  });
+  })
 
   // Update menu mutation
   const updateMenuMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<UIMenu> }) => updateMenu(apiClient, id, data),
+    mutationFn: ({ id, data }: { id: string; data: Partial<UIMenu> }) =>
+      updateMenu(apiClient, id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ui-menus'] });
-      queryClient.invalidateQueries({ queryKey: ['ui-menu', editingMenuId] });
-      showToast(t('success.updated', { item: t('builder.menus.menu') }), 'success');
-      setHasUnsavedChanges(false);
-      handleCloseMenuForm();
+      queryClient.invalidateQueries({ queryKey: ['ui-menus'] })
+      queryClient.invalidateQueries({ queryKey: ['ui-menu', editingMenuId] })
+      showToast(t('success.updated', { item: t('builder.menus.menu') }), 'success')
+      setHasUnsavedChanges(false)
+      handleCloseMenuForm()
     },
     onError: (error: Error) => {
-      showToast(error.message || t('errors.generic'), 'error');
+      showToast(error.message || t('errors.generic'), 'error')
     },
-  });
+  })
 
   // Delete menu mutation
   const deleteMenuMutation = useMutation({
     mutationFn: (id: string) => deleteMenu(apiClient, id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ui-menus'] });
-      showToast(t('success.deleted', { item: t('builder.menus.menu') }), 'success');
-      setDeleteDialogOpen(false);
-      setMenuToDelete(null);
+      queryClient.invalidateQueries({ queryKey: ['ui-menus'] })
+      showToast(t('success.deleted', { item: t('builder.menus.menu') }), 'success')
+      setDeleteDialogOpen(false)
+      setMenuToDelete(null)
       if (editingMenuId === menuToDelete?.id) {
-        setViewMode('list');
-        setEditingMenuId(null);
+        setViewMode('list')
+        setEditingMenuId(null)
       }
     },
     onError: (error: Error) => {
-      showToast(error.message || t('errors.generic'), 'error');
+      showToast(error.message || t('errors.generic'), 'error')
     },
-  });
-
+  })
 
   // Handle create menu action
   const handleCreateMenu = useCallback(() => {
-    setEditingMenu(undefined);
-    setIsMenuFormOpen(true);
-  }, []);
+    setEditingMenu(undefined)
+    setIsMenuFormOpen(true)
+  }, [])
 
   // Handle edit menu config
   const handleEditMenuConfig = useCallback((menu: UIMenu) => {
-    setEditingMenu(menu);
-    setIsMenuFormOpen(true);
-  }, []);
+    setEditingMenu(menu)
+    setIsMenuFormOpen(true)
+  }, [])
 
   // Handle close menu form
   const handleCloseMenuForm = useCallback(() => {
-    setIsMenuFormOpen(false);
-    setEditingMenu(undefined);
-  }, []);
+    setIsMenuFormOpen(false)
+    setEditingMenu(undefined)
+  }, [])
 
   // Handle menu form submit
-  const handleMenuFormSubmit = useCallback((data: MenuFormData) => {
-    const menuData: Partial<UIMenu> = {
-      name: data.name,
-    };
+  const handleMenuFormSubmit = useCallback(
+    (data: MenuFormData) => {
+      const menuData: Partial<UIMenu> = {
+        name: data.name,
+      }
 
-    if (editingMenu) {
-      updateMenuMutation.mutate({ id: editingMenu.id, data: menuData });
-    } else {
-      createMenuMutation.mutate({
-        ...menuData,
-        items: [],
-      });
-    }
-  }, [editingMenu, createMenuMutation, updateMenuMutation]);
+      if (editingMenu) {
+        updateMenuMutation.mutate({ id: editingMenu.id, data: menuData })
+      } else {
+        createMenuMutation.mutate({
+          ...menuData,
+          items: [],
+        })
+      }
+    },
+    [editingMenu, createMenuMutation, updateMenuMutation]
+  )
 
   // Handle delete menu action
   const handleDeleteMenuClick = useCallback((menu: UIMenu) => {
-    setMenuToDelete(menu);
-    setItemToDelete(null);
-    setDeleteDialogOpen(true);
-  }, []);
+    setMenuToDelete(menu)
+    setItemToDelete(null)
+    setDeleteDialogOpen(true)
+  }, [])
 
   // Handle delete menu confirmation
   const handleDeleteMenuConfirm = useCallback(() => {
     if (menuToDelete) {
-      deleteMenuMutation.mutate(menuToDelete.id);
+      deleteMenuMutation.mutate(menuToDelete.id)
     } else if (itemToDelete) {
-      setMenuItems((prev) => removeItemFromTree(prev, itemToDelete));
-      setHasUnsavedChanges(true);
-      setDeleteDialogOpen(false);
-      setItemToDelete(null);
-      showToast(t('success.deleted', { item: t('builder.menus.item') }), 'success');
+      setMenuItems((prev) => removeItemFromTree(prev, itemToDelete))
+      setHasUnsavedChanges(true)
+      setDeleteDialogOpen(false)
+      setItemToDelete(null)
+      showToast(t('success.deleted', { item: t('builder.menus.item') }), 'success')
     }
-  }, [menuToDelete, itemToDelete, deleteMenuMutation, showToast, t]);
+  }, [menuToDelete, itemToDelete, deleteMenuMutation, showToast, t])
 
   // Handle delete cancel
   const handleDeleteCancel = useCallback(() => {
-    setDeleteDialogOpen(false);
-    setMenuToDelete(null);
-    setItemToDelete(null);
-  }, []);
+    setDeleteDialogOpen(false)
+    setMenuToDelete(null)
+    setItemToDelete(null)
+  }, [])
 
   // Handle opening menu editor
   const handleOpenEditor = useCallback((menu: UIMenu) => {
-    setEditingMenuId(menu.id);
-    setViewMode('editor');
-  }, []);
+    setEditingMenuId(menu.id)
+    setViewMode('editor')
+  }, [])
 
   // Handle back to list
   const handleBackToList = useCallback(() => {
     if (hasUnsavedChanges) {
       // Could show a confirmation dialog here
     }
-    setViewMode('list');
-    setEditingMenuId(null);
-    setMenuItems([]);
-    setHasUnsavedChanges(false);
-  }, [hasUnsavedChanges]);
+    setViewMode('list')
+    setEditingMenuId(null)
+    setMenuItems([])
+    setHasUnsavedChanges(false)
+  }, [hasUnsavedChanges])
 
   // Handle add menu item
   const handleAddItem = useCallback((parentId: string | null) => {
-    setParentItemId(parentId);
-    setEditingItem(undefined);
-    setIsItemFormOpen(true);
-  }, []);
+    setParentItemId(parentId)
+    setEditingItem(undefined)
+    setIsItemFormOpen(true)
+  }, [])
 
   // Handle edit menu item
   const handleEditItem = useCallback((item: UIMenuItem) => {
-    setEditingItem(item);
-    setParentItemId(null);
-    setIsItemFormOpen(true);
-  }, []);
+    setEditingItem(item)
+    setParentItemId(null)
+    setIsItemFormOpen(true)
+  }, [])
 
   // Handle delete menu item
   const handleDeleteItem = useCallback((itemId: string) => {
-    setItemToDelete(itemId);
-    setMenuToDelete(null);
-    setDeleteDialogOpen(true);
-  }, []);
+    setItemToDelete(itemId)
+    setMenuToDelete(null)
+    setDeleteDialogOpen(true)
+  }, [])
 
   // Handle close item form
   const handleCloseItemForm = useCallback(() => {
-    setIsItemFormOpen(false);
-    setEditingItem(undefined);
-    setParentItemId(null);
-  }, []);
-
+    setIsItemFormOpen(false)
+    setEditingItem(undefined)
+    setParentItemId(null)
+  }, [])
 
   // Handle item form submit
-  const handleItemFormSubmit = useCallback((data: MenuItemFormData) => {
-    if (editingItem) {
-      // Update existing item (Requirement 8.6: Configure label, path, icon, access policies)
-      setMenuItems((prev) =>
-        updateItemInTree(prev, editingItem.id, (item) => ({
-          ...item,
+  const handleItemFormSubmit = useCallback(
+    (data: MenuItemFormData) => {
+      if (editingItem) {
+        // Update existing item (Requirement 8.6: Configure label, path, icon, access policies)
+        setMenuItems((prev) =>
+          updateItemInTree(prev, editingItem.id, (item) => ({
+            ...item,
+            label: data.label,
+            path: data.path || undefined,
+            icon: data.icon || undefined,
+            policies: data.policies.length > 0 ? data.policies : undefined,
+          }))
+        )
+      } else {
+        // Create new item (Requirement 8.6: Configure label, path, icon, access policies)
+        const newItem: UIMenuItem = {
+          id: generateId(),
           label: data.label,
           path: data.path || undefined,
           icon: data.icon || undefined,
+          order: menuItems.length,
           policies: data.policies.length > 0 ? data.policies : undefined,
-        }))
-      );
-    } else {
-      // Create new item (Requirement 8.6: Configure label, path, icon, access policies)
-      const newItem: UIMenuItem = {
-        id: generateId(),
-        label: data.label,
-        path: data.path || undefined,
-        icon: data.icon || undefined,
-        order: menuItems.length,
-        policies: data.policies.length > 0 ? data.policies : undefined,
-      };
+        }
 
-      if (parentItemId) {
-        // Add as child of parent
-        setMenuItems((prev) => addChildToItem(prev, parentItemId, newItem));
-      } else {
-        // Add to root level
-        setMenuItems((prev) => [...prev, newItem]);
+        if (parentItemId) {
+          // Add as child of parent
+          setMenuItems((prev) => addChildToItem(prev, parentItemId, newItem))
+        } else {
+          // Add to root level
+          setMenuItems((prev) => [...prev, newItem])
+        }
       }
-    }
 
-    setHasUnsavedChanges(true);
-    handleCloseItemForm();
-    showToast(
-      editingItem
-        ? t('success.updated', { item: t('builder.menus.item') })
-        : t('success.created', { item: t('builder.menus.item') }),
-      'success'
-    );
-  }, [editingItem, parentItemId, menuItems.length, handleCloseItemForm, showToast, t]);
+      setHasUnsavedChanges(true)
+      handleCloseItemForm()
+      showToast(
+        editingItem
+          ? t('success.updated', { item: t('builder.menus.item') })
+          : t('success.created', { item: t('builder.menus.item') }),
+        'success'
+      )
+    },
+    [editingItem, parentItemId, menuItems.length, handleCloseItemForm, showToast, t]
+  )
 
   // Handle reorder (drag-and-drop)
   const handleReorder = useCallback((draggedId: string, targetId: string) => {
-    setMenuItems((prev) => moveItemInTree(prev, draggedId, targetId));
-    setHasUnsavedChanges(true);
-  }, []);
+    setMenuItems((prev) => moveItemInTree(prev, draggedId, targetId))
+    setHasUnsavedChanges(true)
+  }, [])
 
   // Handle save menu
   const handleSaveMenu = useCallback(() => {
-    if (!editingMenuId) return;
+    if (!editingMenuId) return
     updateMenuMutation.mutate({
       id: editingMenuId,
       data: { items: menuItems },
-    });
-  }, [editingMenuId, menuItems, updateMenuMutation]);
+    })
+  }, [editingMenuId, menuItems, updateMenuMutation])
 
-  const isSubmitting = createMenuMutation.isPending || updateMenuMutation.isPending;
+  const isSubmitting = createMenuMutation.isPending || updateMenuMutation.isPending
 
   // Render loading state
   if (viewMode === 'list' && isLoadingMenus) {
@@ -1318,7 +1359,7 @@ export function MenuBuilderPage({ menuId, testId = 'menu-builder-page' }: MenuBu
           <LoadingSpinner size="large" label={t('common.loading')} />
         </div>
       </div>
-    );
+    )
   }
 
   // Render error state
@@ -1330,9 +1371,8 @@ export function MenuBuilderPage({ menuId, testId = 'menu-builder-page' }: MenuBu
           onRetry={() => refetchMenus()}
         />
       </div>
-    );
+    )
   }
-
 
   // Render editor view
   if (viewMode === 'editor') {
@@ -1397,7 +1437,11 @@ export function MenuBuilderPage({ menuId, testId = 'menu-builder-page' }: MenuBu
               onReorder={handleReorder}
             />
           </div>
-          <MenuPreview menu={currentMenu || null} items={menuItems} availablePolicies={availablePolicies} />
+          <MenuPreview
+            menu={currentMenu || null}
+            items={menuItems}
+            availablePolicies={availablePolicies}
+          />
         </div>
 
         {isMenuFormOpen && (
@@ -1422,7 +1466,11 @@ export function MenuBuilderPage({ menuId, testId = 'menu-builder-page' }: MenuBu
         <ConfirmDialog
           open={deleteDialogOpen}
           title={menuToDelete ? t('builder.menus.deleteMenu') : t('builder.menus.deleteItem')}
-          message={menuToDelete ? t('builder.menus.confirmDeleteMenu') : t('builder.menus.confirmDeleteItem')}
+          message={
+            menuToDelete
+              ? t('builder.menus.confirmDeleteMenu')
+              : t('builder.menus.confirmDeleteItem')
+          }
           confirmLabel={t('common.delete')}
           cancelLabel={t('common.cancel')}
           onConfirm={handleDeleteMenuConfirm}
@@ -1430,9 +1478,8 @@ export function MenuBuilderPage({ menuId, testId = 'menu-builder-page' }: MenuBu
           variant="danger"
         />
       </div>
-    );
+    )
   }
-
 
   // Render list view
   return (
@@ -1464,10 +1511,18 @@ export function MenuBuilderPage({ menuId, testId = 'menu-builder-page' }: MenuBu
           >
             <thead>
               <tr role="row">
-                <th role="columnheader" scope="col">{t('builder.menus.menuName')}</th>
-                <th role="columnheader" scope="col">{t('builder.menus.itemCount')}</th>
-                <th role="columnheader" scope="col">{t('collections.updated')}</th>
-                <th role="columnheader" scope="col">{t('common.actions')}</th>
+                <th role="columnheader" scope="col">
+                  {t('builder.menus.menuName')}
+                </th>
+                <th role="columnheader" scope="col">
+                  {t('builder.menus.itemCount')}
+                </th>
+                <th role="columnheader" scope="col">
+                  {t('collections.updated')}
+                </th>
+                <th role="columnheader" scope="col">
+                  {t('common.actions')}
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -1547,7 +1602,7 @@ export function MenuBuilderPage({ menuId, testId = 'menu-builder-page' }: MenuBu
         variant="danger"
       />
     </div>
-  );
+  )
 }
 
-export default MenuBuilderPage;
+export default MenuBuilderPage

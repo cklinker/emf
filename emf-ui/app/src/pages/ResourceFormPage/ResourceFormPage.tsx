@@ -11,97 +11,113 @@
  * - 12.4: Use custom field renderers when registered, fall back to defaults
  */
 
-import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useI18n } from '../../context/I18nContext';
-import { usePlugins } from '../../context/PluginContext';
-import { useApi } from '../../context/ApiContext';
-import { useToast, LoadingSpinner, ErrorMessage } from '../../components';
-import styles from './ResourceFormPage.module.css';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
+import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useI18n } from '../../context/I18nContext'
+import { usePlugins } from '../../context/PluginContext'
+import { useApi } from '../../context/ApiContext'
+import { useToast, LoadingSpinner, ErrorMessage } from '../../components'
+import styles from './ResourceFormPage.module.css'
 
 /**
  * Field definition interface for collection schema
  */
 export interface FieldDefinition {
-  id: string;
-  name: string;
-  displayName?: string;
-  type: 'string' | 'number' | 'boolean' | 'date' | 'datetime' | 'json' | 'reference';
-  required: boolean;
-  unique?: boolean;
-  indexed?: boolean;
-  defaultValue?: unknown;
-  referenceTarget?: string;
-  order?: number;
-  validation?: ValidationRule[];
+  id: string
+  name: string
+  displayName?: string
+  type: 'string' | 'number' | 'boolean' | 'date' | 'datetime' | 'json' | 'reference'
+  required: boolean
+  unique?: boolean
+  indexed?: boolean
+  defaultValue?: unknown
+  referenceTarget?: string
+  order?: number
+  validation?: ValidationRule[]
 }
 
 /**
  * Validation rule interface
  */
 export interface ValidationRule {
-  type: 'min' | 'max' | 'pattern' | 'email' | 'url' | 'custom';
-  value?: unknown;
-  message?: string;
+  type: 'min' | 'max' | 'pattern' | 'email' | 'url' | 'custom'
+  value?: unknown
+  message?: string
 }
 
 /**
  * Collection schema interface
  */
 export interface CollectionSchema {
-  id: string;
-  name: string;
-  displayName: string;
-  description?: string;
-  fields: FieldDefinition[];
+  id: string
+  name: string
+  displayName: string
+  description?: string
+  fields: FieldDefinition[]
 }
 
 /**
  * Resource record interface
  */
 export interface Resource {
-  id: string;
-  [key: string]: unknown;
+  id: string
+  [key: string]: unknown
 }
 
 /**
  * Form data type
  */
-export type FormData = Record<string, unknown>;
+export type FormData = Record<string, unknown>
 
 /**
  * Form errors type
  */
-export type FormErrors = Record<string, string>;
+export type FormErrors = Record<string, string>
 
 /**
  * Props for ResourceFormPage component
  */
 export interface ResourceFormPageProps {
   /** Collection name from route params (optional, can be from useParams) */
-  collectionName?: string;
+  collectionName?: string
   /** Resource ID from route params (optional, for edit mode) */
-  resourceId?: string;
+  resourceId?: string
   /** Optional test ID for testing */
-  testId?: string;
+  testId?: string
 }
 
 // API functions using apiClient
-async function fetchCollectionSchema(apiClient: any, collectionName: string): Promise<CollectionSchema> {
-  return apiClient.get(`/control/collections/${collectionName}`);
+async function fetchCollectionSchema(
+  apiClient: any,
+  collectionName: string
+): Promise<CollectionSchema> {
+  return apiClient.get(`/control/collections/${collectionName}`)
 }
 
-async function fetchResource(apiClient: any, collectionName: string, resourceId: string): Promise<Resource> {
-  return apiClient.get(`/api/${collectionName}/${resourceId}`);
+async function fetchResource(
+  apiClient: any,
+  collectionName: string,
+  resourceId: string
+): Promise<Resource> {
+  return apiClient.get(`/api/${collectionName}/${resourceId}`)
 }
 
-async function createResource(apiClient: any, collectionName: string, data: FormData): Promise<Resource> {
-  return apiClient.post(`/api/${collectionName}`, data);
+async function createResource(
+  apiClient: any,
+  collectionName: string,
+  data: FormData
+): Promise<Resource> {
+  return apiClient.post(`/api/${collectionName}`, data)
 }
 
-async function updateResource(apiClient: any, collectionName: string, resourceId: string, data: FormData): Promise<Resource> {
-  return apiClient.put(`/api/${collectionName}/${resourceId}`, data);
+async function updateResource(
+  apiClient: any,
+  collectionName: string,
+  resourceId: string,
+  data: FormData
+): Promise<Resource> {
+  return apiClient.put(`/api/${collectionName}/${resourceId}`, data)
 }
 
 /**
@@ -109,25 +125,25 @@ async function updateResource(apiClient: any, collectionName: string, resourceId
  */
 function getDefaultValueForType(field: FieldDefinition): unknown {
   if (field.defaultValue !== undefined) {
-    return field.defaultValue;
+    return field.defaultValue
   }
-  
+
   switch (field.type) {
     case 'string':
-      return '';
+      return ''
     case 'number':
-      return '';
+      return ''
     case 'boolean':
-      return false;
+      return false
     case 'date':
     case 'datetime':
-      return '';
+      return ''
     case 'json':
-      return '';
+      return ''
     case 'reference':
-      return '';
+      return ''
     default:
-      return '';
+      return ''
   }
 }
 
@@ -135,37 +151,37 @@ function getDefaultValueForType(field: FieldDefinition): unknown {
  * Initialize form data from schema with default values
  */
 function initializeFormData(schema: CollectionSchema): FormData {
-  const data: FormData = {};
+  const data: FormData = {}
   schema.fields.forEach((field) => {
-    data[field.name] = getDefaultValueForType(field);
-  });
-  return data;
+    data[field.name] = getDefaultValueForType(field)
+  })
+  return data
 }
 
 /**
  * Populate form data from existing resource
  */
 function populateFormData(schema: CollectionSchema, resource: Resource): FormData {
-  const data: FormData = {};
+  const data: FormData = {}
   schema.fields.forEach((field) => {
-    const value = resource[field.name];
+    const value = resource[field.name]
     if (value !== undefined && value !== null) {
       // Format dates for input fields
       if (field.type === 'date' && typeof value === 'string') {
-        data[field.name] = value.split('T')[0];
+        data[field.name] = value.split('T')[0]
       } else if (field.type === 'datetime' && typeof value === 'string') {
         // Format datetime for datetime-local input
-        data[field.name] = value.slice(0, 16);
+        data[field.name] = value.slice(0, 16)
       } else if (field.type === 'json' && typeof value === 'object') {
-        data[field.name] = JSON.stringify(value, null, 2);
+        data[field.name] = JSON.stringify(value, null, 2)
       } else {
-        data[field.name] = value;
+        data[field.name] = value
       }
     } else {
-      data[field.name] = getDefaultValueForType(field);
+      data[field.name] = getDefaultValueForType(field)
     }
-  });
-  return data;
+  })
+  return data
 }
 
 /**
@@ -179,21 +195,21 @@ export function ResourceFormPage({
   resourceId: propResourceId,
   testId = 'resource-form-page',
 }: ResourceFormPageProps): React.ReactElement {
-  const params = useParams<{ collectionName: string; resourceId?: string }>();
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const { t } = useI18n();
-  const { apiClient } = useApi();
-  const { showToast } = useToast();
-  
+  const params = useParams<{ collectionName: string; resourceId?: string }>()
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const { t } = useI18n()
+  const { apiClient } = useApi()
+  const { showToast } = useToast()
+
   // Get plugin system for custom field renderers
   // Requirement 12.4: Use registered field renderers when rendering fields
-  const { getFieldRenderer } = usePlugins();
+  const { getFieldRenderer } = usePlugins()
 
   // Get collection name and resource ID from props or route params
-  const collectionName = propCollectionName || params.collectionName || '';
-  const resourceId = propResourceId || params.resourceId;
-  const isEditMode = !!resourceId;
+  const collectionName = propCollectionName || params.collectionName || ''
+  const resourceId = propResourceId || params.resourceId
+  const isEditMode = !!resourceId
 
   // Fetch collection schema
   const {
@@ -204,7 +220,7 @@ export function ResourceFormPage({
     queryKey: ['collection-schema', collectionName],
     queryFn: () => fetchCollectionSchema(apiClient, collectionName),
     enabled: !!collectionName,
-  });
+  })
 
   // Fetch resource data for edit mode
   const {
@@ -215,73 +231,73 @@ export function ResourceFormPage({
     queryKey: ['resource', collectionName, resourceId],
     queryFn: () => fetchResource(apiClient, collectionName, resourceId!),
     enabled: !!collectionName && !!resourceId,
-  });
+  })
 
   // Form state
-  const [formData, setFormData] = useState<FormData>({});
-  const [formErrors, setFormErrors] = useState<FormErrors>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formData, setFormData] = useState<FormData>({})
+  const [formErrors, setFormErrors] = useState<FormErrors>({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Track the key for which form was initialized
-  const currentResourceKey = isEditMode ? resourceId : 'new';
-  const initializedKeyRef = useRef<string | null>(null);
+  const currentResourceKey = isEditMode ? resourceId : 'new'
+  const initializedKeyRef = useRef<string | null>(null)
 
   // Compute initial form data based on schema and resource
   const computedInitialData = useMemo(() => {
-    if (!schema) return null;
+    if (!schema) return null
     if (isEditMode && resource) {
-      return populateFormData(schema, resource);
+      return populateFormData(schema, resource)
     }
-    return initializeFormData(schema);
-  }, [schema, resource, isEditMode]);
+    return initializeFormData(schema)
+  }, [schema, resource, isEditMode])
 
   // Initialize form data when data becomes available or resource changes
   useEffect(() => {
     if (computedInitialData && initializedKeyRef.current !== currentResourceKey) {
-      initializedKeyRef.current = currentResourceKey;
-      setFormData(computedInitialData);
-      setFormErrors({});
+      initializedKeyRef.current = currentResourceKey
+      setFormData(computedInitialData)
+      setFormErrors({})
     }
-  }, [computedInitialData, currentResourceKey]);
+  }, [computedInitialData, currentResourceKey])
 
   // Sort fields by order
   const sortedFields = useMemo(() => {
-    if (!schema?.fields) return [];
+    if (!schema?.fields) return []
     return [...schema.fields].sort((a, b) => {
-      const orderA = a.order ?? 0;
-      const orderB = b.order ?? 0;
-      return orderA - orderB;
-    });
-  }, [schema]);
+      const orderA = a.order ?? 0
+      const orderB = b.order ?? 0
+      return orderA - orderB
+    })
+  }, [schema])
 
   // Create mutation
   const createMutation = useMutation({
     mutationFn: (data: FormData) => createResource(apiClient, collectionName, data),
     onSuccess: (newResource) => {
-      queryClient.invalidateQueries({ queryKey: ['resources', collectionName] });
-      showToast(t('success.created', { item: t('resources.record') }), 'success');
-      navigate(`/resources/${collectionName}/${newResource.id}`);
+      queryClient.invalidateQueries({ queryKey: ['resources', collectionName] })
+      showToast(t('success.created', { item: t('resources.record') }), 'success')
+      navigate(`/resources/${collectionName}/${newResource.id}`)
     },
     onError: (error: Error) => {
-      showToast(error.message || t('errors.generic'), 'error');
-      setIsSubmitting(false);
+      showToast(error.message || t('errors.generic'), 'error')
+      setIsSubmitting(false)
     },
-  });
+  })
 
   // Update mutation
   const updateMutation = useMutation({
     mutationFn: (data: FormData) => updateResource(apiClient, collectionName, resourceId!, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['resources', collectionName] });
-      queryClient.invalidateQueries({ queryKey: ['resource', collectionName, resourceId] });
-      showToast(t('success.updated', { item: t('resources.record') }), 'success');
-      navigate(`/resources/${collectionName}/${resourceId}`);
+      queryClient.invalidateQueries({ queryKey: ['resources', collectionName] })
+      queryClient.invalidateQueries({ queryKey: ['resource', collectionName, resourceId] })
+      showToast(t('success.updated', { item: t('resources.record') }), 'success')
+      navigate(`/resources/${collectionName}/${resourceId}`)
     },
     onError: (error: Error) => {
-      showToast(error.message || t('errors.generic'), 'error');
-      setIsSubmitting(false);
+      showToast(error.message || t('errors.generic'), 'error')
+      setIsSubmitting(false)
     },
-  });
+  })
 
   /**
    * Validate a single field value
@@ -291,43 +307,43 @@ export function ResourceFormPage({
       // Required validation
       if (field.required) {
         if (value === undefined || value === null || value === '') {
-          return t('common.required');
+          return t('common.required')
         }
       }
 
       // Skip further validation if value is empty and not required
       if (value === undefined || value === null || value === '') {
-        return null;
+        return null
       }
 
       // Type-specific validation
       switch (field.type) {
         case 'number': {
-          const numValue = Number(value);
+          const numValue = Number(value)
           if (isNaN(numValue)) {
-            return t('resourceForm.validation.invalidNumber');
+            return t('resourceForm.validation.invalidNumber')
           }
-          break;
+          break
         }
         case 'json': {
           if (typeof value === 'string' && value.trim()) {
             try {
-              JSON.parse(value);
+              JSON.parse(value)
             } catch {
-              return t('resourceForm.validation.invalidJson');
+              return t('resourceForm.validation.invalidJson')
             }
           }
-          break;
+          break
         }
         case 'date':
         case 'datetime': {
           if (typeof value === 'string' && value.trim()) {
-            const date = new Date(value);
+            const date = new Date(value)
             if (isNaN(date.getTime())) {
-              return t('resourceForm.validation.invalidDate');
+              return t('resourceForm.validation.invalidDate')
             }
           }
-          break;
+          break
         }
       }
 
@@ -337,87 +353,99 @@ export function ResourceFormPage({
           switch (rule.type) {
             case 'min': {
               if (field.type === 'number') {
-                const numValue = Number(value);
+                const numValue = Number(value)
                 if (numValue < Number(rule.value)) {
-                  return rule.message || t('resourceForm.validation.minValue', { min: String(rule.value) });
+                  return (
+                    rule.message ||
+                    t('resourceForm.validation.minValue', { min: String(rule.value) })
+                  )
                 }
               } else if (field.type === 'string') {
-                const strValue = String(value);
+                const strValue = String(value)
                 if (strValue.length < Number(rule.value)) {
-                  return rule.message || t('resourceForm.validation.minLength', { min: String(rule.value) });
+                  return (
+                    rule.message ||
+                    t('resourceForm.validation.minLength', { min: String(rule.value) })
+                  )
                 }
               }
-              break;
+              break
             }
             case 'max': {
               if (field.type === 'number') {
-                const numValue = Number(value);
+                const numValue = Number(value)
                 if (numValue > Number(rule.value)) {
-                  return rule.message || t('resourceForm.validation.maxValue', { max: String(rule.value) });
+                  return (
+                    rule.message ||
+                    t('resourceForm.validation.maxValue', { max: String(rule.value) })
+                  )
                 }
               } else if (field.type === 'string') {
-                const strValue = String(value);
+                const strValue = String(value)
                 if (strValue.length > Number(rule.value)) {
-                  return rule.message || t('resourceForm.validation.maxLength', { max: String(rule.value) });
+                  return (
+                    rule.message ||
+                    t('resourceForm.validation.maxLength', { max: String(rule.value) })
+                  )
                 }
               }
-              break;
+              break
             }
             case 'pattern': {
               if (typeof value === 'string' && rule.value) {
-                const regex = new RegExp(String(rule.value));
+                const regex = new RegExp(String(rule.value))
                 if (!regex.test(value)) {
-                  return rule.message || t('resourceForm.validation.pattern');
+                  return rule.message || t('resourceForm.validation.pattern')
                 }
               }
-              break;
+              break
             }
             case 'email': {
               if (typeof value === 'string') {
-                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
                 if (!emailRegex.test(value)) {
-                  return rule.message || t('resourceForm.validation.email');
+                  return rule.message || t('resourceForm.validation.email')
                 }
               }
-              break;
+              break
             }
             case 'url': {
               if (typeof value === 'string') {
                 try {
-                  new URL(value);
+                  new URL(value)
                 } catch {
-                  return rule.message || t('resourceForm.validation.url');
+                  return rule.message || t('resourceForm.validation.url')
                 }
               }
-              break;
+              break
             }
           }
         }
       }
 
-      return null;
+      return null
     },
     [t]
-  );
+  )
 
   /**
    * Validate all form fields
    */
   const validateForm = useCallback((): boolean => {
-    const errors: FormErrors = {};
-    let isValid = true;
+    const errors: FormErrors = {}
+    let isValid = true
 
     sortedFields.forEach((field) => {
-      const error = validateField(field, formData[field.name]);
+      const error = validateField(field, formData[field.name])
       if (error) {
-        errors[field.name] = error;
-        isValid = false;
+        errors[field.name] = error
+        isValid = false
       }
-    });
+    })
 
-    setFormErrors(errors);
-    return isValid;
-  }, [sortedFields, formData, validateField]);
+    setFormErrors(errors)
+    return isValid
+  }, [sortedFields, formData, validateField])
 
   /**
    * Handle field value change
@@ -427,97 +455,97 @@ export function ResourceFormPage({
       setFormData((prev) => ({
         ...prev,
         [fieldName]: value,
-      }));
+      }))
 
       // Clear error when field is modified
       if (formErrors[fieldName]) {
         setFormErrors((prev) => {
-          const next = { ...prev };
-          delete next[fieldName];
-          return next;
-        });
+          const next = { ...prev }
+          delete next[fieldName]
+          return next
+        })
       }
     },
     [formErrors]
-  );
+  )
 
   /**
    * Handle form submission
    */
   const handleSubmit = useCallback(
     (event: React.FormEvent) => {
-      event.preventDefault();
+      event.preventDefault()
 
       if (!validateForm()) {
-        showToast(t('errors.validation'), 'error');
-        return;
+        showToast(t('errors.validation'), 'error')
+        return
       }
 
-      setIsSubmitting(true);
+      setIsSubmitting(true)
 
       // Prepare data for submission
-      const submitData: FormData = {};
+      const submitData: FormData = {}
       sortedFields.forEach((field) => {
-        let value = formData[field.name];
+        let value = formData[field.name]
 
         // Convert values based on field type
         switch (field.type) {
           case 'number':
             if (value !== '' && value !== undefined && value !== null) {
-              value = Number(value);
+              value = Number(value)
             } else {
-              value = null;
+              value = null
             }
-            break;
+            break
           case 'boolean':
-            value = Boolean(value);
-            break;
+            value = Boolean(value)
+            break
           case 'json':
             if (typeof value === 'string' && value.trim()) {
               try {
-                value = JSON.parse(value);
+                value = JSON.parse(value)
               } catch {
                 // Keep as string if invalid JSON
               }
             } else {
-              value = null;
+              value = null
             }
-            break;
+            break
           case 'date':
           case 'datetime':
             if (value === '') {
-              value = null;
+              value = null
             }
-            break;
+            break
           case 'reference':
             if (value === '') {
-              value = null;
+              value = null
             }
-            break;
+            break
         }
 
-        submitData[field.name] = value;
-      });
+        submitData[field.name] = value
+      })
 
       if (isEditMode) {
-        updateMutation.mutate(submitData);
+        updateMutation.mutate(submitData)
       } else {
-        createMutation.mutate(submitData);
+        createMutation.mutate(submitData)
       }
     },
     [validateForm, sortedFields, formData, isEditMode, updateMutation, createMutation, showToast, t]
-  );
+  )
 
   /**
    * Handle cancel action
    */
   const handleCancel = useCallback(() => {
     if (isEditMode) {
-      navigate(`/resources/${collectionName}/${resourceId}`);
+      navigate(`/resources/${collectionName}/${resourceId}`)
     } else {
-      navigate(`/resources/${collectionName}`);
+      navigate(`/resources/${collectionName}`)
     }
-  }, [navigate, collectionName, resourceId, isEditMode]);
+  }, [navigate, collectionName, resourceId, isEditMode])
 
   /**
    * Render form field based on field type
@@ -526,23 +554,19 @@ export function ResourceFormPage({
    */
   const renderField = useCallback(
     (field: FieldDefinition, index: number): React.ReactNode => {
-      const value = formData[field.name];
-      const error = formErrors[field.name];
-      const fieldId = `field-${field.name}`;
-      const errorId = `${fieldId}-error`;
+      const value = formData[field.name]
+      const error = formErrors[field.name]
+      const fieldId = `field-${field.name}`
+      const errorId = `${fieldId}-error`
 
       // Check for custom renderer from plugin system
       // Requirement 12.4: Use registered field renderers when rendering fields
-      const CustomRenderer = getFieldRenderer(field.type);
-      
+      const CustomRenderer = getFieldRenderer(field.type)
+
       if (CustomRenderer) {
         // Use custom renderer from plugin
         return (
-          <div
-            key={field.id}
-            className={styles.fieldGroup}
-            data-testid={`field-group-${index}`}
-          >
+          <div key={field.id} className={styles.fieldGroup} data-testid={`field-group-${index}`}>
             <label htmlFor={fieldId} className={styles.label}>
               {field.displayName || field.name}
               {field.required && <span className={styles.required}>*</span>}
@@ -578,7 +602,7 @@ export function ResourceFormPage({
               </div>
             )}
           </div>
-        );
+        )
       }
 
       // Fall back to default renderers for unregistered types
@@ -588,9 +612,9 @@ export function ResourceFormPage({
         'aria-invalid': !!error,
         'aria-describedby': error ? errorId : undefined,
         'data-testid': `field-${field.name}`,
-      };
+      }
 
-      let input: React.ReactNode;
+      let input: React.ReactNode
 
       switch (field.type) {
         case 'string':
@@ -603,8 +627,8 @@ export function ResourceFormPage({
               onChange={(e) => handleFieldChange(field.name, e.target.value)}
               placeholder={field.displayName || field.name}
             />
-          );
-          break;
+          )
+          break
 
         case 'number':
           input = (
@@ -617,8 +641,8 @@ export function ResourceFormPage({
               placeholder={field.displayName || field.name}
               step="any"
             />
-          );
-          break;
+          )
+          break
 
         case 'boolean':
           input = (
@@ -634,8 +658,8 @@ export function ResourceFormPage({
                 {value ? t('common.yes') : t('common.no')}
               </span>
             </div>
-          );
-          break;
+          )
+          break
 
         case 'date':
           input = (
@@ -646,8 +670,8 @@ export function ResourceFormPage({
               value={String(value ?? '')}
               onChange={(e) => handleFieldChange(field.name, e.target.value)}
             />
-          );
-          break;
+          )
+          break
 
         case 'datetime':
           input = (
@@ -658,8 +682,8 @@ export function ResourceFormPage({
               value={String(value ?? '')}
               onChange={(e) => handleFieldChange(field.name, e.target.value)}
             />
-          );
-          break;
+          )
+          break
 
         case 'json':
           input = (
@@ -671,8 +695,8 @@ export function ResourceFormPage({
               placeholder='{"key": "value"}'
               rows={5}
             />
-          );
-          break;
+          )
+          break
 
         case 'reference':
           input = (
@@ -688,8 +712,8 @@ export function ResourceFormPage({
                   : t('resourceForm.referenceId')
               }
             />
-          );
-          break;
+          )
+          break
 
         default:
           input = (
@@ -700,15 +724,11 @@ export function ResourceFormPage({
               value={String(value ?? '')}
               onChange={(e) => handleFieldChange(field.name, e.target.value)}
             />
-          );
+          )
       }
 
       return (
-        <div
-          key={field.id}
-          className={styles.fieldGroup}
-          data-testid={`field-group-${index}`}
-        >
+        <div key={field.id} className={styles.fieldGroup} data-testid={`field-group-${index}`}>
           <label htmlFor={fieldId} className={styles.label}>
             {field.displayName || field.name}
             {field.required && <span className={styles.required}>*</span>}
@@ -729,13 +749,13 @@ export function ResourceFormPage({
             </div>
           )}
         </div>
-      );
+      )
     },
     [formData, formErrors, handleFieldChange, t, getFieldRenderer]
-  );
+  )
 
   // Loading state
-  const isLoading = schemaLoading || (isEditMode && resourceLoading);
+  const isLoading = schemaLoading || (isEditMode && resourceLoading)
 
   if (isLoading) {
     return (
@@ -744,7 +764,7 @@ export function ResourceFormPage({
           <LoadingSpinner size="large" label={t('common.loading')} />
         </div>
       </div>
-    );
+    )
   }
 
   // Error state - schema error
@@ -753,10 +773,12 @@ export function ResourceFormPage({
       <div className={styles.container} data-testid={testId}>
         <ErrorMessage
           error={schemaError instanceof Error ? schemaError : new Error(t('errors.generic'))}
-          onRetry={() => queryClient.invalidateQueries({ queryKey: ['collection-schema', collectionName] })}
+          onRetry={() =>
+            queryClient.invalidateQueries({ queryKey: ['collection-schema', collectionName] })
+          }
         />
       </div>
-    );
+    )
   }
 
   // Error state - resource error (edit mode)
@@ -765,10 +787,12 @@ export function ResourceFormPage({
       <div className={styles.container} data-testid={testId}>
         <ErrorMessage
           error={resourceError instanceof Error ? resourceError : new Error(t('errors.generic'))}
-          onRetry={() => queryClient.invalidateQueries({ queryKey: ['resource', collectionName, resourceId] })}
+          onRetry={() =>
+            queryClient.invalidateQueries({ queryKey: ['resource', collectionName, resourceId] })
+          }
         />
       </div>
-    );
+    )
   }
 
   // Not found state
@@ -777,7 +801,7 @@ export function ResourceFormPage({
       <div className={styles.container} data-testid={testId}>
         <ErrorMessage error={new Error(t('errors.notFound'))} />
       </div>
-    );
+    )
   }
 
   return (
@@ -789,11 +813,15 @@ export function ResourceFormPage({
             <Link to="/resources" className={styles.breadcrumbLink}>
               {t('resources.title')}
             </Link>
-            <span className={styles.breadcrumbSeparator} aria-hidden="true">/</span>
+            <span className={styles.breadcrumbSeparator} aria-hidden="true">
+              /
+            </span>
             <Link to={`/resources/${collectionName}`} className={styles.breadcrumbLink}>
               {schema.displayName}
             </Link>
-            <span className={styles.breadcrumbSeparator} aria-hidden="true">/</span>
+            <span className={styles.breadcrumbSeparator} aria-hidden="true">
+              /
+            </span>
             <span className={styles.breadcrumbCurrent}>
               {isEditMode ? t('resources.editRecord') : t('resources.createRecord')}
             </span>
@@ -810,12 +838,7 @@ export function ResourceFormPage({
       </header>
 
       {/* Form */}
-      <form
-        className={styles.form}
-        onSubmit={handleSubmit}
-        noValidate
-        data-testid="resource-form"
-      >
+      <form className={styles.form} onSubmit={handleSubmit} noValidate data-testid="resource-form">
         {/* Form Fields */}
         <div className={styles.fieldsContainer}>
           {sortedFields.length === 0 ? (
@@ -856,7 +879,7 @@ export function ResourceFormPage({
         </div>
       </form>
     </div>
-  );
+  )
 }
 
-export default ResourceFormPage;
+export default ResourceFormPage

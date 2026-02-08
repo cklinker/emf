@@ -23,29 +23,29 @@ import React, {
   useMemo,
   useEffect,
   useRef,
-} from 'react';
+} from 'react'
 
 /**
  * Politeness level for announcements
  * - 'polite': Waits for user to finish current task before announcing
  * - 'assertive': Interrupts user immediately (use sparingly)
  */
-export type LiveRegionPoliteness = 'polite' | 'assertive';
+export type LiveRegionPoliteness = 'polite' | 'assertive'
 
 /**
  * Props for the LiveRegion component
  */
 export interface LiveRegionProps {
   /** The message to announce */
-  message: string;
+  message: string
   /** Politeness level - 'polite' (default) or 'assertive' */
-  politeness?: LiveRegionPoliteness;
+  politeness?: LiveRegionPoliteness
   /** Whether to clear the message after announcing (default: true) */
-  clearAfterAnnounce?: boolean;
+  clearAfterAnnounce?: boolean
   /** Delay in ms before clearing the message (default: 1000) */
-  clearDelay?: number;
+  clearDelay?: number
   /** Optional test ID */
-  'data-testid'?: string;
+  'data-testid'?: string
 }
 
 /**
@@ -53,9 +53,9 @@ export interface LiveRegionProps {
  */
 export interface LiveRegionContextValue {
   /** Announce a message to screen readers */
-  announce: (message: string, politeness?: LiveRegionPoliteness) => void;
+  announce: (message: string, politeness?: LiveRegionPoliteness) => void
   /** Clear the current announcement */
-  clear: () => void;
+  clear: () => void
 }
 
 /**
@@ -63,11 +63,11 @@ export interface LiveRegionContextValue {
  */
 export interface LiveRegionProviderProps {
   /** Child components */
-  children: React.ReactNode;
+  children: React.ReactNode
   /** Default politeness level (default: 'polite') */
-  defaultPoliteness?: LiveRegionPoliteness;
+  defaultPoliteness?: LiveRegionPoliteness
   /** Delay before clearing announcements (default: 1000ms) */
-  clearDelay?: number;
+  clearDelay?: number
 }
 
 // Visually hidden styles for screen reader only content
@@ -81,10 +81,10 @@ const visuallyHiddenStyles: React.CSSProperties = {
   clip: 'rect(0, 0, 0, 0)',
   whiteSpace: 'nowrap',
   border: 0,
-};
+}
 
 // Create context
-const LiveRegionContext = createContext<LiveRegionContextValue | undefined>(undefined);
+const LiveRegionContext = createContext<LiveRegionContextValue | undefined>(undefined)
 
 /**
  * LiveRegion Component
@@ -104,29 +104,29 @@ export function LiveRegion({
   clearDelay = 1000,
   'data-testid': testId = 'live-region',
 }: LiveRegionProps): React.ReactElement {
-  const [currentMessage, setCurrentMessage] = useState(message);
-  const clearTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [currentMessage, setCurrentMessage] = useState(message)
+  const clearTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Update message when prop changes
   useEffect(() => {
-    setCurrentMessage(message);
+    setCurrentMessage(message)
 
     // Clear after delay if enabled
     if (clearAfterAnnounce && message) {
       if (clearTimeoutRef.current) {
-        clearTimeout(clearTimeoutRef.current);
+        clearTimeout(clearTimeoutRef.current)
       }
       clearTimeoutRef.current = setTimeout(() => {
-        setCurrentMessage('');
-      }, clearDelay);
+        setCurrentMessage('')
+      }, clearDelay)
     }
 
     return () => {
       if (clearTimeoutRef.current) {
-        clearTimeout(clearTimeoutRef.current);
+        clearTimeout(clearTimeoutRef.current)
       }
-    };
-  }, [message, clearAfterAnnounce, clearDelay]);
+    }
+  }, [message, clearAfterAnnounce, clearDelay])
 
   return (
     <div
@@ -138,7 +138,7 @@ export function LiveRegion({
     >
       {currentMessage}
     </div>
-  );
+  )
 }
 
 /**
@@ -159,9 +159,9 @@ export function LiveRegionProvider({
   defaultPoliteness = 'polite',
   clearDelay = 1000,
 }: LiveRegionProviderProps): React.ReactElement {
-  const [politeMessage, setPoliteMessage] = useState('');
-  const [assertiveMessage, setAssertiveMessage] = useState('');
-  const clearTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [politeMessage, setPoliteMessage] = useState('')
+  const [assertiveMessage, setAssertiveMessage] = useState('')
+  const clearTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   /**
    * Announce a message to screen readers
@@ -170,46 +170,46 @@ export function LiveRegionProvider({
     (message: string, politeness: LiveRegionPoliteness = defaultPoliteness) => {
       // Clear any pending timeout
       if (clearTimeoutRef.current) {
-        clearTimeout(clearTimeoutRef.current);
+        clearTimeout(clearTimeoutRef.current)
       }
 
       // Set the appropriate message
       if (politeness === 'assertive') {
-        setAssertiveMessage(message);
-        setPoliteMessage('');
+        setAssertiveMessage(message)
+        setPoliteMessage('')
       } else {
-        setPoliteMessage(message);
-        setAssertiveMessage('');
+        setPoliteMessage(message)
+        setAssertiveMessage('')
       }
 
       // Clear after delay
       clearTimeoutRef.current = setTimeout(() => {
-        setPoliteMessage('');
-        setAssertiveMessage('');
-      }, clearDelay);
+        setPoliteMessage('')
+        setAssertiveMessage('')
+      }, clearDelay)
     },
     [defaultPoliteness, clearDelay]
-  );
+  )
 
   /**
    * Clear the current announcement
    */
   const clear = useCallback(() => {
     if (clearTimeoutRef.current) {
-      clearTimeout(clearTimeoutRef.current);
+      clearTimeout(clearTimeoutRef.current)
     }
-    setPoliteMessage('');
-    setAssertiveMessage('');
-  }, []);
+    setPoliteMessage('')
+    setAssertiveMessage('')
+  }, [])
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (clearTimeoutRef.current) {
-        clearTimeout(clearTimeoutRef.current);
+        clearTimeout(clearTimeoutRef.current)
       }
-    };
-  }, []);
+    }
+  }, [])
 
   // Memoize context value
   const contextValue = useMemo<LiveRegionContextValue>(
@@ -218,7 +218,7 @@ export function LiveRegionProvider({
       clear,
     }),
     [announce, clear]
-  );
+  )
 
   return (
     <LiveRegionContext.Provider value={contextValue}>
@@ -244,7 +244,7 @@ export function LiveRegionProvider({
         {assertiveMessage}
       </div>
     </LiveRegionContext.Provider>
-  );
+  )
 }
 
 /**
@@ -267,14 +267,14 @@ export function LiveRegionProvider({
  * ```
  */
 export function useAnnounce(): LiveRegionContextValue {
-  const context = useContext(LiveRegionContext);
+  const context = useContext(LiveRegionContext)
   if (context === undefined) {
-    throw new Error('useAnnounce must be used within a LiveRegionProvider');
+    throw new Error('useAnnounce must be used within a LiveRegionProvider')
   }
-  return context;
+  return context
 }
 
 // Export context for testing
-export { LiveRegionContext };
+export { LiveRegionContext }
 
-export default LiveRegion;
+export default LiveRegion

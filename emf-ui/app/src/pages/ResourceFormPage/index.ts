@@ -8,7 +8,7 @@
  * - 11.9: Resource browser allows editing existing resources
  */
 
-export { ResourceFormPage, default } from './ResourceFormPage';
+export { ResourceFormPage, default } from './ResourceFormPage'
 export type {
   ResourceFormPageProps,
   FieldDefinition,
@@ -17,4 +17,4 @@ export type {
   Resource,
   FormData,
   FormErrors,
-} from './ResourceFormPage';
+} from './ResourceFormPage'

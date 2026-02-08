@@ -25,6 +25,7 @@ import type {
   OIDCDiscoveryDocument,
 } from '../types/auth'
 import type { OIDCProviderSummary } from '../types/config'
+import { fetchBootstrapConfig } from '../utils/bootstrapCache'
 
 // Storage keys
 const STORAGE_KEYS = {
@@ -184,22 +185,13 @@ export function AuthProvider({
   )
 
   /**
-   * Fetch available OIDC providers from bootstrap config
-   * Note: This is a one-time fetch on init. If it fails, we return empty array
-   * and the app will show the config error from ConfigProvider.
+   * Fetch available OIDC providers from bootstrap config.
+   * Uses shared cache to avoid duplicate request (ConfigContext also reads bootstrap).
    */
   const fetchProviders = useCallback(async (): Promise<OIDCProviderSummary[]> => {
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL || ''}/control/ui-bootstrap`
-      )
-      if (!response.ok) {
-        // Don't throw - just return empty. ConfigProvider will handle the error display.
-        console.warn('[Auth] Bootstrap config unavailable, OIDC providers not loaded')
-        return []
-      }
-      const config = await response.json()
-      return config.oidcProviders || []
+      const config = (await fetchBootstrapConfig()) as Record<string, unknown>
+      return (config.oidcProviders as OIDCProviderSummary[]) || []
     } catch (err) {
       // Don't throw - just return empty. ConfigProvider will handle the error display.
       console.warn('[Auth] Failed to fetch providers:', err)

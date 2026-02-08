@@ -9,6 +9,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ConfigProvider, useConfig } from './ConfigContext'
+import { clearBootstrapCache } from '../utils/bootstrapCache'
 import type { ReactNode } from 'react'
 import type { BootstrapConfig } from '../types/config'
 
@@ -150,16 +151,14 @@ function TestComponent({
 }
 
 // Helper to render with ConfigProvider
-function renderWithConfig(
-  ui: ReactNode = <TestComponent />,
-  props?: { bootstrapEndpoint?: string; pollInterval?: number }
-) {
+function renderWithConfig(ui: ReactNode = <TestComponent />, props?: { pollInterval?: number }) {
   return render(<ConfigProvider {...props}>{ui}</ConfigProvider>)
 }
 
 describe('ConfigContext', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    clearBootstrapCache()
     vi.useFakeTimers({ shouldAdvanceTime: true })
     global.fetch = createMockFetch()
   })
@@ -212,21 +211,6 @@ describe('ConfigContext', () => {
 
       // Verify fetch was called with correct endpoint
       expect(mockFetch).toHaveBeenCalledWith('/control/ui-bootstrap')
-    })
-
-    it('should use custom bootstrap endpoint when provided', async () => {
-      const mockFetch = createMockFetch()
-      global.fetch = mockFetch
-
-      renderWithConfig(<TestComponent />, {
-        bootstrapEndpoint: '/custom/bootstrap',
-      })
-
-      await waitFor(() => {
-        expect(screen.getByTestId('loading')).toHaveTextContent('not-loading')
-      })
-
-      expect(mockFetch).toHaveBeenCalledWith('/custom/bootstrap')
     })
 
     it('should load config successfully', async () => {

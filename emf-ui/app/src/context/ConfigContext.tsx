@@ -25,6 +25,7 @@ import React, {
   useRef,
 } from 'react'
 import type { BootstrapConfig } from '../types/config'
+import { fetchBootstrapConfig, clearBootstrapCache } from '../utils/bootstrapCache'
 
 /**
  * Configuration context value interface
@@ -46,14 +47,9 @@ export interface ConfigContextValue {
 export interface ConfigProviderProps {
   /** Child components to render */
   children: React.ReactNode
-  /** Optional custom endpoint URL for bootstrap config (defaults to /control/ui-bootstrap) */
-  bootstrapEndpoint?: string
   /** Optional interval in ms to check for config changes (defaults to 0 = disabled) */
   pollInterval?: number
 }
-
-// Bootstrap endpoint URL — prefixed with VITE_API_BASE_URL for production (e.g. https://emf.rzware.com)
-const DEFAULT_BOOTSTRAP_ENDPOINT = `${import.meta.env.VITE_API_BASE_URL || ''}/control/ui-bootstrap`
 
 /**
  * Validate that the bootstrap config has required fields
@@ -183,7 +179,6 @@ const ConfigContext = createContext<ConfigContextValue | undefined>(undefined)
  */
 export function ConfigProvider({
   children,
-  bootstrapEndpoint = DEFAULT_BOOTSTRAP_ENDPOINT,
   pollInterval = 0,
 }: ConfigProviderProps): React.ReactElement {
   const [config, setConfig] = useState<BootstrapConfig | null>(null)
@@ -204,26 +199,19 @@ export function ConfigProvider({
 
   /**
    * Fetch bootstrap configuration from the server
+   * Uses shared cache to avoid duplicate requests (AuthContext also reads bootstrap).
    * Requirements: 1.1, 1.6, 1.7
    */
   const fetchConfig = useCallback(async (): Promise<BootstrapConfig> => {
-    const response = await fetch(bootstrapEndpoint)
-
-    // Requirement 1.6: Handle unavailable endpoint
-    if (!response.ok) {
-      const error = new Error(
-        `Failed to fetch bootstrap configuration: ${response.status} ${response.statusText}`
-      )
-      error.name = 'ConfigFetchError'
-      throw error
-    }
-
     let data: unknown
     try {
-      data = await response.json()
-    } catch {
-      const error = new Error('Failed to parse bootstrap configuration: Invalid JSON response')
-      error.name = 'ConfigParseError'
+      data = await fetchBootstrapConfig()
+    } catch (err) {
+      const error =
+        err instanceof Error
+          ? err
+          : new Error('Failed to fetch bootstrap configuration: Unknown error')
+      error.name = 'ConfigFetchError'
       throw error
     }
 
@@ -233,7 +221,7 @@ export function ConfigProvider({
     }
 
     return data
-  }, [bootstrapEndpoint])
+  }, [])
 
   /**
    * Load or reload the configuration
@@ -276,6 +264,7 @@ export function ConfigProvider({
    * Requirement 1.8: Offer to reload when config changes detected
    */
   const reload = useCallback(async (): Promise<void> => {
+    clearBootstrapCache()
     await loadConfig(true)
   }, [loadConfig])
 

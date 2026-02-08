@@ -23,9 +23,9 @@ import static org.mockito.Mockito.when;
 
 /**
  * Unit tests for HeaderTransformationFilter.
- * 
+ *
  * Tests verify that:
- * - Authorization header is removed from forwarded requests
+ * - Authorization header is preserved for downstream JWT validation
  * - X-Forwarded-User header is added with principal username
  * - X-Forwarded-Roles header is added with comma-separated roles
  * - Other headers are preserved
@@ -49,30 +49,38 @@ class HeaderTransformationFilterTest {
     }
     
     @Test
-    void shouldRemoveAuthorizationHeader() {
+    void shouldPreserveAuthorizationHeader() {
         // Given: A request with Authorization header and authenticated principal
         MockServerHttpRequest request = MockServerHttpRequest
                 .get("/api/users")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer test-token")
                 .header("X-Custom-Header", "custom-value")
                 .build();
-        
+
         MockServerWebExchange exchange = MockServerWebExchange.from(request);
-        
+
         GatewayPrincipal principal = new GatewayPrincipal(
                 "testuser",
                 Arrays.asList("USER", "ADMIN"),
                 Collections.emptyMap()
         );
         exchange.getAttributes().put("gateway.principal", principal);
-        
+
+        // Capture the mutated exchange
+        final ServerWebExchange[] capturedExchange = new ServerWebExchange[1];
+        when(chain.filter(any(ServerWebExchange.class))).thenAnswer(invocation -> {
+            capturedExchange[0] = invocation.getArgument(0);
+            return Mono.empty();
+        });
+
         // When: Filter is applied
         StepVerifier.create(filter.filter(exchange, chain))
                 .verifyComplete();
-        
-        // Then: Verify chain was called with mutated exchange
-        // We need to capture the exchange passed to chain.filter()
-        // For now, we'll verify the filter completes successfully
+
+        // Then: Authorization header should be preserved for downstream JWT validation
+        assertThat(capturedExchange[0]).isNotNull();
+        HttpHeaders headers = capturedExchange[0].getRequest().getHeaders();
+        assertThat(headers.getFirst(HttpHeaders.AUTHORIZATION)).isEqualTo("Bearer test-token");
     }
     
     @Test
@@ -174,15 +182,13 @@ class HeaderTransformationFilterTest {
         StepVerifier.create(filter.filter(exchange, chain))
                 .verifyComplete();
         
-        // Then: Other headers should be preserved
+        // Then: Other headers should be preserved (including Authorization)
         assertThat(capturedExchange[0]).isNotNull();
         HttpHeaders headers = capturedExchange[0].getRequest().getHeaders();
         assertThat(headers.getFirst("X-Custom-Header")).isEqualTo("custom-value");
         assertThat(headers.getFirst("X-Request-ID")).isEqualTo("12345");
         assertThat(headers.getFirst(HttpHeaders.CONTENT_TYPE)).isEqualTo("application/json");
-        
-        // And Authorization header should be removed
-        assertThat(headers.containsKey(HttpHeaders.AUTHORIZATION)).isFalse();
+        assertThat(headers.getFirst(HttpHeaders.AUTHORIZATION)).isEqualTo("Bearer test-token");
     }
     
     @Test

@@ -7,7 +7,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
@@ -18,17 +17,17 @@ import java.util.stream.Collectors;
 /**
  * Global filter that transforms request headers before forwarding to backend services.
  * Runs with order 50 (after authentication and authorization, before forwarding).
- * 
+ *
  * This filter:
- * - Removes the Authorization header from forwarded requests (security best practice)
+ * - Preserves the Authorization header so downstream services can validate JWT tokens
  * - Adds X-Forwarded-User header with the authenticated principal's username
  * - Adds X-Forwarded-Roles header with comma-separated list of principal's roles
  * - Preserves all other request headers
- * 
+ *
  * The backend services can use the X-Forwarded-User and X-Forwarded-Roles headers
- * to identify the authenticated user and their permissions without needing to
- * validate JWT tokens themselves.
- * 
+ * for lightweight identity extraction, or validate the JWT themselves using the
+ * preserved Authorization header.
+ *
  * Validates: Requirements 9.4, 9.5, 9.6
  */
 @Component
@@ -36,7 +35,6 @@ public class HeaderTransformationFilter implements GlobalFilter, Ordered {
     
     private static final Logger log = LoggerFactory.getLogger(HeaderTransformationFilter.class);
     
-    private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String X_FORWARDED_USER_HEADER = "X-Forwarded-User";
     private static final String X_FORWARDED_ROLES_HEADER = "X-Forwarded-Roles";
     private static final String X_TENANT_ID_HEADER = "X-Tenant-ID";
@@ -69,12 +67,6 @@ public class HeaderTransformationFilter implements GlobalFilter, Ordered {
         // Build the mutated request with transformed headers
         ServerHttpRequest mutatedRequest = exchange.getRequest().mutate()
                 .headers(headers -> {
-                    // Remove Authorization header
-                    if (headers.containsKey(AUTHORIZATION_HEADER)) {
-                        headers.remove(AUTHORIZATION_HEADER);
-                        log.trace("Removed Authorization header for user: {}", principal.getUsername());
-                    }
-                    
                     // Add X-Forwarded-User header
                     headers.set(X_FORWARDED_USER_HEADER, principal.getUsername());
                     

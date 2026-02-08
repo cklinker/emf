@@ -3,6 +3,8 @@ package com.emf.controlplane.config;
 import com.emf.controlplane.entity.OidcProvider;
 import com.emf.controlplane.repository.OidcProviderRepository;
 import com.emf.controlplane.service.JwksCache;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.jwk.JWK;
 import com.nimbusds.jose.jwk.JWKSelector;
@@ -19,7 +21,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.convert.converter.Converter;
-import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -37,7 +38,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.*;
-import java.util.stream.Collectors;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Security configuration for the Control Plane Service.
@@ -144,7 +145,10 @@ public class SecurityConfig {
                 
                 // Permit control plane bootstrap endpoint - required for gateway health check
                 .requestMatchers("/control/bootstrap").permitAll()
-                
+
+                // Permit internal endpoints - used by gateway for JWKS lookup before JWT validation
+                .requestMatchers("/internal/**").permitAll()
+
                 // Require authentication for all other endpoints
                 .anyRequest().authenticated()
             )
@@ -210,76 +214,155 @@ public class SecurityConfig {
     }
 
     /**
-     * Converter that extracts roles from various JWT claim locations.
-     * Supports multiple OIDC provider formats.
+     * Converter that extracts roles from JWT claims and applies provider-specific role mappings.
+     *
+     * Role extraction strategy:
+     * 1. If the matching OIDC provider has a rolesClaim configured, extract from that claim
+     * 2. Otherwise, extract from default locations: roles, realm_access.roles, groups
+     * 3. Apply rolesMapping (if configured) to translate provider roles to internal roles
+     * 4. Also extract scope-based authorities
      */
     private class RoleExtractingConverter implements Converter<Jwt, Collection<GrantedAuthority>> {
 
+        private static final ObjectMapper objectMapper = new ObjectMapper();
+
+        // Cache parsed role mappings per provider ID to avoid re-parsing JSON on every request
+        private final ConcurrentHashMap<String, Map<String, String>> roleMappingCache = new ConcurrentHashMap<>();
+
         @Override
         public Collection<GrantedAuthority> convert(Jwt jwt) {
+            // Find the matching provider by issuer
+            OidcProvider provider = findProviderByIssuer(jwt.getClaimAsString("iss"));
+
+            // Collect raw role strings from JWT claims
+            Set<String> rawRoles = new LinkedHashSet<>();
+            if (provider != null && provider.getRolesClaim() != null) {
+                // Use the provider's configured roles claim
+                collectRolesFromClaimPath(jwt, provider.getRolesClaim(), rawRoles);
+            } else {
+                // Default: extract from standard locations
+                collectRolesFromClaim(jwt, "roles", rawRoles);
+                collectKeycloakRoles(jwt, rawRoles);
+                collectRolesFromClaim(jwt, "groups", rawRoles);
+            }
+
+            // Apply role mapping from provider config
+            Map<String, String> mapping = getProviderRoleMapping(provider);
+
             Set<GrantedAuthority> authorities = new HashSet<>();
+            for (String rawRole : rawRoles) {
+                // Check mapping (try exact match, then case-insensitive)
+                String mappedRole = mapping.getOrDefault(rawRole,
+                        mapping.getOrDefault(rawRole.toLowerCase(), rawRole));
+                authorities.add(new SimpleGrantedAuthority("ROLE_" + mappedRole.toUpperCase()));
+            }
 
-            // Extract from "roles" claim (direct array)
-            extractRolesFromClaim(jwt, "roles", authorities);
-
-            // Extract from "realm_access.roles" (Keycloak format)
-            extractKeycloakRoles(jwt, authorities);
-
-            // Extract from "groups" claim
-            extractRolesFromClaim(jwt, "groups", authorities);
-
-            // Extract from "scope" claim (space-separated)
+            // Extract scope-based authorities (not affected by role mapping)
             extractScopeAuthorities(jwt, authorities);
 
-            // Extract from custom claim if configured
+            // Check if any raw role matches the configured admin role
             String adminRole = properties.getSecurity().getAdminRole();
-            if (hasAdminRole(jwt, adminRole)) {
+            boolean isAdmin = rawRoles.stream().anyMatch(r -> r.equalsIgnoreCase(adminRole));
+            // Also check mapped roles
+            if (!isAdmin) {
+                isAdmin = rawRoles.stream()
+                        .map(r -> mapping.getOrDefault(r, mapping.getOrDefault(r.toLowerCase(), r)))
+                        .anyMatch(r -> r.equalsIgnoreCase(adminRole));
+            }
+            if (isAdmin) {
                 authorities.add(new SimpleGrantedAuthority("ROLE_" + adminRole));
             }
 
-            log.debug("Extracted authorities from JWT: {}", authorities);
+            log.debug("Extracted authorities from JWT (issuer={}): {}", jwt.getClaimAsString("iss"), authorities);
             return authorities;
         }
 
+        private OidcProvider findProviderByIssuer(String issuer) {
+            if (issuer == null) return null;
+            try {
+                List<OidcProvider> providers = oidcProviderRepository.findByActiveTrue();
+                for (OidcProvider provider : providers) {
+                    if (issuer.equals(provider.getIssuer())) {
+                        return provider;
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Failed to look up OIDC provider for issuer {}: {}", issuer, e.getMessage());
+            }
+            return null;
+        }
+
+        private Map<String, String> getProviderRoleMapping(OidcProvider provider) {
+            if (provider == null || provider.getRolesMapping() == null || provider.getRolesMapping().isBlank()) {
+                return Collections.emptyMap();
+            }
+            return roleMappingCache.computeIfAbsent(provider.getId(), id -> {
+                try {
+                    Map<String, String> parsed = objectMapper.readValue(
+                            provider.getRolesMapping(),
+                            new TypeReference<Map<String, String>>() {});
+                    // Build case-insensitive lookup by also adding lowercase keys
+                    Map<String, String> result = new HashMap<>(parsed);
+                    for (Map.Entry<String, String> entry : parsed.entrySet()) {
+                        result.putIfAbsent(entry.getKey().toLowerCase(), entry.getValue());
+                    }
+                    return result;
+                } catch (Exception e) {
+                    log.warn("Failed to parse rolesMapping for provider {}: {}", provider.getName(), e.getMessage());
+                    return Collections.emptyMap();
+                }
+            });
+        }
+
+        /**
+         * Extract roles from a claim path, supporting dot notation for nested claims.
+         * E.g., "groups" extracts jwt.groups, "realm_access.roles" extracts jwt.realm_access.roles.
+         */
         @SuppressWarnings("unchecked")
-        private void extractRolesFromClaim(Jwt jwt, String claimName, Set<GrantedAuthority> authorities) {
-            Object claim = jwt.getClaim(claimName);
-            if (claim instanceof Collection) {
-                ((Collection<String>) claim).forEach(role -> 
-                    authorities.add(new SimpleGrantedAuthority("ROLE_" + role.toUpperCase()))
-                );
-            } else if (claim instanceof String) {
-                // Handle comma-separated roles
-                Arrays.stream(((String) claim).split(","))
+        private void collectRolesFromClaimPath(Jwt jwt, String claimPath, Set<String> roles) {
+            if (claimPath.contains(".")) {
+                String[] parts = claimPath.split("\\.", 2);
+                Object parent = jwt.getClaim(parts[0]);
+                if (parent instanceof Map) {
+                    Object nested = ((Map<String, Object>) parent).get(parts[1]);
+                    collectFromValue(nested, roles);
+                }
+            } else {
+                collectFromValue(jwt.getClaim(claimPath), roles);
+            }
+        }
+
+        private void collectRolesFromClaim(Jwt jwt, String claimName, Set<String> roles) {
+            collectFromValue(jwt.getClaim(claimName), roles);
+        }
+
+        private void collectFromValue(Object value, Set<String> roles) {
+            if (value instanceof Collection) {
+                for (Object item : (Collection<?>) value) {
+                    if (item instanceof String) {
+                        roles.add((String) item);
+                    }
+                }
+            } else if (value instanceof String) {
+                Arrays.stream(((String) value).split(","))
                     .map(String::trim)
                     .filter(s -> !s.isEmpty())
-                    .forEach(role -> authorities.add(new SimpleGrantedAuthority("ROLE_" + role.toUpperCase())));
+                    .forEach(roles::add);
             }
         }
 
         @SuppressWarnings("unchecked")
-        private void extractKeycloakRoles(Jwt jwt, Set<GrantedAuthority> authorities) {
+        private void collectKeycloakRoles(Jwt jwt, Set<String> roles) {
             Map<String, Object> realmAccess = jwt.getClaim("realm_access");
             if (realmAccess != null) {
-                Object roles = realmAccess.get("roles");
-                if (roles instanceof Collection) {
-                    ((Collection<String>) roles).forEach(role ->
-                        authorities.add(new SimpleGrantedAuthority("ROLE_" + role.toUpperCase()))
-                    );
-                }
+                collectFromValue(realmAccess.get("roles"), roles);
             }
 
-            // Also check resource_access for client-specific roles
             Map<String, Object> resourceAccess = jwt.getClaim("resource_access");
             if (resourceAccess != null) {
                 resourceAccess.values().forEach(clientAccess -> {
                     if (clientAccess instanceof Map) {
-                        Object clientRoles = ((Map<String, Object>) clientAccess).get("roles");
-                        if (clientRoles instanceof Collection) {
-                            ((Collection<String>) clientRoles).forEach(role ->
-                                authorities.add(new SimpleGrantedAuthority("ROLE_" + role.toUpperCase()))
-                            );
-                        }
+                        collectFromValue(((Map<String, Object>) clientAccess).get("roles"), roles);
                     }
                 });
             }
@@ -293,27 +376,6 @@ public class SecurityConfig {
                     .filter(s -> !s.isEmpty())
                     .forEach(s -> authorities.add(new SimpleGrantedAuthority("SCOPE_" + s)));
             }
-        }
-
-        @SuppressWarnings("unchecked")
-        private boolean hasAdminRole(Jwt jwt, String adminRole) {
-            // Check various claim locations for admin role
-            Object roles = jwt.getClaim("roles");
-            if (roles instanceof Collection && ((Collection<String>) roles).stream()
-                    .anyMatch(r -> r.equalsIgnoreCase(adminRole))) {
-                return true;
-            }
-
-            Map<String, Object> realmAccess = jwt.getClaim("realm_access");
-            if (realmAccess != null) {
-                Object realmRoles = realmAccess.get("roles");
-                if (realmRoles instanceof Collection && ((Collection<String>) realmRoles).stream()
-                        .anyMatch(r -> r.equalsIgnoreCase(adminRole))) {
-                    return true;
-                }
-            }
-
-            return false;
         }
     }
 

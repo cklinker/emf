@@ -352,7 +352,7 @@ jobs:
       - name: Verify gateway health
         run: |
           for i in $(seq 1 30); do
-            STATUS=$(kubectl -n emf exec deploy/emf-gateway -- curl -sf http://localhost:8080/actuator/health 2>/dev/null | grep -o '"status":"UP"' || true)
+            STATUS=$(kubectl -n emf exec deploy/emf-gateway -- curl -sf http://localhost:8080/actuator/health/liveness 2>/dev/null | grep -o '"status":"UP"' || true)
             if [ -n "$STATUS" ]; then
               echo "Gateway is healthy"
               exit 0

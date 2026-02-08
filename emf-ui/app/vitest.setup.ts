@@ -61,7 +61,7 @@ Object.defineProperty(window, 'localStorage', {
 // Export the server so tests can add handlers
 export const server = setupServer(
   // Default handler for bootstrap config
-  http.get('/ui/config/bootstrap', () => {
+  http.get('/control/ui-bootstrap', () => {
     return HttpResponse.json({
       oidcProviders: [
         {

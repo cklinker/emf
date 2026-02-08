@@ -4,7 +4,7 @@
  * Tests for the root App component that wires together all providers and routing.
  *
  * Requirements:
- * - 1.1: Fetch bootstrap configuration from /ui/config/bootstrap on startup
+ * - 1.1: Fetch bootstrap configuration from /control/ui-bootstrap on startup
  * - 1.2: Configure application routes based on page definitions
  * - 2.1: Redirect unauthenticated users to OIDC provider login page
  */
@@ -266,7 +266,7 @@ describe('App', () => {
 
     // Setup MSW handlers
     server.use(
-      http.get('/ui/config/bootstrap', () => {
+      http.get('/control/ui-bootstrap', () => {
         return HttpResponse.json(mockBootstrapConfig)
       })
     )

@@ -2,10 +2,10 @@
  * Configuration Context
  *
  * Provides bootstrap configuration state and management for the application.
- * Fetches configuration from /ui/config/bootstrap and handles loading, error, and reload states.
+ * Fetches configuration from /control/ui-bootstrap and handles loading, error, and reload states.
  *
  * Requirements:
- * - 1.1: Fetch bootstrap configuration from /ui/config/bootstrap on startup
+ * - 1.1: Fetch bootstrap configuration from /control/ui-bootstrap on startup
  * - 1.2: Configure application routes based on page definitions
  * - 1.3: Configure navigation menus based on menu definitions
  * - 1.4: Apply theme settings including colors, fonts, and spacing
@@ -46,14 +46,14 @@ export interface ConfigContextValue {
 export interface ConfigProviderProps {
   /** Child components to render */
   children: React.ReactNode
-  /** Optional custom endpoint URL for bootstrap config (defaults to /ui/config/bootstrap) */
+  /** Optional custom endpoint URL for bootstrap config (defaults to /control/ui-bootstrap) */
   bootstrapEndpoint?: string
   /** Optional interval in ms to check for config changes (defaults to 0 = disabled) */
   pollInterval?: number
 }
 
 // Bootstrap endpoint URL — prefixed with VITE_API_BASE_URL for production (e.g. https://emf.rzware.com)
-const DEFAULT_BOOTSTRAP_ENDPOINT = `${import.meta.env.VITE_API_BASE_URL || ''}/ui/config/bootstrap`
+const DEFAULT_BOOTSTRAP_ENDPOINT = `${import.meta.env.VITE_API_BASE_URL || ''}/control/ui-bootstrap`
 
 /**
  * Validate that the bootstrap config has required fields

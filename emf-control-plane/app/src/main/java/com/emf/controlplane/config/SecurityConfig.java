@@ -142,7 +142,7 @@ public class SecurityConfig {
                 .requestMatchers("/v3/api-docs/**").permitAll()
                 
                 // Permit UI bootstrap endpoint - required for UI to initialize before auth
-                .requestMatchers("/ui/config/bootstrap").permitAll()
+                .requestMatchers("/control/ui-bootstrap").permitAll()
                 
                 // Permit control plane bootstrap endpoint - required for gateway health check
                 .requestMatchers("/control/bootstrap").permitAll()

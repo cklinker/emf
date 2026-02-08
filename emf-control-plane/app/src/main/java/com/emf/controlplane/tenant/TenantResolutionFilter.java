@@ -35,7 +35,7 @@ public class TenantResolutionFilter extends OncePerRequestFilter {
     private static final Set<String> EXEMPT_PATH_PREFIXES = Set.of(
             "/actuator",
             "/platform",
-            "/ui/config/bootstrap",
+            "/control/ui-bootstrap",
             "/control/bootstrap",
             "/openapi",
             "/swagger-ui",

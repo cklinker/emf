@@ -50,7 +50,7 @@ function createBootstrapFetchWrapper(baseFetch: typeof fetch): typeof fetch {
     const urlString = typeof url === 'string' ? url : url instanceof URL ? url.toString() : url.url
 
     // Always intercept bootstrap config requests
-    if (urlString.includes('/ui/config/bootstrap')) {
+    if (urlString.includes('/control/ui-bootstrap')) {
       return Promise.resolve({
         ok: true,
         status: 200,

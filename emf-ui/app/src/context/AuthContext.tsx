@@ -40,8 +40,8 @@ const STORAGE_KEYS = {
   LOGIN_ERROR: 'emf_auth_login_error',
 } as const
 
-// Token refresh buffer (refresh 5 minutes before expiry)
-const TOKEN_REFRESH_BUFFER_MS = 5 * 60 * 1000
+// Token refresh buffer (refresh 30 seconds before expiry)
+const TOKEN_REFRESH_BUFFER_MS = 30 * 1000
 
 /**
  * Generate a random string for state/nonce/code_verifier
@@ -368,13 +368,6 @@ export function AuthProvider({
         authUrl.searchParams.set('code_challenge', codeChallenge)
         authUrl.searchParams.set('code_challenge_method', 'S256')
 
-        console.log('[Auth] Redirecting to OIDC provider:', {
-          state,
-          codeVerifierLength: codeVerifier.length,
-          codeChallenge,
-          redirectUri,
-        })
-
         // Redirect to authorization endpoint
         window.location.href = authUrl.toString()
       } catch (err) {
@@ -435,25 +428,12 @@ export function AuthProvider({
       const errorParam = urlParams.get('error')
       const errorDescription = urlParams.get('error_description')
 
-      console.log('[Auth] Handling callback with params:', {
-        hasCode: !!code,
-        hasState: !!state,
-        hasError: !!errorParam,
-      })
-
-      // Check for error response
       if (errorParam) {
         throw new Error(errorDescription || errorParam)
       }
 
       // Validate state
       const storedState = sessionStorage.getItem(STORAGE_KEYS.STATE)
-      console.log('[Auth] State validation:', {
-        urlState: state,
-        storedState: storedState,
-        match: state === storedState,
-      })
-
       if (!state || state !== storedState) {
         throw new Error('Invalid state parameter')
       }
@@ -462,48 +442,21 @@ export function AuthProvider({
       const codeVerifier = sessionStorage.getItem(STORAGE_KEYS.CODE_VERIFIER)
       const providerId = sessionStorage.getItem(STORAGE_KEYS.PROVIDER_ID)
 
-      console.log('[Auth] Retrieved stored parameters:', {
-        hasCodeVerifier: !!codeVerifier,
-        providerId: providerId,
-      })
-
       if (!code || !codeVerifier || !providerId) {
-        console.error('[Auth] Missing authentication parameters:', {
-          hasCode: !!code,
-          hasCodeVerifier: !!codeVerifier,
-          hasProviderId: !!providerId,
-        })
         throw new Error('Missing authentication parameters')
       }
 
-      // Get provider info from the passed providers array
+      // Get provider info
       const provider = availableProviders.find((p) => p.id === providerId)
       if (!provider) {
-        console.error(
-          '[Auth] Provider not found:',
-          providerId,
-          'Available:',
-          availableProviders.map((p) => p.id)
-        )
         throw new Error(`Provider not found: ${providerId}`)
       }
 
-      console.log('[Auth] Found provider:', provider.name, 'Issuer:', provider.issuer)
-
       // Get discovery document
       const discovery = await fetchDiscoveryDocument(provider.issuer)
-      console.log('[Auth] Discovery document loaded, token endpoint:', discovery.token_endpoint)
 
       // Use the stored redirect_uri (exact match with authorization request)
       const storedRedirectUri = sessionStorage.getItem(STORAGE_KEYS.REDIRECT_URI) || redirectUri
-
-      console.log('[Auth] Token exchange parameters:', {
-        tokenUrl: discovery.token_endpoint,
-        clientId: provider.clientId,
-        codeLength: code.length,
-        redirectUri: storedRedirectUri,
-        codeVerifierLength: codeVerifier.length,
-      })
 
       // Exchange code for tokens
       const tokenUrl = discovery.token_endpoint
@@ -525,19 +478,13 @@ export function AuthProvider({
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        const errorMsg = `Token exchange failed: ${errorData.error_description || errorData.error || response.statusText}`
-        console.error('[Auth] Token exchange error:', {
-          status: response.status,
-          error: errorData.error,
-          errorDescription: errorData.error_description,
-          redirectUri: storedRedirectUri,
-        })
-        throw new Error(errorMsg)
+        throw new Error(
+          `Token exchange failed: ${errorData.error_description || errorData.error || response.statusText}`
+        )
       }
 
       const tokenResponse = (await response.json()) as TokenResponse
 
-      // Store tokens
       const tokens: StoredTokens = {
         accessToken: tokenResponse.access_token,
         idToken: tokenResponse.id_token,
@@ -545,31 +492,12 @@ export function AuthProvider({
         expiresAt: Date.now() + tokenResponse.expires_in * 1000,
       }
 
-      console.log('[Auth] Token exchange successful, storing tokens')
-      console.log('[Auth] Token response:', {
-        hasAccessToken: !!tokenResponse.access_token,
-        hasIdToken: !!tokenResponse.id_token,
-        hasRefreshToken: !!tokenResponse.refresh_token,
-        expiresIn: tokenResponse.expires_in,
-      })
-
       storeTokens(tokens)
 
-      // Extract user from token
       const newUser = extractUserFromToken(tokens.idToken, tokens.accessToken)
-      console.log('[Auth] Extracted user:', newUser)
-
       if (newUser) {
         setUser(newUser)
-        console.log('[Auth] User set successfully:', {
-          id: newUser.id,
-          email: newUser.email,
-          name: newUser.name,
-        })
       } else {
-        console.error('[Auth] Failed to extract user from tokens')
-        console.error('[Auth] ID Token present:', !!tokens.idToken)
-        console.error('[Auth] Access Token present:', !!tokens.accessToken)
         throw new Error('Failed to extract user information from tokens')
       }
 
@@ -578,20 +506,14 @@ export function AuthProvider({
       sessionStorage.removeItem(STORAGE_KEYS.NONCE)
       sessionStorage.removeItem(STORAGE_KEYS.CODE_VERIFIER)
 
-      // Redirect to original path
       let redirectPath = sessionStorage.getItem(STORAGE_KEYS.REDIRECT_PATH) || '/'
       sessionStorage.removeItem(STORAGE_KEYS.REDIRECT_PATH)
 
-      // Don't redirect back to login page
       if (redirectPath === '/login' || redirectPath === '/auth/callback') {
         redirectPath = '/'
       }
 
       console.log('[Auth] Callback complete, redirecting to:', redirectPath)
-
-      // Use window.location.replace to navigate without adding to history
-      // This will reload the page at the new path, and the auth context will
-      // restore the user from the stored tokens
       window.location.replace(window.location.origin + redirectPath)
     },
     [fetchDiscoveryDocument, redirectUri]
@@ -609,7 +531,6 @@ export function AuthProvider({
         // Check for previous login error (persisted in sessionStorage)
         const previousLoginError = sessionStorage.getItem(STORAGE_KEYS.LOGIN_ERROR)
         if (previousLoginError) {
-          console.log('[Auth] Found previous login error:', previousLoginError)
           setError(new Error(previousLoginError))
         }
 
@@ -622,9 +543,6 @@ export function AuthProvider({
         if (isCallback && code) {
           const processedCode = sessionStorage.getItem(STORAGE_KEYS.CALLBACK_PROCESSED)
           if (processedCode === code) {
-            console.log(
-              '[Auth] Callback already processed for this code, skipping duplicate (React StrictMode)'
-            )
             setIsLoading(false)
             return
           }
@@ -638,7 +556,6 @@ export function AuthProvider({
 
         // If no providers available and this is a callback, we're in a bad state
         if (isCallback && availableProviders.length === 0) {
-          console.error('[Auth] Callback received but no providers configured')
           setError(new Error('Authentication configuration unavailable. Please contact support.'))
           // Clear URL to prevent loop
           window.history.replaceState({}, document.title, window.location.pathname)
@@ -649,15 +566,12 @@ export function AuthProvider({
 
         // Handle OAuth callback
         if (isCallback) {
-          console.log('[Auth] Processing callback...')
           try {
             await handleCallback(availableProviders)
-            console.log('[Auth] Callback processed successfully')
             // Clear the processed code marker after successful processing
             sessionStorage.removeItem(STORAGE_KEYS.CALLBACK_PROCESSED)
           } catch (callbackError) {
-            // Log the error for debugging
-            console.error('[Auth] Callback handling failed:', callbackError)
+            console.error('[Auth] Callback failed:', callbackError)
             const authErr =
               callbackError instanceof Error ? callbackError : new Error('Authentication failed')
             setError(authErr)
@@ -684,31 +598,18 @@ export function AuthProvider({
 
         // Check for existing tokens
         const storedTokens = getStoredTokens()
-        console.log('[Auth] Checking for existing tokens:', {
-          hasTokens: !!storedTokens,
-          isExpired: storedTokens ? isTokenExpired(storedTokens.expiresAt) : null,
-          expiresAt: storedTokens?.expiresAt,
-          now: Date.now(),
-        })
 
         if (storedTokens) {
-          console.log('[Auth] Found stored tokens, checking expiration...')
           // Check if tokens are still valid
           if (!isTokenExpired(storedTokens.expiresAt)) {
-            console.log('[Auth] Tokens are valid, extracting user...')
             const existingUser = extractUserFromToken(
               storedTokens.idToken,
               storedTokens.accessToken
             )
-            console.log('[Auth] Restored user from tokens:', existingUser)
             if (existingUser) {
               setUser(existingUser)
-              console.log('[Auth] User restored successfully')
-            } else {
-              console.error('[Auth] Failed to extract user from stored tokens')
             }
           } else {
-            console.log('[Auth] Tokens are expired')
             if (storedTokens.refreshToken) {
               // Try to refresh
               const refreshedTokens = await refreshAccessToken()

@@ -115,8 +115,9 @@ public class SecurityConfig {
             // Disable CSRF for stateless API
             .csrf(AbstractHttpConfigurer::disable)
             
-            // Enable CORS for local development
-            .cors(cors -> cors.configure(http))
+            // Disable CORS — the gateway handles CORS in production.
+            // Enabling it here causes duplicate Access-Control-Allow-Origin headers.
+            .cors(AbstractHttpConfigurer::disable)
             
             // Configure stateless session management
             .sessionManagement(session -> session

@@ -77,12 +77,40 @@ class RouteAuthorizationFilterTest {
                 .get("/api/users")
                 .build();
         MockServerWebExchange exchange = MockServerWebExchange.from(request);
-        
+
         StepVerifier.create(filter.filter(exchange, filterChain))
                 .expectComplete()
                 .verify();
-        
+
         assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    void shouldAllowUnauthenticatedAccessToBootstrapEndpoint() {
+        MockServerHttpRequest request = MockServerHttpRequest
+                .get("/control/bootstrap")
+                .build();
+        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        StepVerifier.create(filter.filter(exchange, filterChain))
+                .expectComplete()
+                .verify();
+
+        verify(filterChain).filter(exchange);
+    }
+
+    @Test
+    void shouldAllowUnauthenticatedAccessToUiBootstrapEndpoint() {
+        MockServerHttpRequest request = MockServerHttpRequest
+                .get("/control/ui-bootstrap")
+                .build();
+        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        StepVerifier.create(filter.filter(exchange, filterChain))
+                .expectComplete()
+                .verify();
+
+        verify(filterChain).filter(exchange);
     }
     
     @Test

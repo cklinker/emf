@@ -31,7 +31,6 @@ public class RouteInitializer implements ApplicationRunner {
     private static final Logger logger = LoggerFactory.getLogger(RouteInitializer.class);
     
     private static final String CONTROL_PLANE_ROUTE_ID = "control-plane";
-    private static final String CONTROL_PLANE_SERVICE_ID = "control-plane";
     private static final String CONTROL_PLANE_PATH = "/control/**";
     private static final String CONTROL_PLANE_COLLECTION_NAME = "control-plane";
     
@@ -94,7 +93,6 @@ public class RouteInitializer implements ApplicationRunner {
         
         RouteDefinition controlPlaneRoute = new RouteDefinition(
             CONTROL_PLANE_ROUTE_ID,
-            CONTROL_PLANE_SERVICE_ID,
             CONTROL_PLANE_PATH,
             controlPlaneUrl,
             CONTROL_PLANE_COLLECTION_NAME

@@ -147,7 +147,6 @@ class RouteAuthorizationFilterTest {
         
         RouteDefinition route = new RouteDefinition(
                 "users-collection",
-                "user-service",
                 "/api/users/**",
                 "http://user-service:8080",
                 "users"
@@ -178,7 +177,6 @@ class RouteAuthorizationFilterTest {
         
         RouteDefinition route = new RouteDefinition(
                 "users-collection",
-                "user-service",
                 "/api/users/**",
                 "http://user-service:8080",
                 "users"
@@ -218,7 +216,6 @@ class RouteAuthorizationFilterTest {
         
         RouteDefinition route = new RouteDefinition(
                 "users-collection",
-                "user-service",
                 "/api/users/**",
                 "http://user-service:8080",
                 "users"
@@ -258,7 +255,6 @@ class RouteAuthorizationFilterTest {
         
         RouteDefinition route = new RouteDefinition(
                 "users-collection",
-                "user-service",
                 "/api/users/**",
                 "http://user-service:8080",
                 "users"
@@ -298,7 +294,6 @@ class RouteAuthorizationFilterTest {
         
         RouteDefinition route = new RouteDefinition(
                 "users-collection",
-                "user-service",
                 "/api/users/**",
                 "http://user-service:8080",
                 "users"
@@ -337,7 +332,6 @@ class RouteAuthorizationFilterTest {
         
         RouteDefinition route = new RouteDefinition(
                 "users-collection",
-                "user-service",
                 "/api/users/**",
                 "http://user-service:8080",
                 "users"
@@ -381,7 +375,6 @@ class RouteAuthorizationFilterTest {
         
         RouteDefinition route = new RouteDefinition(
                 "users-collection",
-                "user-service",
                 "/api/users/**",
                 "http://user-service:8080",
                 "users"

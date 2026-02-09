@@ -36,7 +36,6 @@ class ControlPlaneRouteIntegrationTest {
         
         assertThat(route).isPresent();
         assertThat(route.get().getId()).isEqualTo("control-plane");
-        assertThat(route.get().getServiceId()).isEqualTo("control-plane");
         assertThat(route.get().getPath()).isEqualTo("/control/**");
         assertThat(route.get().getCollectionName()).isEqualTo("control-plane");
     }

@@ -5,7 +5,6 @@ import com.emf.controlplane.dto.UpdateFieldRequest;
 import com.emf.controlplane.entity.Collection;
 import com.emf.controlplane.entity.CollectionVersion;
 import com.emf.controlplane.entity.Field;
-import com.emf.controlplane.entity.Service;
 import com.emf.controlplane.exception.DuplicateResourceException;
 import com.emf.controlplane.exception.ResourceNotFoundException;
 import com.emf.controlplane.exception.ValidationException;
@@ -611,9 +610,7 @@ class FieldServiceTest {
 
     // Helper methods
     private Collection createTestCollection(String id, String name) {
-        Service service = new Service("test-service", "Test Service");
-        service.setId("service-1");
-        Collection collection = new Collection(service, name, "Test description");
+        Collection collection = new Collection(name, "Test description");
         collection.setId(id);
         collection.setActive(true);
         collection.setCurrentVersion(1);

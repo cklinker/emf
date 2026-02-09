@@ -67,7 +67,6 @@ class RouteInitializerTest {
         RouteDefinition capturedRoute = routeCaptor.getValue();
         assertThat(capturedRoute).isNotNull();
         assertThat(capturedRoute.getId()).isEqualTo("control-plane");
-        assertThat(capturedRoute.getServiceId()).isEqualTo("control-plane");
         assertThat(capturedRoute.getPath()).isEqualTo("/control/**");
         assertThat(capturedRoute.getBackendUrl()).isEqualTo(CONTROL_PLANE_URL);
         assertThat(capturedRoute.getCollectionName()).isEqualTo("control-plane");

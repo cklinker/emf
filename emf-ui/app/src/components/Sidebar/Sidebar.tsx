@@ -390,7 +390,7 @@ export function Sidebar({ menus, collapsed, onToggle, onItemClick }: SidebarProp
       '/scheduled-jobs',
       '/email-templates',
       '/scripts',
-      '/services',
+
       '/webhooks',
       '/connected-apps',
       '/plugins',

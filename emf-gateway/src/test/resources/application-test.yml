@@ -31,6 +31,7 @@ spring:
 # EMF Gateway test configuration
 emf:
   gateway:
+    worker-service-url: http://emf-worker:80
     control-plane:
       url: http://localhost:8081
       bootstrap-path: /control/bootstrap
@@ -38,7 +39,6 @@ emf:
       topics:
         collection-changed: emf.collection.changed
         authz-changed: emf.authz.changed
-        service-changed: emf.service.changed
     rate-limit:
       default:
         requests-per-window: 100

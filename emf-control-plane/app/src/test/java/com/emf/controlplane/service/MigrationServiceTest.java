@@ -435,9 +435,7 @@ class MigrationServiceTest {
     // Helper methods
 
     private Collection createTestCollection(String id, String name) {
-        com.emf.controlplane.entity.Service service = new com.emf.controlplane.entity.Service("test-service", "Test Service");
-        service.setId("service-1");
-        Collection collection = new Collection(service, name, "Test description");
+        Collection collection = new Collection(name, "Test description");
         collection.setId(id);
         collection.setActive(true);
         collection.setCurrentVersion(1);

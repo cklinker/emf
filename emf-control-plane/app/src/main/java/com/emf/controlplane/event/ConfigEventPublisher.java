@@ -5,7 +5,6 @@ import com.emf.controlplane.entity.Collection;
 import com.emf.controlplane.entity.FieldPolicy;
 import com.emf.controlplane.entity.OidcProvider;
 import com.emf.controlplane.entity.RoutePolicy;
-import com.emf.controlplane.entity.Service;
 import com.emf.controlplane.entity.UiMenu;
 import com.emf.controlplane.entity.UiPage;
 import com.emf.runtime.event.AuthzChangedPayload;
@@ -13,7 +12,6 @@ import com.emf.runtime.event.ChangeType;
 import com.emf.runtime.event.CollectionChangedPayload;
 import com.emf.runtime.event.ConfigEvent;
 import com.emf.runtime.event.EventFactory;
-import com.emf.runtime.event.ServiceChangedPayload;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -51,7 +49,6 @@ public class ConfigEventPublisher {
 
     private static final Logger log = LoggerFactory.getLogger(ConfigEventPublisher.class);
 
-    private static final String EVENT_TYPE_SERVICE_CHANGED = "emf.config.service.changed";
     private static final String EVENT_TYPE_COLLECTION_CHANGED = "emf.config.collection.changed";
     private static final String EVENT_TYPE_AUTHZ_CHANGED = "emf.config.authz.changed";
     private static final String EVENT_TYPE_UI_CHANGED = "emf.config.ui.changed";
@@ -65,26 +62,6 @@ public class ConfigEventPublisher {
             ControlPlaneProperties properties) {
         this.kafkaTemplate = kafkaTemplate;
         this.properties = properties;
-    }
-
-    /**
-     * Publishes a service changed event to Kafka.
-     * The event includes the full service entity.
-     *
-     * @param service The service that changed
-     * @param changeType The type of change (CREATED, UPDATED, DELETED)
-     */
-    @Async
-    public void publishServiceChanged(Service service, ChangeType changeType) {
-        log.info("Publishing service changed event: serviceId={}, changeType={}", 
-                service.getId(), changeType);
-
-        ServiceChangedPayload payload = PayloadAdapter.toServicePayload(service, changeType);
-        ConfigEvent<ServiceChangedPayload> event = EventFactory.createEvent(
-                EVENT_TYPE_SERVICE_CHANGED, generateCorrelationId(), payload);
-
-        String topic = properties.getKafka().getTopics().getServiceChanged();
-        sendEvent(topic, service.getId(), event);
     }
 
     /**

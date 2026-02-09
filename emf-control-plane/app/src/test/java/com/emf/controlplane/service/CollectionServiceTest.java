@@ -10,7 +10,6 @@ import com.emf.controlplane.exception.ResourceNotFoundException;
 import com.emf.controlplane.repository.CollectionRepository;
 import com.emf.controlplane.repository.CollectionVersionRepository;
 import com.emf.controlplane.repository.FieldRepository;
-import com.emf.controlplane.repository.ServiceRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -52,9 +51,6 @@ class CollectionServiceTest {
     @Mock
     private FieldRepository fieldRepository;
 
-    @Mock
-    private ServiceRepository serviceRepository;
-
     private ObjectMapper objectMapper;
 
     private CollectionService collectionService;
@@ -66,7 +62,6 @@ class CollectionServiceTest {
                 collectionRepository,
                 versionRepository,
                 fieldRepository,
-                serviceRepository,
                 objectMapper,
                 null,  // ConfigEventPublisher is optional in tests
                 null   // CollectionAssignmentService is optional in tests
@@ -166,11 +161,8 @@ class CollectionServiceTest {
         @DisplayName("should create collection with generated ID and initial version")
         void shouldCreateCollectionWithGeneratedIdAndVersion() {
             // Given
-            CreateCollectionRequest request = new CreateCollectionRequest("service-1", "New Collection", "Description");
-            com.emf.controlplane.entity.Service service = new com.emf.controlplane.entity.Service("test-service", "Test Service");
-            service.setId("service-1");
-            
-            when(serviceRepository.findByIdAndActiveTrue("service-1")).thenReturn(Optional.of(service));
+            CreateCollectionRequest request = new CreateCollectionRequest("New Collection", "Description");
+
             when(collectionRepository.existsByNameAndActiveTrue("New Collection")).thenReturn(false);
             when(collectionRepository.save(any(Collection.class))).thenAnswer(invocation -> {
                 Collection c = invocation.getArgument(0);
@@ -190,7 +182,7 @@ class CollectionServiceTest {
             assertThat(result.getCurrentVersion()).isEqualTo(1);
             assertThat(result.getVersions()).hasSize(1);
             assertThat(result.getVersions().get(0).getVersion()).isEqualTo(1);
-            
+
             verify(collectionRepository).save(any(Collection.class));
         }
 
@@ -198,11 +190,8 @@ class CollectionServiceTest {
         @DisplayName("should throw DuplicateResourceException when name already exists")
         void shouldThrowExceptionWhenNameExists() {
             // Given
-            CreateCollectionRequest request = new CreateCollectionRequest("service-1", "Existing Collection", "Description");
-            com.emf.controlplane.entity.Service service = new com.emf.controlplane.entity.Service("test-service", "Test Service");
-            service.setId("service-1");
-            
-            when(serviceRepository.findByIdAndActiveTrue("service-1")).thenReturn(Optional.of(service));
+            CreateCollectionRequest request = new CreateCollectionRequest("Existing Collection", "Description");
+
             when(collectionRepository.existsByNameAndActiveTrue("Existing Collection")).thenReturn(true);
 
             // When/Then
@@ -211,7 +200,7 @@ class CollectionServiceTest {
                     .hasMessageContaining("Collection")
                     .hasMessageContaining("name")
                     .hasMessageContaining("Existing Collection");
-            
+
             verify(collectionRepository, never()).save(any());
         }
 
@@ -219,11 +208,8 @@ class CollectionServiceTest {
         @DisplayName("should create initial version with schema JSON")
         void shouldCreateInitialVersionWithSchema() {
             // Given
-            CreateCollectionRequest request = new CreateCollectionRequest("service-1", "Test Collection", "Test Description");
-            com.emf.controlplane.entity.Service service = new com.emf.controlplane.entity.Service("test-service", "Test Service");
-            service.setId("service-1");
-            
-            when(serviceRepository.findByIdAndActiveTrue("service-1")).thenReturn(Optional.of(service));
+            CreateCollectionRequest request = new CreateCollectionRequest("Test Collection", "Test Description");
+
             when(collectionRepository.existsByNameAndActiveTrue(anyString())).thenReturn(false);
             when(collectionRepository.save(any(Collection.class))).thenAnswer(invocation -> invocation.getArgument(0));
             when(fieldRepository.findByCollectionIdAndActiveTrue(anyString())).thenReturn(Collections.emptyList());
@@ -570,9 +556,7 @@ class CollectionServiceTest {
 
     // Helper method to create test collections
     private Collection createTestCollection(String id, String name) {
-        com.emf.controlplane.entity.Service service = new com.emf.controlplane.entity.Service("test-service", "Test Service");
-        service.setId("service-1");
-        Collection collection = new Collection(service, name, "Test description");
+        Collection collection = new Collection(name, "Test description");
         collection.setId(id);
         collection.setActive(true);
         collection.setCurrentVersion(1);

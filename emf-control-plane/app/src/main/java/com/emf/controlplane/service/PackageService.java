@@ -48,7 +48,6 @@ public class PackageService {
     private final OidcProviderRepository oidcProviderRepository;
     private final UiPageRepository uiPageRepository;
     private final UiMenuRepository uiMenuRepository;
-    private final ServiceRepository serviceRepository;
     private final ObjectMapper objectMapper;
 
     public PackageService(
@@ -60,7 +59,6 @@ public class PackageService {
             OidcProviderRepository oidcProviderRepository,
             UiPageRepository uiPageRepository,
             UiMenuRepository uiMenuRepository,
-            ServiceRepository serviceRepository,
             ObjectMapper objectMapper) {
         this.packageRepository = packageRepository;
         this.collectionRepository = collectionRepository;
@@ -70,7 +68,6 @@ public class PackageService {
         this.oidcProviderRepository = oidcProviderRepository;
         this.uiPageRepository = uiPageRepository;
         this.uiMenuRepository = uiMenuRepository;
-        this.serviceRepository = serviceRepository;
         this.objectMapper = objectMapper;
     }
 
@@ -705,14 +702,11 @@ public class PackageService {
                     "COLLECTION", collection.getId(), collection.getName(), "UPDATED"));
             addPackageItem(pkg, "COLLECTION", collection.getId(), collectionDto);
         } else {
-            // Create new - use default service for imported collections
-            com.emf.controlplane.entity.Service defaultService = serviceRepository
-                    .findByNameAndActiveTrue("default-service")
-                    .orElseThrow(() -> new ResourceNotFoundException("Service", "default-service"));
-            
-            Collection collection = new Collection(defaultService, collectionDto.getName(), collectionDto.getDescription());
+            // Create new collection
+            Collection collection = new Collection(collectionDto.getName(), collectionDto.getDescription());
             collection.setCurrentVersion(1);
             collection.setActive(true);
+            collection.setPath("/api/" + collectionDto.getName());
             collection = collectionRepository.save(collection);
             
             // Import fields

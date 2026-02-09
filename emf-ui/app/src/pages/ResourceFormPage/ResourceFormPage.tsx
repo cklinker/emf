@@ -12,7 +12,7 @@
  */
 
 import React, { useState, useCallback, useMemo } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { usePlugins } from '../../context/PluginContext'
@@ -212,6 +212,18 @@ export function ResourceFormPage({
   const resourceId = propResourceId || params.resourceId
   const isEditMode = !!resourceId
 
+  // Clone mode: detect clone source from URL search params
+  const [searchParams] = useSearchParams()
+  const cloneSourceId = searchParams.get('clone')
+  const isCloneMode = !!cloneSourceId && !!collectionName && !isEditMode
+
+  // Fetch clone source record when cloning
+  const { data: cloneSource } = useQuery({
+    queryKey: ['clone-source', collectionName, cloneSourceId],
+    queryFn: () => apiClient.get<Resource>(`/api/${collectionName}/${cloneSourceId}`),
+    enabled: isCloneMode,
+  })
+
   // Fetch collection schema
   const {
     data: schema,
@@ -240,17 +252,30 @@ export function ResourceFormPage({
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Track the key for which form was initialized
-  const currentResourceKey = isEditMode ? resourceId : 'new'
+  const currentResourceKey = isEditMode
+    ? resourceId
+    : isCloneMode
+      ? `clone-${cloneSourceId}`
+      : 'new'
   const [initializedKey, setInitializedKey] = useState<string | null>(null)
 
-  // Compute initial form data based on schema and resource
+  // Compute initial form data based on schema and resource (or clone source)
   const computedInitialData = useMemo(() => {
     if (!schema) return null
     if (isEditMode && resource) {
       return populateFormData(schema, resource)
     }
+    if (isCloneMode && cloneSource) {
+      // Clone mode: populate from source but exclude system fields
+      const cloneData = Object.fromEntries(
+        Object.entries(cloneSource).filter(
+          ([key]) => key !== 'id' && key !== 'createdAt' && key !== 'updatedAt'
+        )
+      ) as Resource
+      return populateFormData(schema, cloneData)
+    }
     return initializeFormData(schema)
-  }, [schema, resource, isEditMode])
+  }, [schema, resource, isEditMode, isCloneMode, cloneSource])
 
   // Initialize form data when data becomes available or resource changes
   if (computedInitialData && initializedKey !== currentResourceKey) {
@@ -754,7 +779,8 @@ export function ResourceFormPage({
   )
 
   // Loading state
-  const isLoading = schemaLoading || (isEditMode && resourceLoading)
+  const isLoading =
+    schemaLoading || (isEditMode && resourceLoading) || (isCloneMode && !cloneSource)
 
   if (isLoading) {
     return (
@@ -822,16 +848,37 @@ export function ResourceFormPage({
               /
             </span>
             <span className={styles.breadcrumbCurrent}>
-              {isEditMode ? t('resources.editRecord') : t('resources.createRecord')}
+              {isEditMode
+                ? t('resources.editRecord')
+                : isCloneMode
+                  ? t('resources.cloneRecord', { collection: schema.displayName })
+                  : t('resources.createRecord')}
             </span>
           </nav>
           <h1 className={styles.title} data-testid="page-title">
-            {isEditMode ? t('resources.editRecord') : t('resources.createRecord')}
+            {isEditMode
+              ? t('resources.editRecord')
+              : isCloneMode
+                ? t('resources.cloneRecord', { collection: schema.displayName })
+                : t('resources.createRecord')}
           </h1>
           {isEditMode && resourceId && (
             <p className={styles.subtitle} data-testid="resource-id">
               ID: {resourceId}
             </p>
+          )}
+          {isCloneMode && cloneSourceId && (
+            <div className={styles.cloneBanner} data-testid="clone-banner">
+              <span>
+                {t('resources.cloningFrom')} {cloneSourceId}
+              </span>
+              <Link
+                to={`/resources/${collectionName}/${cloneSourceId}`}
+                className={styles.cloneSourceLink}
+              >
+                {t('resources.viewSource')}
+              </Link>
+            </div>
           )}
         </div>
       </header>

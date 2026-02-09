@@ -606,7 +606,10 @@
     "pageInfo": "Page {{page}} of {{total}}",
     "fieldValue": "Field Value",
     "noFieldValue": "No value",
-    "metadata": "Metadata"
+    "metadata": "Metadata",
+    "cloneRecord": "Clone {{collection}}",
+    "cloningFrom": "Cloning from record",
+    "viewSource": "View source"
   },
   "users": {
     "title": "Users",
@@ -1166,5 +1169,56 @@
     "showingAll": "Showing all records",
     "clearFilters": "Clear filters",
     "sumOf": "Sum of {{field}}: {{value}}"
+  },
+  "bulkActions": {
+    "selectedCount": "{{count}} records selected",
+    "export": "Export",
+    "delete": "Delete",
+    "changeFieldValue": "Change Field Value",
+    "submitForApproval": "Submit for Approval",
+    "selectField": "Select field",
+    "enterValue": "Enter value",
+    "apply": "Apply",
+    "processing": "Updated {{current}} of {{total}} records"
+  },
+  "shortcuts": {
+    "title": "Keyboard Shortcuts",
+    "navigation": "Navigation",
+    "search": "Search",
+    "recordActions": "Record Actions",
+    "general": "General",
+    "goHome": "Go to Home",
+    "goCollections": "Go to Collections",
+    "goResources": "Go to Resources",
+    "openSearch": "Open Global Search",
+    "focusFilter": "Focus filter input",
+    "editRecord": "Edit record",
+    "newRecord": "New record",
+    "goBack": "Go back",
+    "showHelp": "Show this help",
+    "closeDialog": "Close modal / dialog"
+  },
+  "notes": {
+    "title": "Notes",
+    "addNote": "Add Note",
+    "save": "Save",
+    "cancel": "Cancel",
+    "edit": "Edit",
+    "delete": "Delete",
+    "confirmDelete": "Delete this note?",
+    "empty": "No notes yet. Click \"Add Note\" to get started.",
+    "comingSoon": "Notes feature coming soon.",
+    "placeholder": "Write a note..."
+  },
+  "attachments": {
+    "title": "Attachments",
+    "upload": "Upload",
+    "download": "Download",
+    "delete": "Delete",
+    "confirmDelete": "Delete this attachment?",
+    "empty": "No attachments yet.",
+    "comingSoon": "Attachments feature coming soon.",
+    "fileSize": "{{size}}",
+    "uploadedBy": "Uploaded by {{user}}"
   }
 }

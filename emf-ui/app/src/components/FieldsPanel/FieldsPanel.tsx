@@ -23,6 +23,7 @@
  */
 
 import React, { useState, useCallback, useMemo } from 'react'
+import { Calendar, Clock, Link2, Pencil, Trash2 } from 'lucide-react'
 import { useI18n } from '../../context/I18nContext'
 import { ConfirmDialog } from '../ConfirmDialog'
 import { LoadingSpinner } from '../LoadingSpinner'
@@ -82,17 +83,25 @@ export interface FieldsPanelProps {
 /**
  * Get the icon for a field type
  */
-function getFieldTypeIcon(type: FieldType): string {
-  const icons: Record<FieldType, string> = {
-    string: 'Aa',
-    number: '#',
-    boolean: '✓',
-    date: '📅',
-    datetime: '🕐',
-    json: '{}',
-    reference: '🔗',
+function getFieldTypeIcon(type: FieldType): React.ReactNode {
+  switch (type) {
+    case 'date':
+      return <Calendar size={14} />
+    case 'datetime':
+      return <Clock size={14} />
+    case 'reference':
+      return <Link2 size={14} />
+    case 'string':
+      return 'Aa'
+    case 'number':
+      return '#'
+    case 'boolean':
+      return '\u2713'
+    case 'json':
+      return '{}'
+    default:
+      return '?'
   }
-  return icons[type] || '?'
 }
 
 /**
@@ -439,7 +448,9 @@ export function FieldsPanel({
                 aria-label={t('fieldsPanel.editFieldLabel', { name: field.name })}
                 data-testid={`${testId}-edit-${field.id}`}
               >
-                <span aria-hidden="true">✏️</span>
+                <span aria-hidden="true">
+                  <Pencil size={14} />
+                </span>
               </button>
               <button
                 type="button"
@@ -449,7 +460,9 @@ export function FieldsPanel({
                 aria-label={t('fieldsPanel.deleteFieldLabel', { name: field.name })}
                 data-testid={`${testId}-delete-${field.id}`}
               >
-                <span aria-hidden="true">🗑️</span>
+                <span aria-hidden="true">
+                  <Trash2 size={14} />
+                </span>
               </button>
             </div>
           </div>

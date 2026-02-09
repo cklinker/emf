@@ -16,6 +16,7 @@
 
 import React, { useMemo, useState, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { AlertTriangle } from 'lucide-react'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
 import { LoadingSpinner, ErrorMessage } from '../../components'
@@ -476,7 +477,7 @@ function HealthAlerts({ healthStatuses, testId }: HealthAlertsProps): React.Reac
     <div className={styles.healthAlerts} data-testid={testId} role="alert" aria-live="polite">
       <div className={styles.healthAlertsHeader}>
         <span className={styles.alertIcon} aria-hidden="true">
-          ⚠️
+          <AlertTriangle size={18} />
         </span>
         <h3 className={styles.healthAlertsTitle}>{t('dashboard.healthAlerts')}</h3>
       </div>

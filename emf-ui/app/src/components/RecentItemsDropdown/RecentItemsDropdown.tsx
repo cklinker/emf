@@ -7,6 +7,7 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Clock } from 'lucide-react'
 import { useI18n } from '../../context/I18nContext'
 import { useAuth } from '../../context/AuthContext'
 import { useRecentRecords } from '../../hooks/useRecentRecords'
@@ -84,7 +85,9 @@ export function RecentItemsDropdown({
         aria-label={t('recent.title')}
         title={t('recent.title')}
       >
-        <span aria-hidden="true">&#x1F552;</span>
+        <span aria-hidden="true">
+          <Clock size={16} />
+        </span>
       </button>
 
       {open && (

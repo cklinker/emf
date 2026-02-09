@@ -365,13 +365,21 @@ describe('AuthorizationPanel', () => {
     it('shows configured badge for fields with policies', () => {
       renderWithI18n(<AuthorizationPanel {...defaultProps} authz={mockAuthz} />)
 
-      // Password field (field-2) has policies configured
+      // Password field (field-2) has policies configured - lock icon is now an SVG
       const passwordField = screen.getByTestId('authorization-panel-field-field-2')
-      expect(within(passwordField).getByText('🔒')).toBeInTheDocument()
+      const passwordToggle = within(passwordField).getByTestId(
+        'authorization-panel-field-field-2-toggle'
+      )
+      // The lock badge has an aria-label and contains an SVG
+      const lockBadge = within(passwordToggle).getByLabelText('Has configured policies')
+      expect(lockBadge.querySelector('svg')).toBeInTheDocument()
 
       // Email field (field-1) has no policies configured
       const emailField = screen.getByTestId('authorization-panel-field-field-1')
-      expect(within(emailField).queryByText('🔒')).not.toBeInTheDocument()
+      const emailToggle = within(emailField).getByTestId('authorization-panel-field-field-1-toggle')
+      expect(
+        within(emailToggle).queryByLabelText('Has configured policies')
+      ).not.toBeInTheDocument()
     })
 
     it('displays configured field policies count', () => {

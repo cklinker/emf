@@ -26,6 +26,7 @@ import React, {
   useEffect,
   useRef,
 } from 'react'
+import { CheckCircle, XCircle, AlertTriangle, Info } from 'lucide-react'
 import styles from './Toast.module.css'
 
 /**
@@ -115,18 +116,18 @@ function generateToastId(): string {
 /**
  * Get the appropriate icon for a toast type
  */
-function getToastIcon(type: ToastType): string {
+function getToastIcon(type: ToastType): React.ReactNode {
   switch (type) {
     case 'success':
-      return '✓'
+      return <CheckCircle size={18} />
     case 'error':
-      return '✕'
+      return <XCircle size={18} />
     case 'warning':
-      return '⚠'
+      return <AlertTriangle size={18} />
     case 'info':
-      return 'ℹ'
+      return <Info size={18} />
     default:
-      return 'ℹ'
+      return <Info size={18} />
   }
 }
 

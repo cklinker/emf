@@ -6,6 +6,7 @@
 
 import React from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
+import { ShieldOff } from 'lucide-react'
 import { useI18n } from '../../context/I18nContext'
 import { useAuth } from '../../context/AuthContext'
 import styles from './UnauthorizedPage.module.css'
@@ -56,7 +57,7 @@ export function UnauthorizedPage({ title, message }: UnauthorizedPageProps): Rea
       <div className={styles.container}>
         {/* Icon */}
         <div className={styles.icon} aria-hidden="true">
-          🚫
+          <ShieldOff size={48} />
         </div>
 
         {/* Title */}

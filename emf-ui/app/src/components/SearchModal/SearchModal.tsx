@@ -7,6 +7,7 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Search, Clock, FileText, ClipboardList } from 'lucide-react'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
 import { useAuth } from '../../context/AuthContext'
@@ -323,7 +324,7 @@ export function SearchModal({ open, onClose }: SearchModalProps): JSX.Element | 
       <div className={styles.modal} onClick={(e) => e.stopPropagation()} data-testid="search-modal">
         <div className={styles.inputContainer}>
           <span className={styles.searchIcon} aria-hidden="true">
-            &#x1F50D;
+            <Search size={18} />
           </span>
           <input
             ref={inputRef}
@@ -362,7 +363,7 @@ export function SearchModal({ open, onClose }: SearchModalProps): JSX.Element | 
                     type="button"
                   >
                     <span className={styles.historyIcon} aria-hidden="true">
-                      &#x1F552;
+                      <Clock size={14} />
                     </span>
                     {term}
                   </button>
@@ -399,7 +400,13 @@ export function SearchModal({ open, onClose }: SearchModalProps): JSX.Element | 
               onMouseEnter={() => setActiveIndex(idx)}
             >
               <span className={styles.resultIcon} aria-hidden="true">
-                {result.type === 'page' ? '📄' : result.type === 'recent' ? '🕐' : '📋'}
+                {result.type === 'page' ? (
+                  <FileText size={16} />
+                ) : result.type === 'recent' ? (
+                  <Clock size={16} />
+                ) : (
+                  <ClipboardList size={16} />
+                )}
               </span>
               <div className={styles.resultInfo}>
                 <span className={styles.resultTitle}>{result.title}</span>

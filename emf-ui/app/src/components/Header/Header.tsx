@@ -11,6 +11,7 @@
  */
 
 import { useState, useCallback, useRef, useEffect } from 'react'
+import { Search } from 'lucide-react'
 import type { BrandingConfig } from '../../types/config'
 import type { User } from '../../types/auth'
 import { useAppShell } from '../AppShell'
@@ -152,7 +153,7 @@ export function Header({ branding, user, onLogout }: HeaderProps): JSX.Element {
           data-testid="search-trigger"
         >
           <span className={styles.searchTriggerIcon} aria-hidden="true">
-            &#x1F50D;
+            <Search size={16} />
           </span>
           {!isMobile && (
             <span className={styles.searchTriggerText}>

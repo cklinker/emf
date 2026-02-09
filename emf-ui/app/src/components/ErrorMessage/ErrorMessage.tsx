@@ -19,6 +19,7 @@
  */
 
 import React, { useMemo } from 'react'
+import { Zap, AlertTriangle, Search, Lock, Monitor, X, RotateCw } from 'lucide-react'
 import { useI18n } from '../../context/I18nContext'
 import styles from './ErrorMessage.module.css'
 
@@ -117,21 +118,21 @@ function detectErrorType(error: Error | string): ErrorType {
 /**
  * Get the appropriate icon for an error type
  */
-function getErrorIcon(type: ErrorType): string {
+function getErrorIcon(type: ErrorType): React.ReactNode {
   switch (type) {
     case 'network':
-      return '⚡' // Lightning bolt for network issues
+      return <Zap size={20} />
     case 'validation':
-      return '⚠' // Warning for validation
+      return <AlertTriangle size={20} />
     case 'notFound':
-      return '🔍' // Magnifying glass for not found
+      return <Search size={20} />
     case 'forbidden':
-      return '🔒' // Lock for forbidden
+      return <Lock size={20} />
     case 'server':
-      return '🖥' // Computer for server errors
+      return <Monitor size={20} />
     case 'generic':
     default:
-      return '✕' // X for generic errors
+      return <X size={20} />
   }
 }
 
@@ -258,7 +259,7 @@ export function ErrorMessage({
           data-testid={`${testId}-retry`}
         >
           <span className={styles.retryIcon} aria-hidden="true">
-            ↻
+            <RotateCw size={14} />
           </span>
           <span className={styles.retryText}>{t('common.retry')}</span>
         </button>

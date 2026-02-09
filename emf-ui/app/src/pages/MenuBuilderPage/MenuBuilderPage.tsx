@@ -18,6 +18,24 @@
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import {
+  Home,
+  BarChart3,
+  Settings,
+  Users,
+  FolderOpen,
+  FileText,
+  BarChart2,
+  Lock,
+  Key,
+  Database,
+  Code,
+  MapPin,
+  Pencil,
+  Trash2,
+  ChevronDown,
+  ChevronRight,
+} from 'lucide-react'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
@@ -174,17 +192,17 @@ function generateId(): string {
  */
 const AVAILABLE_ICONS = [
   { value: '', label: 'None' },
-  { value: 'home', label: '🏠 Home' },
-  { value: 'dashboard', label: '📊 Dashboard' },
-  { value: 'settings', label: '⚙️ Settings' },
-  { value: 'users', label: '👥 Users' },
-  { value: 'folder', label: '📁 Folder' },
-  { value: 'document', label: '📄 Document' },
-  { value: 'chart', label: '📈 Chart' },
-  { value: 'lock', label: '🔒 Lock' },
-  { value: 'key', label: '🔑 Key' },
-  { value: 'database', label: '🗄️ Database' },
-  { value: 'code', label: '💻 Code' },
+  { value: 'home', label: 'Home' },
+  { value: 'dashboard', label: 'Dashboard' },
+  { value: 'settings', label: 'Settings' },
+  { value: 'users', label: 'Users' },
+  { value: 'folder', label: 'Folder' },
+  { value: 'document', label: 'Document' },
+  { value: 'chart', label: 'Chart' },
+  { value: 'lock', label: 'Lock' },
+  { value: 'key', label: 'Key' },
+  { value: 'database', label: 'Database' },
+  { value: 'code', label: 'Code' },
 ]
 
 /**
@@ -644,21 +662,24 @@ function MenuTreeItem({
   const hasChildren = item.children && item.children.length > 0
   const isDragOver = dragOverId === item.id
 
-  const getIconEmoji = (iconName?: string): string => {
-    const iconMap: Record<string, string> = {
-      home: '🏠',
-      dashboard: '📊',
-      settings: '⚙️',
-      users: '👥',
-      folder: '📁',
-      document: '📄',
-      chart: '📈',
-      lock: '🔒',
-      key: '🔑',
-      database: '🗄️',
-      code: '💻',
-    }
-    return iconMap[iconName || ''] || '📌'
+  const iconComponents: Record<string, React.ComponentType<{ size?: number }>> = {
+    home: Home,
+    dashboard: BarChart3,
+    settings: Settings,
+    users: Users,
+    folder: FolderOpen,
+    document: FileText,
+    chart: BarChart2,
+    lock: Lock,
+    key: Key,
+    database: Database,
+    code: Code,
+  }
+
+  const getMenuIcon = (iconName?: string): React.ReactNode => {
+    const IconComp = iconComponents[iconName || '']
+    if (IconComp) return <IconComp size={14} />
+    return <MapPin size={14} />
   }
 
   return (
@@ -683,11 +704,11 @@ function MenuTreeItem({
               aria-label={isExpanded ? 'Collapse' : 'Expand'}
               data-testid={`expand-button-${item.id}`}
             >
-              {isExpanded ? '▼' : '▶'}
+              {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
             </button>
           )}
           {!hasChildren && <span className={styles.expandPlaceholder} />}
-          <span className={styles.itemIcon}>{getIconEmoji(item.icon)}</span>
+          <span className={styles.itemIcon}>{getMenuIcon(item.icon)}</span>
           <span className={styles.itemLabel}>{item.label}</span>
           {item.path && (
             <span className={styles.itemPath}>
@@ -714,7 +735,7 @@ function MenuTreeItem({
             title={t('common.edit')}
             data-testid={`edit-item-button-${item.id}`}
           >
-            ✏️
+            <Pencil size={14} />
           </button>
           <button
             type="button"
@@ -724,7 +745,7 @@ function MenuTreeItem({
             title={t('common.delete')}
             data-testid={`delete-item-button-${item.id}`}
           >
-            🗑️
+            <Trash2 size={14} />
           </button>
         </div>
       </div>
@@ -866,21 +887,24 @@ interface MenuPreviewProps {
 function MenuPreview({ menu, items, availablePolicies }: MenuPreviewProps): React.ReactElement {
   const { t } = useI18n()
 
-  const getIconEmoji = (iconName?: string): string => {
-    const iconMap: Record<string, string> = {
-      home: '🏠',
-      dashboard: '📊',
-      settings: '⚙️',
-      users: '👥',
-      folder: '📁',
-      document: '📄',
-      chart: '📈',
-      lock: '🔒',
-      key: '🔑',
-      database: '🗄️',
-      code: '💻',
-    }
-    return iconMap[iconName || ''] || '📌'
+  const previewIconComponents: Record<string, React.ComponentType<{ size?: number }>> = {
+    home: Home,
+    dashboard: BarChart3,
+    settings: Settings,
+    users: Users,
+    folder: FolderOpen,
+    document: FileText,
+    chart: BarChart2,
+    lock: Lock,
+    key: Key,
+    database: Database,
+    code: Code,
+  }
+
+  const getPreviewIcon = (iconName?: string): React.ReactNode => {
+    const IconComp = previewIconComponents[iconName || '']
+    if (IconComp) return <IconComp size={14} />
+    return <MapPin size={14} />
   }
 
   const getPolicyNames = (policyIds?: string[]): string[] => {
@@ -901,7 +925,7 @@ function MenuPreview({ menu, items, availablePolicies }: MenuPreviewProps): Reac
         data-testid={`preview-item-${item.id}`}
       >
         <div className={styles.previewItemMain}>
-          <span className={styles.previewIcon}>{getIconEmoji(item.icon)}</span>
+          <span className={styles.previewIcon}>{getPreviewIcon(item.icon)}</span>
           <span className={styles.previewLabel}>{item.label}</span>
           {item.path && (
             <span className={styles.previewPath}>
@@ -911,7 +935,9 @@ function MenuPreview({ menu, items, availablePolicies }: MenuPreviewProps): Reac
         </div>
         {policyNames.length > 0 && (
           <div className={styles.previewPolicies} data-testid={`preview-policies-${item.id}`}>
-            <span className={styles.previewPoliciesIcon}>🔒</span>
+            <span className={styles.previewPoliciesIcon}>
+              <Lock size={12} />
+            </span>
             <span className={styles.previewPoliciesText}>{policyNames.join(', ')}</span>
           </div>
         )}

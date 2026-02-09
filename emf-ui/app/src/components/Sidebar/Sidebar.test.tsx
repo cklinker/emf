@@ -292,9 +292,10 @@ describe('Sidebar', () => {
       renderSidebar({ menus: sampleMenus })
 
       await expandSetup(user)
-      // dashboard icon '📊' appears in both Tools (Dashboards) and Setup (Dashboard)
-      expect(screen.getAllByText('📊').length).toBeGreaterThanOrEqual(2)
-      expect(screen.getByText('📁')).toBeInTheDocument() // collections
+      // Icons are now rendered as Lucide SVG components
+      // Verify that menu items have icon containers with SVG elements
+      const dashboardItem = screen.getByTestId('menu-item-dashboard')
+      expect(dashboardItem.querySelector('svg')).toBeInTheDocument()
     })
 
     it('should render multiple menu sections inside Setup', async () => {
@@ -508,8 +509,9 @@ describe('Sidebar', () => {
 
     it('should still show icons when collapsed', () => {
       renderSidebar({ menus: sampleMenus, collapsed: true })
-      // Home icon should be visible in workspace section
-      expect(screen.getByText('🏠')).toBeInTheDocument()
+      // Home icon (Lucide SVG) should be rendered in workspace section
+      const homeItem = screen.getByTestId('menu-item-home')
+      expect(homeItem.querySelector('svg')).toBeInTheDocument()
     })
 
     it('should add title attribute for tooltip when collapsed', () => {
@@ -659,10 +661,12 @@ describe('Sidebar', () => {
 
       await expandSetup(user)
 
-      expect(screen.getByText('👥')).toBeInTheDocument() // users
+      // Icons are rendered as Lucide SVGs
+      const usersItem = screen.getByTestId('menu-item-users-link')
+      expect(usersItem.querySelector('svg')).toBeInTheDocument()
     })
 
-    it('should use icon name as fallback for unknown icons', async () => {
+    it('should not render icon for unknown icon names', async () => {
       const menusWithUnknownIcon: MenuConfig[] = [
         {
           id: 'test',
@@ -675,7 +679,8 @@ describe('Sidebar', () => {
       renderSidebar({ menus: menusWithUnknownIcon })
 
       await expandSetup(user)
-      expect(screen.getByText('custom-icon')).toBeInTheDocument()
+      // Unknown icon names return null, so no icon container is rendered
+      expect(screen.queryByText('custom-icon')).not.toBeInTheDocument()
     })
 
     it('should handle items without icons', async () => {

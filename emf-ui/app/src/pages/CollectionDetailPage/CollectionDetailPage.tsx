@@ -47,7 +47,7 @@ export interface CollectionDetailPageProps {
  * Get display text for field type
  */
 function getFieldTypeDisplay(type: FieldDefinition['type'], t: (key: string) => string): string {
-  return t(`fields.types.${type}`)
+  return t(`fields.types.${type.toLowerCase()}`)
 }
 
 /**
@@ -933,16 +933,16 @@ export function CollectionDetailPage({
           <div className={styles.infoMessage}>
             <p>{t('fieldHistory.description')}</p>
             <p className={styles.trackedFieldsNote}>{t('fieldHistory.trackedFieldsNote')}</p>
-            {fields && fields.length > 0 && (
+            {sortedFields.length > 0 && (
               <div className={styles.trackedFieldsList}>
                 <h3>{t('fieldHistory.trackedFields')}</h3>
                 <ul>
-                  {fields
+                  {sortedFields
                     .filter((f: FieldDefinition) => f.trackHistory)
                     .map((f: FieldDefinition) => (
                       <li key={f.id}>{f.name}</li>
                     ))}
-                  {fields.filter((f: FieldDefinition) => f.trackHistory).length === 0 && (
+                  {sortedFields.filter((f: FieldDefinition) => f.trackHistory).length === 0 && (
                     <li className={styles.emptyNote}>{t('fieldHistory.noTrackedFields')}</li>
                   )}
                 </ul>

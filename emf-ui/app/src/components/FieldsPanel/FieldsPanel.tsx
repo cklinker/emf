@@ -365,8 +365,8 @@ export function FieldsPanel({
               <div className={styles.fieldMain}>
                 <span
                   className={styles.fieldTypeIcon}
-                  title={t(`fields.types.${field.type}`)}
-                  aria-label={t(`fields.types.${field.type}`)}
+                  title={t(`fields.types.${field.type.toLowerCase()}`)}
+                  aria-label={t(`fields.types.${field.type.toLowerCase()}`)}
                 >
                   {getFieldTypeIcon(field.type)}
                 </span>
@@ -385,7 +385,7 @@ export function FieldsPanel({
 
               <div className={styles.fieldMeta}>
                 <span className={styles.fieldType} data-testid={`${testId}-field-type-${field.id}`}>
-                  {t(`fields.types.${field.type}`)}
+                  {t(`fields.types.${field.type.toLowerCase()}`)}
                 </span>
 
                 {field.required && (

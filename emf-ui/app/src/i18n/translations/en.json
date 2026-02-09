@@ -818,6 +818,20 @@
     "triggerRecord": "Trigger Record",
     "currentNode": "Current Node"
   },
+  "approvals": {
+    "instances": "Instances",
+    "approvalInstances": "Approval Instances",
+    "noInstances": "No approval instances found for this process.",
+    "submittedBy": "Submitted By",
+    "currentStep": "Current Step",
+    "submittedAt": "Submitted At",
+    "approve": "Approve",
+    "reject": "Reject",
+    "recall": "Recall",
+    "approved": "Approved successfully",
+    "rejected": "Rejected successfully",
+    "recalled": "Recalled successfully"
+  },
   "sharing": {
     "title": "Sharing Settings",
     "owdTab": "Organization Defaults",
@@ -863,7 +877,14 @@
     "groupDeleted": "User group deleted",
     "noGroups": "No user groups found.",
     "noDescription": "No description",
-    "delete": "Delete"
+    "delete": "Delete",
+    "shareRecord": "Share",
+    "shareCreated": "Record shared successfully",
+    "shareDeleted": "Share removed successfully",
+    "noShares": "No sharing rules for this record.",
+    "sharedWith": "Shared With",
+    "sharedWithType": "Type",
+    "removeShare": "Remove"
   },
   "roleHierarchy": {
     "title": "Role Hierarchy",

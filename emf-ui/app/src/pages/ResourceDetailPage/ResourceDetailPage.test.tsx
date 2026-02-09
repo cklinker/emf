@@ -468,7 +468,7 @@ describe('ResourceDetailPage', () => {
     it('should delete resource and navigate when confirmed', async () => {
       const user = userEvent.setup()
 
-      // Set up complete mock including delete response
+      // Set up complete mock including sharing query and delete response
       const mockFetch = vi
         .fn()
         .mockResolvedValueOnce({
@@ -478,6 +478,10 @@ describe('ResourceDetailPage', () => {
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve(mockResource),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve([]),
         })
         .mockResolvedValueOnce({
           ok: true,
@@ -503,7 +507,7 @@ describe('ResourceDetailPage', () => {
     it('should show error toast when delete fails', async () => {
       const user = userEvent.setup()
 
-      // Set up complete mock including failed delete response
+      // Set up complete mock including sharing query and failed delete response
       const mockFetch = vi
         .fn()
         .mockResolvedValueOnce({
@@ -513,6 +517,10 @@ describe('ResourceDetailPage', () => {
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve(mockResource),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve([]),
         })
         .mockRejectedValueOnce(new Error('Failed to delete resource'))
       wrapFetchMock(mockFetch)

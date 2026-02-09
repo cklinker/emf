@@ -2,7 +2,14 @@ import React, { useState, useCallback, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
-import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
+import {
+  useToast,
+  ConfirmDialog,
+  LoadingSpinner,
+  ErrorMessage,
+  ExecutionLogModal,
+} from '../../components'
+import type { LogColumn } from '../../components'
 import styles from './ApprovalProcessesPage.module.css'
 
 interface ApprovalProcess {
@@ -29,6 +36,29 @@ interface ApprovalProcessFormData {
   allowRecall: boolean
   active: boolean
   executionOrder: number
+}
+
+interface StepInstance {
+  id: string
+  stepId: string
+  assignedTo: string
+  status: string
+  comments: string | null
+  actedAt: string | null
+}
+
+interface ApprovalInstance {
+  id: string
+  approvalProcessId: string
+  approvalProcessName: string
+  collectionId: string
+  recordId: string
+  submittedBy: string
+  currentStepNumber: number
+  status: string
+  submittedAt: string
+  completedAt: string | null
+  stepInstances: StepInstance[]
 }
 
 interface FormErrors {
@@ -376,7 +406,7 @@ export function ApprovalProcessesPage({
   testId = 'approval-processes-page',
 }: ApprovalProcessesPageProps): React.ReactElement {
   const queryClient = useQueryClient()
-  const { formatDate } = useI18n()
+  const { t, formatDate } = useI18n()
   const { apiClient } = useApi()
   const { showToast } = useToast()
 
@@ -388,6 +418,8 @@ export function ApprovalProcessesPage({
   const [approvalProcessToDelete, setApprovalProcessToDelete] = useState<ApprovalProcess | null>(
     null
   )
+  const [instancesItemId, setInstancesItemId] = useState<string | null>(null)
+  const [instancesItemName, setInstancesItemName] = useState('')
 
   const {
     data: approvalProcesses,
@@ -443,6 +475,180 @@ export function ApprovalProcessesPage({
       showToast(err.message || 'An error occurred', 'error')
     },
   })
+
+  // Instances query
+  const {
+    data: allInstances,
+    isLoading: instancesLoading,
+    error: instancesError,
+  } = useQuery({
+    queryKey: ['approval-instances'],
+    queryFn: () =>
+      apiClient.get<ApprovalInstance[]>('/control/approvals/instances?tenantId=default'),
+    enabled: !!instancesItemId,
+  })
+
+  const filteredInstances = (allInstances ?? []).filter(
+    (i) => i.approvalProcessId === instancesItemId
+  )
+
+  // Approve mutation
+  const approveMutation = useMutation({
+    mutationFn: (stepInstanceId: string) =>
+      apiClient.post(
+        `/control/approvals/instances/steps/${stepInstanceId}/approve?${new URLSearchParams({ userId: 'system', comments: '' }).toString()}`
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['approval-instances'] })
+      showToast(t('approvals.approved'), 'success')
+    },
+    onError: (err: Error) => {
+      showToast(err.message || 'An error occurred', 'error')
+    },
+  })
+
+  // Reject mutation
+  const rejectMutation = useMutation({
+    mutationFn: (stepInstanceId: string) =>
+      apiClient.post(
+        `/control/approvals/instances/steps/${stepInstanceId}/reject?${new URLSearchParams({ userId: 'system', comments: '' }).toString()}`
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['approval-instances'] })
+      showToast(t('approvals.rejected'), 'success')
+    },
+    onError: (err: Error) => {
+      showToast(err.message || 'An error occurred', 'error')
+    },
+  })
+
+  // Recall mutation
+  const recallMutation = useMutation({
+    mutationFn: (instanceId: string) =>
+      apiClient.post(
+        `/control/approvals/instances/${instanceId}/recall?${new URLSearchParams({ userId: 'system' }).toString()}`
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['approval-instances'] })
+      showToast(t('approvals.recalled'), 'success')
+    },
+    onError: (err: Error) => {
+      showToast(err.message || 'An error occurred', 'error')
+    },
+  })
+
+  // Instance columns for ExecutionLogModal
+  const instanceColumns: LogColumn<ApprovalInstance>[] = [
+    {
+      key: 'status',
+      header: t('logs.status'),
+      render: (v) => {
+        const status = v as string
+        const colorMap: Record<string, { color: string; bg: string }> = {
+          PENDING: { color: '#92400e', bg: '#fef3c7' },
+          APPROVED: { color: '#065f46', bg: '#d1fae5' },
+          REJECTED: { color: '#991b1b', bg: '#fee2e2' },
+          RECALLED: { color: '#6b7280', bg: '#f3f4f6' },
+        }
+        const style = colorMap[status] ?? { color: '#6b7280', bg: '#f3f4f6' }
+        return (
+          <span
+            style={{
+              display: 'inline-block',
+              padding: '0.125rem 0.5rem',
+              borderRadius: '9999px',
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              color: style.color,
+              backgroundColor: style.bg,
+            }}
+          >
+            {status}
+          </span>
+        )
+      },
+    },
+    { key: 'submittedBy', header: t('approvals.submittedBy') },
+    { key: 'recordId', header: t('logs.recordId') },
+    {
+      key: 'currentStepNumber',
+      header: t('approvals.currentStep'),
+      render: (v) => (v != null ? String(v) : '-'),
+    },
+    {
+      key: 'submittedAt',
+      header: t('approvals.submittedAt'),
+      render: (v) =>
+        v
+          ? formatDate(new Date(v as string), {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+            })
+          : '-',
+    },
+    {
+      key: 'completedAt',
+      header: t('logs.completedAt'),
+      render: (v) =>
+        v
+          ? formatDate(new Date(v as string), {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+            })
+          : '-',
+    },
+    {
+      key: 'actions',
+      header: '',
+      render: (_v: unknown, row: ApprovalInstance) => {
+        if (row.status === 'PENDING') {
+          const pendingStep = row.stepInstances?.find((s) => s.status === 'PENDING')
+          return (
+            <div className={styles.actions}>
+              {pendingStep && (
+                <>
+                  <button
+                    type="button"
+                    className={styles.actionButton}
+                    onClick={() => approveMutation.mutate(pendingStep.id)}
+                    disabled={approveMutation.isPending}
+                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                  >
+                    {t('approvals.approve')}
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.actionButton} ${styles.deleteButton}`}
+                    onClick={() => rejectMutation.mutate(pendingStep.id)}
+                    disabled={rejectMutation.isPending}
+                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                  >
+                    {t('approvals.reject')}
+                  </button>
+                </>
+              )}
+              <button
+                type="button"
+                className={styles.actionButton}
+                onClick={() => recallMutation.mutate(row.id)}
+                disabled={recallMutation.isPending}
+                style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+              >
+                {t('approvals.recall')}
+              </button>
+            </div>
+          )
+        }
+        return null
+      },
+    },
+  ]
 
   const handleCreate = useCallback(() => {
     setEditingApprovalProcess(undefined)
@@ -598,6 +804,18 @@ export function ApprovalProcessesPage({
                       <button
                         type="button"
                         className={styles.actionButton}
+                        onClick={() => {
+                          setInstancesItemId(approvalProcess.id)
+                          setInstancesItemName(approvalProcess.name)
+                        }}
+                        aria-label={`View instances for ${approvalProcess.name}`}
+                        data-testid={`instances-button-${index}`}
+                      >
+                        {t('approvals.instances')}
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.actionButton}
                         onClick={() => handleEdit(approvalProcess)}
                         aria-label={`Edit ${approvalProcess.name}`}
                         data-testid={`edit-button-${index}`}
@@ -641,6 +859,19 @@ export function ApprovalProcessesPage({
         onCancel={handleDeleteCancel}
         variant="danger"
       />
+
+      {instancesItemId && (
+        <ExecutionLogModal<ApprovalInstance>
+          title={t('approvals.approvalInstances')}
+          subtitle={instancesItemName}
+          columns={instanceColumns}
+          data={filteredInstances}
+          isLoading={instancesLoading}
+          error={instancesError instanceof Error ? instancesError : null}
+          onClose={() => setInstancesItemId(null)}
+          emptyMessage={t('approvals.noInstances')}
+        />
+      )}
     </div>
   )
 }

@@ -10,7 +10,7 @@
  * - 11.10: Resource browser allows deleting resources with confirmation
  */
 
-import React, { useState, useCallback, useMemo } from 'react'
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
@@ -46,6 +46,138 @@ export interface CollectionSchema {
 export interface Resource {
   id: string
   [key: string]: unknown
+}
+
+export interface RecordShare {
+  id: string
+  tenantId: string
+  collectionId: string
+  recordId: string
+  sharedWithId: string
+  sharedWithType: string
+  accessLevel: string
+  reason: string
+  createdBy: string
+  createdAt: string
+}
+
+interface ShareFormProps {
+  onSubmit: (data: { sharedWithId: string; sharedWithType: string; accessLevel: string }) => void
+  onCancel: () => void
+  isSubmitting: boolean
+}
+
+function ShareForm({ onSubmit, onCancel, isSubmitting }: ShareFormProps): React.ReactElement {
+  const [sharedWithId, setSharedWithId] = useState('')
+  const [sharedWithType, setSharedWithType] = useState('USER')
+  const [accessLevel, setAccessLevel] = useState('READ')
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    inputRef.current?.focus()
+  }, [])
+
+  const handleSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault()
+      if (sharedWithId.trim()) {
+        onSubmit({ sharedWithId: sharedWithId.trim(), sharedWithType, accessLevel })
+      }
+    },
+    [sharedWithId, sharedWithType, accessLevel, onSubmit]
+  )
+
+  return (
+    <div
+      className={styles.shareModalOverlay}
+      onClick={(e) => e.target === e.currentTarget && onCancel()}
+      onKeyDown={(e) => e.key === 'Escape' && onCancel()}
+      role="presentation"
+    >
+      <div
+        className={styles.shareModal}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="share-form-title"
+      >
+        <div className={styles.shareModalHeader}>
+          <h3 id="share-form-title" className={styles.shareModalTitle}>
+            Share Record
+          </h3>
+          <button
+            type="button"
+            className={styles.shareModalClose}
+            onClick={onCancel}
+            aria-label="Close"
+          >
+            &times;
+          </button>
+        </div>
+        <form className={styles.shareModalBody} onSubmit={handleSubmit}>
+          <div className={styles.shareFormGroup}>
+            <label htmlFor="share-with-id" className={styles.shareFormLabel}>
+              Shared With ID
+            </label>
+            <input
+              ref={inputRef}
+              id="share-with-id"
+              type="text"
+              className={styles.shareFormInput}
+              value={sharedWithId}
+              onChange={(e) => setSharedWithId(e.target.value)}
+              placeholder="Enter user, group, or role ID"
+              required
+              disabled={isSubmitting}
+            />
+          </div>
+          <div className={styles.shareFormGroup}>
+            <label htmlFor="share-type" className={styles.shareFormLabel}>
+              Type
+            </label>
+            <select
+              id="share-type"
+              className={styles.shareFormInput}
+              value={sharedWithType}
+              onChange={(e) => setSharedWithType(e.target.value)}
+              disabled={isSubmitting}
+            >
+              <option value="USER">User</option>
+              <option value="GROUP">Group</option>
+              <option value="ROLE">Role</option>
+            </select>
+          </div>
+          <div className={styles.shareFormGroup}>
+            <label htmlFor="share-access" className={styles.shareFormLabel}>
+              Access Level
+            </label>
+            <select
+              id="share-access"
+              className={styles.shareFormInput}
+              value={accessLevel}
+              onChange={(e) => setAccessLevel(e.target.value)}
+              disabled={isSubmitting}
+            >
+              <option value="READ">Read</option>
+              <option value="READ_WRITE">Read/Write</option>
+            </select>
+          </div>
+          <div className={styles.shareFormActions}>
+            <button
+              type="button"
+              className={styles.shareFormCancel}
+              onClick={onCancel}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </button>
+            <button type="submit" className={styles.shareFormSubmit} disabled={isSubmitting}>
+              {isSubmitting ? 'Sharing...' : 'Share'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
 }
 
 /**
@@ -110,6 +242,9 @@ export function ResourceDetailPage({
   // Delete confirmation dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
 
+  // Share modal state
+  const [shareModalOpen, setShareModalOpen] = useState(false)
+
   // Fetch collection schema
   const {
     data: schema,
@@ -143,6 +278,45 @@ export function ResourceDetailPage({
     },
     onError: (error: Error) => {
       showToast(error.message || t('errors.generic'), 'error')
+    },
+  })
+
+  // Sharing: fetch shares for this record
+  const { data: shares } = useQuery({
+    queryKey: ['record-shares', schema?.id, resourceId],
+    queryFn: () =>
+      apiClient.get<RecordShare[]>(`/control/sharing/records/${schema!.id}/${resourceId}`),
+    enabled: !!schema?.id && !!resourceId,
+  })
+
+  const sharesList: RecordShare[] = Array.isArray(shares) ? shares : []
+
+  // Sharing: create share
+  const createShareMutation = useMutation({
+    mutationFn: (data: { sharedWithId: string; sharedWithType: string; accessLevel: string }) =>
+      apiClient.post(`/control/sharing/records/${schema!.id}`, {
+        recordId: resourceId,
+        ...data,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['record-shares', schema?.id, resourceId] })
+      showToast(t('sharing.shareCreated'), 'success')
+      setShareModalOpen(false)
+    },
+    onError: (err: Error) => {
+      showToast(err.message || t('errors.generic'), 'error')
+    },
+  })
+
+  // Sharing: delete share
+  const deleteShareMutation = useMutation({
+    mutationFn: (shareId: string) => apiClient.delete(`/control/sharing/records/shares/${shareId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['record-shares', schema?.id, resourceId] })
+      showToast(t('sharing.shareDeleted'), 'success')
+    },
+    onError: (err: Error) => {
+      showToast(err.message || t('errors.generic'), 'error')
     },
   })
 
@@ -454,6 +628,76 @@ export function ResourceDetailPage({
           )}
         </div>
       </section>
+
+      {/* Sharing Section */}
+      <section className={styles.sharingSection} aria-labelledby="sharing-heading">
+        <div className={styles.sharingSectionHeader}>
+          <h2 id="sharing-heading" className={styles.sectionTitle}>
+            Sharing
+          </h2>
+          <button
+            type="button"
+            className={styles.shareButton}
+            onClick={() => setShareModalOpen(true)}
+            data-testid="share-button"
+          >
+            {t('sharing.shareRecord')}
+          </button>
+        </div>
+        {sharesList.length === 0 ? (
+          <div className={styles.emptyState} data-testid="no-shares">
+            <p>{t('sharing.noShares')}</p>
+          </div>
+        ) : (
+          <div className={styles.sharingTableContainer}>
+            <table className={styles.sharingTable} role="grid" aria-label="Record shares">
+              <thead>
+                <tr>
+                  <th>{t('sharing.sharedWith')}</th>
+                  <th>{t('sharing.sharedWithType')}</th>
+                  <th>{t('sharing.accessLevel')}</th>
+                  <th>Reason</th>
+                  <th>{t('common.actions')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sharesList.map((share) => (
+                  <tr key={share.id}>
+                    <td className={styles.monoCell}>{share.sharedWithId}</td>
+                    <td>
+                      <span className={styles.shareBadge}>{share.sharedWithType}</span>
+                    </td>
+                    <td>
+                      <span className={styles.shareBadge}>{share.accessLevel}</span>
+                    </td>
+                    <td>{share.reason || '-'}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className={styles.removeButton}
+                        onClick={() => deleteShareMutation.mutate(share.id)}
+                        disabled={deleteShareMutation.isPending}
+                        aria-label={`Remove share for ${share.sharedWithId}`}
+                      >
+                        {t('sharing.removeShare')}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      {/* Share Modal */}
+      {shareModalOpen && (
+        <ShareForm
+          onSubmit={(data) => createShareMutation.mutate(data)}
+          onCancel={() => setShareModalOpen(false)}
+          isSubmitting={createShareMutation.isPending}
+        />
+      )}
 
       {/* Delete Confirmation Dialog */}
       <ConfirmDialog

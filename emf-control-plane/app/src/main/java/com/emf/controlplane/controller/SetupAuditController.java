@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import java.time.Instant;
 
 @RestController
-@RequestMapping("/api/audit")
+@RequestMapping("/control/audit")
 public class SetupAuditController {
 
     private final SetupAuditService auditService;

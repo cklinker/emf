@@ -20,7 +20,7 @@ import java.util.Map;
  * <p>Provides dashboard data including system health, metrics, and recent errors.
  */
 @RestController
-@RequestMapping("/api/_admin")
+@RequestMapping("/control/_admin")
 @SecurityRequirement(name = "bearer-jwt")
 @Tag(name = "Admin", description = "Admin dashboard and monitoring APIs")
 public class AdminController {

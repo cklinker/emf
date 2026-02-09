@@ -164,7 +164,7 @@ export function CollectionDetailPage({
       const response = await apiClient.get<{
         content: SetupAuditTrailEntry[]
         totalElements: number
-      }>('/api/audit?size=50')
+      }>('/control/audit?size=50')
       return response
     },
     enabled: activeTab === 'setupAudit',

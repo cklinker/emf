@@ -75,6 +75,7 @@
     "unauthorized": "You are not authorized to access this resource."
   },
   "navigation": {
+    "main": "Main navigation",
     "home": "Home",
     "dashboard": "Dashboard",
     "collections": "Collections",

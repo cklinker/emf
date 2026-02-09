@@ -30,7 +30,7 @@ import org.springframework.web.bind.annotation.RestController;
  * </ul>
  */
 @RestController
-@RequestMapping("/api/_meta")
+@RequestMapping("/control/_meta")
 @SecurityRequirement(name = "bearer-jwt")
 @Tag(name = "Discovery", description = "Resource discovery APIs")
 public class DiscoveryController {

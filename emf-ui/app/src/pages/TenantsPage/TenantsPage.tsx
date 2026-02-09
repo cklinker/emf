@@ -336,7 +336,7 @@ export function TenantsPage({ testId = 'tenants-page' }: TenantsPageProps): Reac
     queryKey: ['tenants'],
     queryFn: () =>
       apiClient.get<{ content: Tenant[]; totalElements: number }>(
-        '/platform/tenants?page=0&size=100'
+        '/control/tenants?page=0&size=100'
       ),
   })
 
@@ -345,7 +345,7 @@ export function TenantsPage({ testId = 'tenants-page' }: TenantsPageProps): Reac
   // Create mutation
   const createMutation = useMutation({
     mutationFn: (data: TenantFormData) =>
-      apiClient.post<Tenant>('/platform/tenants', {
+      apiClient.post<Tenant>('/control/tenants', {
         slug: data.slug,
         name: data.name,
         edition: data.edition,
@@ -363,7 +363,7 @@ export function TenantsPage({ testId = 'tenants-page' }: TenantsPageProps): Reac
   // Update mutation
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: TenantFormData }) =>
-      apiClient.put<Tenant>(`/platform/tenants/${id}`, {
+      apiClient.put<Tenant>(`/control/tenants/${id}`, {
         name: data.name,
         edition: data.edition,
       }),
@@ -379,7 +379,7 @@ export function TenantsPage({ testId = 'tenants-page' }: TenantsPageProps): Reac
 
   // Suspend mutation
   const suspendMutation = useMutation({
-    mutationFn: (id: string) => apiClient.post(`/platform/tenants/${id}/suspend`),
+    mutationFn: (id: string) => apiClient.post(`/control/tenants/${id}/suspend`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tenants'] })
       showToast('Tenant suspended.', 'success')
@@ -393,7 +393,7 @@ export function TenantsPage({ testId = 'tenants-page' }: TenantsPageProps): Reac
 
   // Activate mutation
   const activateMutation = useMutation({
-    mutationFn: (id: string) => apiClient.post(`/platform/tenants/${id}/activate`),
+    mutationFn: (id: string) => apiClient.post(`/control/tenants/${id}/activate`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tenants'] })
       showToast('Tenant activated.', 'success')

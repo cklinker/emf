@@ -806,6 +806,18 @@
     "webhookDeliveries": "Webhook Deliveries",
     "emailLogs": "Email Logs"
   },
+  "flows": {
+    "executions": "Executions",
+    "runFlow": "Run",
+    "executionStarted": "Flow execution started",
+    "executionCancelled": "Execution cancelled",
+    "cancelExecution": "Cancel",
+    "noExecutions": "No executions found for this flow.",
+    "flowExecutionHistory": "Execution History",
+    "startedBy": "Started By",
+    "triggerRecord": "Trigger Record",
+    "currentNode": "Current Node"
+  },
   "sharing": {
     "title": "Sharing Settings",
     "owdTab": "Organization Defaults",

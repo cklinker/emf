@@ -2,7 +2,14 @@ import React, { useState, useCallback, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
-import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
+import {
+  useToast,
+  ConfirmDialog,
+  LoadingSpinner,
+  ErrorMessage,
+  ExecutionLogModal,
+} from '../../components'
+import type { LogColumn } from '../../components'
 import styles from './FlowsPage.module.css'
 
 interface Flow {
@@ -15,6 +22,19 @@ interface Flow {
   createdBy: string
   createdAt: string
   updatedAt: string
+}
+
+interface FlowExecutionLog {
+  id: string
+  flowId: string
+  flowName: string
+  status: string
+  startedBy: string | null
+  triggerRecordId: string | null
+  currentNodeId: string | null
+  errorMessage: string | null
+  startedAt: string
+  completedAt: string | null
 }
 
 interface FlowFormData {
@@ -291,7 +311,7 @@ function FlowForm({ flow, onSubmit, onCancel, isSubmitting }: FlowFormProps): Re
 
 export function FlowsPage({ testId = 'flows-page' }: FlowsPageProps): React.ReactElement {
   const queryClient = useQueryClient()
-  const { formatDate } = useI18n()
+  const { t, formatDate } = useI18n()
   const { apiClient } = useApi()
   const { showToast } = useToast()
 
@@ -299,6 +319,8 @@ export function FlowsPage({ testId = 'flows-page' }: FlowsPageProps): React.Reac
   const [editingFlow, setEditingFlow] = useState<Flow | undefined>(undefined)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [flowToDelete, setFlowToDelete] = useState<Flow | null>(null)
+  const [execItemId, setExecItemId] = useState<string | null>(null)
+  const [execItemName, setExecItemName] = useState('')
 
   const {
     data: flows,
@@ -350,6 +372,136 @@ export function FlowsPage({ testId = 'flows-page' }: FlowsPageProps): React.Reac
       showToast(err.message || 'An error occurred', 'error')
     },
   })
+
+  const {
+    data: executions,
+    isLoading: execLoading,
+    error: execError,
+  } = useQuery({
+    queryKey: ['flow-executions', execItemId],
+    queryFn: () =>
+      apiClient.get<FlowExecutionLog[]>(
+        `/control/flows/${execItemId}/executions?${new URLSearchParams({ tenantId: 'default' }).toString()}`
+      ),
+    enabled: !!execItemId,
+  })
+
+  const executeMutation = useMutation({
+    mutationFn: async (flowId: string) => {
+      const resp = await apiClient.fetch(
+        `/control/flows/${flowId}/execute?${new URLSearchParams({ tenantId: 'default', userId: 'system' }).toString()}`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }
+      )
+      if (!resp.ok) {
+        const errBody = await resp.json().catch(() => ({}))
+        throw new Error(
+          (errBody as Record<string, string>).message || `Execute failed: ${resp.statusText}`
+        )
+      }
+    },
+    onSuccess: () => {
+      showToast(t('flows.executionStarted'), 'success')
+      if (execItemId) {
+        queryClient.invalidateQueries({ queryKey: ['flow-executions', execItemId] })
+      }
+    },
+    onError: (err: Error) => showToast(err.message, 'error'),
+  })
+
+  const cancelMutation = useMutation({
+    mutationFn: async (executionId: string) => {
+      const resp = await apiClient.fetch(
+        `/control/flows/executions/${executionId}/cancel?${new URLSearchParams({ tenantId: 'default' }).toString()}`,
+        { method: 'POST' }
+      )
+      if (!resp.ok) throw new Error(`Cancel failed: ${resp.statusText}`)
+    },
+    onSuccess: () => {
+      showToast(t('flows.executionCancelled'), 'success')
+      queryClient.invalidateQueries({ queryKey: ['flow-executions', execItemId] })
+    },
+    onError: (err: Error) => showToast(err.message, 'error'),
+  })
+
+  const execColumns: LogColumn<FlowExecutionLog>[] = [
+    {
+      key: 'status',
+      header: t('logs.status'),
+      render: (v) => {
+        const status = v as string
+        const colorMap: Record<string, { color: string; bg: string }> = {
+          SUCCESS: { color: '#065f46', bg: '#d1fae5' },
+          FAILED: { color: '#991b1b', bg: '#fee2e2' },
+          RUNNING: { color: '#1e40af', bg: '#dbeafe' },
+          CANCELLED: { color: '#6b7280', bg: '#f3f4f6' },
+        }
+        const style = colorMap[status] ?? { color: '#6b7280', bg: '#f3f4f6' }
+        return (
+          <span
+            style={{
+              display: 'inline-block',
+              padding: '0.125rem 0.5rem',
+              borderRadius: '9999px',
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              color: style.color,
+              backgroundColor: style.bg,
+            }}
+          >
+            {status}
+          </span>
+        )
+      },
+    },
+    { key: 'startedBy', header: t('flows.startedBy') },
+    { key: 'triggerRecordId', header: t('flows.triggerRecord') },
+    { key: 'currentNodeId', header: t('flows.currentNode') },
+    { key: 'errorMessage', header: t('logs.errorMessage') },
+    {
+      key: 'startedAt',
+      header: t('logs.startedAt'),
+      render: (v) =>
+        v
+          ? formatDate(new Date(v as string), {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+            })
+          : '-',
+    },
+    {
+      key: 'completedAt',
+      header: t('logs.completedAt'),
+      render: (v) =>
+        v
+          ? formatDate(new Date(v as string), {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+            })
+          : '-',
+    },
+    {
+      key: 'actions',
+      header: '',
+      render: (_v: unknown, row: FlowExecutionLog) =>
+        row.status === 'RUNNING' ? (
+          <button
+            type="button"
+            className={`${styles.actionButton} ${styles.deleteButton}`}
+            onClick={() => cancelMutation.mutate(row.id)}
+            disabled={cancelMutation.isPending}
+            style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+          >
+            {t('flows.cancelExecution')}
+          </button>
+        ) : null,
+    },
+  ]
 
   const handleCreate = useCallback(() => {
     setEditingFlow(undefined)
@@ -488,6 +640,28 @@ export function FlowsPage({ testId = 'flows-page' }: FlowsPageProps): React.Reac
                       <button
                         type="button"
                         className={styles.actionButton}
+                        onClick={() => {
+                          setExecItemId(flow.id)
+                          setExecItemName(flow.name)
+                        }}
+                        aria-label={`View executions for ${flow.name}`}
+                        data-testid={`executions-button-${index}`}
+                      >
+                        {t('flows.executions')}
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.actionButton}
+                        onClick={() => executeMutation.mutate(flow.id)}
+                        disabled={!flow.active || executeMutation.isPending}
+                        aria-label={`Run ${flow.name}`}
+                        data-testid={`run-button-${index}`}
+                      >
+                        {t('flows.runFlow')}
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.actionButton}
                         onClick={() => handleEdit(flow)}
                         aria-label={`Edit ${flow.name}`}
                         data-testid={`edit-button-${index}`}
@@ -531,6 +705,19 @@ export function FlowsPage({ testId = 'flows-page' }: FlowsPageProps): React.Reac
         onCancel={handleDeleteCancel}
         variant="danger"
       />
+
+      {execItemId && (
+        <ExecutionLogModal<FlowExecutionLog>
+          title={t('flows.flowExecutionHistory')}
+          subtitle={execItemName}
+          columns={execColumns}
+          data={executions ?? []}
+          isLoading={execLoading}
+          error={execError instanceof Error ? execError : null}
+          onClose={() => setExecItemId(null)}
+          emptyMessage={t('flows.noExecutions')}
+        />
+      )}
     </div>
   )
 }

@@ -1,6 +1,8 @@
 package com.emf.controlplane.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.time.Instant;
 
 /**
@@ -46,6 +48,7 @@ public class Worker extends BaseEntity {
     private String tenantAffinity;
 
     @Column(name = "labels", columnDefinition = "jsonb")
+    @JdbcTypeCode(SqlTypes.JSON)
     private String labels;
 
     @Column(name = "last_heartbeat")

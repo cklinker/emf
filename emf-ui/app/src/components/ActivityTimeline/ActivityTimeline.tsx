@@ -1,0 +1,404 @@
+/**
+ * ActivityTimeline Component
+ *
+ * Displays a chronological activity feed on the record detail page.
+ * Merges multiple data sources (record lifecycle, approvals, sharing)
+ * into a single reverse-chronological timeline.
+ *
+ * Features:
+ * - Color-coded timeline entries by activity type
+ * - Relative time formatting for timestamps
+ * - Collapsible with "Show More" / "Show Less" toggle
+ * - Graceful handling of missing or erroring API endpoints
+ * - Accessible with ARIA attributes
+ */
+
+import React, { useState, useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { useI18n } from '../../context/I18nContext'
+import type { ApiClient } from '../../services/apiClient'
+import styles from './ActivityTimeline.module.css'
+
+/**
+ * Approval step instance from the control plane
+ */
+interface ApprovalStepInstance {
+  id: string
+  status: string
+  assignedTo: string
+  comments: string | null
+  actedAt: string | null
+}
+
+/**
+ * Approval instance from the control plane
+ */
+interface ApprovalInstance {
+  id: string
+  approvalProcessId: string
+  collectionId: string
+  recordId: string
+  submittedBy: string
+  status: string
+  submittedAt: string
+  completedAt: string | null
+  stepInstances: ApprovalStepInstance[]
+}
+
+/**
+ * Record share from the control plane
+ */
+interface RecordShare {
+  id: string
+  sharedWithId: string
+  sharedWithType: string
+  accessLevel: string
+  reason: string
+  createdAt: string
+}
+
+/**
+ * Timeline entry types with visual indicators
+ */
+type TimelineEntryType =
+  | 'CREATED'
+  | 'UPDATED'
+  | 'APPROVAL_SUBMITTED'
+  | 'APPROVAL_APPROVED'
+  | 'APPROVAL_REJECTED'
+  | 'APPROVAL_RECALLED'
+  | 'SHARED'
+
+/**
+ * Internal timeline entry for rendering
+ */
+interface TimelineEntry {
+  id: string
+  type: TimelineEntryType
+  description: string
+  timestamp: string
+}
+
+/**
+ * Props for the ActivityTimeline component
+ */
+export interface ActivityTimelineProps {
+  /** UUID of the collection */
+  collectionId: string
+  /** Name of the collection */
+  collectionName: string
+  /** UUID of the record */
+  recordId: string
+  /** ISO timestamp when the record was created */
+  recordCreatedAt?: string
+  /** ISO timestamp when the record was last updated */
+  recordUpdatedAt?: string
+  /** Authenticated API client instance */
+  apiClient: ApiClient
+}
+
+/**
+ * Default number of entries to show before requiring "Show More"
+ */
+const DEFAULT_VISIBLE_COUNT = 5
+
+/**
+ * Format a date string as a relative time (e.g., "3 hours ago", "2 days ago").
+ * Uses simple threshold-based formatting without external dependencies.
+ */
+function formatRelativeTime(dateStr: string): string {
+  const date = new Date(dateStr)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffSeconds = Math.floor(diffMs / 1000)
+  const diffMinutes = Math.floor(diffSeconds / 60)
+  const diffHours = Math.floor(diffMinutes / 60)
+  const diffDays = Math.floor(diffHours / 24)
+  const diffWeeks = Math.floor(diffDays / 7)
+  const diffMonths = Math.floor(diffDays / 30)
+  const diffYears = Math.floor(diffDays / 365)
+
+  if (diffSeconds < 60) {
+    return 'just now'
+  }
+  if (diffMinutes < 60) {
+    return diffMinutes === 1 ? '1 minute ago' : `${diffMinutes} minutes ago`
+  }
+  if (diffHours < 24) {
+    return diffHours === 1 ? '1 hour ago' : `${diffHours} hours ago`
+  }
+  if (diffDays < 7) {
+    return diffDays === 1 ? '1 day ago' : `${diffDays} days ago`
+  }
+  if (diffWeeks < 5) {
+    return diffWeeks === 1 ? '1 week ago' : `${diffWeeks} weeks ago`
+  }
+  if (diffMonths < 12) {
+    return diffMonths === 1 ? '1 month ago' : `${diffMonths} months ago`
+  }
+  return diffYears === 1 ? '1 year ago' : `${diffYears} years ago`
+}
+
+/**
+ * Get the CSS class name for a timeline entry type icon
+ */
+function getIconClassName(type: TimelineEntryType): string {
+  const classMap: Record<TimelineEntryType, string> = {
+    CREATED: styles.created,
+    UPDATED: styles.updated,
+    APPROVAL_SUBMITTED: styles.approvalSubmitted,
+    APPROVAL_APPROVED: styles.approvalApproved,
+    APPROVAL_REJECTED: styles.approvalRejected,
+    APPROVAL_RECALLED: styles.approvalRecalled,
+    SHARED: styles.shared,
+  }
+  return classMap[type] || ''
+}
+
+/**
+ * Get the icon symbol for a timeline entry type
+ */
+function getIconSymbol(type: TimelineEntryType): string {
+  const symbolMap: Record<TimelineEntryType, string> = {
+    CREATED: '+',
+    UPDATED: '~',
+    APPROVAL_SUBMITTED: '!',
+    APPROVAL_APPROVED: '\u2713',
+    APPROVAL_REJECTED: '\u2717',
+    APPROVAL_RECALLED: '\u21A9',
+    SHARED: '\u21C4',
+  }
+  return symbolMap[type] || '\u2022'
+}
+
+/**
+ * Map an approval instance status to the corresponding timeline entry type
+ */
+function approvalStatusToEntryType(status: string): TimelineEntryType {
+  const statusUpper = status.toUpperCase()
+  if (statusUpper === 'APPROVED') return 'APPROVAL_APPROVED'
+  if (statusUpper === 'REJECTED') return 'APPROVAL_REJECTED'
+  if (statusUpper === 'RECALLED') return 'APPROVAL_RECALLED'
+  return 'APPROVAL_SUBMITTED'
+}
+
+/**
+ * ActivityTimeline Component
+ *
+ * Displays a merged, reverse-chronological activity feed combining
+ * record lifecycle events, approval events, and sharing changes.
+ *
+ * @example
+ * ```tsx
+ * <ActivityTimeline
+ *   collectionId="abc-123"
+ *   collectionName="accounts"
+ *   recordId="def-456"
+ *   recordCreatedAt="2025-01-15T10:00:00Z"
+ *   recordUpdatedAt="2025-01-16T14:30:00Z"
+ *   apiClient={apiClient}
+ * />
+ * ```
+ */
+export function ActivityTimeline({
+  collectionId,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  collectionName,
+  recordId,
+  recordCreatedAt,
+  recordUpdatedAt,
+  apiClient,
+}: ActivityTimelineProps): React.ReactElement {
+  const { t } = useI18n()
+  const [expanded, setExpanded] = useState(false)
+
+  // Fetch approval instances for the record
+  const { data: approvalInstances } = useQuery({
+    queryKey: ['activity-approvals', collectionId, recordId],
+    queryFn: async () => {
+      try {
+        const params = new URLSearchParams({ tenantId: 'default' })
+        const instances = await apiClient.get<ApprovalInstance[]>(
+          `/control/approvals/instances?${params.toString()}`
+        )
+        // Filter client-side for instances matching this record
+        return (instances || []).filter((instance) => instance.recordId === recordId)
+      } catch {
+        // Gracefully handle 404 or other errors
+        return []
+      }
+    },
+    enabled: !!collectionId && !!recordId,
+  })
+
+  // Fetch sharing records for this record
+  const { data: shares } = useQuery({
+    queryKey: ['activity-shares', collectionId, recordId],
+    queryFn: async () => {
+      try {
+        const result = await apiClient.get<RecordShare[]>(
+          `/control/sharing/records/${collectionId}/${recordId}`
+        )
+        return result || []
+      } catch {
+        // Gracefully handle 404 or other errors
+        return []
+      }
+    },
+    enabled: !!collectionId && !!recordId,
+  })
+
+  // Merge all data sources into a single timeline
+  const entries: TimelineEntry[] = useMemo(() => {
+    const allEntries: TimelineEntry[] = []
+
+    // Record creation event
+    if (recordCreatedAt) {
+      allEntries.push({
+        id: 'record-created',
+        type: 'CREATED',
+        description: t('activity.recordCreated'),
+        timestamp: recordCreatedAt,
+      })
+    }
+
+    // Record update event (only if different from created)
+    if (recordUpdatedAt && recordCreatedAt && recordUpdatedAt !== recordCreatedAt) {
+      allEntries.push({
+        id: 'record-updated',
+        type: 'UPDATED',
+        description: t('activity.recordUpdated'),
+        timestamp: recordUpdatedAt,
+      })
+    }
+
+    // Approval events
+    if (approvalInstances) {
+      for (const instance of approvalInstances) {
+        // Submitted event
+        allEntries.push({
+          id: `approval-submitted-${instance.id}`,
+          type: 'APPROVAL_SUBMITTED',
+          description: t('activity.approvalSubmitted'),
+          timestamp: instance.submittedAt,
+        })
+
+        // Completed event (approved, rejected, recalled)
+        if (
+          instance.completedAt &&
+          instance.status.toUpperCase() !== 'PENDING' &&
+          instance.status.toUpperCase() !== 'SUBMITTED'
+        ) {
+          const entryType = approvalStatusToEntryType(instance.status)
+          const descriptionKey =
+            entryType === 'APPROVAL_APPROVED'
+              ? 'activity.approvalApproved'
+              : entryType === 'APPROVAL_REJECTED'
+                ? 'activity.approvalRejected'
+                : 'activity.approvalRecalled'
+
+          allEntries.push({
+            id: `approval-${instance.status.toLowerCase()}-${instance.id}`,
+            type: entryType,
+            description: t(descriptionKey),
+            timestamp: instance.completedAt,
+          })
+        }
+      }
+    }
+
+    // Sharing events
+    if (shares) {
+      for (const share of shares) {
+        allEntries.push({
+          id: `share-${share.id}`,
+          type: 'SHARED',
+          description: t('activity.sharedWith', {
+            id: share.sharedWithId,
+            accessLevel: share.accessLevel,
+          }),
+          timestamp: share.createdAt,
+        })
+      }
+    }
+
+    // Sort reverse chronological (newest first)
+    allEntries.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+
+    return allEntries
+  }, [recordCreatedAt, recordUpdatedAt, approvalInstances, shares, t])
+
+  const visibleEntries = expanded ? entries : entries.slice(0, DEFAULT_VISIBLE_COUNT)
+  const hasMore = entries.length > DEFAULT_VISIBLE_COUNT
+  const totalCount = entries.length
+
+  return (
+    <section
+      className={styles.section}
+      aria-labelledby="activity-timeline-heading"
+      data-testid="activity-timeline"
+    >
+      {/* Header */}
+      <div className={styles.sectionHeader}>
+        <h3 id="activity-timeline-heading">{t('activity.title')}</h3>
+        <span className={styles.countBadge}>{totalCount}</span>
+      </div>
+
+      {/* Timeline or Empty State */}
+      {entries.length === 0 ? (
+        <div className={styles.emptyState} data-testid="activity-timeline-empty">
+          <p>{t('activity.empty')}</p>
+        </div>
+      ) : (
+        <div className={styles.timeline} role="list" aria-label={t('activity.title')}>
+          {visibleEntries.map((entry) => (
+            <div
+              key={entry.id}
+              className={styles.timelineEntry}
+              role="listitem"
+              data-testid={`activity-entry-${entry.id}`}
+            >
+              {/* Icon */}
+              <div
+                className={`${styles.timelineIcon} ${getIconClassName(entry.type)}`}
+                aria-hidden="true"
+              >
+                {getIconSymbol(entry.type)}
+              </div>
+
+              {/* Connector line */}
+              <div className={styles.timelineConnector} aria-hidden="true" />
+
+              {/* Content */}
+              <div className={styles.timelineContent}>
+                <p className={styles.timelineDescription}>{entry.description}</p>
+                <p className={styles.timelineTimestamp}>
+                  <time dateTime={entry.timestamp}>{formatRelativeTime(entry.timestamp)}</time>
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Show More / Show Less toggle */}
+      {hasMore && (
+        <button
+          type="button"
+          className={styles.showMoreButton}
+          onClick={() => setExpanded((prev) => !prev)}
+          aria-expanded={expanded}
+          data-testid="activity-timeline-toggle"
+        >
+          {expanded
+            ? t('activity.showLess')
+            : t('activity.showMore', {
+                count: String(entries.length - DEFAULT_VISIBLE_COUNT),
+              })}
+        </button>
+      )}
+    </section>
+  )
+}
+
+export default ActivityTimeline

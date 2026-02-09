@@ -20,6 +20,10 @@ import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
 import { ApiClient } from '../../services/apiClient'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
+import { useSavedViews } from '../../hooks/useSavedViews'
+import { ViewSelector } from '../../components/ViewSelector/ViewSelector'
+import { InlineEditCell } from '../../components/InlineEditCell/InlineEditCell'
+import { SummaryStatsBar } from '../../components/SummaryStatsBar/SummaryStatsBar'
 import styles from './ResourceListPage.module.css'
 
 /**
@@ -337,6 +341,12 @@ export function ResourceListPage({
   // Export dropdown state - Requirement 11.12
   const [showExportDropdown, setShowExportDropdown] = useState(false)
   const exportDropdownRef = useRef<HTMLDivElement>(null)
+
+  // Inline editing toggle state (T11)
+  const [inlineEditEnabled, setInlineEditEnabled] = useState(false)
+
+  // Saved views hook (T10)
+  const savedViews = useSavedViews(collectionName || '')
 
   // Fetch collection schema
   const {
@@ -690,6 +700,65 @@ export function ResourceListPage({
     }
   }, [showExportDropdown])
 
+  // Saved view selection handler (T10)
+  const handleSelectView = useCallback(
+    (viewId: string | null) => {
+      savedViews.selectView(viewId)
+      if (!viewId) {
+        // "All Records" — reset to defaults
+        setFilters([])
+        setPendingFilters([])
+        setSort(undefined)
+        setVisibleColumnOverrides(null)
+        setPageSize(25)
+        setPage(1)
+        return
+      }
+      const view = savedViews.views.find((v) => v.id === viewId)
+      if (!view) return
+      setFilters(view.filters)
+      setPendingFilters(view.filters)
+      setSort(view.sortField ? { field: view.sortField, direction: view.sortDirection } : undefined)
+      setVisibleColumnOverrides(new Set(view.visibleColumns))
+      setPageSize(view.pageSize)
+      setPage(1)
+    },
+    [savedViews]
+  )
+
+  const handleSaveView = useCallback(
+    (name: string) => {
+      savedViews.saveView(name, {
+        filters,
+        sortField: sort?.field ?? null,
+        sortDirection: sort?.direction ?? 'asc',
+        visibleColumns: Array.from(visibleColumns),
+        pageSize,
+        isDefault: false,
+      })
+      showToast(t('listViews.savedSuccessfully'), 'success')
+    },
+    [savedViews, filters, sort, visibleColumns, pageSize, showToast, t]
+  )
+
+  const handleDeleteView = useCallback(
+    (viewId: string) => {
+      savedViews.deleteView(viewId)
+      showToast(t('listViews.deletedSuccessfully'), 'success')
+    },
+    [savedViews, showToast, t]
+  )
+
+  // Inline edit toggle handler (T11)
+  const handleToggleInlineEdit = useCallback(() => {
+    setInlineEditEnabled((prev) => !prev)
+  }, [])
+
+  // Inline edit save callback (T11)
+  const handleInlineEditSaved = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['resources', collectionName] })
+  }, [queryClient, collectionName])
+
   // Get sort indicator
   const getSortIndicator = useCallback(
     (field: string) => {
@@ -803,6 +872,17 @@ export function ResourceListPage({
           </button>
         </div>
       </header>
+
+      {/* View Selector (T10) */}
+      <ViewSelector
+        views={savedViews.views}
+        activeView={savedViews.activeView}
+        onSelectView={handleSelectView}
+        onSaveView={handleSaveView}
+        onDeleteView={handleDeleteView}
+        onRenameView={savedViews.renameView}
+        onSetDefault={savedViews.setDefaultView}
+      />
 
       {/* Toolbar */}
       <div className={styles.toolbar}>
@@ -960,6 +1040,17 @@ export function ResourceListPage({
               </div>
             )}
           </div>
+
+          {/* Inline Edit Toggle (T11) */}
+          <button
+            type="button"
+            className={`${styles.columnSelectorButton} ${inlineEditEnabled ? styles.filterToggleActive : ''}`}
+            onClick={handleToggleInlineEdit}
+            aria-pressed={inlineEditEnabled}
+            data-testid="inline-edit-toggle"
+          >
+            {inlineEditEnabled ? t('inlineEdit.clickToEdit') : t('inlineEdit.clickToEdit')}
+          </button>
         </div>
       </div>
 
@@ -1061,6 +1152,18 @@ export function ResourceListPage({
             )}
           </div>
         </div>
+      )}
+
+      {/* Summary Stats Bar (T12) */}
+      {!resourcesLoading && !resourcesError && resources.length > 0 && (
+        <SummaryStatsBar
+          totalCount={totalCount}
+          filteredCount={resources.length}
+          filters={filters}
+          visibleFields={visibleFields}
+          records={resources as Array<Record<string, unknown>>}
+          onClearFilters={handleClearFilters}
+        />
       )}
 
       {/* Data Table - Requirement 11.2 */}
@@ -1190,14 +1293,38 @@ export function ResourceListPage({
                         </td>
                       )}
 
-                      {/* Field Cells */}
+                      {/* Field Cells (T11: inline edit when enabled) */}
                       {visibleFields.map((field) => (
                         <td
                           key={field.name}
                           role="gridcell"
                           data-testid={`cell-${field.name}-${index}`}
+                          onClick={inlineEditEnabled ? (e) => e.stopPropagation() : undefined}
                         >
-                          {formatCellValue(resource[field.name], field)}
+                          {inlineEditEnabled ? (
+                            <InlineEditCell
+                              value={resource[field.name]}
+                              fieldName={field.name}
+                              fieldType={
+                                field.type as
+                                  | 'string'
+                                  | 'number'
+                                  | 'boolean'
+                                  | 'date'
+                                  | 'datetime'
+                                  | 'json'
+                                  | 'reference'
+                              }
+                              recordId={resource.id}
+                              collectionName={collectionName!}
+                              displayValue={formatCellValue(resource[field.name], field)}
+                              enabled={true}
+                              apiClient={apiClient}
+                              onSaved={handleInlineEditSaved}
+                            />
+                          ) : (
+                            formatCellValue(resource[field.name], field)
+                          )}
                         </td>
                       ))}
 

@@ -123,6 +123,64 @@ vi.mock('react-router-dom', async () => {
   }
 })
 
+// Mock the new T6-T9 components to isolate ResourceDetailPage tests
+vi.mock('../../components/RecordHeader/RecordHeader', () => ({
+  RecordHeader: ({
+    record,
+    schema,
+  }: {
+    record: { id: string }
+    schema: { displayName: string }
+  }) => (
+    <div data-testid="record-header">
+      <h1 data-testid="record-header-name">{schema.displayName}</h1>
+      <span data-testid="resource-id">{record.id}</span>
+    </div>
+  ),
+}))
+
+vi.mock('../../components/RecordActionsBar/RecordActionsBar', () => ({
+  RecordActionsBar: ({
+    onEdit,
+    onDelete,
+    onBack,
+    onToggleFavorite,
+    isFavorite,
+  }: {
+    collectionName: string
+    recordId: string
+    onEdit: () => void
+    onDelete: () => void
+    onBack: () => void
+    onToggleFavorite: () => void
+    isFavorite: boolean
+    apiClient: unknown
+  }) => (
+    <div data-testid="record-actions-bar">
+      <button data-testid="back-button" aria-label="Back" onClick={onBack}>
+        Back
+      </button>
+      <button data-testid="edit-button" aria-label="Edit Record" onClick={onEdit}>
+        Edit
+      </button>
+      <button data-testid="delete-button" aria-label="Delete Record" onClick={onDelete}>
+        Delete
+      </button>
+      <button data-testid="favorite-button" onClick={onToggleFavorite}>
+        {isFavorite ? 'Unfav' : 'Fav'}
+      </button>
+    </div>
+  ),
+}))
+
+vi.mock('../../components/RelatedRecordsSection/RelatedRecordsSection', () => ({
+  RelatedRecordsSection: () => <div data-testid="related-records-section">Related Records</div>,
+}))
+
+vi.mock('../../components/ActivityTimeline/ActivityTimeline', () => ({
+  ActivityTimeline: () => <div data-testid="activity-timeline">Activity</div>,
+}))
+
 // Sample test data
 const mockSchema: CollectionSchema = {
   id: 'col-1',
@@ -287,11 +345,11 @@ describe('ResourceDetailPage', () => {
       wrapFetchMock(mockFetch)
     })
 
-    it('should display the page title', async () => {
+    it('should display the record header', async () => {
       renderWithProviders(<ResourceDetailPage />)
 
       await waitFor(() => {
-        expect(screen.getByTestId('resource-title')).toHaveTextContent('View Record')
+        expect(screen.getByTestId('record-header')).toBeInTheDocument()
       })
     })
 
@@ -307,8 +365,9 @@ describe('ResourceDetailPage', () => {
       renderWithProviders(<ResourceDetailPage />)
 
       await waitFor(() => {
+        const breadcrumb = screen.getByRole('navigation', { name: 'Breadcrumb' })
+        expect(breadcrumb).toBeInTheDocument()
         expect(screen.getByText('Resource Browser')).toBeInTheDocument()
-        expect(screen.getByText('Users')).toBeInTheDocument()
       })
     })
 
@@ -625,6 +684,7 @@ describe('ResourceDetailPage', () => {
       )
 
       await waitFor(() => {
+        expect(screen.getByTestId('record-header')).toBeInTheDocument()
         expect(screen.getByTestId('resource-id')).toHaveTextContent('prod-789')
       })
     })
@@ -668,8 +728,6 @@ describe('ResourceDetailPage', () => {
       renderWithProviders(<ResourceDetailPage />)
 
       await waitFor(() => {
-        expect(screen.getByRole('heading', { name: 'View Record' })).toBeInTheDocument()
-        expect(screen.getByRole('heading', { name: 'ID' })).toBeInTheDocument()
         expect(screen.getByRole('heading', { name: 'Fields' })).toBeInTheDocument()
         expect(screen.getByRole('heading', { name: 'Metadata' })).toBeInTheDocument()
       })

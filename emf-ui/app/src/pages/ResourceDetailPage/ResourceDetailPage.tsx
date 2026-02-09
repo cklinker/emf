@@ -19,6 +19,10 @@ import { useAuth } from '../../context/AuthContext'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
 import { useRecentRecords } from '../../hooks/useRecentRecords'
 import { useFavorites } from '../../hooks/useFavorites'
+import { RecordHeader } from '../../components/RecordHeader/RecordHeader'
+import { RecordActionsBar } from '../../components/RecordActionsBar/RecordActionsBar'
+import { RelatedRecordsSection } from '../../components/RelatedRecordsSection/RelatedRecordsSection'
+import { ActivityTimeline } from '../../components/ActivityTimeline/ActivityTimeline'
 import type { ApiClient } from '../../services/apiClient'
 import styles from './ResourceDetailPage.module.css'
 
@@ -548,78 +552,47 @@ export function ResourceDetailPage({
 
   return (
     <div className={styles.container} data-testid={testId}>
-      {/* Page Header */}
-      <header className={styles.header}>
-        <div className={styles.headerLeft}>
-          <nav className={styles.breadcrumb} aria-label="Breadcrumb">
-            <Link to="/resources" className={styles.breadcrumbLink}>
-              {t('resources.title')}
-            </Link>
-            <span className={styles.breadcrumbSeparator} aria-hidden="true">
-              /
-            </span>
-            <Link to={`/resources/${collectionName}`} className={styles.breadcrumbLink}>
-              {schema.displayName}
-            </Link>
-            <span className={styles.breadcrumbSeparator} aria-hidden="true">
-              /
-            </span>
-            <span className={styles.breadcrumbCurrent}>{resource.id}</span>
-          </nav>
-          <h1 className={styles.title} data-testid="resource-title">
-            {t('resources.viewRecord')}
-          </h1>
-        </div>
-        <div className={styles.headerActions}>
-          <button
-            type="button"
-            className={styles.favoriteButton}
-            onClick={handleToggleFavorite}
-            aria-label={recordIsFavorite ? t('favorites.remove') : t('favorites.add')}
-            data-testid="favorite-button"
-            title={recordIsFavorite ? t('favorites.remove') : t('favorites.add')}
-          >
-            {recordIsFavorite ? '\u2605' : '\u2606'}
-          </button>
-          <button
-            type="button"
-            className={styles.backButton}
-            onClick={handleBack}
-            aria-label={t('common.back')}
-            data-testid="back-button"
-          >
-            ← {t('common.back')}
-          </button>
-          <button
-            type="button"
-            className={styles.editButton}
-            onClick={handleEdit}
-            aria-label={t('resources.editRecord')}
-            data-testid="edit-button"
-          >
-            {t('common.edit')}
-          </button>
-          <button
-            type="button"
-            className={styles.deleteButton}
-            onClick={handleDeleteClick}
-            aria-label={t('resources.deleteRecord')}
-            data-testid="delete-button"
-          >
-            {t('common.delete')}
-          </button>
-        </div>
-      </header>
+      {/* Breadcrumb Navigation */}
+      <nav className={styles.breadcrumb} aria-label="Breadcrumb">
+        <Link to="/resources" className={styles.breadcrumbLink}>
+          {t('resources.title')}
+        </Link>
+        <span className={styles.breadcrumbSeparator} aria-hidden="true">
+          /
+        </span>
+        <Link to={`/resources/${collectionName}`} className={styles.breadcrumbLink}>
+          {schema.displayName}
+        </Link>
+        <span className={styles.breadcrumbSeparator} aria-hidden="true">
+          /
+        </span>
+        <span className={styles.breadcrumbCurrent}>{resource.id}</span>
+      </nav>
 
-      {/* Resource ID Section */}
-      <section className={styles.idSection} aria-labelledby="id-heading">
-        <h2 id="id-heading" className={styles.sectionTitle}>
-          ID
-        </h2>
-        <div className={styles.idValue} data-testid="resource-id">
-          {resource.id}
-        </div>
-      </section>
+      {/* Record Header (T9) */}
+      <RecordHeader
+        record={
+          resource as Record<string, unknown> & {
+            id: string
+            createdAt?: string
+            updatedAt?: string
+          }
+        }
+        schema={schema}
+        collectionName={collectionName}
+      />
+
+      {/* Record Actions Bar (T8) */}
+      <RecordActionsBar
+        collectionName={collectionName}
+        recordId={resourceId}
+        onEdit={handleEdit}
+        onDelete={handleDeleteClick}
+        onBack={handleBack}
+        isFavorite={recordIsFavorite}
+        onToggleFavorite={handleToggleFavorite}
+        apiClient={apiClient}
+      />
 
       {/* Field Values Section */}
       <section className={styles.fieldsSection} aria-labelledby="fields-heading">
@@ -745,6 +718,23 @@ export function ResourceDetailPage({
           </div>
         )}
       </section>
+
+      {/* Related Records Section (T6) */}
+      <RelatedRecordsSection
+        collectionName={collectionName}
+        recordId={resourceId}
+        apiClient={apiClient}
+      />
+
+      {/* Activity Timeline (T7) */}
+      <ActivityTimeline
+        collectionId={schema.id}
+        collectionName={collectionName}
+        recordId={resourceId}
+        recordCreatedAt={resource.createdAt as string | undefined}
+        recordUpdatedAt={resource.updatedAt as string | undefined}
+        apiClient={apiClient}
+      />
 
       {/* Share Modal */}
       {shareModalOpen && (

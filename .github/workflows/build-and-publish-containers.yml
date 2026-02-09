@@ -7,6 +7,7 @@ on:
       - 'emf-gateway/**'
       - 'emf-control-plane/**'
       - 'emf-platform/runtime/**'
+      - 'emf-worker/**'
       - 'emf-web/**'
       - 'emf-ui/**'
       - '.github/workflows/build-and-publish-containers.yml'
@@ -114,6 +115,33 @@ jobs:
         run: mvn verify -f emf-gateway/pom.xml -B
 
   # ===========================================================================
+  # Test Worker
+  # ===========================================================================
+  test-worker:
+    name: Test Worker
+    needs: build-runtime
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Restore runtime modules
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.m2/repository
+          key: maven-runtime-${{ github.sha }}
+
+      - name: Run tests
+        run: mvn verify -f emf-worker/pom.xml -B
+
+  # ===========================================================================
   # Test Frontend
   # ===========================================================================
   test-frontend:
@@ -142,7 +170,7 @@ jobs:
   # ===========================================================================
   build-gateway:
     name: Build & Push Gateway
-    needs: [test-control-plane, test-gateway, test-frontend]
+    needs: [test-control-plane, test-gateway, test-worker, test-frontend]
     runs-on: ubuntu-latest
     outputs:
       image-tag: ${{ steps.meta.outputs.version }}
@@ -184,7 +212,7 @@ jobs:
 
   build-control-plane:
     name: Build & Push Control Plane
-    needs: [test-control-plane, test-gateway, test-frontend]
+    needs: [test-control-plane, test-gateway, test-worker, test-frontend]
     runs-on: ubuntu-latest
     outputs:
       image-tag: ${{ steps.meta.outputs.version }}
@@ -226,7 +254,7 @@ jobs:
 
   build-ui:
     name: Build & Push Admin UI
-    needs: [test-control-plane, test-gateway, test-frontend]
+    needs: [test-control-plane, test-gateway, test-worker, test-frontend]
     runs-on: ubuntu-latest
     outputs:
       image-tag: ${{ steps.meta.outputs.version }}
@@ -266,12 +294,54 @@ jobs:
           cache-to: type=gha,mode=max
           platforms: linux/amd64
 
+  build-worker:
+    name: Build & Push Worker
+    needs: [test-control-plane, test-gateway, test-worker, test-frontend]
+    runs-on: ubuntu-latest
+    outputs:
+      image-tag: ${{ steps.meta.outputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to DockerHub
+        if: github.event_name != 'workflow_dispatch' || inputs.push_images
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKERHUB_USERNAME }}/emf-worker
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Worker
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: emf-worker/Dockerfile
+          push: ${{ github.event_name != 'workflow_dispatch' || inputs.push_images }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+
   # ===========================================================================
   # Update ArgoCD manifests to trigger deployment
   # ===========================================================================
   deploy:
     name: Update ArgoCD Manifests
-    needs: [build-gateway, build-control-plane, build-ui]
+    needs: [build-gateway, build-control-plane, build-ui, build-worker]
     if: github.ref == 'refs/heads/main' && (github.event_name != 'workflow_dispatch' || inputs.deploy)
     runs-on: ubuntu-latest
     steps:
@@ -306,6 +376,11 @@ jobs:
             sed -i "s|image: cklinker/emf-ui:.*|image: cklinker/emf-ui:${IMAGE_TAG}|g" emf/ui-deployment.yaml
           fi
 
+          # Update worker deployment
+          if [ -f emf/worker-deployment.yaml ]; then
+            sed -i "s|image: cklinker/emf-worker:.*|image: cklinker/emf-worker:${IMAGE_TAG}|g" emf/worker-deployment.yaml
+          fi
+
       - name: Commit and push
         working-directory: homelab-argo
         run: |
@@ -334,6 +409,7 @@ jobs:
           kubectl -n emf rollout status deployment/emf-control-plane --timeout=300s || true
           kubectl -n emf rollout status deployment/emf-gateway --timeout=300s || true
           kubectl -n emf rollout status deployment/emf-ui --timeout=300s || true
+          kubectl -n emf rollout status deployment/emf-worker --timeout=300s || true
 
       - name: Verify control plane health
         run: |
@@ -361,4 +437,18 @@ jobs:
             sleep 10
           done
           echo "Gateway health check failed"
+          exit 1
+
+      - name: Verify worker health
+        run: |
+          for i in $(seq 1 30); do
+            STATUS=$(kubectl -n emf exec deploy/emf-worker -- curl -sf http://localhost:8080/actuator/health/liveness 2>/dev/null | grep -o '"status":"UP"' || true)
+            if [ -n "$STATUS" ]; then
+              echo "Worker is healthy"
+              exit 0
+            fi
+            echo "Attempt $i/30 - waiting..."
+            sleep 10
+          done
+          echo "Worker health check failed"
           exit 1

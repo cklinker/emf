@@ -129,6 +129,50 @@ jobs:
           retention-days: 7
 
   # ===========================================================================
+  # Test Worker (unit + integration tests with JaCoCo coverage)
+  # ===========================================================================
+  test-worker:
+    name: Test Worker
+    needs: build-runtime
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Restore runtime modules
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.m2/repository
+          key: maven-runtime-${{ github.sha }}
+
+      - name: Run tests
+        run: mvn verify -f emf-worker/pom.xml -B
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: worker-test-results
+          path: emf-worker/target/surefire-reports/
+          retention-days: 7
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: worker-coverage
+          path: emf-worker/target/site/jacoco/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # ===========================================================================
   # Test Frontend (lint, typecheck, unit tests with coverage)
   # ===========================================================================
   test-frontend:
@@ -175,7 +219,7 @@ jobs:
   # ===========================================================================
   build-check:
     name: Verify Docker Build (${{ matrix.service.name }})
-    needs: [test-control-plane, test-gateway, test-frontend]
+    needs: [test-control-plane, test-gateway, test-worker, test-frontend]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -183,6 +227,7 @@ jobs:
         service:
           - { name: control-plane, file: emf-control-plane/Dockerfile }
           - { name: gateway, file: emf-gateway/Dockerfile }
+          - { name: worker, file: emf-worker/Dockerfile }
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -205,7 +250,7 @@ jobs:
   # ===========================================================================
   quality-gate:
     name: Quality Gate
-    needs: [test-control-plane, test-gateway, test-frontend, build-check]
+    needs: [test-control-plane, test-gateway, test-worker, test-frontend, build-check]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -217,6 +262,10 @@ jobs:
           fi
           if [[ "${{ needs.test-gateway.result }}" != "success" ]]; then
             echo "Gateway tests failed"
+            exit 1
+          fi
+          if [[ "${{ needs.test-worker.result }}" != "success" ]]; then
+            echo "Worker tests failed"
             exit 1
           fi
           if [[ "${{ needs.test-frontend.result }}" != "success" ]]; then

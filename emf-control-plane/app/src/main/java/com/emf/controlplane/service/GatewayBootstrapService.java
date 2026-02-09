@@ -1,5 +1,6 @@
 package com.emf.controlplane.service;
 
+import com.emf.controlplane.config.ControlPlaneProperties;
 import com.emf.controlplane.dto.GatewayBootstrapConfigDto;
 import com.emf.controlplane.entity.Collection;
 import com.emf.controlplane.entity.Field;
@@ -23,11 +24,14 @@ public class GatewayBootstrapService {
 
     private final ServiceRepository serviceRepository;
     private final CollectionRepository collectionRepository;
+    private final ControlPlaneProperties properties;
 
     public GatewayBootstrapService(ServiceRepository serviceRepository,
-                                  CollectionRepository collectionRepository) {
+                                  CollectionRepository collectionRepository,
+                                  ControlPlaneProperties properties) {
         this.serviceRepository = serviceRepository;
         this.collectionRepository = collectionRepository;
+        this.properties = properties;
     }
 
     /**
@@ -118,11 +122,11 @@ public class GatewayBootstrapService {
     }
 
     /**
-     * Constructs the base URL for a service.
+     * Returns the worker service URL for routing data API requests.
+     * All collection data is served by the worker service.
      */
     private String constructServiceBaseUrl(String serviceName) {
-        String containerName = serviceName.startsWith("emf-") ? serviceName : "emf-" + serviceName;
-        return "http://" + containerName + ":8080";
+        return properties.getWorkerServiceUrl();
     }
 
     /**

@@ -205,6 +205,8 @@ emf:
       enabled: ${SECURITY_ENABLED:true}
       admin-role: ADMIN
       role-claim-name: roles
+    # Worker service URL for routing data API requests through the gateway
+    worker-service-url: ${WORKER_SERVICE_URL:http://emf-worker:80}
 
 # Logging Configuration
 # Requirements: 13.1, 13.2 - Structured JSON logs with correlation IDs

@@ -13,6 +13,7 @@ public class ControlPlaneProperties {
     private KafkaTopics kafka = new KafkaTopics();
     private CacheConfig cache = new CacheConfig();
     private SecurityConfig security = new SecurityConfig();
+    private String workerServiceUrl = "http://emf-worker:80";
 
     public KafkaTopics getKafka() {
         return kafka;
@@ -36,6 +37,14 @@ public class ControlPlaneProperties {
 
     public void setSecurity(SecurityConfig security) {
         this.security = security;
+    }
+
+    public String getWorkerServiceUrl() {
+        return workerServiceUrl;
+    }
+
+    public void setWorkerServiceUrl(String workerServiceUrl) {
+        this.workerServiceUrl = workerServiceUrl;
     }
 
     /**

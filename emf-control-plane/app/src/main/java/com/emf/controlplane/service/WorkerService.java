@@ -2,9 +2,13 @@ package com.emf.controlplane.service;
 
 import com.emf.controlplane.dto.WorkerHeartbeatRequest;
 import com.emf.controlplane.dto.WorkerRegistrationRequest;
+import com.emf.controlplane.entity.Collection;
+import com.emf.controlplane.entity.CollectionAssignment;
 import com.emf.controlplane.entity.Worker;
 import com.emf.controlplane.event.ConfigEventPublisher;
 import com.emf.controlplane.exception.ResourceNotFoundException;
+import com.emf.controlplane.repository.CollectionAssignmentRepository;
+import com.emf.controlplane.repository.CollectionRepository;
 import com.emf.controlplane.repository.WorkerRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -28,14 +32,23 @@ public class WorkerService {
     private static final Logger log = LoggerFactory.getLogger(WorkerService.class);
 
     private final WorkerRepository workerRepository;
+    private final CollectionRepository collectionRepository;
+    private final CollectionAssignmentRepository assignmentRepository;
+    private final CollectionAssignmentService collectionAssignmentService;
     private final ConfigEventPublisher eventPublisher;
     private final ObjectMapper objectMapper;
 
     public WorkerService(
             WorkerRepository workerRepository,
+            CollectionRepository collectionRepository,
+            CollectionAssignmentRepository assignmentRepository,
+            @Nullable CollectionAssignmentService collectionAssignmentService,
             @Nullable ConfigEventPublisher eventPublisher,
             ObjectMapper objectMapper) {
         this.workerRepository = workerRepository;
+        this.collectionRepository = collectionRepository;
+        this.assignmentRepository = assignmentRepository;
+        this.collectionAssignmentService = collectionAssignmentService;
         this.eventPublisher = eventPublisher;
         this.objectMapper = objectMapper;
     }
@@ -123,6 +136,12 @@ public class WorkerService {
             if (!request.status().equals(previousStatus)) {
                 worker = workerRepository.save(worker);
                 publishWorkerStatusChanged(worker);
+
+                // When a worker transitions to READY, assign any unassigned collections
+                if ("READY".equals(request.status()) && !"READY".equals(previousStatus)) {
+                    assignUnassignedCollections();
+                }
+
                 return worker;
             }
         }
@@ -204,6 +223,35 @@ public class WorkerService {
         publishWorkerStatusChanged(worker);
 
         log.info("Worker marked as OFFLINE: id={}", workerId);
+    }
+
+    /**
+     * Finds active collections that have no active (PENDING or READY) worker assignment
+     * and assigns them to available workers.
+     */
+    private void assignUnassignedCollections() {
+        if (collectionAssignmentService == null) {
+            return;
+        }
+
+        try {
+            List<Collection> activeCollections = collectionRepository.findByActiveTrue();
+            for (Collection collection : activeCollections) {
+                List<CollectionAssignment> assignments = assignmentRepository.findByCollectionId(collection.getId());
+                boolean hasActive = assignments.stream()
+                        .anyMatch(a -> "READY".equals(a.getStatus()) || "PENDING".equals(a.getStatus()));
+                if (!hasActive) {
+                    try {
+                        collectionAssignmentService.assignCollection(collection.getId(), collection.getTenantId());
+                        log.info("Auto-assigned unassigned collection: {}", collection.getName());
+                    } catch (IllegalStateException e) {
+                        log.warn("Could not auto-assign collection {}: {}", collection.getName(), e.getMessage());
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Error during auto-assignment of unassigned collections: {}", e.getMessage());
+        }
     }
 
     /**

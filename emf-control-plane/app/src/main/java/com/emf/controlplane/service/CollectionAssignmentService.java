@@ -1,5 +1,6 @@
 package com.emf.controlplane.service;
 
+import com.emf.controlplane.config.ControlPlaneProperties;
 import com.emf.controlplane.entity.CollectionAssignment;
 import com.emf.controlplane.entity.Worker;
 import com.emf.controlplane.event.ConfigEventPublisher;
@@ -32,16 +33,19 @@ public class CollectionAssignmentService {
     private final WorkerRepository workerRepository;
     private final CollectionRepository collectionRepository;
     private final ConfigEventPublisher eventPublisher;
+    private final ControlPlaneProperties properties;
 
     public CollectionAssignmentService(
             CollectionAssignmentRepository assignmentRepository,
             WorkerRepository workerRepository,
             CollectionRepository collectionRepository,
-            @Nullable ConfigEventPublisher eventPublisher) {
+            @Nullable ConfigEventPublisher eventPublisher,
+            ControlPlaneProperties properties) {
         this.assignmentRepository = assignmentRepository;
         this.workerRepository = workerRepository;
         this.collectionRepository = collectionRepository;
         this.eventPublisher = eventPublisher;
+        this.properties = properties;
     }
 
     /**
@@ -98,12 +102,12 @@ public class CollectionAssignmentService {
         selectedWorker.setCurrentLoad(selectedWorker.getCurrentLoad() + 1);
         workerRepository.save(selectedWorker);
 
-        // Publish assignment event
+        // Publish assignment event using K8s service URL (not pod-specific URL)
         String collectionName = collectionRepository.findById(collectionId)
                 .map(c -> c.getName())
                 .orElse(collectionId);
         publishAssignmentEvent(selectedWorker.getId(), collectionId,
-                selectedWorker.getBaseUrl(), collectionName, ChangeType.CREATED);
+                properties.getWorkerServiceUrl(), collectionName, ChangeType.CREATED);
 
         log.info("Collection assigned: collectionId={}, workerId={}", collectionId, selectedWorker.getId());
         return assignment;
@@ -130,15 +134,12 @@ public class CollectionAssignmentService {
             workerRepository.save(worker);
         });
 
-        // Publish assignment event
+        // Publish assignment event using K8s service URL
         String collectionName = collectionRepository.findById(assignment.getCollectionId())
                 .map(c -> c.getName())
                 .orElse(assignment.getCollectionId());
-        String workerBaseUrl = workerRepository.findById(assignment.getWorkerId())
-                .map(w -> w.getBaseUrl())
-                .orElse("");
         publishAssignmentEvent(assignment.getWorkerId(), assignment.getCollectionId(),
-                workerBaseUrl, collectionName, ChangeType.DELETED);
+                properties.getWorkerServiceUrl(), collectionName, ChangeType.DELETED);
 
         log.info("Collection unassigned: assignmentId={}", assignmentId);
     }

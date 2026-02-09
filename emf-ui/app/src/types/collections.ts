@@ -179,6 +179,30 @@ export interface FieldHistoryEntry {
 }
 
 /**
+ * Picklist value within a global or field-level picklist
+ */
+export interface PicklistValue {
+  id?: string
+  value: string
+  label: string
+  isDefault: boolean
+  active: boolean
+  sortOrder: number
+  color?: string
+  description?: string
+}
+
+/**
+ * Dependency between two picklist fields in the same collection
+ */
+export interface PicklistDependency {
+  id: string
+  controllingFieldId: string
+  dependentFieldId: string
+  mapping: Record<string, string[]>
+}
+
+/**
  * Setup audit trail entry
  */
 export interface SetupAuditTrailEntry {

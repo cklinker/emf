@@ -118,6 +118,14 @@ export type { ValidationRuleEditorProps } from './ValidationRuleEditor'
 export { RecordTypeEditor } from './RecordTypeEditor'
 export type { RecordTypeEditorProps } from './RecordTypeEditor'
 
+// PicklistValuesEditor component
+export { PicklistValuesEditor } from './PicklistValuesEditor'
+export type { PicklistValuesEditorProps } from './PicklistValuesEditor'
+
+// PicklistDependencyEditor component
+export { PicklistDependencyEditor } from './PicklistDependencyEditor'
+export type { PicklistDependencyEditorProps } from './PicklistDependencyEditor'
+
 // PageLoader component for loading states
 export { PageLoader, Skeleton, ContentLoader } from './PageLoader'
 export type {

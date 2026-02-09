@@ -2,7 +2,14 @@ import React, { useState, useCallback, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
-import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
+import {
+  useToast,
+  ConfirmDialog,
+  LoadingSpinner,
+  ErrorMessage,
+  ExecutionLogModal,
+} from '../../components'
+import type { LogColumn } from '../../components'
 import styles from './ScriptsPage.module.css'
 
 interface Script {
@@ -32,6 +39,22 @@ interface FormErrors {
   name?: string
   description?: string
   sourceCode?: string
+}
+
+interface ScriptExecutionLog {
+  id: string
+  scriptId: string
+  status: string
+  triggerType: string | null
+  recordId: string | null
+  durationMs: number | null
+  cpuMs: number | null
+  queriesExecuted: number | null
+  dmlRows: number | null
+  callouts: number | null
+  errorMessage: string | null
+  logOutput: string | null
+  executedAt: string
 }
 
 export interface ScriptsPageProps {
@@ -326,6 +349,58 @@ export function ScriptsPage({ testId = 'scripts-page' }: ScriptsPageProps): Reac
   const [editingScript, setEditingScript] = useState<Script | undefined>(undefined)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [scriptToDelete, setScriptToDelete] = useState<Script | null>(null)
+  const [logsItemId, setLogsItemId] = useState<string | null>(null)
+  const [logsItemName, setLogsItemName] = useState('')
+
+  const {
+    data: logs,
+    isLoading: logsLoading,
+    error: logsError,
+  } = useQuery({
+    queryKey: ['script-logs', logsItemId],
+    queryFn: () => apiClient.get<ScriptExecutionLog[]>(`/control/scripts/${logsItemId}/logs`),
+    enabled: !!logsItemId,
+  })
+
+  const logColumns: LogColumn<ScriptExecutionLog>[] = [
+    { key: 'status', header: 'Status' },
+    { key: 'triggerType', header: 'Trigger' },
+    {
+      key: 'durationMs',
+      header: 'Duration',
+      render: (v) => (v != null ? `${v}ms` : '-'),
+    },
+    {
+      key: 'cpuMs',
+      header: 'CPU (ms)',
+      render: (v) => (v != null ? String(v) : '-'),
+    },
+    {
+      key: 'queriesExecuted',
+      header: 'Queries',
+      render: (v) => (v != null ? String(v) : '-'),
+    },
+    {
+      key: 'dmlRows',
+      header: 'DML Rows',
+      render: (v) => (v != null ? String(v) : '-'),
+    },
+    { key: 'errorMessage', header: 'Error' },
+    {
+      key: 'executedAt',
+      header: 'Executed At',
+      render: (v) =>
+        v
+          ? formatDate(new Date(v as string), {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+            })
+          : '-',
+    },
+  ]
 
   const {
     data: scripts,
@@ -528,6 +603,18 @@ export function ScriptsPage({ testId = 'scripts-page' }: ScriptsPageProps): Reac
                       <button
                         type="button"
                         className={styles.actionButton}
+                        onClick={() => {
+                          setLogsItemId(script.id)
+                          setLogsItemName(script.name)
+                        }}
+                        aria-label={`View logs for ${script.name}`}
+                        data-testid={`logs-button-${index}`}
+                      >
+                        Logs
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.actionButton}
                         onClick={() => handleEdit(script)}
                         aria-label={`Edit ${script.name}`}
                         data-testid={`edit-button-${index}`}
@@ -550,6 +637,19 @@ export function ScriptsPage({ testId = 'scripts-page' }: ScriptsPageProps): Reac
             </tbody>
           </table>
         </div>
+      )}
+
+      {logsItemId && (
+        <ExecutionLogModal<ScriptExecutionLog>
+          title="Script Execution Logs"
+          subtitle={logsItemName}
+          columns={logColumns}
+          data={logs ?? []}
+          isLoading={logsLoading}
+          error={logsError instanceof Error ? logsError : null}
+          onClose={() => setLogsItemId(null)}
+          emptyMessage="No execution logs found."
+        />
       )}
 
       {isFormOpen && (

@@ -2,7 +2,14 @@ import React, { useState, useCallback, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
-import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
+import {
+  useToast,
+  ConfirmDialog,
+  LoadingSpinner,
+  ErrorMessage,
+  ExecutionLogModal,
+} from '../../components'
+import type { LogColumn } from '../../components'
 import styles from './EmailTemplatesPage.module.css'
 
 interface EmailTemplate {
@@ -36,6 +43,18 @@ interface FormErrors {
   bodyHtml?: string
   bodyText?: string
   folder?: string
+}
+
+interface EmailLog {
+  id: string
+  templateId: string
+  recipientEmail: string
+  subject: string
+  status: string
+  source: string | null
+  sourceId: string | null
+  errorMessage: string | null
+  sentAt: string | null
 }
 
 export interface EmailTemplatesPageProps {
@@ -380,6 +399,42 @@ export function EmailTemplatesPage({
   const [editingTemplate, setEditingTemplate] = useState<EmailTemplate | undefined>(undefined)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [templateToDelete, setTemplateToDelete] = useState<EmailTemplate | null>(null)
+  const [logsItemId, setLogsItemId] = useState<string | null>(null)
+  const [logsItemName, setLogsItemName] = useState('')
+
+  const {
+    data: allEmailLogs,
+    isLoading: logsLoading,
+    error: logsError,
+  } = useQuery({
+    queryKey: ['email-template-logs', logsItemId],
+    queryFn: () => apiClient.get<EmailLog[]>('/control/email-templates/logs?tenantId=default'),
+    enabled: !!logsItemId,
+  })
+
+  const filteredLogs = (allEmailLogs ?? []).filter((log) => log.templateId === logsItemId)
+
+  const logColumns: LogColumn<EmailLog>[] = [
+    { key: 'status', header: 'Status' },
+    { key: 'recipientEmail', header: 'Recipient' },
+    { key: 'subject', header: 'Subject' },
+    { key: 'source', header: 'Source' },
+    { key: 'errorMessage', header: 'Error' },
+    {
+      key: 'sentAt',
+      header: 'Sent At',
+      render: (v) =>
+        v
+          ? formatDate(new Date(v as string), {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+            })
+          : '-',
+    },
+  ]
 
   const {
     data: templates,
@@ -579,6 +634,18 @@ export function EmailTemplatesPage({
                       <button
                         type="button"
                         className={styles.actionButton}
+                        onClick={() => {
+                          setLogsItemId(template.id)
+                          setLogsItemName(template.name)
+                        }}
+                        aria-label={`View logs for ${template.name}`}
+                        data-testid={`logs-button-${index}`}
+                      >
+                        Logs
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.actionButton}
                         onClick={() => handleEdit(template)}
                         aria-label={`Edit ${template.name}`}
                         data-testid={`edit-button-${index}`}
@@ -601,6 +668,19 @@ export function EmailTemplatesPage({
             </tbody>
           </table>
         </div>
+      )}
+
+      {logsItemId && (
+        <ExecutionLogModal<EmailLog>
+          title="Email Logs"
+          subtitle={logsItemName}
+          columns={logColumns}
+          data={filteredLogs}
+          isLoading={logsLoading}
+          error={logsError instanceof Error ? logsError : null}
+          onClose={() => setLogsItemId(null)}
+          emptyMessage="No email logs found."
+        />
       )}
 
       {isFormOpen && (

@@ -2,7 +2,14 @@ import React, { useState, useCallback, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
-import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
+import {
+  useToast,
+  ConfirmDialog,
+  LoadingSpinner,
+  ErrorMessage,
+  ExecutionLogModal,
+} from '../../components'
+import type { LogColumn } from '../../components'
 import styles from './WorkflowRulesPage.module.css'
 
 interface WorkflowRule {
@@ -34,6 +41,17 @@ interface FormErrors {
   description?: string
   collectionId?: string
   executionOrder?: string
+}
+
+interface WorkflowExecutionLog {
+  id: string
+  recordId: string
+  triggerType: string
+  status: string
+  actionsExecuted: number
+  errorMessage: string | null
+  executedAt: string
+  durationMs: number | null
 }
 
 export interface WorkflowRulesPageProps {
@@ -364,6 +382,46 @@ export function WorkflowRulesPage({
   )
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [workflowRuleToDelete, setWorkflowRuleToDelete] = useState<WorkflowRule | null>(null)
+  const [logsItemId, setLogsItemId] = useState<string | null>(null)
+  const [logsItemName, setLogsItemName] = useState('')
+
+  const {
+    data: logs,
+    isLoading: logsLoading,
+    error: logsError,
+  } = useQuery({
+    queryKey: ['workflow-rule-logs', logsItemId],
+    queryFn: () =>
+      apiClient.get<WorkflowExecutionLog[]>(`/control/workflow-rules/${logsItemId}/logs`),
+    enabled: !!logsItemId,
+  })
+
+  const logColumns: LogColumn<WorkflowExecutionLog>[] = [
+    { key: 'status', header: 'Status' },
+    { key: 'triggerType', header: 'Trigger Type' },
+    { key: 'recordId', header: 'Record ID' },
+    { key: 'actionsExecuted', header: 'Actions' },
+    {
+      key: 'durationMs',
+      header: 'Duration',
+      render: (v) => (v != null ? `${v}ms` : '-'),
+    },
+    { key: 'errorMessage', header: 'Error' },
+    {
+      key: 'executedAt',
+      header: 'Executed At',
+      render: (v) =>
+        v
+          ? formatDate(new Date(v as string), {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+            })
+          : '-',
+    },
+  ]
 
   const {
     data: workflowRules,
@@ -570,6 +628,18 @@ export function WorkflowRulesPage({
                       <button
                         type="button"
                         className={styles.actionButton}
+                        onClick={() => {
+                          setLogsItemId(workflowRule.id)
+                          setLogsItemName(workflowRule.name)
+                        }}
+                        aria-label={`View logs for ${workflowRule.name}`}
+                        data-testid={`logs-button-${index}`}
+                      >
+                        Logs
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.actionButton}
                         onClick={() => handleEdit(workflowRule)}
                         aria-label={`Edit ${workflowRule.name}`}
                         data-testid={`edit-button-${index}`}
@@ -592,6 +662,19 @@ export function WorkflowRulesPage({
             </tbody>
           </table>
         </div>
+      )}
+
+      {logsItemId && (
+        <ExecutionLogModal<WorkflowExecutionLog>
+          title="Workflow Execution Logs"
+          subtitle={logsItemName}
+          columns={logColumns}
+          data={logs ?? []}
+          isLoading={logsLoading}
+          error={logsError instanceof Error ? logsError : null}
+          onClose={() => setLogsItemId(null)}
+          emptyMessage="No execution logs found."
+        />
       )}
 
       {isFormOpen && (

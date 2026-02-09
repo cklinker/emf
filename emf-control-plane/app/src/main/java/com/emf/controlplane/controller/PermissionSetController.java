@@ -86,6 +86,14 @@ public class PermissionSetController {
         return ResponseEntity.noContent().build();
     }
 
+    @GetMapping("/{id}/assigned-users")
+    public ResponseEntity<List<UserDto>> getAssignedUsers(@PathVariable String id) {
+        List<UserDto> users = permissionSetService.getAssignedUsers(id).stream()
+                .map(UserDto::fromEntity)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(users);
+    }
+
     @PostMapping("/{id}/assign/{userId}")
     public ResponseEntity<Void> assignToUser(
             @PathVariable String id,

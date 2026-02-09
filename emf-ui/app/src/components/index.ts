@@ -126,6 +126,10 @@ export type { PicklistValuesEditorProps } from './PicklistValuesEditor'
 export { PicklistDependencyEditor } from './PicklistDependencyEditor'
 export type { PicklistDependencyEditorProps } from './PicklistDependencyEditor'
 
+// ExecutionLogModal component
+export { ExecutionLogModal } from './ExecutionLogModal'
+export type { ExecutionLogModalProps, LogColumn } from './ExecutionLogModal'
+
 // PageLoader component for loading states
 export { PageLoader, Skeleton, ContentLoader } from './PageLoader'
 export type {

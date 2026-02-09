@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useApi } from '../../context/ApiContext'
 import { useI18n } from '../../context/I18nContext'
 import { useToast } from '../../components/Toast'
+import { ConfirmDialog } from '../../components'
 import styles from './PermissionSetsPage.module.css'
 
 interface PermissionSet {
@@ -35,6 +36,15 @@ interface Collection {
   id: string
   name: string
   displayName: string
+}
+
+interface AssignedUser {
+  id: string
+  email: string
+  firstName: string | null
+  lastName: string | null
+  username: string | null
+  status: string
 }
 
 const SYSTEM_PERMISSION_KEYS = [
@@ -127,7 +137,10 @@ export function PermissionSetsPage({ testId = 'permission-sets-page' }: Permissi
 
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [selectedSet, setSelectedSet] = useState<PermissionSet | null>(null)
-  const [activeTab, setActiveTab] = useState<'object' | 'system'>('object')
+  const [activeTab, setActiveTab] = useState<'object' | 'system' | 'users'>('object')
+  const [assignUserId, setAssignUserId] = useState('')
+  const [unassignDialogOpen, setUnassignDialogOpen] = useState(false)
+  const [userToUnassign, setUserToUnassign] = useState<AssignedUser | null>(null)
 
   const { data: permSets, isLoading } = useQuery({
     queryKey: ['permission-sets'],
@@ -143,6 +156,56 @@ export function PermissionSetsPage({ testId = 'permission-sets-page' }: Permissi
     queryKey: ['permission-sets', selectedSet?.id],
     queryFn: () => apiClient.get<PermissionSet>(`/control/permission-sets/${selectedSet?.id}`),
     enabled: !!selectedSet?.id,
+  })
+
+  const { data: assignedUsers } = useQuery({
+    queryKey: ['permission-set-users', selectedSet?.id],
+    queryFn: () =>
+      apiClient.get<AssignedUser[]>(`/control/permission-sets/${selectedSet?.id}/assigned-users`),
+    enabled: !!selectedSet?.id && activeTab === 'users',
+  })
+
+  const { data: allUsersResponse } = useQuery({
+    queryKey: ['users-for-assignment'],
+    queryFn: () =>
+      apiClient.get<{ content: AssignedUser[] } | AssignedUser[]>('/control/users?size=1000'),
+    enabled: activeTab === 'users',
+  })
+
+  const allUsers: AssignedUser[] = Array.isArray(allUsersResponse)
+    ? allUsersResponse
+    : (allUsersResponse?.content ?? [])
+
+  const assignMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const resp = await apiClient.fetch(
+        `/control/permission-sets/${selectedSet?.id}/assign/${userId}`,
+        { method: 'POST' }
+      )
+      if (!resp.ok) throw new Error(`API request failed: ${resp.statusText}`)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['permission-set-users', selectedSet?.id] })
+      showToast(t('permissionSets.userAssigned'), 'success')
+      setAssignUserId('')
+    },
+    onError: (err: Error) => {
+      showToast(err.message || t('errors.generic'), 'error')
+    },
+  })
+
+  const unassignMutation = useMutation({
+    mutationFn: (userId: string) =>
+      apiClient.delete(`/control/permission-sets/${selectedSet?.id}/assign/${userId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['permission-set-users', selectedSet?.id] })
+      showToast(t('permissionSets.userUnassigned'), 'success')
+      setUnassignDialogOpen(false)
+      setUserToUnassign(null)
+    },
+    onError: (err: Error) => {
+      showToast(err.message || t('errors.generic'), 'error')
+    },
   })
 
   const createMutation = useMutation({
@@ -306,6 +369,12 @@ export function PermissionSetsPage({ testId = 'permission-sets-page' }: Permissi
                 >
                   {t('profiles.systemPermissions')}
                 </button>
+                <button
+                  className={`${styles.tab} ${activeTab === 'users' ? styles.tabActive : ''}`}
+                  onClick={() => setActiveTab('users')}
+                >
+                  {t('permissionSets.assignedUsers')}
+                </button>
               </div>
 
               {activeTab === 'object' && (
@@ -384,6 +453,78 @@ export function PermissionSetsPage({ testId = 'permission-sets-page' }: Permissi
                   </div>
                 </div>
               )}
+
+              {activeTab === 'users' && (
+                <div className={styles.card}>
+                  <div className={styles.assignForm}>
+                    <select
+                      className={styles.assignSelect}
+                      value={assignUserId}
+                      onChange={(e) => setAssignUserId(e.target.value)}
+                    >
+                      <option value="">{t('permissionSets.selectUser')}</option>
+                      {allUsers
+                        .filter((u) => !(assignedUsers ?? []).some((au) => au.id === u.id))
+                        .map((u) => (
+                          <option key={u.id} value={u.id}>
+                            {u.firstName && u.lastName
+                              ? `${u.firstName} ${u.lastName} (${u.email})`
+                              : u.email}
+                          </option>
+                        ))}
+                    </select>
+                    <button
+                      className={styles.btnPrimary}
+                      onClick={() => {
+                        if (assignUserId) assignMutation.mutate(assignUserId)
+                      }}
+                      disabled={!assignUserId || assignMutation.isPending}
+                    >
+                      {t('permissionSets.assign')}
+                    </button>
+                  </div>
+
+                  {(assignedUsers ?? []).length === 0 ? (
+                    <p className={styles.emptyState}>{t('permissionSets.noAssignedUsers')}</p>
+                  ) : (
+                    <table className={styles.table}>
+                      <thead>
+                        <tr>
+                          <th>{t('common.name')}</th>
+                          <th>{t('users.email')}</th>
+                          <th>{t('users.status')}</th>
+                          <th>{t('common.actions')}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(assignedUsers ?? []).map((user) => (
+                          <tr key={user.id}>
+                            <td>
+                              {user.firstName && user.lastName
+                                ? `${user.firstName} ${user.lastName}`
+                                : user.username || '-'}
+                            </td>
+                            <td>{user.email}</td>
+                            <td>{user.status}</td>
+                            <td>
+                              <button
+                                className={styles.btnDanger}
+                                onClick={() => {
+                                  setUserToUnassign(user)
+                                  setUnassignDialogOpen(true)
+                                }}
+                                disabled={unassignMutation.isPending}
+                              >
+                                {t('permissionSets.unassign')}
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              )}
             </>
           )}
         </div>
@@ -396,6 +537,22 @@ export function PermissionSetsPage({ testId = 'permission-sets-page' }: Permissi
           isSubmitting={createMutation.isPending}
         />
       )}
+
+      <ConfirmDialog
+        open={unassignDialogOpen}
+        title={t('permissionSets.unassign')}
+        message={`Are you sure you want to unassign ${userToUnassign?.email ?? 'this user'}?`}
+        confirmLabel={t('permissionSets.unassign')}
+        cancelLabel={t('common.cancel')}
+        onConfirm={() => {
+          if (userToUnassign) unassignMutation.mutate(userToUnassign.id)
+        }}
+        onCancel={() => {
+          setUnassignDialogOpen(false)
+          setUserToUnassign(null)
+        }}
+        variant="danger"
+      />
     </div>
   )
 }

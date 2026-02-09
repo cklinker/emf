@@ -226,6 +226,18 @@ public class PermissionSetService {
     }
 
     @Transactional(readOnly = true)
+    public List<User> getAssignedUsers(String permSetId) {
+        getPermissionSet(permSetId); // verify exists
+        List<String> userIds = userPermissionSetRepository.findByPermissionSetId(permSetId).stream()
+                .map(UserPermissionSet::getUserId)
+                .toList();
+        if (userIds.isEmpty()) {
+            return List.of();
+        }
+        return userRepository.findAllById(userIds);
+    }
+
+    @Transactional(readOnly = true)
     public List<PermissionSet> getUserPermissionSets(String userId) {
         List<String> permSetIds = userPermissionSetRepository.findByUserId(userId).stream()
                 .map(UserPermissionSet::getPermissionSetId)

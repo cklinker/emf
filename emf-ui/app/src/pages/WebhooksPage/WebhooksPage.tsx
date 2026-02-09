@@ -2,7 +2,14 @@ import React, { useState, useCallback, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
-import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
+import {
+  useToast,
+  ConfirmDialog,
+  LoadingSpinner,
+  ErrorMessage,
+  ExecutionLogModal,
+} from '../../components'
+import type { LogColumn } from '../../components'
 import styles from './WebhooksPage.module.css'
 
 interface Webhook {
@@ -33,6 +40,19 @@ interface FormErrors {
   name?: string
   url?: string
   events?: string
+}
+
+interface WebhookDelivery {
+  id: string
+  webhookId: string
+  eventType: string
+  payload: string
+  responseStatus: number | null
+  responseBody: string | null
+  attemptCount: number
+  status: string
+  nextRetryAt: string | null
+  deliveredAt: string | null
 }
 
 export interface WebhooksPageProps {
@@ -352,6 +372,57 @@ export function WebhooksPage({ testId = 'webhooks-page' }: WebhooksPageProps): R
   const [editingWebhook, setEditingWebhook] = useState<Webhook | undefined>(undefined)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [webhookToDelete, setWebhookToDelete] = useState<Webhook | null>(null)
+  const [logsItemId, setLogsItemId] = useState<string | null>(null)
+  const [logsItemName, setLogsItemName] = useState('')
+
+  const {
+    data: deliveries,
+    isLoading: deliveriesLoading,
+    error: deliveriesError,
+  } = useQuery({
+    queryKey: ['webhook-deliveries', logsItemId],
+    queryFn: () => apiClient.get<WebhookDelivery[]>(`/control/webhooks/${logsItemId}/deliveries`),
+    enabled: !!logsItemId,
+  })
+
+  const deliveryColumns: LogColumn<WebhookDelivery>[] = [
+    { key: 'status', header: 'Status' },
+    { key: 'eventType', header: 'Event Type' },
+    {
+      key: 'responseStatus',
+      header: 'Response Code',
+      render: (v) => (v != null ? String(v) : '-'),
+    },
+    { key: 'attemptCount', header: 'Attempts' },
+    {
+      key: 'deliveredAt',
+      header: 'Delivered At',
+      render: (v) =>
+        v
+          ? formatDate(new Date(v as string), {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+            })
+          : '-',
+    },
+    {
+      key: 'nextRetryAt',
+      header: 'Next Retry',
+      render: (v) =>
+        v
+          ? formatDate(new Date(v as string), {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+            })
+          : '-',
+    },
+  ]
 
   const {
     data: webhooks,
@@ -580,6 +651,18 @@ export function WebhooksPage({ testId = 'webhooks-page' }: WebhooksPageProps): R
                       <button
                         type="button"
                         className={styles.actionButton}
+                        onClick={() => {
+                          setLogsItemId(webhook.id)
+                          setLogsItemName(webhook.name)
+                        }}
+                        aria-label={`View deliveries for ${webhook.name}`}
+                        data-testid={`deliveries-button-${index}`}
+                      >
+                        Deliveries
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.actionButton}
                         onClick={() => handleEdit(webhook)}
                         aria-label={`Edit ${webhook.name}`}
                         data-testid={`edit-button-${index}`}
@@ -602,6 +685,19 @@ export function WebhooksPage({ testId = 'webhooks-page' }: WebhooksPageProps): R
             </tbody>
           </table>
         </div>
+      )}
+
+      {logsItemId && (
+        <ExecutionLogModal<WebhookDelivery>
+          title="Webhook Deliveries"
+          subtitle={logsItemName}
+          columns={deliveryColumns}
+          data={deliveries ?? []}
+          isLoading={deliveriesLoading}
+          error={deliveriesError instanceof Error ? deliveriesError : null}
+          onClose={() => setLogsItemId(null)}
+          emptyMessage="No deliveries found."
+        />
       )}
 
       {isFormOpen && (

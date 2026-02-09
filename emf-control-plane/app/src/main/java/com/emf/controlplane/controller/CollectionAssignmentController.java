@@ -72,7 +72,6 @@ public class CollectionAssignmentController {
      * @return No content
      */
     @PostMapping("/{collectionId}/{workerId}/ready")
-    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> markReady(
             @PathVariable String collectionId,
             @PathVariable String workerId) {

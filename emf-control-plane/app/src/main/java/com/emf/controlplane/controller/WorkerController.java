@@ -43,7 +43,6 @@ public class WorkerController {
      * @return The registered worker
      */
     @PostMapping("/register")
-    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Worker> register(@RequestBody WorkerRegistrationRequest request) {
         Worker worker = workerService.register(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(worker);
@@ -57,7 +56,6 @@ public class WorkerController {
      * @return The updated worker
      */
     @PostMapping("/{id}/heartbeat")
-    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Worker> heartbeat(
             @PathVariable String id,
             @RequestBody WorkerHeartbeatRequest request) {
@@ -72,7 +70,6 @@ public class WorkerController {
      * @return No content
      */
     @PostMapping("/{id}/deregister")
-    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deregister(@PathVariable String id) {
         workerService.deregister(id);
         return ResponseEntity.noContent().build();

@@ -558,7 +558,7 @@ export function FieldEditor({
         >
           {FIELD_TYPES.map((type) => (
             <option key={type} value={type}>
-              {t(`fields.types.${type}`)}
+              {t(`fields.types.${type.toLowerCase()}`)}
             </option>
           ))}
         </select>

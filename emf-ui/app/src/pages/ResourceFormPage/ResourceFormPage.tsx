@@ -572,7 +572,7 @@ export function ResourceFormPage({
               {field.required && <span className={styles.required}>*</span>}
             </label>
             <div className={styles.fieldTypeHint}>
-              {t(`fields.types.${field.type}`)}
+              {t(`fields.types.${field.type.toLowerCase()}`)}
               {field.referenceTarget && ` → ${field.referenceTarget}`}
             </div>
             <div data-testid={`custom-renderer-${field.name}`}>
@@ -734,7 +734,7 @@ export function ResourceFormPage({
             {field.required && <span className={styles.required}>*</span>}
           </label>
           <div className={styles.fieldTypeHint}>
-            {t(`fields.types.${field.type}`)}
+            {t(`fields.types.${field.type.toLowerCase()}`)}
             {field.referenceTarget && ` → ${field.referenceTarget}`}
           </div>
           {input}

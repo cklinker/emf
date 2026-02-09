@@ -273,7 +273,7 @@ export function ResourceDetailPage({
    */
   const getFieldTypeLabel = useCallback(
     (type: FieldDefinition['type']): string => {
-      return t(`fields.types.${type}`)
+      return t(`fields.types.${type.toLowerCase()}`)
     },
     [t]
   )

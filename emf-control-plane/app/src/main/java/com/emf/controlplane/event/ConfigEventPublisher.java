@@ -24,6 +24,7 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -178,6 +179,62 @@ public class ConfigEventPublisher {
 
         String topic = properties.getKafka().getTopics().getOidcChanged();
         sendEvent(topic, "oidc-config", event);
+    }
+
+    /**
+     * Publishes a worker assignment changed event to Kafka.
+     * The event notifies that a collection assignment to a worker has changed.
+     *
+     * @param workerId The worker ID
+     * @param collectionId The collection ID
+     * @param workerBaseUrl The worker's base URL
+     * @param collectionName The collection name
+     * @param changeType The type of change (CREATED, DELETED)
+     */
+    @Async
+    public void publishWorkerAssignmentChanged(String workerId, String collectionId,
+            String workerBaseUrl, String collectionName, ChangeType changeType) {
+        log.info("Publishing worker assignment changed event: workerId={}, collectionId={}, changeType={}",
+                workerId, collectionId, changeType);
+
+        Map<String, Object> payload = Map.of(
+                "workerId", workerId,
+                "collectionId", collectionId,
+                "workerBaseUrl", workerBaseUrl,
+                "collectionName", collectionName,
+                "changeType", changeType.name()
+        );
+        ConfigEvent<Map<String, Object>> event = EventFactory.createEvent(
+                "emf.worker.assignment.changed", generateCorrelationId(), payload);
+
+        String topic = properties.getKafka().getTopics().getWorkerAssignmentChanged();
+        sendEvent(topic, collectionId, event);
+    }
+
+    /**
+     * Publishes a worker status changed event to Kafka.
+     * The event notifies that a worker's status has changed.
+     *
+     * @param workerId The worker ID
+     * @param host The worker's host
+     * @param status The worker's new status
+     * @param pool The worker's pool
+     */
+    @Async
+    public void publishWorkerStatusChanged(String workerId, String host, String status, String pool) {
+        log.info("Publishing worker status changed event: workerId={}, status={}", workerId, status);
+
+        Map<String, Object> payload = Map.of(
+                "workerId", workerId,
+                "host", host,
+                "status", status,
+                "pool", pool
+        );
+        ConfigEvent<Map<String, Object>> event = EventFactory.createEvent(
+                "emf.worker.status.changed", generateCorrelationId(), payload);
+
+        String topic = properties.getKafka().getTopics().getWorkerStatusChanged();
+        sendEvent(topic, workerId, event);
     }
 
     /**

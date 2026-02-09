@@ -21,7 +21,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -455,6 +457,114 @@ class ConfigEventListenerTest {
             
             // Act & Assert - should not throw exception
             assertDoesNotThrow(() -> listener.handleServiceChanged(event));
+        }
+    }
+
+    @Nested
+    @DisplayName("Worker Assignment Changed Event Tests")
+    class WorkerAssignmentChangedTests {
+
+        @Test
+        @DisplayName("Should add route when collection is assigned to worker")
+        void shouldAddRouteWhenCollectionAssignedToWorker() {
+            // Arrange
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("workerId", "worker-1");
+            payload.put("collectionId", "collection-1");
+            payload.put("workerBaseUrl", "http://worker-1:8080");
+            payload.put("collectionName", "accounts");
+            payload.put("changeType", "CREATED");
+
+            ConfigEvent<Object> event = new ConfigEvent<>(
+                UUID.randomUUID().toString(),
+                "emf.worker.assignment.changed",
+                UUID.randomUUID().toString(),
+                Instant.now(),
+                payload
+            );
+
+            // Act
+            listener.handleWorkerAssignmentChanged(event);
+
+            // Assert
+            ArgumentCaptor<RouteDefinition> routeCaptor = ArgumentCaptor.forClass(RouteDefinition.class);
+            verify(routeRegistry).updateRoute(routeCaptor.capture());
+
+            RouteDefinition capturedRoute = routeCaptor.getValue();
+            assertEquals("collection-1", capturedRoute.getId());
+            assertEquals("worker-1", capturedRoute.getServiceId());
+            assertEquals("/api/accounts/**", capturedRoute.getPath());
+            assertEquals("http://worker-1:8080", capturedRoute.getBackendUrl());
+            assertEquals("accounts", capturedRoute.getCollectionName());
+        }
+
+        @Test
+        @DisplayName("Should remove route when collection is unassigned from worker")
+        void shouldRemoveRouteWhenCollectionUnassigned() {
+            // Arrange
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("workerId", "worker-1");
+            payload.put("collectionId", "collection-1");
+            payload.put("collectionName", "accounts");
+            payload.put("changeType", "DELETED");
+
+            ConfigEvent<Object> event = new ConfigEvent<>(
+                UUID.randomUUID().toString(),
+                "emf.worker.assignment.changed",
+                UUID.randomUUID().toString(),
+                Instant.now(),
+                payload
+            );
+
+            // Act
+            listener.handleWorkerAssignmentChanged(event);
+
+            // Assert
+            verify(routeRegistry).removeRoute("collection-1");
+            verify(routeRegistry, never()).updateRoute(any());
+        }
+
+        @Test
+        @DisplayName("Should handle null payload gracefully")
+        void shouldHandleNullPayloadGracefully() {
+            // Arrange
+            ConfigEvent<Object> event = new ConfigEvent<>(
+                UUID.randomUUID().toString(),
+                "emf.worker.assignment.changed",
+                UUID.randomUUID().toString(),
+                Instant.now(),
+                null
+            );
+
+            // Act & Assert - should not throw exception
+            assertDoesNotThrow(() -> listener.handleWorkerAssignmentChanged(event));
+            verify(routeRegistry, never()).updateRoute(any());
+            verify(routeRegistry, never()).removeRoute(any());
+        }
+
+        @Test
+        @DisplayName("Should handle missing required fields gracefully")
+        void shouldHandleMissingRequiredFieldsGracefully() {
+            // Arrange - missing workerBaseUrl and collectionName
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("workerId", "worker-1");
+            payload.put("collectionId", "collection-1");
+            payload.put("changeType", "CREATED");
+            // workerBaseUrl and collectionName are missing
+
+            ConfigEvent<Object> event = new ConfigEvent<>(
+                UUID.randomUUID().toString(),
+                "emf.worker.assignment.changed",
+                UUID.randomUUID().toString(),
+                Instant.now(),
+                payload
+            );
+
+            // Act
+            listener.handleWorkerAssignmentChanged(event);
+
+            // Assert - should not add route when required fields are missing
+            verify(routeRegistry, never()).updateRoute(any());
         }
     }
 }

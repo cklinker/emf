@@ -54,6 +54,7 @@ public class CollectionService {
     private final ServiceRepository serviceRepository;
     private final ObjectMapper objectMapper;
     private final ConfigEventPublisher eventPublisher;
+    private final CollectionAssignmentService collectionAssignmentService;
 
     public CollectionService(
             CollectionRepository collectionRepository,
@@ -61,13 +62,15 @@ public class CollectionService {
             FieldRepository fieldRepository,
             ServiceRepository serviceRepository,
             ObjectMapper objectMapper,
-            @Nullable ConfigEventPublisher eventPublisher) {
+            @Nullable ConfigEventPublisher eventPublisher,
+            @Nullable CollectionAssignmentService collectionAssignmentService) {
         this.collectionRepository = collectionRepository;
         this.versionRepository = versionRepository;
         this.fieldRepository = fieldRepository;
         this.serviceRepository = serviceRepository;
         this.objectMapper = objectMapper;
         this.eventPublisher = eventPublisher;
+        this.collectionAssignmentService = collectionAssignmentService;
     }
 
     /**
@@ -170,7 +173,18 @@ public class CollectionService {
         
         // Publish event
         publishCollectionChangedEvent(collection, ChangeType.CREATED);
-        
+
+        // Auto-assign to an available worker (best-effort)
+        if (collectionAssignmentService != null) {
+            try {
+                collectionAssignmentService.assignCollection(collection.getId(), tenantId);
+                log.info("Auto-assigned collection {} to a worker", collection.getId());
+            } catch (IllegalStateException e) {
+                log.warn("No available workers for auto-assignment of collection {}: {}",
+                        collection.getId(), e.getMessage());
+            }
+        }
+
         log.info("Created collection with id: {} for service: {}", collection.getId(), service.getName());
         return collection;
     }

@@ -67,6 +67,8 @@ public class ControlPlaneProperties {
             private String authzChanged = "config.authz.changed";
             private String uiChanged = "config.ui.changed";
             private String oidcChanged = "config.oidc.changed";
+            private String workerAssignmentChanged = "emf.worker.assignment.changed";
+            private String workerStatusChanged = "emf.worker.status.changed";
 
             public String getServiceChanged() {
                 return serviceChanged;
@@ -106,6 +108,22 @@ public class ControlPlaneProperties {
 
             public void setOidcChanged(String oidcChanged) {
                 this.oidcChanged = oidcChanged;
+            }
+
+            public String getWorkerAssignmentChanged() {
+                return workerAssignmentChanged;
+            }
+
+            public void setWorkerAssignmentChanged(String workerAssignmentChanged) {
+                this.workerAssignmentChanged = workerAssignmentChanged;
+            }
+
+            public String getWorkerStatusChanged() {
+                return workerStatusChanged;
+            }
+
+            public void setWorkerStatusChanged(String workerStatusChanged) {
+                this.workerStatusChanged = workerStatusChanged;
             }
         }
     }

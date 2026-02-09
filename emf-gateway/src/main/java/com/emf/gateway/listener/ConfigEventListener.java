@@ -400,8 +400,85 @@ public class ConfigEventListener {
     }
     
     /**
+     * Handles worker assignment changed events from Kafka.
+     *
+     * When a collection is assigned to a worker (CREATED), adds a route to the registry
+     * pointing to the worker's base URL.
+     *
+     * When a collection is unassigned from a worker (DELETED), removes the route.
+     *
+     * @param event The worker assignment changed event
+     */
+    @SuppressWarnings("unchecked")
+    @KafkaListener(
+        topics = "${emf.gateway.kafka.topics.worker-assignment-changed:emf.worker.assignment.changed}",
+        groupId = "${spring.kafka.consumer.group-id}",
+        containerFactory = "kafkaListenerContainerFactory"
+    )
+    public void handleWorkerAssignmentChanged(ConfigEvent<Object> event) {
+        try {
+            logger.info("Received worker assignment event: eventId={}, correlationId={}",
+                        event.getEventId(), event.getCorrelationId());
+
+            Object rawPayload = event.getPayload();
+
+            if (rawPayload == null) {
+                logger.error("Worker assignment event has null payload: eventId={}", event.getEventId());
+                return;
+            }
+
+            // The payload is deserialized as a LinkedHashMap since there is no typed payload class
+            Map<String, Object> payload;
+            if (rawPayload instanceof Map) {
+                payload = (Map<String, Object>) rawPayload;
+            } else {
+                // Fallback: convert via ObjectMapper
+                payload = objectMapper.convertValue(rawPayload, new TypeReference<Map<String, Object>>() {});
+            }
+
+            String workerId = (String) payload.get("workerId");
+            String collectionId = (String) payload.get("collectionId");
+            String workerBaseUrl = (String) payload.get("workerBaseUrl");
+            String collectionName = (String) payload.get("collectionName");
+            String changeType = (String) payload.get("changeType");
+
+            logger.info("Processing worker assignment: workerId={}, collectionId={}, collectionName={}, changeType={}",
+                        workerId, collectionId, collectionName, changeType);
+
+            if ("DELETED".equals(changeType)) {
+                routeRegistry.removeRoute(collectionId);
+                logger.info("Removed route for unassigned collection: {}", collectionName);
+            } else {
+                // CREATED — add route pointing to worker
+                if (workerBaseUrl == null || collectionName == null || collectionId == null) {
+                    logger.error("Missing required fields in worker assignment event: " +
+                                "collectionId={}, collectionName={}, workerBaseUrl={}",
+                                collectionId, collectionName, workerBaseUrl);
+                    return;
+                }
+
+                String path = "/api/" + collectionName + "/**";
+                RouteDefinition route = new RouteDefinition(
+                    collectionId,
+                    workerId,  // use workerId as the serviceId for worker-based routes
+                    path,
+                    workerBaseUrl,
+                    collectionName
+                );
+
+                routeRegistry.updateRoute(route);
+                logger.info("Added/updated route for worker-assigned collection: path={}, workerUrl={}",
+                            path, workerBaseUrl);
+            }
+        } catch (Exception e) {
+            logger.error("Error processing worker assignment event: eventId={}, error={}",
+                        event.getEventId(), e.getMessage(), e);
+        }
+    }
+
+    /**
      * Removes all routes associated with a service.
-     * 
+     *
      * @param serviceId The service ID
      */
     private void removeRoutesForService(String serviceId) {

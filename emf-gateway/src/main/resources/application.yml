@@ -11,7 +11,7 @@ spring:
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
-        spring.json.trusted.packages: com.emf.gateway.event,com.emf.controlplane.event
+        spring.json.trusted.packages: com.emf.gateway.event,com.emf.controlplane.event,java.util
   
   # Redis configuration for caching and rate limiting
   data:
@@ -77,6 +77,7 @@ emf:
         collection-changed: emf.config.collection.changed
         authz-changed: emf.config.authz.changed
         service-changed: emf.config.service.changed
+        worker-assignment-changed: emf.worker.assignment.changed
     
     # Default rate limiting configuration
     rate-limit:

@@ -1,0 +1,60 @@
+server:
+  port: ${SERVER_PORT:8080}
+  shutdown: graceful
+
+spring:
+  application:
+    name: emf-worker
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/emf_control_plane}
+    username: ${SPRING_DATASOURCE_USERNAME:emf}
+    password: ${SPRING_DATASOURCE_PASSWORD:emf}
+    driver-class-name: org.postgresql.Driver
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: ${emf.worker.id:emf-worker-default}
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
+emf:
+  worker:
+    id: ${WORKER_ID:}
+    pool: ${WORKER_POOL:default}
+    capacity: ${WORKER_CAPACITY:50}
+    tenant-affinity: ${TENANT_AFFINITY:}
+    heartbeat-interval: ${HEARTBEAT_INTERVAL:15000}
+    control-plane-url: ${CONTROL_PLANE_URL:http://localhost:8081}
+  storage:
+    mode: PHYSICAL_TABLES
+  kafka:
+    topics:
+      assignment-changed: emf.worker.assignment.changed
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+  health:
+    readinessState:
+      enabled: true
+    livenessState:
+      enabled: true
+
+logging:
+  level:
+    com.emf: ${LOGGING_LEVEL_COM_EMF:INFO}
+    root: ${LOGGING_LEVEL_ROOT:INFO}

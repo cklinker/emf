@@ -110,6 +110,14 @@ export type { ProtectedRouteProps } from './ProtectedRoute'
 export { PageTransition, usePrefersReducedMotion } from './PageTransition'
 export type { PageTransitionProps, TransitionType } from './PageTransition'
 
+// ValidationRuleEditor component
+export { ValidationRuleEditor } from './ValidationRuleEditor'
+export type { ValidationRuleEditorProps } from './ValidationRuleEditor'
+
+// RecordTypeEditor component
+export { RecordTypeEditor } from './RecordTypeEditor'
+export type { RecordTypeEditorProps } from './RecordTypeEditor'
+
 // PageLoader component for loading states
 export { PageLoader, Skeleton, ContentLoader } from './PageLoader'
 export type {

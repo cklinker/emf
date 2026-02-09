@@ -64,6 +64,8 @@
     "optional": "Optional",
     "none": "None",
     "name": "Name",
+    "activate": "Activate",
+    "deactivate": "Deactivate",
     "pageOf": "Page {{current}} of {{total}}"
   },
   "auth": {
@@ -134,10 +136,27 @@
   "validationRules": {
     "formula": "Formula",
     "errorMessage": "Error Message",
-    "evaluateOn": "Evaluate On"
+    "evaluateOn": "Evaluate On",
+    "addRule": "Add Rule",
+    "editRule": "Edit Rule",
+    "deleteRule": "Delete Rule",
+    "confirmDelete": "Are you sure you want to delete this validation rule? This action cannot be undone.",
+    "formulaPlaceholder": "e.g., amount <= 0",
+    "errorMessagePlaceholder": "e.g., Amount must be positive",
+    "errorFieldLabel": "Error Display Field",
+    "errorFieldHint": "Leave blank for record-level error",
+    "evaluateOnCreate": "Create Only",
+    "evaluateOnUpdate": "Update Only",
+    "evaluateOnBoth": "Create & Update"
   },
   "recordTypes": {
-    "default": "Default"
+    "default": "Default",
+    "addRecordType": "Add Record Type",
+    "editRecordType": "Edit Record Type",
+    "deleteRecordType": "Delete Record Type",
+    "confirmDelete": "Are you sure you want to delete this record type? This action cannot be undone.",
+    "isDefaultLabel": "Default Record Type",
+    "isDefaultHint": "New records will use this record type by default."
   },
   "fieldHistory": {
     "description": "Field history tracks changes to individual field values when records are updated.",
@@ -828,7 +847,9 @@
     "saved": "Changes saved successfully.",
     "created": "{{item}} created successfully.",
     "updated": "{{item}} updated successfully.",
-    "deleted": "{{item}} deleted successfully."
+    "deleted": "{{item}} deleted successfully.",
+    "activated": "Activated successfully.",
+    "deactivated": "Deactivated successfully."
   },
   "fieldsPanel": {
     "noFields": "No fields defined",

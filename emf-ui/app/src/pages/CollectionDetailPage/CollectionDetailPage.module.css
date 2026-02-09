@@ -402,6 +402,24 @@
   outline-offset: 2px;
 }
 
+/* Action Buttons Container */
+.actionButtons {
+  display: flex;
+  gap: var(--spacing-xs, 0.25rem);
+  flex-wrap: nowrap;
+}
+
+/* Danger Action Button */
+.actionButtonDanger {
+  color: var(--color-error-text, #dc2626);
+  border-color: var(--color-error-border, #fecaca);
+}
+
+.actionButtonDanger:hover {
+  background-color: var(--color-error-bg-hover, #fef2f2);
+  border-color: var(--color-error, #dc2626);
+}
+
 /* Authorization Section */
 .authzSection {
   margin-bottom: var(--spacing-xl, 2rem);

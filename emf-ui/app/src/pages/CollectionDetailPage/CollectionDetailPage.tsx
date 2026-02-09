@@ -23,6 +23,8 @@ import {
   FieldEditor,
   type FieldDefinition as FieldEditorDefinition,
 } from '../../components/FieldEditor'
+import { ValidationRuleEditor } from '../../components/ValidationRuleEditor'
+import { RecordTypeEditor } from '../../components/RecordTypeEditor'
 import type {
   Collection,
   FieldDefinition,
@@ -90,6 +92,22 @@ export function CollectionDetailPage({
   // Field editor modal state
   const [fieldEditorOpen, setFieldEditorOpen] = useState(false)
   const [editingField, setEditingField] = useState<FieldDefinition | undefined>(undefined)
+
+  // Validation rule editor state
+  const [validationRuleEditorOpen, setValidationRuleEditorOpen] = useState(false)
+  const [editingValidationRule, setEditingValidationRule] = useState<
+    CollectionValidationRule | undefined
+  >(undefined)
+  const [deleteValidationRuleDialogOpen, setDeleteValidationRuleDialogOpen] = useState(false)
+  const [validationRuleToDelete, setValidationRuleToDelete] = useState<
+    CollectionValidationRule | undefined
+  >(undefined)
+
+  // Record type editor state
+  const [recordTypeEditorOpen, setRecordTypeEditorOpen] = useState(false)
+  const [editingRecordType, setEditingRecordType] = useState<RecordType | undefined>(undefined)
+  const [deleteRecordTypeDialogOpen, setDeleteRecordTypeDialogOpen] = useState(false)
+  const [recordTypeToDelete, setRecordTypeToDelete] = useState<RecordType | undefined>(undefined)
 
   // Active tab state for sections
   const [activeTab, setActiveTab] = useState<
@@ -237,6 +255,130 @@ export function CollectionDetailPage({
     },
   })
 
+  // --- Validation Rule mutations ---
+  const createValidationRuleMutation = useMutation({
+    mutationFn: async (data: Record<string, unknown>) => {
+      await apiClient.post(`/control/collections/${collectionId}/validation-rules`, data)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['validation-rules', collectionId] })
+      showToast(t('success.created', { item: t('collections.validationRules') }), 'success')
+      setValidationRuleEditorOpen(false)
+      setEditingValidationRule(undefined)
+    },
+    onError: (error: Error) => {
+      showToast(error.message || t('errors.generic'), 'error')
+    },
+  })
+
+  const updateValidationRuleMutation = useMutation({
+    mutationFn: async ({ ruleId, data }: { ruleId: string; data: Record<string, unknown> }) => {
+      await apiClient.put(`/control/collections/${collectionId}/validation-rules/${ruleId}`, data)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['validation-rules', collectionId] })
+      showToast(t('success.updated', { item: t('collections.validationRules') }), 'success')
+      setValidationRuleEditorOpen(false)
+      setEditingValidationRule(undefined)
+    },
+    onError: (error: Error) => {
+      showToast(error.message || t('errors.generic'), 'error')
+    },
+  })
+
+  const deleteValidationRuleMutation = useMutation({
+    mutationFn: async (ruleId: string) => {
+      await apiClient.delete(`/control/collections/${collectionId}/validation-rules/${ruleId}`)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['validation-rules', collectionId] })
+      showToast(t('success.deleted', { item: t('collections.validationRules') }), 'success')
+      setDeleteValidationRuleDialogOpen(false)
+      setValidationRuleToDelete(undefined)
+    },
+    onError: (error: Error) => {
+      showToast(error.message || t('errors.generic'), 'error')
+    },
+  })
+
+  const activateValidationRuleMutation = useMutation({
+    mutationFn: async (ruleId: string) => {
+      await apiClient.post(
+        `/control/collections/${collectionId}/validation-rules/${ruleId}/activate`,
+        {}
+      )
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['validation-rules', collectionId] })
+      showToast(t('success.activated'), 'success')
+    },
+    onError: (error: Error) => {
+      showToast(error.message || t('errors.generic'), 'error')
+    },
+  })
+
+  const deactivateValidationRuleMutation = useMutation({
+    mutationFn: async (ruleId: string) => {
+      await apiClient.post(
+        `/control/collections/${collectionId}/validation-rules/${ruleId}/deactivate`,
+        {}
+      )
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['validation-rules', collectionId] })
+      showToast(t('success.deactivated'), 'success')
+    },
+    onError: (error: Error) => {
+      showToast(error.message || t('errors.generic'), 'error')
+    },
+  })
+
+  // --- Record Type mutations ---
+  const createRecordTypeMutation = useMutation({
+    mutationFn: async (data: Record<string, unknown>) => {
+      await apiClient.post(`/control/collections/${collectionId}/record-types`, data)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['record-types', collectionId] })
+      showToast(t('success.created', { item: t('collections.recordTypes') }), 'success')
+      setRecordTypeEditorOpen(false)
+      setEditingRecordType(undefined)
+    },
+    onError: (error: Error) => {
+      showToast(error.message || t('errors.generic'), 'error')
+    },
+  })
+
+  const updateRecordTypeMutation = useMutation({
+    mutationFn: async ({ rtId, data }: { rtId: string; data: Record<string, unknown> }) => {
+      await apiClient.put(`/control/collections/${collectionId}/record-types/${rtId}`, data)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['record-types', collectionId] })
+      showToast(t('success.updated', { item: t('collections.recordTypes') }), 'success')
+      setRecordTypeEditorOpen(false)
+      setEditingRecordType(undefined)
+    },
+    onError: (error: Error) => {
+      showToast(error.message || t('errors.generic'), 'error')
+    },
+  })
+
+  const deleteRecordTypeMutation = useMutation({
+    mutationFn: async (rtId: string) => {
+      await apiClient.delete(`/control/collections/${collectionId}/record-types/${rtId}`)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['record-types', collectionId] })
+      showToast(t('success.deleted', { item: t('collections.recordTypes') }), 'success')
+      setDeleteRecordTypeDialogOpen(false)
+      setRecordTypeToDelete(undefined)
+    },
+    onError: (error: Error) => {
+      showToast(error.message || t('errors.generic'), 'error')
+    },
+  })
+
   // Handle edit action
   const handleEdit = useCallback(() => {
     navigate(`/collections/${collectionId}/edit`)
@@ -264,7 +406,16 @@ export function CollectionDetailPage({
 
   // Handle tab change
   const handleTabChange = useCallback(
-    (tab: 'fields' | 'authorization' | 'validationRules' | 'recordTypes' | 'versions') => {
+    (
+      tab:
+        | 'fields'
+        | 'authorization'
+        | 'validationRules'
+        | 'recordTypes'
+        | 'fieldHistory'
+        | 'setupAudit'
+        | 'versions'
+    ) => {
       setActiveTab(tab)
     },
     []
@@ -332,6 +483,109 @@ export function CollectionDetailPage({
     },
     [navigate, collectionId]
   )
+
+  // --- Validation Rule handlers ---
+  const handleAddValidationRule = useCallback(() => {
+    setEditingValidationRule(undefined)
+    setValidationRuleEditorOpen(true)
+  }, [])
+
+  const handleEditValidationRule = useCallback((rule: CollectionValidationRule) => {
+    setEditingValidationRule(rule)
+    setValidationRuleEditorOpen(true)
+  }, [])
+
+  const handleValidationRuleSave = useCallback(
+    async (data: Record<string, unknown>) => {
+      if (editingValidationRule) {
+        await updateValidationRuleMutation.mutateAsync({
+          ruleId: editingValidationRule.id,
+          data,
+        })
+      } else {
+        await createValidationRuleMutation.mutateAsync(data)
+      }
+    },
+    [editingValidationRule, createValidationRuleMutation, updateValidationRuleMutation]
+  )
+
+  const handleValidationRuleCancel = useCallback(() => {
+    setValidationRuleEditorOpen(false)
+    setEditingValidationRule(undefined)
+  }, [])
+
+  const handleDeleteValidationRuleClick = useCallback((rule: CollectionValidationRule) => {
+    setValidationRuleToDelete(rule)
+    setDeleteValidationRuleDialogOpen(true)
+  }, [])
+
+  const handleDeleteValidationRuleConfirm = useCallback(() => {
+    if (validationRuleToDelete) {
+      deleteValidationRuleMutation.mutate(validationRuleToDelete.id)
+    }
+  }, [validationRuleToDelete, deleteValidationRuleMutation])
+
+  const handleDeleteValidationRuleCancel = useCallback(() => {
+    setDeleteValidationRuleDialogOpen(false)
+    setValidationRuleToDelete(undefined)
+  }, [])
+
+  const handleActivateValidationRule = useCallback(
+    (ruleId: string) => {
+      activateValidationRuleMutation.mutate(ruleId)
+    },
+    [activateValidationRuleMutation]
+  )
+
+  const handleDeactivateValidationRule = useCallback(
+    (ruleId: string) => {
+      deactivateValidationRuleMutation.mutate(ruleId)
+    },
+    [deactivateValidationRuleMutation]
+  )
+
+  // --- Record Type handlers ---
+  const handleAddRecordType = useCallback(() => {
+    setEditingRecordType(undefined)
+    setRecordTypeEditorOpen(true)
+  }, [])
+
+  const handleEditRecordType = useCallback((rt: RecordType) => {
+    setEditingRecordType(rt)
+    setRecordTypeEditorOpen(true)
+  }, [])
+
+  const handleRecordTypeSave = useCallback(
+    async (data: Record<string, unknown>) => {
+      if (editingRecordType) {
+        await updateRecordTypeMutation.mutateAsync({ rtId: editingRecordType.id, data })
+      } else {
+        await createRecordTypeMutation.mutateAsync(data)
+      }
+    },
+    [editingRecordType, createRecordTypeMutation, updateRecordTypeMutation]
+  )
+
+  const handleRecordTypeCancel = useCallback(() => {
+    setRecordTypeEditorOpen(false)
+    setEditingRecordType(undefined)
+  }, [])
+
+  const handleDeleteRecordTypeClick = useCallback((rt: RecordType) => {
+    setRecordTypeToDelete(rt)
+    setDeleteRecordTypeDialogOpen(true)
+  }, [])
+
+  const handleDeleteRecordTypeConfirm = useCallback(() => {
+    if (recordTypeToDelete) {
+      deleteRecordTypeMutation.mutate(recordTypeToDelete.id)
+    }
+  }, [recordTypeToDelete, deleteRecordTypeMutation])
+
+  const handleDeleteRecordTypeCancel = useCallback(() => {
+    setDeleteRecordTypeDialogOpen(false)
+    setRecordTypeToDelete(undefined)
+  }, [])
 
   // Sort fields by order
   const sortedFields = useMemo(() => {
@@ -805,6 +1059,15 @@ export function CollectionDetailPage({
         >
           <div className={styles.panelHeader}>
             <h2 className={styles.panelTitle}>{t('collections.validationRules')}</h2>
+            <button
+              type="button"
+              className={styles.addButton}
+              onClick={handleAddValidationRule}
+              aria-label={t('validationRules.addRule')}
+              data-testid="add-validation-rule-button"
+            >
+              {t('validationRules.addRule')}
+            </button>
           </div>
           {isLoadingRules ? (
             <div className={styles.loadingContainer}>
@@ -813,6 +1076,9 @@ export function CollectionDetailPage({
           ) : validationRules.length === 0 ? (
             <div className={styles.emptyState} data-testid="validation-rules-empty">
               <p>{t('common.noData')}</p>
+              <button type="button" className={styles.addButton} onClick={handleAddValidationRule}>
+                {t('validationRules.addRule')}
+              </button>
             </div>
           ) : (
             <div className={styles.tableContainer}>
@@ -828,6 +1094,7 @@ export function CollectionDetailPage({
                     <th scope="col">{t('validationRules.errorMessage')}</th>
                     <th scope="col">{t('validationRules.evaluateOn')}</th>
                     <th scope="col">{t('collections.status')}</th>
+                    <th scope="col">{t('common.actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -847,6 +1114,49 @@ export function CollectionDetailPage({
                         >
                           {rule.active ? t('collections.active') : t('collections.inactive')}
                         </span>
+                      </td>
+                      <td className={styles.actionsCell}>
+                        <div className={styles.actionButtons}>
+                          <button
+                            type="button"
+                            className={styles.actionButton}
+                            onClick={() => handleEditValidationRule(rule)}
+                            aria-label={`${t('common.edit')} ${rule.name}`}
+                            data-testid={`edit-validation-rule-${index}`}
+                          >
+                            {t('common.edit')}
+                          </button>
+                          {rule.active ? (
+                            <button
+                              type="button"
+                              className={styles.actionButton}
+                              onClick={() => handleDeactivateValidationRule(rule.id)}
+                              aria-label={`${t('common.deactivate')} ${rule.name}`}
+                              data-testid={`deactivate-validation-rule-${index}`}
+                            >
+                              {t('common.deactivate')}
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              className={styles.actionButton}
+                              onClick={() => handleActivateValidationRule(rule.id)}
+                              aria-label={`${t('common.activate')} ${rule.name}`}
+                              data-testid={`activate-validation-rule-${index}`}
+                            >
+                              {t('common.activate')}
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            className={`${styles.actionButton} ${styles.actionButtonDanger}`}
+                            onClick={() => handleDeleteValidationRuleClick(rule)}
+                            aria-label={`${t('common.delete')} ${rule.name}`}
+                            data-testid={`delete-validation-rule-${index}`}
+                          >
+                            {t('common.delete')}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -868,6 +1178,15 @@ export function CollectionDetailPage({
         >
           <div className={styles.panelHeader}>
             <h2 className={styles.panelTitle}>{t('collections.recordTypes')}</h2>
+            <button
+              type="button"
+              className={styles.addButton}
+              onClick={handleAddRecordType}
+              aria-label={t('recordTypes.addRecordType')}
+              data-testid="add-record-type-button"
+            >
+              {t('recordTypes.addRecordType')}
+            </button>
           </div>
           {isLoadingRecordTypes ? (
             <div className={styles.loadingContainer}>
@@ -876,6 +1195,9 @@ export function CollectionDetailPage({
           ) : recordTypes.length === 0 ? (
             <div className={styles.emptyState} data-testid="record-types-empty">
               <p>{t('common.noData')}</p>
+              <button type="button" className={styles.addButton} onClick={handleAddRecordType}>
+                {t('recordTypes.addRecordType')}
+              </button>
             </div>
           ) : (
             <div className={styles.tableContainer}>
@@ -890,6 +1212,7 @@ export function CollectionDetailPage({
                     <th scope="col">{t('collections.description')}</th>
                     <th scope="col">{t('recordTypes.default')}</th>
                     <th scope="col">{t('collections.status')}</th>
+                    <th scope="col">{t('common.actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -908,6 +1231,28 @@ export function CollectionDetailPage({
                         >
                           {rt.active ? t('collections.active') : t('collections.inactive')}
                         </span>
+                      </td>
+                      <td className={styles.actionsCell}>
+                        <div className={styles.actionButtons}>
+                          <button
+                            type="button"
+                            className={styles.actionButton}
+                            onClick={() => handleEditRecordType(rt)}
+                            aria-label={`${t('common.edit')} ${rt.name}`}
+                            data-testid={`edit-record-type-${index}`}
+                          >
+                            {t('common.edit')}
+                          </button>
+                          <button
+                            type="button"
+                            className={`${styles.actionButton} ${styles.actionButtonDanger}`}
+                            onClick={() => handleDeleteRecordTypeClick(rt)}
+                            aria-label={`${t('common.delete')} ${rt.name}`}
+                            data-testid={`delete-record-type-${index}`}
+                          >
+                            {t('common.delete')}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -1102,10 +1447,39 @@ export function CollectionDetailPage({
         variant="danger"
       />
 
+      {/* Validation Rule Delete Confirmation */}
+      <ConfirmDialog
+        open={deleteValidationRuleDialogOpen}
+        title={t('validationRules.deleteRule')}
+        message={t('validationRules.confirmDelete')}
+        confirmLabel={t('common.delete')}
+        cancelLabel={t('common.cancel')}
+        onConfirm={handleDeleteValidationRuleConfirm}
+        onCancel={handleDeleteValidationRuleCancel}
+        variant="danger"
+      />
+
+      {/* Record Type Delete Confirmation */}
+      <ConfirmDialog
+        open={deleteRecordTypeDialogOpen}
+        title={t('recordTypes.deleteRecordType')}
+        message={t('recordTypes.confirmDelete')}
+        confirmLabel={t('common.delete')}
+        cancelLabel={t('common.cancel')}
+        onConfirm={handleDeleteRecordTypeConfirm}
+        onCancel={handleDeleteRecordTypeCancel}
+        variant="danger"
+      />
+
       {/* Field Editor Modal */}
       {fieldEditorOpen && (
-        <div className={styles.modalOverlay} onClick={handleFieldCancel}>
-          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+        <div className={styles.modalOverlay} role="presentation" onMouseDown={handleFieldCancel}>
+          {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
+          <div
+            className={styles.modalContent}
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
             <FieldEditor
               collectionId={collectionId}
               field={editingField}
@@ -1117,6 +1491,58 @@ export function CollectionDetailPage({
               onSave={handleFieldSave}
               onCancel={handleFieldCancel}
               isSubmitting={addFieldMutation.isPending || updateFieldMutation.isPending}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Validation Rule Editor Modal */}
+      {validationRuleEditorOpen && (
+        <div
+          className={styles.modalOverlay}
+          role="presentation"
+          onMouseDown={handleValidationRuleCancel}
+        >
+          {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
+          <div
+            className={styles.modalContent}
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <ValidationRuleEditor
+              collectionId={collectionId}
+              rule={editingValidationRule}
+              onSave={handleValidationRuleSave}
+              onCancel={handleValidationRuleCancel}
+              isSubmitting={
+                createValidationRuleMutation.isPending || updateValidationRuleMutation.isPending
+              }
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Record Type Editor Modal */}
+      {recordTypeEditorOpen && (
+        <div
+          className={styles.modalOverlay}
+          role="presentation"
+          onMouseDown={handleRecordTypeCancel}
+        >
+          {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
+          <div
+            className={styles.modalContent}
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <RecordTypeEditor
+              collectionId={collectionId}
+              recordType={editingRecordType}
+              onSave={handleRecordTypeSave}
+              onCancel={handleRecordTypeCancel}
+              isSubmitting={
+                createRecordTypeMutation.isPending || updateRecordTypeMutation.isPending
+              }
             />
           </div>
         </div>

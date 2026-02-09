@@ -25,4 +25,6 @@ public interface WorkerRepository extends JpaRepository<Worker, String> {
     List<Worker> findByTenantAffinity(String tenantAffinity);
 
     Optional<Worker> findByHost(String host);
+
+    long countByStatus(String status);
 }

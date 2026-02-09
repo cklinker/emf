@@ -36,6 +36,22 @@ class WorkerMetricsConfigTest {
     }
 
     @Test
+    void shouldRegisterCollectionCountGaugeForHpa() {
+        Gauge gauge = meterRegistry.find("emf.worker.collection.count").gauge();
+        assertNotNull(gauge, "emf.worker.collection.count gauge should be registered for HPA");
+        assertEquals(5.0, gauge.value(), "Should reflect lifecycle manager collection count");
+    }
+
+    @Test
+    void shouldUpdateCollectionCountWhenActiveCountChanges() {
+        when(lifecycleManager.getActiveCollectionCount()).thenReturn(42);
+
+        Gauge gauge = meterRegistry.find("emf.worker.collection.count").gauge();
+        assertNotNull(gauge);
+        assertEquals(42.0, gauge.value(), "HPA gauge should reflect updated collection count");
+    }
+
+    @Test
     void shouldRegisterInitializingCollectionsGauge() {
         Gauge gauge = meterRegistry.find("emf.worker.collections.initializing").gauge();
         assertNotNull(gauge, "emf.worker.collections.initializing gauge should be registered");

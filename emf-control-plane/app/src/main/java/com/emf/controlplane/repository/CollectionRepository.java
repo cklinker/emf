@@ -79,4 +79,12 @@ public interface CollectionRepository extends JpaRepository<Collection, String> 
 
     @Query("SELECT DISTINCT c FROM Collection c LEFT JOIN FETCH c.fields WHERE c.active = true")
     List<Collection> findByActiveTrueWithFields();
+
+    /**
+     * Counts active collections that have no READY assignment.
+     * Used by KEDA scaler to determine if new workers are needed.
+     */
+    @Query("SELECT COUNT(c) FROM Collection c WHERE c.active = true AND c.id NOT IN " +
+           "(SELECT ca.collectionId FROM CollectionAssignment ca WHERE ca.status = 'READY')")
+    long countUnassignedCollections();
 }

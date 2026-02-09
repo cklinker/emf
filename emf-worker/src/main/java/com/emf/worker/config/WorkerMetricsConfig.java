@@ -14,6 +14,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * <p>Exposes the following gauges at {@code /actuator/metrics/emf.worker.*}:
  * <ul>
  *   <li>{@code emf.worker.collections.active} - number of active collections</li>
+ *   <li>{@code emf.worker.collection.count} - active collection count for HPA scaling (Prometheus: emf_worker_collection_count)</li>
  *   <li>{@code emf.worker.collections.initializing} - number currently initializing</li>
  *   <li>{@code emf.worker.uptime.seconds} - JVM uptime in seconds</li>
  *   <li>{@code emf.worker.heap.used.bytes} - current heap usage in bytes</li>
@@ -31,6 +32,13 @@ public class WorkerMetricsConfig {
         Gauge.builder("emf.worker.collections.active", lifecycleManager,
                         CollectionLifecycleManager::getActiveCollectionCount)
                 .description("Number of active collections hosted by this worker")
+                .register(meterRegistry);
+
+        // HPA collection count gauge — same value, exposed as emf_worker_collection_count
+        // in Prometheus format for Kubernetes HPA custom metrics (target: 40 per pod)
+        Gauge.builder("emf.worker.collection.count", lifecycleManager,
+                        CollectionLifecycleManager::getActiveCollectionCount)
+                .description("Collection count for HPA scaling (target: 40 per pod)")
                 .register(meterRegistry);
 
         // Initializing collections gauge — tracks collections currently being initialized

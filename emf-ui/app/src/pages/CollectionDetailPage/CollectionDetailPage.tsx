@@ -25,12 +25,14 @@ import {
 } from '../../components/FieldEditor'
 import { ValidationRuleEditor } from '../../components/ValidationRuleEditor'
 import { RecordTypeEditor } from '../../components/RecordTypeEditor'
+import { PicklistDependencyEditor } from '../../components/PicklistDependencyEditor'
 import type {
   Collection,
   FieldDefinition,
   CollectionVersion,
   CollectionValidationRule,
   RecordType,
+  PicklistDependency,
   SetupAuditTrailEntry,
 } from '../../types/collections'
 import styles from './CollectionDetailPage.module.css'
@@ -109,12 +111,23 @@ export function CollectionDetailPage({
   const [deleteRecordTypeDialogOpen, setDeleteRecordTypeDialogOpen] = useState(false)
   const [recordTypeToDelete, setRecordTypeToDelete] = useState<RecordType | undefined>(undefined)
 
+  // Picklist dependency editor state
+  const [dependencyEditorOpen, setDependencyEditorOpen] = useState(false)
+  const [editingDependency, setEditingDependency] = useState<PicklistDependency | undefined>(
+    undefined
+  )
+  const [deleteDependencyDialogOpen, setDeleteDependencyDialogOpen] = useState(false)
+  const [dependencyToDelete, setDependencyToDelete] = useState<PicklistDependency | undefined>(
+    undefined
+  )
+
   // Active tab state for sections
   const [activeTab, setActiveTab] = useState<
     | 'fields'
     | 'authorization'
     | 'validationRules'
     | 'recordTypes'
+    | 'picklistDependencies'
     | 'fieldHistory'
     | 'setupAudit'
     | 'versions'
@@ -173,6 +186,41 @@ export function CollectionDetailPage({
       return response
     },
     enabled: !!collectionId && activeTab === 'recordTypes',
+  })
+
+  // Fetch picklist dependencies (one query per picklist field, combined)
+  const picklistFieldIds = useMemo(() => {
+    if (!collection?.fields) return []
+    return collection.fields
+      .filter((f) => f.type === 'picklist' || f.type === 'multi_picklist')
+      .map((f) => f.id)
+  }, [collection])
+
+  const { data: allDependencies = [], isLoading: isLoadingDependencies } = useQuery({
+    queryKey: ['picklist-dependencies', collectionId, picklistFieldIds],
+    queryFn: async () => {
+      if (picklistFieldIds.length === 0) return []
+      const results = await Promise.all(
+        picklistFieldIds.map((fieldId) =>
+          apiClient
+            .get<PicklistDependency[]>(`/control/picklists/fields/${fieldId}/dependencies`)
+            .catch(() => [] as PicklistDependency[])
+        )
+      )
+      // Deduplicate by id
+      const seen = new Set<string>()
+      const deduped: PicklistDependency[] = []
+      for (const deps of results) {
+        for (const dep of deps) {
+          if (!seen.has(dep.id)) {
+            seen.add(dep.id)
+            deduped.push(dep)
+          }
+        }
+      }
+      return deduped
+    },
+    enabled: !!collectionId && activeTab === 'picklistDependencies' && picklistFieldIds.length > 0,
   })
 
   // Fetch setup audit trail
@@ -373,6 +421,47 @@ export function CollectionDetailPage({
       showToast(t('success.deleted', { item: t('collections.recordTypes') }), 'success')
       setDeleteRecordTypeDialogOpen(false)
       setRecordTypeToDelete(undefined)
+    },
+    onError: (error: Error) => {
+      showToast(error.message || t('errors.generic'), 'error')
+    },
+  })
+
+  // --- Picklist Dependency mutations ---
+  const saveDependencyMutation = useMutation({
+    mutationFn: async (data: {
+      controllingFieldId: string
+      dependentFieldId: string
+      mapping: Record<string, string[]>
+    }) => {
+      await apiClient.put('/control/picklists/dependencies', data)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['picklist-dependencies', collectionId],
+      })
+      showToast(t('picklistDependencies.saved'), 'success')
+      setDependencyEditorOpen(false)
+      setEditingDependency(undefined)
+    },
+    onError: (error: Error) => {
+      showToast(error.message || t('errors.generic'), 'error')
+    },
+  })
+
+  const deleteDependencyMutation = useMutation({
+    mutationFn: async (dep: PicklistDependency) => {
+      await apiClient.delete(
+        `/control/picklists/dependencies/${dep.controllingFieldId}/${dep.dependentFieldId}`
+      )
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['picklist-dependencies', collectionId],
+      })
+      showToast(t('picklistDependencies.deleted'), 'success')
+      setDeleteDependencyDialogOpen(false)
+      setDependencyToDelete(undefined)
     },
     onError: (error: Error) => {
       showToast(error.message || t('errors.generic'), 'error')
@@ -587,6 +676,58 @@ export function CollectionDetailPage({
     setRecordTypeToDelete(undefined)
   }, [])
 
+  // --- Picklist Dependency handlers ---
+  const handleAddDependency = useCallback(() => {
+    setEditingDependency(undefined)
+    setDependencyEditorOpen(true)
+  }, [])
+
+  const handleEditDependency = useCallback((dep: PicklistDependency) => {
+    setEditingDependency(dep)
+    setDependencyEditorOpen(true)
+  }, [])
+
+  const handleDependencySave = useCallback(
+    async (data: {
+      controllingFieldId: string
+      dependentFieldId: string
+      mapping: Record<string, string[]>
+    }) => {
+      await saveDependencyMutation.mutateAsync(data)
+    },
+    [saveDependencyMutation]
+  )
+
+  const handleDependencyCancel = useCallback(() => {
+    setDependencyEditorOpen(false)
+    setEditingDependency(undefined)
+  }, [])
+
+  const handleDeleteDependencyClick = useCallback((dep: PicklistDependency) => {
+    setDependencyToDelete(dep)
+    setDeleteDependencyDialogOpen(true)
+  }, [])
+
+  const handleDeleteDependencyConfirm = useCallback(() => {
+    if (dependencyToDelete) {
+      deleteDependencyMutation.mutate(dependencyToDelete)
+    }
+  }, [dependencyToDelete, deleteDependencyMutation])
+
+  const handleDeleteDependencyCancel = useCallback(() => {
+    setDeleteDependencyDialogOpen(false)
+    setDependencyToDelete(undefined)
+  }, [])
+
+  // Helper to resolve field name from ID
+  const getFieldName = useCallback(
+    (fieldId: string): string => {
+      const field = collection?.fields?.find((f) => f.id === fieldId)
+      return field?.displayName || field?.name || fieldId
+    },
+    [collection]
+  )
+
   // Sort fields by order
   const sortedFields = useMemo(() => {
     if (!collection?.fields) return []
@@ -797,6 +938,18 @@ export function CollectionDetailPage({
           data-testid="record-types-tab"
         >
           {t('collections.recordTypes')}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          className={`${styles.tab} ${activeTab === 'picklistDependencies' ? styles.tabActive : ''}`}
+          onClick={() => handleTabChange('picklistDependencies')}
+          aria-selected={activeTab === 'picklistDependencies'}
+          aria-controls="picklist-dependencies-panel"
+          id="picklist-dependencies-tab"
+          data-testid="picklist-dependencies-tab"
+        >
+          {t('picklistDependencies.title')}
         </button>
         <button
           type="button"
@@ -1263,6 +1416,101 @@ export function CollectionDetailPage({
         </section>
       )}
 
+      {/* Picklist Dependencies Panel */}
+      {activeTab === 'picklistDependencies' && (
+        <section
+          id="picklist-dependencies-panel"
+          role="tabpanel"
+          aria-labelledby="picklist-dependencies-tab"
+          className={styles.tabPanel}
+          data-testid="picklist-dependencies-panel"
+        >
+          <div className={styles.panelHeader}>
+            <h2 className={styles.panelTitle}>{t('picklistDependencies.title')}</h2>
+            {picklistFieldIds.length >= 2 && (
+              <button
+                type="button"
+                className={styles.addButton}
+                onClick={handleAddDependency}
+                aria-label={t('picklistDependencies.addDependency')}
+                data-testid="add-dependency-button"
+              >
+                {t('picklistDependencies.addDependency')}
+              </button>
+            )}
+          </div>
+          {picklistFieldIds.length < 2 ? (
+            <div className={styles.emptyState} data-testid="dependencies-no-fields">
+              <p>{t('picklistDependencies.noPicklistFields')}</p>
+            </div>
+          ) : isLoadingDependencies ? (
+            <div className={styles.loadingContainer}>
+              <LoadingSpinner size="medium" label={t('common.loading')} />
+            </div>
+          ) : allDependencies.length === 0 ? (
+            <div className={styles.emptyState} data-testid="dependencies-empty">
+              <p>{t('picklistDependencies.noDependencies')}</p>
+              <button type="button" className={styles.addButton} onClick={handleAddDependency}>
+                {t('picklistDependencies.addDependency')}
+              </button>
+            </div>
+          ) : (
+            <div className={styles.tableContainer}>
+              <table
+                className={styles.table}
+                aria-label={t('picklistDependencies.title')}
+                data-testid="dependencies-table"
+              >
+                <thead>
+                  <tr>
+                    <th scope="col">{t('picklistDependencies.controllingField')}</th>
+                    <th scope="col">{t('picklistDependencies.dependentField')}</th>
+                    <th scope="col">{t('picklistDependencies.mapping')}</th>
+                    <th scope="col">{t('common.actions')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {allDependencies.map((dep, index) => (
+                    <tr key={dep.id} data-testid={`dependency-row-${index}`}>
+                      <td className={styles.fieldNameCell}>
+                        {getFieldName(dep.controllingFieldId)}
+                      </td>
+                      <td className={styles.fieldNameCell}>{getFieldName(dep.dependentFieldId)}</td>
+                      <td>
+                        {Object.keys(dep.mapping).length} mapping
+                        {Object.keys(dep.mapping).length !== 1 ? 's' : ''}
+                      </td>
+                      <td className={styles.actionsCell}>
+                        <div className={styles.actionButtons}>
+                          <button
+                            type="button"
+                            className={styles.actionButton}
+                            onClick={() => handleEditDependency(dep)}
+                            aria-label={`${t('common.edit')} dependency`}
+                            data-testid={`edit-dependency-${index}`}
+                          >
+                            {t('common.edit')}
+                          </button>
+                          <button
+                            type="button"
+                            className={`${styles.actionButton} ${styles.actionButtonDanger}`}
+                            onClick={() => handleDeleteDependencyClick(dep)}
+                            aria-label={`${t('common.delete')} dependency`}
+                            data-testid={`delete-dependency-${index}`}
+                          >
+                            {t('common.delete')}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
+
       {/* Field History Panel */}
       {activeTab === 'fieldHistory' && (
         <section
@@ -1520,6 +1768,30 @@ export function CollectionDetailPage({
             />
           </div>
         </div>
+      )}
+
+      {/* Picklist Dependency Delete Confirmation */}
+      <ConfirmDialog
+        open={deleteDependencyDialogOpen}
+        title={t('picklistDependencies.deleteDependency')}
+        message={t('picklistDependencies.confirmDelete')}
+        confirmLabel={t('common.delete')}
+        cancelLabel={t('common.cancel')}
+        onConfirm={handleDeleteDependencyConfirm}
+        onCancel={handleDeleteDependencyCancel}
+        variant="danger"
+      />
+
+      {/* Picklist Dependency Editor Modal */}
+      {dependencyEditorOpen && (
+        <PicklistDependencyEditor
+          collectionId={collectionId}
+          fields={sortedFields}
+          dependency={editingDependency}
+          onSave={handleDependencySave}
+          onCancel={handleDependencyCancel}
+          isSubmitting={saveDependencyMutation.isPending}
+        />
       )}
 
       {/* Record Type Editor Modal */}

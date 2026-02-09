@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
+import { PicklistValuesEditor } from '../../components/PicklistValuesEditor'
 import styles from './PicklistsPage.module.css'
 
 interface GlobalPicklist {
@@ -266,6 +267,8 @@ export function PicklistsPage({
   const [editingPicklist, setEditingPicklist] = useState<GlobalPicklist | undefined>(undefined)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [picklistToDelete, setPicklistToDelete] = useState<GlobalPicklist | null>(null)
+  const [valuesPicklistId, setValuesPicklistId] = useState<string | null>(null)
+  const [valuesPicklistName, setValuesPicklistName] = useState('')
 
   const {
     data: picklists,
@@ -358,6 +361,16 @@ export function PicklistsPage({
   const handleDeleteCancel = useCallback(() => {
     setDeleteDialogOpen(false)
     setPicklistToDelete(null)
+  }, [])
+
+  const handleManageValues = useCallback((pl: GlobalPicklist) => {
+    setValuesPicklistId(pl.id)
+    setValuesPicklistName(pl.name)
+  }, [])
+
+  const handleCloseValues = useCallback(() => {
+    setValuesPicklistId(null)
+    setValuesPicklistName('')
   }, [])
 
   if (isLoading) {
@@ -470,6 +483,15 @@ export function PicklistsPage({
                       <button
                         type="button"
                         className={styles.actionButton}
+                        onClick={() => handleManageValues(pl)}
+                        aria-label={`${t('picklists.manageValues')} ${pl.name}`}
+                        data-testid={`values-button-${index}`}
+                      >
+                        {t('picklists.manageValues')}
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.actionButton}
                         onClick={() => handleEdit(pl)}
                         aria-label={`${t('common.edit')} ${pl.name}`}
                         data-testid={`edit-button-${index}`}
@@ -513,6 +535,14 @@ export function PicklistsPage({
         onCancel={handleDeleteCancel}
         variant="danger"
       />
+
+      {valuesPicklistId && (
+        <PicklistValuesEditor
+          picklistId={valuesPicklistId}
+          picklistName={valuesPicklistName}
+          onClose={handleCloseValues}
+        />
+      )}
     </div>
   )
 }

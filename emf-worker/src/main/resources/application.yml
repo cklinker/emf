@@ -48,11 +48,23 @@ management:
       show-details: always
       probes:
         enabled: true
+    prometheus:
+      enabled: true
+    metrics:
+      enabled: true
   health:
     readinessState:
       enabled: true
     livenessState:
       enabled: true
+  metrics:
+    distribution:
+      percentiles-histogram:
+        emf_worker_request_duration_seconds: true
+      percentiles:
+        emf_worker_request_duration_seconds: 0.5,0.95,0.99
+    tags:
+      application: ${spring.application.name}
 
 logging:
   level:

@@ -234,6 +234,10 @@ export type { BulkJobsPageProps } from './BulkJobsPage'
 export { SetupHomePage } from './SetupHomePage'
 export type { SetupHomePageProps } from './SetupHomePage'
 
+// WorkersPage - Worker management page
+export { WorkersPage } from './WorkersPage'
+export type { WorkersPageProps, Worker, WorkerAssignment, RebalanceResult } from './WorkersPage'
+
 // NotFoundPage - 404 error page
 export { NotFoundPage } from './NotFoundPage'
 export type { NotFoundPageProps } from './NotFoundPage'

@@ -47,6 +47,8 @@ public class DynamicReactiveJwtDecoder implements ReactiveJwtDecoder {
         this.redisTemplate = redisTemplate;
         this.objectMapper = new ObjectMapper();
         this.fallbackIssuerUri = fallbackIssuerUri;
+        log.info("DynamicReactiveJwtDecoder initialized: fallbackIssuerUri={}, redis={}",
+                fallbackIssuerUri, redisTemplate != null ? "enabled" : "disabled");
     }
 
     @Override
@@ -127,11 +129,16 @@ public class DynamicReactiveJwtDecoder implements ReactiveJwtDecoder {
     }
 
     private Mono<String> lookupFromControlPlane(String issuer) {
+        log.debug("Looking up OIDC provider from control plane for issuer: {}", issuer);
         return controlPlaneClient.get()
                 .uri("/internal/oidc/by-issuer?issuer={issuer}", issuer)
                 .retrieve()
                 .bodyToMono(JsonNode.class)
-                .map(json -> json.get("jwksUri").asText())
+                .map(json -> {
+                    String jwksUri = json.get("jwksUri").asText();
+                    log.debug("Control plane returned JWKS URI: {} for issuer: {}", jwksUri, issuer);
+                    return jwksUri;
+                })
                 .onErrorResume(e -> {
                     log.warn("Failed to lookup OIDC provider for issuer {}, using OIDC discovery: {}",
                             issuer, e.getMessage());

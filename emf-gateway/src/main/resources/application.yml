@@ -31,7 +31,7 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: ${JWT_ISSUER_URI:http://localhost:9000/realms/emf}
+          issuer-uri: ${OIDC_ISSUER_URI:${JWT_ISSUER_URI:http://localhost:9000/realms/emf}}
   
   # Cloud Gateway configuration
   cloud:

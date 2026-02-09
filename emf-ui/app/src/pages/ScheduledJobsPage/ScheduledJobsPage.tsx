@@ -2,7 +2,14 @@ import React, { useState, useCallback, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
-import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
+import {
+  useToast,
+  ConfirmDialog,
+  LoadingSpinner,
+  ErrorMessage,
+  ExecutionLogModal,
+} from '../../components'
+import type { LogColumn } from '../../components'
 import styles from './ScheduledJobsPage.module.css'
 
 interface ScheduledJob {
@@ -35,6 +42,17 @@ interface FormErrors {
   name?: string
   description?: string
   cronExpression?: string
+}
+
+interface JobExecutionLog {
+  id: string
+  jobId: string
+  status: string
+  recordsProcessed: number
+  errorMessage: string | null
+  startedAt: string | null
+  completedAt: string | null
+  durationMs: number | null
 }
 
 export interface ScheduledJobsPageProps {
@@ -348,6 +366,57 @@ export function ScheduledJobsPage({
   )
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [scheduledJobToDelete, setScheduledJobToDelete] = useState<ScheduledJob | null>(null)
+  const [logsItemId, setLogsItemId] = useState<string | null>(null)
+  const [logsItemName, setLogsItemName] = useState('')
+
+  const {
+    data: logs,
+    isLoading: logsLoading,
+    error: logsError,
+  } = useQuery({
+    queryKey: ['scheduled-job-logs', logsItemId],
+    queryFn: () => apiClient.get<JobExecutionLog[]>(`/control/scheduled-jobs/${logsItemId}/logs`),
+    enabled: !!logsItemId,
+  })
+
+  const logColumns: LogColumn<JobExecutionLog>[] = [
+    { key: 'status', header: 'Status' },
+    { key: 'recordsProcessed', header: 'Records' },
+    {
+      key: 'durationMs',
+      header: 'Duration',
+      render: (v) => (v != null ? `${v}ms` : '-'),
+    },
+    { key: 'errorMessage', header: 'Error' },
+    {
+      key: 'startedAt',
+      header: 'Started At',
+      render: (v) =>
+        v
+          ? formatDate(new Date(v as string), {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+            })
+          : '-',
+    },
+    {
+      key: 'completedAt',
+      header: 'Completed At',
+      render: (v) =>
+        v
+          ? formatDate(new Date(v as string), {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+            })
+          : '-',
+    },
+  ]
 
   const {
     data: scheduledJobs,
@@ -560,6 +629,18 @@ export function ScheduledJobsPage({
                       <button
                         type="button"
                         className={styles.actionButton}
+                        onClick={() => {
+                          setLogsItemId(scheduledJob.id)
+                          setLogsItemName(scheduledJob.name)
+                        }}
+                        aria-label={`View logs for ${scheduledJob.name}`}
+                        data-testid={`logs-button-${index}`}
+                      >
+                        Logs
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.actionButton}
                         onClick={() => handleEdit(scheduledJob)}
                         aria-label={`Edit ${scheduledJob.name}`}
                         data-testid={`edit-button-${index}`}
@@ -582,6 +663,19 @@ export function ScheduledJobsPage({
             </tbody>
           </table>
         </div>
+      )}
+
+      {logsItemId && (
+        <ExecutionLogModal<JobExecutionLog>
+          title="Scheduled Job Logs"
+          subtitle={logsItemName}
+          columns={logColumns}
+          data={logs ?? []}
+          isLoading={logsLoading}
+          error={logsError instanceof Error ? logsError : null}
+          onClose={() => setLogsItemId(null)}
+          emptyMessage="No execution logs found."
+        />
       )}
 
       {isFormOpen && (

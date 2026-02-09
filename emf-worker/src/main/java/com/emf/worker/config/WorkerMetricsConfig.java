@@ -4,6 +4,7 @@ import com.emf.worker.service.CollectionLifecycleManager;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
 
 import java.lang.management.ManagementFactory;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -27,7 +28,7 @@ public class WorkerMetricsConfig {
     private final AtomicInteger initializingCount = new AtomicInteger(0);
 
     public WorkerMetricsConfig(MeterRegistry meterRegistry,
-                                CollectionLifecycleManager lifecycleManager) {
+                                @Lazy CollectionLifecycleManager lifecycleManager) {
         // Active collections gauge — reads live count from the lifecycle manager
         Gauge.builder("emf.worker.collections.active", lifecycleManager,
                         CollectionLifecycleManager::getActiveCollectionCount)

@@ -127,6 +127,10 @@ export type { UserDetailPageProps } from './UserDetailPage'
 export { PicklistsPage } from './PicklistsPage'
 export type { PicklistsPageProps } from './PicklistsPage'
 
+// HomePage - User-centric landing page
+export { HomePage } from './HomePage'
+export type { HomePageProps } from './HomePage'
+
 // DashboardPage - System health and metrics dashboard
 export { DashboardPage } from './DashboardPage'
 export type {

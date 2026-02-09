@@ -15,11 +15,12 @@ export {
   type UseKeyboardShortcutsOptions,
 } from './useKeyboardShortcuts'
 
-// Export custom hooks as they are implemented
-// Example exports:
-// export { useAuth } from './useAuth';
-// export { useConfig } from './useConfig';
-// export { useTheme } from './useTheme';
-// export { useI18n } from './useI18n';
-// export { usePlugins } from './usePlugins';
-// export { useToast } from './useToast';
+// Recent records hook for tracking user activity
+export {
+  useRecentRecords,
+  type RecentRecord,
+  type UseRecentRecordsReturn,
+} from './useRecentRecords'
+
+// Favorites hook for starred/pinned items
+export { useFavorites, type FavoriteItem, type UseFavoritesReturn } from './useFavorites'

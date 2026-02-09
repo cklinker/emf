@@ -1,7 +1,8 @@
 /**
  * Sidebar Component Tests
  *
- * Tests for the Sidebar component including menu rendering,
+ * Tests for the Sidebar component including the three-section layout
+ * (My Workspace, Tools, Setup), menu rendering inside Setup,
  * nested menu items, collapsed state, and accessibility.
  *
  * Requirements tested:
@@ -26,12 +27,67 @@ vi.mock('../../context/I18nContext', () => ({
         'navigation.main': 'Main navigation',
         'navigation.menu': 'Menu',
         'navigation.noMenus': 'No menus configured',
+        'navigation.home': 'Home',
+        'sidebar.workspace': 'My Workspace',
+        'sidebar.allCollections': 'All Collections',
+        'sidebar.tools': 'Tools',
+        'sidebar.reports': 'Reports',
+        'sidebar.dashboards': 'Dashboards',
+        'sidebar.setup': 'Setup',
+        'sidebar.systemHealth': 'System Health',
+        'sidebar.monitoring': 'Monitoring',
       }
       return translations[key] || key
     },
     formatDate: vi.fn(),
     formatNumber: vi.fn(),
     direction: 'ltr' as const,
+  })),
+}))
+
+// Mock AuthContext
+vi.mock('../../context/AuthContext', () => ({
+  useAuth: vi.fn(() => ({
+    user: { id: 'test-user', email: 'test@example.com' },
+    isAuthenticated: true,
+    isLoading: false,
+    login: vi.fn(),
+    logout: vi.fn(),
+  })),
+}))
+
+// Mock ApiContext
+vi.mock('../../context/ApiContext', () => ({
+  useApi: vi.fn(() => ({
+    apiClient: {
+      get: vi.fn().mockResolvedValue([]),
+      post: vi.fn(),
+      put: vi.fn(),
+      delete: vi.fn(),
+    },
+  })),
+}))
+
+// Mock useFavorites
+vi.mock('../../hooks/useFavorites', () => ({
+  useFavorites: vi.fn(() => ({
+    favorites: [],
+    addFavorite: vi.fn(),
+    removeFavorite: vi.fn(),
+    isFavorite: vi.fn(() => false),
+    clearFavorites: vi.fn(),
+  })),
+}))
+
+// Mock react-query
+vi.mock('@tanstack/react-query', () => ({
+  useQuery: vi.fn(() => ({
+    data: [],
+    isLoading: false,
+    error: null,
+  })),
+  useQueryClient: vi.fn(() => ({
+    invalidateQueries: vi.fn(),
   })),
 }))
 
@@ -49,6 +105,13 @@ function renderSidebar(props: Partial<SidebarProps> = {}, initialRoute: string =
       <Sidebar {...defaultProps} />
     </MemoryRouter>
   )
+}
+
+/** Expand the Setup section by clicking its toggle button */
+async function expandSetup(user: ReturnType<typeof userEvent.setup>) {
+  const setupSection = screen.getByTestId('setup-section')
+  const toggle = within(setupSection).getByRole('button', { name: /Setup/ })
+  await user.click(toggle)
 }
 
 // Sample menu configurations for testing
@@ -111,7 +174,7 @@ const multipleMenus: MenuConfig[] = [
   {
     id: 'main',
     name: 'Main',
-    items: [{ id: 'home', label: 'Home', path: '/', icon: 'home' }],
+    items: [{ id: 'home-link', label: 'Home Link', path: '/home-link', icon: 'home' }],
   },
   {
     id: 'admin',
@@ -123,6 +186,7 @@ const multipleMenus: MenuConfig[] = [
 describe('Sidebar', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    localStorage.clear()
   })
 
   afterEach(() => {
@@ -140,65 +204,163 @@ describe('Sidebar', () => {
       expect(screen.getByTestId('sidebar')).toHaveAttribute('aria-label', 'Main navigation')
     })
 
-    it('should render empty state when no menus provided', () => {
+    it('should render all three sections', () => {
+      renderSidebar({ menus: sampleMenus })
+      expect(screen.getByTestId('workspace-section')).toBeInTheDocument()
+      expect(screen.getByTestId('tools-section')).toBeInTheDocument()
+      expect(screen.getByTestId('setup-section')).toBeInTheDocument()
+    })
+
+    it('should render section titles', () => {
+      renderSidebar({ menus: sampleMenus })
+      expect(screen.getByText('My Workspace')).toBeInTheDocument()
+      expect(screen.getByText('Tools')).toBeInTheDocument()
+      expect(screen.getByText('Setup')).toBeInTheDocument()
+    })
+
+    it('should render empty state when no menus and no collections', () => {
       renderSidebar({ menus: [] })
       expect(screen.getByTestId('sidebar-empty')).toBeInTheDocument()
       expect(screen.getByText('No menus configured')).toBeInTheDocument()
     })
   })
 
-  describe('Menu Rendering', () => {
-    it('should render menu sections', () => {
-      renderSidebar({ menus: sampleMenus })
-      expect(screen.getByTestId('menu-section-main')).toBeInTheDocument()
+  describe('My Workspace Section', () => {
+    it('should render Home link', () => {
+      renderSidebar({ menus: [] })
+      expect(screen.getByTestId('menu-item-home')).toBeInTheDocument()
+      expect(screen.getByText('Home')).toBeInTheDocument()
     })
 
-    it('should render menu section title', () => {
-      renderSidebar({ menus: sampleMenus })
-      expect(screen.getByText('Main Menu')).toBeInTheDocument()
+    it('should render All Collections link', () => {
+      renderSidebar({ menus: [] })
+      expect(screen.getByTestId('menu-item-all-collections')).toBeInTheDocument()
+      expect(screen.getByText('All Collections')).toBeInTheDocument()
+    })
+  })
+
+  describe('Tools Section', () => {
+    it('should render Reports link', () => {
+      renderSidebar({ menus: [] })
+      expect(screen.getByTestId('menu-item-reports')).toBeInTheDocument()
+      expect(screen.getByText('Reports')).toBeInTheDocument()
     })
 
-    it('should render menu items', () => {
+    it('should render Dashboards link', () => {
+      renderSidebar({ menus: [] })
+      expect(screen.getByTestId('menu-item-dashboards')).toBeInTheDocument()
+      expect(screen.getByText('Dashboards')).toBeInTheDocument()
+    })
+  })
+
+  describe('Setup Section', () => {
+    it('should have Setup collapsed by default', () => {
       renderSidebar({ menus: sampleMenus })
+      // Menu items from menus prop should not be visible until Setup is expanded
+      expect(screen.queryByTestId('menu-item-dashboard')).not.toBeInTheDocument()
+    })
+
+    it('should expand Setup when toggle is clicked', async () => {
+      const user = userEvent.setup()
+      renderSidebar({ menus: sampleMenus })
+
+      await expandSetup(user)
+
       expect(screen.getByTestId('menu-item-dashboard')).toBeInTheDocument()
       expect(screen.getByTestId('menu-item-collections')).toBeInTheDocument()
     })
 
-    it('should render menu item labels', () => {
+    it('should render menu section titles inside Setup', async () => {
+      const user = userEvent.setup()
       renderSidebar({ menus: sampleMenus })
+
+      await expandSetup(user)
+      expect(screen.getByText('Main Menu')).toBeInTheDocument()
+    })
+
+    it('should render menu item labels inside Setup', async () => {
+      const user = userEvent.setup()
+      renderSidebar({ menus: sampleMenus })
+
+      await expandSetup(user)
       expect(screen.getByText('Dashboard')).toBeInTheDocument()
       expect(screen.getByText('Collections')).toBeInTheDocument()
     })
 
-    it('should render menu item icons', () => {
+    it('should render menu item icons inside Setup', async () => {
+      const user = userEvent.setup()
       renderSidebar({ menus: sampleMenus })
-      // Icons are rendered as emoji/unicode
-      expect(screen.getByText('📊')).toBeInTheDocument() // dashboard
+
+      await expandSetup(user)
+      // dashboard icon '📊' appears in both Tools (Dashboards) and Setup (Dashboard)
+      expect(screen.getAllByText('📊').length).toBeGreaterThanOrEqual(2)
       expect(screen.getByText('📁')).toBeInTheDocument() // collections
     })
 
-    it('should render multiple menu sections', () => {
+    it('should render multiple menu sections inside Setup', async () => {
+      const user = userEvent.setup()
       renderSidebar({ menus: multipleMenus })
-      expect(screen.getByTestId('menu-section-main')).toBeInTheDocument()
-      expect(screen.getByTestId('menu-section-admin')).toBeInTheDocument()
+
+      await expandSetup(user)
       expect(screen.getByText('Main')).toBeInTheDocument()
       expect(screen.getByText('Admin')).toBeInTheDocument()
+    })
+
+    it('should render System Health link inside Setup', async () => {
+      const user = userEvent.setup()
+      renderSidebar({ menus: sampleMenus })
+
+      await expandSetup(user)
+      expect(screen.getByTestId('menu-item-system-health')).toBeInTheDocument()
+      expect(screen.getByText('System Health')).toBeInTheDocument()
+    })
+
+    it('should have aria-expanded on Setup toggle', () => {
+      renderSidebar({ menus: sampleMenus })
+      const setupSection = screen.getByTestId('setup-section')
+      const toggle = within(setupSection).getByRole('button', { name: /Setup/ })
+      expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    })
+
+    it('should toggle aria-expanded when Setup is clicked', async () => {
+      const user = userEvent.setup()
+      renderSidebar({ menus: sampleMenus })
+
+      const setupSection = screen.getByTestId('setup-section')
+      const toggle = within(setupSection).getByRole('button', { name: /Setup/ })
+
+      await user.click(toggle)
+      expect(toggle).toHaveAttribute('aria-expanded', 'true')
+
+      await user.click(toggle)
+      expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    })
+
+    it('should auto-expand Setup when current route matches a setup path', () => {
+      renderSidebar({ menus: sampleMenus }, '/collections')
+      // Setup should auto-expand because /collections is a setup path
+      expect(screen.getByTestId('menu-item-dashboard')).toBeInTheDocument()
     })
   })
 
   describe('Navigation Links', () => {
-    it('should render menu items as links when path is provided', () => {
+    it('should render menu items as links when path is provided', async () => {
+      const user = userEvent.setup()
       renderSidebar({ menus: sampleMenus })
+
+      await expandSetup(user)
+
       const dashboardItem = screen.getByTestId('menu-item-dashboard')
       const link = within(dashboardItem).getByRole('link')
       expect(link).toHaveAttribute('href', '/dashboard')
     })
 
     it('should highlight active menu item based on current route', () => {
-      renderSidebar({ menus: sampleMenus }, '/dashboard')
-      const dashboardItem = screen.getByTestId('menu-item-dashboard')
-      const link = within(dashboardItem).getByRole('link')
-      // CSS Modules hash class names, so check for partial match
+      // /collections auto-expands Setup
+      renderSidebar({ menus: sampleMenus }, '/collections')
+
+      const collectionsItem = screen.getByTestId('menu-item-collections')
+      const link = within(collectionsItem).getByRole('link')
       expect(link.className).toMatch(/menuItemContent--active/)
     })
 
@@ -207,8 +369,22 @@ describe('Sidebar', () => {
       const user = userEvent.setup()
       renderSidebar({ menus: sampleMenus, onItemClick })
 
+      await expandSetup(user)
+
       const dashboardItem = screen.getByTestId('menu-item-dashboard')
       const link = within(dashboardItem).getByRole('link')
+      await user.click(link)
+
+      expect(onItemClick).toHaveBeenCalledTimes(1)
+    })
+
+    it('should call onItemClick for workspace links', async () => {
+      const onItemClick = vi.fn()
+      const user = userEvent.setup()
+      renderSidebar({ menus: [], onItemClick })
+
+      const homeItem = screen.getByTestId('menu-item-home')
+      const link = within(homeItem).getByRole('link')
       await user.click(link)
 
       expect(onItemClick).toHaveBeenCalledTimes(1)
@@ -216,16 +392,23 @@ describe('Sidebar', () => {
   })
 
   describe('Nested Menu Items', () => {
-    it('should render parent items with children as buttons', () => {
+    it('should render parent items with children as buttons', async () => {
+      const user = userEvent.setup()
       renderSidebar({ menus: nestedMenus })
+
+      await expandSetup(user)
+
       const securityItem = screen.getByTestId('menu-item-security')
       const button = within(securityItem).getByRole('button')
       expect(button).toBeInTheDocument()
     })
 
-    it('should not show nested items initially', () => {
+    it('should not show nested items initially', async () => {
+      const user = userEvent.setup()
       renderSidebar({ menus: nestedMenus })
-      // Submenu should be collapsed (max-height: 0)
+
+      await expandSetup(user)
+
       const submenu = screen.getByRole('group', { name: 'Security submenu' })
       expect(submenu).not.toHaveClass('submenu--expanded')
     })
@@ -234,12 +417,13 @@ describe('Sidebar', () => {
       const user = userEvent.setup()
       renderSidebar({ menus: nestedMenus })
 
+      await expandSetup(user)
+
       const securityItem = screen.getByTestId('menu-item-security')
       const button = within(securityItem).getByRole('button')
       await user.click(button)
 
       const submenu = screen.getByRole('group', { name: 'Security submenu' })
-      // CSS Modules hash class names, so check for partial match
       expect(submenu.className).toMatch(/submenu--expanded/)
     })
 
@@ -247,17 +431,16 @@ describe('Sidebar', () => {
       const user = userEvent.setup()
       renderSidebar({ menus: nestedMenus })
 
+      await expandSetup(user)
+
       const securityItem = screen.getByTestId('menu-item-security')
       const button = within(securityItem).getByRole('button')
 
-      // Expand
       await user.click(button)
-      // CSS Modules hash class names, so check for partial match
       expect(screen.getByRole('group', { name: 'Security submenu' }).className).toMatch(
         /submenu--expanded/
       )
 
-      // Collapse
       await user.click(button)
       expect(screen.getByRole('group', { name: 'Security submenu' }).className).not.toMatch(
         /submenu--expanded/
@@ -268,12 +451,12 @@ describe('Sidebar', () => {
       const user = userEvent.setup()
       renderSidebar({ menus: nestedMenus })
 
-      // Expand the parent
+      await expandSetup(user)
+
       const securityItem = screen.getByTestId('menu-item-security')
       const button = within(securityItem).getByRole('button')
       await user.click(button)
 
-      // Check nested items are rendered
       expect(screen.getByTestId('menu-item-roles')).toBeInTheDocument()
       expect(screen.getByTestId('menu-item-policies')).toBeInTheDocument()
     })
@@ -281,6 +464,8 @@ describe('Sidebar', () => {
     it('should have proper aria-expanded attribute on expandable items', async () => {
       const user = userEvent.setup()
       renderSidebar({ menus: nestedMenus })
+
+      await expandSetup(user)
 
       const securityItem = screen.getByTestId('menu-item-security')
       const button = within(securityItem).getByRole('button')
@@ -291,8 +476,11 @@ describe('Sidebar', () => {
       expect(button).toHaveAttribute('aria-expanded', 'true')
     })
 
-    it('should have aria-controls linking to submenu', () => {
+    it('should have aria-controls linking to submenu', async () => {
+      const user = userEvent.setup()
       renderSidebar({ menus: nestedMenus })
+
+      await expandSetup(user)
 
       const securityItem = screen.getByTestId('menu-item-security')
       const button = within(securityItem).getByRole('button')
@@ -306,33 +494,35 @@ describe('Sidebar', () => {
   })
 
   describe('Collapsed State', () => {
-    it('should hide menu section titles when collapsed', () => {
+    it('should hide section titles when collapsed', () => {
       renderSidebar({ menus: sampleMenus, collapsed: true })
-      expect(screen.queryByText('Main Menu')).not.toBeInTheDocument()
+      expect(screen.queryByText('My Workspace')).not.toBeInTheDocument()
+      expect(screen.queryByText('Tools')).not.toBeInTheDocument()
     })
 
     it('should hide menu item labels when collapsed', () => {
       renderSidebar({ menus: sampleMenus, collapsed: true })
-      expect(screen.queryByText('Dashboard')).not.toBeInTheDocument()
-      expect(screen.queryByText('Collections')).not.toBeInTheDocument()
+      expect(screen.queryByText('Home')).not.toBeInTheDocument()
+      expect(screen.queryByText('Reports')).not.toBeInTheDocument()
     })
 
     it('should still show icons when collapsed', () => {
       renderSidebar({ menus: sampleMenus, collapsed: true })
-      expect(screen.getByText('📊')).toBeInTheDocument()
-      expect(screen.getByText('📁')).toBeInTheDocument()
+      // Home icon should be visible in workspace section
+      expect(screen.getByText('🏠')).toBeInTheDocument()
     })
 
     it('should add title attribute for tooltip when collapsed', () => {
       renderSidebar({ menus: sampleMenus, collapsed: true })
-      const dashboardItem = screen.getByTestId('menu-item-dashboard')
-      const link = within(dashboardItem).getByRole('link')
-      expect(link).toHaveAttribute('title', 'Dashboard')
+      const homeItem = screen.getByTestId('menu-item-home')
+      const link = within(homeItem).getByRole('link')
+      expect(link).toHaveAttribute('title', 'Home')
     })
 
-    it('should hide nested items when collapsed', () => {
+    it('should hide nested items when collapsed', async () => {
+      // Even with Setup "expanded", collapsed sidebar hides submenus
+      localStorage.setItem('emf_sidebar_setup_collapsed', 'true')
       renderSidebar({ menus: nestedMenus, collapsed: true })
-      // Submenu should not be rendered when collapsed
       expect(screen.queryByRole('group', { name: 'Security submenu' })).not.toBeInTheDocument()
     })
 
@@ -343,49 +533,61 @@ describe('Sidebar', () => {
   })
 
   describe('Active State', () => {
-    it('should mark current route as active', () => {
-      renderSidebar({ menus: sampleMenus }, '/collections')
-      const collectionsItem = screen.getByTestId('menu-item-collections')
-      // CSS Modules hash class names, so check for partial match
-      expect(collectionsItem.className).toMatch(/menuItem--active/)
+    it('should mark current route as active for workspace links', () => {
+      renderSidebar({ menus: [] }, '/')
+      const homeItem = screen.getByTestId('menu-item-home')
+      expect(homeItem.className).toMatch(/menuItem--active/)
     })
 
     it('should set aria-current on active link', () => {
-      renderSidebar({ menus: sampleMenus }, '/dashboard')
-      const dashboardItem = screen.getByTestId('menu-item-dashboard')
-      const link = within(dashboardItem).getByRole('link')
+      renderSidebar({ menus: [] }, '/')
+      const homeItem = screen.getByTestId('menu-item-home')
+      const link = within(homeItem).getByRole('link')
       expect(link).toHaveAttribute('aria-current', 'page')
     })
 
     it('should not set aria-current on inactive links', () => {
-      renderSidebar({ menus: sampleMenus }, '/dashboard')
-      const collectionsItem = screen.getByTestId('menu-item-collections')
-      const link = within(collectionsItem).getByRole('link')
+      renderSidebar({ menus: [] }, '/some-other-page')
+      const homeItem = screen.getByTestId('menu-item-home')
+      const link = within(homeItem).getByRole('link')
       expect(link).not.toHaveAttribute('aria-current')
+    })
+
+    it('should mark setup menu item as active when route matches', () => {
+      renderSidebar({ menus: sampleMenus }, '/collections')
+      const collectionsItem = screen.getByTestId('menu-item-collections')
+      expect(collectionsItem.className).toMatch(/menuItem--active/)
     })
   })
 
   describe('Accessibility', () => {
-    it('should have role="menubar" on menu lists', () => {
+    it('should have role="menubar" on workspace menu list', () => {
       renderSidebar({ menus: sampleMenus })
-      const menuList = screen.getByRole('menubar', { name: 'Main Menu' })
-      expect(menuList).toBeInTheDocument()
+      expect(screen.getByRole('menubar', { name: 'My Workspace' })).toBeInTheDocument()
     })
 
-    it('should have role="group" on submenus', () => {
+    it('should have role="menubar" on tools menu list', () => {
+      renderSidebar({ menus: sampleMenus })
+      expect(screen.getByRole('menubar', { name: 'Tools' })).toBeInTheDocument()
+    })
+
+    it('should have role="group" on submenus inside setup', async () => {
+      const user = userEvent.setup()
       renderSidebar({ menus: nestedMenus })
+
+      await expandSetup(user)
+
       const submenu = screen.getByRole('group', { name: 'Security submenu' })
       expect(submenu).toBeInTheDocument()
     })
 
     it('should be keyboard navigable', async () => {
       const user = userEvent.setup()
-      renderSidebar({ menus: sampleMenus })
+      renderSidebar({ menus: [] })
 
-      const dashboardItem = screen.getByTestId('menu-item-dashboard')
-      const link = within(dashboardItem).getByRole('link')
+      const homeItem = screen.getByTestId('menu-item-home')
+      const link = within(homeItem).getByRole('link')
 
-      // Tab to the link
       await user.tab()
       expect(link).toHaveFocus()
     })
@@ -394,10 +596,11 @@ describe('Sidebar', () => {
       const user = userEvent.setup()
       renderSidebar({ menus: nestedMenus })
 
+      await expandSetup(user)
+
       const securityItem = screen.getByTestId('menu-item-security')
       const button = within(securityItem).getByRole('button')
 
-      // Focus and press Enter
       button.focus()
       await user.keyboard('{Enter}')
 
@@ -408,10 +611,11 @@ describe('Sidebar', () => {
       const user = userEvent.setup()
       renderSidebar({ menus: nestedMenus })
 
+      await expandSetup(user)
+
       const securityItem = screen.getByTestId('menu-item-security')
       const button = within(securityItem).getByRole('button')
 
-      // Focus and press Space
       button.focus()
       await user.keyboard(' ')
 
@@ -420,7 +624,7 @@ describe('Sidebar', () => {
   })
 
   describe('Menu Items Without Path', () => {
-    it('should render items without path as non-interactive', () => {
+    it('should render items without path as non-interactive', async () => {
       const menusWithNoPath: MenuConfig[] = [
         {
           id: 'test',
@@ -429,37 +633,36 @@ describe('Sidebar', () => {
         },
       ]
 
+      const user = userEvent.setup()
       renderSidebar({ menus: menusWithNoPath })
-      const item = screen.getByTestId('menu-item-label-only')
 
-      // Should not have a link or button
+      await expandSetup(user)
+
+      const item = screen.getByTestId('menu-item-label-only')
       expect(within(item).queryByRole('link')).not.toBeInTheDocument()
       expect(within(item).queryByRole('button')).not.toBeInTheDocument()
     })
   })
 
   describe('Icon Mapping', () => {
-    it('should map known icon names to emoji', () => {
+    it('should map known icon names to emoji', async () => {
       const menusWithIcons: MenuConfig[] = [
         {
           id: 'icons',
           name: 'Icons',
-          items: [
-            { id: 'home', label: 'Home', path: '/home', icon: 'home' },
-            { id: 'users', label: 'Users', path: '/users', icon: 'users' },
-            { id: 'settings', label: 'Settings', path: '/settings', icon: 'settings' },
-          ],
+          items: [{ id: 'users-link', label: 'Users', path: '/users', icon: 'users' }],
         },
       ]
 
+      const user = userEvent.setup()
       renderSidebar({ menus: menusWithIcons })
 
-      expect(screen.getByText('🏠')).toBeInTheDocument() // home
+      await expandSetup(user)
+
       expect(screen.getByText('👥')).toBeInTheDocument() // users
-      expect(screen.getByText('⚙️')).toBeInTheDocument() // settings
     })
 
-    it('should use icon name as fallback for unknown icons', () => {
+    it('should use icon name as fallback for unknown icons', async () => {
       const menusWithUnknownIcon: MenuConfig[] = [
         {
           id: 'test',
@@ -468,11 +671,14 @@ describe('Sidebar', () => {
         },
       ]
 
+      const user = userEvent.setup()
       renderSidebar({ menus: menusWithUnknownIcon })
+
+      await expandSetup(user)
       expect(screen.getByText('custom-icon')).toBeInTheDocument()
     })
 
-    it('should handle items without icons', () => {
+    it('should handle items without icons', async () => {
       const menusWithoutIcons: MenuConfig[] = [
         {
           id: 'test',
@@ -481,7 +687,10 @@ describe('Sidebar', () => {
         },
       ]
 
+      const user = userEvent.setup()
       renderSidebar({ menus: menusWithoutIcons })
+
+      await expandSetup(user)
       expect(screen.getByText('No Icon')).toBeInTheDocument()
     })
   })
@@ -520,12 +729,15 @@ describe('Sidebar', () => {
       const user = userEvent.setup()
       renderSidebar({ menus: deeplyNestedMenus })
 
-      // Expand level 1 - use getByRole with name to be more specific
+      // First expand Setup
+      await expandSetup(user)
+
+      // Expand level 1
       const level1Item = screen.getByTestId('menu-item-level1')
       const level1Button = within(level1Item).getByRole('button', { name: /Level 1/ })
       await user.click(level1Button)
 
-      // Expand level 2 - use getByRole with name to be more specific
+      // Expand level 2
       const level2Item = screen.getByTestId('menu-item-level2')
       const level2Button = within(level2Item).getByRole('button', { name: /Level 2/ })
       await user.click(level2Button)

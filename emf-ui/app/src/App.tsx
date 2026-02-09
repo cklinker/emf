@@ -37,6 +37,7 @@ import { PageLoader } from './components/PageLoader'
 
 // Pages
 import {
+  HomePage,
   DashboardPage,
   CollectionsPage,
   CollectionDetailPage,
@@ -342,9 +343,19 @@ function App({ plugins = [] }: AppProps): React.ReactElement {
                             {/* OAuth callback route - shows loading or error while AuthContext processes the callback */}
                             <Route path="/auth/callback" element={<AuthCallbackPage />} />
 
-                            {/* Dashboard - Home route */}
+                            {/* Home Page - default landing page */}
                             <Route
                               path="/"
+                              element={
+                                <ProtectedPageRoute>
+                                  <HomePage />
+                                </ProtectedPageRoute>
+                              }
+                            />
+
+                            {/* System Health Dashboard (moved from /) */}
+                            <Route
+                              path="/system-health"
                               element={
                                 <ProtectedPageRoute>
                                   <DashboardPage />

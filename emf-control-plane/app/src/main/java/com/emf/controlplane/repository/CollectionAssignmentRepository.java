@@ -26,4 +26,6 @@ public interface CollectionAssignmentRepository extends JpaRepository<Collection
     long countByWorkerIdAndStatus(String workerId, String status);
 
     List<CollectionAssignment> findByStatus(String status);
+
+    long countByStatus(String status);
 }

@@ -146,6 +146,9 @@ public class SecurityConfig {
                 // Permit control plane bootstrap endpoint - required for gateway health check
                 .requestMatchers("/control/bootstrap").permitAll()
 
+                // Permit worker metrics endpoints - used by KEDA and Prometheus for autoscaling
+                .requestMatchers("/control/metrics/**").permitAll()
+
                 // Permit internal endpoints - used by gateway for JWKS lookup before JWT validation
                 .requestMatchers("/internal/**").permitAll()
 

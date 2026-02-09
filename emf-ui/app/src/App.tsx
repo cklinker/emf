@@ -47,6 +47,7 @@ import {
   CollectionsPage,
   CollectionDetailPage,
   CollectionFormPage,
+  CollectionWizardPage,
   RolesPage,
   PoliciesPage,
   OIDCProvidersPage,
@@ -84,6 +85,7 @@ import {
   WebhooksPage,
   ConnectedAppsPage,
   BulkJobsPage,
+  SetupHomePage,
   LoginPage,
   UnauthorizedPage,
   NotFoundPage,
@@ -382,7 +384,7 @@ function App({ plugins = [] }: AppProps): React.ReactElement {
                               path="/collections/new"
                               element={
                                 <ProtectedPageRoute>
-                                  <CollectionFormPage />
+                                  <CollectionWizardPage />
                                 </ProtectedPageRoute>
                               }
                             />
@@ -759,6 +761,16 @@ function App({ plugins = [] }: AppProps): React.ReactElement {
                               element={
                                 <ProtectedPageRoute>
                                   <BulkJobsPage />
+                                </ProtectedPageRoute>
+                              }
+                            />
+
+                            {/* Setup Home Page */}
+                            <Route
+                              path="/setup"
+                              element={
+                                <ProtectedPageRoute>
+                                  <SetupHomePage />
                                 </ProtectedPageRoute>
                               }
                             />

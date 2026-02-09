@@ -1,6 +1,9 @@
 /**
  * DashboardsPage Styles
+ * Covers: card grid list, viewer, editor, widget renderers, modals
  */
+
+/* ─── Container & Layout ──────────────────────────────────────────────────── */
 
 .container {
   padding: 2rem;
@@ -15,7 +18,8 @@
   min-height: 400px;
 }
 
-/* Header */
+/* ─── Header ──────────────────────────────────────────────────────────────── */
+
 .header {
   display: flex;
   justify-content: space-between;
@@ -31,6 +35,9 @@
 }
 
 .createButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
   padding: 0.75rem 1.5rem;
   font-size: 1rem;
   font-weight: 500;
@@ -51,135 +58,8 @@
   outline-offset: 2px;
 }
 
-/* Table */
-.tableContainer {
-  background: #fff;
-  border: 1px solid var(--color-border, #e5e7eb);
-  border-radius: 0.5rem;
-  overflow: hidden;
-}
+/* ─── Empty State ─────────────────────────────────────────────────────────── */
 
-.table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.table thead {
-  background-color: var(--color-bg-secondary, #f9fafb);
-}
-
-.table th {
-  padding: 0.75rem 1rem;
-  text-align: left;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--color-text-secondary, #6b7280);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  border-bottom: 1px solid var(--color-border, #e5e7eb);
-}
-
-.tableRow {
-  border-bottom: 1px solid var(--color-border, #e5e7eb);
-  transition: background-color 0.15s;
-}
-
-.tableRow:hover {
-  background-color: var(--color-bg-hover, #f9fafb);
-}
-
-.tableRow:last-child {
-  border-bottom: none;
-}
-
-.table td {
-  padding: 1rem;
-  font-size: 0.875rem;
-  color: var(--color-text-primary, #1a1a1a);
-}
-
-.descriptionCell {
-  color: var(--color-text-secondary, #6b7280);
-  max-width: 300px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Badge */
-.badge {
-  display: inline-block;
-  padding: 0.25rem 0.75rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  border-radius: 9999px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #1e40af;
-  background-color: #dbeafe;
-}
-
-.boolBadge {
-  display: inline-block;
-  padding: 0.25rem 0.75rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  border-radius: 9999px;
-}
-
-.boolTrue {
-  color: #065f46;
-  background-color: #d1fae5;
-}
-
-.boolFalse {
-  color: #6b7280;
-  background-color: #f3f4f6;
-}
-
-/* Actions */
-.actionsCell {
-  text-align: right;
-}
-
-.actions {
-  display: flex;
-  gap: 0.5rem;
-  justify-content: flex-end;
-}
-
-.actionButton {
-  padding: 0.5rem 1rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--color-primary, #0066cc);
-  background-color: transparent;
-  border: 1px solid var(--color-border, #e5e7eb);
-  border-radius: 0.375rem;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.actionButton:hover {
-  background-color: var(--color-bg-secondary, #f9fafb);
-  border-color: var(--color-primary, #0066cc);
-}
-
-.actionButton:focus-visible {
-  outline: 2px solid var(--color-primary, #0066cc);
-  outline-offset: 2px;
-}
-
-.deleteButton {
-  color: #dc2626;
-}
-
-.deleteButton:hover {
-  border-color: #dc2626;
-  background-color: #fef2f2;
-}
-
-/* Empty State */
 .emptyState {
   padding: 4rem 2rem;
   text-align: center;
@@ -187,9 +67,804 @@
   background: #fff;
   border: 1px solid var(--color-border, #e5e7eb);
   border-radius: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
 }
 
-/* Modal */
+.emptyIcon {
+  color: var(--color-text-secondary, #9ca3af);
+  margin-bottom: 0.5rem;
+}
+
+.emptyTitle {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--color-text-primary, #1a1a1a);
+  margin: 0;
+}
+
+.emptyHint {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary, #6b7280);
+  margin: 0;
+}
+
+/* ─── Card Grid ───────────────────────────────────────────────────────────── */
+
+.cardGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 1.5rem;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 0.5rem;
+  overflow: hidden;
+  transition:
+    box-shadow 0.2s,
+    border-color 0.2s;
+  display: flex;
+  flex-direction: column;
+}
+
+.card:hover {
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  border-color: var(--color-primary, #0066cc);
+}
+
+.cardClickable {
+  padding: 1.25rem;
+  cursor: pointer;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.cardClickable:focus-visible {
+  outline: 2px solid var(--color-primary, #0066cc);
+  outline-offset: -2px;
+  border-radius: 0.5rem 0.5rem 0 0;
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.cardTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.cardIcon {
+  color: var(--color-primary, #0066cc);
+  flex-shrink: 0;
+}
+
+.cardName {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--color-text-primary, #1a1a1a);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.accessBadge {
+  display: inline-block;
+  padding: 0.125rem 0.625rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  border-radius: 9999px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+  color: #1e40af;
+  background-color: #dbeafe;
+}
+
+.accessPRIVATE {
+  color: #92400e;
+  background-color: #fef3c7;
+}
+
+.accessPUBLIC {
+  color: #065f46;
+  background-color: #d1fae5;
+}
+
+.accessHIDDEN {
+  color: #6b7280;
+  background-color: #f3f4f6;
+}
+
+.cardDescription {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary, #6b7280);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.cardMeta {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.75rem;
+  color: var(--color-text-secondary, #6b7280);
+}
+
+.cardMetaItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.cardFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+  color: var(--color-text-secondary, #9ca3af);
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--color-border, #f3f4f6);
+  margin-top: auto;
+}
+
+.cardDate {
+  font-size: 0.75rem;
+}
+
+.cardCreator {
+  font-size: 0.75rem;
+}
+
+.cardActions {
+  display: flex;
+  border-top: 1px solid var(--color-border, #e5e7eb);
+}
+
+.cardActionButton {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  padding: 0.625rem 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-text-secondary, #6b7280);
+  background: transparent;
+  border: none;
+  border-right: 1px solid var(--color-border, #e5e7eb);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.cardActionButton:last-child {
+  border-right: none;
+}
+
+.cardActionButton:hover {
+  background-color: var(--color-bg-secondary, #f9fafb);
+  color: var(--color-primary, #0066cc);
+}
+
+.cardActionButton:focus-visible {
+  outline: 2px solid var(--color-primary, #0066cc);
+  outline-offset: -2px;
+}
+
+.cardActionDelete:hover {
+  color: #dc2626;
+  background-color: #fef2f2;
+}
+
+/* ─── Dashboard Viewer ────────────────────────────────────────────────────── */
+
+.viewerContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.viewerHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.viewerHeaderLeft {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.viewerTitle {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+.viewerDescription {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary, #6b7280);
+  margin: 0;
+}
+
+.backButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text-secondary, #6b7280);
+  background: transparent;
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: all 0.15s;
+  width: fit-content;
+}
+
+.backButton:hover {
+  color: var(--color-text-primary, #1a1a1a);
+  background-color: var(--color-bg-secondary, #f9fafb);
+  border-color: var(--color-text-secondary, #9ca3af);
+}
+
+.backButton:focus-visible {
+  outline: 2px solid var(--color-primary, #0066cc);
+  outline-offset: 2px;
+}
+
+.editDashboardButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.625rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-primary, #0066cc);
+  background: transparent;
+  border: 1px solid var(--color-primary, #0066cc);
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.editDashboardButton:hover {
+  background-color: rgba(0, 102, 204, 0.05);
+}
+
+.editDashboardButton:focus-visible {
+  outline: 2px solid var(--color-primary, #0066cc);
+  outline-offset: 2px;
+}
+
+.viewerEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 4rem 2rem;
+  background: #fff;
+  border: 2px dashed var(--color-border, #e5e7eb);
+  border-radius: 0.5rem;
+  color: var(--color-text-secondary, #9ca3af);
+  text-align: center;
+}
+
+.viewerEmpty p {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--color-text-secondary, #6b7280);
+}
+
+/* ─── Widget Grid ─────────────────────────────────────────────────────────── */
+
+.widgetGrid {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.widgetCell {
+  min-height: 160px;
+  background: #fff;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+/* ─── Widget Loading / Error / Empty ──────────────────────────────────────── */
+
+.widgetLoading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 2rem;
+  color: var(--color-text-secondary, #9ca3af);
+  height: 100%;
+  min-height: 120px;
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.widgetError {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 2rem;
+  color: #dc2626;
+  font-size: 0.875rem;
+  height: 100%;
+  min-height: 120px;
+}
+
+.widgetEmpty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  color: var(--color-text-secondary, #9ca3af);
+  font-size: 0.875rem;
+}
+
+/* ─── Metric Card Widget ──────────────────────────────────────────────────── */
+
+.metricCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  height: 100%;
+  text-align: center;
+  gap: 0.5rem;
+}
+
+.metricValue {
+  font-size: 2.25rem;
+  font-weight: 700;
+  color: var(--color-primary, #0066cc);
+  line-height: 1;
+}
+
+.metricLabel {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+.metricMeta {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary, #9ca3af);
+}
+
+/* ─── Bar Chart Widget ────────────────────────────────────────────────────── */
+
+.barChart {
+  display: flex;
+  flex-direction: column;
+  padding: 1.25rem;
+  height: 100%;
+}
+
+.barChartTitle {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--color-text-primary, #1a1a1a);
+  margin-bottom: 1rem;
+}
+
+.barChartBody {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  flex: 1;
+}
+
+.barRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.barLabel {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary, #6b7280);
+  min-width: 80px;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.barTrack {
+  flex: 1;
+  height: 20px;
+  background-color: var(--color-bg-secondary, #f3f4f6);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.barFill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-primary, #0066cc), #3b82f6);
+  border-radius: 4px;
+  transition: width 0.4s ease;
+  min-width: 2px;
+}
+
+.barValue {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text-primary, #1a1a1a);
+  min-width: 50px;
+  text-align: right;
+}
+
+/* ─── Data Table Widget ───────────────────────────────────────────────────── */
+
+.dataTableWidget {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.dataTableTitle {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--color-text-primary, #1a1a1a);
+  padding: 1rem 1.25rem 0.75rem;
+}
+
+.dataTableContainer {
+  overflow-x: auto;
+  flex: 1;
+}
+
+.dataTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.dataTable thead {
+  background-color: var(--color-bg-secondary, #f9fafb);
+}
+
+.dataTable th {
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  font-weight: 600;
+  color: var(--color-text-secondary, #6b7280);
+  text-transform: uppercase;
+  font-size: 0.6875rem;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--color-border, #e5e7eb);
+}
+
+.dataTable td {
+  padding: 0.5rem 0.75rem;
+  color: var(--color-text-primary, #1a1a1a);
+  border-bottom: 1px solid var(--color-border, #f3f4f6);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dataTable tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.dataTable tbody tr:hover {
+  background-color: var(--color-bg-hover, #f9fafb);
+}
+
+/* ─── Recent Records Widget ───────────────────────────────────────────────── */
+
+.recentRecordsWidget {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.recentRecordsTitle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--color-text-primary, #1a1a1a);
+  padding: 1rem 1.25rem 0.75rem;
+}
+
+.recentRecordsList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex: 1;
+}
+
+.recentRecordItem {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 0.625rem 1.25rem;
+  border-bottom: 1px solid var(--color-border, #f3f4f6);
+  font-size: 0.8125rem;
+  transition: background-color 0.15s;
+}
+
+.recentRecordItem:last-child {
+  border-bottom: none;
+}
+
+.recentRecordItem:hover {
+  background-color: var(--color-bg-hover, #f9fafb);
+}
+
+.recentRecordField {
+  display: inline-flex;
+  gap: 0.25rem;
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+.recentRecordFieldLabel {
+  color: var(--color-text-secondary, #9ca3af);
+  font-weight: 500;
+}
+
+/* ─── Dashboard Editor ────────────────────────────────────────────────────── */
+
+.editorContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-height: calc(100vh - 200px);
+}
+
+.editorHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.editorHeaderLeft {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.editorTitle {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+.editorBody {
+  display: flex;
+  gap: 1.5rem;
+  flex: 1;
+}
+
+/* Palette */
+
+.editorPalette {
+  width: 240px;
+  flex-shrink: 0;
+  background: #fff;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  align-self: flex-start;
+  position: sticky;
+  top: 1rem;
+}
+
+.paletteTitle {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-primary, #1a1a1a);
+  margin: 0 0 0.75rem 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.paletteList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.paletteItem {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  width: 100%;
+  padding: 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text-primary, #1a1a1a);
+  background: var(--color-bg-secondary, #f9fafb);
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: left;
+}
+
+.paletteItem:hover {
+  border-color: var(--color-primary, #0066cc);
+  background-color: rgba(0, 102, 204, 0.04);
+}
+
+.paletteItem:focus-visible {
+  outline: 2px solid var(--color-primary, #0066cc);
+  outline-offset: 2px;
+}
+
+.paletteItemIcon {
+  display: flex;
+  align-items: center;
+  color: var(--color-primary, #0066cc);
+}
+
+.paletteItemLabel {
+  flex: 1;
+}
+
+.paletteItemAdd {
+  color: var(--color-text-secondary, #9ca3af);
+}
+
+/* Canvas */
+
+.editorCanvas {
+  flex: 1;
+  min-height: 400px;
+  background: #fff;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 0.5rem;
+  padding: 1.25rem;
+}
+
+.canvasEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 300px;
+  color: var(--color-text-secondary, #9ca3af);
+  text-align: center;
+  gap: 0.5rem;
+}
+
+.canvasEmpty p {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--color-text-secondary, #6b7280);
+}
+
+.canvasEmptyHint {
+  font-size: 0.875rem !important;
+  color: var(--color-text-secondary, #9ca3af) !important;
+}
+
+.canvasGrid {
+  display: grid;
+  gap: 1rem;
+}
+
+.canvasWidget {
+  background: var(--color-bg-secondary, #f9fafb);
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 0.5rem;
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+
+.canvasWidget:hover {
+  border-color: var(--color-primary, #0066cc);
+}
+
+.canvasWidgetHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  background-color: #fff;
+  border-bottom: 1px solid var(--color-border, #e5e7eb);
+}
+
+.canvasWidgetType {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-primary, #0066cc);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.canvasWidgetRemove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem;
+  background: transparent;
+  border: none;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  color: var(--color-text-secondary, #9ca3af);
+  transition: all 0.15s;
+}
+
+.canvasWidgetRemove:hover {
+  color: #dc2626;
+  background-color: #fef2f2;
+}
+
+.canvasWidgetRemove:focus-visible {
+  outline: 2px solid var(--color-primary, #0066cc);
+  outline-offset: 2px;
+}
+
+.canvasWidgetBody {
+  padding: 0.875rem;
+}
+
+.canvasWidgetTitle {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-primary, #1a1a1a);
+  margin-bottom: 0.25rem;
+}
+
+.canvasWidgetInfo {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary, #9ca3af);
+}
+
+/* ─── Modal ───────────────────────────────────────────────────────────────── */
+
 .modalOverlay {
   position: fixed;
   top: 0;
@@ -232,9 +907,10 @@
 }
 
 .modalCloseButton {
-  padding: 0.5rem;
-  font-size: 1.5rem;
-  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.375rem;
   color: var(--color-text-secondary, #6b7280);
   background: transparent;
   border: none;
@@ -248,11 +924,17 @@
   background-color: var(--color-bg-secondary, #f9fafb);
 }
 
+.modalCloseButton:focus-visible {
+  outline: 2px solid var(--color-primary, #0066cc);
+  outline-offset: 2px;
+}
+
 .modalBody {
   padding: 1.5rem;
 }
 
-/* Form */
+/* ─── Form ────────────────────────────────────────────────────────────────── */
+
 .form {
   display: flex;
   flex-direction: column;
@@ -308,11 +990,6 @@
   font-family: inherit;
 }
 
-.formHint {
-  font-size: 0.75rem;
-  color: var(--color-text-secondary, #6b7280);
-}
-
 .formError {
   font-size: 0.75rem;
   color: #dc2626;
@@ -361,6 +1038,9 @@
 }
 
 .submitButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
   padding: 0.625rem 1.25rem;
   font-size: 0.875rem;
   font-weight: 500;
@@ -381,7 +1061,13 @@
   cursor: not-allowed;
 }
 
-/* Responsive */
+.submitButton:focus-visible {
+  outline: 2px solid var(--color-primary, #0066cc);
+  outline-offset: 2px;
+}
+
+/* ─── Responsive ──────────────────────────────────────────────────────────── */
+
 @media (max-width: 768px) {
   .container {
     padding: 1rem;
@@ -395,21 +1081,43 @@
 
   .createButton {
     width: 100%;
+    justify-content: center;
   }
 
-  .tableContainer {
-    overflow-x: auto;
+  .cardGrid {
+    grid-template-columns: 1fr;
   }
 
-  .table {
-    min-width: 700px;
-  }
-
-  .actions {
+  .viewerHeader {
     flex-direction: column;
   }
 
-  .actionButton {
+  .editorBody {
+    flex-direction: column;
+  }
+
+  .editorPalette {
     width: 100%;
+    position: static;
+  }
+
+  .paletteList {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .paletteItem {
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .editorHeaderLeft {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .barLabel {
+    min-width: 60px;
+    max-width: 80px;
   }
 }

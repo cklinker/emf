@@ -946,6 +946,28 @@
     "maxWorkflows": "Maximum Workflows",
     "maxReports": "Maximum Reports"
   },
+  "workers": {
+    "title": "Workers",
+    "count": "{{count}} workers",
+    "podName": "Pod Name",
+    "host": "Host",
+    "port": "Port",
+    "pool": "Pool",
+    "status": "Status",
+    "capacityLabel": "Capacity",
+    "lastHeartbeat": "Last Heartbeat",
+    "noWorkers": "No workers registered.",
+    "rebalance": "Rebalance",
+    "rebalanceSuccess": "Rebalance completed successfully.",
+    "autoRefresh": "Auto-refresh 15s",
+    "viewAssignments": "Assignments",
+    "assignments": "Assignments",
+    "assignmentsFor": "Assignments for {{name}}",
+    "noAssignments": "No assignments for this worker.",
+    "collection": "Collection",
+    "assignmentStatus": "Status",
+    "assignedAt": "Assigned"
+  },
   "errors": {
     "generic": "An error occurred. Please try again.",
     "network": "Network error. Please check your connection.",
@@ -1097,6 +1119,7 @@
     "dashboards": "Dashboards",
     "setup": "Setup",
     "systemHealth": "System Health",
+    "workers": "Workers",
     "monitoring": "Monitoring"
   },
   "setup": {

@@ -6,6 +6,7 @@ import com.emf.controlplane.entity.CollectionAssignment;
 import com.emf.controlplane.entity.Worker;
 import com.emf.controlplane.exception.ResourceNotFoundException;
 import com.emf.controlplane.service.CollectionAssignmentService;
+import com.emf.controlplane.service.WorkerRebalanceService;
 import com.emf.controlplane.service.WorkerService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -24,12 +25,15 @@ public class WorkerController {
 
     private final WorkerService workerService;
     private final CollectionAssignmentService collectionAssignmentService;
+    private final WorkerRebalanceService workerRebalanceService;
 
     public WorkerController(
             WorkerService workerService,
-            CollectionAssignmentService collectionAssignmentService) {
+            CollectionAssignmentService collectionAssignmentService,
+            WorkerRebalanceService workerRebalanceService) {
         this.workerService = workerService;
         this.collectionAssignmentService = collectionAssignmentService;
+        this.workerRebalanceService = workerRebalanceService;
     }
 
     /**
@@ -111,5 +115,19 @@ public class WorkerController {
     public ResponseEntity<List<CollectionAssignment>> getWorkerAssignments(@PathVariable String id) {
         List<CollectionAssignment> assignments = collectionAssignmentService.findByWorker(id);
         return ResponseEntity.ok(assignments);
+    }
+
+    /**
+     * Triggers a manual rebalance of collection assignments across workers.
+     * Calculates the ideal distribution and moves assignments from overloaded
+     * to underloaded workers, respecting tenant affinity constraints.
+     *
+     * @return The rebalance report with details of moves made
+     */
+    @PostMapping("/rebalance")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<WorkerRebalanceService.RebalanceReport> rebalance() {
+        WorkerRebalanceService.RebalanceReport report = workerRebalanceService.rebalance();
+        return ResponseEntity.ok(report);
     }
 }

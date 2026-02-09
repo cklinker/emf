@@ -86,6 +86,7 @@ import {
   ConnectedAppsPage,
   BulkJobsPage,
   SetupHomePage,
+  WorkersPage,
   LoginPage,
   UnauthorizedPage,
   NotFoundPage,
@@ -439,6 +440,16 @@ function App({ plugins = [] }: AppProps): React.ReactElement {
                               element={
                                 <ProtectedPageRoute>
                                   <ServicesPage />
+                                </ProtectedPageRoute>
+                              }
+                            />
+
+                            {/* Workers route */}
+                            <Route
+                              path="/workers"
+                              element={
+                                <ProtectedPageRoute>
+                                  <WorkersPage />
                                 </ProtectedPageRoute>
                               }
                             />

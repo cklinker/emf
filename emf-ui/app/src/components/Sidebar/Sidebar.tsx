@@ -54,6 +54,7 @@ import {
   Hammer,
   HeartPulse,
   Inbox,
+  Server,
   ChevronRight,
   type LucideIcon,
 } from 'lucide-react'
@@ -147,6 +148,8 @@ function getIcon(iconName?: string): React.ReactNode {
     tools: Hammer,
     health: HeartPulse,
     bulk: Inbox,
+    server: Server,
+    workers: Server,
   }
 
   const IconComponent = iconMap[iconName.toLowerCase()]
@@ -397,6 +400,7 @@ export function Sidebar({ menus, collapsed, onToggle, onItemClick }: SidebarProp
       '/tenants',
       '/tenant-dashboard',
       '/system-health',
+      '/workers',
       '/audit-trail',
       '/governor-limits',
     ]
@@ -534,7 +538,7 @@ export function Sidebar({ menus, collapsed, onToggle, onItemClick }: SidebarProp
               </div>
             ))}
 
-            {/* System Health link */}
+            {/* System Health & Workers links */}
             <div className={styles.setupSubsection}>
               <ul className={styles.menuList} role="menubar" aria-label={t('sidebar.monitoring')}>
                 <MenuItem
@@ -543,6 +547,17 @@ export function Sidebar({ menus, collapsed, onToggle, onItemClick }: SidebarProp
                     label: t('sidebar.systemHealth'),
                     path: '/system-health',
                     icon: 'health',
+                  }}
+                  level={0}
+                  collapsed={collapsed}
+                  onItemClick={onItemClick}
+                />
+                <MenuItem
+                  item={{
+                    id: 'workers',
+                    label: t('sidebar.workers'),
+                    path: '/workers',
+                    icon: 'workers',
                   }}
                   level={0}
                   collapsed={collapsed}

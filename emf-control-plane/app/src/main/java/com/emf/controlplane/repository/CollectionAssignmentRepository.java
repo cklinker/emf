@@ -22,4 +22,8 @@ public interface CollectionAssignmentRepository extends JpaRepository<Collection
     Optional<CollectionAssignment> findByCollectionIdAndWorkerId(String collectionId, String workerId);
 
     long countByWorkerId(String workerId);
+
+    long countByWorkerIdAndStatus(String workerId, String status);
+
+    List<CollectionAssignment> findByStatus(String status);
 }

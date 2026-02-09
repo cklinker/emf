@@ -8,10 +8,12 @@ import com.emf.runtime.model.FieldType;
 import com.emf.runtime.model.StorageMode;
 import com.emf.runtime.registry.CollectionRegistry;
 import com.emf.runtime.storage.StorageAdapter;
+import com.emf.worker.config.WorkerMetricsConfig;
 import com.emf.worker.config.WorkerProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -51,6 +53,12 @@ public class CollectionLifecycleManager {
     private final ObjectMapper objectMapper;
 
     /**
+     * Optional metrics config for updating initializing collection count.
+     * Injected lazily to avoid circular dependency (MetricsConfig depends on this bean).
+     */
+    private WorkerMetricsConfig metricsConfig;
+
+    /**
      * Tracks which collection IDs are actively managed by this worker.
      * Maps collection ID to collection name for quick lookup.
      */
@@ -68,6 +76,11 @@ public class CollectionLifecycleManager {
         this.objectMapper = objectMapper;
     }
 
+    @Autowired(required = false)
+    public void setMetricsConfig(WorkerMetricsConfig metricsConfig) {
+        this.metricsConfig = metricsConfig;
+    }
+
     /**
      * Initializes a collection on this worker by fetching its definition from
      * the control plane, registering it locally, and initializing storage.
@@ -77,6 +90,10 @@ public class CollectionLifecycleManager {
     @SuppressWarnings("unchecked")
     public void initializeCollection(String collectionId) {
         log.info("Initializing collection: {}", collectionId);
+
+        if (metricsConfig != null) {
+            metricsConfig.getInitializingCount().incrementAndGet();
+        }
 
         try {
             // Fetch collection definition from control plane
@@ -116,6 +133,10 @@ public class CollectionLifecycleManager {
 
         } catch (Exception e) {
             log.error("Failed to initialize collection {}: {}", collectionId, e.getMessage(), e);
+        } finally {
+            if (metricsConfig != null) {
+                metricsConfig.getInitializingCount().decrementAndGet();
+            }
         }
     }
 

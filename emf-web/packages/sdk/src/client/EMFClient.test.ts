@@ -474,9 +474,9 @@ describe('EMFClient', () => {
       vi.clearAllMocks();
     });
 
-    it('should fetch from /api/_meta/resources endpoint (Requirement 2.1)', async () => {
+    it('should fetch from /control/_meta/resources endpoint (Requirement 2.1)', async () => {
       await client.discover();
-      expect(mockAxiosGet).toHaveBeenCalledWith('/api/_meta/resources');
+      expect(mockAxiosGet).toHaveBeenCalledWith('/control/_meta/resources');
     });
 
     it('should return ResourceMetadata array for all resources (Requirement 2.2)', async () => {

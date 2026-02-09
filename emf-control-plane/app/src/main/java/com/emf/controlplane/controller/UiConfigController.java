@@ -38,7 +38,7 @@ import java.util.stream.Collectors;
  * </ul>
  */
 @RestController
-@RequestMapping("/ui")
+@RequestMapping("/control/ui")
 @SecurityRequirement(name = "bearer-jwt")
 @Tag(name = "UI Configuration", description = "UI configuration management APIs")
 public class UiConfigController {

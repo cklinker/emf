@@ -207,7 +207,7 @@ describe('OpenAPI Parser', () => {
     });
 
     it('should return null for non-matching paths', () => {
-      expect(extractCollectionName('/api/_admin/collections')).toBeNull();
+      expect(extractCollectionName('/control/_admin/collections')).toBeNull();
       expect(extractCollectionName('/health')).toBeNull();
       expect(extractCollectionName('/api')).toBeNull();
     });
@@ -323,8 +323,8 @@ describe('OpenAPI Parser', () => {
         openapi: '3.0.0',
         info: { title: 'Test', version: '1.0.0' },
         paths: {
-          '/api/_admin/collections': { get: { responses: {} } },
-          '/api/_meta/resources': { get: { responses: {} } },
+          '/control/_admin/collections': { get: { responses: {} } },
+          '/control/_meta/resources': { get: { responses: {} } },
           '/api/users': { get: { responses: {} } },
         },
       };

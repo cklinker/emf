@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/governor-limits")
+@RequestMapping("/control/governor-limits")
 public class GovernorLimitsController {
 
     private final GovernorLimitsService governorLimitsService;

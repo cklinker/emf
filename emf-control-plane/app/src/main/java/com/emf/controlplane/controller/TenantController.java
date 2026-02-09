@@ -17,11 +17,10 @@ import org.springframework.web.bind.annotation.*;
 
 /**
  * REST controller for platform-level tenant administration.
- * Uses /platform/tenants path, separate from tenant-scoped /control endpoints.
  * Requires PLATFORM_ADMIN role for all operations.
  */
 @RestController
-@RequestMapping("/platform/tenants")
+@RequestMapping("/control/tenants")
 public class TenantController {
 
     private final TenantService tenantService;

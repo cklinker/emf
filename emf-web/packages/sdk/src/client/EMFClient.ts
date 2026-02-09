@@ -96,7 +96,7 @@ export class EMFClient {
   /**
    * Discover available resources from the control plane
    *
-   * Fetches resource metadata from the Discovery_Endpoint (/api/_meta/resources)
+   * Fetches resource metadata from the Discovery_Endpoint (/control/_meta/resources)
    * and caches the results for the configured TTL period.
    *
    * @returns Promise<ResourceMetadata[]> - Array of resource metadata objects
@@ -112,7 +112,7 @@ export class EMFClient {
 
     try {
       // Fetch fresh data from discovery endpoint
-      const response = await this.axiosInstance.get('/api/_meta/resources');
+      const response = await this.axiosInstance.get('/control/_meta/resources');
 
       // Validate response with Zod schema if validation is enabled
       let resources: ResourceMetadata[];

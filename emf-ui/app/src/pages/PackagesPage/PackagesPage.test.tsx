@@ -106,10 +106,10 @@ function setupMswHandlers(overrides: Record<string, unknown> = {}) {
     http.get('/control/policies', () => {
       return HttpResponse.json(overrides.policies ?? mockPolicies)
     }),
-    http.get('/ui/pages', () => {
+    http.get('/control/ui/pages', () => {
       return HttpResponse.json(overrides.pages ?? mockPages)
     }),
-    http.get('/ui/menus', () => {
+    http.get('/control/ui/menus', () => {
       return HttpResponse.json(overrides.menus ?? mockMenus)
     }),
     http.post('/control/packages/export', () => {

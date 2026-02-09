@@ -257,27 +257,27 @@ export class AdminClient {
     },
 
     listPages: async (): Promise<UIPage[]> => {
-      const response = await this.axios.get<UIPage[]>('/ui/pages');
+      const response = await this.axios.get<UIPage[]>('/control/ui/pages');
       return response.data;
     },
 
     createPage: async (page: UIPage): Promise<UIPage> => {
-      const response = await this.axios.post<UIPage>('/ui/pages', page);
+      const response = await this.axios.post<UIPage>('/control/ui/pages', page);
       return response.data;
     },
 
     updatePage: async (id: string, page: UIPage): Promise<UIPage> => {
-      const response = await this.axios.put<UIPage>(`/ui/pages/${id}`, page);
+      const response = await this.axios.put<UIPage>(`/control/ui/pages/${id}`, page);
       return response.data;
     },
 
     listMenus: async (): Promise<UIMenu[]> => {
-      const response = await this.axios.get<UIMenu[]>('/ui/menus');
+      const response = await this.axios.get<UIMenu[]>('/control/ui/menus');
       return response.data;
     },
 
     updateMenu: async (id: string, menu: UIMenu): Promise<UIMenu> => {
-      const response = await this.axios.put<UIMenu>(`/ui/menus/${id}`, menu);
+      const response = await this.axios.put<UIMenu>(`/control/ui/menus/${id}`, menu);
       return response.data;
     },
   };
@@ -303,36 +303,36 @@ export class AdminClient {
   readonly tenants = {
     list: async (page = 0, size = 20): Promise<Page<Tenant>> => {
       const response = await this.axios.get<Page<Tenant>>(
-        `/platform/tenants?page=${page}&size=${size}`
+        `/control/tenants?page=${page}&size=${size}`
       );
       return response.data;
     },
 
     get: async (id: string): Promise<Tenant> => {
-      const response = await this.axios.get<Tenant>(`/platform/tenants/${id}`);
+      const response = await this.axios.get<Tenant>(`/control/tenants/${id}`);
       return response.data;
     },
 
     create: async (request: CreateTenantRequest): Promise<Tenant> => {
-      const response = await this.axios.post<Tenant>('/platform/tenants', request);
+      const response = await this.axios.post<Tenant>('/control/tenants', request);
       return response.data;
     },
 
     update: async (id: string, request: UpdateTenantRequest): Promise<Tenant> => {
-      const response = await this.axios.put<Tenant>(`/platform/tenants/${id}`, request);
+      const response = await this.axios.put<Tenant>(`/control/tenants/${id}`, request);
       return response.data;
     },
 
     suspend: async (id: string): Promise<void> => {
-      await this.axios.post(`/platform/tenants/${id}/suspend`);
+      await this.axios.post(`/control/tenants/${id}/suspend`);
     },
 
     activate: async (id: string): Promise<void> => {
-      await this.axios.post(`/platform/tenants/${id}/activate`);
+      await this.axios.post(`/control/tenants/${id}/activate`);
     },
 
     getLimits: async (id: string): Promise<GovernorLimits> => {
-      const response = await this.axios.get<GovernorLimits>(`/platform/tenants/${id}/limits`);
+      const response = await this.axios.get<GovernorLimits>(`/control/tenants/${id}/limits`);
       return response.data;
     },
   };

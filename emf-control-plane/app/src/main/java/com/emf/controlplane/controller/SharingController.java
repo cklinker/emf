@@ -23,7 +23,7 @@ import java.util.stream.Collectors;
  * Handles OWD settings, sharing rules, record shares, and user groups.
  */
 @RestController
-@RequestMapping("/api/sharing")
+@RequestMapping("/control/sharing")
 @Tag(name = "Sharing", description = "Record-level sharing management")
 public class SharingController {
 

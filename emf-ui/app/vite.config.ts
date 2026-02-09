@@ -13,16 +13,12 @@ export default defineConfig({
   server: {
     port: 5174,
     proxy: {
-      // Proxy API requests to the control plane
-      '/ui': {
-        target: 'http://localhost:8081',
-        changeOrigin: true,
-      },
+      // All control plane endpoints are under /control
       '/control': {
         target: 'http://localhost:8081',
         changeOrigin: true,
       },
-      '/api': {
+      '/internal': {
         target: 'http://localhost:8081',
         changeOrigin: true,
       },

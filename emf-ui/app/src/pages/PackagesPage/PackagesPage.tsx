@@ -147,7 +147,7 @@ async function fetchPolicies(apiClient: any): Promise<SelectableItem[]> {
 }
 
 async function fetchPages(apiClient: any): Promise<SelectableItem[]> {
-  const data = await apiClient.get('/ui/pages?size=1000')
+  const data = await apiClient.get('/control/ui/pages?size=1000')
   // Handle paginated response from Spring
   const pages = data.content || data
   return pages.map((p: { id: string; name: string }) => ({
@@ -158,7 +158,7 @@ async function fetchPages(apiClient: any): Promise<SelectableItem[]> {
 }
 
 async function fetchMenus(apiClient: any): Promise<SelectableItem[]> {
-  const data = await apiClient.get('/ui/menus?size=1000')
+  const data = await apiClient.get('/control/ui/menus?size=1000')
   // Handle paginated response from Spring
   const menus = data.content || data
   return menus.map((m: { id: string; name: string }) => ({

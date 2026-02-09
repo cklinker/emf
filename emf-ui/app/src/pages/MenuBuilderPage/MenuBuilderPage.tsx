@@ -85,23 +85,23 @@ export interface MenuBuilderPageProps {
 
 // API functions using apiClient
 async function fetchMenus(apiClient: any): Promise<UIMenu[]> {
-  return apiClient.get('/ui/menus')
+  return apiClient.get('/control/ui/menus')
 }
 
 async function fetchMenu(apiClient: any, id: string): Promise<UIMenu> {
-  return apiClient.get(`/ui/menus/${id}`)
+  return apiClient.get(`/control/ui/menus/${id}`)
 }
 
 async function createMenu(apiClient: any, data: Partial<UIMenu>): Promise<UIMenu> {
-  return apiClient.post('/ui/menus', data)
+  return apiClient.post('/control/ui/menus', data)
 }
 
 async function updateMenu(apiClient: any, id: string, data: Partial<UIMenu>): Promise<UIMenu> {
-  return apiClient.put(`/ui/menus/${id}`, data)
+  return apiClient.put(`/control/ui/menus/${id}`, data)
 }
 
 async function deleteMenu(apiClient: any, id: string): Promise<void> {
-  return apiClient.delete(`/ui/menus/${id}`)
+  return apiClient.delete(`/control/ui/menus/${id}`)
 }
 
 /**

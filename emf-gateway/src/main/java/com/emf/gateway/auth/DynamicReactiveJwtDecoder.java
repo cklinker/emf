@@ -63,12 +63,29 @@ public class DynamicReactiveJwtDecoder implements ReactiveJwtDecoder {
         }
 
         return resolveJwksUri(issuer)
-                .flatMap(jwksUri -> {
-                    NimbusReactiveJwtDecoder decoder = decoderCache.computeIfAbsent(
-                            jwksUri,
-                            uri -> NimbusReactiveJwtDecoder.withJwkSetUri(uri).build());
-                    return decoder.decode(token);
+                .flatMap(jwksUri -> decodeWithJwksUri(token, jwksUri))
+                .onErrorResume(e -> {
+                    // Primary JWKS URI failed (stale DB, unreachable endpoint, etc.)
+                    // Fall back to standard OIDC discovery from the issuer URL
+                    log.warn("JWT decode failed for issuer {}, trying OIDC discovery: {}",
+                            issuer, e.getMessage());
+                    return discoverJwksUri(issuer)
+                            .flatMap(jwksUri -> {
+                                // Update Redis cache with the discovered URI
+                                Mono<Boolean> cacheUpdate = redisTemplate != null
+                                        ? redisTemplate.opsForValue()
+                                                .set(REDIS_PREFIX + issuer, jwksUri, PROVIDER_CACHE_TTL)
+                                        : Mono.just(true);
+                                return cacheUpdate.then(decodeWithJwksUri(token, jwksUri));
+                            });
                 });
+    }
+
+    private Mono<Jwt> decodeWithJwksUri(String token, String jwksUri) {
+        NimbusReactiveJwtDecoder decoder = decoderCache.computeIfAbsent(
+                jwksUri,
+                uri -> NimbusReactiveJwtDecoder.withJwkSetUri(uri).build());
+        return decoder.decode(token);
     }
 
     /**
@@ -116,8 +133,25 @@ public class DynamicReactiveJwtDecoder implements ReactiveJwtDecoder {
                 .bodyToMono(JsonNode.class)
                 .map(json -> json.get("jwksUri").asText())
                 .onErrorResume(e -> {
-                    log.warn("Failed to lookup OIDC provider for issuer {}, using fallback: {}",
+                    log.warn("Failed to lookup OIDC provider for issuer {}, using OIDC discovery: {}",
                             issuer, e.getMessage());
+                    return discoverJwksUri(issuer);
+                });
+    }
+
+    /**
+     * Discovers the JWKS URI from the issuer's standard OIDC discovery endpoint.
+     * This is a fallback when the control plane lookup fails or returns stale data.
+     */
+    private Mono<String> discoverJwksUri(String issuer) {
+        String discoveryUrl = issuer.replaceAll("/$", "") + "/.well-known/openid-configuration";
+        return WebClient.create().get()
+                .uri(discoveryUrl)
+                .retrieve()
+                .bodyToMono(JsonNode.class)
+                .map(json -> json.get("jwks_uri").asText())
+                .onErrorResume(e -> {
+                    log.error("OIDC discovery failed for issuer {}: {}", issuer, e.getMessage());
                     return Mono.just(fallbackIssuerUri + "/protocol/openid-connect/certs");
                 });
     }

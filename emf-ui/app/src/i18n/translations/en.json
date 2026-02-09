@@ -1095,5 +1095,76 @@
     "setup": "Setup",
     "systemHealth": "System Health",
     "monitoring": "Monitoring"
+  },
+  "relatedRecords": {
+    "title": "Related Records",
+    "noRelationships": "No related records found.",
+    "loading": "Loading related records...",
+    "viewAll": "View All",
+    "records": "records",
+    "errorLoading": "Failed to load related records."
+  },
+  "activity": {
+    "title": "Activity",
+    "noActivity": "No activity recorded for this record.",
+    "showMore": "Show More",
+    "showLess": "Show Less",
+    "recordCreated": "Record created",
+    "recordUpdated": "Record updated",
+    "submittedForApproval": "Submitted for approval",
+    "approved": "Approved",
+    "rejected": "Rejected",
+    "recalled": "Recalled",
+    "sharedWith": "Shared with {{id}} ({{level}})",
+    "loading": "Loading activity..."
+  },
+  "recordActions": {
+    "edit": "Edit",
+    "clone": "Clone",
+    "delete": "Delete",
+    "submitForApproval": "Submit for Approval",
+    "changeOwner": "Change Owner",
+    "moreActions": "More Actions",
+    "approvalSubmitted": "Submitted for approval successfully",
+    "approvalError": "Failed to submit for approval",
+    "pendingApproval": "Pending Approval",
+    "approvedStatus": "Approved",
+    "rejectedStatus": "Rejected"
+  },
+  "recordHeader": {
+    "created": "Created",
+    "updated": "Updated",
+    "copyId": "Copy ID",
+    "copied": "Copied!",
+    "ago": "ago",
+    "justNow": "just now",
+    "minutesAgo": "{{count}}m ago",
+    "hoursAgo": "{{count}}h ago",
+    "daysAgo": "{{count}}d ago"
+  },
+  "listViews": {
+    "allRecords": "All Records",
+    "saveCurrentView": "Save Current View",
+    "manageViews": "Manage Views",
+    "viewName": "View name",
+    "save": "Save",
+    "savedSuccessfully": "View saved successfully",
+    "deletedSuccessfully": "View deleted",
+    "setAsDefault": "Set as Default",
+    "defaultView": "Default"
+  },
+  "inlineEdit": {
+    "editInDetailView": "Edit in detail view",
+    "saving": "Saving...",
+    "saved": "Saved",
+    "error": "Failed to save",
+    "clickToEdit": "Click to edit"
+  },
+  "summaryStats": {
+    "records": "{{count}} records",
+    "shown": "{{count}} shown",
+    "showingAll": "Showing all records",
+    "clearFilters": "Clear filters",
+    "sumOf": "Sum of {{field}}: {{value}}"
   }
 }

@@ -1,0 +1,294 @@
+/**
+ * RecordHeader Component
+ *
+ * A compact, information-dense header for the record detail page.
+ * Displays the record name, collection badge, key field pills,
+ * relative timestamps, and a copyable record ID.
+ *
+ * This is a pure display component — it makes no API calls.
+ */
+
+import React, { useState, useMemo, useCallback, useEffect } from 'react'
+import { useI18n } from '../../context/I18nContext'
+import styles from './RecordHeader.module.css'
+
+/**
+ * Props for the RecordHeader component
+ */
+export interface RecordHeaderProps {
+  /** The record data including id, createdAt, updatedAt, and field values */
+  record: Record<string, unknown> & { id: string; createdAt?: string; updatedAt?: string }
+  /** The schema definition for the record's collection */
+  schema: {
+    name: string
+    displayName: string
+    fields: Array<{
+      name: string
+      displayName?: string
+      type: string
+      required: boolean
+      referenceTarget?: string
+    }>
+  }
+  /** The API name of the collection */
+  collectionName: string
+}
+
+/**
+ * Maximum number of key fields to display
+ */
+const MAX_KEY_FIELDS = 4
+
+/**
+ * Duration in milliseconds to show the "Copied!" tooltip
+ */
+const COPIED_TOOLTIP_DURATION = 2000
+
+/**
+ * Status-like field names that get priority in key field selection
+ */
+const STATUS_FIELD_NAMES = new Set(['status', 'state', 'stage'])
+
+/**
+ * Format a date string as a relative time (e.g., "3 hours ago", "just now").
+ *
+ * @param dateString - ISO 8601 date string
+ * @param t - Translation function from i18n context
+ * @returns A human-readable relative time string
+ */
+function formatRelativeTime(
+  dateString: string,
+  t: (key: string, params?: Record<string, string | number>) => string
+): string {
+  const date = new Date(dateString)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+
+  if (diffMs < 0) {
+    return t('recordHeader.justNow')
+  }
+
+  const diffMinutes = Math.floor(diffMs / (1000 * 60))
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+
+  if (diffMinutes < 1) {
+    return t('recordHeader.justNow')
+  }
+
+  if (diffMinutes < 60) {
+    return t('recordHeader.minutesAgo', { count: diffMinutes })
+  }
+
+  if (diffHours < 24) {
+    return t('recordHeader.hoursAgo', { count: diffHours })
+  }
+
+  return t('recordHeader.daysAgo', { count: diffDays })
+}
+
+/**
+ * RecordHeader Component
+ *
+ * Renders a compact header at the top of the record detail page with:
+ * - Record name (derived from the first string field or record ID)
+ * - Collection badge
+ * - Up to 4 key field pills
+ * - Relative timestamps for creation and last update
+ * - Copyable record ID with tooltip feedback
+ *
+ * @example
+ * ```tsx
+ * <RecordHeader
+ *   record={recordData}
+ *   schema={collectionSchema}
+ *   collectionName="accounts"
+ * />
+ * ```
+ */
+export function RecordHeader({
+  record,
+  schema,
+  collectionName,
+}: RecordHeaderProps): React.ReactElement {
+  const { t } = useI18n()
+  const [copied, setCopied] = useState(false)
+
+  // Auto-reset the copied state after the tooltip duration
+  useEffect(() => {
+    if (!copied) return
+    const timer = setTimeout(() => {
+      setCopied(false)
+    }, COPIED_TOOLTIP_DURATION)
+    return () => clearTimeout(timer)
+  }, [copied])
+
+  /**
+   * Determine the record's display name.
+   * Uses the value of the first string-type field from the schema.
+   * Falls back to the record ID if no suitable field is found.
+   */
+  const recordName = useMemo(() => {
+    const firstStringField = schema.fields.find((field) => field.type.toLowerCase() === 'string')
+
+    if (firstStringField) {
+      const value = record[firstStringField.name]
+      if (value !== null && value !== undefined && String(value).trim() !== '') {
+        return String(value)
+      }
+    }
+
+    return record.id
+  }, [schema.fields, record])
+
+  /**
+   * Select up to 4 key fields to display as pills.
+   *
+   * Priority order:
+   * 1. Picklist fields named "status", "state", or "stage"
+   * 2. Reference fields
+   * 3. Date or datetime fields
+   * 4. Remaining non-name fields in schema order
+   */
+  const keyFields = useMemo(() => {
+    // Find the name field so we can exclude it from key fields
+    const nameField = schema.fields.find((field) => field.type.toLowerCase() === 'string')
+    const nameFieldName = nameField?.name
+
+    // Filter out the name field and fields without values
+    const candidateFields = schema.fields.filter((field) => {
+      if (field.name === nameFieldName) return false
+      if (field.name === 'id') return false
+      const value = record[field.name]
+      return value !== null && value !== undefined && String(value).trim() !== ''
+    })
+
+    // Priority buckets
+    const statusPicklists: typeof candidateFields = []
+    const references: typeof candidateFields = []
+    const dates: typeof candidateFields = []
+    const others: typeof candidateFields = []
+
+    for (const field of candidateFields) {
+      const typeLower = field.type.toLowerCase()
+      const nameLower = field.name.toLowerCase()
+
+      if (typeLower.includes('picklist') && STATUS_FIELD_NAMES.has(nameLower)) {
+        statusPicklists.push(field)
+      } else if (typeLower === 'reference') {
+        references.push(field)
+      } else if (typeLower === 'date' || typeLower === 'datetime') {
+        dates.push(field)
+      } else {
+        others.push(field)
+      }
+    }
+
+    const prioritized = [...statusPicklists, ...references, ...dates, ...others]
+    return prioritized.slice(0, MAX_KEY_FIELDS)
+  }, [schema.fields, record])
+
+  /**
+   * Copy the record ID to the clipboard and show a brief tooltip.
+   */
+  const handleCopyId = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(record.id)
+      setCopied(true)
+    } catch {
+      // Clipboard API may not be available in all contexts
+      console.warn('[RecordHeader] Failed to copy record ID to clipboard')
+    }
+  }, [record.id])
+
+  /**
+   * Format a field value for display in key field pills.
+   */
+  const formatFieldValue = useCallback(
+    (field: (typeof schema.fields)[number]): string => {
+      const value = record[field.name]
+      if (value === null || value === undefined) return ''
+
+      const typeLower = field.type.toLowerCase()
+
+      if (typeLower === 'date' || typeLower === 'datetime') {
+        try {
+          const date = new Date(String(value))
+          if (!isNaN(date.getTime())) {
+            return typeLower === 'date' ? date.toLocaleDateString() : date.toLocaleString()
+          }
+        } catch {
+          // Fall through to default
+        }
+      }
+
+      return String(value)
+    },
+    [record, schema]
+  )
+
+  return (
+    <div className={styles.header} data-testid="record-header">
+      {/* Top row: name + collection badge */}
+      <div className={styles.headerTop}>
+        <h1 className={styles.recordName} data-testid="record-header-name">
+          {recordName}
+        </h1>
+        <span className={styles.collectionBadge} data-testid="record-header-collection">
+          {schema.displayName || collectionName}
+        </span>
+      </div>
+
+      {/* Key fields */}
+      {keyFields.length > 0 && (
+        <div className={styles.keyFields} data-testid="record-header-key-fields">
+          {keyFields.map((field) => (
+            <span
+              key={field.name}
+              className={styles.keyField}
+              data-testid={`record-header-field-${field.name}`}
+            >
+              <span className={styles.keyFieldLabel}>{field.displayName || field.name}:</span>
+              <span className={styles.keyFieldValue}>{formatFieldValue(field)}</span>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Bottom row: timestamps + record ID */}
+      <div className={styles.headerBottom}>
+        <span className={styles.timestamps} data-testid="record-header-timestamps">
+          {record.createdAt && (
+            <>
+              {t('recordHeader.created')} {formatRelativeTime(record.createdAt, t)}
+            </>
+          )}
+          {record.createdAt && record.updatedAt && ' \u00B7 '}
+          {record.updatedAt && (
+            <>
+              {t('recordHeader.updated')} {formatRelativeTime(record.updatedAt, t)}
+            </>
+          )}
+        </span>
+
+        <button
+          type="button"
+          className={styles.recordId}
+          onClick={handleCopyId}
+          title={t('recordHeader.copyId')}
+          aria-label={t('recordHeader.copyId')}
+          data-testid="record-header-id"
+        >
+          {record.id}
+          {copied && (
+            <span className={styles.copiedTooltip} role="status" aria-live="polite">
+              {t('recordHeader.copied')}
+            </span>
+          )}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+export default RecordHeader

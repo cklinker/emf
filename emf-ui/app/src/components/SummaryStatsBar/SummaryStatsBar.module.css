@@ -1,0 +1,149 @@
+/**
+ * SummaryStatsBar Styles
+ *
+ * Provides styling for the summary stats bar component that displays
+ * record counts, filter descriptions, and field aggregates above data tables.
+ *
+ * Uses CSS custom properties for theming support.
+ * Supports responsive design and reduced motion preferences.
+ */
+
+/* Bar container */
+.bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-md, 1rem);
+  padding: var(--spacing-sm, 0.5rem) var(--spacing-md, 1rem);
+  background-color: var(--color-surface-secondary, #f5f5f5);
+  border: 1px solid var(--color-border-light, #e5e7eb);
+  border-radius: var(--border-radius-md, 0.375rem);
+  margin-bottom: var(--spacing-md, 1rem);
+  font-size: var(--font-size-sm, 0.875rem);
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+/* Left side - record count, filter description, clear link */
+.leftSide {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm, 0.5rem);
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+/* Right side - aggregates */
+.rightSide {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md, 1rem);
+  color: var(--color-text-secondary, #666666);
+  flex-shrink: 0;
+}
+
+/* Bold record count display */
+.recordCount {
+  font-weight: var(--font-weight-semibold, 600);
+  white-space: nowrap;
+}
+
+/* Filter description text */
+.filterDescription {
+  font-weight: var(--font-weight-normal, 400);
+  color: var(--color-text-secondary, #666666);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 400px;
+}
+
+/* Clear filters link */
+.clearFilters {
+  color: var(--color-link, #0066cc);
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: var(--font-size-sm, 0.875rem);
+  font-weight: var(--font-weight-medium, 500);
+  cursor: pointer;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.clearFilters:hover {
+  color: var(--color-button-primary-hover, #0052a3);
+  text-decoration: underline;
+}
+
+.clearFilters:focus {
+  outline: 2px solid var(--color-focus-ring, #0066cc);
+  outline-offset: 2px;
+}
+
+.clearFilters:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.clearFilters:focus-visible {
+  outline: 2px solid var(--color-focus-ring, #0066cc);
+  outline-offset: 2px;
+}
+
+/* Aggregate display */
+.aggregate {
+  font-size: var(--font-size-xs, 0.75rem);
+  color: var(--color-text-secondary, #666666);
+  white-space: nowrap;
+}
+
+/* Separator between items (dot) */
+.separator {
+  color: var(--color-text-tertiary, #9ca3af);
+  font-size: var(--font-size-xs, 0.75rem);
+  user-select: none;
+}
+
+/* Responsive Design */
+
+/* Tablet */
+@media (max-width: 1023px) {
+  .filterDescription {
+    max-width: 250px;
+  }
+}
+
+/* Mobile */
+@media (max-width: 767px) {
+  .bar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-xs, 0.25rem);
+  }
+
+  .rightSide {
+    flex-wrap: wrap;
+  }
+
+  .filterDescription {
+    max-width: 100%;
+  }
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .clearFilters {
+    transition: none;
+  }
+}
+
+/* Dark Theme Support */
+[data-theme='dark'] .bar {
+  --color-text-primary: #f9fafb;
+  --color-text-secondary: #d1d5db;
+  --color-text-tertiary: #9ca3af;
+  --color-surface-secondary: #111827;
+  --color-border-light: #4b5563;
+  --color-link: #60a5fa;
+}

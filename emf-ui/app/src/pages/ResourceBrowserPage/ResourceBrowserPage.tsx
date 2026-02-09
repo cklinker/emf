@@ -191,6 +191,7 @@ export function ResourceBrowserPage({
           aria-label={t('resources.title')}
           data-testid="collections-grid"
         >
+          {/* eslint-disable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex */}
           {filteredCollections.map((collection, index) => (
             <div
               key={collection.id}
@@ -216,6 +217,7 @@ export function ResourceBrowserPage({
               </div>
             </div>
           ))}
+          {/* eslint-enable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex */}
         </div>
       )}
 

@@ -101,6 +101,7 @@ describe('Visual Accessibility', () => {
 
     it('elements with tabindex should be focusable', () => {
       render(
+        // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
         <div tabIndex={0} data-testid="test-focusable">
           Focusable Div
         </div>
@@ -150,6 +151,7 @@ describe('Visual Accessibility', () => {
 
   describe('Alt Text for Non-Text Content (Requirement 14.8)', () => {
     it('images should have alt attribute', () => {
+      // eslint-disable-next-line jsx-a11y/img-redundant-alt
       render(<img src="/test-image.png" alt="Test image description" data-testid="test-image" />)
 
       const image = screen.getByTestId('test-image')
@@ -288,6 +290,7 @@ describe('Component Focus Indicator Tests', () => {
       render(
         <div>
           <button data-testid="btn">Button</button>
+          {/* eslint-disable-next-line jsx-a11y/anchor-is-valid */}
           <a href="#" data-testid="link">
             Link
           </a>

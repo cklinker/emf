@@ -668,14 +668,13 @@ export function OIDCProvidersPage({
   // Create mutation
   const createMutation = useMutation({
     mutationFn: (data: OIDCProviderFormData) => {
-      const payload: any = {
+      const payload: Record<string, unknown> = {
         ...data,
         scopes: data.scopes
           .split(',')
           .map((s) => s.trim())
           .filter(Boolean),
       }
-      // Only include claim fields if they have values (Requirement 12.2)
       if (data.rolesClaim?.trim()) payload.rolesClaim = data.rolesClaim.trim()
       if (data.rolesMapping?.trim()) payload.rolesMapping = data.rolesMapping.trim()
       if (data.emailClaim?.trim()) payload.emailClaim = data.emailClaim.trim()
@@ -696,14 +695,13 @@ export function OIDCProvidersPage({
   // Update mutation
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: OIDCProviderFormData }) => {
-      const payload: any = {
+      const payload: Record<string, unknown> = {
         ...data,
         scopes: data.scopes
           .split(',')
           .map((s) => s.trim())
           .filter(Boolean),
       }
-      // Only include claim fields if they have values (Requirement 12.2)
       if (data.rolesClaim?.trim()) payload.rolesClaim = data.rolesClaim.trim()
       if (data.rolesMapping?.trim()) payload.rolesMapping = data.rolesMapping.trim()
       if (data.emailClaim?.trim()) payload.emailClaim = data.emailClaim.trim()

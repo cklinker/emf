@@ -456,6 +456,7 @@ export function I18nProvider({
  * }
  * ```
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function useI18n(): I18nContextValue {
   const context = useContext(I18nContext)
   if (context === undefined) {
@@ -467,7 +468,7 @@ export function useI18n(): I18nContextValue {
 // Export the context for testing purposes
 export { I18nContext }
 
-// Export utility functions for testing
+/* eslint-disable react-refresh/only-export-components */
 export {
   getBrowserLocale,
   getStoredLocale,
@@ -479,3 +480,4 @@ export {
   RTL_LOCALES,
   DEFAULT_LOCALE,
 }
+/* eslint-enable react-refresh/only-export-components */

@@ -350,6 +350,7 @@ export function PluginProvider({
  * }
  * ```
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function usePlugins(): PluginContextValue {
   const context = useContext(PluginContext)
   if (context === undefined) {

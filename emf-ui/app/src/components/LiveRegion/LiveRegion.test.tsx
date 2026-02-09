@@ -321,11 +321,15 @@ describe('useAnnounce', () => {
   })
 
   it('should return context value when used inside LiveRegionProvider', () => {
-    let contextValue: ReturnType<typeof useAnnounce> | undefined
-
     function TestInsideProvider() {
-      contextValue = useAnnounce()
-      return <div data-testid="has-context">{contextValue ? 'yes' : 'no'}</div>
+      const contextValue = useAnnounce()
+      return (
+        <div>
+          <div data-testid="has-context">{contextValue ? 'yes' : 'no'}</div>
+          <div data-testid="has-announce">{typeof contextValue?.announce}</div>
+          <div data-testid="has-clear">{typeof contextValue?.clear}</div>
+        </div>
+      )
     }
 
     render(
@@ -335,8 +339,7 @@ describe('useAnnounce', () => {
     )
 
     expect(screen.getByTestId('has-context')).toHaveTextContent('yes')
-    expect(contextValue).toBeDefined()
-    expect(typeof contextValue?.announce).toBe('function')
-    expect(typeof contextValue?.clear).toBe('function')
+    expect(screen.getByTestId('has-announce')).toHaveTextContent('function')
+    expect(screen.getByTestId('has-clear')).toHaveTextContent('function')
   })
 })

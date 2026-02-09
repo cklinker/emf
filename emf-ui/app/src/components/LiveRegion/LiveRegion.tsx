@@ -104,20 +104,18 @@ export function LiveRegion({
   clearDelay = 1000,
   'data-testid': testId = 'live-region',
 }: LiveRegionProps): React.ReactElement {
-  const [currentMessage, setCurrentMessage] = useState(message)
+  const [clearedMessage, setClearedMessage] = useState<string | null>(null)
   const clearTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Update message when prop changes
-  useEffect(() => {
-    setCurrentMessage(message)
+  const isCleared = clearedMessage === message
 
-    // Clear after delay if enabled
+  useEffect(() => {
     if (clearAfterAnnounce && message) {
       if (clearTimeoutRef.current) {
         clearTimeout(clearTimeoutRef.current)
       }
       clearTimeoutRef.current = setTimeout(() => {
-        setCurrentMessage('')
+        setClearedMessage(message)
       }, clearDelay)
     }
 
@@ -136,7 +134,7 @@ export function LiveRegion({
       style={visuallyHiddenStyles}
       data-testid={testId}
     >
-      {currentMessage}
+      {isCleared ? '' : message}
     </div>
   )
 }
@@ -266,6 +264,7 @@ export function LiveRegionProvider({
  * }
  * ```
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAnnounce(): LiveRegionContextValue {
   const context = useContext(LiveRegionContext)
   if (context === undefined) {

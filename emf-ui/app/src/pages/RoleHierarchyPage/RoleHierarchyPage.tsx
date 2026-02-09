@@ -154,7 +154,15 @@ export function RoleHierarchyPage({ className }: RoleHierarchyPageProps): React.
       <div key={node.id} className={styles.treeNode}>
         <div
           className={`${styles.treeNodeContent} ${isSelected ? styles.treeNodeSelected : ''}`}
+          role="button"
+          tabIndex={0}
           onClick={() => handleSelectRole(node)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              handleSelectRole(node)
+            }
+          }}
         >
           {hasChildren ? (
             <button

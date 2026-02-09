@@ -19,6 +19,7 @@ import { useAuth } from '../../context/AuthContext'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
 import { useRecentRecords } from '../../hooks/useRecentRecords'
 import { useFavorites } from '../../hooks/useFavorites'
+import type { ApiClient } from '../../services/apiClient'
 import styles from './ResourceDetailPage.module.css'
 
 /**
@@ -197,14 +198,14 @@ export interface ResourceDetailPageProps {
 
 // API functions using apiClient
 async function fetchCollectionSchema(
-  apiClient: any,
+  apiClient: ApiClient,
   collectionName: string
 ): Promise<CollectionSchema> {
   return apiClient.get(`/control/collections/${collectionName}`)
 }
 
 async function fetchResource(
-  apiClient: any,
+  apiClient: ApiClient,
   collectionName: string,
   resourceId: string
 ): Promise<Resource> {
@@ -212,7 +213,7 @@ async function fetchResource(
 }
 
 async function deleteResource(
-  apiClient: any,
+  apiClient: ApiClient,
   collectionName: string,
   resourceId: string
 ): Promise<void> {
@@ -475,13 +476,13 @@ export function ResourceDetailPage({
           )
 
         case 'string':
-        default:
-          // Handle long strings
+        default: {
           const stringValue = String(value)
           if (stringValue.length > 500) {
             return <div className={styles.longTextValue}>{stringValue}</div>
           }
           return stringValue
+        }
       }
     },
     [t, formatDate, formatNumber]

@@ -14,7 +14,8 @@ import React, { useState, useCallback, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
-import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
+import { useToast, LoadingSpinner, ErrorMessage } from '../../components'
+import type { ApiClient } from '../../services/apiClient'
 import styles from './PackagesPage.module.css'
 
 /**
@@ -109,14 +110,15 @@ export interface PackagesPageProps {
 }
 
 // API functions using apiClient
-async function fetchPackageHistory(apiClient: any): Promise<Package[]> {
+async function fetchPackageHistory(apiClient: ApiClient): Promise<Package[]> {
   return apiClient.get('/control/packages/history')
 }
 
-async function fetchCollections(apiClient: any): Promise<SelectableItem[]> {
-  const data = await apiClient.get('/control/collections?size=1000')
-  // Handle paginated response from Spring
-  const collections = data.content || data
+async function fetchCollections(apiClient: ApiClient): Promise<SelectableItem[]> {
+  const data = await apiClient.get<{ content?: Array<{ id: string; name: string }> }>(
+    '/control/collections?size=1000'
+  )
+  const collections = data.content || (data as unknown as Array<{ id: string; name: string }>)
   return collections.map((c: { id: string; name: string }) => ({
     id: c.id,
     name: c.name,
@@ -124,10 +126,11 @@ async function fetchCollections(apiClient: any): Promise<SelectableItem[]> {
   }))
 }
 
-async function fetchRoles(apiClient: any): Promise<SelectableItem[]> {
-  const data = await apiClient.get('/control/roles?size=1000')
-  // Handle paginated response from Spring
-  const roles = data.content || data
+async function fetchRoles(apiClient: ApiClient): Promise<SelectableItem[]> {
+  const data = await apiClient.get<{ content?: Array<{ id: string; name: string }> }>(
+    '/control/roles?size=1000'
+  )
+  const roles = data.content || (data as unknown as Array<{ id: string; name: string }>)
   return roles.map((r: { id: string; name: string }) => ({
     id: r.id,
     name: r.name,
@@ -135,10 +138,11 @@ async function fetchRoles(apiClient: any): Promise<SelectableItem[]> {
   }))
 }
 
-async function fetchPolicies(apiClient: any): Promise<SelectableItem[]> {
-  const data = await apiClient.get('/control/policies?size=1000')
-  // Handle paginated response from Spring
-  const policies = data.content || data
+async function fetchPolicies(apiClient: ApiClient): Promise<SelectableItem[]> {
+  const data = await apiClient.get<{ content?: Array<{ id: string; name: string }> }>(
+    '/control/policies?size=1000'
+  )
+  const policies = data.content || (data as unknown as Array<{ id: string; name: string }>)
   return policies.map((p: { id: string; name: string }) => ({
     id: p.id,
     name: p.name,
@@ -146,10 +150,11 @@ async function fetchPolicies(apiClient: any): Promise<SelectableItem[]> {
   }))
 }
 
-async function fetchPages(apiClient: any): Promise<SelectableItem[]> {
-  const data = await apiClient.get('/control/ui/pages?size=1000')
-  // Handle paginated response from Spring
-  const pages = data.content || data
+async function fetchPages(apiClient: ApiClient): Promise<SelectableItem[]> {
+  const data = await apiClient.get<{ content?: Array<{ id: string; name: string }> }>(
+    '/control/ui/pages?size=1000'
+  )
+  const pages = data.content || (data as unknown as Array<{ id: string; name: string }>)
   return pages.map((p: { id: string; name: string }) => ({
     id: p.id,
     name: p.name,
@@ -157,10 +162,11 @@ async function fetchPages(apiClient: any): Promise<SelectableItem[]> {
   }))
 }
 
-async function fetchMenus(apiClient: any): Promise<SelectableItem[]> {
-  const data = await apiClient.get('/control/ui/menus?size=1000')
-  // Handle paginated response from Spring
-  const menus = data.content || data
+async function fetchMenus(apiClient: ApiClient): Promise<SelectableItem[]> {
+  const data = await apiClient.get<{ content?: Array<{ id: string; name: string }> }>(
+    '/control/ui/menus?size=1000'
+  )
+  const menus = data.content || (data as unknown as Array<{ id: string; name: string }>)
   return menus.map((m: { id: string; name: string }) => ({
     id: m.id,
     name: m.name,
@@ -168,18 +174,18 @@ async function fetchMenus(apiClient: any): Promise<SelectableItem[]> {
   }))
 }
 
-async function exportPackage(apiClient: any, options: ExportOptions): Promise<Blob> {
+async function exportPackage(apiClient: ApiClient, options: ExportOptions): Promise<Blob> {
   return apiClient.post('/control/packages/export', options, { responseType: 'blob' })
 }
 
-async function previewImport(apiClient: any, file: File): Promise<ImportPreview> {
+async function previewImport(apiClient: ApiClient, file: File): Promise<ImportPreview> {
   const formData = new FormData()
   formData.append('file', file)
   return apiClient.post('/control/packages/import/preview', formData)
 }
 
 async function executeImport(
-  apiClient: any,
+  apiClient: ApiClient,
   file: File,
   dryRun: boolean = false
 ): Promise<ImportResult> {

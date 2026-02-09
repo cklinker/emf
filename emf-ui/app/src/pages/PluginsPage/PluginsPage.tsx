@@ -125,7 +125,7 @@ function PluginCard({
   }`
 
   return (
-    <article
+    <div
       className={cardClassName}
       onClick={onSelect}
       onKeyDown={handleKeyDown}
@@ -191,7 +191,7 @@ function PluginCard({
           )}
         </div>
       </div>
-    </article>
+    </div>
   )
 }
 
@@ -219,7 +219,6 @@ function PluginDetailsPanel({
   return (
     <aside
       className={styles.detailsPanel}
-      role="complementary"
       aria-label={`${plugin.name} details`}
       data-testid="plugin-details-panel"
     >
@@ -381,7 +380,6 @@ export function PluginsPage({ testId = 'plugins-page' }: PluginsPageProps): Reac
 
   // Count statistics
   const loadedCount = plugins.filter((p) => p.status === 'loaded').length
-  const errorCount = plugins.filter((p) => p.status === 'error').length
   const totalFieldRenderers = fieldRenderers.size
   const totalPageComponents = pageComponents.size
 

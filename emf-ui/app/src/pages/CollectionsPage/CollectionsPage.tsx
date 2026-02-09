@@ -474,6 +474,7 @@ export function CollectionsPage({
                         className={styles.actions}
                         onClick={(e) => e.stopPropagation()}
                         onKeyDown={(e) => e.stopPropagation()}
+                        role="toolbar"
                       >
                         <button
                           type="button"

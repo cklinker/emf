@@ -11,38 +11,11 @@ import React, { useState, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
-import { useToast, LoadingSpinner, ErrorMessage } from '../../components'
+import { useToast, LoadingSpinner } from '../../components'
 import styles from './SharingSettingsPage.module.css'
 
 export interface SharingSettingsPageProps {
   className?: string
-}
-
-interface SharingRule {
-  id: string
-  collectionId: string
-  name: string
-  ruleType: string
-  sharedFrom?: string
-  sharedTo: string
-  sharedToType: string
-  accessLevel: string
-  active: boolean
-}
-
-interface UserGroup {
-  id: string
-  name: string
-  description?: string
-  groupType: string
-  memberIds?: string[]
-}
-
-interface OrgWideDefault {
-  id?: string
-  collectionId: string
-  internalAccess: string
-  externalAccess: string
 }
 
 interface Collection {
@@ -55,7 +28,7 @@ type TabType = 'owd' | 'rules' | 'groups'
 
 export function SharingSettingsPage({ className }: SharingSettingsPageProps): React.ReactElement {
   const { t } = useI18n()
-  const { adminClient, client } = useApi()
+  const { adminClient } = useApi()
   const { showToast } = useToast()
   const queryClient = useQueryClient()
 

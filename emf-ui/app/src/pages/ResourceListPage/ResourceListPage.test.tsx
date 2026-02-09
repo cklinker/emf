@@ -20,38 +20,6 @@ import { escapeCSVValue, recordsToCSV, recordsToJSON } from './ResourceListPage'
 import { http, HttpResponse } from 'msw'
 import { server } from '../../../vitest.setup'
 
-// Helper to create a proper Response-like object
-function createMockResponse(data: unknown, ok = true, status = 200): Response {
-  return {
-    ok,
-    status,
-    json: () => Promise.resolve(data),
-    text: () => Promise.resolve(JSON.stringify(data)),
-    clone: function () {
-      return this
-    },
-    headers: new Headers(),
-    redirected: false,
-    statusText: ok ? 'OK' : 'Error',
-    type: 'basic' as ResponseType,
-    url: '',
-    body: null,
-    bodyUsed: false,
-    arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
-    blob: () => Promise.resolve(new Blob()),
-    formData: () => Promise.resolve(new FormData()),
-    bytes: () => Promise.resolve(new Uint8Array()),
-  } as Response
-}
-
-// Helper to get URL from fetch argument
-function getUrlFromFetchArg(arg: unknown): string {
-  if (typeof arg === 'string') return arg
-  if (arg instanceof URL) return arg.toString()
-  if (arg && typeof arg === 'object' && 'url' in arg) return (arg as { url: string }).url
-  return ''
-}
-
 // Mock useNavigate
 const mockNavigate = vi.fn()
 vi.mock('react-router-dom', async () => {
@@ -146,10 +114,7 @@ function setupResourceListHandlers() {
 // Helper to render with providers and routing
 function renderWithProviders(ui: React.ReactElement, { route = '/resources/users' } = {}) {
   const queryClient = createTestQueryClient()
-  const Wrapper = createTestWrapper()
-
-  // Since createTestWrapper includes BrowserRouter, we need to navigate to the right route
-  // We'll use a custom wrapper that doesn't include routing
+  createTestWrapper()
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[route]}>
@@ -330,12 +295,9 @@ describe('ResourceListPage', () => {
     it.skip('should display loading spinner while fetching schema', async () => {
       // SKIPPED: MSW handlers not intercepting requests properly
       // Set up MSW to never resolve
-      let resolvePromise: any
       server.use(
         http.get('/control/collections', () => {
-          return new Promise((resolve) => {
-            resolvePromise = resolve
-          })
+          return new Promise(() => {})
         })
       )
 
@@ -439,7 +401,7 @@ describe('ResourceListPage', () => {
     })
 
     it('should sort by column when header is clicked', async () => {
-      const user = userEvent.setup()
+      userEvent.setup()
       renderWithProviders(<ResourceListPage />)
 
       await waitFor(() => {
@@ -462,7 +424,7 @@ describe('ResourceListPage', () => {
     })
 
     it('should toggle sort direction on subsequent clicks', async () => {
-      const user = userEvent.setup()
+      userEvent.setup()
 
       renderWithProviders(<ResourceListPage />)
 

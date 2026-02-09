@@ -16,17 +16,11 @@
  */
 
 import React from 'react'
-import { render, screen, fireEvent, within } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { AuthorizationPanel, ROUTE_OPERATIONS, FIELD_OPERATIONS } from './AuthorizationPanel'
-import type {
-  PolicySummary,
-  FieldDefinition,
-  CollectionAuthz,
-  RoutePolicyConfig,
-  FieldPolicyConfig,
-} from './AuthorizationPanel'
+import type { PolicySummary, FieldDefinition, CollectionAuthz } from './AuthorizationPanel'
 import { I18nProvider } from '../../context/I18nContext'
 
 // Mock policies

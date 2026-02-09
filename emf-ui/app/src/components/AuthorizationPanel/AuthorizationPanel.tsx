@@ -105,11 +105,13 @@ export interface AuthorizationPanelProps {
 /**
  * All route operations
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export const ROUTE_OPERATIONS: RouteOperation[] = ['create', 'read', 'update', 'delete', 'list']
 
 /**
  * All field operations
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export const FIELD_OPERATIONS: FieldOperation[] = ['read', 'write']
 
 /**
@@ -148,7 +150,9 @@ function getOperationIcon(operation: RouteOperation | FieldOperation): string {
  * ```
  */
 export function AuthorizationPanel({
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   collectionId,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   collectionName,
   fields,
   policies,

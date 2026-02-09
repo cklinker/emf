@@ -57,6 +57,7 @@ export function ApiProvider({ children, baseUrl = '' }: ApiProviderProps): React
  *
  * @throws Error if used outside of ApiProvider
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function useApi(): ApiContextValue {
   const context = useContext(ApiContext)
   if (context === undefined) {

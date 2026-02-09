@@ -425,7 +425,7 @@ describe('DashboardPage', () => {
 
       await waitFor(() => {
         const errorsList = screen.getByTestId('errors-list')
-        expect(errorsList).toHaveAttribute('role', 'list')
+        expect(errorsList.tagName.toLowerCase()).toBe('ul')
         expect(errorsList).toHaveAttribute('aria-label')
       })
     })

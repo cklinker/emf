@@ -18,6 +18,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
+import { ApiClient } from '../../services/apiClient'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
 import styles from './ResourceListPage.module.css'
 
@@ -31,6 +32,7 @@ export type ExportFormat = 'csv' | 'json'
  * Escape a value for CSV format
  * Handles commas, quotes, and newlines
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function escapeCSVValue(value: unknown): string {
   if (value === null || value === undefined) {
     return ''
@@ -58,6 +60,7 @@ export function escapeCSVValue(value: unknown): string {
  * Convert records to CSV format
  * Requirement 11.12: Export selected records to CSV
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function recordsToCSV(
   records: Resource[],
   fields: FieldDefinition[],
@@ -93,6 +96,7 @@ export function recordsToCSV(
  * Convert records to JSON format
  * Requirement 11.12: Export selected records to JSON
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function recordsToJSON(records: Resource[]): string {
   return JSON.stringify(records, null, 2)
 }
@@ -100,6 +104,7 @@ export function recordsToJSON(records: Resource[]): string {
 /**
  * Trigger a file download in the browser
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function downloadFile(content: string, filename: string, mimeType: string): void {
   const blob = new Blob([content], { type: mimeType })
   const url = URL.createObjectURL(blob)
@@ -217,19 +222,19 @@ function generateFilterId(): string {
 
 // API functions using apiClient
 async function fetchCollectionSchema(
-  apiClient: any,
+  apiClient: ApiClient,
   collectionName: string
 ): Promise<CollectionSchema> {
   console.log('[fetchCollectionSchema] Fetching collection by name:', collectionName)
 
   // First, fetch all collections to find the one with matching name
-  const response = await apiClient.get<{ content: any[] }>('/control/collections')
+  const response = await apiClient.get<{ content: CollectionSchema[] }>('/control/collections')
   console.log('[fetchCollectionSchema] Collections response:', response)
 
   const collections = response?.content || []
   console.log('[fetchCollectionSchema] Collections array:', collections)
 
-  const collection = collections.find((c: any) => c.name === collectionName)
+  const collection = collections.find((c: CollectionSchema) => c.name === collectionName)
   console.log('[fetchCollectionSchema] Found collection:', collection)
 
   if (!collection) {
@@ -251,7 +256,7 @@ interface FetchResourcesParams {
 }
 
 async function fetchResources(
-  apiClient: any,
+  apiClient: ApiClient,
   params: FetchResourcesParams
 ): Promise<PaginatedResponse> {
   const { collectionName, page, pageSize, sort, filters } = params
@@ -274,7 +279,7 @@ async function fetchResources(
 }
 
 async function deleteResource(
-  apiClient: any,
+  apiClient: ApiClient,
   collectionName: string,
   resourceId: string
 ): Promise<void> {
@@ -282,7 +287,7 @@ async function deleteResource(
 }
 
 async function deleteResources(
-  apiClient: any,
+  apiClient: ApiClient,
   collectionName: string,
   resourceIds: string[]
 ): Promise<void> {
@@ -318,7 +323,7 @@ export function ResourceListPage({
   const [showFilters, setShowFilters] = useState(false)
 
   // Column visibility state - Requirement 11.5 (column selection)
-  const [visibleColumns, setVisibleColumns] = useState<Set<string>>(new Set())
+  const [visibleColumnOverrides, setVisibleColumnOverrides] = useState<Set<string> | null>(null)
   const [showColumnSelector, setShowColumnSelector] = useState(false)
 
   // Bulk selection state - Requirement 11.11
@@ -344,17 +349,27 @@ export function ResourceListPage({
     enabled: !!collectionName,
   })
 
-  // Initialize visible columns when schema loads
-  useEffect(() => {
-    if (schema && visibleColumns.size === 0) {
-      // Show first 5 fields by default plus id
-      const defaultColumns = new Set<string>(['id'])
-      schema.fields.slice(0, 5).forEach((field) => {
-        defaultColumns.add(field.name)
-      })
-      setVisibleColumns(defaultColumns)
-    }
-  }, [schema, visibleColumns.size])
+  // Compute visible columns: use overrides if user has toggled, otherwise derive defaults from schema
+  const visibleColumns = useMemo(() => {
+    if (visibleColumnOverrides) return visibleColumnOverrides
+    if (!schema) return new Set<string>()
+    const defaultColumns = new Set<string>(['id'])
+    schema.fields.slice(0, 5).forEach((field) => {
+      defaultColumns.add(field.name)
+    })
+    return defaultColumns
+  }, [visibleColumnOverrides, schema])
+
+  const setVisibleColumns = useCallback(
+    (value: Set<string> | ((prev: Set<string>) => Set<string>)) => {
+      if (typeof value === 'function') {
+        setVisibleColumnOverrides((prev) => value(prev ?? new Set()))
+      } else {
+        setVisibleColumnOverrides(value)
+      }
+    },
+    []
+  )
 
   // Fetch resources - Requirement 11.2
   const {
@@ -498,17 +513,20 @@ export function ResourceListPage({
     setShowColumnSelector((prev) => !prev)
   }, [])
 
-  const handleToggleColumn = useCallback((fieldName: string) => {
-    setVisibleColumns((prev) => {
-      const next = new Set(prev)
-      if (next.has(fieldName)) {
-        next.delete(fieldName)
-      } else {
-        next.add(fieldName)
-      }
-      return next
-    })
-  }, [])
+  const handleToggleColumn = useCallback(
+    (fieldName: string) => {
+      setVisibleColumns((prev) => {
+        const next = new Set(prev)
+        if (next.has(fieldName)) {
+          next.delete(fieldName)
+        } else {
+          next.add(fieldName)
+        }
+        return next
+      })
+    },
+    [setVisibleColumns]
+  )
 
   // Selection handlers - Requirement 11.11
   const handleSelectAll = useCallback(() => {
@@ -1187,6 +1205,7 @@ export function ResourceListPage({
                       <td role="gridcell" className={styles.actionsCell}>
                         <div
                           className={styles.actions}
+                          role="toolbar"
                           onClick={(e) => e.stopPropagation()}
                           onKeyDown={(e) => e.stopPropagation()}
                         >

@@ -198,27 +198,25 @@ describe('PageTransition', () => {
     it('returns false when reduced motion is not preferred', () => {
       window.matchMedia = createMatchMedia(false) as typeof window.matchMedia
 
-      let result: boolean | undefined
       function TestComponent() {
-        result = usePrefersReducedMotion()
-        return null
+        const result = usePrefersReducedMotion()
+        return <div data-testid="result">{String(result)}</div>
       }
 
       render(<TestComponent />)
-      expect(result).toBe(false)
+      expect(screen.getByTestId('result')).toHaveTextContent('false')
     })
 
     it('returns true when reduced motion is preferred', () => {
       window.matchMedia = createMatchMedia(true) as typeof window.matchMedia
 
-      let result: boolean | undefined
       function TestComponent() {
-        result = usePrefersReducedMotion()
-        return null
+        const result = usePrefersReducedMotion()
+        return <div data-testid="result">{String(result)}</div>
       }
 
       render(<TestComponent />)
-      expect(result).toBe(true)
+      expect(screen.getByTestId('result')).toHaveTextContent('true')
     })
   })
 

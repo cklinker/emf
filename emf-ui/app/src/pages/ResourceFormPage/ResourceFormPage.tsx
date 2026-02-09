@@ -11,13 +11,14 @@
  * - 12.4: Use custom field renderers when registered, fall back to defaults
  */
 
-import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
+import React, { useState, useCallback, useMemo } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { usePlugins } from '../../context/PluginContext'
 import { useApi } from '../../context/ApiContext'
 import { useToast, LoadingSpinner, ErrorMessage } from '../../components'
+import type { ApiClient } from '../../services/apiClient'
 import styles from './ResourceFormPage.module.css'
 
 /**
@@ -89,14 +90,14 @@ export interface ResourceFormPageProps {
 
 // API functions using apiClient
 async function fetchCollectionSchema(
-  apiClient: any,
+  apiClient: ApiClient,
   collectionName: string
 ): Promise<CollectionSchema> {
   return apiClient.get(`/control/collections/${collectionName}`)
 }
 
 async function fetchResource(
-  apiClient: any,
+  apiClient: ApiClient,
   collectionName: string,
   resourceId: string
 ): Promise<Resource> {
@@ -104,7 +105,7 @@ async function fetchResource(
 }
 
 async function createResource(
-  apiClient: any,
+  apiClient: ApiClient,
   collectionName: string,
   data: FormData
 ): Promise<Resource> {
@@ -112,7 +113,7 @@ async function createResource(
 }
 
 async function updateResource(
-  apiClient: any,
+  apiClient: ApiClient,
   collectionName: string,
   resourceId: string,
   data: FormData
@@ -240,7 +241,7 @@ export function ResourceFormPage({
 
   // Track the key for which form was initialized
   const currentResourceKey = isEditMode ? resourceId : 'new'
-  const initializedKeyRef = useRef<string | null>(null)
+  const [initializedKey, setInitializedKey] = useState<string | null>(null)
 
   // Compute initial form data based on schema and resource
   const computedInitialData = useMemo(() => {
@@ -252,13 +253,11 @@ export function ResourceFormPage({
   }, [schema, resource, isEditMode])
 
   // Initialize form data when data becomes available or resource changes
-  useEffect(() => {
-    if (computedInitialData && initializedKeyRef.current !== currentResourceKey) {
-      initializedKeyRef.current = currentResourceKey
-      setFormData(computedInitialData)
-      setFormErrors({})
-    }
-  }, [computedInitialData, currentResourceKey])
+  if (computedInitialData && initializedKey !== currentResourceKey) {
+    setInitializedKey(currentResourceKey ?? null)
+    setFormData(computedInitialData)
+    setFormErrors({})
+  }
 
   // Sort fields by order
   const sortedFields = useMemo(() => {

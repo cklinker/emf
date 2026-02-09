@@ -22,6 +22,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
 import { LoadingSpinner, ErrorMessage } from '../../components'
+import type { ApiClient } from '../../services/apiClient'
 import styles from './MigrationsPage.module.css'
 
 /**
@@ -112,32 +113,36 @@ export interface MigrationsPageProps {
 }
 
 // API functions using apiClient
-async function fetchMigrationHistory(apiClient: any): Promise<MigrationRun[]> {
+async function fetchMigrationHistory(apiClient: ApiClient): Promise<MigrationRun[]> {
   return apiClient.get('/control/migrations')
 }
 
-async function fetchMigrationDetails(apiClient: any, id: string): Promise<MigrationRun> {
+async function fetchMigrationDetails(apiClient: ApiClient, id: string): Promise<MigrationRun> {
   return apiClient.get(`/control/migrations/${id}`)
 }
 
-async function fetchCollectionsForMigration(apiClient: any): Promise<CollectionSummary[]> {
+async function fetchCollectionsForMigration(apiClient: ApiClient): Promise<CollectionSummary[]> {
   // The API returns a paginated response, so we need to extract the content array
-  const response = await apiClient.get('/control/collections?size=1000')
+  const response = await apiClient.get<Record<string, unknown>>('/control/collections?size=1000')
 
   // Handle paginated response structure
   if (response && response.content && Array.isArray(response.content)) {
     // Map the collection DTOs to CollectionSummary format
     return Promise.all(
-      response.content.map(async (collection: any) => {
+      response.content.map(async (collection: Record<string, unknown>) => {
         // Fetch versions for each collection
-        const versions = await apiClient.get(`/control/collections/${collection.id}/versions`)
-        const versionNumbers = Array.isArray(versions) ? versions.map((v: any) => v.version) : []
+        const versions = await apiClient.get<Array<Record<string, unknown>>>(
+          `/control/collections/${collection.id}/versions`
+        )
+        const versionNumbers = Array.isArray(versions)
+          ? versions.map((v: Record<string, unknown>) => v.version as number)
+          : []
 
         return {
-          id: collection.id,
-          name: collection.name,
-          displayName: collection.displayName || collection.name,
-          currentVersion: collection.currentVersion || 1,
+          id: collection.id as string,
+          name: collection.name as string,
+          displayName: (collection.displayName || collection.name) as string,
+          currentVersion: (collection.currentVersion as number) || 1,
           availableVersions: versionNumbers.length > 0 ? versionNumbers : [1],
         }
       })
@@ -154,7 +159,7 @@ interface CreateMigrationPlanRequest {
 }
 
 async function createMigrationPlan(
-  apiClient: any,
+  apiClient: ApiClient,
   request: CreateMigrationPlanRequest
 ): Promise<MigrationPlan> {
   return apiClient.post('/control/migrations/plan', request)
@@ -174,7 +179,7 @@ export interface ExecuteMigrationResponse {
 }
 
 async function executeMigration(
-  apiClient: any,
+  apiClient: ApiClient,
   request: ExecuteMigrationRequest
 ): Promise<ExecuteMigrationResponse> {
   return apiClient.post('/control/migrations/execute', request)
@@ -184,14 +189,14 @@ async function executeMigration(
  * Rollback a failed migration
  * Requirement 10.7: Migration execution offers rollback option on failure
  */
-async function rollbackMigration(apiClient: any, runId: string): Promise<MigrationRun> {
+async function rollbackMigration(apiClient: ApiClient, runId: string): Promise<MigrationRun> {
   return apiClient.post(`/control/migrations/${runId}/rollback`, {})
 }
 
 /**
  * Get migration run status for polling
  */
-async function getMigrationRunStatus(apiClient: any, runId: string): Promise<MigrationRun> {
+async function getMigrationRunStatus(apiClient: ApiClient, runId: string): Promise<MigrationRun> {
   return apiClient.get(`/control/migrations/${runId}`)
 }
 
@@ -314,12 +319,19 @@ function MigrationPlanDisplay({
     <div
       className={styles.modalOverlay}
       onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="migration-plan-title"
+      onKeyDown={(e) => e.key === 'Escape' && onClose()}
+      role="presentation"
       data-testid="migration-plan-modal"
     >
-      <div className={styles.modalContent} onClick={(e) => e.stopPropagation()} role="document">
+      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
+      <div
+        className={styles.modalContent}
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="migration-plan-title"
+      >
         <div className={styles.modalHeader}>
           <h2 id="migration-plan-title" className={styles.modalTitle}>
             {t('migrations.planDetails')}
@@ -531,7 +543,7 @@ function MigrationExecutionModal({
         clearInterval(pollingIntervalRef.current)
       }
     }
-  }, [isPolling, runId, queryClient])
+  }, [isPolling, runId, queryClient, apiClient])
 
   // Start execution when modal opens
   useEffect(() => {
@@ -794,8 +806,9 @@ function MigrationPlanningForm({
     },
   })
 
-  // Ensure collections is always an array
-  const collectionsArray = Array.isArray(collections) ? collections : []
+  const collectionsArray = useMemo(() => {
+    return Array.isArray(collections) ? collections : []
+  }, [collections])
 
   const selectedCollection = useMemo(() => {
     return collectionsArray.find((c) => c.id === selectedCollectionId)
@@ -835,12 +848,19 @@ function MigrationPlanningForm({
     <div
       className={styles.modalOverlay}
       onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="plan-migration-title"
+      onKeyDown={(e) => e.key === 'Escape' && onClose()}
+      role="presentation"
       data-testid="plan-migration-modal"
     >
-      <div className={styles.modalContent} onClick={(e) => e.stopPropagation()} role="document">
+      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
+      <div
+        className={styles.modalContent}
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="plan-migration-title"
+      >
         <div className={styles.modalHeader}>
           <h2 id="plan-migration-title" className={styles.modalTitle}>
             {t('migrations.planMigration')}
@@ -1039,12 +1059,18 @@ function MigrationRunDetails({
       className={styles.modalOverlay}
       onClick={onClose}
       onKeyDown={handleKeyDown}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="migration-details-title"
+      role="presentation"
       data-testid="migration-details-modal"
     >
-      <div className={styles.modalContent} onClick={(e) => e.stopPropagation()} role="document">
+      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
+      <div
+        className={styles.modalContent}
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="migration-details-title"
+      >
         <div className={styles.modalHeader}>
           <h2 id="migration-details-title" className={styles.modalTitle}>
             {t('migrations.runDetails')}

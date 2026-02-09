@@ -19,7 +19,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { createTestWrapper, setupAuthMocks, wrapFetchMock } from '../../test/testUtils'
-import { ResourceBrowserPage, CollectionSummary } from './ResourceBrowserPage'
+import { ResourceBrowserPage } from './ResourceBrowserPage'
 
 // Mock navigate function
 const mockNavigate = vi.fn()

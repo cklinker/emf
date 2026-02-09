@@ -37,6 +37,7 @@ export interface ProtectedRouteProps {
 /**
  * Check if user has any of the required roles
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function hasRequiredRoles(
   userRoles: string[] | undefined,
   requiredRoles: string[]
@@ -55,6 +56,7 @@ export function hasRequiredRoles(
  * Note: In a real implementation, this would check against the user's
  * permissions/policies from the auth context or a separate authorization service
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function hasRequiredPolicies(
   userPolicies: string[] | undefined,
   requiredPolicies: string[]

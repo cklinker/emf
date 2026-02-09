@@ -241,8 +241,12 @@ function PropertyPanel({ component, onChange }: PropertyPanelProps): React.React
       <h3 className={styles.propertyTitle}>{t('builder.pages.properties')}</h3>
       <div className={styles.propertyContent}>
         <div className={styles.propertyGroup}>
-          <label className={styles.propertyLabel}>Component Type</label>
-          <span className={styles.propertyValue}>{component.type}</span>
+          <label className={styles.propertyLabel} htmlFor="prop-type">
+            Component Type
+          </label>
+          <span id="prop-type" className={styles.propertyValue}>
+            {component.type}
+          </span>
         </div>
         <div className={styles.propertyGroup}>
           <label className={styles.propertyLabel} htmlFor="prop-id">
@@ -684,6 +688,7 @@ function Canvas({
   }
 
   return (
+    // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/click-events-have-key-events
     <div
       className={`${styles.canvas} ${isDragOver ? styles.canvasDragOver : ''}`}
       onDragOver={handleDragOver}
@@ -700,6 +705,7 @@ function Canvas({
           <p className={styles.canvasHint}>{t('builder.pages.canvasHint')}</p>
         </div>
       ) : (
+        // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
         <div className={styles.canvasContent} onClick={(e) => e.stopPropagation()}>
           {components.map(renderComponent)}
         </div>
@@ -982,7 +988,7 @@ export function PageBuilderPage({
   // Editor state
   const [components, setComponents] = useState<PageComponent[]>([])
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null)
-  const [draggedComponentType, setDraggedComponentType] = useState<string | null>(null)
+  const [, setDraggedComponentType] = useState<string | null>(null)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
 
   // Preview mode state (Requirement 7.7)
@@ -1001,19 +1007,20 @@ export function PageBuilderPage({
   })
 
   // Fetch single page query for editing
-  const { data: currentPage, isLoading: isLoadingPage } = useQuery({
+  const { data: currentPage } = useQuery({
     queryKey: ['ui-page', editingPageId],
     queryFn: () => apiClient.get<UIPage>(`/control/ui/pages/${editingPageId}`),
     enabled: viewMode === 'editor' && !!editingPageId,
   })
 
   // Update components when page data loads
-  useEffect(() => {
-    if (currentPage) {
-      setComponents(currentPage.components || [])
-      setHasUnsavedChanges(false)
-    }
-  }, [currentPage])
+  const [loadedPageId, setLoadedPageId] = useState<string | null>(null)
+  const currentPageId = currentPage?.id ?? null
+  if (currentPageId && loadedPageId !== currentPageId) {
+    setLoadedPageId(currentPageId)
+    setComponents(currentPage?.components || [])
+    setHasUnsavedChanges(false)
+  }
 
   // Create mutation
   const createMutation = useMutation({

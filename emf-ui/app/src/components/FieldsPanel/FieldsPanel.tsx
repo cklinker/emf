@@ -337,6 +337,7 @@ export function FieldsPanel({
         aria-label={t('fieldsPanel.fieldListLabel')}
         data-testid={`${testId}-list`}
       >
+        {/* eslint-disable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex */}
         {sortedFields.map((field, index) => (
           <div
             key={field.id}
@@ -453,6 +454,7 @@ export function FieldsPanel({
             </div>
           </div>
         ))}
+        {/* eslint-enable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex */}
       </div>
 
       {/* Delete confirmation dialog */}

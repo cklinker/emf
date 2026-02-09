@@ -87,6 +87,7 @@ export interface CollectionFormProps {
  * - Lowercase alphanumeric and underscores only
  * - Must start with a letter
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export const collectionFormSchema = z.object({
   serviceId: z.string().min(1, 'validation.serviceRequired'),
   name: z

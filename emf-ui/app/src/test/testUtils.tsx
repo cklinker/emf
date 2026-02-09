@@ -16,6 +16,7 @@ import { PluginProvider } from '../context/PluginContext'
 /**
  * Mock bootstrap config response
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export const mockBootstrapConfig = {
   oidcProviders: [
     {
@@ -30,6 +31,7 @@ export const mockBootstrapConfig = {
 /**
  * Mock tokens for authenticated state
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export const mockTokens = {
   accessToken: 'mock-access-token',
   idToken:
@@ -82,6 +84,7 @@ function createBootstrapFetchWrapper(baseFetch: typeof fetch): typeof fetch {
  * Setup mock fetch for bootstrap config and authentication
  * This should be called once at the start of each test file
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function setupAuthMocks() {
   // Store original fetch if not already stored
   if (!originalFetch) {
@@ -127,6 +130,7 @@ export function setupAuthMocks() {
  * Wrap a test's fetch mock to also handle bootstrap config
  * Call this after setting up your test's fetch mock
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function wrapFetchMock(testFetchMock: typeof fetch) {
   global.fetch = createBootstrapFetchWrapper(testFetchMock)
 }
@@ -134,6 +138,7 @@ export function wrapFetchMock(testFetchMock: typeof fetch) {
 /**
  * Create a test wrapper with all required providers
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function createTestWrapper() {
   const queryClient = new QueryClient({
     defaultOptions: {

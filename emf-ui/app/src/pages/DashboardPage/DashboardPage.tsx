@@ -14,7 +14,7 @@
  * - 13.7: Dashboard displays health alerts when services are unhealthy
  */
 
-import React, { useMemo, useState, useCallback, useEffect } from 'react'
+import React, { useMemo, useState, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
@@ -320,12 +320,7 @@ function ErrorsList({ errors, testId }: ErrorsListProps): React.ReactElement {
   }
 
   return (
-    <ul
-      className={styles.errorsList}
-      data-testid={testId}
-      role="list"
-      aria-label={t('dashboard.recentErrors')}
-    >
+    <ul className={styles.errorsList} data-testid={testId} aria-label={t('dashboard.recentErrors')}>
       {errors.map((error) => (
         <li
           key={error.id}
@@ -485,6 +480,7 @@ function HealthAlerts({ healthStatuses, testId }: HealthAlertsProps): React.Reac
         </span>
         <h3 className={styles.healthAlertsTitle}>{t('dashboard.healthAlerts')}</h3>
       </div>
+      {/* eslint-disable-next-line jsx-a11y/no-redundant-roles */}
       <ul className={styles.alertsList} role="list">
         {unhealthyServices.map((health) => (
           <li
@@ -560,7 +556,7 @@ export function DashboardPage({
       ]
     }
     return dashboardData.health
-  }, [dashboardData?.health])
+  }, [dashboardData])
 
   // Default metrics
   const metrics = useMemo(() => {
@@ -573,12 +569,12 @@ export function DashboardPage({
       }
     }
     return dashboardData.metrics
-  }, [dashboardData?.metrics])
+  }, [dashboardData])
 
   // Recent errors
   const recentErrors = useMemo(() => {
     return dashboardData?.recentErrors || []
-  }, [dashboardData?.recentErrors])
+  }, [dashboardData])
 
   // Render loading state
   if (isLoading) {

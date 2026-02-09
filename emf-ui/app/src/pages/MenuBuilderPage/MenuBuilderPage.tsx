@@ -21,6 +21,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
+import type { ApiClient } from '../../services/apiClient'
 import styles from './MenuBuilderPage.module.css'
 
 /**
@@ -84,23 +85,23 @@ export interface MenuBuilderPageProps {
 }
 
 // API functions using apiClient
-async function fetchMenus(apiClient: any): Promise<UIMenu[]> {
+async function fetchMenus(apiClient: ApiClient): Promise<UIMenu[]> {
   return apiClient.get('/control/ui/menus')
 }
 
-async function fetchMenu(apiClient: any, id: string): Promise<UIMenu> {
-  return apiClient.get(`/control/ui/menus/${id}`)
-}
-
-async function createMenu(apiClient: any, data: Partial<UIMenu>): Promise<UIMenu> {
+async function createMenu(apiClient: ApiClient, data: Partial<UIMenu>): Promise<UIMenu> {
   return apiClient.post('/control/ui/menus', data)
 }
 
-async function updateMenu(apiClient: any, id: string, data: Partial<UIMenu>): Promise<UIMenu> {
+async function updateMenu(
+  apiClient: ApiClient,
+  id: string,
+  data: Partial<UIMenu>
+): Promise<UIMenu> {
   return apiClient.put(`/control/ui/menus/${id}`, data)
 }
 
-async function deleteMenu(apiClient: any, id: string): Promise<void> {
+async function deleteMenu(apiClient: ApiClient, id: string): Promise<void> {
   return apiClient.delete(`/control/ui/menus/${id}`)
 }
 
@@ -116,7 +117,7 @@ interface Policy {
 /**
  * Fetch available policies for access control
  */
-async function fetchPolicies(apiClient: any): Promise<Policy[]> {
+async function fetchPolicies(apiClient: ApiClient): Promise<Policy[]> {
   try {
     return await apiClient.get('/control/policies')
   } catch {
@@ -1118,11 +1119,9 @@ export function MenuBuilderPage({
     return menus.find((m) => m.id === editingMenuId)
   }, [editingMenuId, menus])
 
-  const isLoadingMenu = isLoadingMenus
-
-  // Update menu items when menu data loads
   useEffect(() => {
     if (currentMenu) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setMenuItems(currentMenu.items || [])
       setHasUnsavedChanges(false)
     }

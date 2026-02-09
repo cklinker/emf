@@ -124,6 +124,7 @@ export interface FieldEditorProps {
 /**
  * All available field types
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export const FIELD_TYPES: FieldType[] = [
   'string',
   'number',
@@ -153,6 +154,7 @@ export const FIELD_TYPES: FieldType[] = [
 /**
  * Validation rule types available for each field type
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export const VALIDATION_RULES_BY_TYPE: Record<FieldType, ValidationRuleType[]> = {
   string: ['min', 'max', 'pattern', 'email', 'url'],
   number: ['min', 'max'],
@@ -191,6 +193,7 @@ const validationRuleSchema = z.object({
 /**
  * Zod validation schema for field form
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export const fieldEditorSchema = z
   .object({
     name: z
@@ -277,6 +280,7 @@ function generateFieldId(): string {
  * - Loading state during submission
  */
 export function FieldEditor({
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   collectionId,
   field,
   collections = [],
@@ -333,6 +337,7 @@ export function FieldEditor({
   })
 
   // Watch field type to show/hide reference target and validation rules
+  // eslint-disable-next-line react-hooks/incompatible-library
   const watchedType = watch('type')
 
   // Get available validation rules for current field type

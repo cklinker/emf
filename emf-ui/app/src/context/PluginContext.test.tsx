@@ -754,7 +754,7 @@ describe('PluginContext', () => {
       const plugin = createTestPlugin({
         id: 'string-error-plugin',
         onLoad: async () => {
-          throw 'String error' // eslint-disable-line no-throw-literal
+          throw 'String error'
         },
       })
 

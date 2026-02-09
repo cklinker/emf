@@ -499,6 +499,7 @@ export function ThemeProvider({
  * }
  * ```
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function useTheme(): ThemeContextValue {
   const context = useContext(ThemeContext)
   if (context === undefined) {
@@ -510,5 +511,5 @@ export function useTheme(): ThemeContextValue {
 // Export the context for testing purposes
 export { ThemeContext }
 
-// Export utility functions for testing
+// eslint-disable-next-line react-refresh/only-export-components
 export { getSystemTheme, getStoredTheme, storeTheme, resolveTheme, getThemeColors }

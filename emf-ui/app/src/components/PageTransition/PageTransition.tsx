@@ -155,7 +155,7 @@ export function PageTransition({
   )
 }
 
-// Export the hook for external use
+// eslint-disable-next-line react-refresh/only-export-components
 export { usePrefersReducedMotion }
 
 // Export default for convenience

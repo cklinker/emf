@@ -21,7 +21,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter } from 'react-router-dom'
-import { createTestWrapper, setupAuthMocks } from '../../test/testUtils'
+import { setupAuthMocks } from '../../test/testUtils'
 import { PluginsPage } from './PluginsPage'
 import { PluginProvider } from '../../context/PluginContext'
 import { I18nProvider } from '../../context/I18nContext'
@@ -464,7 +464,7 @@ describe('PluginsPage', () => {
 
       await waitFor(() => {
         const panel = screen.getByTestId('plugin-details-panel')
-        expect(panel).toHaveAttribute('role', 'complementary')
+        expect(panel.tagName.toLowerCase()).toBe('aside')
         expect(panel).toHaveAttribute('aria-label', 'Test Plugin One details')
       })
     })

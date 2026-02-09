@@ -17,6 +17,10 @@ export type { CollectionDetailPageProps } from './CollectionDetailPage'
 export { CollectionFormPage } from './CollectionFormPage'
 export type { CollectionFormPageProps } from './CollectionFormPage'
 
+// CollectionWizardPage - Multi-step wizard for creating collections
+export { CollectionWizardPage } from './CollectionWizardPage'
+export type { CollectionWizardPageProps } from './CollectionWizardPage'
+
 // RolesPage - Authorization roles management page
 export { RolesPage } from './RolesPage'
 export type { RolesPageProps, Role } from './RolesPage'
@@ -225,6 +229,10 @@ export type { ConnectedAppsPageProps } from './ConnectedAppsPage'
 // BulkJobsPage - Bulk job management page
 export { BulkJobsPage } from './BulkJobsPage'
 export type { BulkJobsPageProps } from './BulkJobsPage'
+
+// SetupHomePage - Setup directory page
+export { SetupHomePage } from './SetupHomePage'
+export type { SetupHomePageProps } from './SetupHomePage'
 
 // NotFoundPage - 404 error page
 export { NotFoundPage } from './NotFoundPage'

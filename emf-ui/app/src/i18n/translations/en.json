@@ -1099,6 +1099,26 @@
     "systemHealth": "System Health",
     "monitoring": "Monitoring"
   },
+  "setup": {
+    "title": "Setup",
+    "searchPlaceholder": "Search setup...",
+    "stats": {
+      "collections": "Total Collections",
+      "users": "Total Users",
+      "reports": "Total Reports",
+      "dashboards": "Total Dashboards"
+    },
+    "categories": {
+      "administration": "Administration",
+      "dataModel": "Data Model",
+      "security": "Security",
+      "automation": "Automation",
+      "integration": "Integration",
+      "analytics": "Analytics",
+      "uiCustomization": "UI & Customization",
+      "platform": "Platform"
+    }
+  },
   "relatedRecords": {
     "title": "Related Records",
     "noRelationships": "No related records found.",
@@ -1220,5 +1240,28 @@
     "comingSoon": "Attachments feature coming soon.",
     "fileSize": "{{size}}",
     "uploadedBy": "Uploaded by {{user}}"
+  },
+  "wizard": {
+    "steps": {
+      "basics": "Basics",
+      "fields": "Fields",
+      "authorization": "Authorization",
+      "review": "Review"
+    },
+    "chooseTemplate": "Choose a template",
+    "noFields": "No fields",
+    "fieldsCount": "{{count}} fields",
+    "skipAuthButton": "Skip — Configure Later",
+    "authQuestion": "Who can access this collection?",
+    "authDescription": "Configure policies for each CRUD operation. This is optional and can be configured later.",
+    "reviewAndCreate": "Review & Create",
+    "createCollection": "Create Collection",
+    "creating": "Creating collection...",
+    "noFieldsConfigured": "No fields configured. Fields can be added after creation.",
+    "authNotConfigured": "Not configured — will use defaults",
+    "templateContact": "Contact",
+    "templateAccount": "Account",
+    "templateTask": "Task",
+    "templateCustom": "Custom"
   }
 }

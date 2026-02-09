@@ -23,6 +23,8 @@ import { RecordHeader } from '../../components/RecordHeader/RecordHeader'
 import { RecordActionsBar } from '../../components/RecordActionsBar/RecordActionsBar'
 import { RelatedRecordsSection } from '../../components/RelatedRecordsSection/RelatedRecordsSection'
 import { ActivityTimeline } from '../../components/ActivityTimeline/ActivityTimeline'
+import { NotesSection } from '../../components/NotesSection/NotesSection'
+import { AttachmentsSection } from '../../components/AttachmentsSection/AttachmentsSection'
 import type { ApiClient } from '../../services/apiClient'
 import styles from './ResourceDetailPage.module.css'
 
@@ -725,6 +727,12 @@ export function ResourceDetailPage({
         recordId={resourceId}
         apiClient={apiClient}
       />
+
+      {/* Notes Section (T20) */}
+      <NotesSection collectionId={schema.id} recordId={resourceId} apiClient={apiClient} />
+
+      {/* Attachments Section (T20) */}
+      <AttachmentsSection collectionId={schema.id} recordId={resourceId} apiClient={apiClient} />
 
       {/* Activity Timeline (T7) */}
       <ActivityTimeline

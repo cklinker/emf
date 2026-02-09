@@ -1,0 +1,334 @@
+/**
+ * BulkActionsBar Styles
+ *
+ * Styles for the floating bulk actions bar component including:
+ * - Fixed-position floating bar at bottom center
+ * - Action buttons (export, change value, delete, submit for approval)
+ * - Change Field Value modal with form controls
+ * - Progress bar for batch operations
+ *
+ * Uses CSS custom properties for theming support.
+ * Supports reduced motion and dark mode.
+ */
+
+/* Floating Bar */
+.bar {
+  position: fixed;
+  bottom: var(--spacing-6, 1.5rem);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: var(--border-radius-lg, 0.5rem);
+  padding: var(--spacing-3, 0.75rem) var(--spacing-4, 1rem);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-4, 1rem);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  min-width: 500px;
+  animation: slideUp 0.2s ease-out;
+}
+
+/* Hidden state */
+.barHidden {
+  display: none;
+}
+
+/* Slide-up animation */
+@keyframes slideUp {
+  from {
+    transform: translateX(-50%) translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Selected count label */
+.count {
+  font-weight: 600;
+  font-size: var(--font-size-sm, 0.875rem);
+  white-space: nowrap;
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+/* Actions group */
+.actions {
+  display: flex;
+  gap: var(--spacing-2, 0.5rem);
+}
+
+/* Action button base */
+.actionButton {
+  padding: var(--spacing-1, 0.25rem) var(--spacing-3, 0.75rem);
+  border-radius: var(--border-radius-md, 0.375rem);
+  font-size: var(--font-size-sm, 0.875rem);
+  cursor: pointer;
+  border: 1px solid var(--color-border, #d1d5db);
+  background: var(--color-surface, #ffffff);
+  color: var(--color-text-primary, #1a1a1a);
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.actionButton:hover {
+  background: var(--color-surface-hover, #f9fafb);
+}
+
+.actionButton:focus {
+  outline: 2px solid var(--color-focus-ring, #0066cc);
+  outline-offset: 2px;
+}
+
+.actionButton:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.actionButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Danger button variant */
+.dangerButton {
+  color: var(--color-error, #dc2626);
+  border-color: var(--color-error, #dc2626);
+}
+
+.dangerButton:hover {
+  background: var(--color-error, #dc2626);
+  color: white;
+}
+
+/* Deselect link button */
+.deselectLink {
+  color: var(--color-primary, #0066cc);
+  cursor: pointer;
+  font-size: var(--font-size-sm, 0.875rem);
+  background: none;
+  border: none;
+  padding: 0;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color 0.15s ease;
+}
+
+.deselectLink:hover {
+  text-decoration: underline;
+}
+
+.deselectLink:focus {
+  outline: 2px solid var(--color-focus-ring, #0066cc);
+  outline-offset: 2px;
+}
+
+.deselectLink:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Modal Overlay */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Modal */
+.modal {
+  background: var(--color-surface, #ffffff);
+  border-radius: var(--border-radius-lg, 0.5rem);
+  padding: var(--spacing-6, 1.5rem);
+  min-width: 400px;
+  max-width: 500px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+}
+
+/* Modal title */
+.modalTitle {
+  font-size: var(--font-size-lg, 1.125rem);
+  font-weight: 600;
+  margin: 0 0 var(--spacing-4, 1rem) 0;
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+/* Form group */
+.formGroup {
+  margin-bottom: var(--spacing-4, 1rem);
+}
+
+.formGroup label {
+  display: block;
+  font-size: var(--font-size-sm, 0.875rem);
+  font-weight: 500;
+  margin-bottom: var(--spacing-1, 0.25rem);
+  color: var(--color-text-secondary, #666666);
+}
+
+.formGroup select,
+.formGroup input[type='text'],
+.formGroup input[type='number'],
+.formGroup input[type='date'],
+.formGroup input[type='datetime-local'] {
+  width: 100%;
+  padding: var(--spacing-2, 0.5rem);
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: var(--border-radius-md, 0.375rem);
+  font-size: var(--font-size-sm, 0.875rem);
+  background: var(--color-surface, #ffffff);
+  color: var(--color-text-primary, #1a1a1a);
+  box-sizing: border-box;
+}
+
+.formGroup select:focus,
+.formGroup input:focus {
+  outline: 2px solid var(--color-focus-ring, #0066cc);
+  outline-offset: -1px;
+  border-color: var(--color-primary, #0066cc);
+}
+
+/* Checkbox wrapper for boolean fields */
+.checkboxWrapper {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2, 0.5rem);
+  padding: var(--spacing-2, 0.5rem) 0;
+}
+
+.checkboxWrapper input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.checkboxWrapper span {
+  font-size: var(--font-size-sm, 0.875rem);
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+/* Modal actions */
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-2, 0.5rem);
+  margin-top: var(--spacing-4, 1rem);
+}
+
+.modalActions button {
+  padding: var(--spacing-2, 0.5rem) var(--spacing-4, 1rem);
+  border-radius: var(--border-radius-md, 0.375rem);
+  font-size: var(--font-size-sm, 0.875rem);
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+/* Cancel button in modal */
+.cancelButton {
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #d1d5db);
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+.cancelButton:hover {
+  background: var(--color-surface-hover, #f9fafb);
+}
+
+/* Apply button in modal */
+.applyButton {
+  background: var(--color-button-primary, #0066cc);
+  border: 1px solid var(--color-button-primary, #0066cc);
+  color: var(--color-button-primary-text, #ffffff);
+}
+
+.applyButton:hover {
+  background: var(--color-button-primary-hover, #0052a3);
+  border-color: var(--color-button-primary-hover, #0052a3);
+}
+
+.applyButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Progress bar */
+.progressSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-1, 0.25rem);
+  flex: 1;
+  min-width: 120px;
+}
+
+.progressText {
+  font-size: var(--font-size-xs, 0.75rem);
+  color: var(--color-text-secondary, #666666);
+  white-space: nowrap;
+}
+
+.progressBar {
+  height: 4px;
+  background: var(--color-surface-secondary, #e5e7eb);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--color-primary, #0066cc);
+  transition: width 0.3s ease;
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .bar {
+    animation: none;
+  }
+
+  .actionButton,
+  .dangerButton,
+  .deselectLink,
+  .cancelButton,
+  .applyButton,
+  .progressFill {
+    transition: none;
+  }
+}
+
+/* Dark Theme Support */
+[data-theme='dark'] .bar {
+  background: var(--color-surface, #1f2937);
+  border-color: var(--color-border, #374151);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme='dark'] .modal {
+  background: var(--color-surface, #1f2937);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+}
+
+/* High Contrast Mode Support */
+@media (forced-colors: active) {
+  .bar {
+    border: 2px solid currentColor;
+  }
+
+  .actionButton,
+  .cancelButton,
+  .applyButton {
+    border: 2px solid currentColor;
+  }
+
+  .modal {
+    border: 2px solid currentColor;
+  }
+}

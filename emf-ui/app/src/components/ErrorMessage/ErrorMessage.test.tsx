@@ -270,40 +270,46 @@ describe('ErrorMessage', () => {
   })
 
   describe('Error Icons', () => {
-    it('shows lightning icon for network errors', () => {
+    it('shows icon for network errors', () => {
       renderErrorMessage({ error: 'Network error' })
 
-      expect(screen.getByTestId('error-message-icon')).toHaveTextContent('⚡')
+      const icon = screen.getByTestId('error-message-icon')
+      expect(icon.querySelector('svg')).toBeInTheDocument()
     })
 
-    it('shows warning icon for validation errors', () => {
+    it('shows icon for validation errors', () => {
       renderErrorMessage({ error: 'Validation error' })
 
-      expect(screen.getByTestId('error-message-icon')).toHaveTextContent('⚠')
+      const icon = screen.getByTestId('error-message-icon')
+      expect(icon.querySelector('svg')).toBeInTheDocument()
     })
 
-    it('shows magnifying glass icon for not found errors', () => {
+    it('shows icon for not found errors', () => {
       renderErrorMessage({ error: 'Not found' })
 
-      expect(screen.getByTestId('error-message-icon')).toHaveTextContent('🔍')
+      const icon = screen.getByTestId('error-message-icon')
+      expect(icon.querySelector('svg')).toBeInTheDocument()
     })
 
-    it('shows lock icon for forbidden errors', () => {
+    it('shows icon for forbidden errors', () => {
       renderErrorMessage({ error: 'Permission denied' })
 
-      expect(screen.getByTestId('error-message-icon')).toHaveTextContent('🔒')
+      const icon = screen.getByTestId('error-message-icon')
+      expect(icon.querySelector('svg')).toBeInTheDocument()
     })
 
-    it('shows computer icon for server errors', () => {
+    it('shows icon for server errors', () => {
       renderErrorMessage({ error: 'Server error' })
 
-      expect(screen.getByTestId('error-message-icon')).toHaveTextContent('🖥')
+      const icon = screen.getByTestId('error-message-icon')
+      expect(icon.querySelector('svg')).toBeInTheDocument()
     })
 
-    it('shows X icon for generic errors', () => {
+    it('shows icon for generic errors', () => {
       renderErrorMessage({ error: 'Unknown error', type: 'generic' })
 
-      expect(screen.getByTestId('error-message-icon')).toHaveTextContent('✕')
+      const icon = screen.getByTestId('error-message-icon')
+      expect(icon.querySelector('svg')).toBeInTheDocument()
     })
   })
 })

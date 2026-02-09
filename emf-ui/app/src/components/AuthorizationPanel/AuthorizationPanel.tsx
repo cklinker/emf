@@ -19,6 +19,17 @@
  */
 
 import React, { useState, useCallback, useMemo } from 'react'
+import {
+  PlusCircle,
+  Eye,
+  Pencil,
+  Trash2,
+  List,
+  Lightbulb,
+  AlertTriangle,
+  Lock,
+  ChevronRight,
+} from 'lucide-react'
 import { useI18n } from '../../context/I18nContext'
 import { LoadingSpinner } from '../LoadingSpinner'
 import styles from './AuthorizationPanel.module.css'
@@ -117,16 +128,22 @@ export const FIELD_OPERATIONS: FieldOperation[] = ['read', 'write']
 /**
  * Get the icon for an operation
  */
-function getOperationIcon(operation: RouteOperation | FieldOperation): string {
-  const icons: Record<string, string> = {
-    create: '➕',
-    read: '👁️',
-    update: '✏️',
-    delete: '🗑️',
-    list: '📋',
-    write: '✏️',
+function getOperationIcon(operation: RouteOperation | FieldOperation): React.ReactNode {
+  switch (operation) {
+    case 'create':
+      return <PlusCircle size={14} />
+    case 'read':
+      return <Eye size={14} />
+    case 'update':
+    case 'write':
+      return <Pencil size={14} />
+    case 'delete':
+      return <Trash2 size={14} />
+    case 'list':
+      return <List size={14} />
+    default:
+      return '\u2022'
   }
-  return icons[operation] || '•'
 }
 
 /**
@@ -299,7 +316,7 @@ export function AuthorizationPanel({
       {/* Authorization Hint */}
       <div className={styles.hint} data-testid={`${testId}-hint`}>
         <span className={styles.hintIcon} aria-hidden="true">
-          💡
+          <Lightbulb size={16} />
         </span>
         <p className={styles.hintText}>{t('authorizationPanel.hint')}</p>
       </div>
@@ -421,7 +438,7 @@ export function AuthorizationPanel({
                       className={`${styles.expandIcon} ${isExpanded ? styles.rotated : ''}`}
                       aria-hidden="true"
                     >
-                      ▶
+                      <ChevronRight size={14} />
                     </span>
                     <span className={styles.fieldName}>{field.displayName || field.name}</span>
                     {field.displayName && field.displayName !== field.name && (
@@ -433,7 +450,7 @@ export function AuthorizationPanel({
                         title={t('authorizationPanel.hasConfiguredPolicies')}
                         aria-label={t('authorizationPanel.hasConfiguredPolicies')}
                       >
-                        🔒
+                        <Lock size={14} />
                       </span>
                     )}
                   </button>
@@ -493,7 +510,7 @@ export function AuthorizationPanel({
       {policies.length === 0 && (
         <div className={styles.warningBanner} data-testid={`${testId}-no-policies-warning`}>
           <span className={styles.warningIcon} aria-hidden="true">
-            ⚠️
+            <AlertTriangle size={16} />
           </span>
           <p className={styles.warningText}>{t('authorizationPanel.noPoliciesWarning')}</p>
         </div>

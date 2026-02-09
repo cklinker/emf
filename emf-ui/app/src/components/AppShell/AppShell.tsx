@@ -20,6 +20,7 @@ import {
   useRef,
   type ReactNode,
 } from 'react'
+import { Menu, X } from 'lucide-react'
 import { useTheme } from '../../context/ThemeContext'
 import { useEscapeKey } from '../../hooks/useKeyboardShortcuts'
 import { SkipLinks } from '../SkipLinks'
@@ -340,7 +341,7 @@ export function AppShell({
             data-testid="mobile-menu-toggle"
           >
             <span className={styles.hamburgerIcon} aria-hidden="true">
-              {sidebarOpen ? '✕' : '☰'}
+              {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
             </span>
           </button>
         )}

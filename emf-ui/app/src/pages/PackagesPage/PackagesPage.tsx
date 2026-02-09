@@ -12,6 +12,7 @@
 
 import React, { useState, useCallback, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { Package, FolderOpen } from 'lucide-react'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
 import { useToast, LoadingSpinner, ErrorMessage } from '../../components'
@@ -648,7 +649,9 @@ function ImportPanel({ onImportComplete }: ImportPanelProps): React.ReactElement
         />
         {selectedFile ? (
           <div className={styles.selectedFile}>
-            <span className={styles.fileIcon}>📦</span>
+            <span className={styles.fileIcon}>
+              <Package size={16} />
+            </span>
             <span className={styles.fileName}>{selectedFile.name}</span>
             <button
               type="button"
@@ -665,7 +668,9 @@ function ImportPanel({ onImportComplete }: ImportPanelProps): React.ReactElement
           </div>
         ) : (
           <div className={styles.dropZoneContent}>
-            <span className={styles.dropZoneIcon}>📁</span>
+            <span className={styles.dropZoneIcon}>
+              <FolderOpen size={24} />
+            </span>
             <span className={styles.dropZoneText}>{t('packages.dropZoneText')}</span>
             <span className={styles.dropZoneHint}>{t('packages.dropZoneHint')}</span>
           </div>

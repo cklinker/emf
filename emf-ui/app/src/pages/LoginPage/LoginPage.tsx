@@ -11,6 +11,7 @@
 
 import React, { useEffect, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { KeyRound } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useConfig } from '../../context/ConfigContext'
 import { useI18n } from '../../context/I18nContext'
@@ -164,7 +165,7 @@ export function LoginPage({ title }: LoginPageProps): React.ReactElement {
                     <LoadingSpinner size="small" />
                   ) : (
                     <span className={styles.providerIcon} aria-hidden="true">
-                      🔐
+                      <KeyRound size={20} />
                     </span>
                   )}
                   <span className={styles.providerName}>{provider.name}</span>

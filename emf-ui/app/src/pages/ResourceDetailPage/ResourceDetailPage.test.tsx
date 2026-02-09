@@ -181,6 +181,14 @@ vi.mock('../../components/ActivityTimeline/ActivityTimeline', () => ({
   ActivityTimeline: () => <div data-testid="activity-timeline">Activity</div>,
 }))
 
+vi.mock('../../components/NotesSection/NotesSection', () => ({
+  NotesSection: () => <div data-testid="notes-section">Notes</div>,
+}))
+
+vi.mock('../../components/AttachmentsSection/AttachmentsSection', () => ({
+  AttachmentsSection: () => <div data-testid="attachments-section">Attachments</div>,
+}))
+
 // Sample test data
 const mockSchema: CollectionSchema = {
   id: 'col-1',

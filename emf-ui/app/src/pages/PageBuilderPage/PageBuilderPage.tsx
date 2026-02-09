@@ -22,6 +22,7 @@
 
 import React, { useState, useCallback, useEffect, useRef, type ComponentType } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { Image, FileEdit, Grid3x3, Square, Box } from 'lucide-react'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
 import { usePlugins } from '../../context/PluginContext'
@@ -458,7 +459,9 @@ function Preview({
               />
             ) : (
               <div className={styles.previewImagePlaceholder}>
-                <span>🖼</span>
+                <span>
+                  <Image size={24} />
+                </span>
                 <span>{t('builder.pages.imagePlaceholder') || 'Image'}</span>
               </div>
             )}
@@ -468,7 +471,9 @@ function Preview({
         return (
           <div key={comp.id} className={styles.previewFormElement}>
             <div className={styles.previewFormPlaceholder}>
-              <span>📝</span>
+              <span>
+                <FileEdit size={24} />
+              </span>
               <span>Form Component</span>
             </div>
           </div>
@@ -477,7 +482,9 @@ function Preview({
         return (
           <div key={comp.id} className={styles.previewTableElement}>
             <div className={styles.previewTablePlaceholder}>
-              <span>⊞</span>
+              <span>
+                <Grid3x3 size={24} />
+              </span>
               <span>Table Component</span>
             </div>
           </div>
@@ -486,7 +493,9 @@ function Preview({
         return (
           <div key={comp.id} className={styles.previewCardElement}>
             <div className={styles.previewCardPlaceholder}>
-              <span>▢</span>
+              <span>
+                <Square size={24} />
+              </span>
               <span>Card Component</span>
             </div>
           </div>
@@ -496,7 +505,9 @@ function Preview({
           <div key={comp.id} className={styles.previewContainerElement}>
             {comp.children?.map(renderPreviewComponent) || (
               <div className={styles.previewContainerPlaceholder}>
-                <span>◻</span>
+                <span>
+                  <Box size={24} />
+                </span>
                 <span>Container</span>
               </div>
             )}
@@ -673,12 +684,30 @@ function Canvas({
                   {(comp.props.label as string) || 'Button'}
                 </span>
               )}
-              {comp.type === 'image' && <span className={styles.previewImage}>🖼 Image</span>}
-              {comp.type === 'form' && <span className={styles.previewForm}>📝 Form</span>}
-              {comp.type === 'table' && <span className={styles.previewTable}>⊞ Table</span>}
-              {comp.type === 'card' && <span className={styles.previewCard}>▢ Card</span>}
+              {comp.type === 'image' && (
+                <span className={styles.previewImage}>
+                  <Image size={14} /> Image
+                </span>
+              )}
+              {comp.type === 'form' && (
+                <span className={styles.previewForm}>
+                  <FileEdit size={14} /> Form
+                </span>
+              )}
+              {comp.type === 'table' && (
+                <span className={styles.previewTable}>
+                  <Grid3x3 size={14} /> Table
+                </span>
+              )}
+              {comp.type === 'card' && (
+                <span className={styles.previewCard}>
+                  <Square size={14} /> Card
+                </span>
+              )}
               {comp.type === 'container' && (
-                <span className={styles.previewContainer}>◻ Container</span>
+                <span className={styles.previewContainer}>
+                  <Box size={14} /> Container
+                </span>
               )}
             </>
           )}

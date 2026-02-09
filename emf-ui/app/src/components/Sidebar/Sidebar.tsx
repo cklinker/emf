@@ -17,6 +17,46 @@ import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
 import { useAuth } from '../../context/AuthContext'
 import { useFavorites } from '../../hooks/useFavorites'
+import {
+  Home,
+  BarChart3,
+  FolderOpen,
+  Users,
+  User,
+  Settings,
+  Lock,
+  ClipboardList,
+  Key,
+  Wrench,
+  FileText,
+  Menu,
+  Package,
+  RefreshCw,
+  Search,
+  BookOpen,
+  Plug,
+  Mail,
+  Zap,
+  CheckCircle,
+  Shuffle,
+  Clock,
+  Link,
+  FileEdit,
+  Handshake,
+  ScrollText,
+  Ruler,
+  Building2,
+  Puzzle,
+  BarChart2,
+  HelpCircle,
+  LogOut,
+  Star,
+  Hammer,
+  HeartPulse,
+  Inbox,
+  ChevronRight,
+  type LucideIcon,
+} from 'lucide-react'
 import styles from './Sidebar.module.css'
 
 /**
@@ -49,67 +89,69 @@ interface MenuItemProps {
 
 const SETUP_COLLAPSED_KEY = 'emf_sidebar_setup_collapsed'
 
-function getIcon(iconName?: string): string {
-  if (!iconName) return ''
+function getIcon(iconName?: string): React.ReactNode {
+  if (!iconName) return null
 
-  const iconMap: Record<string, string> = {
-    home: '\u{1F3E0}',
-    dashboard: '\u{1F4CA}',
-    collections: '\u{1F4C1}',
-    collection: '\u{1F4C1}',
-    folder: '\u{1F4C1}',
-    users: '\u{1F465}',
-    user: '\u{1F464}',
-    settings: '\u2699\uFE0F',
-    config: '\u2699\uFE0F',
-    security: '\u{1F512}',
-    roles: '\u{1F512}',
-    policies: '\u{1F4CB}',
-    policy: '\u{1F4CB}',
-    oidc: '\u{1F511}',
-    auth: '\u{1F511}',
-    key: '\u{1F511}',
-    builder: '\u{1F527}',
-    pages: '\u{1F4C4}',
-    page: '\u{1F4C4}',
-    menus: '\u2630',
-    menu: '\u2630',
-    packages: '\u{1F4E6}',
-    package: '\u{1F4E6}',
-    migrations: '\u{1F504}',
-    migration: '\u{1F504}',
-    browser: '\u{1F50D}',
-    resources: '\u{1F4DA}',
-    resource: '\u{1F4DA}',
-    picklist: '\u{1F4CB}',
-    plugins: '\u{1F50C}',
-    plugin: '\u{1F50C}',
-    extension: '\u{1F50C}',
-    email: '\u2709\uFE0F',
-    workflow: '\u26A1',
-    approval: '\u2705',
-    flow: '\u{1F500}',
-    schedule: '\u{1F550}',
-    webhook: '\u{1F517}',
-    script: '\u{1F4DD}',
-    sharing: '\u{1F91D}',
-    audit: '\u{1F4DC}',
-    limits: '\u{1F4CF}',
-    tenants: '\u{1F3E2}',
-    apps: '\u{1F9E9}',
-    report: '\u{1F4C8}',
-    help: '\u2753',
-    docs: '\u{1F4D6}',
-    logout: '\u{1F6AA}',
-    star: '\u2B50',
-    clock: '\u{1F552}',
-    search: '\u{1F50D}',
-    tools: '\u{1F6E0}\uFE0F',
-    health: '\u{1F3E5}',
-    bulk: '\u{1F4E5}',
+  const iconMap: Record<string, LucideIcon> = {
+    home: Home,
+    dashboard: BarChart3,
+    collections: FolderOpen,
+    collection: FolderOpen,
+    folder: FolderOpen,
+    users: Users,
+    user: User,
+    settings: Settings,
+    config: Settings,
+    security: Lock,
+    roles: Lock,
+    policies: ClipboardList,
+    policy: ClipboardList,
+    oidc: Key,
+    auth: Key,
+    key: Key,
+    builder: Wrench,
+    pages: FileText,
+    page: FileText,
+    menus: Menu,
+    menu: Menu,
+    packages: Package,
+    package: Package,
+    migrations: RefreshCw,
+    migration: RefreshCw,
+    browser: Search,
+    resources: BookOpen,
+    resource: BookOpen,
+    picklist: ClipboardList,
+    plugins: Plug,
+    plugin: Plug,
+    extension: Plug,
+    email: Mail,
+    workflow: Zap,
+    approval: CheckCircle,
+    flow: Shuffle,
+    schedule: Clock,
+    webhook: Link,
+    script: FileEdit,
+    sharing: Handshake,
+    audit: ScrollText,
+    limits: Ruler,
+    tenants: Building2,
+    apps: Puzzle,
+    report: BarChart2,
+    help: HelpCircle,
+    docs: BookOpen,
+    logout: LogOut,
+    star: Star,
+    clock: Clock,
+    search: Search,
+    tools: Hammer,
+    health: HeartPulse,
+    bulk: Inbox,
   }
 
-  return iconMap[iconName.toLowerCase()] || iconName
+  const IconComponent = iconMap[iconName.toLowerCase()]
+  if (!IconComponent) return null
+  return <IconComponent size={16} />
 }
 
 /**
@@ -215,7 +257,7 @@ function MenuItem({ item, level, collapsed, onItemClick }: MenuItemProps): JSX.E
                 className={`${styles.expandIcon} ${isExpanded ? styles['expandIcon--expanded'] : ''}`}
                 aria-hidden="true"
               >
-                \u25B8
+                <ChevronRight size={14} />
               </span>
             </>
           )}
@@ -451,7 +493,7 @@ export function Sidebar({ menus, collapsed, onToggle, onItemClick }: SidebarProp
               className={`${styles.expandIcon} ${setupExpanded ? styles['expandIcon--expanded'] : ''}`}
               aria-hidden="true"
             >
-              {'\u25B8'}
+              <ChevronRight size={14} />
             </span>
           </button>
         )}

@@ -24,3 +24,6 @@ export {
 
 // Favorites hook for starred/pinned items
 export { useFavorites, type FavoriteItem, type UseFavoritesReturn } from './useFavorites'
+
+// Global keyboard shortcuts hook
+export { useGlobalShortcuts } from './useGlobalShortcuts'

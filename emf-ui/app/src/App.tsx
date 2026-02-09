@@ -14,6 +14,7 @@
 import React, { useCallback } from 'react'
 import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { AlertTriangle } from 'lucide-react'
 
 // Context Providers
 import { AuthProvider } from './context/AuthContext'
@@ -24,8 +25,12 @@ import { I18nProvider } from './context/I18nContext'
 import { PluginProvider } from './context/PluginContext'
 import { useAuth } from './context/AuthContext'
 
+// Hooks
+import { useGlobalShortcuts } from './hooks/useGlobalShortcuts'
+
 // Components
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp/KeyboardShortcutsHelp'
 import { ToastProvider } from './components/Toast'
 import { LiveRegionProvider } from './components/LiveRegion'
 import { ProtectedRoute } from './components/ProtectedRoute'
@@ -191,12 +196,11 @@ function BootstrapError({
     >
       <div
         style={{
-          fontSize: '3rem',
           marginBottom: '1rem',
         }}
         aria-hidden="true"
       >
-        ⚠️
+        <AlertTriangle size={48} />
       </div>
       <h1 style={{ margin: '0 0 1rem', fontSize: '1.5rem', fontWeight: 600 }}>
         Unable to Load Application
@@ -231,6 +235,7 @@ function BootstrapError({
 function AppLayout({ children }: { children: React.ReactNode }): React.ReactElement {
   const { user, logout } = useAuth()
   const { config, isLoading: configLoading, error, reload } = useConfig()
+  const { helpOpen, setHelpOpen } = useGlobalShortcuts()
 
   // Show loading state while config is loading
   if (configLoading) {
@@ -259,6 +264,7 @@ function AppLayout({ children }: { children: React.ReactNode }): React.ReactElem
       <PageTransition type="fade" duration={200}>
         {children}
       </PageTransition>
+      <KeyboardShortcutsHelp isOpen={helpOpen} onClose={() => setHelpOpen(false)} />
     </AppShell>
   )
 }

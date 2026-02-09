@@ -14,6 +14,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
+import { ArrowLeft, Star, ChevronDown } from 'lucide-react'
 import { useI18n } from '../../context/I18nContext'
 import { useToast } from '../../components'
 import type { ApiClient } from '../../services/apiClient'
@@ -267,7 +268,7 @@ export function RecordActionsBar({
           aria-label={t('common.back')}
           data-testid="actions-back-button"
         >
-          &larr; {t('common.back')}
+          <ArrowLeft size={16} /> {t('common.back')}
         </button>
 
         {/* Approval status pill */}
@@ -302,7 +303,7 @@ export function RecordActionsBar({
           data-testid="actions-favorite-button"
           title={isFavorite ? t('favorites.remove') : t('favorites.add')}
         >
-          {isFavorite ? '\u2605' : '\u2606'}
+          <Star size={16} fill={isFavorite ? 'currentColor' : 'none'} />
         </button>
 
         {/* Dropdown menu */}
@@ -318,7 +319,7 @@ export function RecordActionsBar({
             aria-label={t('recordActions.moreActions')}
             data-testid="actions-dropdown-toggle"
           >
-            &#9660;
+            <ChevronDown size={16} />
           </button>
 
           {dropdownOpen && (

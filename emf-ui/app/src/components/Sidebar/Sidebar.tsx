@@ -1,25 +1,29 @@
 /**
  * Sidebar Component
  *
- * Navigation sidebar with dynamic menu rendering from bootstrap configuration.
- * Supports nested menu items, collapsed state, and mobile responsive behavior.
+ * Navigation sidebar with contextual sections: My Workspace, Tools, and Setup.
+ * The Setup section is collapsed by default and contains all admin links.
  *
  * Requirements:
  * - 1.3: Configure navigation menus based on menu definitions
  * - 17.4: Collapse navigation menu into hamburger menu on mobile
  */
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import type { MenuConfig, MenuItemConfig } from '../../types/config'
 import { useI18n } from '../../context/I18nContext'
+import { useApi } from '../../context/ApiContext'
+import { useAuth } from '../../context/AuthContext'
+import { useFavorites } from '../../hooks/useFavorites'
 import styles from './Sidebar.module.css'
 
 /**
  * Props for the Sidebar component
  */
 export interface SidebarProps {
-  /** Menu configurations to render */
+  /** Menu configurations to render (from bootstrap — used for Setup section) */
   menus: MenuConfig[]
   /** Whether the sidebar is collapsed (desktop/tablet) */
   collapsed: boolean
@@ -43,63 +47,66 @@ interface MenuItemProps {
   onItemClick?: () => void
 }
 
-/**
- * Get icon for a menu item
- * Supports common icon names with emoji fallbacks
- */
+const SETUP_COLLAPSED_KEY = 'emf_sidebar_setup_collapsed'
+
 function getIcon(iconName?: string): string {
   if (!iconName) return ''
 
-  // Map common icon names to emoji/unicode characters
   const iconMap: Record<string, string> = {
-    home: '🏠',
-    dashboard: '📊',
-    collections: '📁',
-    collection: '📁',
-    folder: '📁',
-    users: '👥',
-    user: '👤',
-    settings: '⚙️',
-    config: '⚙️',
-    security: '🔒',
-    roles: '🔒',
-    policies: '📋',
-    policy: '📋',
-    oidc: '🔑',
-    auth: '🔑',
-    key: '🔑',
-    builder: '🔧',
-    pages: '📄',
-    page: '📄',
-    menus: '☰',
-    menu: '☰',
-    packages: '📦',
-    package: '📦',
-    migrations: '🔄',
-    migration: '🔄',
-    browser: '🔍',
-    resources: '📚',
-    resource: '📚',
-    picklist: '📋',
-    plugins: '🔌',
-    plugin: '🔌',
-    extension: '🔌',
-    email: '✉️',
-    workflow: '⚡',
-    approval: '✅',
-    flow: '🔀',
-    schedule: '🕐',
-    webhook: '🔗',
-    script: '📝',
-    sharing: '🤝',
-    audit: '📜',
-    limits: '📏',
-    tenants: '🏢',
-    apps: '🧩',
-    report: '📈',
-    help: '❓',
-    docs: '📖',
-    logout: '🚪',
+    home: '\u{1F3E0}',
+    dashboard: '\u{1F4CA}',
+    collections: '\u{1F4C1}',
+    collection: '\u{1F4C1}',
+    folder: '\u{1F4C1}',
+    users: '\u{1F465}',
+    user: '\u{1F464}',
+    settings: '\u2699\uFE0F',
+    config: '\u2699\uFE0F',
+    security: '\u{1F512}',
+    roles: '\u{1F512}',
+    policies: '\u{1F4CB}',
+    policy: '\u{1F4CB}',
+    oidc: '\u{1F511}',
+    auth: '\u{1F511}',
+    key: '\u{1F511}',
+    builder: '\u{1F527}',
+    pages: '\u{1F4C4}',
+    page: '\u{1F4C4}',
+    menus: '\u2630',
+    menu: '\u2630',
+    packages: '\u{1F4E6}',
+    package: '\u{1F4E6}',
+    migrations: '\u{1F504}',
+    migration: '\u{1F504}',
+    browser: '\u{1F50D}',
+    resources: '\u{1F4DA}',
+    resource: '\u{1F4DA}',
+    picklist: '\u{1F4CB}',
+    plugins: '\u{1F50C}',
+    plugin: '\u{1F50C}',
+    extension: '\u{1F50C}',
+    email: '\u2709\uFE0F',
+    workflow: '\u26A1',
+    approval: '\u2705',
+    flow: '\u{1F500}',
+    schedule: '\u{1F550}',
+    webhook: '\u{1F517}',
+    script: '\u{1F4DD}',
+    sharing: '\u{1F91D}',
+    audit: '\u{1F4DC}',
+    limits: '\u{1F4CF}',
+    tenants: '\u{1F3E2}',
+    apps: '\u{1F9E9}',
+    report: '\u{1F4C8}',
+    help: '\u2753',
+    docs: '\u{1F4D6}',
+    logout: '\u{1F6AA}',
+    star: '\u2B50',
+    clock: '\u{1F552}',
+    search: '\u{1F50D}',
+    tools: '\u{1F6E0}\uFE0F',
+    health: '\u{1F3E5}',
+    bulk: '\u{1F4E5}',
   }
 
   return iconMap[iconName.toLowerCase()] || iconName
@@ -109,11 +116,9 @@ function getIcon(iconName?: string): string {
  * MenuItem component renders a single menu item with optional children
  */
 function MenuItem({ item, level, collapsed, onItemClick }: MenuItemProps): JSX.Element {
-  const [isExpanded, setIsExpanded] = useState(false)
   const location = useLocation()
   const hasChildren = item.children && item.children.length > 0
 
-  // Check if this item or any of its children is active
   const isActive = useMemo(() => {
     if (item.path && location.pathname === item.path) {
       return true
@@ -124,16 +129,13 @@ function MenuItem({ item, level, collapsed, onItemClick }: MenuItemProps): JSX.E
     return false
   }, [item, location.pathname, hasChildren])
 
-  // Auto-expand if a child is active
-  useMemo(() => {
-    if (isActive && hasChildren) {
-      setIsExpanded(true)
-    }
-  }, [isActive, hasChildren])
+  // Initialize expanded if child is active
+  const [isExpanded, setIsExpanded] = useState(() => {
+    if (!hasChildren) return false
+    if (item.path && location.pathname === item.path) return true
+    return item.children?.some((child) => child.path && location.pathname === child.path) ?? false
+  })
 
-  /**
-   * Toggle expansion of nested items
-   */
   const handleToggle = useCallback(
     (e: React.MouseEvent) => {
       if (hasChildren) {
@@ -144,9 +146,6 @@ function MenuItem({ item, level, collapsed, onItemClick }: MenuItemProps): JSX.E
     [hasChildren]
   )
 
-  /**
-   * Handle item click
-   */
   const handleClick = useCallback(() => {
     if (!hasChildren && onItemClick) {
       onItemClick()
@@ -170,7 +169,6 @@ function MenuItem({ item, level, collapsed, onItemClick }: MenuItemProps): JSX.E
     .filter(Boolean)
     .join(' ')
 
-  // Render as NavLink if it has a path and no children
   if (item.path && !hasChildren) {
     return (
       <li className={itemClasses} data-testid={`menu-item-${item.id}`}>
@@ -194,7 +192,6 @@ function MenuItem({ item, level, collapsed, onItemClick }: MenuItemProps): JSX.E
     )
   }
 
-  // Render as expandable button if it has children
   if (hasChildren) {
     return (
       <li className={itemClasses} data-testid={`menu-item-${item.id}`}>
@@ -218,13 +215,12 @@ function MenuItem({ item, level, collapsed, onItemClick }: MenuItemProps): JSX.E
                 className={`${styles.expandIcon} ${isExpanded ? styles['expandIcon--expanded'] : ''}`}
                 aria-hidden="true"
               >
-                ▸
+                \u25B8
               </span>
             </>
           )}
         </button>
 
-        {/* Nested menu items */}
         {!collapsed && (
           <ul
             id={`submenu-${item.id}`}
@@ -247,7 +243,6 @@ function MenuItem({ item, level, collapsed, onItemClick }: MenuItemProps): JSX.E
     )
   }
 
-  // Render as non-interactive item (no path, no children)
   return (
     <li className={itemClasses} data-testid={`menu-item-${item.id}`}>
       <span className={contentClasses} title={collapsed ? item.label : undefined}>
@@ -263,27 +258,110 @@ function MenuItem({ item, level, collapsed, onItemClick }: MenuItemProps): JSX.E
 }
 
 /**
- * Sidebar component provides navigation with dynamic menu rendering.
+ * Sidebar component with contextual navigation sections.
  *
- * Features:
- * - Renders navigation menus from bootstrap configuration
- * - Supports nested menu items with expand/collapse
- * - Handles collapsed state for desktop/tablet
- * - Accessible with keyboard navigation and ARIA attributes
- * - Highlights active menu items based on current route
- *
- * @example
- * ```tsx
- * <Sidebar
- *   menus={config.menus}
- *   collapsed={sidebarCollapsed}
- *   onToggle={toggleSidebar}
- *   onItemClick={closeMobileSidebar}
- * />
- * ```
+ * Sections:
+ * 1. My Workspace - Home, favorite collections, All Collections
+ * 2. Tools - Reports, Dashboards
+ * 3. Setup (collapsed by default) - All admin pages grouped by category
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function Sidebar({ menus, collapsed, onToggle, onItemClick }: SidebarProps): JSX.Element {
   const { t } = useI18n()
+  const { user } = useAuth()
+  const userId = user?.id ?? 'anonymous'
+  const { favorites } = useFavorites(userId)
+
+  let apiClient: ReturnType<typeof useApi>['apiClient'] | null = null
+  try {
+    const api = useApi()
+    apiClient = api.apiClient
+  } catch {
+    // Not in ApiProvider
+  }
+
+  // Fetch collections for dynamic sidebar links
+  const { data: collections } = useQuery({
+    queryKey: ['sidebar-collections'],
+    queryFn: () =>
+      apiClient!.get<Array<{ name: string; displayName: string }>>('/control/collections'),
+    enabled: !!apiClient,
+    staleTime: 300000,
+  })
+
+  const collectionsList = useMemo(
+    () => (Array.isArray(collections) ? collections : []),
+    [collections]
+  )
+
+  // Favorited collections
+  const favoriteCollections = useMemo(
+    () => favorites.filter((f) => f.type === 'collection').slice(0, 10),
+    [favorites]
+  )
+
+  // Setup section collapsed state (persisted)
+  const [setupExpanded, setSetupExpanded] = useState(() => {
+    try {
+      return localStorage.getItem(SETUP_COLLAPSED_KEY) === 'true'
+    } catch {
+      return false
+    }
+  })
+
+  const toggleSetup = useCallback(() => {
+    setSetupExpanded((prev) => {
+      const next = !prev
+      try {
+        localStorage.setItem(SETUP_COLLAPSED_KEY, String(next))
+      } catch {
+        // ignore
+      }
+      return next
+    })
+  }, [])
+
+  // Check if any setup path is active to auto-expand
+  const location = useLocation()
+  useEffect(() => {
+    const setupPaths = [
+      '/collections',
+      '/roles',
+      '/policies',
+      '/oidc-providers',
+      '/users',
+      '/profiles',
+      '/permission-sets',
+      '/sharing',
+      '/role-hierarchy',
+      '/picklists',
+      '/layouts',
+      '/listviews',
+      '/pages',
+      '/menus',
+      '/workflow-rules',
+      '/approvals',
+      '/flows',
+      '/scheduled-jobs',
+      '/email-templates',
+      '/scripts',
+      '/services',
+      '/webhooks',
+      '/connected-apps',
+      '/plugins',
+      '/packages',
+      '/migrations',
+      '/bulk-jobs',
+      '/tenants',
+      '/tenant-dashboard',
+      '/system-health',
+      '/audit-trail',
+      '/governor-limits',
+    ]
+    if (setupPaths.some((p) => location.pathname.startsWith(p))) {
+      setSetupExpanded(true)
+    }
+  }, [location.pathname])
 
   const sidebarClasses = [styles.sidebar, collapsed ? styles['sidebar--collapsed'] : '']
     .filter(Boolean)
@@ -291,33 +369,151 @@ export function Sidebar({ menus, collapsed, onToggle, onItemClick }: SidebarProp
 
   return (
     <nav className={sidebarClasses} aria-label={t('navigation.main')} data-testid="sidebar">
-      {/* Menu sections */}
-      {menus.map((menu) => (
-        <div key={menu.id} className={styles.menuSection} data-testid={`menu-section-${menu.id}`}>
-          {/* Menu section header */}
-          {!collapsed && menu.name && <h2 className={styles.menuSectionTitle}>{menu.name}</h2>}
+      {/* ==================== MY WORKSPACE ==================== */}
+      <div className={styles.menuSection} data-testid="workspace-section">
+        {!collapsed && <h2 className={styles.menuSectionTitle}>{t('sidebar.workspace')}</h2>}
+        <ul className={styles.menuList} role="menubar" aria-label={t('sidebar.workspace')}>
+          <MenuItem
+            item={{ id: 'home', label: t('navigation.home'), path: '/', icon: 'home' }}
+            level={0}
+            collapsed={collapsed}
+            onItemClick={onItemClick}
+          />
 
-          {/* Menu items */}
-          <ul
-            className={styles.menuList}
-            role="menubar"
-            aria-label={menu.name || t('navigation.menu')}
+          {/* Favorite collections */}
+          {favoriteCollections.map((fav) => (
+            <MenuItem
+              key={`fav-${fav.id}`}
+              item={{
+                id: `fav-${fav.id}`,
+                label: fav.displayValue,
+                path: `/resources/${fav.id}`,
+                icon: 'star',
+              }}
+              level={0}
+              collapsed={collapsed}
+              onItemClick={onItemClick}
+            />
+          ))}
+
+          <MenuItem
+            item={{
+              id: 'all-collections',
+              label: t('sidebar.allCollections'),
+              path: '/resources',
+              icon: 'resources',
+            }}
+            level={0}
+            collapsed={collapsed}
+            onItemClick={onItemClick}
+          />
+        </ul>
+      </div>
+
+      {/* ==================== TOOLS ==================== */}
+      <div className={styles.menuSection} data-testid="tools-section">
+        {!collapsed && <h2 className={styles.menuSectionTitle}>{t('sidebar.tools')}</h2>}
+        <ul className={styles.menuList} role="menubar" aria-label={t('sidebar.tools')}>
+          <MenuItem
+            item={{ id: 'reports', label: t('sidebar.reports'), path: '/reports', icon: 'report' }}
+            level={0}
+            collapsed={collapsed}
+            onItemClick={onItemClick}
+          />
+          <MenuItem
+            item={{
+              id: 'dashboards',
+              label: t('sidebar.dashboards'),
+              path: '/dashboards',
+              icon: 'dashboard',
+            }}
+            level={0}
+            collapsed={collapsed}
+            onItemClick={onItemClick}
+          />
+        </ul>
+      </div>
+
+      {/* ==================== SETUP (Collapsed by default) ==================== */}
+      <div className={styles.menuSection} data-testid="setup-section">
+        {!collapsed && (
+          <button
+            type="button"
+            className={styles.setupToggle}
+            onClick={toggleSetup}
+            aria-expanded={setupExpanded}
           >
-            {menu.items.map((item) => (
-              <MenuItem
-                key={item.id}
-                item={item}
-                level={0}
-                collapsed={collapsed}
-                onItemClick={onItemClick}
-              />
+            <span className={styles.setupToggleIcon} aria-hidden="true">
+              {getIcon('settings')}
+            </span>
+            <span className={styles.menuSectionTitle}>{t('sidebar.setup')}</span>
+            <span
+              className={`${styles.expandIcon} ${setupExpanded ? styles['expandIcon--expanded'] : ''}`}
+              aria-hidden="true"
+            >
+              {'\u25B8'}
+            </span>
+          </button>
+        )}
+        {collapsed && (
+          <button
+            type="button"
+            className={styles.menuItemContent}
+            onClick={toggleSetup}
+            title={t('sidebar.setup')}
+          >
+            <span className={styles.menuItemIcon} aria-hidden="true">
+              {getIcon('settings')}
+            </span>
+          </button>
+        )}
+
+        {setupExpanded && !collapsed && (
+          <div className={styles.setupContent}>
+            {/* Render bootstrap menus as setup subsections */}
+            {menus.map((menu) => (
+              <div key={menu.id} className={styles.setupSubsection}>
+                {menu.name && <h3 className={styles.setupSubsectionTitle}>{menu.name}</h3>}
+                <ul
+                  className={styles.menuList}
+                  role="menubar"
+                  aria-label={menu.name || t('navigation.menu')}
+                >
+                  {menu.items.map((item) => (
+                    <MenuItem
+                      key={item.id}
+                      item={item}
+                      level={0}
+                      collapsed={collapsed}
+                      onItemClick={onItemClick}
+                    />
+                  ))}
+                </ul>
+              </div>
             ))}
-          </ul>
-        </div>
-      ))}
+
+            {/* System Health link */}
+            <div className={styles.setupSubsection}>
+              <ul className={styles.menuList} role="menubar" aria-label={t('sidebar.monitoring')}>
+                <MenuItem
+                  item={{
+                    id: 'system-health',
+                    label: t('sidebar.systemHealth'),
+                    path: '/system-health',
+                    icon: 'health',
+                  }}
+                  level={0}
+                  collapsed={collapsed}
+                  onItemClick={onItemClick}
+                />
+              </ul>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Empty state */}
-      {menus.length === 0 && (
+      {menus.length === 0 && collectionsList.length === 0 && (
         <div className={styles.emptyState} data-testid="sidebar-empty">
           {!collapsed && <p className={styles.emptyStateText}>{t('navigation.noMenus')}</p>}
         </div>

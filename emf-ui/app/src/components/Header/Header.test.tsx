@@ -28,6 +28,16 @@ vi.mock('../AppShell', () => ({
   })),
 }))
 
+// Mock SearchModal and RecentItemsDropdown to isolate Header tests
+vi.mock('../SearchModal', () => ({
+  SearchModal: ({ open }: { open: boolean }) =>
+    open ? <div data-testid="search-modal">Search</div> : null,
+}))
+
+vi.mock('../RecentItemsDropdown', () => ({
+  RecentItemsDropdown: () => <div data-testid="recent-items-dropdown">Recent</div>,
+}))
+
 // Import the mocked module to control it in tests
 import { useAppShell } from '../AppShell'
 const mockUseAppShell = vi.mocked(useAppShell)

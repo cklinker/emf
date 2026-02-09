@@ -1050,5 +1050,50 @@
       "typeRequired": "Field type is required",
       "referenceTargetRequired": "Target collection is required for reference fields"
     }
+  },
+  "home": {
+    "welcome": "Home",
+    "subtitle": "Your workspace overview",
+    "quickCreate": "Quick Create",
+    "recentRecords": "Recent Records",
+    "noRecentRecords": "No recently viewed records. Start browsing collections to see your recent activity here.",
+    "pendingApprovals": "Pending Approvals",
+    "noApprovals": "No pending approvals.",
+    "submittedBy": "Submitted by",
+    "pending": "Pending",
+    "viewAll": "View All",
+    "favorites": "Favorites",
+    "noFavorites": "Star records and collections for quick access."
+  },
+  "search": {
+    "placeholder": "Search records, pages...",
+    "label": "Global search",
+    "recentSearches": "Recent Searches",
+    "recentlyViewed": "Recently Viewed",
+    "results": "Results",
+    "noResults": "No results found.",
+    "typePage": "Page",
+    "typeRecent": "Recent",
+    "typeRecord": "Record"
+  },
+  "recent": {
+    "title": "Recent Items",
+    "noRecent": "No recently viewed items."
+  },
+  "favorites": {
+    "add": "Add to Favorites",
+    "remove": "Remove from Favorites",
+    "added": "Added to favorites",
+    "removed": "Removed from favorites"
+  },
+  "sidebar": {
+    "workspace": "My Workspace",
+    "allCollections": "All Collections",
+    "tools": "Tools",
+    "reports": "Reports",
+    "dashboards": "Dashboards",
+    "setup": "Setup",
+    "systemHealth": "System Health",
+    "monitoring": "Monitoring"
   }
 }

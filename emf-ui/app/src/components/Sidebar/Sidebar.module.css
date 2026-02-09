@@ -212,6 +212,66 @@
 }
 
 /* ==========================================================================
+   Setup Toggle
+   ========================================================================== */
+
+.setupToggle {
+  display: flex;
+  align-items: center;
+  gap: var(--app-shell-spacing-sm, 8px);
+  width: 100%;
+  padding: var(--app-shell-spacing-sm, 8px) var(--app-shell-spacing-md, 16px);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-secondary, #666666);
+  transition: color 150ms ease;
+}
+
+.setupToggle:hover {
+  color: var(--app-shell-text, var(--color-text, #1a1a1a));
+}
+
+.setupToggle:focus {
+  outline: 2px solid var(--color-focus, #0066cc);
+  outline-offset: -2px;
+}
+
+.setupToggle:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.setupToggle .menuSectionTitle {
+  padding: 0;
+  flex: 1;
+  text-align: left;
+}
+
+.setupToggleIcon {
+  font-size: 0.875rem;
+}
+
+.setupContent {
+  border-top: 1px solid var(--color-border, rgba(0, 0, 0, 0.08));
+  padding-top: var(--app-shell-spacing-sm, 8px);
+  margin-top: var(--app-shell-spacing-xs, 4px);
+}
+
+.setupSubsection {
+  margin-bottom: var(--app-shell-spacing-sm, 8px);
+}
+
+.setupSubsectionTitle {
+  margin: 0;
+  padding: var(--app-shell-spacing-xs, 4px) var(--app-shell-spacing-md, 16px);
+  font-size: 0.625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-secondary, #999999);
+}
+
+/* ==========================================================================
    Empty State
    ========================================================================== */
 

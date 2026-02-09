@@ -15,7 +15,10 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
+import { useAuth } from '../../context/AuthContext'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
+import { useRecentRecords } from '../../hooks/useRecentRecords'
+import { useFavorites } from '../../hooks/useFavorites'
 import styles from './ResourceDetailPage.module.css'
 
 /**
@@ -234,6 +237,10 @@ export function ResourceDetailPage({
   const { t, formatDate, formatNumber } = useI18n()
   const { apiClient } = useApi()
   const { showToast } = useToast()
+  const { user } = useAuth()
+  const userId = user?.id ?? 'anonymous'
+  const { addRecentRecord } = useRecentRecords(userId)
+  const { isFavorite, addFavorite, removeFavorite } = useFavorites(userId)
 
   // Get collection name and resource ID from props or route params
   const collectionName = propCollectionName || params.collectionName || ''
@@ -330,6 +337,44 @@ export function ResourceDetailPage({
       return orderA - orderB
     })
   }, [schema])
+
+  // Track recent record view
+  useEffect(() => {
+    if (resource && schema && collectionName && resourceId) {
+      const firstStringField = schema.fields?.find((f) => f.type === 'string')
+      const displayValue = firstStringField
+        ? String(resource[firstStringField.name] ?? resource.id)
+        : String(resource.id)
+      addRecentRecord({
+        id: resourceId,
+        collectionName,
+        collectionDisplayName: schema.displayName || collectionName,
+        displayValue,
+      })
+    }
+    // Only track once when resource loads
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resource?.id, schema?.id])
+
+  const recordIsFavorite = isFavorite(resourceId, 'record')
+
+  const handleToggleFavorite = useCallback(() => {
+    if (recordIsFavorite) {
+      removeFavorite(resourceId, 'record')
+    } else {
+      const firstStringField = schema?.fields?.find((f) => f.type === 'string')
+      const displayValue = firstStringField
+        ? String(resource?.[firstStringField.name] ?? resourceId)
+        : String(resourceId)
+      addFavorite({
+        id: resourceId,
+        type: 'record',
+        collectionName,
+        collectionDisplayName: schema?.displayName || collectionName,
+        displayValue,
+      })
+    }
+  }, [recordIsFavorite, resourceId, collectionName, schema, resource, addFavorite, removeFavorite])
 
   // Handle back navigation
   const handleBack = useCallback(() => {
@@ -525,6 +570,16 @@ export function ResourceDetailPage({
           </h1>
         </div>
         <div className={styles.headerActions}>
+          <button
+            type="button"
+            className={styles.favoriteButton}
+            onClick={handleToggleFavorite}
+            aria-label={recordIsFavorite ? t('favorites.remove') : t('favorites.add')}
+            data-testid="favorite-button"
+            title={recordIsFavorite ? t('favorites.remove') : t('favorites.add')}
+          >
+            {recordIsFavorite ? '\u2605' : '\u2606'}
+          </button>
           <button
             type="button"
             className={styles.backButton}

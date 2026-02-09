@@ -54,11 +54,78 @@
 }
 
 /* ==========================================================================
+   Search Trigger
+   ========================================================================== */
+
+.searchTrigger {
+  display: flex;
+  align-items: center;
+  gap: var(--app-shell-spacing-sm, 8px);
+  padding: var(--app-shell-spacing-xs, 4px) var(--app-shell-spacing-md, 16px);
+  background: var(--color-surface-hover, rgba(0, 0, 0, 0.03));
+  border: 1px solid var(--app-shell-border, var(--color-border, #e0e0e0));
+  border-radius: var(--border-radius, 4px);
+  cursor: pointer;
+  color: var(--color-text-secondary, #666666);
+  font-size: 0.875rem;
+  min-width: 200px;
+  transition: border-color 150ms ease;
+}
+
+.searchTrigger:hover {
+  border-color: var(--color-text-secondary, #999999);
+}
+
+.searchTrigger:focus {
+  outline: 2px solid var(--color-focus, #0066cc);
+  outline-offset: 2px;
+}
+
+.searchTrigger:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.searchTriggerIcon {
+  font-size: 0.875rem;
+  opacity: 0.6;
+}
+
+.searchTriggerText {
+  display: flex;
+  align-items: center;
+  gap: var(--app-shell-spacing-md, 16px);
+  flex: 1;
+}
+
+.searchKbd {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 5px;
+  font-size: 0.6875rem;
+  font-family: inherit;
+  color: var(--color-text-secondary, #999999);
+  background: var(--app-shell-surface, var(--color-surface, #ffffff));
+  border: 1px solid var(--app-shell-border, var(--color-border, #e0e0e0));
+  border-radius: 3px;
+}
+
+/* ==========================================================================
    Spacer
    ========================================================================== */
 
 .spacer {
   flex: 1;
+}
+
+/* ==========================================================================
+   Header Actions
+   ========================================================================== */
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: var(--app-shell-spacing-sm, 8px);
 }
 
 /* ==========================================================================
@@ -258,6 +325,11 @@
   .appName {
     /* Hidden on mobile via component logic */
     display: none;
+  }
+
+  .searchTrigger {
+    min-width: auto;
+    padding: var(--app-shell-spacing-xs, 4px) var(--app-shell-spacing-sm, 8px);
   }
 
   .userName {

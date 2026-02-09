@@ -130,6 +130,14 @@ export type { PicklistDependencyEditorProps } from './PicklistDependencyEditor'
 export { ExecutionLogModal } from './ExecutionLogModal'
 export type { ExecutionLogModalProps, LogColumn } from './ExecutionLogModal'
 
+// SearchModal component for global search (Cmd+K)
+export { SearchModal } from './SearchModal'
+export type { SearchModalProps } from './SearchModal'
+
+// RecentItemsDropdown component for header
+export { RecentItemsDropdown } from './RecentItemsDropdown'
+export type { RecentItemsDropdownProps } from './RecentItemsDropdown'
+
 // PageLoader component for loading states
 export { PageLoader, Skeleton, ContentLoader } from './PageLoader'
 export type {

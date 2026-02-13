@@ -93,16 +93,16 @@ class RateLimitFilterTest {
         exchange.getAttributes().put("gateway.principal", principal);
         
         RouteDefinition route = new RouteDefinition(
-            "users-collection", "user-service", "/api/users/**",
+            "users-collection", "/api/users/**",
             "http://user-service:8080", "users"
         );
-        
+
         when(routeRegistry.findByPath("/api/users")).thenReturn(Optional.of(route));
-        
+
         // When & Then
         StepVerifier.create(filter.filter(exchange, chain))
             .verifyComplete();
-        
+
         verify(chain).filter(exchange);
         verify(rateLimiter, never()).checkRateLimit(anyString(), anyString(), any());
     }
@@ -118,18 +118,18 @@ class RateLimitFilterTest {
         
         RateLimitConfig config = new RateLimitConfig(10, Duration.ofMinutes(1));
         RouteDefinition route = new RouteDefinition(
-            "users-collection", "user-service", "/api/users/**",
+            "users-collection", "/api/users/**",
             "http://user-service:8080", "users", config
         );
-        
+
         when(routeRegistry.findByPath("/api/users")).thenReturn(Optional.of(route));
         when(rateLimiter.checkRateLimit("users-collection", "user@example.com", config))
             .thenReturn(Mono.just(RateLimitResult.allowed(5)));
-        
+
         // When & Then
         StepVerifier.create(filter.filter(exchange, chain))
             .verifyComplete();
-        
+
         verify(chain).filter(exchange);
         
         // Verify rate limit headers are added
@@ -150,10 +150,10 @@ class RateLimitFilterTest {
         
         RateLimitConfig config = new RateLimitConfig(10, Duration.ofMinutes(1));
         RouteDefinition route = new RouteDefinition(
-            "users-collection", "user-service", "/api/users/**",
+            "users-collection", "/api/users/**",
             "http://user-service:8080", "users", config
         );
-        
+
         when(routeRegistry.findByPath("/api/users")).thenReturn(Optional.of(route));
         when(rateLimiter.checkRateLimit("users-collection", "user@example.com", config))
             .thenReturn(Mono.just(RateLimitResult.notAllowed(Duration.ofSeconds(60))));
@@ -181,12 +181,12 @@ class RateLimitFilterTest {
         // Given
         RateLimitConfig config = new RateLimitConfig(10, Duration.ofMinutes(1));
         RouteDefinition route = new RouteDefinition(
-            "users-collection", "user-service", "/api/users/**",
+            "users-collection", "/api/users/**",
             "http://user-service:8080", "users", config
         );
-        
+
         when(routeRegistry.findByPath("/api/users")).thenReturn(Optional.of(route));
-        
+
         // First principal
         MockServerHttpRequest request1 = MockServerHttpRequest.get("/api/users").build();
         ServerWebExchange exchange1 = MockServerWebExchange.from(request1);
@@ -233,10 +233,10 @@ class RateLimitFilterTest {
         
         RateLimitConfig config = new RateLimitConfig(10, Duration.ofMinutes(1));
         RouteDefinition route = new RouteDefinition(
-            "users-collection", "user-service", "/api/users/**",
+            "users-collection", "/api/users/**",
             "http://user-service:8080", "users", config
         );
-        
+
         when(routeRegistry.findByPath("/api/users")).thenReturn(Optional.of(route));
         when(rateLimiter.checkRateLimit("users-collection", "user@example.com", config))
             .thenReturn(Mono.just(RateLimitResult.allowed(0)));

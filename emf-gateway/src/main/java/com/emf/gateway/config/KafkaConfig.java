@@ -56,9 +56,9 @@ public class KafkaConfig {
         config.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class);
         config.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         
-        // Configure JSON deserializer to trust the shared event package
+        // Configure JSON deserializer to trust the shared event package and java.util for Map payloads
         JsonDeserializer<ConfigEvent<?>> deserializer = new JsonDeserializer<>();
-        deserializer.addTrustedPackages("com.emf.runtime.event");
+        deserializer.addTrustedPackages("com.emf.runtime.event", "java.util");
         
         return new DefaultKafkaConsumerFactory<>(
             config,

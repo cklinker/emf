@@ -110,13 +110,12 @@ class EndToEndRequestFlowIntegrationTest {
         String backendUrl = mockBackend.url("/").toString();
         RouteDefinition route = new RouteDefinition(
                 "test-collection",
-                "test-service",
                 "/api/test/**",
                 backendUrl,
                 "test-collection"
         );
         routeRegistry.addRoute(route);
-        
+
         // Mock backend response
         String jsonApiResponse = """
                 {
@@ -162,7 +161,6 @@ class EndToEndRequestFlowIntegrationTest {
         String backendUrl = mockBackend.url("/").toString();
         RouteDefinition route = new RouteDefinition(
                 "protected-collection",
-                "test-service",
                 "/api/protected/**",
                 backendUrl,
                 "protected-collection"
@@ -192,7 +190,6 @@ class EndToEndRequestFlowIntegrationTest {
         String backendUrl = mockBackend.url("/").toString();
         RouteDefinition route = new RouteDefinition(
                 "filtered-collection",
-                "test-service",
                 "/api/filtered/**",
                 backendUrl,
                 "filtered-collection"
@@ -246,7 +243,6 @@ class EndToEndRequestFlowIntegrationTest {
         
         RouteDefinition route = new RouteDefinition(
                 "rate-limited-collection",
-                "test-service",
                 "/api/ratelimited/**",
                 backendUrl,
                 "rate-limited-collection",
@@ -293,13 +289,12 @@ class EndToEndRequestFlowIntegrationTest {
         String backendUrl = mockBackend.url("/").toString();
         RouteDefinition route = new RouteDefinition(
                 "test-collection",
-                "test-service",
                 "/api/test/**",
                 backendUrl,
                 "test-collection"
         );
         routeRegistry.addRoute(route);
-        
+
         // Act & Assert - request without JWT should be unauthorized
         webTestClient.get()
                 .uri("/api/test/1")
@@ -326,13 +321,12 @@ class EndToEndRequestFlowIntegrationTest {
         String backendUrl = mockBackend.url("/").toString();
         RouteDefinition route = new RouteDefinition(
                 "test-collection",
-                "test-service",
                 "/api/test/**",
                 backendUrl,
                 "test-collection"
         );
         routeRegistry.addRoute(route);
-        
+
         // Mock backend error response
         mockBackend.enqueue(new MockResponse()
                 .setResponseCode(500)

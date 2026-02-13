@@ -185,11 +185,12 @@ emf:
     kafka:
       enabled: ${KAFKA_EVENTS_ENABLED:false}
       topics:
-        service-changed: emf.config.service.changed
         collection-changed: emf.config.collection.changed
         authz-changed: emf.config.authz.changed
         ui-changed: emf.config.ui.changed
         oidc-changed: emf.config.oidc.changed
+        worker-assignment-changed: emf.worker.assignment.changed
+        worker-status-changed: emf.worker.status.changed
     # Cache Configuration
     cache:
       collections:
@@ -203,6 +204,8 @@ emf:
       enabled: ${SECURITY_ENABLED:true}
       admin-role: ADMIN
       role-claim-name: roles
+    # Worker service URL for routing data API requests through the gateway
+    worker-service-url: ${WORKER_SERVICE_URL:http://emf-worker:80}
 
 # Logging Configuration
 # Requirements: 13.1, 13.2 - Structured JSON logs with correlation IDs

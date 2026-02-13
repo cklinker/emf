@@ -230,11 +230,6 @@ const CATEGORIES: SetupCategory[] = [
     icon: <Settings size={20} />,
     items: [
       {
-        name: 'Services',
-        path: '/services',
-        description: 'Manage domain services',
-      },
-      {
         name: 'Packages',
         path: '/packages',
         description: 'Import/export configuration packages',

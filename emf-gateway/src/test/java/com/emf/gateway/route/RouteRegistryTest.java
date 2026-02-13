@@ -64,7 +64,6 @@ class RouteRegistryTest {
     void testAddRouteWithNullPath() {
         RouteDefinition route = new RouteDefinition(
             "invalid-route",
-            "service",
             null,
             "http://backend:8080",
             "collection"
@@ -79,7 +78,6 @@ class RouteRegistryTest {
     void testAddRouteWithEmptyPath() {
         RouteDefinition route = new RouteDefinition(
             "invalid-route",
-            "service",
             "",
             "http://backend:8080",
             "collection"
@@ -131,7 +129,6 @@ class RouteRegistryTest {
         // Update with same ID but different path
         RouteDefinition route2 = new RouteDefinition(
             "users-collection",
-            "user-service-v2",
             "/api/v2/users/**",
             "http://user-service-v2:8080",
             "users"
@@ -338,7 +335,6 @@ class RouteRegistryTest {
     private RouteDefinition createRoute(String id, String path) {
         return new RouteDefinition(
             id,
-            "service-" + id,
             path,
             "http://backend-" + id + ":8080",
             "collection-" + id

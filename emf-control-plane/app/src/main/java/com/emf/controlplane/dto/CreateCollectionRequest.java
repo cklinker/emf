@@ -8,9 +8,6 @@ import jakarta.validation.constraints.Size;
  */
 public class CreateCollectionRequest {
 
-    @NotBlank(message = "Service ID is required")
-    private String serviceId;
-
     @NotBlank(message = "Collection name is required")
     @Size(min = 1, max = 100, message = "Collection name must be between 1 and 100 characters")
     private String name;
@@ -24,25 +21,15 @@ public class CreateCollectionRequest {
     public CreateCollectionRequest() {
     }
 
-    public CreateCollectionRequest(String serviceId, String name, String description) {
-        this.serviceId = serviceId;
+    public CreateCollectionRequest(String name, String description) {
         this.name = name;
         this.description = description;
     }
 
-    public CreateCollectionRequest(String serviceId, String name, String description, String path) {
-        this.serviceId = serviceId;
+    public CreateCollectionRequest(String name, String description, String path) {
         this.name = name;
         this.description = description;
         this.path = path;
-    }
-
-    public String getServiceId() {
-        return serviceId;
-    }
-
-    public void setServiceId(String serviceId) {
-        this.serviceId = serviceId;
     }
 
     public String getName() {

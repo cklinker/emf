@@ -1,0 +1,128 @@
+# Default values for emf-worker
+# This is a YAML-formatted file.
+
+# =============================================================================
+# Replica Configuration
+# =============================================================================
+replicaCount: 2
+
+# =============================================================================
+# Image Configuration
+# =============================================================================
+image:
+  repository: cklinker/emf-worker
+  tag: latest
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+# =============================================================================
+# Service Account
+# =============================================================================
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+# =============================================================================
+# Pod Configuration
+# =============================================================================
+podAnnotations: {}
+
+podSecurityContext: {}
+
+securityContext: {}
+
+# =============================================================================
+# Service Configuration
+# =============================================================================
+service:
+  type: ClusterIP
+  port: 8080
+
+# =============================================================================
+# Resource Limits
+# =============================================================================
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi
+
+# =============================================================================
+# Worker Configuration
+# =============================================================================
+worker:
+  pool: default
+  capacity: 50
+  heartbeatInterval: 15
+  controlPlaneUrl: http://emf-control-plane:8080
+
+# =============================================================================
+# Environment Variables
+# =============================================================================
+env:
+  SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/emf
+  SPRING_DATASOURCE_USERNAME: emf
+  SPRING_DATASOURCE_PASSWORD: emf
+  SPRING_REDIS_HOST: redis
+  SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+
+# =============================================================================
+# Autoscaling Configuration (HPA)
+# =============================================================================
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 70
+  targetCollectionCount: 40
+
+# =============================================================================
+# KEDA Configuration
+# =============================================================================
+keda:
+  enabled: false
+  pollingInterval: 30
+  cooldownPeriod: 300
+  minReplicaCount: 2
+  maxReplicaCount: 20
+  metricsUrl: http://emf-control-plane:8080/control/metrics/unassigned-collections
+
+# =============================================================================
+# Pod Disruption Budget
+# =============================================================================
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# =============================================================================
+# Graceful Shutdown
+# =============================================================================
+terminationGracePeriodSeconds: 60
+
+# =============================================================================
+# Prometheus ServiceMonitor
+# =============================================================================
+serviceMonitor:
+  enabled: false
+  interval: 15s
+  scrapeTimeout: 10s
+  additionalLabels: {}
+
+# =============================================================================
+# Node Selection
+# =============================================================================
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}

@@ -324,7 +324,7 @@ curl -sL -X PATCH \
 
 | Fact | Value |
 |------|-------|
-| Flyway migration ranges | V7 (base), V8–V13 (Phase 1), V14–V20 (Phase 2) |
+| Flyway migration ranges | V7 (base), V8–V13 (Phase 1), V14–V20 (Phase 2), V21–V24 (Phase 3), V25–V29 (Phase 4), V30–V35 (Phase 5), V36 (OIDC role mapping), V40 (Remove service table) |
 | FieldType enum (runtime-core) | STRING, INTEGER, LONG, DOUBLE, BOOLEAN, DATE, DATETIME, JSON |
 | FieldService VALID_FIELD_TYPES | "string", "number", "boolean", "date", "datetime", "reference", "array", "object" |
 | Control-plane "number" maps to | runtime DOUBLE (not INTEGER) |

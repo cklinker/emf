@@ -13,8 +13,6 @@ import java.util.Objects;
 public class CollectionChangedPayload {
 
     private String id;
-    private String serviceId;
-    private String serviceName;
     private String name;
     private String displayName;
     private String description;
@@ -38,22 +36,6 @@ public class CollectionChangedPayload {
 
     public void setId(String id) {
         this.id = id;
-    }
-
-    public String getServiceId() {
-        return serviceId;
-    }
-
-    public void setServiceId(String serviceId) {
-        this.serviceId = serviceId;
-    }
-
-    public String getServiceName() {
-        return serviceName;
-    }
-
-    public void setServiceName(String serviceName) {
-        this.serviceName = serviceName;
     }
 
     public String getName() {

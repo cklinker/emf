@@ -46,16 +46,15 @@ class DynamicRouteLocatorTest {
         // Given
         RouteDefinition routeDef = new RouteDefinition(
                 "users-collection",
-                "user-service",
                 "/api/users/**",
                 "http://user-service:8080",
                 "users"
         );
         routeRegistry.addRoute(routeDef);
-        
+
         // When
         Flux<Route> routes = routeLocator.getRoutes();
-        
+
         // Then
         StepVerifier.create(routes)
                 .assertNext(route -> {
@@ -71,14 +70,12 @@ class DynamicRouteLocatorTest {
         // Given
         RouteDefinition route1 = new RouteDefinition(
                 "users-collection",
-                "user-service",
                 "/api/users/**",
                 "http://user-service:8080",
                 "users"
         );
         RouteDefinition route2 = new RouteDefinition(
                 "posts-collection",
-                "post-service",
                 "/api/posts/**",
                 "http://post-service:8080",
                 "posts"
@@ -107,7 +104,6 @@ class DynamicRouteLocatorTest {
         // Given
         RouteDefinition routeDef = new RouteDefinition(
                 "invalid-route",
-                "invalid-service",
                 "/api/invalid/**",
                 "not-a-valid-url",
                 "invalid"
@@ -125,21 +121,19 @@ class DynamicRouteLocatorTest {
         // Given - initial route
         RouteDefinition route1 = new RouteDefinition(
                 "users-collection",
-                "user-service",
                 "/api/users/**",
                 "http://user-service:8080",
                 "users"
         );
         routeRegistry.addRoute(route1);
-        
+
         // When - get initial routes
         List<Route> initialRoutes = routeLocator.getRoutes().collectList().block();
         assertThat(initialRoutes).hasSize(1);
-        
+
         // Given - add another route
         RouteDefinition route2 = new RouteDefinition(
                 "posts-collection",
-                "post-service",
                 "/api/posts/**",
                 "http://post-service:8080",
                 "posts"
@@ -158,7 +152,6 @@ class DynamicRouteLocatorTest {
         // Given
         RouteDefinition routeDef = new RouteDefinition(
                 "my-custom-id",
-                "my-service",
                 "/api/custom/**",
                 "http://custom-service:8080",
                 "custom"
@@ -179,7 +172,6 @@ class DynamicRouteLocatorTest {
         String backendUrl = "http://backend-service:9090";
         RouteDefinition routeDef = new RouteDefinition(
                 "test-route",
-                "test-service",
                 "/api/test/**",
                 backendUrl,
                 "test"
@@ -199,7 +191,6 @@ class DynamicRouteLocatorTest {
         // Given
         RouteDefinition routeDef = new RouteDefinition(
                 "health-check",
-                "health-service",
                 "/health",
                 "http://health-service:8080",
                 "health"
@@ -226,22 +217,21 @@ class DynamicRouteLocatorTest {
         // Given
         RouteDefinition routeDef = new RouteDefinition(
                 "users-collection",
-                "user-service",
                 "/api/users/**",
                 "http://user-service:8080",
                 "users"
         );
         routeRegistry.addRoute(routeDef);
-        
+
         // When
         List<Route> routes = routeLocator.getRoutes().collectList().block();
         Route route = routes.get(0);
-        
+
         // Then - should match single segment
         MockServerHttpRequest singleSegment = MockServerHttpRequest.get("/api/users/123").build();
         MockServerWebExchange singleExchange = MockServerWebExchange.from(singleSegment);
         assertThat(Mono.from(route.getPredicate().apply(singleExchange)).block()).isTrue();
-        
+
         // Then - should match multiple segments
         MockServerHttpRequest multiSegment = MockServerHttpRequest.get("/api/users/123/posts/456").build();
         MockServerWebExchange multiExchange = MockServerWebExchange.from(multiSegment);
@@ -258,7 +248,6 @@ class DynamicRouteLocatorTest {
         // Given
         RouteDefinition routeDef = new RouteDefinition(
                 "users-collection",
-                "user-service",
                 "/api/users/*",
                 "http://user-service:8080",
                 "users"

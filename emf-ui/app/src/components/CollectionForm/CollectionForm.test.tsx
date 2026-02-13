@@ -36,7 +36,6 @@ function renderWithProviders(ui: React.ReactElement) {
 // Mock collection for edit mode tests
 const mockCollection: Collection = {
   id: 'col-123',
-  serviceId: 'test-service',
   name: 'test_collection',
   displayName: 'Test Collection',
   description: 'A test collection for testing',
@@ -284,12 +283,8 @@ describe('CollectionForm Component', () => {
     it('should call onSubmit with form data when valid', async () => {
       const onSubmit = vi.fn().mockResolvedValue(undefined)
       const user = userEvent.setup()
-      const services = [{ id: 'test-service', name: 'Test Service' }]
-      renderWithProviders(
-        <CollectionForm {...defaultProps} onSubmit={onSubmit} services={services} />
-      )
+      renderWithProviders(<CollectionForm {...defaultProps} onSubmit={onSubmit} />)
 
-      await user.selectOptions(screen.getByTestId('collection-service-select'), 'test-service')
       await user.type(screen.getByTestId('collection-name-input'), 'my_collection')
       await user.type(screen.getByTestId('collection-display-name-input'), 'My Collection')
       await user.type(screen.getByTestId('collection-description-input'), 'A description')
@@ -303,7 +298,6 @@ describe('CollectionForm Component', () => {
       await waitFor(() => {
         expect(onSubmit).toHaveBeenCalledTimes(1)
         expect(onSubmit).toHaveBeenCalledWith({
-          serviceId: 'test-service',
           name: 'my_collection',
           displayName: 'My Collection',
           description: 'A description',
@@ -329,12 +323,8 @@ describe('CollectionForm Component', () => {
     it('should submit with empty description as undefined', async () => {
       const onSubmit = vi.fn().mockResolvedValue(undefined)
       const user = userEvent.setup()
-      const services = [{ id: 'test-service', name: 'Test Service' }]
-      renderWithProviders(
-        <CollectionForm {...defaultProps} onSubmit={onSubmit} services={services} />
-      )
+      renderWithProviders(<CollectionForm {...defaultProps} onSubmit={onSubmit} />)
 
-      await user.selectOptions(screen.getByTestId('collection-service-select'), 'test-service')
       await user.type(screen.getByTestId('collection-name-input'), 'my_collection')
       await user.type(screen.getByTestId('collection-display-name-input'), 'My Collection')
       // Leave description empty
@@ -344,7 +334,6 @@ describe('CollectionForm Component', () => {
       await waitFor(() => {
         expect(onSubmit).toHaveBeenCalledWith(
           expect.objectContaining({
-            serviceId: 'test-service',
             description: undefined,
           })
         )
@@ -354,12 +343,8 @@ describe('CollectionForm Component', () => {
     it('should submit with active unchecked', async () => {
       const onSubmit = vi.fn().mockResolvedValue(undefined)
       const user = userEvent.setup()
-      const services = [{ id: 'test-service', name: 'Test Service' }]
-      renderWithProviders(
-        <CollectionForm {...defaultProps} onSubmit={onSubmit} services={services} />
-      )
+      renderWithProviders(<CollectionForm {...defaultProps} onSubmit={onSubmit} />)
 
-      await user.selectOptions(screen.getByTestId('collection-service-select'), 'test-service')
       await user.type(screen.getByTestId('collection-name-input'), 'my_collection')
       await user.type(screen.getByTestId('collection-display-name-input'), 'My Collection')
       await user.click(screen.getByTestId('collection-active-checkbox')) // Uncheck
@@ -391,7 +376,6 @@ describe('CollectionForm Component', () => {
 
       await waitFor(() => {
         expect(onSubmit).toHaveBeenCalledWith({
-          serviceId: 'test-service',
           name: 'test_collection',
           displayName: 'Updated Collection',
           description: 'A test collection for testing',
@@ -575,7 +559,6 @@ describe('CollectionForm Integration', () => {
       .fn()
       .mockImplementation(() => new Promise((resolve) => setTimeout(resolve, 100)))
     const user = userEvent.setup()
-    const services = [{ id: 'test-service', name: 'Test Service' }]
 
     const TestComponent = () => {
       const [isSubmitting, setIsSubmitting] = React.useState(false)
@@ -590,18 +573,12 @@ describe('CollectionForm Integration', () => {
       }
 
       return (
-        <CollectionForm
-          onSubmit={handleSubmit}
-          onCancel={() => {}}
-          isSubmitting={isSubmitting}
-          services={services}
-        />
+        <CollectionForm onSubmit={handleSubmit} onCancel={() => {}} isSubmitting={isSubmitting} />
       )
     }
 
     renderWithProviders(<TestComponent />)
 
-    await user.selectOptions(screen.getByTestId('collection-service-select'), 'test-service')
     await user.type(screen.getByTestId('collection-name-input'), 'my_collection')
     await user.type(screen.getByTestId('collection-display-name-input'), 'My Collection')
     await user.click(screen.getByTestId('collection-form-submit'))

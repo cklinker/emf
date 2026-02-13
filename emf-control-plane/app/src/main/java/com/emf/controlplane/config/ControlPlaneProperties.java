@@ -13,6 +13,7 @@ public class ControlPlaneProperties {
     private KafkaTopics kafka = new KafkaTopics();
     private CacheConfig cache = new CacheConfig();
     private SecurityConfig security = new SecurityConfig();
+    private String workerServiceUrl = "http://emf-worker:80";
 
     public KafkaTopics getKafka() {
         return kafka;
@@ -36,6 +37,14 @@ public class ControlPlaneProperties {
 
     public void setSecurity(SecurityConfig security) {
         this.security = security;
+    }
+
+    public String getWorkerServiceUrl() {
+        return workerServiceUrl;
+    }
+
+    public void setWorkerServiceUrl(String workerServiceUrl) {
+        this.workerServiceUrl = workerServiceUrl;
     }
 
     /**
@@ -62,19 +71,12 @@ public class ControlPlaneProperties {
         }
 
         public static class Topics {
-            private String serviceChanged = "config.service.changed";
             private String collectionChanged = "config.collection.changed";
             private String authzChanged = "config.authz.changed";
             private String uiChanged = "config.ui.changed";
             private String oidcChanged = "config.oidc.changed";
-
-            public String getServiceChanged() {
-                return serviceChanged;
-            }
-
-            public void setServiceChanged(String serviceChanged) {
-                this.serviceChanged = serviceChanged;
-            }
+            private String workerAssignmentChanged = "emf.worker.assignment.changed";
+            private String workerStatusChanged = "emf.worker.status.changed";
 
             public String getCollectionChanged() {
                 return collectionChanged;
@@ -106,6 +108,22 @@ public class ControlPlaneProperties {
 
             public void setOidcChanged(String oidcChanged) {
                 this.oidcChanged = oidcChanged;
+            }
+
+            public String getWorkerAssignmentChanged() {
+                return workerAssignmentChanged;
+            }
+
+            public void setWorkerAssignmentChanged(String workerAssignmentChanged) {
+                this.workerAssignmentChanged = workerAssignmentChanged;
+            }
+
+            public String getWorkerStatusChanged() {
+                return workerStatusChanged;
+            }
+
+            public void setWorkerStatusChanged(String workerStatusChanged) {
+                this.workerStatusChanged = workerStatusChanged;
             }
         }
     }

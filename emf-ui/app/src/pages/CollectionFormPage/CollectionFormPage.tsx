@@ -38,13 +38,6 @@ export function CollectionFormPage({
 
   const isEditMode = Boolean(id)
 
-  // Fetch available services
-  const { data: servicesData, isLoading: servicesLoading } = useQuery({
-    queryKey: ['services'],
-    queryFn: () =>
-      apiClient.get<{ content: Array<{ id: string; name: string }> }>('/control/services?size=100'),
-  })
-
   // Fetch existing collection if in edit mode
   const {
     data: collection,
@@ -68,9 +61,8 @@ export function CollectionFormPage({
         await apiClient.put(`/control/collections/${id}`, requestData)
         navigate(`/${getTenantSlug()}/collections/${id}`)
       } else {
-        // Create new collection - backend expects serviceId, name, and description
+        // Create new collection
         const requestData = {
-          serviceId: data.serviceId,
           name: data.name,
           description: data.description || '',
         }
@@ -133,13 +125,7 @@ export function CollectionFormPage({
       </header>
 
       <div className={styles.content}>
-        <CollectionForm
-          collection={collection}
-          services={servicesData?.content ?? []}
-          servicesLoading={servicesLoading}
-          onSubmit={handleSubmit}
-          onCancel={handleCancel}
-        />
+        <CollectionForm collection={collection} onSubmit={handleSubmit} onCancel={handleCancel} />
       </div>
     </div>
   )

@@ -61,7 +61,6 @@ import {
   ResourceDetailPage,
   ResourceFormPage,
   PluginsPage,
-  ServicesPage,
   UsersPage,
   UserDetailPage,
   ProfilesPage,
@@ -87,6 +86,7 @@ import {
   ConnectedAppsPage,
   BulkJobsPage,
   SetupHomePage,
+  WorkersPage,
   LoginPage,
   UnauthorizedPage,
   NotFoundPage,
@@ -457,12 +457,12 @@ function TenantRoutes(): React.ReactElement {
         }
       />
 
-      {/* Services route */}
+      {/* Workers route */}
       <Route
-        path="services"
+        path="workers"
         element={
           <ProtectedPageRoute>
-            <ServicesPage />
+            <WorkersPage />
           </ProtectedPageRoute>
         }
       />

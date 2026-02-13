@@ -342,9 +342,7 @@ class DiscoveryServiceTest {
     // Helper methods to create test entities
     
     private Collection createTestCollection(String id, String name, String description) {
-        com.emf.controlplane.entity.Service service = new com.emf.controlplane.entity.Service("test-service", "Test Service");
-        service.setId("service-1");
-        Collection collection = new Collection(service, name, description);
+        Collection collection = new Collection(name, description);
         collection.setId(id);
         collection.setActive(true);
         collection.setCurrentVersion(1);

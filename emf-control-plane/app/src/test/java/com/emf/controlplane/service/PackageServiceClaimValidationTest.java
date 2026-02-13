@@ -58,10 +58,7 @@ class PackageServiceClaimValidationTest {
     
     @Mock
     private UiMenuRepository uiMenuRepository;
-    
-    @Mock
-    private ServiceRepository serviceRepository;
-    
+
     private ObjectMapper objectMapper; // Use real instance instead of mock
 
     @InjectMocks
@@ -81,7 +78,6 @@ class PackageServiceClaimValidationTest {
             oidcProviderRepository,
             uiPageRepository,
             uiMenuRepository,
-            serviceRepository,
             objectMapper
         );
     }

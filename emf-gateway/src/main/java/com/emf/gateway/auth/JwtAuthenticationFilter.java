@@ -6,6 +6,7 @@ import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtException;
@@ -54,6 +55,12 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         String path = exchange.getRequest().getPath().value();
         
+        // Allow CORS preflight requests through — browsers send OPTIONS without credentials
+        if (exchange.getRequest().getMethod() == HttpMethod.OPTIONS) {
+            log.debug("Allowing CORS preflight request for path: {}", path);
+            return chain.filter(exchange);
+        }
+
         // Allow unauthenticated access to bootstrap endpoints
         if (path.equals(BOOTSTRAP_PATH) || path.equals(UI_BOOTSTRAP_PATH)) {
             log.debug("Allowing unauthenticated access to bootstrap endpoint: {}", path);

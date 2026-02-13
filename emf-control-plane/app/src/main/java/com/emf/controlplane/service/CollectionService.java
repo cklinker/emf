@@ -13,7 +13,6 @@ import com.emf.controlplane.exception.ResourceNotFoundException;
 import com.emf.controlplane.repository.CollectionRepository;
 import com.emf.controlplane.repository.CollectionVersionRepository;
 import com.emf.controlplane.repository.FieldRepository;
-import com.emf.controlplane.repository.ServiceRepository;
 import com.emf.controlplane.tenant.TenantContextHolder;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -51,23 +50,23 @@ public class CollectionService {
     private final CollectionRepository collectionRepository;
     private final CollectionVersionRepository versionRepository;
     private final FieldRepository fieldRepository;
-    private final ServiceRepository serviceRepository;
     private final ObjectMapper objectMapper;
     private final ConfigEventPublisher eventPublisher;
+    private final CollectionAssignmentService collectionAssignmentService;
 
     public CollectionService(
             CollectionRepository collectionRepository,
             CollectionVersionRepository versionRepository,
             FieldRepository fieldRepository,
-            ServiceRepository serviceRepository,
             ObjectMapper objectMapper,
-            @Nullable ConfigEventPublisher eventPublisher) {
+            @Nullable ConfigEventPublisher eventPublisher,
+            @Nullable CollectionAssignmentService collectionAssignmentService) {
         this.collectionRepository = collectionRepository;
         this.versionRepository = versionRepository;
         this.fieldRepository = fieldRepository;
-        this.serviceRepository = serviceRepository;
         this.objectMapper = objectMapper;
         this.eventPublisher = eventPublisher;
+        this.collectionAssignmentService = collectionAssignmentService;
     }
 
     /**
@@ -113,17 +112,7 @@ public class CollectionService {
     @Transactional
     public Collection createCollection(CreateCollectionRequest request) {
         String tenantId = TenantContextHolder.getTenantId();
-        log.info("Creating collection with name: {} for service: {} tenant: {}", request.getName(), request.getServiceId(), tenantId);
-
-        // Verify service exists
-        com.emf.controlplane.entity.Service service;
-        if (tenantId != null) {
-            service = serviceRepository.findByIdAndTenantIdAndActiveTrue(request.getServiceId(), tenantId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Service", request.getServiceId()));
-        } else {
-            service = serviceRepository.findByIdAndActiveTrue(request.getServiceId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Service", request.getServiceId()));
-        }
+        log.info("Creating collection with name: {} tenant: {}", request.getName(), tenantId);
 
         // Check for duplicate name within the tenant
         if (tenantId != null) {
@@ -137,41 +126,41 @@ public class CollectionService {
         }
 
         // Create the collection entity
-        Collection collection = new Collection(service, request.getName(), request.getDescription());
+        Collection collection = new Collection(request.getName(), request.getDescription());
         collection.setCurrentVersion(1);
         collection.setActive(true);
         if (tenantId != null) {
             collection.setTenantId(tenantId);
         }
-        
+
         // Set path if provided, otherwise generate default path
         if (request.getPath() != null && !request.getPath().isEmpty()) {
             collection.setPath(request.getPath());
         } else {
-            // Generate default path: /api/{collectionName}
-            String basePath = service.getBasePath();
-            if (basePath == null || basePath.isEmpty()) {
-                basePath = "/api";
-            }
-            if (!basePath.startsWith("/")) {
-                basePath = "/" + basePath;
-            }
-            if (basePath.endsWith("/")) {
-                basePath = basePath.substring(0, basePath.length() - 1);
-            }
-            collection.setPath(basePath + "/" + request.getName());
+            collection.setPath("/api/" + request.getName());
         }
-        
+
         // Save the collection first to get the ID
         collection = collectionRepository.save(collection);
-        
+
         // Create initial version (version 1)
         createNewVersion(collection);
-        
+
         // Publish event
         publishCollectionChangedEvent(collection, ChangeType.CREATED);
-        
-        log.info("Created collection with id: {} for service: {}", collection.getId(), service.getName());
+
+        // Auto-assign to an available worker (best-effort)
+        if (collectionAssignmentService != null) {
+            try {
+                collectionAssignmentService.assignCollection(collection.getId(), tenantId);
+                log.info("Auto-assigned collection {} to a worker", collection.getId());
+            } catch (IllegalStateException e) {
+                log.warn("No available workers for auto-assignment of collection {}: {}",
+                        collection.getId(), e.getMessage());
+            }
+        }
+
+        log.info("Created collection with id: {}", collection.getId());
         return collection;
     }
 

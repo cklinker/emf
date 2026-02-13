@@ -33,10 +33,6 @@ export type { PoliciesPageProps, Policy } from './PoliciesPage'
 export { OIDCProvidersPage } from './OIDCProvidersPage'
 export type { OIDCProvidersPageProps, OIDCProvider } from './OIDCProvidersPage'
 
-// ServicesPage - Domain services management page
-export { ServicesPage } from './ServicesPage'
-export type { ServicesPageProps, Service } from './ServicesPage'
-
 // PageBuilderPage - UI page builder
 export { PageBuilderPage } from './PageBuilderPage'
 export type {
@@ -236,6 +232,10 @@ export type { SetupHomePageProps } from './SetupHomePage'
 
 // NoTenantPage - Tenant slug required error page
 export { NoTenantPage } from './NoTenantPage/NoTenantPage'
+
+// WorkersPage - Worker management page
+export { WorkersPage } from './WorkersPage'
+export type { WorkersPageProps, Worker, WorkerAssignment, RebalanceResult } from './WorkersPage'
 
 // NotFoundPage - 404 error page
 export { NotFoundPage } from './NotFoundPage'

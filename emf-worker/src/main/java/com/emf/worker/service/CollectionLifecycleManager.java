@@ -193,8 +193,11 @@ public class CollectionLifecycleManager {
         }
         builder.fields(fields);
 
-        // Parse storage config
+        // Parse storage config (normalize legacy "PHYSICAL_TABLE" → "PHYSICAL_TABLES")
         String storageMode = getStringOrDefault(data, "storageMode", "PHYSICAL_TABLES");
+        if ("PHYSICAL_TABLE".equals(storageMode)) {
+            storageMode = "PHYSICAL_TABLES";
+        }
         String tableName = getStringOrDefault(data, "tableName", "tbl_" + name);
         builder.storageConfig(new com.emf.runtime.model.StorageConfig(
                 StorageMode.valueOf(storageMode), tableName, null));

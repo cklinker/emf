@@ -28,7 +28,7 @@ public class Collection extends BaseEntity {
     private String path;
 
     @Column(name = "storage_mode", length = 50)
-    private String storageMode = "PHYSICAL_TABLE";
+    private String storageMode = "PHYSICAL_TABLES";
 
     @Column(name = "active", nullable = false)
     private boolean active = true;

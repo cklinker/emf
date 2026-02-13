@@ -1,6 +1,8 @@
 package com.emf.controlplane.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 
@@ -23,12 +25,15 @@ public class ConnectedApp extends BaseEntity {
     @Column(name = "client_secret_hash", nullable = false, length = 200)
     private String clientSecretHash;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "redirect_uris", columnDefinition = "jsonb")
     private String redirectUris;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "scopes", columnDefinition = "jsonb")
     private String scopes;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "ip_restrictions", columnDefinition = "jsonb")
     private String ipRestrictions;
 

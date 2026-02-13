@@ -1,6 +1,8 @@
 package com.emf.controlplane.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 
@@ -15,6 +17,7 @@ public class ConnectedAppToken extends BaseEntity {
     @Column(name = "token_hash", nullable = false, length = 200)
     private String tokenHash;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "scopes", columnDefinition = "jsonb")
     private String scopes;
 

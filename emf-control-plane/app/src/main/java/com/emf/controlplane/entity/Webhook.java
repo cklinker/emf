@@ -1,6 +1,8 @@
 package com.emf.controlplane.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -18,6 +20,7 @@ public class Webhook extends BaseEntity {
     @Column(name = "url", nullable = false, length = 2048)
     private String url;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "events", columnDefinition = "jsonb")
     private String events;
 
@@ -27,6 +30,7 @@ public class Webhook extends BaseEntity {
     @Column(name = "filter_formula", columnDefinition = "TEXT")
     private String filterFormula;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "headers", columnDefinition = "jsonb")
     private String headers;
 
@@ -36,6 +40,7 @@ public class Webhook extends BaseEntity {
     @Column(name = "active")
     private boolean active = true;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "retry_policy", columnDefinition = "jsonb")
     private String retryPolicy;
 

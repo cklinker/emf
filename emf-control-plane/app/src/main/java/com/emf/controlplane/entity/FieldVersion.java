@@ -1,6 +1,8 @@
 package com.emf.controlplane.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
@@ -40,6 +42,7 @@ public class FieldVersion {
     @Column(name = "active", nullable = false)
     private boolean active;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "constraints", columnDefinition = "jsonb")
     private String constraints;
 

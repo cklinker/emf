@@ -1,6 +1,8 @@
 package com.emf.controlplane.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 /**
  * Represents a single step within a migration run.
@@ -23,6 +25,7 @@ public class MigrationStep extends BaseEntity {
     @Column(name = "status", nullable = false, length = 50)
     private String status;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "details", columnDefinition = "jsonb")
     private String details;
 

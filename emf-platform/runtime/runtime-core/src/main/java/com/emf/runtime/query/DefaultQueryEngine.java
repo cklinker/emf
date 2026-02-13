@@ -9,6 +9,7 @@ import com.emf.runtime.service.RollupSummaryService;
 import com.emf.runtime.formula.FormulaEvaluator;
 import com.emf.runtime.storage.StorageAdapter;
 import com.emf.runtime.validation.OperationType;
+import com.emf.runtime.validation.TypeCoercionService;
 import com.emf.runtime.validation.ValidationEngine;
 import com.emf.runtime.validation.ValidationException;
 import com.emf.runtime.validation.ValidationResult;
@@ -152,6 +153,9 @@ public class DefaultQueryEngine implements QueryEngine {
         // Encrypt ENCRYPTED field values before validation and storage
         encryptFields(definition, recordData);
 
+        // Coerce string values to expected types (e.g., "10" → 10.0 for DOUBLE fields)
+        TypeCoercionService.coerce(definition, recordData);
+
         // Validate data
         if (validationEngine != null) {
             ValidationResult validation = validationEngine.validate(definition, recordData, OperationType.CREATE);
@@ -190,12 +194,15 @@ public class DefaultQueryEngine implements QueryEngine {
         recordData.remove("id");
         recordData.remove("createdAt");
         
+        // Coerce string values to expected types (e.g., "10" → 10.0 for DOUBLE fields)
+        TypeCoercionService.coerce(definition, recordData);
+
         // Validate data
         if (validationEngine != null) {
             // Merge with existing data for validation
             Map<String, Object> mergedData = new HashMap<>(existing.get());
             mergedData.putAll(recordData);
-            
+
             ValidationResult validation = validationEngine.validate(definition, mergedData, OperationType.UPDATE, id);
             if (!validation.valid()) {
                 throw new ValidationException(validation);

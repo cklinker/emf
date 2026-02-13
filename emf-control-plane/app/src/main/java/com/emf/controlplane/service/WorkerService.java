@@ -83,7 +83,9 @@ public class WorkerService {
 
         worker.setHost(request.host());
         worker.setPort(request.port());
-        worker.setBaseUrl("http://" + request.host() + ":" + request.port());
+        // Use pod IP for baseUrl if available (routable in K8s cluster), otherwise fall back to hostname
+        String routeHost = (request.hostIp() != null && !request.hostIp().isBlank()) ? request.hostIp() : request.host();
+        worker.setBaseUrl("http://" + routeHost + ":" + request.port());
         worker.setPodName(request.podName());
         worker.setNamespace(request.namespace());
         worker.setCapacity(request.capacity() > 0 ? request.capacity() : 50);

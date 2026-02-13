@@ -187,6 +187,58 @@ class RouteConfigServiceTest {
     }
 
     @Test
+    void testRefreshRoutes_WithWorkerBaseUrl() throws InterruptedException {
+        // Arrange - collection with worker-specific base URL
+        String jsonResponse = """
+            {
+              "collections": [
+                {
+                  "id": "product-collection",
+                  "name": "product",
+                  "path": "/api/product",
+                  "workerBaseUrl": "http://10.1.150.147:8080",
+                  "fields": []
+                },
+                {
+                  "id": "tasks-collection",
+                  "name": "tasks",
+                  "path": "/api/tasks",
+                  "fields": []
+                }
+              ],
+              "authorization": {
+                "roles": [],
+                "policies": [],
+                "routePolicies": [],
+                "fieldPolicies": []
+              }
+            }
+            """;
+
+        mockWebServer.enqueue(new MockResponse()
+            .setBody(jsonResponse)
+            .addHeader("Content-Type", "application/json"));
+
+        // Act
+        routeConfigService.refreshRoutes();
+        Thread.sleep(500);
+
+        // Assert
+        List<RouteDefinition> routes = routeRegistry.getAllRoutes();
+        assertEquals(2, routes.size());
+
+        // Collection with workerBaseUrl should use the pod-specific URL
+        RouteDefinition productRoute = routeRegistry.findByPath("/api/product/**").orElse(null);
+        assertNotNull(productRoute);
+        assertEquals("http://10.1.150.147:8080", productRoute.getBackendUrl());
+
+        // Collection without workerBaseUrl should fall back to generic service URL
+        RouteDefinition tasksRoute = routeRegistry.findByPath("/api/tasks/**").orElse(null);
+        assertNotNull(tasksRoute);
+        assertEquals(WORKER_SERVICE_URL, tasksRoute.getBackendUrl());
+    }
+
+    @Test
     void testRefreshRoutes_MissingPath() throws InterruptedException {
         // Arrange - collection with missing path
         String jsonResponse = """

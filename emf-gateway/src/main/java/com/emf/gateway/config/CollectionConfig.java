@@ -13,6 +13,7 @@ public class CollectionConfig {
     private String id;
     private String name;
     private String path;
+    private String workerBaseUrl;
     private List<FieldConfig> fields;
 
     public CollectionConfig() {
@@ -47,6 +48,14 @@ public class CollectionConfig {
 
     public void setPath(String path) {
         this.path = path;
+    }
+
+    public String getWorkerBaseUrl() {
+        return workerBaseUrl;
+    }
+
+    public void setWorkerBaseUrl(String workerBaseUrl) {
+        this.workerBaseUrl = workerBaseUrl;
     }
 
     public List<FieldConfig> getFields() {

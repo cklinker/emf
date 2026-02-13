@@ -43,6 +43,7 @@ public class GatewayBootstrapConfigDto {
         private String id;
         private String name;
         private String path;
+        private String workerBaseUrl;
         private List<FieldDto> fields;
 
         public CollectionDto() {
@@ -52,6 +53,14 @@ public class GatewayBootstrapConfigDto {
             this.id = id;
             this.name = name;
             this.path = path;
+            this.fields = fields;
+        }
+
+        public CollectionDto(String id, String name, String path, String workerBaseUrl, List<FieldDto> fields) {
+            this.id = id;
+            this.name = name;
+            this.path = path;
+            this.workerBaseUrl = workerBaseUrl;
             this.fields = fields;
         }
 
@@ -77,6 +86,14 @@ public class GatewayBootstrapConfigDto {
 
         public void setPath(String path) {
             this.path = path;
+        }
+
+        public String getWorkerBaseUrl() {
+            return workerBaseUrl;
+        }
+
+        public void setWorkerBaseUrl(String workerBaseUrl) {
+            this.workerBaseUrl = workerBaseUrl;
         }
 
         public List<FieldDto> getFields() {

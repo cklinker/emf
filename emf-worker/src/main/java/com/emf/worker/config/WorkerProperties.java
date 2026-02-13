@@ -116,4 +116,26 @@ public class WorkerProperties {
             return "localhost";
         }
     }
+
+    /**
+     * Returns the IP address of this worker pod. Uses the POD_IP environment variable
+     * if set (via Kubernetes downward API), otherwise resolves the local host address.
+     * Falls back to the hostname if IP resolution fails.
+     *
+     * @return the IP address or hostname as fallback
+     */
+    public String getHostIp() {
+        // Prefer POD_IP env var (Kubernetes downward API)
+        String podIp = System.getenv("POD_IP");
+        if (podIp != null && !podIp.isBlank()) {
+            return podIp;
+        }
+        // Resolve IP from hostname
+        try {
+            return InetAddress.getLocalHost().getHostAddress();
+        } catch (UnknownHostException e) {
+            // Fall back to hostname
+            return getHost();
+        }
+    }
 }

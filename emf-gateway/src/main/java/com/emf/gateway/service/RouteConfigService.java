@@ -144,11 +144,15 @@ public class RouteConfigService {
                 path = path + "/**";
             }
 
-            // Create route definition using worker service URL
+            // Use collection-specific worker URL if available, otherwise fall back to generic service URL
+            String backendUrl = (collection.getWorkerBaseUrl() != null && !collection.getWorkerBaseUrl().isEmpty())
+                    ? collection.getWorkerBaseUrl()
+                    : workerServiceUrl;
+
             RouteDefinition route = new RouteDefinition(
                 collectionId,
                 path,
-                workerServiceUrl,
+                backendUrl,
                 collectionName
             );
 

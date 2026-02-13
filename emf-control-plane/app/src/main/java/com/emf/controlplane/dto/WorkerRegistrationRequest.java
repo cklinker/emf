@@ -10,6 +10,7 @@ public record WorkerRegistrationRequest(
     String podName,
     String namespace,
     String host,
+    String hostIp,
     int port,
     int capacity,
     String pool,

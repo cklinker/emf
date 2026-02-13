@@ -4,8 +4,6 @@ import com.emf.gateway.tenant.TenantSlugCache;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.cloud.gateway.filter.GatewayFilterChain;
-import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.HttpStatus;
@@ -13,6 +11,8 @@ import org.springframework.http.MediaType;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
+import org.springframework.web.server.WebFilter;
+import org.springframework.web.server.WebFilterChain;
 import reactor.core.publisher.Mono;
 
 import java.nio.charset.StandardCharsets;
@@ -27,16 +27,17 @@ import java.util.regex.Pattern;
  * Incoming: {@code /{slug}/api/users/123} → rewritten to {@code /api/users/123}
  * with tenant attributes set on the exchange.
  * <p>
- * Runs at order -300, before {@link TenantResolutionFilter} (-200) and all
- * other gateway filters, so downstream components see bare paths and have
- * tenant context available.
+ * Implemented as a {@link WebFilter} (not a Gateway GlobalFilter) so that
+ * path rewriting occurs <em>before</em> Spring Cloud Gateway's route matching.
+ * This is essential because route predicates like {@code /control/**} or
+ * {@code /api/**} must see the bare (slug-stripped) path.
  * <p>
  * Platform paths (actuator, etc.) are exempted and pass through without a slug.
  * When {@code emf.gateway.tenant-slug.require-prefix} is {@code false}
  * (migration mode), requests without a slug prefix also pass through.
  */
 @Component
-public class TenantSlugExtractionFilter implements GlobalFilter, Ordered {
+public class TenantSlugExtractionFilter implements WebFilter, Ordered {
 
     private static final Logger log = LoggerFactory.getLogger(TenantSlugExtractionFilter.class);
 
@@ -65,7 +66,7 @@ public class TenantSlugExtractionFilter implements GlobalFilter, Ordered {
     }
 
     @Override
-    public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
+    public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
         if (!enabled) {
             return chain.filter(exchange);
         }

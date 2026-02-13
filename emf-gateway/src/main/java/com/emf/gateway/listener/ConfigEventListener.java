@@ -410,6 +410,10 @@ public class ConfigEventListener {
                 logger.info("Added/updated route for worker-assigned collection: path={}, workerUrl={}",
                             path, workerBaseUrl);
             }
+
+            // Notify Spring Cloud Gateway to refresh its route cache
+            applicationEventPublisher.publishEvent(new RefreshRoutesEvent(this));
+
         } catch (Exception e) {
             logger.error("Error processing worker assignment event: eventId={}, error={}",
                         event.getEventId(), e.getMessage(), e);

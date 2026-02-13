@@ -118,7 +118,7 @@ export function TenantDashboardPage({
     refetch,
   } = useQuery({
     queryKey: ['tenant-dashboard'],
-    queryFn: () => apiClient.get<TenantDashboardData>('/control/dashboard'),
+    queryFn: () => apiClient.get<TenantDashboardData>('/control/_admin/dashboard'),
     refetchInterval: 60000, // Refresh every minute
   })
 

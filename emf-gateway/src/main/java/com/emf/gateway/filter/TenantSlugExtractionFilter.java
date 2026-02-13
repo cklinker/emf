@@ -97,28 +97,32 @@ public class TenantSlugExtractionFilter implements GlobalFilter, Ordered {
             return notFound(exchange, "Invalid tenant identifier: " + firstSegment);
         }
 
-        // Resolve slug to tenant ID
-        Optional<String> tenantId = slugCache.resolve(firstSegment);
-        if (tenantId.isEmpty()) {
-            if (!requirePrefix) {
-                // Could be a non-slug path segment during migration; pass through
-                return chain.filter(exchange);
-            }
-            return notFound(exchange, "Tenant not found: " + firstSegment);
-        }
-
-        // Set tenant context on exchange attributes
-        exchange.getAttributes().put(TenantResolutionFilter.TENANT_ID_ATTR, tenantId.get());
-        exchange.getAttributes().put(TenantResolutionFilter.TENANT_SLUG_ATTR, firstSegment);
-
-        // Strip the slug segment from the path
+        // Strip the slug segment from the path (must happen regardless of cache hit
+        // so that downstream route matching sees bare paths like /control/** and /api/**)
         String strippedPath = stripFirstSegment(path, firstSegment);
         if (strippedPath.isEmpty()) {
             strippedPath = "/";
         }
 
-        log.debug("Resolved tenant slug '{}' (id={}), rewriting path '{}' → '{}'",
-                firstSegment, tenantId.get(), path, strippedPath);
+        // Resolve slug to tenant ID
+        Optional<String> tenantId = slugCache.resolve(firstSegment);
+        if (tenantId.isEmpty()) {
+            if (requirePrefix) {
+                return notFound(exchange, "Tenant not found: " + firstSegment);
+            }
+            // Slug pattern matched but not in cache — strip the segment anyway so
+            // route matching works, but don't set tenant attributes. The downstream
+            // TenantResolutionFilter or control-plane will resolve tenant from headers.
+            log.warn("Slug '{}' matches pattern but is not in cache; stripping path but no tenant context set", firstSegment);
+        } else {
+            // Set tenant context on exchange attributes
+            exchange.getAttributes().put(TenantResolutionFilter.TENANT_ID_ATTR, tenantId.get());
+            log.debug("Resolved tenant slug '{}' (id={}), rewriting path '{}' → '{}'",
+                    firstSegment, tenantId.get(), path, strippedPath);
+        }
+
+        // Always set the slug attribute so HeaderTransformationFilter can propagate it
+        exchange.getAttributes().put(TenantResolutionFilter.TENANT_SLUG_ATTR, firstSegment);
 
         // Mutate the request with the stripped path
         ServerHttpRequest mutatedRequest = exchange.getRequest().mutate()

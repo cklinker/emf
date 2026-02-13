@@ -137,7 +137,8 @@ export function RelatedRecordsSection({
       // Skip the current collection itself
       if (collection.name === collectionName) continue
 
-      for (const field of collection.fields) {
+      const collectionFields = Array.isArray(collection.fields) ? collection.fields : []
+      for (const field of collectionFields) {
         if (REFERENCE_FIELD_TYPES.has(field.type) && field.referenceTarget === collectionName) {
           related.push({ collection, referenceField: field })
           // Only add the collection once per reference field
@@ -181,9 +182,10 @@ export function RelatedRecordsSection({
   const displayFields = useMemo(() => {
     if (!activeRelated) return []
     // Exclude the reference field that points back to the current record
-    const fields = activeRelated.collection.fields.filter(
-      (f) => f.name !== activeRelated.referenceField.name
-    )
+    const collectionFields = Array.isArray(activeRelated.collection.fields)
+      ? activeRelated.collection.fields
+      : []
+    const fields = collectionFields.filter((f) => f.name !== activeRelated.referenceField.name)
     return fields.slice(0, MAX_DISPLAY_COLUMNS)
   }, [activeRelated])
 

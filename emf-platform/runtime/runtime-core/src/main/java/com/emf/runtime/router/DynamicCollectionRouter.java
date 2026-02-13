@@ -342,10 +342,14 @@ public class DynamicCollectionRouter {
             if (key.endsWith("_id")) {
                 String relationshipName = key.substring(0, key.length() - 3);
                 Map<String, Object> relationshipData = new java.util.HashMap<>();
-                relationshipData.put("data", Map.of(
-                    "type", relationshipName + "s", // Pluralize (simple approach)
-                    "id", value
-                ));
+                if (value != null) {
+                    relationshipData.put("data", Map.of(
+                        "type", relationshipName + "s", // Pluralize (simple approach)
+                        "id", value
+                    ));
+                } else {
+                    relationshipData.put("data", null);
+                }
                 relationships.put(relationshipName, relationshipData);
             } else {
                 attributes.put(key, value);

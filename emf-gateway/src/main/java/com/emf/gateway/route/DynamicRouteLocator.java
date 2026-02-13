@@ -2,12 +2,9 @@ package com.emf.gateway.route;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.handler.AsyncPredicate;
 import org.springframework.cloud.gateway.route.Route;
 import org.springframework.cloud.gateway.route.RouteLocator;
-import org.springframework.cloud.gateway.support.ServerWebExchangeUtils;
-import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Flux;
@@ -64,7 +61,11 @@ public class DynamicRouteLocator implements RouteLocator {
      * 2. Sets the URI to the backend service URL
      * 3. Configures a path predicate to match incoming requests
      * 4. Preserves the original path when forwarding to the backend
-     * 
+     *
+     * <p>Note: Collection API path rewriting ({@code /api/xxx} → {@code /api/collections/xxx})
+     * is handled by {@link com.emf.gateway.filter.CollectionPathRewriteFilter}, a GlobalFilter
+     * that runs after route URL resolution but before the request is sent upstream.
+     *
      * @param routeDefinition The route definition to convert
      * @return A Spring Cloud Gateway Route object
      */
@@ -79,21 +80,11 @@ public class DynamicRouteLocator implements RouteLocator {
                 return Mono.just(matches);
             };
 
-            Route.AsyncBuilder builder = Route.async()
+            Route route = Route.async()
                     .id(routeDefinition.getId())
                     .uri(uri)
-                    .asyncPredicate(pathPredicate);
-
-            // For collection API routes (/api/{collectionName}/**), rewrite the path
-            // to include /collections so the worker's DynamicCollectionRouter can handle it.
-            // Gateway accepts: /api/product/123
-            // Worker expects:  /api/collections/product/123
-            String routePath = routeDefinition.getPath();
-            if (routePath != null && routePath.startsWith("/api/") && !routePath.startsWith("/api/collections/")) {
-                builder.filter(createCollectionPathRewriteFilter());
-            }
-
-            Route route = builder.build();
+                    .asyncPredicate(pathPredicate)
+                    .build();
 
             logger.trace("Converted RouteDefinition to Route: id={}, path={}, uri={}",
                     routeDefinition.getId(), routeDefinition.getPath(), uri);
@@ -105,43 +96,6 @@ public class DynamicRouteLocator implements RouteLocator {
                     routeDefinition.getBackendUrl(), routeDefinition.getId(), e);
             throw new IllegalStateException("Invalid route configuration for route: " + routeDefinition.getId(), e);
         }
-    }
-
-    /**
-     * Creates a GatewayFilter that rewrites /api/{collectionName}/... to /api/collections/{collectionName}/...
-     * so that the worker's DynamicCollectionRouter (mapped at /api/collections) can handle the request.
-     */
-    private GatewayFilter createCollectionPathRewriteFilter() {
-        return (exchange, chain) -> {
-            String originalPath = exchange.getRequest().getURI().getRawPath();
-
-            // Rewrite /api/xxx to /api/collections/xxx
-            if (originalPath.startsWith("/api/") && !originalPath.startsWith("/api/collections/")) {
-                String newPath = "/api/collections" + originalPath.substring("/api".length());
-
-                logger.debug("Rewriting collection API path: '{}' → '{}'", originalPath, newPath);
-
-                ServerHttpRequest mutatedRequest = exchange.getRequest().mutate()
-                        .path(newPath)
-                        .build();
-
-                ServerWebExchange mutatedExchange = exchange.mutate()
-                        .request(mutatedRequest)
-                        .build();
-
-                // Update the GATEWAY_REQUEST_URL_ATTR so the routing filter uses the rewritten path
-                URI originalUri = exchange.getRequest().getURI();
-                URI routeUri = exchange.getAttribute(ServerWebExchangeUtils.GATEWAY_REQUEST_URL_ATTR);
-                if (routeUri != null) {
-                    URI rewrittenUri = URI.create(routeUri.toString().replace(originalPath, newPath));
-                    mutatedExchange.getAttributes().put(ServerWebExchangeUtils.GATEWAY_REQUEST_URL_ATTR, rewrittenUri);
-                }
-
-                return chain.filter(mutatedExchange);
-            }
-
-            return chain.filter(exchange);
-        };
     }
     
     /**

@@ -7,7 +7,6 @@ import java.util.List;
 /**
  * Represents a collection definition in the EMF platform.
  * A collection is a logical grouping of data entities with defined fields and operations.
- * Each collection belongs to a domain service.
  */
 @Entity
 @Table(name = "collection")
@@ -15,10 +14,6 @@ public class Collection extends BaseEntity {
 
     @Column(name = "tenant_id", nullable = false, length = 36)
     private String tenantId;
-
-    @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "service_id", nullable = false)
-    private Service service;
 
     @Column(name = "name", nullable = false, length = 100)
     private String name;
@@ -53,9 +48,8 @@ public class Collection extends BaseEntity {
         super();
     }
 
-    public Collection(Service service, String name, String description) {
+    public Collection(String name, String description) {
         super();
-        this.service = service;
         this.name = name;
         this.displayName = name;
         this.description = description;
@@ -67,14 +61,6 @@ public class Collection extends BaseEntity {
 
     public void setTenantId(String tenantId) {
         this.tenantId = tenantId;
-    }
-
-    public Service getService() {
-        return service;
-    }
-
-    public void setService(Service service) {
-        this.service = service;
     }
 
     public String getName() {

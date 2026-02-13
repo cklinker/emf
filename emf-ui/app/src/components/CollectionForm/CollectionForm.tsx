@@ -28,8 +28,6 @@ export type StorageMode = 'PHYSICAL_TABLE' | 'JSONB'
  * Collection data for the form
  */
 export interface CollectionFormData {
-  /** Service ID that owns this collection */
-  serviceId: string
   /** Collection name (alphanumeric, underscores, lowercase) */
   name: string
   /** Display name for the collection */
@@ -47,7 +45,6 @@ export interface CollectionFormData {
  */
 export interface Collection {
   id: string
-  serviceId: string
   name: string
   displayName: string
   description?: string
@@ -64,10 +61,6 @@ export interface Collection {
 export interface CollectionFormProps {
   /** Existing collection data for edit mode */
   collection?: Collection
-  /** Available services to choose from */
-  services?: Array<{ id: string; name: string }>
-  /** Whether services are loading */
-  servicesLoading?: boolean
   /** Callback when form is submitted successfully */
   onSubmit: (data: CollectionFormData) => Promise<void>
   /** Callback when form is cancelled */
@@ -89,7 +82,6 @@ export interface CollectionFormProps {
  */
 // eslint-disable-next-line react-refresh/only-export-components
 export const collectionFormSchema = z.object({
-  serviceId: z.string().min(1, 'validation.serviceRequired'),
   name: z
     .string()
     .min(1, 'validation.nameRequired')
@@ -125,8 +117,6 @@ export type CollectionFormSchema = z.infer<typeof collectionFormSchema>
  */
 export function CollectionForm({
   collection,
-  services = [],
-  servicesLoading = false,
   onSubmit,
   onCancel,
   isSubmitting = false,
@@ -144,7 +134,6 @@ export function CollectionForm({
   } = useForm<CollectionFormSchema>({
     resolver: zodResolver(collectionFormSchema),
     defaultValues: {
-      serviceId: collection?.serviceId ?? '',
       name: collection?.name ?? '',
       displayName: collection?.displayName ?? '',
       description: collection?.description ?? '',
@@ -158,7 +147,6 @@ export function CollectionForm({
   useEffect(() => {
     if (collection) {
       reset({
-        serviceId: collection.serviceId,
         name: collection.name,
         displayName: collection.displayName,
         description: collection.description ?? '',
@@ -172,7 +160,6 @@ export function CollectionForm({
   const handleFormSubmit = useCallback(
     async (data: CollectionFormSchema) => {
       const formData: CollectionFormData = {
-        serviceId: data.serviceId,
         name: data.name,
         displayName: data.displayName,
         description: data.description || undefined,
@@ -204,45 +191,6 @@ export function CollectionForm({
       data-testid={testId}
       noValidate
     >
-      {/* Service Field */}
-      <div className={styles.fieldGroup}>
-        <label htmlFor="collection-service" className={styles.label}>
-          {t('collections.service')}
-          <span className={styles.required} aria-hidden="true">
-            *
-          </span>
-        </label>
-        <select
-          id="collection-service"
-          className={`${styles.select} ${errors.serviceId ? styles.inputError : ''}`}
-          disabled={isEditMode || isSubmitting || servicesLoading}
-          aria-required="true"
-          aria-invalid={!!errors.serviceId}
-          aria-describedby={errors.serviceId ? 'service-error' : undefined}
-          data-testid="collection-service-select"
-          {...register('serviceId')}
-        >
-          <option value="">
-            {servicesLoading ? t('common.loading') : t('collections.selectService')}
-          </option>
-          {services.map((service) => (
-            <option key={service.id} value={service.id}>
-              {service.name}
-            </option>
-          ))}
-        </select>
-        {errors.serviceId && (
-          <span
-            id="service-error"
-            className={styles.errorMessage}
-            role="alert"
-            data-testid="service-error"
-          >
-            {getErrorMessage(errors.serviceId.message)}
-          </span>
-        )}
-      </div>
-
       {/* Name Field */}
       <div className={styles.fieldGroup}>
         <label htmlFor="collection-name" className={styles.label}>

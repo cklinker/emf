@@ -236,8 +236,7 @@ public class AuthorizationIntegrationTest extends IntegrationTestBase {
         // Create a minimal valid request body for creating a collection
         Map<String, Object> collectionRequest = Map.of(
             "name", "test-collection",
-            "description", "Test collection",
-            "serviceId", "test-service"
+            "description", "Test collection"
         );
         
         HttpEntity<Map<String, Object>> request = new HttpEntity<>(collectionRequest, headers);

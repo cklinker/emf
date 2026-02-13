@@ -66,6 +66,9 @@ emf:
     # Feature flag: use profile-based permissions instead of legacy role-based policies
     use-profiles: ${USE_PROFILES:false}
 
+    # Worker service URL
+    worker-service-url: ${WORKER_SERVICE_URL:http://emf-worker:80}
+
     # Control plane connection
     control-plane:
       url: ${CONTROL_PLANE_URL:http://localhost:8080}
@@ -76,7 +79,6 @@ emf:
       topics:
         collection-changed: emf.config.collection.changed
         authz-changed: emf.config.authz.changed
-        service-changed: emf.config.service.changed
         worker-assignment-changed: emf.worker.assignment.changed
     
     # Default rate limiting configuration

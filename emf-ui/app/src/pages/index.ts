@@ -33,10 +33,6 @@ export type { PoliciesPageProps, Policy } from './PoliciesPage'
 export { OIDCProvidersPage } from './OIDCProvidersPage'
 export type { OIDCProvidersPageProps, OIDCProvider } from './OIDCProvidersPage'
 
-// ServicesPage - Domain services management page
-export { ServicesPage } from './ServicesPage'
-export type { ServicesPageProps, Service } from './ServicesPage'
-
 // PageBuilderPage - UI page builder
 export { PageBuilderPage } from './PageBuilderPage'
 export type {

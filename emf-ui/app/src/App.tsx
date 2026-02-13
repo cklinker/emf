@@ -60,7 +60,6 @@ import {
   ResourceDetailPage,
   ResourceFormPage,
   PluginsPage,
-  ServicesPage,
   UsersPage,
   UserDetailPage,
   ProfilesPage,
@@ -430,16 +429,6 @@ function App({ plugins = [] }: AppProps): React.ReactElement {
                               element={
                                 <ProtectedPageRoute>
                                   <OIDCProvidersPage />
-                                </ProtectedPageRoute>
-                              }
-                            />
-
-                            {/* Services route */}
-                            <Route
-                              path="/services"
-                              element={
-                                <ProtectedPageRoute>
-                                  <ServicesPage />
                                 </ProtectedPageRoute>
                               }
                             />

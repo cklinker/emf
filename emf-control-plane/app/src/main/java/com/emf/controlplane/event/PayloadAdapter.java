@@ -4,12 +4,9 @@ import com.emf.controlplane.entity.Collection;
 import com.emf.controlplane.entity.Field;
 import com.emf.controlplane.entity.FieldPolicy;
 import com.emf.controlplane.entity.RoutePolicy;
-import com.emf.controlplane.entity.Service;
 import com.emf.runtime.event.AuthzChangedPayload;
 import com.emf.runtime.event.ChangeType;
 import com.emf.runtime.event.CollectionChangedPayload;
-import com.emf.runtime.event.ServiceChangedPayload;
-
 import java.time.Instant;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -29,8 +26,6 @@ public class PayloadAdapter {
     public static CollectionChangedPayload toCollectionPayload(Collection collection, ChangeType changeType) {
         CollectionChangedPayload payload = new CollectionChangedPayload();
         payload.setId(collection.getId());
-        payload.setServiceId(collection.getService() != null ? collection.getService().getId() : null);
-        payload.setServiceName(collection.getService() != null ? collection.getService().getName() : null);
         payload.setName(collection.getName());
         payload.setDisplayName(collection.getDisplayName());
         payload.setDescription(collection.getDescription());
@@ -129,21 +124,4 @@ public class PayloadAdapter {
         return payload;
     }
 
-    /**
-     * Creates a ServiceChangedPayload from a Service entity.
-     */
-    public static ServiceChangedPayload toServicePayload(Service service, ChangeType changeType) {
-        ServiceChangedPayload payload = new ServiceChangedPayload();
-        payload.setServiceId(service.getId());
-        payload.setServiceName(service.getName());
-        payload.setDisplayName(service.getDisplayName());
-        payload.setDescription(service.getDescription());
-        payload.setBasePath(service.getBasePath());
-        payload.setEnvironment(service.getEnvironment());
-        payload.setDatabaseUrl(service.getDatabaseUrl());
-        payload.setActive(service.isActive());
-        payload.setChangeType(changeType);
-        payload.setTimestamp(Instant.now());
-        return payload;
-    }
 }

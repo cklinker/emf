@@ -74,7 +74,7 @@ public class CollectionManagementIntegrationTest extends IntegrationTestBase {
         
         // Use the sample-service ID from the database
         Map<String, Object> collectionData = Map.of(
-            "serviceId", "423db1e7-aa78-4649-b8b9-111b6a40682a",
+
             "name", "test-collection",
             "description", "A test collection for integration testing"
         );
@@ -115,7 +115,7 @@ public class CollectionManagementIntegrationTest extends IntegrationTestBase {
         HttpHeaders headers = authHelper.createAuthHeaders(token);
         
         Map<String, Object> collectionData = Map.of(
-            "serviceId", "423db1e7-aa78-4649-b8b9-111b6a40682a",
+
             "name", "persistent-collection",
             "description", "Testing collection persistence"
         );
@@ -163,7 +163,7 @@ public class CollectionManagementIntegrationTest extends IntegrationTestBase {
         
         // First create the collection
         Map<String, Object> collectionData = Map.of(
-            "serviceId", "423db1e7-aa78-4649-b8b9-111b6a40682a",
+
             "name", "collection-with-fields",
             "description", "Collection with custom fields"
         );
@@ -236,7 +236,7 @@ public class CollectionManagementIntegrationTest extends IntegrationTestBase {
         
         // Create parent collection
         Map<String, Object> parentData = Map.of(
-            "serviceId", "423db1e7-aa78-4649-b8b9-111b6a40682a",
+
             "name", "parent-collection",
             "description", "Parent collection for relationship testing"
         );
@@ -254,7 +254,7 @@ public class CollectionManagementIntegrationTest extends IntegrationTestBase {
         
         // Create child collection
         Map<String, Object> childData = Map.of(
-            "serviceId", "423db1e7-aa78-4649-b8b9-111b6a40682a",
+
             "name", "child-collection",
             "description", "Child collection for relationship testing"
         );
@@ -308,7 +308,7 @@ public class CollectionManagementIntegrationTest extends IntegrationTestBase {
         
         // Test 1: Missing required field (name)
         Map<String, Object> missingNameData = Map.of(
-            "serviceId", "423db1e7-aa78-4649-b8b9-111b6a40682a",
+
             "description", "Collection without a name"
         );
         
@@ -328,7 +328,7 @@ public class CollectionManagementIntegrationTest extends IntegrationTestBase {
         
         // Test 2: Empty name
         Map<String, Object> emptyNameData = Map.of(
-            "serviceId", "423db1e7-aa78-4649-b8b9-111b6a40682a",
+
             "name", "",
             "description", "Collection with empty name"
         );
@@ -360,7 +360,7 @@ public class CollectionManagementIntegrationTest extends IntegrationTestBase {
         HttpHeaders headers = authHelper.createAuthHeaders(token);
         
         Map<String, Object> collectionData = Map.of(
-            "serviceId", "423db1e7-aa78-4649-b8b9-111b6a40682a",
+
             "name", "duplicate-test-collection",
             "description", "First collection"
         );
@@ -378,7 +378,7 @@ public class CollectionManagementIntegrationTest extends IntegrationTestBase {
         
         // Act - try to create another collection with the same name
         Map<String, Object> duplicateData = Map.of(
-            "serviceId", "423db1e7-aa78-4649-b8b9-111b6a40682a",
+
             "name", "duplicate-test-collection",
             "description", "Second collection with same name"
         );
@@ -412,7 +412,7 @@ public class CollectionManagementIntegrationTest extends IntegrationTestBase {
         
         for (int i = 1; i <= 3; i++) {
             Map<String, Object> collectionData = Map.of(
-                "serviceId", "423db1e7-aa78-4649-b8b9-111b6a40682a",
+    
                 "name", "list-test-collection-" + i,
                 "description", "Collection " + i + " for list testing"
             );
@@ -473,7 +473,7 @@ public class CollectionManagementIntegrationTest extends IntegrationTestBase {
         HttpHeaders headers = authHelper.createAuthHeaders(token);
         
         Map<String, Object> collectionData = Map.of(
-            "serviceId", "423db1e7-aa78-4649-b8b9-111b6a40682a",
+
             "name", "update-test-collection",
             "description", "Original description"
         );
@@ -536,7 +536,7 @@ public class CollectionManagementIntegrationTest extends IntegrationTestBase {
         HttpHeaders headers = authHelper.createAuthHeaders(token);
         
         Map<String, Object> collectionData = Map.of(
-            "serviceId", "423db1e7-aa78-4649-b8b9-111b6a40682a",
+
             "name", "delete-test-collection",
             "description", "Collection to be deleted"
         );

@@ -12,8 +12,6 @@ import java.util.List;
 public class CollectionDto {
 
     private String id;
-    private String serviceId;
-    private String serviceName;
     private String name;
     private String displayName;
     private String description;
@@ -28,13 +26,11 @@ public class CollectionDto {
     public CollectionDto() {
     }
 
-    public CollectionDto(String id, String serviceId, String serviceName, String name, String displayName, String description, 
-                         String storageMode, boolean active, Integer currentVersion, 
+    public CollectionDto(String id, String name, String displayName, String description,
+                         String storageMode, boolean active, Integer currentVersion,
                          List<FieldDto> fields, AuthorizationConfigDto authz,
                          Instant createdAt, Instant updatedAt) {
         this.id = id;
-        this.serviceId = serviceId;
-        this.serviceName = serviceName;
         this.name = name;
         this.displayName = displayName;
         this.description = description;
@@ -49,7 +45,7 @@ public class CollectionDto {
 
     /**
      * Creates a CollectionDto from a Collection entity.
-     * 
+     *
      * @param collection The collection entity to convert
      * @return A new CollectionDto with data from the entity
      */
@@ -59,8 +55,6 @@ public class CollectionDto {
         }
         return new CollectionDto(
                 collection.getId(),
-                collection.getService() != null ? collection.getService().getId() : null,
-                collection.getService() != null ? collection.getService().getName() : null,
                 collection.getName(),
                 collection.getDisplayName(),
                 collection.getDescription(),
@@ -73,10 +67,10 @@ public class CollectionDto {
                 collection.getUpdatedAt()
         );
     }
-    
+
     /**
      * Creates a CollectionDto from a Collection entity with fields and authz.
-     * 
+     *
      * @param collection The collection entity to convert
      * @param fields The fields for this collection
      * @param authz The authorization config for this collection
@@ -88,8 +82,6 @@ public class CollectionDto {
         }
         return new CollectionDto(
                 collection.getId(),
-                collection.getService() != null ? collection.getService().getId() : null,
-                collection.getService() != null ? collection.getService().getName() : null,
                 collection.getName(),
                 collection.getDisplayName(),
                 collection.getDescription(),
@@ -109,22 +101,6 @@ public class CollectionDto {
 
     public void setId(String id) {
         this.id = id;
-    }
-
-    public String getServiceId() {
-        return serviceId;
-    }
-
-    public void setServiceId(String serviceId) {
-        this.serviceId = serviceId;
-    }
-
-    public String getServiceName() {
-        return serviceName;
-    }
-
-    public void setServiceName(String serviceName) {
-        this.serviceName = serviceName;
     }
 
     public String getName() {

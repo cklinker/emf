@@ -42,7 +42,6 @@ export interface CollectionWizardPageProps {
  * Basics step data
  */
 interface BasicsData {
-  serviceId: string
   name: string
   displayName: string
   description: string
@@ -173,7 +172,6 @@ function getTemplateIcon(icon: string): React.ReactNode {
  * Validation errors for basics step
  */
 interface BasicsErrors {
-  serviceId?: string
   name?: string
   displayName?: string
 }
@@ -198,7 +196,6 @@ export function CollectionWizardPage({
   // Wizard state
   const [currentStep, setCurrentStep] = useState(1)
   const [basics, setBasics] = useState<BasicsData>({
-    serviceId: '',
     name: '',
     displayName: '',
     description: '',
@@ -216,13 +213,6 @@ export function CollectionWizardPage({
   const [isCreating, setIsCreating] = useState(false)
   const [basicsErrors, setBasicsErrors] = useState<BasicsErrors>({})
 
-  // Fetch services
-  const { data: servicesData, isLoading: servicesLoading } = useQuery({
-    queryKey: ['services'],
-    queryFn: () =>
-      apiClient.get<{ content: Array<{ id: string; name: string }> }>('/control/services?size=100'),
-  })
-
   // Fetch policies
   const { data: policiesData } = useQuery({
     queryKey: ['policies'],
@@ -232,7 +222,6 @@ export function CollectionWizardPage({
       ),
   })
 
-  const services = useMemo(() => servicesData?.content ?? [], [servicesData])
   const policies = useMemo(() => {
     if (!policiesData) return []
     // Handle both array and paginated response
@@ -259,11 +248,6 @@ export function CollectionWizardPage({
   const handleNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setBasics((prev) => ({ ...prev, name: e.target.value }))
     setBasicsErrors((prev) => ({ ...prev, name: undefined }))
-  }, [])
-
-  const handleServiceChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-    setBasics((prev) => ({ ...prev, serviceId: e.target.value }))
-    setBasicsErrors((prev) => ({ ...prev, serviceId: undefined }))
   }, [])
 
   const handleDescriptionChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -345,9 +329,6 @@ export function CollectionWizardPage({
   // Validation
   const validateBasics = useCallback((): boolean => {
     const errors: BasicsErrors = {}
-    if (!basics.serviceId) {
-      errors.serviceId = t('collectionForm.validation.serviceRequired')
-    }
     if (!basics.name) {
       errors.name = t('collectionForm.validation.nameRequired')
     } else if (!/^[a-z][a-z0-9_]*$/.test(basics.name)) {
@@ -394,7 +375,6 @@ export function CollectionWizardPage({
         createdAt: string
         updatedAt: string
       }>('/control/collections', {
-        serviceId: basics.serviceId,
         name: basics.name,
         description: basics.description || '',
       })
@@ -493,15 +473,6 @@ export function CollectionWizardPage({
     [policies, t]
   )
 
-  // Get service name by ID
-  const getServiceName = useCallback(
-    (serviceId: string): string => {
-      const service = services.find((s) => s.id === serviceId)
-      return service ? service.name : serviceId
-    },
-    [services]
-  )
-
   // Render step indicator
   const renderStepIndicator = useCallback(() => {
     return (
@@ -554,40 +525,6 @@ export function CollectionWizardPage({
       <div data-testid="wizard-step-basics">
         <h2 className={styles.stepTitle}>{t('collections.createCollection')}</h2>
         <div className={styles.formGrid}>
-          {/* Service */}
-          <div className={styles.fieldGroup}>
-            <label htmlFor="wizard-service" className={styles.label}>
-              {t('collections.service')}
-              <span className={styles.required} aria-hidden="true">
-                *
-              </span>
-            </label>
-            <select
-              id="wizard-service"
-              className={`${styles.select} ${basicsErrors.serviceId ? styles.inputError : ''}`}
-              value={basics.serviceId}
-              onChange={handleServiceChange}
-              disabled={servicesLoading}
-              aria-required="true"
-              aria-invalid={!!basicsErrors.serviceId}
-              data-testid="wizard-service-select"
-            >
-              <option value="">
-                {servicesLoading ? t('common.loading') : t('collections.selectService')}
-              </option>
-              {services.map((service) => (
-                <option key={service.id} value={service.id}>
-                  {service.name}
-                </option>
-              ))}
-            </select>
-            {basicsErrors.serviceId && (
-              <span className={styles.errorText} role="alert" data-testid="wizard-service-error">
-                {basicsErrors.serviceId}
-              </span>
-            )}
-          </div>
-
           {/* Display Name */}
           <div className={styles.fieldGroup}>
             <label htmlFor="wizard-display-name" className={styles.label}>
@@ -703,12 +640,9 @@ export function CollectionWizardPage({
   }, [
     basics,
     basicsErrors,
-    services,
-    servicesLoading,
     t,
     handleDisplayNameChange,
     handleNameChange,
-    handleServiceChange,
     handleDescriptionChange,
     handleStorageModeChange,
     handleActiveChange,
@@ -986,11 +920,6 @@ export function CollectionWizardPage({
                   {basics.name}
                 </span>
 
-                <span className={styles.reviewLabel}>{t('collections.service')}</span>
-                <span className={styles.reviewValue} data-testid="wizard-review-service">
-                  {getServiceName(basics.serviceId)}
-                </span>
-
                 <span className={styles.reviewLabel}>{t('collections.description')}</span>
                 <span className={styles.reviewValue} data-testid="wizard-review-description">
                   {basics.description || t('common.none')}
@@ -1093,16 +1022,7 @@ export function CollectionWizardPage({
         )}
       </div>
     )
-  }, [
-    basics,
-    fields,
-    authorization,
-    hasAuthConfigured,
-    isCreating,
-    t,
-    getServiceName,
-    getPolicyName,
-  ])
+  }, [basics, fields, authorization, hasAuthConfigured, isCreating, t, getPolicyName])
 
   // Render current step content
   const renderCurrentStep = useCallback(() => {

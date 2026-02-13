@@ -220,7 +220,12 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Install dependencies
-        run: npm install
+        run: npm install --prefer-offline --no-audit --no-fund
+        timeout-minutes: 5
+        env:
+          npm_config_fetch_retries: 5
+          npm_config_fetch_retry_mintimeout: 10000
+          npm_config_fetch_retry_maxtimeout: 60000
 
       - name: Lint
         run: npm run lint

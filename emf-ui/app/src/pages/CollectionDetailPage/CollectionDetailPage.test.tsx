@@ -774,7 +774,7 @@ describe('CollectionDetailPage', () => {
 
       await user.click(screen.getByTestId('edit-button'))
 
-      expect(mockNavigate).toHaveBeenCalledWith('/collections/users/edit')
+      expect(mockNavigate).toHaveBeenCalledWith('/default/collections/users/edit')
     })
 
     it('should display delete button', async () => {
@@ -864,7 +864,7 @@ describe('CollectionDetailPage', () => {
       // Wait for navigation to happen (indicates delete was successful)
       await waitFor(
         () => {
-          expect(mockNavigate).toHaveBeenCalledWith('/collections')
+          expect(mockNavigate).toHaveBeenCalledWith('/default/collections')
         },
         { timeout: 3000 }
       )
@@ -903,7 +903,7 @@ describe('CollectionDetailPage', () => {
 
       await user.click(screen.getByTestId('back-button'))
 
-      expect(mockNavigate).toHaveBeenCalledWith('/collections')
+      expect(mockNavigate).toHaveBeenCalledWith('/default/collections')
     })
 
     it('should open field editor modal when add field button is clicked', async () => {

@@ -61,6 +61,12 @@ export interface EMFClientConfig {
   baseUrl: string;
 
   /**
+   * Tenant slug for URL-based tenant scoping (optional).
+   * When provided, the Axios baseURL becomes `${baseUrl}/${tenantSlug}`.
+   */
+  tenantSlug?: string;
+
+  /**
    * Token provider for authentication (optional)
    */
   tokenProvider?: TokenProvider;

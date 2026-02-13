@@ -27,3 +27,6 @@ export { useFavorites, type FavoriteItem, type UseFavoritesReturn } from './useF
 
 // Global keyboard shortcuts hook
 export { useGlobalShortcuts } from './useGlobalShortcuts'
+
+// Tenant ID hook for centralized tenant resolution
+export { useTenantId, getTenantId } from './useTenantId'

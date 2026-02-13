@@ -15,6 +15,8 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cloud.gateway.event.RefreshRoutesEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
@@ -22,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Kafka listener for configuration change events from the control plane.
@@ -42,15 +45,33 @@ public class ConfigEventListener {
     private final RouteRegistry routeRegistry;
     private final AuthzConfigCache authzConfigCache;
     private final ObjectMapper objectMapper;
+    private final ApplicationEventPublisher applicationEventPublisher;
     private final String workerServiceUrl;
+
+    // Cache of service ID to base URL for building backend URLs
+    private final Map<String, String> serviceUrlCache = new ConcurrentHashMap<>();
+
+    /**
+     * Populates the service URL cache from bootstrap data.
+     * Called by RouteConfigService during startup so that subsequent
+     * collection-changed Kafka events can resolve service URLs.
+     */
+    public void populateServiceUrlCache(Map<String, String> serviceUrls) {
+        if (serviceUrls != null && !serviceUrls.isEmpty()) {
+            serviceUrlCache.putAll(serviceUrls);
+            logger.info("Populated service URL cache with {} entries from bootstrap", serviceUrls.size());
+        }
+    }
 
     public ConfigEventListener(RouteRegistry routeRegistry,
                               AuthzConfigCache authzConfigCache,
                               ObjectMapper objectMapper,
+                              ApplicationEventPublisher applicationEventPublisher,
                               @org.springframework.beans.factory.annotation.Value("${emf.gateway.worker-service-url:http://emf-worker:80}") String workerServiceUrl) {
         this.routeRegistry = routeRegistry;
         this.authzConfigCache = authzConfigCache;
         this.objectMapper = objectMapper;
+        this.applicationEventPublisher = applicationEventPublisher;
         this.workerServiceUrl = workerServiceUrl;
     }
 
@@ -106,6 +127,9 @@ public class ConfigEventListener {
                                 payload.getId(), payload.getName());
                 }
             }
+
+            // Notify Spring Cloud Gateway to refresh its route cache
+            applicationEventPublisher.publishEvent(new RefreshRoutesEvent(this));
 
         } catch (Exception e) {
             logger.error("Error processing collection changed event: eventId={}, error={}",

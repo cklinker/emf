@@ -441,7 +441,7 @@ describe('ResourceDetailPage', () => {
         const referenceField = screen.getByTestId('field-value-organizationId')
         const link = referenceField.querySelector('a')
         expect(link).toBeInTheDocument()
-        expect(link).toHaveAttribute('href', '/resources/organizations/org-456')
+        expect(link).toHaveAttribute('href', '/default/resources/organizations/org-456')
       })
     })
   })
@@ -471,7 +471,7 @@ describe('ResourceDetailPage', () => {
 
       await user.click(screen.getByTestId('back-button'))
 
-      expect(mockNavigate).toHaveBeenCalledWith('/resources/users')
+      expect(mockNavigate).toHaveBeenCalledWith('/default/resources/users')
     })
 
     it('should navigate to edit page when edit button is clicked', async () => {
@@ -484,7 +484,7 @@ describe('ResourceDetailPage', () => {
 
       await user.click(screen.getByTestId('edit-button'))
 
-      expect(mockNavigate).toHaveBeenCalledWith('/resources/users/res-123/edit')
+      expect(mockNavigate).toHaveBeenCalledWith('/default/resources/users/res-123/edit')
     })
   })
 
@@ -567,7 +567,7 @@ describe('ResourceDetailPage', () => {
 
       await waitFor(() => {
         expect(mockShowToast).toHaveBeenCalledWith('Record deleted successfully', 'success')
-        expect(mockNavigate).toHaveBeenCalledWith('/resources/users')
+        expect(mockNavigate).toHaveBeenCalledWith('/default/resources/users')
       })
     })
 

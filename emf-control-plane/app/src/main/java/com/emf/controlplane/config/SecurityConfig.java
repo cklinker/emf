@@ -146,6 +146,9 @@ public class SecurityConfig {
                 // Permit control plane bootstrap endpoint - required for gateway health check
                 .requestMatchers("/control/bootstrap").permitAll()
 
+                // Permit tenant slug-map endpoint - used by gateway to resolve URL slugs
+                .requestMatchers("/control/tenants/slug-map").permitAll()
+
                 // Permit worker endpoints - internal cluster communication (registration, heartbeat, assignments)
                 .requestMatchers("/control/workers/**").permitAll()
                 .requestMatchers("/control/collections/**").permitAll()

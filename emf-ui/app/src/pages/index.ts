@@ -230,6 +230,9 @@ export type { BulkJobsPageProps } from './BulkJobsPage'
 export { SetupHomePage } from './SetupHomePage'
 export type { SetupHomePageProps } from './SetupHomePage'
 
+// NoTenantPage - Tenant slug required error page
+export { NoTenantPage } from './NoTenantPage/NoTenantPage'
+
 // WorkersPage - Worker management page
 export { WorkersPage } from './WorkersPage'
 export type { WorkersPageProps, Worker, WorkerAssignment, RebalanceResult } from './WorkersPage'

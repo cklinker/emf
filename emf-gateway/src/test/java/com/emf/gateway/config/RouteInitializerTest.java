@@ -3,6 +3,7 @@ package com.emf.gateway.config;
 import com.emf.gateway.route.RouteDefinition;
 import com.emf.gateway.route.RouteRegistry;
 import com.emf.gateway.service.RouteConfigService;
+import com.emf.gateway.tenant.TenantSlugCache;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -37,7 +38,10 @@ class RouteInitializerTest {
     
     @Mock
     private ApplicationEventPublisher eventPublisher;
-    
+
+    @Mock
+    private TenantSlugCache tenantSlugCache;
+
     @Mock
     private ApplicationArguments applicationArguments;
     
@@ -51,6 +55,7 @@ class RouteInitializerTest {
             routeRegistry,
             routeConfigService,
             eventPublisher,
+            tenantSlugCache,
             CONTROL_PLANE_URL
         );
     }
@@ -133,6 +138,7 @@ class RouteInitializerTest {
             routeRegistry,
             routeConfigService,
             eventPublisher,
+            tenantSlugCache,
             customUrl
         );
         

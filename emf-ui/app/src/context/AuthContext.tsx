@@ -26,6 +26,7 @@ import type {
 } from '../types/auth'
 import type { OIDCProviderSummary } from '../types/config'
 import { fetchBootstrapConfig } from '../utils/bootstrapCache'
+import { getTenantSlug, setResolvedTenantId } from './TenantContext'
 
 // Storage keys
 const STORAGE_KEYS = {
@@ -196,6 +197,10 @@ export function AuthProvider({
   const fetchProviders = useCallback(async (): Promise<OIDCProviderSummary[]> => {
     try {
       const config = (await fetchBootstrapConfig()) as Record<string, unknown>
+      // Store resolved tenant ID from bootstrap response
+      if (config.tenantId) {
+        setResolvedTenantId(config.tenantId as string)
+      }
       return (config.oidcProviders as OIDCProviderSummary[]) || []
     } catch (err) {
       // Don't throw - just return empty. ConfigProvider will handle the error display.
@@ -318,7 +323,8 @@ export function AuthProvider({
         // Store current path for redirect after auth
         sessionStorage.setItem(STORAGE_KEYS.REDIRECT_PATH, window.location.pathname)
         loginInProgress = false
-        window.location.href = '/auth/select-provider'
+        const slug = getTenantSlug()
+        window.location.href = `/${slug}/auth/select-provider`
         return
       }
 
@@ -506,11 +512,20 @@ export function AuthProvider({
       sessionStorage.removeItem(STORAGE_KEYS.NONCE)
       sessionStorage.removeItem(STORAGE_KEYS.CODE_VERIFIER)
 
-      let redirectPath = sessionStorage.getItem(STORAGE_KEYS.REDIRECT_PATH) || '/'
+      const slug = getTenantSlug()
+      const tenantBase = `/${slug}`
+      let redirectPath = sessionStorage.getItem(STORAGE_KEYS.REDIRECT_PATH) || tenantBase
       sessionStorage.removeItem(STORAGE_KEYS.REDIRECT_PATH)
 
-      if (redirectPath === '/login' || redirectPath === '/auth/callback') {
-        redirectPath = '/'
+      // Redirect to tenant home if path points to login/callback pages
+      if (
+        redirectPath === '/login' ||
+        redirectPath === '/auth/callback' ||
+        redirectPath === `${tenantBase}/login` ||
+        redirectPath === `${tenantBase}/auth/callback` ||
+        redirectPath === '/'
+      ) {
+        redirectPath = tenantBase
       }
 
       console.log('[Auth] Callback complete, redirecting to:', redirectPath)

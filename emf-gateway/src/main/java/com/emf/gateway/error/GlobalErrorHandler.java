@@ -179,9 +179,9 @@ public class GlobalErrorHandler implements ErrorWebExceptionHandler {
             log.error("Failed to serialize error response for path: {}, correlationId: {}", 
                 path, correlationId, e);
             
-            // Fallback to simple JSON string
+            // Fallback to simple JSON:API error format
             String fallbackJson = String.format(
-                "{\"error\":{\"status\":%d,\"code\":\"%s\",\"message\":\"%s\",\"path\":\"%s\",\"correlationId\":\"%s\"}}",
+                "{\"errors\":[{\"status\":\"%d\",\"code\":\"%s\",\"detail\":\"%s\",\"meta\":{\"path\":\"%s\",\"correlationId\":\"%s\"}}]}",
                 status.value(),
                 errorResponse.getCode(),
                 errorResponse.getMessage(),

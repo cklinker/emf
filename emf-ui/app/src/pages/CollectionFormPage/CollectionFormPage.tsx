@@ -9,6 +9,7 @@ import React, { useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
+import { getTenantSlug } from '../../context/TenantContext'
 import { useApi } from '../../context/ApiContext'
 import { CollectionForm, LoadingSpinner, ErrorMessage } from '../../components'
 import type { Collection, CollectionFormData } from '../../components/CollectionForm/CollectionForm'
@@ -58,7 +59,7 @@ export function CollectionFormPage({
           description: data.description || '',
         }
         await apiClient.put(`/control/collections/${id}`, requestData)
-        navigate(`/collections/${id}`)
+        navigate(`/${getTenantSlug()}/collections/${id}`)
       } else {
         // Create new collection
         const requestData = {
@@ -77,7 +78,7 @@ export function CollectionFormPage({
         }>('/control/collections', requestData)
 
         console.log('Created collection:', created)
-        navigate(`/collections/${created.id}`)
+        navigate(`/${getTenantSlug()}/collections/${created.id}`)
       }
     },
     [apiClient, navigate, isEditMode, id]
@@ -86,9 +87,9 @@ export function CollectionFormPage({
   // Handle cancel
   const handleCancel = useCallback(() => {
     if (isEditMode && id) {
-      navigate(`/collections/${id}`)
+      navigate(`/${getTenantSlug()}/collections/${id}`)
     } else {
-      navigate('/collections')
+      navigate(`/${getTenantSlug()}/collections`)
     }
   }, [navigate, isEditMode, id])
 
@@ -109,7 +110,7 @@ export function CollectionFormPage({
       <div className={styles.container} data-testid={testId}>
         <ErrorMessage
           error={error instanceof Error ? error : new Error(t('errors.generic'))}
-          onRetry={() => navigate('/collections')}
+          onRetry={() => navigate(`/${getTenantSlug()}/collections`)}
         />
       </div>
     )

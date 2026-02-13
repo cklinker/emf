@@ -31,9 +31,16 @@ public class TenantResolutionFilter implements GlobalFilter, Ordered {
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
+        // If tenant was already resolved from URL slug by TenantSlugExtractionFilter, skip
+        String existingTenantId = (String) exchange.getAttributes().get(TENANT_ID_ATTR);
+        if (existingTenantId != null && !existingTenantId.isBlank()) {
+            log.debug("Tenant already resolved from URL slug: id={}", existingTenantId);
+            return chain.filter(exchange);
+        }
+
         ServerHttpRequest request = exchange.getRequest();
 
-        // Try X-Tenant-ID header first
+        // Fall back to header-based resolution (service-to-service / legacy requests)
         String tenantId = request.getHeaders().getFirst("X-Tenant-ID");
         String tenantSlug = request.getHeaders().getFirst("X-Tenant-Slug");
 

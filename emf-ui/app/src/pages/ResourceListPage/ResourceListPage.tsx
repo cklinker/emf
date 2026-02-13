@@ -17,6 +17,7 @@ import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
+import { getTenantSlug } from '../../context/TenantContext'
 import { useApi } from '../../context/ApiContext'
 import { ApiClient } from '../../services/apiClient'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
@@ -562,19 +563,19 @@ export function ResourceListPage({
 
   // Navigation handlers
   const handleCreate = useCallback(() => {
-    navigate(`/resources/${collectionName}/new`)
+    navigate(`/${getTenantSlug()}/resources/${collectionName}/new`)
   }, [navigate, collectionName])
 
   const handleView = useCallback(
     (resource: Resource) => {
-      navigate(`/resources/${collectionName}/${resource.id}`)
+      navigate(`/${getTenantSlug()}/resources/${collectionName}/${resource.id}`)
     },
     [navigate, collectionName]
   )
 
   const handleEdit = useCallback(
     (resource: Resource) => {
-      navigate(`/resources/${collectionName}/${resource.id}/edit`)
+      navigate(`/${getTenantSlug()}/resources/${collectionName}/${resource.id}/edit`)
     },
     [navigate, collectionName]
   )
@@ -850,7 +851,7 @@ export function ResourceListPage({
       <header className={styles.header}>
         <div className={styles.headerLeft}>
           <nav className={styles.breadcrumb} aria-label="Breadcrumb">
-            <Link to="/resources" className={styles.breadcrumbLink}>
+            <Link to={`/${getTenantSlug()}/resources`} className={styles.breadcrumbLink}>
               {t('resources.title')}
             </Link>
             <span className={styles.breadcrumbSeparator} aria-hidden="true">

@@ -11,6 +11,8 @@ import com.emf.controlplane.entity.PicklistValue;
 import com.emf.controlplane.exception.DuplicateResourceException;
 import com.emf.controlplane.exception.ResourceNotFoundException;
 import com.emf.controlplane.exception.ValidationException;
+import com.emf.controlplane.event.ConfigEventPublisher;
+import com.emf.runtime.event.ChangeType;
 import com.emf.controlplane.repository.FieldRepository;
 import com.emf.controlplane.repository.GlobalPicklistRepository;
 import com.emf.controlplane.repository.PicklistDependencyRepository;
@@ -19,6 +21,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,18 +42,21 @@ public class PicklistService {
     private final PicklistDependencyRepository picklistDependencyRepository;
     private final FieldRepository fieldRepository;
     private final ObjectMapper objectMapper;
+    private final ConfigEventPublisher eventPublisher;
 
     public PicklistService(
             GlobalPicklistRepository globalPicklistRepository,
             PicklistValueRepository picklistValueRepository,
             PicklistDependencyRepository picklistDependencyRepository,
             FieldRepository fieldRepository,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            @Nullable ConfigEventPublisher eventPublisher) {
         this.globalPicklistRepository = globalPicklistRepository;
         this.picklistValueRepository = picklistValueRepository;
         this.picklistDependencyRepository = picklistDependencyRepository;
         this.fieldRepository = fieldRepository;
         this.objectMapper = objectMapper;
+        this.eventPublisher = eventPublisher;
     }
 
     // --- Global Picklist Management ---
@@ -122,6 +128,17 @@ public class PicklistService {
 
         GlobalPicklist picklist = globalPicklistRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("GlobalPicklist", id));
+
+        // Check if any fields reference this global picklist before deleting
+        List<Field> referencingFields = fieldRepository.findByFieldTypeConfigContaining(id);
+        if (!referencingFields.isEmpty()) {
+            String fieldNames = referencingFields.stream()
+                    .map(Field::getName)
+                    .collect(Collectors.joining(", "));
+            throw new ValidationException("globalPicklist",
+                    "Cannot delete global picklist '" + picklist.getName()
+                            + "' because it is referenced by fields: " + fieldNames);
+        }
 
         // Delete associated values
         picklistValueRepository.deleteByPicklistSourceTypeAndPicklistSourceId(SOURCE_GLOBAL, id);

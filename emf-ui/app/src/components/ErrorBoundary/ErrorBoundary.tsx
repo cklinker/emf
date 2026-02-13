@@ -68,7 +68,8 @@ export function ErrorFallback({ error, onReset }: ErrorFallbackProps): ReactElem
    * Handle navigate home action
    */
   const handleGoHome = (): void => {
-    window.location.href = '/'
+    const slug = window.location.pathname.split('/')[1] || ''
+    window.location.href = slug ? `/${slug}` : '/'
   }
 
   /**

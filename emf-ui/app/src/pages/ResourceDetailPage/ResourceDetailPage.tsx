@@ -14,6 +14,7 @@ import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
+import { getTenantSlug } from '../../context/TenantContext'
 import { useApi } from '../../context/ApiContext'
 import { useAuth } from '../../context/AuthContext'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
@@ -288,7 +289,7 @@ export function ResourceDetailPage({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['resources', collectionName] })
       showToast(t('success.deleted', { item: t('resources.record') }), 'success')
-      navigate(`/resources/${collectionName}`)
+      navigate(`/${getTenantSlug()}/resources/${collectionName}`)
     },
     onError: (error: Error) => {
       showToast(error.message || t('errors.generic'), 'error')
@@ -385,12 +386,12 @@ export function ResourceDetailPage({
 
   // Handle back navigation
   const handleBack = useCallback(() => {
-    navigate(`/resources/${collectionName}`)
+    navigate(`/${getTenantSlug()}/resources/${collectionName}`)
   }, [navigate, collectionName])
 
   // Handle edit action
   const handleEdit = useCallback(() => {
-    navigate(`/resources/${collectionName}/${resourceId}/edit`)
+    navigate(`/${getTenantSlug()}/resources/${collectionName}/${resourceId}/edit`)
   }, [navigate, collectionName, resourceId])
 
   // Handle delete action - open confirmation dialog
@@ -470,7 +471,7 @@ export function ResourceDetailPage({
             <span className={styles.referenceValue}>
               {field.referenceTarget ? (
                 <Link
-                  to={`/resources/${field.referenceTarget}/${value}`}
+                  to={`/${getTenantSlug()}/resources/${field.referenceTarget}/${value}`}
                   className={styles.referenceLink}
                 >
                   {String(value)}
@@ -556,13 +557,16 @@ export function ResourceDetailPage({
     <div className={styles.container} data-testid={testId}>
       {/* Breadcrumb Navigation */}
       <nav className={styles.breadcrumb} aria-label="Breadcrumb">
-        <Link to="/resources" className={styles.breadcrumbLink}>
+        <Link to={`/${getTenantSlug()}/resources`} className={styles.breadcrumbLink}>
           {t('resources.title')}
         </Link>
         <span className={styles.breadcrumbSeparator} aria-hidden="true">
           /
         </span>
-        <Link to={`/resources/${collectionName}`} className={styles.breadcrumbLink}>
+        <Link
+          to={`/${getTenantSlug()}/resources/${collectionName}`}
+          className={styles.breadcrumbLink}
+        >
           {schema.displayName}
         </Link>
         <span className={styles.breadcrumbSeparator} aria-hidden="true">

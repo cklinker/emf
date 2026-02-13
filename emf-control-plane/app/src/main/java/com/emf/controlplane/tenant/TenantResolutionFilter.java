@@ -37,6 +37,7 @@ public class TenantResolutionFilter extends OncePerRequestFilter {
             "/platform",
             "/control/ui-bootstrap",
             "/control/bootstrap",
+            "/control/tenants/slug-map",
             "/openapi",
             "/swagger-ui",
             "/v3/api-docs"

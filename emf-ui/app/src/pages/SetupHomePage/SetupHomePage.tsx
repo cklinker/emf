@@ -24,6 +24,7 @@ import {
 } from 'lucide-react'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
+import { getTenantId } from '../../hooks'
 import styles from './SetupHomePage.module.css'
 
 export interface SetupHomePageProps {
@@ -299,13 +300,13 @@ export function SetupHomePage({ testId = 'setup-home-page' }: SetupHomePageProps
 
   const { data: reportsData } = useQuery({
     queryKey: ['setup-stats-reports'],
-    queryFn: () => apiClient.get<unknown>('/control/reports?tenantId=default'),
+    queryFn: () => apiClient.get<unknown>(`/control/reports?tenantId=${getTenantId()}`),
     staleTime: 300000,
   })
 
   const { data: dashboardsData } = useQuery({
     queryKey: ['setup-stats-dashboards'],
-    queryFn: () => apiClient.get<unknown>('/control/dashboards?tenantId=default'),
+    queryFn: () => apiClient.get<unknown>(`/control/dashboards?tenantId=${getTenantId()}`),
     staleTime: 300000,
   })
 

@@ -20,6 +20,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Unit tests for GlobalErrorHandler.
+ * Validates JSON:API error response format: {"errors":[{status, code, title, detail, meta}]}
  */
 class GlobalErrorHandlerTest {
 
@@ -37,22 +38,23 @@ class GlobalErrorHandlerTest {
         MockServerWebExchange exchange = MockServerWebExchange.from(
             MockServerHttpRequest.get("/api/users").build()
         );
-        
+
         GatewayAuthenticationException exception = new GatewayAuthenticationException("Invalid JWT token");
-        
+
         Mono<Void> result = errorHandler.handle(exchange, exception);
-        
+
         StepVerifier.create(result)
             .verifyComplete();
-        
+
         assertEquals(HttpStatus.UNAUTHORIZED, exchange.getResponse().getStatusCode());
         assertEquals(MediaType.APPLICATION_JSON, exchange.getResponse().getHeaders().getContentType());
-        
+
         String responseBody = getResponseBody(exchange);
-        assertTrue(responseBody.contains("\"status\":401"));
+        assertTrue(responseBody.contains("\"errors\""));
+        assertTrue(responseBody.contains("\"status\":\"401\""));
         assertTrue(responseBody.contains("\"code\":\"UNAUTHORIZED\""));
-        assertTrue(responseBody.contains("Invalid JWT token"));
-        assertTrue(responseBody.contains("/api/users"));
+        assertTrue(responseBody.contains("\"detail\":\"Invalid JWT token\""));
+        assertTrue(responseBody.contains("\"path\":\"/api/users\""));
     }
 
     @Test
@@ -60,20 +62,20 @@ class GlobalErrorHandlerTest {
         MockServerWebExchange exchange = MockServerWebExchange.from(
             MockServerHttpRequest.get("/api/posts").build()
         );
-        
+
         JwtException exception = new JwtException("Token expired");
-        
+
         Mono<Void> result = errorHandler.handle(exchange, exception);
-        
+
         StepVerifier.create(result)
             .verifyComplete();
-        
+
         assertEquals(HttpStatus.UNAUTHORIZED, exchange.getResponse().getStatusCode());
-        
+
         String responseBody = getResponseBody(exchange);
-        assertTrue(responseBody.contains("\"status\":401"));
+        assertTrue(responseBody.contains("\"status\":\"401\""));
         assertTrue(responseBody.contains("\"code\":\"UNAUTHORIZED\""));
-        assertTrue(responseBody.contains("Token expired"));
+        assertTrue(responseBody.contains("\"detail\":\"Token expired\""));
     }
 
     @Test
@@ -81,21 +83,21 @@ class GlobalErrorHandlerTest {
         MockServerWebExchange exchange = MockServerWebExchange.from(
             MockServerHttpRequest.get("/api/admin").build()
         );
-        
+
         GatewayAuthorizationException exception = new GatewayAuthorizationException("Insufficient permissions");
-        
+
         Mono<Void> result = errorHandler.handle(exchange, exception);
-        
+
         StepVerifier.create(result)
             .verifyComplete();
-        
+
         assertEquals(HttpStatus.FORBIDDEN, exchange.getResponse().getStatusCode());
-        
+
         String responseBody = getResponseBody(exchange);
-        assertTrue(responseBody.contains("\"status\":403"));
+        assertTrue(responseBody.contains("\"status\":\"403\""));
         assertTrue(responseBody.contains("\"code\":\"FORBIDDEN\""));
-        assertTrue(responseBody.contains("Insufficient permissions"));
-        assertTrue(responseBody.contains("/api/admin"));
+        assertTrue(responseBody.contains("\"detail\":\"Insufficient permissions\""));
+        assertTrue(responseBody.contains("\"path\":\"/api/admin\""));
     }
 
     @Test
@@ -103,25 +105,25 @@ class GlobalErrorHandlerTest {
         MockServerWebExchange exchange = MockServerWebExchange.from(
             MockServerHttpRequest.get("/api/data").build()
         );
-        
+
         RateLimitExceededException exception = new RateLimitExceededException(
-            "Rate limit exceeded", 
-            Duration.ofSeconds(60), 
+            "Rate limit exceeded",
+            Duration.ofSeconds(60),
             100
         );
-        
+
         Mono<Void> result = errorHandler.handle(exchange, exception);
-        
+
         StepVerifier.create(result)
             .verifyComplete();
-        
+
         assertEquals(HttpStatus.TOO_MANY_REQUESTS, exchange.getResponse().getStatusCode());
         assertEquals("60", exchange.getResponse().getHeaders().getFirst("Retry-After"));
-        
+
         String responseBody = getResponseBody(exchange);
-        assertTrue(responseBody.contains("\"status\":429"));
+        assertTrue(responseBody.contains("\"status\":\"429\""));
         assertTrue(responseBody.contains("\"code\":\"RATE_LIMIT_EXCEEDED\""));
-        assertTrue(responseBody.contains("Rate limit exceeded"));
+        assertTrue(responseBody.contains("\"detail\":\"Rate limit exceeded\""));
     }
 
     @Test
@@ -129,18 +131,18 @@ class GlobalErrorHandlerTest {
         MockServerWebExchange exchange = MockServerWebExchange.from(
             MockServerHttpRequest.get("/api/unknown").build()
         );
-        
+
         RouteNotFoundException exception = new RouteNotFoundException("No route found for path: /api/unknown");
-        
+
         Mono<Void> result = errorHandler.handle(exchange, exception);
-        
+
         StepVerifier.create(result)
             .verifyComplete();
-        
+
         assertEquals(HttpStatus.NOT_FOUND, exchange.getResponse().getStatusCode());
-        
+
         String responseBody = getResponseBody(exchange);
-        assertTrue(responseBody.contains("\"status\":404"));
+        assertTrue(responseBody.contains("\"status\":\"404\""));
         assertTrue(responseBody.contains("\"code\":\"NOT_FOUND\""));
         assertTrue(responseBody.contains("No route found"));
     }
@@ -150,22 +152,22 @@ class GlobalErrorHandlerTest {
         MockServerWebExchange exchange = MockServerWebExchange.from(
             MockServerHttpRequest.get("/api/service").build()
         );
-        
+
         ResponseStatusException exception = new ResponseStatusException(
-            HttpStatus.BAD_REQUEST, 
+            HttpStatus.BAD_REQUEST,
             "Invalid request parameters"
         );
-        
+
         Mono<Void> result = errorHandler.handle(exchange, exception);
-        
+
         StepVerifier.create(result)
             .verifyComplete();
-        
+
         assertEquals(HttpStatus.BAD_REQUEST, exchange.getResponse().getStatusCode());
-        
+
         String responseBody = getResponseBody(exchange);
-        assertTrue(responseBody.contains("\"status\":400"));
-        assertTrue(responseBody.contains("Invalid request parameters"));
+        assertTrue(responseBody.contains("\"status\":\"400\""));
+        assertTrue(responseBody.contains("\"detail\":\"Invalid request parameters\""));
     }
 
     @Test
@@ -173,22 +175,22 @@ class GlobalErrorHandlerTest {
         MockServerWebExchange exchange = MockServerWebExchange.from(
             MockServerHttpRequest.get("/api/resources").build()
         );
-        
+
         JsonApiParser.JsonApiParseException exception = new JsonApiParser.JsonApiParseException(
             "Failed to parse JSON:API response"
         );
-        
+
         Mono<Void> result = errorHandler.handle(exchange, exception);
-        
+
         StepVerifier.create(result)
             .verifyComplete();
-        
+
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, exchange.getResponse().getStatusCode());
-        
+
         String responseBody = getResponseBody(exchange);
-        assertTrue(responseBody.contains("\"status\":500"));
+        assertTrue(responseBody.contains("\"status\":\"500\""));
         assertTrue(responseBody.contains("\"code\":\"JSONAPI_PARSE_ERROR\""));
-        assertTrue(responseBody.contains("Failed to process JSON:API response"));
+        assertTrue(responseBody.contains("\"detail\":\"Failed to process JSON:API response\""));
     }
 
     @Test
@@ -196,20 +198,20 @@ class GlobalErrorHandlerTest {
         MockServerWebExchange exchange = MockServerWebExchange.from(
             MockServerHttpRequest.get("/api/error").build()
         );
-        
+
         RuntimeException exception = new RuntimeException("Unexpected error");
-        
+
         Mono<Void> result = errorHandler.handle(exchange, exception);
-        
+
         StepVerifier.create(result)
             .verifyComplete();
-        
+
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, exchange.getResponse().getStatusCode());
-        
+
         String responseBody = getResponseBody(exchange);
-        assertTrue(responseBody.contains("\"status\":500"));
+        assertTrue(responseBody.contains("\"status\":\"500\""));
         assertTrue(responseBody.contains("\"code\":\"INTERNAL_ERROR\""));
-        assertTrue(responseBody.contains("An unexpected error occurred"));
+        assertTrue(responseBody.contains("\"detail\":\"An unexpected error occurred\""));
         // Should NOT contain the actual exception message for security
         assertFalse(responseBody.contains("Unexpected error"));
     }
@@ -221,14 +223,14 @@ class GlobalErrorHandlerTest {
                 .header("X-Correlation-ID", "test-correlation-123")
                 .build()
         );
-        
+
         GatewayAuthenticationException exception = new GatewayAuthenticationException("Test error");
-        
+
         Mono<Void> result = errorHandler.handle(exchange, exception);
-        
+
         StepVerifier.create(result)
             .verifyComplete();
-        
+
         String responseBody = getResponseBody(exchange);
         assertTrue(responseBody.contains("\"correlationId\":\"test-correlation-123\""));
     }
@@ -238,14 +240,14 @@ class GlobalErrorHandlerTest {
         MockServerWebExchange exchange = MockServerWebExchange.from(
             MockServerHttpRequest.get("/api/test").build()
         );
-        
+
         GatewayAuthenticationException exception = new GatewayAuthenticationException("Test error");
-        
+
         Mono<Void> result = errorHandler.handle(exchange, exception);
-        
+
         StepVerifier.create(result)
             .verifyComplete();
-        
+
         String responseBody = getResponseBody(exchange);
         assertTrue(responseBody.contains("\"correlationId\":"));
         // Should contain a UUID-like string
@@ -257,16 +259,16 @@ class GlobalErrorHandlerTest {
         MockServerWebExchange exchange = MockServerWebExchange.from(
             MockServerHttpRequest.get("/api/users").build()
         );
-        
+
         GatewayAuthenticationException exception = new GatewayAuthenticationException(null);
-        
+
         Mono<Void> result = errorHandler.handle(exchange, exception);
-        
+
         StepVerifier.create(result)
             .verifyComplete();
-        
+
         String responseBody = getResponseBody(exchange);
-        assertTrue(responseBody.contains("\"message\":\"Authentication failed\""));
+        assertTrue(responseBody.contains("\"detail\":\"Authentication failed\""));
     }
 
     @Test
@@ -274,16 +276,16 @@ class GlobalErrorHandlerTest {
         MockServerWebExchange exchange = MockServerWebExchange.from(
             MockServerHttpRequest.get("/api/admin").build()
         );
-        
+
         GatewayAuthorizationException exception = new GatewayAuthorizationException(null);
-        
+
         Mono<Void> result = errorHandler.handle(exchange, exception);
-        
+
         StepVerifier.create(result)
             .verifyComplete();
-        
+
         String responseBody = getResponseBody(exchange);
-        assertTrue(responseBody.contains("\"message\":\"Access denied\""));
+        assertTrue(responseBody.contains("\"detail\":\"Access denied\""));
     }
 
     @Test
@@ -291,20 +293,20 @@ class GlobalErrorHandlerTest {
         MockServerWebExchange exchange = MockServerWebExchange.from(
             MockServerHttpRequest.get("/api/data").build()
         );
-        
+
         RateLimitExceededException exception = new RateLimitExceededException(
-            null, 
-            Duration.ofSeconds(30), 
+            null,
+            Duration.ofSeconds(30),
             50
         );
-        
+
         Mono<Void> result = errorHandler.handle(exchange, exception);
-        
+
         StepVerifier.create(result)
             .verifyComplete();
-        
+
         String responseBody = getResponseBody(exchange);
-        assertTrue(responseBody.contains("\"message\":\"Rate limit exceeded\""));
+        assertTrue(responseBody.contains("\"detail\":\"Rate limit exceeded\""));
     }
 
     @Test
@@ -312,16 +314,16 @@ class GlobalErrorHandlerTest {
         MockServerWebExchange exchange = MockServerWebExchange.from(
             MockServerHttpRequest.get("/api/unknown").build()
         );
-        
+
         RouteNotFoundException exception = new RouteNotFoundException(null);
-        
+
         Mono<Void> result = errorHandler.handle(exchange, exception);
-        
+
         StepVerifier.create(result)
             .verifyComplete();
-        
+
         String responseBody = getResponseBody(exchange);
-        assertTrue(responseBody.contains("\"message\":\"Route not found\""));
+        assertTrue(responseBody.contains("\"detail\":\"Route not found\""));
     }
 
     @Test
@@ -329,14 +331,14 @@ class GlobalErrorHandlerTest {
         MockServerWebExchange exchange = MockServerWebExchange.from(
             MockServerHttpRequest.get("/api/test").build()
         );
-        
+
         GatewayAuthenticationException exception = new GatewayAuthenticationException("Test");
-        
+
         Mono<Void> result = errorHandler.handle(exchange, exception);
-        
+
         StepVerifier.create(result)
             .verifyComplete();
-        
+
         assertEquals(MediaType.APPLICATION_JSON, exchange.getResponse().getHeaders().getContentType());
     }
 
@@ -345,20 +347,23 @@ class GlobalErrorHandlerTest {
         MockServerWebExchange exchange = MockServerWebExchange.from(
             MockServerHttpRequest.get("/api/users").build()
         );
-        
+
         GatewayAuthenticationException exception = new GatewayAuthenticationException("Invalid token");
-        
+
         Mono<Void> result = errorHandler.handle(exchange, exception);
-        
+
         StepVerifier.create(result)
             .verifyComplete();
-        
+
         String responseBody = getResponseBody(exchange);
-        
-        // Verify all required fields are present
+
+        // Verify JSON:API error structure
+        assertTrue(responseBody.contains("\"errors\""));
         assertTrue(responseBody.contains("\"status\":"));
         assertTrue(responseBody.contains("\"code\":"));
-        assertTrue(responseBody.contains("\"message\":"));
+        assertTrue(responseBody.contains("\"title\":"));
+        assertTrue(responseBody.contains("\"detail\":"));
+        assertTrue(responseBody.contains("\"meta\""));
         assertTrue(responseBody.contains("\"timestamp\":"));
         assertTrue(responseBody.contains("\"path\":"));
         assertTrue(responseBody.contains("\"correlationId\":"));

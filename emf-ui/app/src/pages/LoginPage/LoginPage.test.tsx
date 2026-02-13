@@ -74,7 +74,7 @@ function TestWrapper({ children }: { children: React.ReactNode }) {
     <MemoryRouter initialEntries={['/login']}>
       <Routes>
         <Route path="/login" element={children} />
-        <Route path="/" element={<div data-testid="dashboard">Dashboard</div>} />
+        <Route path="/default" element={<div data-testid="dashboard">Dashboard</div>} />
       </Routes>
     </MemoryRouter>
   )

@@ -153,7 +153,10 @@ public class DefaultValidationEngine implements ValidationEngine {
      */
     private boolean isValidType(Object value, FieldType expectedType) {
         return switch (expectedType) {
-            case STRING, PHONE, EMAIL, URL, RICH_TEXT, ENCRYPTED, EXTERNAL_ID, PICKLIST -> value instanceof String;
+            case STRING, RICH_TEXT, ENCRYPTED, EXTERNAL_ID, PICKLIST -> value instanceof String;
+            case EMAIL -> value instanceof String s && (s.isEmpty() || s.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"));
+            case URL -> value instanceof String s && (s.isEmpty() || s.matches("^https?://.*|^ftp://.*"));
+            case PHONE -> value instanceof String s && (s.isEmpty() || s.matches("^[+]?[0-9() \\-.ext]+$"));
             case INTEGER -> value instanceof Integer || isIntegerCompatible(value);
             case LONG -> value instanceof Long || value instanceof Integer || isLongCompatible(value);
             case DOUBLE, CURRENCY, PERCENT -> value instanceof Double || value instanceof Float ||

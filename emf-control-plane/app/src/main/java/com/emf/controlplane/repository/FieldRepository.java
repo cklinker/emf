@@ -81,4 +81,11 @@ public interface FieldRepository extends JpaRepository<Field, String> {
      * Find all active fields with history tracking enabled for a collection.
      */
     List<Field> findByCollectionIdAndTrackHistoryTrueAndActiveTrue(String collectionId);
+
+    /**
+     * Find active fields whose field_type_config JSON contains the given string.
+     * Used to check if any fields reference a global picklist by its ID.
+     */
+    @Query("SELECT f FROM Field f WHERE f.active = true AND f.fieldTypeConfig LIKE %:searchText%")
+    List<Field> findByFieldTypeConfigContaining(@Param("searchText") String searchText);
 }

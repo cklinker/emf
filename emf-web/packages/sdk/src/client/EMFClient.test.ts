@@ -62,6 +62,47 @@ describe('EMFClient', () => {
     });
   });
 
+  describe('tenantSlug configuration', () => {
+    it('should append tenantSlug to baseUrl when provided', () => {
+      const client = new EMFClient({
+        baseUrl: 'https://api.example.com',
+        tenantSlug: 'acme-corp',
+      });
+      expect(client.getBaseUrl()).toBe('https://api.example.com/acme-corp');
+    });
+
+    it('should append tenantSlug to baseUrl with trailing slash removed', () => {
+      const client = new EMFClient({
+        baseUrl: 'https://api.example.com/',
+        tenantSlug: 'acme-corp',
+      });
+      expect(client.getBaseUrl()).toBe('https://api.example.com/acme-corp');
+    });
+
+    it('should build URLs with tenantSlug prefix', () => {
+      const client = new EMFClient({
+        baseUrl: 'https://api.example.com',
+        tenantSlug: 'acme-corp',
+      });
+      expect(client.buildUrl('/api/users')).toBe('https://api.example.com/acme-corp/api/users');
+      expect(client.buildUrl('api/users')).toBe('https://api.example.com/acme-corp/api/users');
+    });
+
+    it('should use tenantSlug-prefixed base URL for axios instance', () => {
+      const client = new EMFClient({
+        baseUrl: 'https://api.example.com',
+        tenantSlug: 'acme-corp',
+      });
+      const axiosInstance = client.getAxiosInstance();
+      expect(axiosInstance.defaults.baseURL).toBe('https://api.example.com/acme-corp');
+    });
+
+    it('should not modify baseUrl when tenantSlug is not provided', () => {
+      const client = new EMFClient({ baseUrl: 'https://api.example.com' });
+      expect(client.getBaseUrl()).toBe('https://api.example.com');
+    });
+  });
+
   describe('Token Provider handling (Requirements 1.2, 1.3)', () => {
     it('should work without a token provider (Requirement 1.3)', () => {
       const client = new EMFClient({ baseUrl: 'https://api.example.com' });

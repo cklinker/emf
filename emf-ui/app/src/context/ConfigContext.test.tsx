@@ -209,8 +209,8 @@ describe('ConfigContext', () => {
         expect(screen.getByTestId('loading')).toHaveTextContent('not-loading')
       })
 
-      // Verify fetch was called with correct endpoint
-      expect(mockFetch).toHaveBeenCalledWith('/control/ui-bootstrap')
+      // Verify fetch was called with correct endpoint (tenant-scoped)
+      expect(mockFetch).toHaveBeenCalledWith('/default/control/ui-bootstrap')
     })
 
     it('should load config successfully', async () => {

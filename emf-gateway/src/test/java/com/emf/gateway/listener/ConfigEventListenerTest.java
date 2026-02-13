@@ -53,7 +53,7 @@ class ConfigEventListenerTest {
     @BeforeEach
     void setUp() {
         objectMapper = new ObjectMapper();
-        listener = new ConfigEventListener(routeRegistry, authzConfigCache, objectMapper, WORKER_SERVICE_URL);
+        listener = new ConfigEventListener(routeRegistry, authzConfigCache, objectMapper, event -> {}, WORKER_SERVICE_URL);
     }
 
     @Nested

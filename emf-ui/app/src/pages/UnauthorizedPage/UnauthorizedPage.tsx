@@ -8,6 +8,7 @@ import React from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { ShieldOff } from 'lucide-react'
 import { useI18n } from '../../context/I18nContext'
+import { getTenantSlug } from '../../context/TenantContext'
 import { useAuth } from '../../context/AuthContext'
 import styles from './UnauthorizedPage.module.css'
 
@@ -45,7 +46,7 @@ export function UnauthorizedPage({ title, message }: UnauthorizedPageProps): Rea
   }
 
   const handleGoHome = () => {
-    navigate('/')
+    navigate(`/${getTenantSlug()}`)
   }
 
   const handleLogout = async () => {
@@ -116,7 +117,7 @@ export function UnauthorizedPage({ title, message }: UnauthorizedPageProps): Rea
         {/* Help link */}
         <p className={styles.helpText}>
           {t('unauthorized.helpText')}{' '}
-          <Link to="/help" className={styles.helpLink}>
+          <Link to={`/${getTenantSlug()}/help`} className={styles.helpLink}>
             {t('unauthorized.contactSupport')}
           </Link>
         </p>

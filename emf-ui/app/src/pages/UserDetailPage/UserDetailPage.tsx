@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useApi } from '../../context/ApiContext'
 import { useI18n } from '../../context/I18nContext'
+import { getTenantSlug } from '../../context/TenantContext'
 import { useToast } from '../../components/Toast'
 import styles from './UserDetailPage.module.css'
 
@@ -199,7 +200,10 @@ export function UserDetailPage({ testId = 'user-detail-page' }: UserDetailPagePr
     <div className={styles.container} data-testid={testId}>
       <header className={styles.header}>
         <div className={styles.headerLeft}>
-          <button className={styles.backButton} onClick={() => navigate('/users')}>
+          <button
+            className={styles.backButton}
+            onClick={() => navigate(`/${getTenantSlug()}/users`)}
+          >
             {t('common.back')}
           </button>
           <h1>

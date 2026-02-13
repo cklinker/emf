@@ -21,10 +21,10 @@ class ValidationRulesTest {
         @Test
         @DisplayName("Should create validation rules with all parameters")
         void shouldCreateWithAllParameters() {
-            ValidationRules rules = new ValidationRules(0, 100, 1, 255, "^[a-z]+$");
-            
-            assertEquals(0, rules.minValue());
-            assertEquals(100, rules.maxValue());
+            ValidationRules rules = new ValidationRules(0.0, 100.0, 1, 255, "^[a-z]+$");
+
+            assertEquals(0.0, rules.minValue());
+            assertEquals(100.0, rules.maxValue());
             assertEquals(1, rules.minLength());
             assertEquals(255, rules.maxLength());
             assertEquals("^[a-z]+$", rules.pattern());
@@ -62,10 +62,10 @@ class ValidationRulesTest {
         @Test
         @DisplayName("forNumeric() should create rules with only value constraints")
         void forNumericShouldCreateValueConstraints() {
-            ValidationRules rules = ValidationRules.forNumeric(0, 100);
-            
-            assertEquals(0, rules.minValue());
-            assertEquals(100, rules.maxValue());
+            ValidationRules rules = ValidationRules.forNumeric(0.0, 100.0);
+
+            assertEquals(0.0, rules.minValue());
+            assertEquals(100.0, rules.maxValue());
             assertNull(rules.minLength());
             assertNull(rules.maxLength());
             assertNull(rules.pattern());
@@ -103,8 +103,8 @@ class ValidationRulesTest {
         @Test
         @DisplayName("Should be equal when all fields match")
         void shouldBeEqualWhenFieldsMatch() {
-            ValidationRules rules1 = new ValidationRules(0, 100, 1, 255, "^[a-z]+$");
-            ValidationRules rules2 = new ValidationRules(0, 100, 1, 255, "^[a-z]+$");
+            ValidationRules rules1 = new ValidationRules(0.0, 100.0, 1, 255, "^[a-z]+$");
+            ValidationRules rules2 = new ValidationRules(0.0, 100.0, 1, 255, "^[a-z]+$");
             
             assertEquals(rules1, rules2);
             assertEquals(rules1.hashCode(), rules2.hashCode());
@@ -113,8 +113,8 @@ class ValidationRulesTest {
         @Test
         @DisplayName("Should not be equal when fields differ")
         void shouldNotBeEqualWhenFieldsDiffer() {
-            ValidationRules rules1 = new ValidationRules(0, 100, 1, 255, "^[a-z]+$");
-            ValidationRules rules2 = new ValidationRules(1, 100, 1, 255, "^[a-z]+$");
+            ValidationRules rules1 = new ValidationRules(0.0, 100.0, 1, 255, "^[a-z]+$");
+            ValidationRules rules2 = new ValidationRules(1.0, 100.0, 1, 255, "^[a-z]+$");
             
             assertNotEquals(rules1, rules2);
         }

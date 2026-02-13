@@ -37,6 +37,10 @@ public class FieldHistory extends BaseEntity {
     @Column(name = "changed_by", nullable = false, length = 36)
     private String changedBy;
 
+    /**
+     * Explicit change timestamp. Falls back to createdAt (set automatically by
+     * BaseEntity) when not set, avoiding redundant Instant.now() calls.
+     */
     @Column(name = "changed_at", nullable = false)
     private Instant changedAt;
 
@@ -104,7 +108,7 @@ public class FieldHistory extends BaseEntity {
     }
 
     public Instant getChangedAt() {
-        return changedAt;
+        return changedAt != null ? changedAt : getCreatedAt();
     }
 
     public void setChangedAt(Instant changedAt) {

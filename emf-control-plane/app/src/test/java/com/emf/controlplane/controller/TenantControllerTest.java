@@ -7,6 +7,7 @@ import com.emf.controlplane.dto.UpdateTenantRequest;
 import com.emf.controlplane.entity.Tenant;
 import com.emf.controlplane.exception.DuplicateResourceException;
 import com.emf.controlplane.exception.ResourceNotFoundException;
+import com.emf.controlplane.repository.TenantRepository;
 import com.emf.controlplane.service.TenantService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -39,11 +40,14 @@ class TenantControllerTest {
     @Mock
     private TenantService tenantService;
 
+    @Mock
+    private TenantRepository tenantRepository;
+
     private TenantController controller;
 
     @BeforeEach
     void setUp() {
-        controller = new TenantController(tenantService);
+        controller = new TenantController(tenantService, tenantRepository);
     }
 
     @Nested

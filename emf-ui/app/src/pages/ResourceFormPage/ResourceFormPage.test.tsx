@@ -470,7 +470,7 @@ describe('ResourceFormPage', () => {
 
       // Verify navigation
       await waitFor(() => {
-        expect(mockNavigate).toHaveBeenCalledWith('/resources/users/new-res-123')
+        expect(mockNavigate).toHaveBeenCalledWith('/default/resources/users/new-res-123')
       })
     })
 
@@ -487,7 +487,7 @@ describe('ResourceFormPage', () => {
       await user.click(cancelButton)
 
       // Verify navigation
-      expect(mockNavigate).toHaveBeenCalledWith('/resources/users')
+      expect(mockNavigate).toHaveBeenCalledWith('/default/resources/users')
     })
   })
 
@@ -647,7 +647,7 @@ describe('ResourceFormPage', () => {
 
       // Verify navigation
       await waitFor(() => {
-        expect(mockNavigate).toHaveBeenCalledWith('/resources/users/res-123')
+        expect(mockNavigate).toHaveBeenCalledWith('/default/resources/users/res-123')
       })
     })
 
@@ -665,7 +665,7 @@ describe('ResourceFormPage', () => {
       await user.click(screen.getByTestId('cancel-button'))
 
       // Verify navigation to detail page
-      expect(mockNavigate).toHaveBeenCalledWith('/resources/users/res-123')
+      expect(mockNavigate).toHaveBeenCalledWith('/default/resources/users/res-123')
     })
   })
 

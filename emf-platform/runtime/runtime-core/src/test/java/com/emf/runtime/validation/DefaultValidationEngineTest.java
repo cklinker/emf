@@ -322,7 +322,7 @@ class DefaultValidationEngineTest {
         void shouldRejectValueBelowMinimum() {
             FieldDefinition field = new FieldDefinition(
                 "age", FieldType.INTEGER, false, false, false, null,
-                ValidationRules.forNumeric(18, null), null, null
+                ValidationRules.forNumeric(18.0, null), null, null
             );
             CollectionDefinition definition = createTestCollection(field);
             
@@ -338,7 +338,7 @@ class DefaultValidationEngineTest {
         void shouldAcceptValueAtMinimum() {
             FieldDefinition field = new FieldDefinition(
                 "age", FieldType.INTEGER, false, false, false, null,
-                ValidationRules.forNumeric(18, null), null, null
+                ValidationRules.forNumeric(18.0, null), null, null
             );
             CollectionDefinition definition = createTestCollection(field);
             
@@ -353,7 +353,7 @@ class DefaultValidationEngineTest {
         void shouldRejectValueAboveMaximum() {
             FieldDefinition field = new FieldDefinition(
                 "score", FieldType.INTEGER, false, false, false, null,
-                ValidationRules.forNumeric(null, 100), null, null
+                ValidationRules.forNumeric(null, 100.0), null, null
             );
             CollectionDefinition definition = createTestCollection(field);
             
@@ -369,7 +369,7 @@ class DefaultValidationEngineTest {
         void shouldAcceptValueAtMaximum() {
             FieldDefinition field = new FieldDefinition(
                 "score", FieldType.INTEGER, false, false, false, null,
-                ValidationRules.forNumeric(null, 100), null, null
+                ValidationRules.forNumeric(null, 100.0), null, null
             );
             CollectionDefinition definition = createTestCollection(field);
             
@@ -384,7 +384,7 @@ class DefaultValidationEngineTest {
         void shouldValidateMinMaxForDoubleValues() {
             FieldDefinition field = new FieldDefinition(
                 "price", FieldType.DOUBLE, false, false, false, null,
-                ValidationRules.forNumeric(0, 1000), null, null
+                ValidationRules.forNumeric(0.0, 1000.0), null, null
             );
             CollectionDefinition definition = createTestCollection(field);
             
@@ -915,7 +915,7 @@ class DefaultValidationEngineTest {
         void shouldValidateProvidedFieldsInUpdate() {
             FieldDefinition field = new FieldDefinition(
                 "age", FieldType.INTEGER, false, false, false, null,
-                ValidationRules.forNumeric(0, 150), null, null
+                ValidationRules.forNumeric(0.0, 150.0), null, null
             );
             CollectionDefinition definition = createTestCollection(field);
             

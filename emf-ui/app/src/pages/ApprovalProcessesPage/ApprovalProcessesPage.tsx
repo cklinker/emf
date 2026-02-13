@@ -10,6 +10,7 @@ import {
   ExecutionLogModal,
 } from '../../components'
 import type { LogColumn } from '../../components'
+import { getTenantId } from '../../hooks'
 import styles from './ApprovalProcessesPage.module.css'
 
 interface ApprovalProcess {
@@ -429,7 +430,7 @@ export function ApprovalProcessesPage({
   } = useQuery({
     queryKey: ['approvalProcesses'],
     queryFn: () =>
-      apiClient.get<ApprovalProcess[]>('/control/approvals/processes?tenantId=default'),
+      apiClient.get<ApprovalProcess[]>(`/control/approvals/processes?tenantId=${getTenantId()}`),
   })
 
   const approvalProcessList: ApprovalProcess[] = approvalProcesses ?? []
@@ -437,7 +438,7 @@ export function ApprovalProcessesPage({
   const createMutation = useMutation({
     mutationFn: (data: ApprovalProcessFormData) =>
       apiClient.post<ApprovalProcess>(
-        '/control/approvals/processes?tenantId=default&userId=system',
+        `/control/approvals/processes?tenantId=${getTenantId()}&userId=system`,
         data
       ),
     onSuccess: () => {
@@ -484,7 +485,7 @@ export function ApprovalProcessesPage({
   } = useQuery({
     queryKey: ['approval-instances'],
     queryFn: () =>
-      apiClient.get<ApprovalInstance[]>('/control/approvals/instances?tenantId=default'),
+      apiClient.get<ApprovalInstance[]>(`/control/approvals/instances?tenantId=${getTenantId()}`),
     enabled: !!instancesItemId,
   })
 

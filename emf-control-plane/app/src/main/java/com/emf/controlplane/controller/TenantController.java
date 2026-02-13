@@ -100,7 +100,8 @@ public class TenantController {
     }
 
     /**
-     * Returns a slug → tenantId mapping for all active tenants.
+     * Returns a slug → tenantId mapping for all routable tenants.
+     * Includes ACTIVE and PROVISIONING tenants (excludes only SUSPENDED and DECOMMISSIONED).
      * Used by the API Gateway's TenantSlugCache to resolve URL path slugs
      * without per-request database lookups.
      * <p>
@@ -109,7 +110,7 @@ public class TenantController {
      */
     @GetMapping("/slug-map")
     public ResponseEntity<Map<String, String>> getSlugMap() {
-        Map<String, String> slugMap = tenantRepository.findByStatus("ACTIVE").stream()
+        Map<String, String> slugMap = tenantRepository.findByStatusNot("DECOMMISSIONED").stream()
                 .collect(Collectors.toMap(Tenant::getSlug, Tenant::getId));
         return ResponseEntity.ok(slugMap);
     }

@@ -6,6 +6,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -22,6 +23,10 @@ public interface TenantRepository extends JpaRepository<Tenant, String> {
     boolean existsBySlug(String slug);
 
     List<Tenant> findByStatus(String status);
+
+    List<Tenant> findByStatusIn(Collection<String> statuses);
+
+    List<Tenant> findByStatusNot(String status);
 
     Page<Tenant> findAll(Pageable pageable);
 }

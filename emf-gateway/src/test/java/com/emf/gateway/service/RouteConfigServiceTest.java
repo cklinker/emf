@@ -41,6 +41,7 @@ class RouteConfigServiceTest {
         routeConfigService = new RouteConfigService(
             WebClient.builder(),
             routeRegistry,
+            null,
             baseUrl,
             "/control/bootstrap"
         );

@@ -5,6 +5,7 @@ import com.emf.controlplane.dto.GovernorLimits;
 import com.emf.controlplane.dto.TenantDto;
 import com.emf.controlplane.dto.UpdateTenantRequest;
 import com.emf.controlplane.entity.Tenant;
+import com.emf.controlplane.repository.TenantRepository;
 import com.emf.controlplane.service.TenantService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
@@ -15,6 +16,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+import java.util.stream.Collectors;
+
 /**
  * REST controller for platform-level tenant administration.
  * Requires PLATFORM_ADMIN role for all operations.
@@ -24,9 +28,11 @@ import org.springframework.web.bind.annotation.*;
 public class TenantController {
 
     private final TenantService tenantService;
+    private final TenantRepository tenantRepository;
 
-    public TenantController(TenantService tenantService) {
+    public TenantController(TenantService tenantService, TenantRepository tenantRepository) {
         this.tenantService = tenantService;
+        this.tenantRepository = tenantRepository;
     }
 
     @GetMapping
@@ -91,5 +97,20 @@ public class TenantController {
     public ResponseEntity<GovernorLimits> getLimits(@PathVariable String id) {
         GovernorLimits limits = tenantService.getGovernorLimits(id);
         return ResponseEntity.ok(limits);
+    }
+
+    /**
+     * Returns a slug → tenantId mapping for all active tenants.
+     * Used by the API Gateway's TenantSlugCache to resolve URL path slugs
+     * without per-request database lookups.
+     * <p>
+     * This endpoint is internal (called by the gateway on startup and periodic refresh).
+     * It does not require tenant context or authentication.
+     */
+    @GetMapping("/slug-map")
+    public ResponseEntity<Map<String, String>> getSlugMap() {
+        Map<String, String> slugMap = tenantRepository.findByStatus("ACTIVE").stream()
+                .collect(Collectors.toMap(Tenant::getSlug, Tenant::getId));
+        return ResponseEntity.ok(slugMap);
     }
 }

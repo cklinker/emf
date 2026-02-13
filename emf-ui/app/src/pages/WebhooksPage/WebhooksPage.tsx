@@ -10,6 +10,7 @@ import {
   ExecutionLogModal,
 } from '../../components'
 import type { LogColumn } from '../../components'
+import { getTenantId } from '../../hooks'
 import styles from './WebhooksPage.module.css'
 
 interface Webhook {
@@ -431,7 +432,7 @@ export function WebhooksPage({ testId = 'webhooks-page' }: WebhooksPageProps): R
     refetch,
   } = useQuery({
     queryKey: ['webhooks'],
-    queryFn: () => apiClient.get<Webhook[]>('/control/webhooks?tenantId=default'),
+    queryFn: () => apiClient.get<Webhook[]>(`/control/webhooks?tenantId=${getTenantId()}`),
   })
 
   const webhookList: Webhook[] = webhooks ?? []
@@ -447,7 +448,10 @@ export function WebhooksPage({ testId = 'webhooks-page' }: WebhooksPageProps): R
         secret: data.secret || null,
         active: data.active,
       }
-      return apiClient.post<Webhook>('/control/webhooks?tenantId=default&userId=system', payload)
+      return apiClient.post<Webhook>(
+        `/control/webhooks?tenantId=${getTenantId()}&userId=system`,
+        payload
+      )
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['webhooks'] })

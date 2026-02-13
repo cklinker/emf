@@ -3,11 +3,13 @@ package com.emf.gateway.service;
 import com.emf.gateway.config.BootstrapConfig;
 import com.emf.gateway.config.CollectionConfig;
 import com.emf.gateway.config.ServiceConfig;
+import com.emf.gateway.listener.ConfigEventListener;
 import com.emf.gateway.route.RouteDefinition;
 import com.emf.gateway.route.RouteRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
@@ -31,27 +33,31 @@ public class RouteConfigService {
     
     private final WebClient webClient;
     private final RouteRegistry routeRegistry;
+    private final ConfigEventListener configEventListener;
     private final String controlPlaneUrl;
     private final String bootstrapPath;
-    
+
     /**
      * Creates a new RouteConfigService.
-     * 
+     *
      * @param webClientBuilder WebClient builder for making HTTP requests
      * @param routeRegistry Route registry to populate with routes
+     * @param configEventListener Listener whose service URL cache is populated from bootstrap data
      * @param controlPlaneUrl Base URL of the control plane service
      * @param bootstrapPath Path to the bootstrap endpoint
      */
     public RouteConfigService(
             WebClient.Builder webClientBuilder,
             RouteRegistry routeRegistry,
+            @Nullable ConfigEventListener configEventListener,
             @Value("${emf.gateway.control-plane.url}") String controlPlaneUrl,
             @Value("${emf.gateway.control-plane.bootstrap-path}") String bootstrapPath) {
         this.webClient = webClientBuilder.baseUrl(controlPlaneUrl).build();
         this.routeRegistry = routeRegistry;
+        this.configEventListener = configEventListener;
         this.controlPlaneUrl = controlPlaneUrl;
         this.bootstrapPath = bootstrapPath;
-        
+
         logger.info("RouteConfigService initialized with control plane URL: {}", controlPlaneUrl);
     }
     
@@ -100,7 +106,19 @@ public class RouteConfigService {
                 .doOnNext(config -> {
                     // Build a map of service ID to service config for lookup
                     Map<String, ServiceConfig> serviceMap = buildServiceMap(config);
-                    
+
+                    // Populate ConfigEventListener's service URL cache so that
+                    // subsequent Kafka collection-changed events can resolve backend URLs
+                    if (configEventListener != null) {
+                        Map<String, String> serviceUrls = new HashMap<>();
+                        for (Map.Entry<String, ServiceConfig> entry : serviceMap.entrySet()) {
+                            if (entry.getValue().getBaseUrl() != null) {
+                                serviceUrls.put(entry.getKey(), entry.getValue().getBaseUrl());
+                            }
+                        }
+                        configEventListener.populateServiceUrlCache(serviceUrls);
+                    }
+
                     // Process each collection and create routes
                     if (config.getCollections() != null) {
                         int validRoutes = 0;

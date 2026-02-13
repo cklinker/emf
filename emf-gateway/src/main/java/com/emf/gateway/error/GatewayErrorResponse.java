@@ -1,13 +1,16 @@
 package com.emf.gateway.error;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.time.Instant;
+import java.util.List;
+import java.util.Map;
 
 /**
- * Standard error response for API Gateway errors.
- * Provides a consistent error format for authentication, authorization,
- * rate limiting, routing, and internal errors.
+ * Standard JSON:API error response for API Gateway errors.
+ * Serializes as {"errors": [{...}]} per JSON:API specification.
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class GatewayErrorResponse {
@@ -40,6 +43,33 @@ public class GatewayErrorResponse {
         this.correlationId = correlationId;
     }
 
+    /**
+     * Serializes in JSON:API error format: {"errors": [{status, code, title, detail, meta}]}
+     */
+    @JsonProperty("errors")
+    public List<Map<String, Object>> getErrors() {
+        Map<String, Object> error = new java.util.LinkedHashMap<>();
+        error.put("status", String.valueOf(status));
+        error.put("code", code);
+        error.put("title", code);
+        error.put("detail", message);
+
+        Map<String, Object> meta = new java.util.LinkedHashMap<>();
+        meta.put("timestamp", timestamp);
+        if (path != null) {
+            meta.put("path", path);
+        }
+        if (correlationId != null) {
+            meta.put("correlationId", correlationId);
+        }
+        error.put("meta", meta);
+
+        return List.of(error);
+    }
+
+    // Getters/setters remain for internal use (hidden from JSON serialization)
+
+    @JsonIgnore
     public int getStatus() {
         return status;
     }
@@ -48,6 +78,7 @@ public class GatewayErrorResponse {
         this.status = status;
     }
 
+    @JsonIgnore
     public String getCode() {
         return code;
     }
@@ -56,6 +87,7 @@ public class GatewayErrorResponse {
         this.code = code;
     }
 
+    @JsonIgnore
     public String getMessage() {
         return message;
     }
@@ -64,6 +96,7 @@ public class GatewayErrorResponse {
         this.message = message;
     }
 
+    @JsonIgnore
     public Instant getTimestamp() {
         return timestamp;
     }
@@ -72,6 +105,7 @@ public class GatewayErrorResponse {
         this.timestamp = timestamp;
     }
 
+    @JsonIgnore
     public String getPath() {
         return path;
     }
@@ -80,6 +114,7 @@ public class GatewayErrorResponse {
         this.path = path;
     }
 
+    @JsonIgnore
     public String getCorrelationId() {
         return correlationId;
     }

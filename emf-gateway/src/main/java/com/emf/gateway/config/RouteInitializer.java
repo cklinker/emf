@@ -3,6 +3,7 @@ package com.emf.gateway.config;
 import com.emf.gateway.route.RouteDefinition;
 import com.emf.gateway.route.RouteRegistry;
 import com.emf.gateway.service.RouteConfigService;
+import com.emf.gateway.tenant.TenantSlugCache;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -38,34 +39,41 @@ public class RouteInitializer implements ApplicationRunner {
     private final RouteRegistry routeRegistry;
     private final RouteConfigService routeConfigService;
     private final ApplicationEventPublisher eventPublisher;
+    private final TenantSlugCache tenantSlugCache;
     private final String controlPlaneUrl;
-    
+
     /**
      * Creates a new RouteInitializer.
-     * 
+     *
      * @param routeRegistry The route registry to populate
      * @param routeConfigService Service for fetching routes from control plane
      * @param eventPublisher Event publisher for triggering route refresh
+     * @param tenantSlugCache Tenant slug cache to prime on startup
      * @param controlPlaneUrl Base URL of the control plane service
      */
     public RouteInitializer(
             RouteRegistry routeRegistry,
             RouteConfigService routeConfigService,
             ApplicationEventPublisher eventPublisher,
+            TenantSlugCache tenantSlugCache,
             @Value("${emf.gateway.control-plane.url}") String controlPlaneUrl) {
         this.routeRegistry = routeRegistry;
         this.routeConfigService = routeConfigService;
         this.eventPublisher = eventPublisher;
+        this.tenantSlugCache = tenantSlugCache;
         this.controlPlaneUrl = controlPlaneUrl;
     }
     
     @Override
     public void run(ApplicationArguments args) {
         logger.info("Initializing gateway routes");
-        
+
+        // Prime the tenant slug cache before route loading
+        tenantSlugCache.refresh();
+
         // Add static control plane route first
         addControlPlaneRoute();
-        
+
         // Fetch and add dynamic routes from control plane
         routeConfigService.refreshRoutes();
         

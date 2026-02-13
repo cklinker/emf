@@ -17,6 +17,7 @@ import React, { useState, useCallback, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
+import { getTenantSlug } from '../../context/TenantContext'
 import { useApi } from '../../context/ApiContext'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
 import {
@@ -258,7 +259,7 @@ export function CollectionDetailPage({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['collections'] })
       showToast(t('success.deleted', { item: t('collections.title') }), 'success')
-      navigate('/collections')
+      navigate(`/${getTenantSlug()}/collections`)
     },
     onError: (error: Error) => {
       showToast(error.message || t('errors.generic'), 'error')
@@ -470,7 +471,7 @@ export function CollectionDetailPage({
 
   // Handle edit action
   const handleEdit = useCallback(() => {
-    navigate(`/collections/${collectionId}/edit`)
+    navigate(`/${getTenantSlug()}/collections/${collectionId}/edit`)
   }, [navigate, collectionId])
 
   // Handle delete action - open confirmation dialog
@@ -490,7 +491,7 @@ export function CollectionDetailPage({
 
   // Handle back navigation
   const handleBack = useCallback(() => {
-    navigate('/collections')
+    navigate(`/${getTenantSlug()}/collections`)
   }, [navigate])
 
   // Handle tab change
@@ -568,7 +569,7 @@ export function CollectionDetailPage({
   // Handle view version action
   const handleViewVersion = useCallback(
     (version: CollectionVersion) => {
-      navigate(`/collections/${collectionId}/versions/${version.version}`)
+      navigate(`/${getTenantSlug()}/collections/${collectionId}/versions/${version.version}`)
     },
     [navigate, collectionId]
   )

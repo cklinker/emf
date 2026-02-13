@@ -10,6 +10,7 @@ import {
   ExecutionLogModal,
 } from '../../components'
 import type { LogColumn } from '../../components'
+import { getTenantId } from '../../hooks'
 import styles from './WorkflowRulesPage.module.css'
 
 interface WorkflowRule {
@@ -430,14 +431,18 @@ export function WorkflowRulesPage({
     refetch,
   } = useQuery({
     queryKey: ['workflow-rules'],
-    queryFn: () => apiClient.get<WorkflowRule[]>('/control/workflow-rules?tenantId=default'),
+    queryFn: () =>
+      apiClient.get<WorkflowRule[]>(`/control/workflow-rules?tenantId=${getTenantId()}`),
   })
 
   const workflowRuleList: WorkflowRule[] = workflowRules ?? []
 
   const createMutation = useMutation({
     mutationFn: (data: WorkflowRuleFormData) =>
-      apiClient.post<WorkflowRule>('/control/workflow-rules?tenantId=default&userId=system', data),
+      apiClient.post<WorkflowRule>(
+        `/control/workflow-rules?tenantId=${getTenantId()}&userId=system`,
+        data
+      ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workflow-rules'] })
       showToast('Workflow rule created successfully', 'success')

@@ -264,6 +264,39 @@ public class FieldService {
             field.setTrackHistory(request.getTrackHistory());
         }
 
+        // Update displayName if provided
+        if (request.getDisplayName() != null) {
+            field.setDisplayName(request.getDisplayName());
+        }
+
+        // Update unique if provided
+        if (request.getUnique() != null) {
+            field.setUnique(request.getUnique());
+        }
+
+        // Update indexed if provided
+        if (request.getIndexed() != null) {
+            field.setIndexed(request.getIndexed());
+        }
+
+        // Update defaultValue if provided
+        if (request.getDefaultValue() != null) {
+            field.setDefaultValue(request.getDefaultValue());
+        }
+
+        // Update fieldTypeConfig if provided
+        if (request.getFieldTypeConfig() != null) {
+            String effectiveType = request.getType() != null
+                    ? resolveFieldType(request.getType()) : field.getType();
+            validateFieldTypeConfig(effectiveType, request.getFieldTypeConfig());
+            field.setFieldTypeConfig(request.getFieldTypeConfig());
+        }
+
+        // Update order if provided
+        if (request.getOrder() != null) {
+            field.setOrder(request.getOrder());
+        }
+
         // Update constraints if provided
         if (request.getConstraints() != null) {
             String effectiveType = request.getType() != null ? request.getType() : field.getType();

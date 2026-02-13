@@ -234,6 +234,9 @@ export type { BulkJobsPageProps } from './BulkJobsPage'
 export { SetupHomePage } from './SetupHomePage'
 export type { SetupHomePageProps } from './SetupHomePage'
 
+// NoTenantPage - Tenant slug required error page
+export { NoTenantPage } from './NoTenantPage/NoTenantPage'
+
 // NotFoundPage - 404 error page
 export { NotFoundPage } from './NotFoundPage'
 export type { NotFoundPageProps } from './NotFoundPage'

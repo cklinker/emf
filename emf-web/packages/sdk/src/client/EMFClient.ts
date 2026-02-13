@@ -45,7 +45,8 @@ export class EMFClient {
   public readonly admin: AdminClient;
 
   constructor(config: EMFClientConfig) {
-    this.baseUrl = config.baseUrl.replace(/\/$/, ''); // Remove trailing slash
+    const rawBase = config.baseUrl.replace(/\/$/, ''); // Remove trailing slash
+    this.baseUrl = config.tenantSlug ? `${rawBase}/${config.tenantSlug}` : rawBase;
     this.cacheConfig = { ...DEFAULT_CACHE_CONFIG, ...config.cache };
     this.retryConfig = { ...DEFAULT_RETRY_CONFIG, ...config.retry };
     this.validationEnabled = config.validation ?? true;

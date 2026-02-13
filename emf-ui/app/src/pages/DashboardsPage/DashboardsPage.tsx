@@ -18,6 +18,7 @@ import {
   AlertCircle,
   Loader2,
 } from 'lucide-react'
+import { getTenantId } from '../../hooks'
 import styles from './DashboardsPage.module.css'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -1582,14 +1583,17 @@ export function DashboardsPage({
     refetch,
   } = useQuery({
     queryKey: ['dashboards'],
-    queryFn: () => apiClient.get<Dashboard[]>('/control/dashboards?tenantId=default'),
+    queryFn: () => apiClient.get<Dashboard[]>(`/control/dashboards?tenantId=${getTenantId()}`),
   })
 
   const dashboardList: Dashboard[] = dashboards ?? []
 
   const createMutation = useMutation({
     mutationFn: (data: DashboardFormData) =>
-      apiClient.post<Dashboard>('/control/dashboards?tenantId=default&userId=system', data),
+      apiClient.post<Dashboard>(
+        `/control/dashboards?tenantId=${getTenantId()}&userId=system`,
+        data
+      ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['dashboards'] })
       showToast('Dashboard created successfully', 'success')

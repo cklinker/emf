@@ -461,7 +461,7 @@ describe('CollectionsPage', () => {
       const createButton = screen.getByTestId('create-collection-button')
       await user.click(createButton)
 
-      expect(mockNavigate).toHaveBeenCalledWith('/collections/new')
+      expect(mockNavigate).toHaveBeenCalledWith('/default/collections/new')
     })
 
     it('should navigate to edit page when clicking edit button', async () => {
@@ -476,7 +476,7 @@ describe('CollectionsPage', () => {
       const editButton = screen.getByTestId('edit-button-0')
       await user.click(editButton)
 
-      expect(mockNavigate).toHaveBeenCalledWith('/collections/3/edit')
+      expect(mockNavigate).toHaveBeenCalledWith('/default/collections/3/edit')
     })
 
     it('should navigate to detail page when clicking on a row', async () => {
@@ -490,7 +490,7 @@ describe('CollectionsPage', () => {
       const row = screen.getByTestId('collection-row-0')
       await user.click(row)
 
-      expect(mockNavigate).toHaveBeenCalledWith('/collections/3')
+      expect(mockNavigate).toHaveBeenCalledWith('/default/collections/3')
     })
 
     it('should open delete confirmation dialog when clicking delete button', async () => {

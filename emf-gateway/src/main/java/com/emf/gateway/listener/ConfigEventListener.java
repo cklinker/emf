@@ -17,6 +17,8 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cloud.gateway.event.RefreshRoutesEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
@@ -56,16 +58,31 @@ public class ConfigEventListener {
     private final RouteRegistry routeRegistry;
     private final AuthzConfigCache authzConfigCache;
     private final ObjectMapper objectMapper;
-    
+    private final ApplicationEventPublisher applicationEventPublisher;
+
     // Cache of service ID to base URL for building backend URLs
     private final Map<String, String> serviceUrlCache = new ConcurrentHashMap<>();
-    
-    public ConfigEventListener(RouteRegistry routeRegistry, 
+
+    /**
+     * Populates the service URL cache from bootstrap data.
+     * Called by RouteConfigService during startup so that subsequent
+     * collection-changed Kafka events can resolve service URLs.
+     */
+    public void populateServiceUrlCache(Map<String, String> serviceUrls) {
+        if (serviceUrls != null && !serviceUrls.isEmpty()) {
+            serviceUrlCache.putAll(serviceUrls);
+            logger.info("Populated service URL cache with {} entries from bootstrap", serviceUrls.size());
+        }
+    }
+
+    public ConfigEventListener(RouteRegistry routeRegistry,
                               AuthzConfigCache authzConfigCache,
-                              ObjectMapper objectMapper) {
+                              ObjectMapper objectMapper,
+                              ApplicationEventPublisher applicationEventPublisher) {
         this.routeRegistry = routeRegistry;
         this.authzConfigCache = authzConfigCache;
         this.objectMapper = objectMapper;
+        this.applicationEventPublisher = applicationEventPublisher;
     }
     
     /**
@@ -106,21 +123,24 @@ public class ConfigEventListener {
             if (payload.getChangeType() == ChangeType.DELETED) {
                 // Remove the route for deleted collection
                 routeRegistry.removeRoute(payload.getId());
-                logger.info("Removed route for deleted collection: id={}, name={}", 
+                logger.info("Removed route for deleted collection: id={}, name={}",
                            payload.getId(), payload.getName());
             } else {
                 // Create or update route for created/updated collection
                 RouteDefinition route = buildRouteFromCollection(payload);
-                
+
                 if (route != null) {
                     routeRegistry.updateRoute(route);
-                    logger.info("Updated route for collection: id={}, name={}, path={}", 
+                    logger.info("Updated route for collection: id={}, name={}, path={}",
                                payload.getId(), payload.getName(), route.getPath());
                 } else {
-                    logger.error("Failed to build route from collection: id={}, name={}", 
+                    logger.error("Failed to build route from collection: id={}, name={}",
                                 payload.getId(), payload.getName());
                 }
             }
+
+            // Notify Spring Cloud Gateway to refresh its route cache
+            applicationEventPublisher.publishEvent(new RefreshRoutesEvent(this));
             
         } catch (Exception e) {
             logger.error("Error processing collection changed event: eventId={}, error={}", 

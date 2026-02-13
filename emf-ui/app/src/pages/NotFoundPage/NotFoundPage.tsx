@@ -7,6 +7,7 @@
 import React from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { useI18n } from '../../context/I18nContext'
+import { getTenantSlug } from '../../context/TenantContext'
 import styles from './NotFoundPage.module.css'
 
 /**
@@ -34,7 +35,7 @@ export function NotFoundPage({ title, message }: NotFoundPageProps): React.React
   }
 
   const handleGoHome = () => {
-    navigate('/')
+    navigate(`/${getTenantSlug()}`)
   }
 
   return (
@@ -67,17 +68,17 @@ export function NotFoundPage({ title, message }: NotFoundPageProps): React.React
           <p className={styles.suggestionsTitle}>{t('notFound.suggestions')}</p>
           <ul className={styles.suggestionsList}>
             <li>
-              <Link to="/" className={styles.suggestionLink}>
+              <Link to={`/${getTenantSlug()}`} className={styles.suggestionLink}>
                 {t('notFound.dashboard')}
               </Link>
             </li>
             <li>
-              <Link to="/collections" className={styles.suggestionLink}>
+              <Link to={`/${getTenantSlug()}/collections`} className={styles.suggestionLink}>
                 {t('notFound.collections')}
               </Link>
             </li>
             <li>
-              <Link to="/resources" className={styles.suggestionLink}>
+              <Link to={`/${getTenantSlug()}/resources`} className={styles.suggestionLink}>
                 {t('notFound.resources')}
               </Link>
             </li>

@@ -338,8 +338,8 @@ describe('Sidebar', () => {
     })
 
     it('should auto-expand Setup when current route matches a setup path', () => {
-      renderSidebar({ menus: sampleMenus }, '/collections')
-      // Setup should auto-expand because /collections is a setup path
+      renderSidebar({ menus: sampleMenus }, '/default/collections')
+      // Setup should auto-expand because /default/collections is a setup path
       expect(screen.getByTestId('menu-item-dashboard')).toBeInTheDocument()
     })
   })
@@ -353,12 +353,12 @@ describe('Sidebar', () => {
 
       const dashboardItem = screen.getByTestId('menu-item-dashboard')
       const link = within(dashboardItem).getByRole('link')
-      expect(link).toHaveAttribute('href', '/dashboard')
+      expect(link).toHaveAttribute('href', '/default/dashboard')
     })
 
     it('should highlight active menu item based on current route', () => {
-      // /collections auto-expands Setup
-      renderSidebar({ menus: sampleMenus }, '/collections')
+      // /default/collections auto-expands Setup
+      renderSidebar({ menus: sampleMenus }, '/default/collections')
 
       const collectionsItem = screen.getByTestId('menu-item-collections')
       const link = within(collectionsItem).getByRole('link')
@@ -536,13 +536,13 @@ describe('Sidebar', () => {
 
   describe('Active State', () => {
     it('should mark current route as active for workspace links', () => {
-      renderSidebar({ menus: [] }, '/')
+      renderSidebar({ menus: [] }, '/default')
       const homeItem = screen.getByTestId('menu-item-home')
       expect(homeItem.className).toMatch(/menuItem--active/)
     })
 
     it('should set aria-current on active link', () => {
-      renderSidebar({ menus: [] }, '/')
+      renderSidebar({ menus: [] }, '/default')
       const homeItem = screen.getByTestId('menu-item-home')
       const link = within(homeItem).getByRole('link')
       expect(link).toHaveAttribute('aria-current', 'page')
@@ -556,7 +556,7 @@ describe('Sidebar', () => {
     })
 
     it('should mark setup menu item as active when route matches', () => {
-      renderSidebar({ menus: sampleMenus }, '/collections')
+      renderSidebar({ menus: sampleMenus }, '/default/collections')
       const collectionsItem = screen.getByTestId('menu-item-collections')
       expect(collectionsItem.className).toMatch(/menuItem--active/)
     })

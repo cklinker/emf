@@ -6,6 +6,8 @@ import jakarta.validation.constraints.Size;
 /**
  * Request DTO for updating an existing field in a collection.
  * All fields are optional - only provided fields will be updated.
+ * Type validation is handled by FieldService.resolveFieldType() which supports
+ * all 24 field types including Phase 2 types.
  */
 public class UpdateFieldRequest {
 
@@ -13,26 +15,36 @@ public class UpdateFieldRequest {
     @Pattern(regexp = "^[a-zA-Z][a-zA-Z0-9_]*$", message = "Field name must start with a letter and contain only letters, numbers, and underscores")
     private String name;
 
-    @Pattern(regexp = "^(string|number|boolean|date|datetime|reference|array|object)$", 
-             message = "Field type must be one of: string, number, boolean, date, datetime, reference, array, object")
+    @Size(min = 1, max = 50, message = "Field display name must be between 1 and 50 characters")
+    private String displayName;
+
+    // Type validation handled by FieldService.resolveFieldType() to support all 24 types
     private String type;
 
     private Boolean required;
+
+    private Boolean unique;
+
+    private Boolean indexed;
+
+    private String defaultValue;
 
     @Size(max = 500, message = "Description must not exceed 500 characters")
     private String description;
 
     /**
      * JSON string containing field constraints.
-     * Examples:
-     * - For string: {"minLength": 1, "maxLength": 100, "pattern": "^[a-z]+$"}
-     * - For number: {"min": 0, "max": 100}
-     * - For reference: {"collection": "other-collection-id"}
-     * - For array: {"itemType": "string", "minItems": 0, "maxItems": 10}
      */
     private String constraints;
 
+    /**
+     * JSON string containing type-specific configuration.
+     */
+    private String fieldTypeConfig;
+
     private Boolean trackHistory;
+
+    private Integer order;
 
     public UpdateFieldRequest() {
     }
@@ -53,6 +65,14 @@ public class UpdateFieldRequest {
         this.name = name;
     }
 
+    public String getDisplayName() {
+        return displayName;
+    }
+
+    public void setDisplayName(String displayName) {
+        this.displayName = displayName;
+    }
+
     public String getType() {
         return type;
     }
@@ -67,6 +87,30 @@ public class UpdateFieldRequest {
 
     public void setRequired(Boolean required) {
         this.required = required;
+    }
+
+    public Boolean getUnique() {
+        return unique;
+    }
+
+    public void setUnique(Boolean unique) {
+        this.unique = unique;
+    }
+
+    public Boolean getIndexed() {
+        return indexed;
+    }
+
+    public void setIndexed(Boolean indexed) {
+        this.indexed = indexed;
+    }
+
+    public String getDefaultValue() {
+        return defaultValue;
+    }
+
+    public void setDefaultValue(String defaultValue) {
+        this.defaultValue = defaultValue;
     }
 
     public String getDescription() {
@@ -85,12 +129,28 @@ public class UpdateFieldRequest {
         this.constraints = constraints;
     }
 
+    public String getFieldTypeConfig() {
+        return fieldTypeConfig;
+    }
+
+    public void setFieldTypeConfig(String fieldTypeConfig) {
+        this.fieldTypeConfig = fieldTypeConfig;
+    }
+
     public Boolean getTrackHistory() {
         return trackHistory;
     }
 
     public void setTrackHistory(Boolean trackHistory) {
         this.trackHistory = trackHistory;
+    }
+
+    public Integer getOrder() {
+        return order;
+    }
+
+    public void setOrder(Integer order) {
+        this.order = order;
     }
 
     @Override

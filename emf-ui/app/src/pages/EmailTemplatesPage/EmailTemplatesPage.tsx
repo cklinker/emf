@@ -10,6 +10,7 @@ import {
   ExecutionLogModal,
 } from '../../components'
 import type { LogColumn } from '../../components'
+import { getTenantId } from '../../hooks'
 import styles from './EmailTemplatesPage.module.css'
 
 interface EmailTemplate {
@@ -408,7 +409,8 @@ export function EmailTemplatesPage({
     error: logsError,
   } = useQuery({
     queryKey: ['email-template-logs', logsItemId],
-    queryFn: () => apiClient.get<EmailLog[]>('/control/email-templates/logs?tenantId=default'),
+    queryFn: () =>
+      apiClient.get<EmailLog[]>(`/control/email-templates/logs?tenantId=${getTenantId()}`),
     enabled: !!logsItemId,
   })
 
@@ -443,7 +445,8 @@ export function EmailTemplatesPage({
     refetch,
   } = useQuery({
     queryKey: ['email-templates'],
-    queryFn: () => apiClient.get<EmailTemplate[]>('/control/email-templates?tenantId=default'),
+    queryFn: () =>
+      apiClient.get<EmailTemplate[]>(`/control/email-templates?tenantId=${getTenantId()}`),
   })
 
   const templateList: EmailTemplate[] = templates ?? []
@@ -451,7 +454,7 @@ export function EmailTemplatesPage({
   const createMutation = useMutation({
     mutationFn: (data: EmailTemplateFormData) =>
       apiClient.post<EmailTemplate>(
-        '/control/email-templates?tenantId=default&userId=system',
+        `/control/email-templates?tenantId=${getTenantId()}&userId=system`,
         data
       ),
     onSuccess: () => {

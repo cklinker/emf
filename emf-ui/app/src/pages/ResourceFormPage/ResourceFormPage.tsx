@@ -15,6 +15,7 @@ import React, { useState, useCallback, useMemo } from 'react'
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
+import { getTenantSlug } from '../../context/TenantContext'
 import { usePlugins } from '../../context/PluginContext'
 import { useApi } from '../../context/ApiContext'
 import { useToast, LoadingSpinner, ErrorMessage } from '../../components'
@@ -300,7 +301,7 @@ export function ResourceFormPage({
     onSuccess: (newResource) => {
       queryClient.invalidateQueries({ queryKey: ['resources', collectionName] })
       showToast(t('success.created', { item: t('resources.record') }), 'success')
-      navigate(`/resources/${collectionName}/${newResource.id}`)
+      navigate(`/${getTenantSlug()}/resources/${collectionName}/${newResource.id}`)
     },
     onError: (error: Error) => {
       showToast(error.message || t('errors.generic'), 'error')
@@ -315,7 +316,7 @@ export function ResourceFormPage({
       queryClient.invalidateQueries({ queryKey: ['resources', collectionName] })
       queryClient.invalidateQueries({ queryKey: ['resource', collectionName, resourceId] })
       showToast(t('success.updated', { item: t('resources.record') }), 'success')
-      navigate(`/resources/${collectionName}/${resourceId}`)
+      navigate(`/${getTenantSlug()}/resources/${collectionName}/${resourceId}`)
     },
     onError: (error: Error) => {
       showToast(error.message || t('errors.generic'), 'error')
@@ -565,9 +566,9 @@ export function ResourceFormPage({
    */
   const handleCancel = useCallback(() => {
     if (isEditMode) {
-      navigate(`/resources/${collectionName}/${resourceId}`)
+      navigate(`/${getTenantSlug()}/resources/${collectionName}/${resourceId}`)
     } else {
-      navigate(`/resources/${collectionName}`)
+      navigate(`/${getTenantSlug()}/resources/${collectionName}`)
     }
   }, [navigate, collectionName, resourceId, isEditMode])
 
@@ -835,13 +836,16 @@ export function ResourceFormPage({
       <header className={styles.header}>
         <div className={styles.headerLeft}>
           <nav className={styles.breadcrumb} aria-label="Breadcrumb">
-            <Link to="/resources" className={styles.breadcrumbLink}>
+            <Link to={`/${getTenantSlug()}/resources`} className={styles.breadcrumbLink}>
               {t('resources.title')}
             </Link>
             <span className={styles.breadcrumbSeparator} aria-hidden="true">
               /
             </span>
-            <Link to={`/resources/${collectionName}`} className={styles.breadcrumbLink}>
+            <Link
+              to={`/${getTenantSlug()}/resources/${collectionName}`}
+              className={styles.breadcrumbLink}
+            >
               {schema.displayName}
             </Link>
             <span className={styles.breadcrumbSeparator} aria-hidden="true">
@@ -873,7 +877,7 @@ export function ResourceFormPage({
                 {t('resources.cloningFrom')} {cloneSourceId}
               </span>
               <Link
-                to={`/resources/${collectionName}/${cloneSourceId}`}
+                to={`/${getTenantSlug()}/resources/${collectionName}/${cloneSourceId}`}
                 className={styles.cloneSourceLink}
               >
                 {t('resources.viewSource')}

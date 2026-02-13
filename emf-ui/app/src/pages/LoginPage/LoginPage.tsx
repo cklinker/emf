@@ -13,6 +13,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { KeyRound } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
+import { getTenantSlug } from '../../context/TenantContext'
 import { useConfig } from '../../context/ConfigContext'
 import { useI18n } from '../../context/I18nContext'
 import { LoadingSpinner } from '../../components/LoadingSpinner'
@@ -44,7 +45,8 @@ export function LoginPage({ title }: LoginPageProps): React.ReactElement {
   const [isLoggingIn, setIsLoggingIn] = useState(false)
 
   // Get the redirect path from location state
-  const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/'
+  const from =
+    (location.state as { from?: { pathname: string } })?.from?.pathname || `/${getTenantSlug()}`
 
   // Redirect if already authenticated
   useEffect(() => {

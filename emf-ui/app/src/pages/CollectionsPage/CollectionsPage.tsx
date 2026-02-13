@@ -17,6 +17,7 @@ import React, { useState, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
+import { getTenantSlug } from '../../context/TenantContext'
 import { useApi } from '../../context/ApiContext'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
 import styles from './CollectionsPage.module.css'
@@ -209,13 +210,13 @@ export function CollectionsPage({
 
   // Handle create action
   const handleCreate = useCallback(() => {
-    navigate('/collections/new')
+    navigate(`/${getTenantSlug()}/collections/new`)
   }, [navigate])
 
   // Handle edit action
   const handleEdit = useCallback(
     (collection: Collection) => {
-      navigate(`/collections/${collection.id}/edit`)
+      navigate(`/${getTenantSlug()}/collections/${collection.id}/edit`)
     },
     [navigate]
   )
@@ -223,7 +224,7 @@ export function CollectionsPage({
   // Handle view/detail action
   const handleView = useCallback(
     (collection: Collection) => {
-      navigate(`/collections/${collection.id}`)
+      navigate(`/${getTenantSlug()}/collections/${collection.id}`)
     },
     [navigate]
   )

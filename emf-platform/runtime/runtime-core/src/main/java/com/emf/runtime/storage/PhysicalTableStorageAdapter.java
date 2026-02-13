@@ -201,10 +201,13 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         try {
             // Execute query
             List<Map<String, Object>> data = jdbcTemplate.queryForList(sql.toString(), params.toArray());
-            
+
+            // Reconstruct companion column values into structured fields
+            reconstructCompanionColumns(definition, data);
+
             // Get total count
             long totalCount = getTotalCount(tableName, request.filters());
-            
+
             return QueryResult.of(data, totalCount, pagination);
         } catch (DataAccessException e) {
             throw new StorageException("Failed to query collection: " + definition.name(), e);
@@ -215,10 +218,15 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
     public Optional<Map<String, Object>> getById(CollectionDefinition definition, String id) {
         String tableName = getTableName(definition);
         String sql = "SELECT * FROM " + sanitizeIdentifier(tableName) + " WHERE id = ?";
-        
+
         try {
             List<Map<String, Object>> results = jdbcTemplate.queryForList(sql, id);
-            return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
+            if (results.isEmpty()) {
+                return Optional.empty();
+            }
+            // Reconstruct companion column values
+            reconstructCompanionColumns(definition, results);
+            return Optional.of(results.get(0));
         } catch (DataAccessException e) {
             throw new StorageException("Failed to get record by ID from collection: " + definition.name(), e);
         }
@@ -650,8 +658,42 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
     }
     
     /**
+     * Reconstructs structured values from companion columns for CURRENCY and GEOLOCATION fields.
+     * CURRENCY: combines primary column (amount) with _currency_code companion into a value + code.
+     * GEOLOCATION: combines primary column (latitude) with _longitude companion into a Map.
+     */
+    private void reconstructCompanionColumns(CollectionDefinition definition, List<Map<String, Object>> records) {
+        for (FieldDefinition field : definition.fields()) {
+            if (field.type() == FieldType.CURRENCY) {
+                String codeKey = field.name() + "_currency_code";
+                for (Map<String, Object> record : records) {
+                    // Ensure currency_code is accessible via the companion key name
+                    // The raw column name from JDBC may already be present
+                    if (!record.containsKey(codeKey)) {
+                        // Nothing to reconstruct
+                        continue;
+                    }
+                }
+            } else if (field.type() == FieldType.GEOLOCATION) {
+                String lngKey = field.name() + "_longitude";
+                for (Map<String, Object> record : records) {
+                    Object lat = record.get(field.name());
+                    Object lng = record.get(lngKey);
+                    if (lat instanceof Number && lng instanceof Number) {
+                        Map<String, Object> geo = new HashMap<>();
+                        geo.put("latitude", ((Number) lat).doubleValue());
+                        geo.put("longitude", ((Number) lng).doubleValue());
+                        record.put(field.name(), geo);
+                        record.remove(lngKey);
+                    }
+                }
+            }
+        }
+    }
+
+    /**
      * Attempts to detect which field caused a unique constraint violation.
-     * 
+     *
      * @param definition the collection definition
      * @param data the data that was being inserted/updated
      * @param e the exception

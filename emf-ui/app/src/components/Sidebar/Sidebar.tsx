@@ -17,6 +17,7 @@ import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
 import { useAuth } from '../../context/AuthContext'
 import { useFavorites } from '../../hooks/useFavorites'
+import { getTenantSlug } from '../../context/TenantContext'
 import {
   Home,
   BarChart3,
@@ -366,39 +367,41 @@ export function Sidebar({ menus, collapsed, onToggle, onItemClick }: SidebarProp
   // Check if any setup path is active to auto-expand
   const location = useLocation()
   useEffect(() => {
+    const slug = getTenantSlug()
+    const base = `/${slug}`
     const setupPaths = [
-      '/collections',
-      '/roles',
-      '/policies',
-      '/oidc-providers',
-      '/users',
-      '/profiles',
-      '/permission-sets',
-      '/sharing',
-      '/role-hierarchy',
-      '/picklists',
-      '/layouts',
-      '/listviews',
-      '/pages',
-      '/menus',
-      '/workflow-rules',
-      '/approvals',
-      '/flows',
-      '/scheduled-jobs',
-      '/email-templates',
-      '/scripts',
-      '/services',
-      '/webhooks',
-      '/connected-apps',
-      '/plugins',
-      '/packages',
-      '/migrations',
-      '/bulk-jobs',
-      '/tenants',
-      '/tenant-dashboard',
-      '/system-health',
-      '/audit-trail',
-      '/governor-limits',
+      `${base}/collections`,
+      `${base}/roles`,
+      `${base}/policies`,
+      `${base}/oidc-providers`,
+      `${base}/users`,
+      `${base}/profiles`,
+      `${base}/permission-sets`,
+      `${base}/sharing`,
+      `${base}/role-hierarchy`,
+      `${base}/picklists`,
+      `${base}/layouts`,
+      `${base}/listviews`,
+      `${base}/pages`,
+      `${base}/menus`,
+      `${base}/workflow-rules`,
+      `${base}/approvals`,
+      `${base}/flows`,
+      `${base}/scheduled-jobs`,
+      `${base}/email-templates`,
+      `${base}/scripts`,
+      `${base}/services`,
+      `${base}/webhooks`,
+      `${base}/connected-apps`,
+      `${base}/plugins`,
+      `${base}/packages`,
+      `${base}/migrations`,
+      `${base}/bulk-jobs`,
+      `${base}/tenants`,
+      `${base}/tenant-dashboard`,
+      `${base}/system-health`,
+      `${base}/audit-trail`,
+      `${base}/governor-limits`,
     ]
     if (setupPaths.some((p) => location.pathname.startsWith(p))) {
       setSetupExpanded(true)
@@ -416,7 +419,12 @@ export function Sidebar({ menus, collapsed, onToggle, onItemClick }: SidebarProp
         {!collapsed && <h2 className={styles.menuSectionTitle}>{t('sidebar.workspace')}</h2>}
         <ul className={styles.menuList} role="menubar" aria-label={t('sidebar.workspace')}>
           <MenuItem
-            item={{ id: 'home', label: t('navigation.home'), path: '/', icon: 'home' }}
+            item={{
+              id: 'home',
+              label: t('navigation.home'),
+              path: `/${getTenantSlug()}`,
+              icon: 'home',
+            }}
             level={0}
             collapsed={collapsed}
             onItemClick={onItemClick}
@@ -429,7 +437,7 @@ export function Sidebar({ menus, collapsed, onToggle, onItemClick }: SidebarProp
               item={{
                 id: `fav-${fav.id}`,
                 label: fav.displayValue,
-                path: `/resources/${fav.id}`,
+                path: `/${getTenantSlug()}/resources/${fav.id}`,
                 icon: 'star',
               }}
               level={0}
@@ -442,7 +450,7 @@ export function Sidebar({ menus, collapsed, onToggle, onItemClick }: SidebarProp
             item={{
               id: 'all-collections',
               label: t('sidebar.allCollections'),
-              path: '/resources',
+              path: `/${getTenantSlug()}/resources`,
               icon: 'resources',
             }}
             level={0}
@@ -457,7 +465,12 @@ export function Sidebar({ menus, collapsed, onToggle, onItemClick }: SidebarProp
         {!collapsed && <h2 className={styles.menuSectionTitle}>{t('sidebar.tools')}</h2>}
         <ul className={styles.menuList} role="menubar" aria-label={t('sidebar.tools')}>
           <MenuItem
-            item={{ id: 'reports', label: t('sidebar.reports'), path: '/reports', icon: 'report' }}
+            item={{
+              id: 'reports',
+              label: t('sidebar.reports'),
+              path: `/${getTenantSlug()}/reports`,
+              icon: 'report',
+            }}
             level={0}
             collapsed={collapsed}
             onItemClick={onItemClick}
@@ -466,7 +479,7 @@ export function Sidebar({ menus, collapsed, onToggle, onItemClick }: SidebarProp
             item={{
               id: 'dashboards',
               label: t('sidebar.dashboards'),
-              path: '/dashboards',
+              path: `/${getTenantSlug()}/dashboards`,
               icon: 'dashboard',
             }}
             level={0}
@@ -521,15 +534,32 @@ export function Sidebar({ menus, collapsed, onToggle, onItemClick }: SidebarProp
                   role="menubar"
                   aria-label={menu.name || t('navigation.menu')}
                 >
-                  {menu.items.map((item) => (
-                    <MenuItem
-                      key={item.id}
-                      item={item}
-                      level={0}
-                      collapsed={collapsed}
-                      onItemClick={onItemClick}
-                    />
-                  ))}
+                  {menu.items.map((item) => {
+                    const slug = getTenantSlug()
+                    const prefixedItem = {
+                      ...item,
+                      path:
+                        item.path && !item.path.startsWith(`/${slug}`)
+                          ? `/${slug}${item.path}`
+                          : item.path,
+                      children: item.children?.map((child) => ({
+                        ...child,
+                        path:
+                          child.path && !child.path.startsWith(`/${slug}`)
+                            ? `/${slug}${child.path}`
+                            : child.path,
+                      })),
+                    }
+                    return (
+                      <MenuItem
+                        key={item.id}
+                        item={prefixedItem}
+                        level={0}
+                        collapsed={collapsed}
+                        onItemClick={onItemClick}
+                      />
+                    )
+                  })}
                 </ul>
               </div>
             ))}
@@ -541,7 +571,7 @@ export function Sidebar({ menus, collapsed, onToggle, onItemClick }: SidebarProp
                   item={{
                     id: 'system-health',
                     label: t('sidebar.systemHealth'),
-                    path: '/system-health',
+                    path: `/${getTenantSlug()}/system-health`,
                     icon: 'health',
                   }}
                   level={0}

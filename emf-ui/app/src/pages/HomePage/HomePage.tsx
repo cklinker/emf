@@ -10,6 +10,7 @@ import { useMemo } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
+import { getTenantSlug } from '../../context/TenantContext'
 import { useApi } from '../../context/ApiContext'
 import { useAuth } from '../../context/AuthContext'
 import { useRecentRecords } from '../../hooks/useRecentRecords'
@@ -97,7 +98,7 @@ export function HomePage({ testId = 'home-page' }: HomePageProps): JSX.Element {
               <button
                 key={col.name}
                 className={styles.quickCreateButton}
-                onClick={() => navigate(`/resources/${col.name}/new`)}
+                onClick={() => navigate(`/${getTenantSlug()}/resources/${col.name}/new`)}
               >
                 <span className={styles.quickCreateIcon} aria-hidden="true">
                   +
@@ -124,7 +125,7 @@ export function HomePage({ testId = 'home-page' }: HomePageProps): JSX.Element {
               {recentDisplay.map((record, idx) => (
                 <li key={`${record.collectionName}-${record.id}-${idx}`}>
                   <Link
-                    to={`/resources/${record.collectionName}/${record.id}`}
+                    to={`/${getTenantSlug()}/resources/${record.collectionName}/${record.id}`}
                     className={styles.recordItem}
                   >
                     <div className={styles.recordInfo}>
@@ -158,7 +159,7 @@ export function HomePage({ testId = 'home-page' }: HomePageProps): JSX.Element {
               {approvalsList.slice(0, 5).map((approval) => (
                 <li key={approval.id}>
                   <Link
-                    to={`/resources/${approval.collectionId}/${approval.recordId}`}
+                    to={`/${getTenantSlug()}/resources/${approval.collectionId}/${approval.recordId}`}
                     className={styles.recordItem}
                   >
                     <div className={styles.recordInfo}>
@@ -173,7 +174,7 @@ export function HomePage({ testId = 'home-page' }: HomePageProps): JSX.Element {
               ))}
               {approvalsList.length > 5 && (
                 <li>
-                  <Link to="/approvals" className={styles.viewAll}>
+                  <Link to={`/${getTenantSlug()}/approvals`} className={styles.viewAll}>
                     {t('home.viewAll')} ({approvalsList.length})
                   </Link>
                 </li>
@@ -196,7 +197,7 @@ export function HomePage({ testId = 'home-page' }: HomePageProps): JSX.Element {
               {favoriteRecords.map((fav) => (
                 <li key={`${fav.type}-${fav.id}`}>
                   <Link
-                    to={`/resources/${fav.collectionName}/${fav.id}`}
+                    to={`/${getTenantSlug()}/resources/${fav.collectionName}/${fav.id}`}
                     className={styles.recordItem}
                   >
                     <div className={styles.recordInfo}>

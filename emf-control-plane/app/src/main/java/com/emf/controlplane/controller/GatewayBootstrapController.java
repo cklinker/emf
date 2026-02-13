@@ -6,6 +6,7 @@ import com.emf.controlplane.entity.UiPage;
 import com.emf.controlplane.repository.OidcProviderRepository;
 import com.emf.controlplane.service.GatewayBootstrapService;
 import com.emf.controlplane.service.UiConfigService;
+import com.emf.controlplane.tenant.TenantContextHolder;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -115,13 +116,25 @@ public class GatewayBootstrapController {
                 true, true, true, true, true
         );
 
-        List<BootstrapConfigDto.OidcProviderSummary> oidcProviders = oidcProviderRepository.findByActiveTrue()
-                .stream()
-                .map(p -> new BootstrapConfigDto.OidcProviderSummary(p.getId(), p.getName(), p.getIssuer(), p.getClientId()))
-                .collect(Collectors.toList());
+        // Return tenant-scoped OIDC providers when tenant context is set (slug-based request),
+        // otherwise return all active providers (gateway internal bootstrap)
+        String tenantId = TenantContextHolder.getTenantId();
+        List<BootstrapConfigDto.OidcProviderSummary> oidcProviders;
+        if (tenantId != null) {
+            oidcProviders = oidcProviderRepository.findByTenantIdAndActiveTrue(tenantId)
+                    .stream()
+                    .map(p -> new BootstrapConfigDto.OidcProviderSummary(p.getId(), p.getName(), p.getIssuer(), p.getClientId()))
+                    .collect(Collectors.toList());
+        } else {
+            oidcProviders = oidcProviderRepository.findByActiveTrue()
+                    .stream()
+                    .map(p -> new BootstrapConfigDto.OidcProviderSummary(p.getId(), p.getName(), p.getIssuer(), p.getClientId()))
+                    .collect(Collectors.toList());
+        }
 
+        String tenantSlug = TenantContextHolder.getTenantSlug();
         BootstrapConfigDto bootstrapDto = new BootstrapConfigDto(
-                pageDtos, menuDtos, theme, branding, features, oidcProviders
+                pageDtos, menuDtos, theme, branding, features, oidcProviders, tenantId, tenantSlug
         );
 
         return ResponseEntity.ok(bootstrapDto);

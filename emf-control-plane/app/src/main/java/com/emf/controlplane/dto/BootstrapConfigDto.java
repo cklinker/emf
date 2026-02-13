@@ -16,6 +16,8 @@ public class BootstrapConfigDto {
     private BrandingConfig branding;
     private FeatureFlags features;
     private List<OidcProviderSummary> oidcProviders;
+    private String tenantId;
+    private String tenantSlug;
 
     public BootstrapConfigDto() {
     }
@@ -29,6 +31,15 @@ public class BootstrapConfigDto {
         this.branding = branding;
         this.features = features;
         this.oidcProviders = oidcProviders;
+    }
+
+    public BootstrapConfigDto(List<UiPageDto> pages, List<UiMenuDto> menus,
+                              ThemeConfig theme, BrandingConfig branding,
+                              FeatureFlags features, List<OidcProviderSummary> oidcProviders,
+                              String tenantId, String tenantSlug) {
+        this(pages, menus, theme, branding, features, oidcProviders);
+        this.tenantId = tenantId;
+        this.tenantSlug = tenantSlug;
     }
 
     public List<UiPageDto> getPages() {
@@ -77,6 +88,22 @@ public class BootstrapConfigDto {
 
     public void setOidcProviders(List<OidcProviderSummary> oidcProviders) {
         this.oidcProviders = oidcProviders;
+    }
+
+    public String getTenantId() {
+        return tenantId;
+    }
+
+    public void setTenantId(String tenantId) {
+        this.tenantId = tenantId;
+    }
+
+    public String getTenantSlug() {
+        return tenantSlug;
+    }
+
+    public void setTenantSlug(String tenantSlug) {
+        this.tenantSlug = tenantSlug;
     }
 
     @Override

@@ -452,7 +452,7 @@ class FieldDefinitionBuilderTest {
         @Test
         @DisplayName("Should create numeric field with validation rules")
         void shouldCreateNumericFieldWithValidationRules() {
-            ValidationRules rules = ValidationRules.forNumeric(0, 100);
+            ValidationRules rules = ValidationRules.forNumeric(0.0, 100.0);
             
             FieldDefinition field = FieldDefinitionBuilder.builder()
                 .name("percentage")

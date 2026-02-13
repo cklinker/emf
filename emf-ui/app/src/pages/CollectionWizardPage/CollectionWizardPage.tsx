@@ -25,6 +25,8 @@ import {
   Wand2,
 } from 'lucide-react'
 import { useI18n } from '../../context/I18nContext'
+import { getTenantSlug } from '../../context/TenantContext'
+import { getTenantId } from '../../hooks'
 import { useApi } from '../../context/ApiContext'
 import { useToast } from '../../components/Toast'
 import { LoadingSpinner } from '../../components'
@@ -377,7 +379,7 @@ export function CollectionWizardPage({
   }, [])
 
   const handleCancel = useCallback(() => {
-    navigate('/collections')
+    navigate(`/${getTenantSlug()}/collections`)
   }, [navigate])
 
   // Create collection
@@ -429,7 +431,7 @@ export function CollectionWizardPage({
             method: 'GET',
             pathPattern: `/gateway/${collectionPath}/**`,
             policyId: authorization.readPolicyId,
-            tenantId: 'default',
+            tenantId: getTenantId(),
           })
         }
 
@@ -438,7 +440,7 @@ export function CollectionWizardPage({
             method: 'POST',
             pathPattern: `/gateway/${collectionPath}`,
             policyId: authorization.createPolicyId,
-            tenantId: 'default',
+            tenantId: getTenantId(),
           })
         }
 
@@ -447,7 +449,7 @@ export function CollectionWizardPage({
             method: 'PUT',
             pathPattern: `/gateway/${collectionPath}/**`,
             policyId: authorization.updatePolicyId,
-            tenantId: 'default',
+            tenantId: getTenantId(),
           })
         }
 
@@ -456,13 +458,13 @@ export function CollectionWizardPage({
             method: 'DELETE',
             pathPattern: `/gateway/${collectionPath}/**`,
             policyId: authorization.deletePolicyId,
-            tenantId: 'default',
+            tenantId: getTenantId(),
           })
         }
       }
 
       showToast(t('success.created', { item: 'Collection' }), 'success')
-      navigate(`/collections/${collectionId}`)
+      navigate(`/${getTenantSlug()}/collections/${collectionId}`)
     } catch (error) {
       console.error('Failed to create collection:', error)
       showToast(error instanceof Error ? error.message : t('errors.generic'), 'error')

@@ -8,6 +8,8 @@ import com.emf.controlplane.entity.ValidationRule;
 import com.emf.controlplane.exception.DuplicateResourceException;
 import com.emf.controlplane.exception.ResourceNotFoundException;
 import com.emf.controlplane.exception.ValidationException;
+import com.emf.controlplane.event.ConfigEventPublisher;
+import com.emf.runtime.event.ChangeType;
 import com.emf.controlplane.repository.CollectionRepository;
 import com.emf.controlplane.repository.FieldRepository;
 import com.emf.controlplane.repository.ValidationRuleRepository;
@@ -35,16 +37,19 @@ public class ValidationRuleService {
     private final CollectionRepository collectionRepository;
     private final FieldRepository fieldRepository;
     private final ValidationRuleEvaluator validationRuleEvaluator;
+    private final ConfigEventPublisher eventPublisher;
 
     public ValidationRuleService(
             ValidationRuleRepository validationRuleRepository,
             CollectionRepository collectionRepository,
             FieldRepository fieldRepository,
-            @Nullable ValidationRuleEvaluator validationRuleEvaluator) {
+            @Nullable ValidationRuleEvaluator validationRuleEvaluator,
+            @Nullable ConfigEventPublisher eventPublisher) {
         this.validationRuleRepository = validationRuleRepository;
         this.collectionRepository = collectionRepository;
         this.fieldRepository = fieldRepository;
         this.validationRuleEvaluator = validationRuleEvaluator;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional(readOnly = true)
@@ -95,6 +100,7 @@ public class ValidationRuleService {
         rule.setEvaluateOn(evaluateOn);
 
         rule = validationRuleRepository.save(rule);
+        publishCollectionChanged(collection);
         log.info("Created validation rule '{}' with id: {}", request.getName(), rule.getId());
         return rule;
     }
@@ -150,7 +156,9 @@ public class ValidationRuleService {
             rule.setActive(request.getActive());
         }
 
-        return validationRuleRepository.save(rule);
+        rule = validationRuleRepository.save(rule);
+        publishCollectionChanged(rule.getCollection());
+        return rule;
     }
 
     @Transactional
@@ -159,7 +167,9 @@ public class ValidationRuleService {
         log.info("Deleting validation rule: {}", ruleId);
         ValidationRule rule = validationRuleRepository.findById(ruleId)
                 .orElseThrow(() -> new ResourceNotFoundException("ValidationRule", ruleId));
+        Collection collection = rule.getCollection();
         validationRuleRepository.delete(rule);
+        publishCollectionChanged(collection);
     }
 
     @Transactional
@@ -240,5 +250,11 @@ public class ValidationRuleService {
     private Collection verifyCollection(String collectionId) {
         return collectionRepository.findByIdAndActiveTrue(collectionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Collection", collectionId));
+    }
+
+    private void publishCollectionChanged(Collection collection) {
+        if (eventPublisher != null) {
+            eventPublisher.publishCollectionChanged(collection, ChangeType.UPDATED);
+        }
     }
 }

@@ -2,6 +2,11 @@ package com.emf.runtime.query;
 
 import com.emf.runtime.model.CollectionDefinition;
 import com.emf.runtime.model.FieldDefinition;
+import com.emf.runtime.model.FieldType;
+import com.emf.runtime.service.AutoNumberService;
+import com.emf.runtime.service.FieldEncryptionService;
+import com.emf.runtime.service.RollupSummaryService;
+import com.emf.runtime.formula.FormulaEvaluator;
 import com.emf.runtime.storage.StorageAdapter;
 import com.emf.runtime.validation.OperationType;
 import com.emf.runtime.validation.ValidationEngine;
@@ -15,44 +20,65 @@ import java.util.*;
 
 /**
  * Default implementation of the QueryEngine interface.
- * 
+ *
  * <p>This implementation:
  * <ul>
  *   <li>Validates query parameters against collection definitions</li>
  *   <li>Integrates with StorageAdapter for persistence</li>
  *   <li>Integrates with ValidationEngine for data validation</li>
+ *   <li>Integrates with FormulaEvaluator for FORMULA field computation</li>
+ *   <li>Integrates with RollupSummaryService for ROLLUP_SUMMARY computation</li>
+ *   <li>Integrates with FieldEncryptionService for ENCRYPTED field handling</li>
+ *   <li>Integrates with AutoNumberService for AUTO_NUMBER generation</li>
  *   <li>Adds system fields (id, createdAt, updatedAt) automatically</li>
  *   <li>Logs query performance metrics</li>
  * </ul>
- * 
+ *
  * <p>Thread Safety: This class is thread-safe. All operations delegate to
  * thread-safe components (StorageAdapter, ValidationEngine).
- * 
+ *
  * @since 1.0.0
  */
 public class DefaultQueryEngine implements QueryEngine {
-    
+
     private static final Logger logger = LoggerFactory.getLogger(DefaultQueryEngine.class);
-    
+
     private static final Set<String> SYSTEM_FIELDS = Set.of("id", "createdAt", "updatedAt");
-    
+
     private final StorageAdapter storageAdapter;
     private final ValidationEngine validationEngine;
-    
+    private final FieldEncryptionService encryptionService;
+    private final AutoNumberService autoNumberService;
+    private final FormulaEvaluator formulaEvaluator;
+    private final RollupSummaryService rollupSummaryService;
+
+    /**
+     * Creates a new DefaultQueryEngine with all services.
+     */
+    public DefaultQueryEngine(StorageAdapter storageAdapter, ValidationEngine validationEngine,
+                              FieldEncryptionService encryptionService, AutoNumberService autoNumberService,
+                              FormulaEvaluator formulaEvaluator, RollupSummaryService rollupSummaryService) {
+        this.storageAdapter = Objects.requireNonNull(storageAdapter, "storageAdapter cannot be null");
+        this.validationEngine = validationEngine;
+        this.encryptionService = encryptionService;
+        this.autoNumberService = autoNumberService;
+        this.formulaEvaluator = formulaEvaluator;
+        this.rollupSummaryService = rollupSummaryService;
+    }
+
     /**
      * Creates a new DefaultQueryEngine.
-     * 
+     *
      * @param storageAdapter the storage adapter for persistence
      * @param validationEngine the validation engine for data validation (may be null)
      */
     public DefaultQueryEngine(StorageAdapter storageAdapter, ValidationEngine validationEngine) {
-        this.storageAdapter = Objects.requireNonNull(storageAdapter, "storageAdapter cannot be null");
-        this.validationEngine = validationEngine;
+        this(storageAdapter, validationEngine, null, null, null, null);
     }
-    
+
     /**
      * Creates a new DefaultQueryEngine without validation.
-     * 
+     *
      * @param storageAdapter the storage adapter for persistence
      */
     public DefaultQueryEngine(StorageAdapter storageAdapter) {
@@ -77,12 +103,18 @@ public class DefaultQueryEngine implements QueryEngine {
         
         // Execute query via storage adapter
         QueryResult result = storageAdapter.query(definition, request);
-        
+
+        // Compute formula and rollup fields on results
+        computeVirtualFields(definition, result.data());
+
+        // Decrypt encrypted fields on results
+        decryptFields(definition, result.data());
+
         // Log query performance
         long duration = System.currentTimeMillis() - startTime;
         logger.debug("Query executed on collection '{}': {} records returned in {}ms",
             definition.name(), result.size(), duration);
-        
+
         return result;
     }
     
@@ -91,7 +123,12 @@ public class DefaultQueryEngine implements QueryEngine {
         Objects.requireNonNull(definition, "definition cannot be null");
         Objects.requireNonNull(id, "id cannot be null");
         
-        return storageAdapter.getById(definition, id);
+        Optional<Map<String, Object>> result = storageAdapter.getById(definition, id);
+        result.ifPresent(record -> {
+            computeVirtualFields(definition, List.of(record));
+            decryptFields(definition, List.of(record));
+        });
+        return result;
     }
     
     @Override
@@ -108,7 +145,13 @@ public class DefaultQueryEngine implements QueryEngine {
         recordData.put("id", id);
         recordData.put("createdAt", now);
         recordData.put("updatedAt", now);
-        
+
+        // Generate auto-number values for AUTO_NUMBER fields
+        generateAutoNumbers(definition, recordData);
+
+        // Encrypt ENCRYPTED field values before validation and storage
+        encryptFields(definition, recordData);
+
         // Validate data
         if (validationEngine != null) {
             ValidationResult validation = validationEngine.validate(definition, recordData, OperationType.CREATE);
@@ -227,5 +270,92 @@ public class DefaultQueryEngine implements QueryEngine {
             return true;
         }
         return definition.getField(fieldName) != null;
+    }
+
+    /**
+     * Generates auto-number values for AUTO_NUMBER fields during record creation.
+     */
+    private void generateAutoNumbers(CollectionDefinition definition, Map<String, Object> data) {
+        if (autoNumberService == null) {
+            return;
+        }
+        for (FieldDefinition field : definition.fields()) {
+            if (field.type() == FieldType.AUTO_NUMBER && !data.containsKey(field.name())) {
+                String seqName = "seq_" + definition.name() + "_" + field.name();
+                // TODO: Read prefix/padding from field-type-specific config once FieldDefinition carries it
+                String prefix = "";
+                int padding = 6;
+                try {
+                    String value = autoNumberService.generateNext(seqName, prefix, padding);
+                    data.put(field.name(), value);
+                } catch (Exception e) {
+                    logger.warn("Failed to generate auto-number for field '{}': {}", field.name(), e.getMessage());
+                }
+            }
+        }
+    }
+
+    /**
+     * Encrypts ENCRYPTED field values before storage.
+     */
+    private void encryptFields(CollectionDefinition definition, Map<String, Object> data) {
+        if (encryptionService == null) {
+            return;
+        }
+        String tenantId = data.containsKey("tenantId") ? data.get("tenantId").toString() : "default";
+        for (FieldDefinition field : definition.fields()) {
+            if (field.type() == FieldType.ENCRYPTED && data.containsKey(field.name())) {
+                Object value = data.get(field.name());
+                if (value instanceof String plaintext) {
+                    byte[] encrypted = encryptionService.encrypt(plaintext, tenantId);
+                    data.put(field.name(), encrypted);
+                }
+            }
+        }
+    }
+
+    /**
+     * Decrypts ENCRYPTED field values after retrieval.
+     */
+    private void decryptFields(CollectionDefinition definition, List<Map<String, Object>> records) {
+        if (encryptionService == null) {
+            return;
+        }
+        for (Map<String, Object> record : records) {
+            String tenantId = record.containsKey("tenantId") ? record.get("tenantId").toString() : "default";
+            for (FieldDefinition field : definition.fields()) {
+                if (field.type() == FieldType.ENCRYPTED && record.containsKey(field.name())) {
+                    Object value = record.get(field.name());
+                    if (value instanceof byte[] encryptedData) {
+                        try {
+                            String decrypted = encryptionService.decrypt(encryptedData, tenantId);
+                            record.put(field.name(), decrypted);
+                        } catch (Exception e) {
+                            logger.warn("Failed to decrypt field '{}': {}", field.name(), e.getMessage());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Computes FORMULA and ROLLUP_SUMMARY field values after retrieval.
+     */
+    private void computeVirtualFields(CollectionDefinition definition, List<Map<String, Object>> records) {
+        for (Map<String, Object> record : records) {
+            for (FieldDefinition field : definition.fields()) {
+                // TODO: FORMULA and ROLLUP_SUMMARY require field-type-specific config
+                // (expression, childTable, etc.) which is not yet available on FieldDefinition.
+                // These will be wired once FieldDefinition carries a config map.
+                if (field.type() == FieldType.FORMULA && formulaEvaluator != null) {
+                    // Formula expression would come from field config; skip until available
+                    logger.debug("Skipping formula field '{}' — config not available on FieldDefinition", field.name());
+                } else if (field.type() == FieldType.ROLLUP_SUMMARY && rollupSummaryService != null) {
+                    // Rollup config would come from field config; skip until available
+                    logger.debug("Skipping rollup field '{}' — config not available on FieldDefinition", field.name());
+                }
+            }
+        }
     }
 }

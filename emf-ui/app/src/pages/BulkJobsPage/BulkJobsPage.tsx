@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
+import { getTenantId } from '../../hooks'
 import styles from './BulkJobsPage.module.css'
 
 interface BulkJob {
@@ -298,7 +299,7 @@ export function BulkJobsPage({ testId = 'bulk-jobs-page' }: BulkJobsPageProps): 
     refetch,
   } = useQuery({
     queryKey: ['bulk-jobs'],
-    queryFn: () => apiClient.get<BulkJob[]>('/control/bulk-jobs?tenantId=default'),
+    queryFn: () => apiClient.get<BulkJob[]>(`/control/bulk-jobs?tenantId=${getTenantId()}`),
     refetchInterval: 5000,
   })
 
@@ -306,7 +307,7 @@ export function BulkJobsPage({ testId = 'bulk-jobs-page' }: BulkJobsPageProps): 
 
   const createMutation = useMutation({
     mutationFn: (data: BulkJobFormData) =>
-      apiClient.post<BulkJob>('/control/bulk-jobs?tenantId=default&userId=system', data),
+      apiClient.post<BulkJob>(`/control/bulk-jobs?tenantId=${getTenantId()}&userId=system`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bulk-jobs'] })
       showToast('Bulk job created successfully', 'success')

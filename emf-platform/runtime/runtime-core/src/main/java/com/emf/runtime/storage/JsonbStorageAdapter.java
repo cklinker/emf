@@ -622,7 +622,9 @@ public class JsonbStorageAdapter implements StorageAdapter {
     private boolean isNumericType(com.emf.runtime.model.FieldType type) {
         return type == com.emf.runtime.model.FieldType.INTEGER ||
                type == com.emf.runtime.model.FieldType.LONG ||
-               type == com.emf.runtime.model.FieldType.DOUBLE;
+               type == com.emf.runtime.model.FieldType.DOUBLE ||
+               type == com.emf.runtime.model.FieldType.CURRENCY ||
+               type == com.emf.runtime.model.FieldType.PERCENT;
     }
     
     /**

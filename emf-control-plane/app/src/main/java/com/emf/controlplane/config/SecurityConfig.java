@@ -146,6 +146,9 @@ public class SecurityConfig {
                 // Permit control plane bootstrap endpoint - required for gateway health check
                 .requestMatchers("/control/bootstrap").permitAll()
 
+                // Permit tenant slug-map endpoint - used by gateway to resolve URL slugs
+                .requestMatchers("/control/tenants/slug-map").permitAll()
+
                 // Permit internal endpoints - used by gateway for JWKS lookup before JWT validation
                 .requestMatchers("/internal/**").permitAll()
 

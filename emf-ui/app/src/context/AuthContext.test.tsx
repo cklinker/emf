@@ -9,6 +9,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AuthProvider, useAuth } from './AuthContext'
+import { clearBootstrapCache } from '../utils/bootstrapCache'
 import type { ReactNode } from 'react'
 
 // Store original fetch
@@ -158,6 +159,7 @@ function createMockJwt(payload: Record<string, unknown>): string {
 describe('AuthContext', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    clearBootstrapCache()
 
     // Clear mock storage
     Object.keys(mockSessionStorage).forEach((key) => delete mockSessionStorage[key])

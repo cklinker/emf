@@ -155,7 +155,7 @@ public class RouteAuthorizationFilter implements GlobalFilter, Ordered {
         exchange.getResponse().getHeaders().add(HttpHeaders.CONTENT_TYPE, "application/json");
 
         String errorJson = String.format(
-            "{\"error\":{\"status\":403,\"code\":\"FORBIDDEN\",\"message\":\"%s\",\"path\":\"%s\"}}",
+            "{\"errors\":[{\"status\":\"403\",\"code\":\"FORBIDDEN\",\"detail\":\"%s\",\"meta\":{\"path\":\"%s\"}}]}",
             message,
             exchange.getRequest().getPath().value()
         );

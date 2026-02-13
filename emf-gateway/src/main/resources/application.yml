@@ -66,6 +66,13 @@ emf:
     # Feature flag: use profile-based permissions instead of legacy role-based policies
     use-profiles: ${USE_PROFILES:false}
 
+    # Tenant slug URL prefix configuration
+    tenant-slug:
+      enabled: ${TENANT_SLUG_ENABLED:true}
+      require-prefix: ${TENANT_SLUG_REQUIRE_PREFIX:false}
+      platform-paths: /actuator,/platform
+      cache-refresh-ms: 60000
+
     # Control plane connection
     control-plane:
       url: ${CONTROL_PLANE_URL:http://localhost:8080}

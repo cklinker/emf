@@ -97,17 +97,61 @@ public class RouteRegistry {
     }
     
     /**
-     * Finds a route by its path pattern.
-     * 
-     * @param path The path pattern to search for
-     * @return Optional containing the route if found, empty otherwise
+     * Finds a route whose path pattern matches the given request path.
+     * Supports exact match, /** (multi-segment wildcard), and /* (single-segment wildcard).
+     *
+     * @param path The request path to match against registered route patterns
+     * @return Optional containing the matching route if found, empty otherwise
      */
     public Optional<RouteDefinition> findByPath(String path) {
         if (path == null || path.isEmpty()) {
             return Optional.empty();
         }
-        
-        return Optional.ofNullable(routes.get(path));
+
+        // Try exact match first (most efficient)
+        RouteDefinition exact = routes.get(path);
+        if (exact != null) {
+            return Optional.of(exact);
+        }
+
+        // Try wildcard matching against all registered patterns
+        for (RouteDefinition route : routes.values()) {
+            if (matchesPath(path, route.getPath())) {
+                return Optional.of(route);
+            }
+        }
+
+        return Optional.empty();
+    }
+
+    /**
+     * Matches a request path against a route path pattern.
+     * Supports /** (multi-segment) and /* (single-segment) wildcards.
+     */
+    private boolean matchesPath(String requestPath, String routePattern) {
+        if (requestPath == null || routePattern == null) {
+            return false;
+        }
+
+        if (requestPath.equals(routePattern)) {
+            return true;
+        }
+
+        if (routePattern.endsWith("/**")) {
+            String prefix = routePattern.substring(0, routePattern.length() - 3);
+            return requestPath.startsWith(prefix);
+        }
+
+        if (routePattern.endsWith("/*")) {
+            String prefix = routePattern.substring(0, routePattern.length() - 2);
+            if (!requestPath.startsWith(prefix)) {
+                return false;
+            }
+            String remainder = requestPath.substring(prefix.length());
+            return !remainder.isEmpty() && !remainder.substring(1).contains("/");
+        }
+
+        return false;
     }
     
     /**

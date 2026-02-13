@@ -16,6 +16,7 @@ import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { ArrowLeft, Star, ChevronDown } from 'lucide-react'
 import { useI18n } from '../../context/I18nContext'
+import { getTenantId } from '../../hooks'
 import { useToast } from '../../components'
 import type { ApiClient } from '../../services/apiClient'
 import styles from './RecordActionsBar.module.css'
@@ -182,7 +183,7 @@ export function RecordActionsBar({
   const submitApprovalMutation = useMutation({
     mutationFn: async () => {
       const params = new URLSearchParams({
-        tenantId: 'default',
+        tenantId: getTenantId(),
         collectionId: collectionName,
         recordId: recordId,
         processId: '',
@@ -217,7 +218,7 @@ export function RecordActionsBar({
     queryKey: ['approval-instances', collectionName, recordId],
     queryFn: async () => {
       const result = await apiClient.get<ApprovalInstance[]>(
-        '/control/approvals/instances?tenantId=default'
+        `/control/approvals/instances?tenantId=${getTenantId()}`
       )
       return result
     },

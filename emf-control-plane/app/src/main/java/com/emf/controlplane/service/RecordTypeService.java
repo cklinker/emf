@@ -11,6 +11,8 @@ import com.emf.controlplane.entity.RecordTypePicklist;
 import com.emf.controlplane.exception.DuplicateResourceException;
 import com.emf.controlplane.exception.ResourceNotFoundException;
 import com.emf.controlplane.exception.ValidationException;
+import com.emf.controlplane.event.ConfigEventPublisher;
+import com.emf.runtime.event.ChangeType;
 import com.emf.controlplane.repository.CollectionRepository;
 import com.emf.controlplane.repository.FieldRepository;
 import com.emf.controlplane.repository.RecordTypePicklistRepository;
@@ -19,6 +21,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,18 +38,21 @@ public class RecordTypeService {
     private final CollectionRepository collectionRepository;
     private final FieldRepository fieldRepository;
     private final ObjectMapper objectMapper;
+    private final ConfigEventPublisher eventPublisher;
 
     public RecordTypeService(
             RecordTypeRepository recordTypeRepository,
             RecordTypePicklistRepository recordTypePicklistRepository,
             CollectionRepository collectionRepository,
             FieldRepository fieldRepository,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            @Nullable ConfigEventPublisher eventPublisher) {
         this.recordTypeRepository = recordTypeRepository;
         this.recordTypePicklistRepository = recordTypePicklistRepository;
         this.collectionRepository = collectionRepository;
         this.fieldRepository = fieldRepository;
         this.objectMapper = objectMapper;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional(readOnly = true)
@@ -77,6 +83,7 @@ public class RecordTypeService {
         }
 
         recordType = recordTypeRepository.save(recordType);
+        publishCollectionChanged(collection);
         log.info("Created record type '{}' with id: {}", request.getName(), recordType.getId());
         return recordType;
     }
@@ -118,7 +125,9 @@ public class RecordTypeService {
             recordType.setDefault(request.getIsDefault());
         }
 
-        return recordTypeRepository.save(recordType);
+        recordType = recordTypeRepository.save(recordType);
+        publishCollectionChanged(recordType.getCollection());
+        return recordType;
     }
 
     @Transactional
@@ -127,7 +136,9 @@ public class RecordTypeService {
         log.info("Deleting record type: {}", recordTypeId);
         RecordType recordType = recordTypeRepository.findById(recordTypeId)
                 .orElseThrow(() -> new ResourceNotFoundException("RecordType", recordTypeId));
+        Collection collection = recordType.getCollection();
         recordTypeRepository.delete(recordType);
+        publishCollectionChanged(collection);
     }
 
     // --- Picklist Override Management ---
@@ -216,5 +227,11 @@ public class RecordTypeService {
     private Collection verifyCollection(String collectionId) {
         return collectionRepository.findByIdAndActiveTrue(collectionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Collection", collectionId));
+    }
+
+    private void publishCollectionChanged(Collection collection) {
+        if (eventPublisher != null) {
+            eventPublisher.publishCollectionChanged(collection, ChangeType.UPDATED);
+        }
     }
 }

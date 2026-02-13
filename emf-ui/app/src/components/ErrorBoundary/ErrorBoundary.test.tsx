@@ -248,8 +248,12 @@ describe('ErrorBoundary', () => {
     })
 
     it('should navigate to home when go home button is clicked', () => {
-      // Mock window.location
-      const locationMock = { reload: vi.fn(), href: '/some-page' }
+      // Mock window.location with pathname so handleGoHome can extract slug
+      const locationMock = {
+        reload: vi.fn(),
+        href: '/default/some-page',
+        pathname: '/default/some-page',
+      }
       Object.defineProperty(window, 'location', {
         value: locationMock,
         writable: true,
@@ -262,7 +266,7 @@ describe('ErrorBoundary', () => {
       )
 
       fireEvent.click(screen.getByTestId('go-home-button'))
-      expect(locationMock.href).toBe('/')
+      expect(locationMock.href).toBe('/default')
     })
 
     it('should reset error state when try again button is clicked', () => {

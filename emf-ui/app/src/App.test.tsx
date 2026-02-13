@@ -64,6 +64,18 @@ const mockAuthContext = {
   getAccessToken: vi.fn(),
 }
 
+// Mock the TenantContext
+vi.mock('./context/TenantContext', () => ({
+  TenantProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  useTenant: () => ({
+    tenantSlug: 'test-tenant',
+    tenantBasePath: '/test-tenant',
+  }),
+  getTenantSlug: () => 'test-tenant',
+  setResolvedTenantId: vi.fn(),
+  getResolvedTenantId: () => null,
+}))
+
 // Mock the AuthContext
 vi.mock('./context/AuthContext', () => ({
   AuthProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -71,6 +83,15 @@ vi.mock('./context/AuthContext', () => ({
   AuthContext: {
     Provider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   },
+}))
+
+// Mock the ApiContext
+vi.mock('./context/ApiContext', () => ({
+  ApiProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  useApi: () => ({
+    baseUrl: '/test-tenant',
+    fetch: vi.fn(),
+  }),
 }))
 
 // Mock the ConfigContext
@@ -221,12 +242,16 @@ vi.mock('./components/ProtectedRoute', () => ({
 
 // Mock page components
 vi.mock('./pages', () => ({
+  HomePage: () => <div data-testid="home-page">Home Page</div>,
   DashboardPage: () => <div data-testid="dashboard-page">Dashboard Page</div>,
   CollectionsPage: () => <div data-testid="collections-page">Collections Page</div>,
   CollectionDetailPage: () => (
     <div data-testid="collection-detail-page">Collection Detail Page</div>
   ),
   CollectionFormPage: () => <div data-testid="collection-form-page">Collection Form Page</div>,
+  CollectionWizardPage: () => (
+    <div data-testid="collection-wizard-page">Collection Wizard Page</div>
+  ),
   RolesPage: () => <div data-testid="roles-page">Roles Page</div>,
   PoliciesPage: () => <div data-testid="policies-page">Policies Page</div>,
   OIDCProvidersPage: () => <div data-testid="oidc-providers-page">OIDC Providers Page</div>,
@@ -239,6 +264,23 @@ vi.mock('./pages', () => ({
   ResourceListPage: () => <div data-testid="resource-list-page">Resource List Page</div>,
   ResourceDetailPage: () => <div data-testid="resource-detail-page">Resource Detail Page</div>,
   ResourceFormPage: () => <div data-testid="resource-form-page">Resource Form Page</div>,
+  PicklistsPage: () => <div data-testid="picklists-page">Picklists Page</div>,
+  PageLayoutsPage: () => <div data-testid="page-layouts-page">Page Layouts Page</div>,
+  ListViewsPage: () => <div data-testid="list-views-page">List Views Page</div>,
+  ReportsPage: () => <div data-testid="reports-page">Reports Page</div>,
+  DashboardsPage: () => <div data-testid="dashboards-page">Dashboards Page</div>,
+  WorkflowRulesPage: () => <div data-testid="workflow-rules-page">Workflow Rules Page</div>,
+  ApprovalProcessesPage: () => (
+    <div data-testid="approval-processes-page">Approval Processes Page</div>
+  ),
+  FlowsPage: () => <div data-testid="flows-page">Flows Page</div>,
+  ScheduledJobsPage: () => <div data-testid="scheduled-jobs-page">Scheduled Jobs Page</div>,
+  EmailTemplatesPage: () => <div data-testid="email-templates-page">Email Templates Page</div>,
+  ScriptsPage: () => <div data-testid="scripts-page">Scripts Page</div>,
+  WebhooksPage: () => <div data-testid="webhooks-page">Webhooks Page</div>,
+  ConnectedAppsPage: () => <div data-testid="connected-apps-page">Connected Apps Page</div>,
+  BulkJobsPage: () => <div data-testid="bulk-jobs-page">Bulk Jobs Page</div>,
+  SetupHomePage: () => <div data-testid="setup-home-page">Setup Home Page</div>,
   PluginsPage: () => <div data-testid="plugins-page">Plugins Page</div>,
   UsersPage: () => <div data-testid="users-page">Users Page</div>,
   UserDetailPage: () => <div data-testid="user-detail-page">User Detail Page</div>,
@@ -253,6 +295,11 @@ vi.mock('./pages', () => ({
   LoginPage: () => <div data-testid="login-page">Login Page</div>,
   UnauthorizedPage: () => <div data-testid="unauthorized-page">Unauthorized Page</div>,
   NotFoundPage: () => <div data-testid="not-found-page">Not Found Page</div>,
+}))
+
+// Mock the NoTenantPage (imported separately in App.tsx)
+vi.mock('./pages/NoTenantPage/NoTenantPage', () => ({
+  NoTenantPage: () => <div data-testid="no-tenant-page">No Tenant Page</div>,
 }))
 
 describe('App', () => {
@@ -297,8 +344,17 @@ describe('App', () => {
   })
 
   describe('Public Routes', () => {
-    it('should render login page at /login', async () => {
-      window.history.pushState({}, '', '/login')
+    it('should render no-tenant page at root /', async () => {
+      window.history.pushState({}, '', '/')
+      render(<App />)
+
+      await waitFor(() => {
+        expect(screen.getByTestId('no-tenant-page')).toBeInTheDocument()
+      })
+    })
+
+    it('should render login page at /:tenantSlug/login', async () => {
+      window.history.pushState({}, '', '/test-tenant/login')
       render(<App />)
 
       await waitFor(() => {
@@ -306,8 +362,8 @@ describe('App', () => {
       })
     })
 
-    it('should render unauthorized page at /unauthorized', async () => {
-      window.history.pushState({}, '', '/unauthorized')
+    it('should render unauthorized page at /:tenantSlug/unauthorized', async () => {
+      window.history.pushState({}, '', '/test-tenant/unauthorized')
       render(<App />)
 
       await waitFor(() => {
@@ -315,8 +371,8 @@ describe('App', () => {
       })
     })
 
-    it('should render not found page for unknown routes', async () => {
-      window.history.pushState({}, '', '/unknown-route')
+    it('should render not found page for unknown routes under tenant', async () => {
+      window.history.pushState({}, '', '/test-tenant/unknown-route')
       render(<App />)
 
       await waitFor(() => {
@@ -331,8 +387,8 @@ describe('App', () => {
       mockAuthContext.user = null
     })
 
-    it('should redirect to login when accessing dashboard unauthenticated', async () => {
-      window.history.pushState({}, '', '/')
+    it('should redirect to login when accessing home unauthenticated', async () => {
+      window.history.pushState({}, '', '/test-tenant')
       render(<App />)
 
       await waitFor(() => {
@@ -341,7 +397,7 @@ describe('App', () => {
     })
 
     it('should redirect to login when accessing collections unauthenticated', async () => {
-      window.history.pushState({}, '', '/collections')
+      window.history.pushState({}, '', '/test-tenant/collections')
       render(<App />)
 
       await waitFor(() => {
@@ -350,7 +406,7 @@ describe('App', () => {
     })
 
     it('should redirect to login when accessing roles unauthenticated', async () => {
-      window.history.pushState({}, '', '/roles')
+      window.history.pushState({}, '', '/test-tenant/roles')
       render(<App />)
 
       await waitFor(() => {
@@ -370,8 +426,17 @@ describe('App', () => {
       }
     })
 
-    it('should render dashboard page at / when authenticated', async () => {
-      window.history.pushState({}, '', '/')
+    it('should render home page at /:tenantSlug when authenticated', async () => {
+      window.history.pushState({}, '', '/test-tenant')
+      render(<App />)
+
+      await waitFor(() => {
+        expect(screen.getByTestId('home-page')).toBeInTheDocument()
+      })
+    })
+
+    it('should render dashboard page at /:tenantSlug/system-health when authenticated', async () => {
+      window.history.pushState({}, '', '/test-tenant/system-health')
       render(<App />)
 
       await waitFor(() => {
@@ -379,8 +444,8 @@ describe('App', () => {
       })
     })
 
-    it('should render collections page at /collections when authenticated', async () => {
-      window.history.pushState({}, '', '/collections')
+    it('should render collections page at /:tenantSlug/collections when authenticated', async () => {
+      window.history.pushState({}, '', '/test-tenant/collections')
       render(<App />)
 
       await waitFor(() => {
@@ -388,8 +453,8 @@ describe('App', () => {
       })
     })
 
-    it('should render collection detail page at /collections/:id when authenticated', async () => {
-      window.history.pushState({}, '', '/collections/test-collection')
+    it('should render collection detail page at /:tenantSlug/collections/:id when authenticated', async () => {
+      window.history.pushState({}, '', '/test-tenant/collections/test-collection')
       render(<App />)
 
       await waitFor(() => {
@@ -397,8 +462,8 @@ describe('App', () => {
       })
     })
 
-    it('should render roles page at /roles when authenticated', async () => {
-      window.history.pushState({}, '', '/roles')
+    it('should render roles page at /:tenantSlug/roles when authenticated', async () => {
+      window.history.pushState({}, '', '/test-tenant/roles')
       render(<App />)
 
       await waitFor(() => {
@@ -406,8 +471,8 @@ describe('App', () => {
       })
     })
 
-    it('should render policies page at /policies when authenticated', async () => {
-      window.history.pushState({}, '', '/policies')
+    it('should render policies page at /:tenantSlug/policies when authenticated', async () => {
+      window.history.pushState({}, '', '/test-tenant/policies')
       render(<App />)
 
       await waitFor(() => {
@@ -415,8 +480,8 @@ describe('App', () => {
       })
     })
 
-    it('should render OIDC providers page at /oidc-providers when authenticated', async () => {
-      window.history.pushState({}, '', '/oidc-providers')
+    it('should render OIDC providers page at /:tenantSlug/oidc-providers when authenticated', async () => {
+      window.history.pushState({}, '', '/test-tenant/oidc-providers')
       render(<App />)
 
       await waitFor(() => {
@@ -424,8 +489,8 @@ describe('App', () => {
       })
     })
 
-    it('should render page builder page at /pages when authenticated', async () => {
-      window.history.pushState({}, '', '/pages')
+    it('should render page builder page at /:tenantSlug/pages when authenticated', async () => {
+      window.history.pushState({}, '', '/test-tenant/pages')
       render(<App />)
 
       await waitFor(() => {
@@ -433,8 +498,8 @@ describe('App', () => {
       })
     })
 
-    it('should render menu builder page at /menus when authenticated', async () => {
-      window.history.pushState({}, '', '/menus')
+    it('should render menu builder page at /:tenantSlug/menus when authenticated', async () => {
+      window.history.pushState({}, '', '/test-tenant/menus')
       render(<App />)
 
       await waitFor(() => {
@@ -442,8 +507,8 @@ describe('App', () => {
       })
     })
 
-    it('should render packages page at /packages when authenticated', async () => {
-      window.history.pushState({}, '', '/packages')
+    it('should render packages page at /:tenantSlug/packages when authenticated', async () => {
+      window.history.pushState({}, '', '/test-tenant/packages')
       render(<App />)
 
       await waitFor(() => {
@@ -451,8 +516,8 @@ describe('App', () => {
       })
     })
 
-    it('should render migrations page at /migrations when authenticated', async () => {
-      window.history.pushState({}, '', '/migrations')
+    it('should render migrations page at /:tenantSlug/migrations when authenticated', async () => {
+      window.history.pushState({}, '', '/test-tenant/migrations')
       render(<App />)
 
       await waitFor(() => {
@@ -460,8 +525,8 @@ describe('App', () => {
       })
     })
 
-    it('should render resource browser page at /resources when authenticated', async () => {
-      window.history.pushState({}, '', '/resources')
+    it('should render resource browser page at /:tenantSlug/resources when authenticated', async () => {
+      window.history.pushState({}, '', '/test-tenant/resources')
       render(<App />)
 
       await waitFor(() => {
@@ -469,8 +534,8 @@ describe('App', () => {
       })
     })
 
-    it('should render resource list page at /resources/:collection when authenticated', async () => {
-      window.history.pushState({}, '', '/resources/users')
+    it('should render resource list page at /:tenantSlug/resources/:collection when authenticated', async () => {
+      window.history.pushState({}, '', '/test-tenant/resources/users')
       render(<App />)
 
       await waitFor(() => {
@@ -478,8 +543,8 @@ describe('App', () => {
       })
     })
 
-    it('should render resource detail page at /resources/:collection/:id when authenticated', async () => {
-      window.history.pushState({}, '', '/resources/users/123')
+    it('should render resource detail page at /:tenantSlug/resources/:collection/:id when authenticated', async () => {
+      window.history.pushState({}, '', '/test-tenant/resources/users/123')
       render(<App />)
 
       await waitFor(() => {
@@ -487,8 +552,8 @@ describe('App', () => {
       })
     })
 
-    it('should render resource form page at /resources/:collection/new when authenticated', async () => {
-      window.history.pushState({}, '', '/resources/users/new')
+    it('should render resource form page at /:tenantSlug/resources/:collection/new when authenticated', async () => {
+      window.history.pushState({}, '', '/test-tenant/resources/users/new')
       render(<App />)
 
       await waitFor(() => {
@@ -496,8 +561,8 @@ describe('App', () => {
       })
     })
 
-    it('should render resource form page at /resources/:collection/:id/edit when authenticated', async () => {
-      window.history.pushState({}, '', '/resources/users/123/edit')
+    it('should render resource form page at /:tenantSlug/resources/:collection/:id/edit when authenticated', async () => {
+      window.history.pushState({}, '', '/test-tenant/resources/users/123/edit')
       render(<App />)
 
       await waitFor(() => {
@@ -505,8 +570,8 @@ describe('App', () => {
       })
     })
 
-    it('should render plugins page at /plugins when authenticated', async () => {
-      window.history.pushState({}, '', '/plugins')
+    it('should render plugins page at /:tenantSlug/plugins when authenticated', async () => {
+      window.history.pushState({}, '', '/test-tenant/plugins')
       render(<App />)
 
       await waitFor(() => {
@@ -514,8 +579,8 @@ describe('App', () => {
       })
     })
 
-    it('should render users page at /users when authenticated', async () => {
-      window.history.pushState({}, '', '/users')
+    it('should render users page at /:tenantSlug/users when authenticated', async () => {
+      window.history.pushState({}, '', '/test-tenant/users')
       render(<App />)
 
       await waitFor(() => {
@@ -523,8 +588,8 @@ describe('App', () => {
       })
     })
 
-    it('should render user detail page at /users/:id when authenticated', async () => {
-      window.history.pushState({}, '', '/users/test-user-123')
+    it('should render user detail page at /:tenantSlug/users/:id when authenticated', async () => {
+      window.history.pushState({}, '', '/test-tenant/users/test-user-123')
       render(<App />)
 
       await waitFor(() => {
@@ -532,8 +597,8 @@ describe('App', () => {
       })
     })
 
-    it('should render profiles page at /profiles when authenticated', async () => {
-      window.history.pushState({}, '', '/profiles')
+    it('should render profiles page at /:tenantSlug/profiles when authenticated', async () => {
+      window.history.pushState({}, '', '/test-tenant/profiles')
       render(<App />)
 
       await waitFor(() => {
@@ -541,8 +606,8 @@ describe('App', () => {
       })
     })
 
-    it('should render permission sets page at /permission-sets when authenticated', async () => {
-      window.history.pushState({}, '', '/permission-sets')
+    it('should render permission sets page at /:tenantSlug/permission-sets when authenticated', async () => {
+      window.history.pushState({}, '', '/test-tenant/permission-sets')
       render(<App />)
 
       await waitFor(() => {
@@ -550,8 +615,8 @@ describe('App', () => {
       })
     })
 
-    it('should render sharing settings page at /sharing when authenticated', async () => {
-      window.history.pushState({}, '', '/sharing')
+    it('should render sharing settings page at /:tenantSlug/sharing when authenticated', async () => {
+      window.history.pushState({}, '', '/test-tenant/sharing')
       render(<App />)
 
       await waitFor(() => {
@@ -559,8 +624,8 @@ describe('App', () => {
       })
     })
 
-    it('should render role hierarchy page at /role-hierarchy when authenticated', async () => {
-      window.history.pushState({}, '', '/role-hierarchy')
+    it('should render role hierarchy page at /:tenantSlug/role-hierarchy when authenticated', async () => {
+      window.history.pushState({}, '', '/test-tenant/role-hierarchy')
       render(<App />)
 
       await waitFor(() => {
@@ -581,30 +646,31 @@ describe('App', () => {
       }
 
       const routes = [
-        '/',
-        '/collections',
-        '/collections/test',
-        '/roles',
-        '/policies',
-        '/oidc-providers',
-        '/pages',
-        '/menus',
-        '/packages',
-        '/migrations',
-        '/resources',
-        '/resources/users',
-        '/resources/users/123',
-        '/resources/users/new',
-        '/resources/users/123/edit',
-        '/plugins',
-        '/users',
-        '/users/test-user-123',
-        '/profiles',
-        '/permission-sets',
-        '/sharing',
-        '/role-hierarchy',
-        '/login',
-        '/unauthorized',
+        '/test-tenant',
+        '/test-tenant/system-health',
+        '/test-tenant/collections',
+        '/test-tenant/collections/test',
+        '/test-tenant/roles',
+        '/test-tenant/policies',
+        '/test-tenant/oidc-providers',
+        '/test-tenant/pages',
+        '/test-tenant/menus',
+        '/test-tenant/packages',
+        '/test-tenant/migrations',
+        '/test-tenant/resources',
+        '/test-tenant/resources/users',
+        '/test-tenant/resources/users/123',
+        '/test-tenant/resources/users/new',
+        '/test-tenant/resources/users/123/edit',
+        '/test-tenant/plugins',
+        '/test-tenant/users',
+        '/test-tenant/users/test-user-123',
+        '/test-tenant/profiles',
+        '/test-tenant/permission-sets',
+        '/test-tenant/sharing',
+        '/test-tenant/role-hierarchy',
+        '/test-tenant/login',
+        '/test-tenant/unauthorized',
       ]
 
       routes.forEach((route) => {
@@ -641,7 +707,7 @@ describe('App Integration', () => {
   })
 
   it('should render app shell with header and sidebar for protected routes', async () => {
-    window.history.pushState({}, '', '/')
+    window.history.pushState({}, '', '/test-tenant')
     render(<App />)
 
     await waitFor(() => {

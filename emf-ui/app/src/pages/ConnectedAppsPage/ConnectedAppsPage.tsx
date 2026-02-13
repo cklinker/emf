@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
+import { getTenantId } from '../../hooks'
 import styles from './ConnectedAppsPage.module.css'
 
 interface ConnectedApp {
@@ -427,7 +428,8 @@ export function ConnectedAppsPage({
     refetch,
   } = useQuery({
     queryKey: ['connected-apps'],
-    queryFn: () => apiClient.get<ConnectedApp[]>('/control/connected-apps?tenantId=default'),
+    queryFn: () =>
+      apiClient.get<ConnectedApp[]>(`/control/connected-apps?tenantId=${getTenantId()}`),
   })
 
   const appList: ConnectedApp[] = connectedApps ?? []
@@ -435,7 +437,7 @@ export function ConnectedAppsPage({
   const createMutation = useMutation({
     mutationFn: (data: ConnectedAppFormData) =>
       apiClient.post<ConnectedAppCreatedResponse>(
-        '/control/connected-apps?tenantId=default&userId=system',
+        `/control/connected-apps?tenantId=${getTenantId()}&userId=system`,
         data
       ),
     onSuccess: (result: ConnectedAppCreatedResponse) => {

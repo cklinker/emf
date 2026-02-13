@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
+import { getTenantId } from '../../hooks'
 import styles from './PageLayoutsPage.module.css'
 
 interface PageLayout {
@@ -317,14 +318,14 @@ export function PageLayoutsPage({
     refetch,
   } = useQuery({
     queryKey: ['pageLayouts'],
-    queryFn: () => apiClient.get<PageLayout[]>('/control/layouts?tenantId=default'),
+    queryFn: () => apiClient.get<PageLayout[]>(`/control/layouts?tenantId=${getTenantId()}`),
   })
 
   const layoutList = layouts ?? []
 
   const createMutation = useMutation({
     mutationFn: (data: PageLayoutFormData) =>
-      apiClient.post<PageLayout>('/control/layouts?tenantId=default', data),
+      apiClient.post<PageLayout>(`/control/layouts?tenantId=${getTenantId()}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pageLayouts'] })
       showToast('Layout created successfully', 'success')

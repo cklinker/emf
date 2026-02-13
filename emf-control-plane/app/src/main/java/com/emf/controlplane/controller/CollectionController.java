@@ -147,17 +147,17 @@ public class CollectionController {
     }
 
     /**
-     * Retrieves a collection by its ID.
-     * 
-     * @param id The collection ID
+     * Retrieves a collection by its ID or name.
+     *
+     * @param id The collection ID (UUID) or name
      * @return The collection if found
-     * 
+     *
      * Validates: Requirements 1.4, 1.5
      */
     @GetMapping("/{id}")
     @Operation(
             summary = "Get collection",
-            description = "Retrieves a collection by its ID"
+            description = "Retrieves a collection by its ID or name"
     )
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Collection found"),
@@ -165,33 +165,36 @@ public class CollectionController {
             @ApiResponse(responseCode = "404", description = "Collection not found")
     })
     public ResponseEntity<CollectionDto> getCollection(
-            @Parameter(description = "Collection ID", required = true)
+            @Parameter(description = "Collection ID or name", required = true)
             @PathVariable String id) {
-        
+
         log.debug("REST request to get collection: {}", id);
-        
+
         CollectionDto dto = getCollectionDto(id);
-        
+
         return ResponseEntity.ok(dto);
     }
-    
+
     /**
      * Internal method to get and cache CollectionDto.
      * Separated from the controller method to avoid caching ResponseEntity.
      */
     @Cacheable(value = CacheConfig.COLLECTIONS_CACHE, key = "#id", unless = "#result == null")
     private CollectionDto getCollectionDto(String id) {
-        Collection collection = collectionService.getCollection(id);
-        
+        Collection collection = collectionService.getCollectionByIdOrName(id);
+
+        // Use the resolved collection ID for subsequent lookups
+        String collectionId = collection.getId();
+
         // Fetch fields for this collection
-        List<Field> fields = fieldService.listFields(id);
+        List<Field> fields = fieldService.listFields(collectionId);
         List<FieldDto> fieldDtos = fields.stream()
                 .map(FieldDto::fromEntity)
                 .collect(Collectors.toList());
-        
+
         // Fetch authorization config
-        AuthorizationConfigDto authz = authorizationService.getCollectionAuthorization(id);
-        
+        AuthorizationConfigDto authz = authorizationService.getCollectionAuthorization(collectionId);
+
         return CollectionDto.fromEntityWithDetails(collection, fieldDtos, authz);
     }
 

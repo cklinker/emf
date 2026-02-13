@@ -193,6 +193,7 @@ public class WorkerRegistrationService {
         Map<String, Object> registration = new HashMap<>();
         registration.put("workerId", workerProperties.getId());
         registration.put("host", workerProperties.getHost());
+        registration.put("hostIp", workerProperties.getHostIp());
         registration.put("port", getServerPort());
         registration.put("capacity", workerProperties.getCapacity());
         registration.put("pool", workerProperties.getPool());

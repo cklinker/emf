@@ -102,12 +102,12 @@ public class CollectionAssignmentService {
         selectedWorker.setCurrentLoad(selectedWorker.getCurrentLoad() + 1);
         workerRepository.save(selectedWorker);
 
-        // Publish assignment event using K8s service URL (not pod-specific URL)
+        // Publish assignment event using worker's pod-specific URL for direct routing
         String collectionName = collectionRepository.findById(collectionId)
                 .map(c -> c.getName())
                 .orElse(collectionId);
         publishAssignmentEvent(selectedWorker.getId(), collectionId,
-                properties.getWorkerServiceUrl(), collectionName, ChangeType.CREATED);
+                selectedWorker.getBaseUrl(), collectionName, ChangeType.CREATED);
 
         log.info("Collection assigned: collectionId={}, workerId={}", collectionId, selectedWorker.getId());
         return assignment;
@@ -134,12 +134,15 @@ public class CollectionAssignmentService {
             workerRepository.save(worker);
         });
 
-        // Publish assignment event using K8s service URL
+        // Publish assignment removal event
         String collectionName = collectionRepository.findById(assignment.getCollectionId())
                 .map(c -> c.getName())
                 .orElse(assignment.getCollectionId());
+        String workerBaseUrl = workerRepository.findById(assignment.getWorkerId())
+                .map(Worker::getBaseUrl)
+                .orElse(properties.getWorkerServiceUrl());
         publishAssignmentEvent(assignment.getWorkerId(), assignment.getCollectionId(),
-                properties.getWorkerServiceUrl(), collectionName, ChangeType.DELETED);
+                workerBaseUrl, collectionName, ChangeType.DELETED);
 
         log.info("Collection unassigned: assignmentId={}", assignmentId);
     }

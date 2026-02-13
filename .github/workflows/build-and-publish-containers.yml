@@ -39,7 +39,7 @@ jobs:
   # ===========================================================================
   build-runtime:
     name: Build Runtime Modules
-    runs-on: ubuntu-latest
+    runs-on: k8s-runner
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -66,7 +66,7 @@ jobs:
   test-control-plane:
     name: Test Control Plane
     needs: build-runtime
-    runs-on: ubuntu-latest
+    runs-on: k8s-runner
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -93,7 +93,7 @@ jobs:
   test-gateway:
     name: Test Gateway
     needs: build-runtime
-    runs-on: ubuntu-latest
+    runs-on: k8s-runner
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -120,7 +120,7 @@ jobs:
   test-worker:
     name: Test Worker
     needs: build-runtime
-    runs-on: ubuntu-latest
+    runs-on: k8s-runner
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -146,7 +146,7 @@ jobs:
   # ===========================================================================
   test-frontend:
     name: Test Frontend
-    runs-on: ubuntu-latest
+    runs-on: k8s-runner
     defaults:
       run:
         working-directory: emf-web
@@ -171,7 +171,7 @@ jobs:
   build-gateway:
     name: Build & Push Gateway
     needs: [test-control-plane, test-gateway, test-worker, test-frontend]
-    runs-on: ubuntu-latest
+    runs-on: k8s-runner
     outputs:
       image-tag: ${{ steps.meta.outputs.version }}
     steps:
@@ -213,7 +213,7 @@ jobs:
   build-control-plane:
     name: Build & Push Control Plane
     needs: [test-control-plane, test-gateway, test-worker, test-frontend]
-    runs-on: ubuntu-latest
+    runs-on: k8s-runner
     outputs:
       image-tag: ${{ steps.meta.outputs.version }}
     steps:
@@ -255,7 +255,7 @@ jobs:
   build-ui:
     name: Build & Push Admin UI
     needs: [test-control-plane, test-gateway, test-worker, test-frontend]
-    runs-on: ubuntu-latest
+    runs-on: k8s-runner
     outputs:
       image-tag: ${{ steps.meta.outputs.version }}
     steps:
@@ -297,7 +297,7 @@ jobs:
   build-worker:
     name: Build & Push Worker
     needs: [test-control-plane, test-gateway, test-worker, test-frontend]
-    runs-on: ubuntu-latest
+    runs-on: k8s-runner
     outputs:
       image-tag: ${{ steps.meta.outputs.version }}
     steps:
@@ -343,7 +343,7 @@ jobs:
     name: Update ArgoCD Manifests
     needs: [build-gateway, build-control-plane, build-ui, build-worker]
     if: github.ref == 'refs/heads/main' && (github.event_name != 'workflow_dispatch' || inputs.deploy)
-    runs-on: ubuntu-latest
+    runs-on: k8s-runner
     steps:
       - name: Checkout ArgoCD repo
         uses: actions/checkout@v4

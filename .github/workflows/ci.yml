@@ -19,7 +19,7 @@ jobs:
   # ===========================================================================
   build-runtime:
     name: Build Runtime Modules
-    runs-on: ubuntu-latest
+    runs-on: k8s-runner
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -46,7 +46,7 @@ jobs:
   test-control-plane:
     name: Test Control Plane
     needs: build-runtime
-    runs-on: ubuntu-latest
+    runs-on: k8s-runner
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -90,7 +90,7 @@ jobs:
   test-gateway:
     name: Test Gateway
     needs: build-runtime
-    runs-on: ubuntu-latest
+    runs-on: k8s-runner
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -134,7 +134,7 @@ jobs:
   test-worker:
     name: Test Worker
     needs: build-runtime
-    runs-on: ubuntu-latest
+    runs-on: k8s-runner
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -177,7 +177,7 @@ jobs:
   # ===========================================================================
   test-frontend:
     name: Test Frontend
-    runs-on: ubuntu-latest
+    runs-on: k8s-runner
     defaults:
       run:
         working-directory: emf-web
@@ -220,7 +220,7 @@ jobs:
   build-check:
     name: Verify Docker Build (${{ matrix.service.name }})
     needs: [test-control-plane, test-gateway, test-worker, test-frontend]
-    runs-on: ubuntu-latest
+    runs-on: k8s-runner
     strategy:
       fail-fast: false
       matrix:
@@ -252,7 +252,7 @@ jobs:
     name: Quality Gate
     needs: [test-control-plane, test-gateway, test-worker, test-frontend, build-check]
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: k8s-runner
     steps:
       - name: Check all jobs passed
         run: |

@@ -18,6 +18,7 @@ import React, { useState, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
+import { getTenantSlug } from '../../context/TenantContext'
 import { LoadingSpinner } from '../LoadingSpinner'
 import type { ApiClient } from '../../services/apiClient'
 import styles from './RelatedRecordsSection.module.css'
@@ -359,13 +360,17 @@ export function RelatedRecordsSection({
                     <tr
                       key={record.id}
                       onClick={() =>
-                        navigate(`/resources/${activeRelated!.collection.name}/${record.id}`)
+                        navigate(
+                          `/${getTenantSlug()}/resources/${activeRelated!.collection.name}/${record.id}`
+                        )
                       }
                       tabIndex={0}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
                           e.preventDefault()
-                          navigate(`/resources/${activeRelated!.collection.name}/${record.id}`)
+                          navigate(
+                            `/${getTenantSlug()}/resources/${activeRelated!.collection.name}/${record.id}`
+                          )
                         }
                       }}
                       data-testid={`related-record-row-${record.id}`}
@@ -382,7 +387,7 @@ export function RelatedRecordsSection({
 
             {/* View All Link */}
             <Link
-              to={`/resources/${activeRelated!.collection.name}`}
+              to={`/${getTenantSlug()}/resources/${activeRelated!.collection.name}`}
               className={styles.viewAllLink}
               data-testid="related-records-view-all"
             >

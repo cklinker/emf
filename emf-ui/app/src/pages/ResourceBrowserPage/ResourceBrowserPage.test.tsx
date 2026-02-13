@@ -432,7 +432,7 @@ describe('ResourceBrowserPage', () => {
       const usersCard = screen.getByTestId('collection-card-0')
       await user.click(usersCard)
 
-      expect(mockNavigate).toHaveBeenCalledWith('/resources/users')
+      expect(mockNavigate).toHaveBeenCalledWith('/default/resources/users')
     })
 
     it('should navigate to collection data view when pressing Enter on a collection card', async () => {
@@ -446,7 +446,7 @@ describe('ResourceBrowserPage', () => {
       usersCard.focus()
       fireEvent.keyDown(usersCard, { key: 'Enter' })
 
-      expect(mockNavigate).toHaveBeenCalledWith('/resources/users')
+      expect(mockNavigate).toHaveBeenCalledWith('/default/resources/users')
     })
 
     it('should navigate to collection data view when pressing Space on a collection card', async () => {
@@ -460,7 +460,7 @@ describe('ResourceBrowserPage', () => {
       usersCard.focus()
       fireEvent.keyDown(usersCard, { key: ' ' })
 
-      expect(mockNavigate).toHaveBeenCalledWith('/resources/users')
+      expect(mockNavigate).toHaveBeenCalledWith('/default/resources/users')
     })
   })
 

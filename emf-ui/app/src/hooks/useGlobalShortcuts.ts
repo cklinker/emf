@@ -20,6 +20,7 @@
 import { useState, useCallback, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useKeyboardShortcuts } from './useKeyboardShortcuts'
+import { getTenantSlug } from '../context/TenantContext'
 
 export function useGlobalShortcuts() {
   const navigate = useNavigate()
@@ -30,10 +31,10 @@ export function useGlobalShortcuts() {
   const gPrefixRef = useRef(false)
   const gTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Determine context
-  const isDetailPage = /^\/resources\/[^/]+\/[^/]+$/.test(location.pathname)
+  // Determine context (account for /{slug}/ prefix in tenant URLs)
+  const isDetailPage = /^\/[^/]+\/resources\/[^/]+\/[^/]+$/.test(location.pathname)
   const isListPage =
-    /^\/resources\/[^/]+$/.test(location.pathname) && !location.pathname.endsWith('/new')
+    /^\/[^/]+\/resources\/[^/]+$/.test(location.pathname) && !location.pathname.endsWith('/new')
 
   const clearGPrefix = useCallback(() => {
     gPrefixRef.current = false
@@ -107,7 +108,7 @@ export function useGlobalShortcuts() {
       handler: () => {
         if (gPrefixRef.current) {
           clearGPrefix()
-          navigate('/')
+          navigate(`/${getTenantSlug()}`)
         }
       },
       description: 'Go to Home',
@@ -118,7 +119,7 @@ export function useGlobalShortcuts() {
       handler: () => {
         if (gPrefixRef.current) {
           clearGPrefix()
-          navigate('/collections')
+          navigate(`/${getTenantSlug()}/collections`)
         }
       },
       description: 'Go to Collections',
@@ -129,7 +130,7 @@ export function useGlobalShortcuts() {
       handler: () => {
         if (gPrefixRef.current) {
           clearGPrefix()
-          navigate('/resources')
+          navigate(`/${getTenantSlug()}/resources`)
         }
       },
       description: 'Go to Resources',
@@ -139,8 +140,8 @@ export function useGlobalShortcuts() {
       key: 'n',
       handler: () => {
         if (isListPage) {
-          const match = location.pathname.match(/^\/resources\/([^/]+)$/)
-          if (match) navigate(`/resources/${match[1]}/new`)
+          const match = location.pathname.match(/^\/[^/]+\/resources\/([^/]+)$/)
+          if (match) navigate(`/${getTenantSlug()}/resources/${match[1]}/new`)
         }
       },
       description: 'New record',
@@ -150,8 +151,8 @@ export function useGlobalShortcuts() {
       key: 'e',
       handler: () => {
         if (isDetailPage) {
-          const match = location.pathname.match(/^\/resources\/([^/]+)\/([^/]+)$/)
-          if (match) navigate(`/resources/${match[1]}/${match[2]}/edit`)
+          const match = location.pathname.match(/^\/[^/]+\/resources\/([^/]+)\/([^/]+)$/)
+          if (match) navigate(`/${getTenantSlug()}/resources/${match[1]}/${match[2]}/edit`)
         }
       },
       description: 'Edit record',

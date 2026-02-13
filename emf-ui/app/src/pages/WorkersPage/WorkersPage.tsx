@@ -41,15 +41,20 @@ export interface Worker {
 }
 
 /**
- * Worker assignment interface
+ * Worker assignment interface matching the WorkerAssignmentDto API response
  */
 export interface WorkerAssignment {
   id: string
   workerId: string
+  collectionId: string
   collectionName: string
-  collectionDisplayName: string
+  collectionDisplayName: string | null
+  tenantId: string
   status: string
   assignedAt: string
+  readyAt: string | null
+  createdAt: string
+  updatedAt: string
 }
 
 /**
@@ -116,10 +121,10 @@ function compareWorkers(
 
   switch (column) {
     case 'podName':
-      cmp = a.podName.localeCompare(b.podName)
+      cmp = (a.podName || '').localeCompare(b.podName || '')
       break
     case 'host':
-      cmp = a.host.localeCompare(b.host)
+      cmp = (a.host || '').localeCompare(b.host || '')
       break
     case 'port':
       cmp = a.port - b.port
@@ -300,7 +305,7 @@ function AssignmentsModal({
       >
         <div className={styles.modalHeader}>
           <h2 id="assignments-modal-title" className={styles.modalTitle}>
-            {t('workers.assignmentsFor', { name: worker.podName })}
+            {t('workers.assignmentsFor', { name: worker.podName || worker.host || worker.id })}
           </h2>
           <button
             type="button"
@@ -638,7 +643,7 @@ export function WorkersPage({ testId = 'workers-page' }: WorkersPageProps): Reac
                   data-testid={`worker-row-${index}`}
                 >
                   <td role="gridcell" className={styles.nameCell}>
-                    <code>{worker.podName}</code>
+                    <code>{worker.podName || worker.host || worker.id}</code>
                   </td>
                   <td role="gridcell" className={styles.hostCell}>
                     {worker.host}
@@ -667,7 +672,7 @@ export function WorkersPage({ testId = 'workers-page' }: WorkersPageProps): Reac
                           e.stopPropagation()
                           handleWorkerClick(worker)
                         }}
-                        aria-label={`${t('workers.viewAssignments')} ${worker.podName}`}
+                        aria-label={`${t('workers.viewAssignments')} ${worker.podName || worker.host || worker.id}`}
                         data-testid={`view-assignments-button-${index}`}
                       >
                         {t('workers.viewAssignments')}

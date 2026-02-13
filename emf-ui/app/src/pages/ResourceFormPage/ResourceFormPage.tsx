@@ -266,13 +266,18 @@ export function ResourceFormPage({
   const [initializedKey, setInitializedKey] = useState<string | null>(null)
 
   // Compute initial form data based on schema and resource (or clone source)
+  // In edit/clone mode, wait for the resource data before initializing to avoid
+  // populating with empty defaults that then block re-initialization.
   const computedInitialData = useMemo(() => {
     if (!schema) return null
-    if (isEditMode && resource) {
+    if (isEditMode) {
+      // Wait for resource to load before initializing form
+      if (!resource) return null
       return populateFormData(schema, resource)
     }
-    if (isCloneMode && cloneSource) {
-      // Clone mode: populate from source but exclude system fields
+    if (isCloneMode) {
+      // Wait for clone source to load before initializing form
+      if (!cloneSource) return null
       const cloneData = Object.fromEntries(
         Object.entries(cloneSource).filter(
           ([key]) => key !== 'id' && key !== 'createdAt' && key !== 'updatedAt'

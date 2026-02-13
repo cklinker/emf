@@ -154,7 +154,8 @@ function getDefaultValueForType(field: FieldDefinition): unknown {
  */
 function initializeFormData(schema: CollectionSchema): FormData {
   const data: FormData = {}
-  schema.fields.forEach((field) => {
+  const fields = Array.isArray(schema.fields) ? schema.fields : []
+  fields.forEach((field) => {
     data[field.name] = getDefaultValueForType(field)
   })
   return data
@@ -165,7 +166,8 @@ function initializeFormData(schema: CollectionSchema): FormData {
  */
 function populateFormData(schema: CollectionSchema, resource: Resource): FormData {
   const data: FormData = {}
-  schema.fields.forEach((field) => {
+  const fields = Array.isArray(schema.fields) ? schema.fields : []
+  fields.forEach((field) => {
     const value = resource[field.name]
     if (value !== undefined && value !== null) {
       // Format dates for input fields

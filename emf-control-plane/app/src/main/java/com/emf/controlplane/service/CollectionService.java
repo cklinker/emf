@@ -85,11 +85,19 @@ public class CollectionService {
         String tenantId = TenantContextHolder.getTenantId();
         log.debug("Listing collections for tenant: {} with filter: {}", tenantId, filter);
 
+        // When tenant is set, try tenant-scoped first; if empty, fall back to global
+        // This handles collections created before multi-tenancy (no tenantId set)
         if (tenantId != null) {
+            Page<Collection> result;
             if (filter != null && !filter.isBlank()) {
-                return collectionRepository.findByTenantIdAndActiveAndSearchTerm(tenantId, filter.trim(), pageable);
+                result = collectionRepository.findByTenantIdAndActiveAndSearchTerm(tenantId, filter.trim(), pageable);
+            } else {
+                result = collectionRepository.findByTenantIdAndActiveTrue(tenantId, pageable);
             }
-            return collectionRepository.findByTenantIdAndActiveTrue(tenantId, pageable);
+            if (!result.isEmpty()) {
+                return result;
+            }
+            // Fall through to global query if tenant-scoped returned empty
         }
 
         if (filter != null && !filter.isBlank()) {
@@ -181,9 +189,12 @@ public class CollectionService {
         String tenantId = TenantContextHolder.getTenantId();
         log.debug("Fetching collection: {} for tenant: {}", id, tenantId);
 
+        // Try tenant-scoped first, then fall back to global (for collections without tenantId)
         if (tenantId != null) {
-            return collectionRepository.findByIdAndTenantIdAndActiveTrue(id, tenantId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Collection", id));
+            java.util.Optional<Collection> result = collectionRepository.findByIdAndTenantIdAndActiveTrue(id, tenantId);
+            if (result.isPresent()) {
+                return result.get();
+            }
         }
         return collectionRepository.findByIdAndActiveTrue(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Collection", id));
@@ -202,22 +213,25 @@ public class CollectionService {
         String tenantId = TenantContextHolder.getTenantId();
         log.debug("Fetching collection by ID or name: {} for tenant: {}", idOrName, tenantId);
 
-        // Try by ID first
-        java.util.Optional<Collection> byId;
+        // Try by ID first (tenant-scoped, then global fallback)
         if (tenantId != null) {
-            byId = collectionRepository.findByIdAndTenantIdAndActiveTrue(idOrName, tenantId);
-        } else {
-            byId = collectionRepository.findByIdAndActiveTrue(idOrName);
+            java.util.Optional<Collection> byId = collectionRepository.findByIdAndTenantIdAndActiveTrue(idOrName, tenantId);
+            if (byId.isPresent()) {
+                return byId.get();
+            }
         }
+        java.util.Optional<Collection> byId = collectionRepository.findByIdAndActiveTrue(idOrName);
         if (byId.isPresent()) {
             return byId.get();
         }
 
-        // Fall back to name lookup
+        // Fall back to name lookup (tenant-scoped, then global fallback)
         log.debug("Collection not found by ID '{}', trying name lookup", idOrName);
         if (tenantId != null) {
-            return collectionRepository.findByTenantIdAndNameAndActiveTrue(tenantId, idOrName)
-                    .orElseThrow(() -> new ResourceNotFoundException("Collection", idOrName));
+            java.util.Optional<Collection> byName = collectionRepository.findByTenantIdAndNameAndActiveTrue(tenantId, idOrName);
+            if (byName.isPresent()) {
+                return byName.get();
+            }
         }
         return collectionRepository.findByNameAndActiveTrue(idOrName)
                 .orElseThrow(() -> new ResourceNotFoundException("Collection", idOrName));

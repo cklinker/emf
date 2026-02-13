@@ -364,8 +364,9 @@ export function ResourceListPage({
   const visibleColumns = useMemo(() => {
     if (visibleColumnOverrides) return visibleColumnOverrides
     if (!schema) return new Set<string>()
+    const schemaFields = Array.isArray(schema.fields) ? schema.fields : []
     const defaultColumns = new Set<string>(['id'])
-    schema.fields.slice(0, 5).forEach((field) => {
+    schemaFields.slice(0, 5).forEach((field) => {
       defaultColumns.add(field.name)
     })
     return defaultColumns
@@ -432,7 +433,8 @@ export function ResourceListPage({
   // Get visible fields for table columns
   const visibleFields = useMemo(() => {
     if (!schema) return []
-    return schema.fields.filter((field) => visibleColumns.has(field.name))
+    const schemaFields = Array.isArray(schema.fields) ? schema.fields : []
+    return schemaFields.filter((field) => visibleColumns.has(field.name))
   }, [schema, visibleColumns])
 
   // Calculate total pages
@@ -480,10 +482,11 @@ export function ResourceListPage({
   }, [showFilters, filters])
 
   const handleAddFilter = useCallback(() => {
-    if (!schema || schema.fields.length === 0) return
+    const addFilterFields = Array.isArray(schema?.fields) ? schema.fields : []
+    if (!schema || addFilterFields.length === 0) return
     const newFilter: FilterCondition = {
       id: generateFilterId(),
-      field: schema.fields[0].name,
+      field: addFilterFields[0].name,
       operator: 'equals',
       value: '',
     }
@@ -1027,7 +1030,7 @@ export function ResourceListPage({
                   />
                   ID
                 </label>
-                {schema.fields.map((field) => (
+                {(Array.isArray(schema.fields) ? schema.fields : []).map((field) => (
                   <label key={field.name} className={styles.columnOption}>
                     <input
                       type="checkbox"
@@ -1075,7 +1078,7 @@ export function ResourceListPage({
                   aria-label="Filter field"
                   data-testid={`filter-field-${filter.id}`}
                 >
-                  {schema.fields.map((field) => (
+                  {(Array.isArray(schema.fields) ? schema.fields : []).map((field) => (
                     <option key={field.name} value={field.name}>
                       {field.displayName || field.name}
                     </option>

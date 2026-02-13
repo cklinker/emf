@@ -128,8 +128,10 @@ export function RecordHeader({
    * Uses the value of the first string-type field from the schema.
    * Falls back to the record ID if no suitable field is found.
    */
+  const fields = useMemo(() => (Array.isArray(schema.fields) ? schema.fields : []), [schema.fields])
+
   const recordName = useMemo(() => {
-    const firstStringField = schema.fields.find((field) => field.type.toLowerCase() === 'string')
+    const firstStringField = fields.find((field) => field.type.toLowerCase() === 'string')
 
     if (firstStringField) {
       const value = record[firstStringField.name]
@@ -139,7 +141,7 @@ export function RecordHeader({
     }
 
     return record.id
-  }, [schema.fields, record])
+  }, [fields, record])
 
   /**
    * Select up to 4 key fields to display as pills.
@@ -152,11 +154,11 @@ export function RecordHeader({
    */
   const keyFields = useMemo(() => {
     // Find the name field so we can exclude it from key fields
-    const nameField = schema.fields.find((field) => field.type.toLowerCase() === 'string')
+    const nameField = fields.find((field) => field.type.toLowerCase() === 'string')
     const nameFieldName = nameField?.name
 
     // Filter out the name field and fields without values
-    const candidateFields = schema.fields.filter((field) => {
+    const candidateFields = fields.filter((field) => {
       if (field.name === nameFieldName) return false
       if (field.name === 'id') return false
       const value = record[field.name]
@@ -186,7 +188,7 @@ export function RecordHeader({
 
     const prioritized = [...statusPicklists, ...references, ...dates, ...others]
     return prioritized.slice(0, MAX_KEY_FIELDS)
-  }, [schema.fields, record])
+  }, [fields, record])
 
   /**
    * Copy the record ID to the clipboard and show a brief tooltip.

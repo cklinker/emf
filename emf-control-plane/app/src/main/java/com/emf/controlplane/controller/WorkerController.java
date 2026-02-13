@@ -1,10 +1,13 @@
 package com.emf.controlplane.controller;
 
+import com.emf.controlplane.dto.WorkerAssignmentDto;
 import com.emf.controlplane.dto.WorkerHeartbeatRequest;
 import com.emf.controlplane.dto.WorkerRegistrationRequest;
+import com.emf.controlplane.entity.Collection;
 import com.emf.controlplane.entity.CollectionAssignment;
 import com.emf.controlplane.entity.Worker;
 import com.emf.controlplane.exception.ResourceNotFoundException;
+import com.emf.controlplane.repository.CollectionRepository;
 import com.emf.controlplane.service.CollectionAssignmentService;
 import com.emf.controlplane.service.WorkerRebalanceService;
 import com.emf.controlplane.service.WorkerService;
@@ -14,6 +17,10 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * REST controller for managing worker registrations, heartbeats, and lifecycle.
@@ -25,14 +32,17 @@ public class WorkerController {
 
     private final WorkerService workerService;
     private final CollectionAssignmentService collectionAssignmentService;
+    private final CollectionRepository collectionRepository;
     private final WorkerRebalanceService workerRebalanceService;
 
     public WorkerController(
             WorkerService workerService,
             CollectionAssignmentService collectionAssignmentService,
+            CollectionRepository collectionRepository,
             WorkerRebalanceService workerRebalanceService) {
         this.workerService = workerService;
         this.collectionAssignmentService = collectionAssignmentService;
+        this.collectionRepository = collectionRepository;
         this.workerRebalanceService = workerRebalanceService;
     }
 
@@ -102,16 +112,35 @@ public class WorkerController {
     }
 
     /**
-     * Gets collection assignments for a worker.
+     * Gets collection assignments for a worker, enriched with collection names.
      *
      * @param id The worker ID
-     * @return List of assignments for the worker
+     * @return List of enriched assignment DTOs for the worker
      */
     @GetMapping("/{id}/assignments")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<List<CollectionAssignment>> getWorkerAssignments(@PathVariable String id) {
+    public ResponseEntity<List<WorkerAssignmentDto>> getWorkerAssignments(@PathVariable String id) {
         List<CollectionAssignment> assignments = collectionAssignmentService.findByWorker(id);
-        return ResponseEntity.ok(assignments);
+
+        // Batch-fetch all referenced collections in a single query
+        Set<String> collectionIds = assignments.stream()
+                .map(CollectionAssignment::getCollectionId)
+                .collect(Collectors.toSet());
+        Map<String, Collection> collectionsById = collectionRepository.findAllById(collectionIds)
+                .stream()
+                .collect(Collectors.toMap(Collection::getId, Function.identity()));
+
+        // Enrich each assignment with collection name/displayName
+        List<WorkerAssignmentDto> dtos = assignments.stream()
+                .map(a -> {
+                    Collection col = collectionsById.get(a.getCollectionId());
+                    String name = col != null ? col.getName() : a.getCollectionId();
+                    String displayName = col != null ? col.getDisplayName() : null;
+                    return WorkerAssignmentDto.from(a, name, displayName);
+                })
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(dtos);
     }
 
     /**

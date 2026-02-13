@@ -239,7 +239,10 @@ export function ResourceDetailPage({
   resourceId: propResourceId,
   testId = 'resource-detail-page',
 }: ResourceDetailPageProps): React.ReactElement {
-  const params = useParams<{ collectionName: string; resourceId: string }>()
+  const { collection: routeCollection, id: routeResourceId } = useParams<{
+    collection: string
+    id: string
+  }>()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { t, formatDate, formatNumber } = useI18n()
@@ -251,8 +254,8 @@ export function ResourceDetailPage({
   const { isFavorite, addFavorite, removeFavorite } = useFavorites(userId)
 
   // Get collection name and resource ID from props or route params
-  const collectionName = propCollectionName || params.collectionName || ''
-  const resourceId = propResourceId || params.resourceId || ''
+  const collectionName = propCollectionName || routeCollection || ''
+  const resourceId = propResourceId || routeResourceId || ''
 
   // Delete confirmation dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)

@@ -57,7 +57,7 @@ class TenantSlugExtractionFilterTest {
 
     private TenantSlugCache slugCache;
 
-    private static final List<String> PLATFORM_PATHS = List.of("/actuator", "/platform");
+    private static final List<String> PLATFORM_PATHS = List.of("/actuator", "/platform", "/control");
 
     @BeforeEach
     void setUp() {
@@ -180,6 +180,20 @@ class TenantSlugExtractionFilterTest {
                 .verifyComplete();
 
         // Should pass through without slug extraction — original exchange, not mutated
+        verify(chain).filter(exchange);
+    }
+
+    @Test
+    void shouldBypassControlPlanePaths() {
+        TenantSlugExtractionFilter filter = createFilter(true, true);
+
+        MockServerHttpRequest request = MockServerHttpRequest.get("/control/ui-bootstrap").build();
+        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        StepVerifier.create(filter.filter(exchange, chain))
+                .verifyComplete();
+
+        // Should pass through without slug extraction — "control" is a platform path, not a slug
         verify(chain).filter(exchange);
     }
 

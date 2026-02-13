@@ -197,7 +197,10 @@ export function ResourceFormPage({
   resourceId: propResourceId,
   testId = 'resource-form-page',
 }: ResourceFormPageProps): React.ReactElement {
-  const params = useParams<{ collectionName: string; resourceId?: string }>()
+  const { collection: routeCollection, id: routeResourceId } = useParams<{
+    collection: string
+    id?: string
+  }>()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { t } = useI18n()
@@ -209,8 +212,8 @@ export function ResourceFormPage({
   const { getFieldRenderer } = usePlugins()
 
   // Get collection name and resource ID from props or route params
-  const collectionName = propCollectionName || params.collectionName || ''
-  const resourceId = propResourceId || params.resourceId
+  const collectionName = propCollectionName || routeCollection || ''
+  const resourceId = propResourceId || routeResourceId
   const isEditMode = !!resourceId
 
   // Clone mode: detect clone source from URL search params

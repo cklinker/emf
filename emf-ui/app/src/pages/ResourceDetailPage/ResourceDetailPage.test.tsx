@@ -249,8 +249,8 @@ function renderWithProviders(
       <MemoryRouter initialEntries={[route]}>
         <AuthWrapper>
           <Routes>
-            <Route path="/resources/:collectionName/:resourceId" element={ui} />
-            <Route path="/resources/:collectionName" element={<div>List Page</div>} />
+            <Route path="/resources/:collection/:id" element={ui} />
+            <Route path="/resources/:collection" element={<div>List Page</div>} />
             <Route path="/resources" element={<div>Browser Page</div>} />
           </Routes>
         </AuthWrapper>

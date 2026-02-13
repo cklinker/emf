@@ -156,8 +156,8 @@ function renderWithProviders(
           <PluginProvider plugins={plugins}>
             <MemoryRouter initialEntries={[route]}>
               <Routes>
-                <Route path="/resources/:collectionName/new" element={ui} />
-                <Route path="/resources/:collectionName/:resourceId/edit" element={ui} />
+                <Route path="/resources/:collection/new" element={ui} />
+                <Route path="/resources/:collection/:id/edit" element={ui} />
               </Routes>
             </MemoryRouter>
           </PluginProvider>

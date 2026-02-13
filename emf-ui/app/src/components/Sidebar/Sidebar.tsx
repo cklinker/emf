@@ -585,7 +585,7 @@ export function Sidebar({ menus, collapsed, onToggle, onItemClick }: SidebarProp
                   item={{
                     id: 'workers',
                     label: t('sidebar.workers'),
-                    path: '/workers',
+                    path: `/${getTenantSlug()}/workers`,
                     icon: 'workers',
                   }}
                   level={0}

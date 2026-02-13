@@ -190,6 +190,40 @@ public class CollectionService {
     }
 
     /**
+     * Retrieves a collection by its ID or name.
+     * First attempts lookup by ID, then falls back to lookup by name.
+     *
+     * @param idOrName The collection ID (UUID) or name
+     * @return The collection entity
+     * @throws ResourceNotFoundException if collection not found by either ID or name
+     */
+    @Transactional(readOnly = true)
+    public Collection getCollectionByIdOrName(String idOrName) {
+        String tenantId = TenantContextHolder.getTenantId();
+        log.debug("Fetching collection by ID or name: {} for tenant: {}", idOrName, tenantId);
+
+        // Try by ID first
+        java.util.Optional<Collection> byId;
+        if (tenantId != null) {
+            byId = collectionRepository.findByIdAndTenantIdAndActiveTrue(idOrName, tenantId);
+        } else {
+            byId = collectionRepository.findByIdAndActiveTrue(idOrName);
+        }
+        if (byId.isPresent()) {
+            return byId.get();
+        }
+
+        // Fall back to name lookup
+        log.debug("Collection not found by ID '{}', trying name lookup", idOrName);
+        if (tenantId != null) {
+            return collectionRepository.findByTenantIdAndNameAndActiveTrue(tenantId, idOrName)
+                    .orElseThrow(() -> new ResourceNotFoundException("Collection", idOrName));
+        }
+        return collectionRepository.findByNameAndActiveTrue(idOrName)
+                .orElseThrow(() -> new ResourceNotFoundException("Collection", idOrName));
+    }
+
+    /**
      * Updates an existing collection.
      * Creates a new version with incremented version number.
      * Evicts the collection from cache after update.

@@ -307,12 +307,13 @@ function ProtectedPageRoute({
   requiredRoles?: string[]
   requiredPolicies?: string[]
 }): React.ReactElement {
+  const { tenantBasePath } = useTenant()
   return (
     <ProtectedRoute
       requiredRoles={requiredRoles}
       requiredPolicies={requiredPolicies}
-      loginPath="login"
-      unauthorizedPath="unauthorized"
+      loginPath={`${tenantBasePath}/login`}
+      unauthorizedPath={`${tenantBasePath}/unauthorized`}
     >
       <AppLayout>{children}</AppLayout>
     </ProtectedRoute>
@@ -735,7 +736,7 @@ function TenantRoutes(): React.ReactElement {
       <Route
         path="tenants"
         element={
-          <ProtectedPageRoute requiredRoles={['PLATFORM_ADMIN']}>
+          <ProtectedPageRoute requiredRoles={['PLATFORM_ADMIN', 'emf-admins']}>
             <TenantsPage />
           </ProtectedPageRoute>
         }

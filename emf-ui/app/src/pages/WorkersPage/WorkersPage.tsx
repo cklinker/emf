@@ -7,13 +7,16 @@
  *
  * Requirements:
  * - Display a list of all workers with status badges
+ * - Default to showing only online workers (READY, STARTING, DRAINING)
+ * - Toggle to show offline/failed workers
+ * - Click column headers to sort by that column
  * - Click a worker row to see its assignments
  * - Rebalance button triggers POST /control/workers/rebalance
  * - Auto-refresh every 15 seconds
  * - Relative time display for Last Heartbeat
  */
 
-import React, { useState, useCallback, useEffect, useRef } from 'react'
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
@@ -65,6 +68,13 @@ export interface WorkersPageProps {
   testId?: string
 }
 
+/** Sortable column keys */
+type SortColumn = 'podName' | 'host' | 'port' | 'pool' | 'status' | 'capacity' | 'lastHeartbeat'
+type SortDirection = 'asc' | 'desc'
+
+/** Statuses considered "online" (shown by default) */
+const ONLINE_STATUSES: Set<Worker['status']> = new Set(['READY', 'STARTING', 'DRAINING'])
+
 const AUTO_REFRESH_INTERVAL = 15000
 
 /**
@@ -91,6 +101,58 @@ function formatRelativeTime(timestamp: string): string {
 
   const days = Math.floor(hours / 24)
   return `${days}d ago`
+}
+
+/**
+ * Compare two workers by a given column
+ */
+function compareWorkers(
+  a: Worker,
+  b: Worker,
+  column: SortColumn,
+  direction: SortDirection
+): number {
+  let cmp = 0
+
+  switch (column) {
+    case 'podName':
+      cmp = a.podName.localeCompare(b.podName)
+      break
+    case 'host':
+      cmp = a.host.localeCompare(b.host)
+      break
+    case 'port':
+      cmp = a.port - b.port
+      break
+    case 'pool':
+      cmp = a.pool.localeCompare(b.pool)
+      break
+    case 'status': {
+      const order: Record<Worker['status'], number> = {
+        READY: 0,
+        STARTING: 1,
+        DRAINING: 2,
+        OFFLINE: 3,
+        FAILED: 4,
+      }
+      cmp = (order[a.status] ?? 5) - (order[b.status] ?? 5)
+      break
+    }
+    case 'capacity': {
+      const aUtil = a.capacity > 0 ? a.currentLoad / a.capacity : 0
+      const bUtil = b.capacity > 0 ? b.currentLoad / b.capacity : 0
+      cmp = aUtil - bUtil
+      break
+    }
+    case 'lastHeartbeat': {
+      const aTime = new Date(a.lastHeartbeat).getTime() || 0
+      const bTime = new Date(b.lastHeartbeat).getTime() || 0
+      cmp = aTime - bTime
+      break
+    }
+  }
+
+  return direction === 'desc' ? -cmp : cmp
 }
 
 /**
@@ -151,6 +213,46 @@ function CapacityBar({ current, capacity }: CapacityBarProps): React.ReactElemen
         {current}/{capacity}
       </span>
     </div>
+  )
+}
+
+/**
+ * Sortable column header
+ */
+interface SortableHeaderProps {
+  column: SortColumn
+  label: string
+  currentSort: SortColumn
+  currentDirection: SortDirection
+  onSort: (column: SortColumn) => void
+}
+
+function SortableHeader({
+  column,
+  label,
+  currentSort,
+  currentDirection,
+  onSort,
+}: SortableHeaderProps): React.ReactElement {
+  const isActive = currentSort === column
+  const ariaSort = isActive ? (currentDirection === 'asc' ? 'ascending' : 'descending') : 'none'
+
+  return (
+    <th
+      role="columnheader"
+      scope="col"
+      aria-sort={ariaSort}
+      className={`${styles.sortableHeader} ${isActive ? styles.sortableHeaderActive : ''}`}
+      onClick={() => onSort(column)}
+      data-testid={`sort-header-${column}`}
+    >
+      <span className={styles.sortableHeaderContent}>
+        {label}
+        <span className={styles.sortIndicator} aria-hidden="true">
+          {isActive ? (currentDirection === 'asc' ? ' \u25B2' : ' \u25BC') : ' \u25B4'}
+        </span>
+      </span>
+    </th>
   )
 }
 
@@ -293,6 +395,13 @@ export function WorkersPage({ testId = 'workers-page' }: WorkersPageProps): Reac
   // Modal state for viewing assignments
   const [selectedWorker, setSelectedWorker] = useState<Worker | null>(null)
 
+  // Filter state — default to hiding offline workers
+  const [showOffline, setShowOffline] = useState(false)
+
+  // Sort state — default to sorting by status ascending
+  const [sortColumn, setSortColumn] = useState<SortColumn>('status')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
+
   // Relative time updater
   const [, setTick] = useState(0)
   const tickRef = useRef<ReturnType<typeof setInterval>>()
@@ -318,9 +427,23 @@ export function WorkersPage({ testId = 'workers-page' }: WorkersPageProps): Reac
     refetchInterval: AUTO_REFRESH_INTERVAL,
   })
 
-  const workers: Worker[] = Array.isArray(workersData)
+  const allWorkers: Worker[] = Array.isArray(workersData)
     ? workersData
     : ((workersData as unknown as { content?: Worker[] })?.content ?? [])
+
+  // Filter and sort workers
+  const workers = useMemo(() => {
+    const filtered = showOffline
+      ? allWorkers
+      : allWorkers.filter((w) => ONLINE_STATUSES.has(w.status))
+    return [...filtered].sort((a, b) => compareWorkers(a, b, sortColumn, sortDirection))
+  }, [allWorkers, showOffline, sortColumn, sortDirection])
+
+  // Count offline workers for the toggle label
+  const offlineCount = useMemo(
+    () => allWorkers.filter((w) => !ONLINE_STATUSES.has(w.status)).length,
+    [allWorkers]
+  )
 
   // Fetch assignments when a worker is selected
   const { data: assignmentsData, isLoading: assignmentsLoading } = useQuery({
@@ -362,6 +485,19 @@ export function WorkersPage({ testId = 'workers-page' }: WorkersPageProps): Reac
     rebalanceMutation.mutate()
   }, [rebalanceMutation])
 
+  // Handle column sort
+  const handleSort = useCallback(
+    (column: SortColumn) => {
+      if (sortColumn === column) {
+        setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'))
+      } else {
+        setSortColumn(column)
+        setSortDirection('asc')
+      }
+    },
+    [sortColumn]
+  )
+
   // Render loading state
   if (isLoading) {
     return (
@@ -396,6 +532,15 @@ export function WorkersPage({ testId = 'workers-page' }: WorkersPageProps): Reac
           </span>
         </div>
         <div className={styles.headerActions}>
+          <label className={styles.filterToggle} data-testid="show-offline-toggle">
+            <input
+              type="checkbox"
+              checked={showOffline}
+              onChange={(e) => setShowOffline(e.target.checked)}
+              className={styles.filterCheckbox}
+            />
+            <span className={styles.filterLabel}>Show offline ({offlineCount})</span>
+          </label>
           <span className={styles.autoRefreshLabel}>{t('workers.autoRefresh')}</span>
           <button
             type="button"
@@ -413,7 +558,11 @@ export function WorkersPage({ testId = 'workers-page' }: WorkersPageProps): Reac
       {/* Workers Table */}
       {workers.length === 0 ? (
         <div className={styles.emptyState} data-testid="empty-state">
-          <p>{t('workers.noWorkers')}</p>
+          <p>
+            {showOffline
+              ? t('workers.noWorkers')
+              : 'No online workers. Toggle "Show offline" to see all workers.'}
+          </p>
         </div>
       ) : (
         <div className={styles.tableContainer}>
@@ -425,27 +574,55 @@ export function WorkersPage({ testId = 'workers-page' }: WorkersPageProps): Reac
           >
             <thead>
               <tr role="row">
-                <th role="columnheader" scope="col">
-                  {t('workers.podName')}
-                </th>
-                <th role="columnheader" scope="col">
-                  {t('workers.host')}
-                </th>
-                <th role="columnheader" scope="col">
-                  {t('workers.port')}
-                </th>
-                <th role="columnheader" scope="col">
-                  {t('workers.pool')}
-                </th>
-                <th role="columnheader" scope="col">
-                  {t('workers.status')}
-                </th>
-                <th role="columnheader" scope="col">
-                  {t('workers.capacityLabel')}
-                </th>
-                <th role="columnheader" scope="col">
-                  {t('workers.lastHeartbeat')}
-                </th>
+                <SortableHeader
+                  column="podName"
+                  label={t('workers.podName')}
+                  currentSort={sortColumn}
+                  currentDirection={sortDirection}
+                  onSort={handleSort}
+                />
+                <SortableHeader
+                  column="host"
+                  label={t('workers.host')}
+                  currentSort={sortColumn}
+                  currentDirection={sortDirection}
+                  onSort={handleSort}
+                />
+                <SortableHeader
+                  column="port"
+                  label={t('workers.port')}
+                  currentSort={sortColumn}
+                  currentDirection={sortDirection}
+                  onSort={handleSort}
+                />
+                <SortableHeader
+                  column="pool"
+                  label={t('workers.pool')}
+                  currentSort={sortColumn}
+                  currentDirection={sortDirection}
+                  onSort={handleSort}
+                />
+                <SortableHeader
+                  column="status"
+                  label={t('workers.status')}
+                  currentSort={sortColumn}
+                  currentDirection={sortDirection}
+                  onSort={handleSort}
+                />
+                <SortableHeader
+                  column="capacity"
+                  label={t('workers.capacityLabel')}
+                  currentSort={sortColumn}
+                  currentDirection={sortDirection}
+                  onSort={handleSort}
+                />
+                <SortableHeader
+                  column="lastHeartbeat"
+                  label={t('workers.lastHeartbeat')}
+                  currentSort={sortColumn}
+                  currentDirection={sortDirection}
+                  onSort={handleSort}
+                />
                 <th role="columnheader" scope="col">
                   {t('common.actions')}
                 </th>

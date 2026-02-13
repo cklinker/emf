@@ -16,6 +16,7 @@ import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { ArrowLeft, Star, ChevronDown } from 'lucide-react'
 import { useI18n } from '../../context/I18nContext'
+import { getTenantSlug } from '../../context/TenantContext'
 import { getTenantId } from '../../hooks'
 import { useToast } from '../../components'
 import type { ApiClient } from '../../services/apiClient'
@@ -176,7 +177,7 @@ export function RecordActionsBar({
   const handleClone = useCallback(() => {
     setDropdownOpen(false)
     setFocusedIndex(-1)
-    navigate(`/resources/${collectionName}/new?clone=${recordId}`)
+    navigate(`/${getTenantSlug()}/resources/${collectionName}/new?clone=${recordId}`)
   }, [navigate, collectionName, recordId])
 
   // Submit for approval mutation

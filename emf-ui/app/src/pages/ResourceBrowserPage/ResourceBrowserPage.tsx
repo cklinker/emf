@@ -13,6 +13,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
+import { getTenantSlug } from '../../context/TenantContext'
 import { LoadingSpinner, ErrorMessage } from '../../components'
 import styles from './ResourceBrowserPage.module.css'
 
@@ -104,7 +105,7 @@ export function ResourceBrowserPage({
   // Handle collection selection - navigate to collection data view
   const handleCollectionSelect = useCallback(
     (collection: CollectionSummary) => {
-      navigate(`/resources/${collection.name}`)
+      navigate(`/${getTenantSlug()}/resources/${collection.name}`)
     },
     [navigate]
   )

@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { useApi } from '../../context/ApiContext'
 import { useI18n } from '../../context/I18nContext'
+import { getTenantSlug } from '../../context/TenantContext'
 import { useToast } from '../../components/Toast'
 import styles from './UsersPage.module.css'
 
@@ -324,7 +325,7 @@ export function UsersPage({ testId = 'users-page' }: UsersPageProps) {
                   <td>
                     <button
                       className={styles.linkButton}
-                      onClick={() => navigate(`/users/${user.id}`)}
+                      onClick={() => navigate(`/${getTenantSlug()}/users/${user.id}`)}
                     >
                       {user.firstName} {user.lastName}
                     </button>
@@ -339,7 +340,7 @@ export function UsersPage({ testId = 'users-page' }: UsersPageProps) {
                     <div className={styles.actionButtons}>
                       <button
                         className={styles.btnSmall}
-                        onClick={() => navigate(`/users/${user.id}`)}
+                        onClick={() => navigate(`/${getTenantSlug()}/users/${user.id}`)}
                       >
                         {t('common.edit')}
                       </button>

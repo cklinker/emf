@@ -123,12 +123,16 @@ public class GatewayBootstrapController {
         if (tenantId != null) {
             oidcProviders = oidcProviderRepository.findByTenantIdAndActiveTrue(tenantId)
                     .stream()
-                    .map(p -> new BootstrapConfigDto.OidcProviderSummary(p.getId(), p.getName(), p.getIssuer(), p.getClientId()))
+                    .map(p -> new BootstrapConfigDto.OidcProviderSummary(
+                            p.getId(), p.getName(), p.getIssuer(), p.getClientId(),
+                            p.getRolesClaim(), p.getRolesMapping()))
                     .collect(Collectors.toList());
         } else {
             oidcProviders = oidcProviderRepository.findByActiveTrue()
                     .stream()
-                    .map(p -> new BootstrapConfigDto.OidcProviderSummary(p.getId(), p.getName(), p.getIssuer(), p.getClientId()))
+                    .map(p -> new BootstrapConfigDto.OidcProviderSummary(
+                            p.getId(), p.getName(), p.getIssuer(), p.getClientId(),
+                            p.getRolesClaim(), p.getRolesMapping()))
                     .collect(Collectors.toList());
         }
 

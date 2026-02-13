@@ -87,4 +87,8 @@ export interface OIDCProviderSummary {
   name: string
   issuer: string
   clientId: string
+  /** The JWT claim name containing roles/groups (e.g., "groups") */
+  rolesClaim?: string
+  /** JSON string mapping IdP groups to application roles (e.g., '{"emf-admins": "ADMIN"}') */
+  rolesMapping?: string
 }

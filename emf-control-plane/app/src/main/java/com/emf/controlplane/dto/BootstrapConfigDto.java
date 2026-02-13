@@ -232,6 +232,8 @@ public class BootstrapConfigDto {
         private String name;
         private String issuer;
         private String clientId;
+        private String rolesClaim;
+        private String rolesMapping;
 
         public OidcProviderSummary() {
         }
@@ -243,6 +245,13 @@ public class BootstrapConfigDto {
             this.clientId = clientId;
         }
 
+        public OidcProviderSummary(String id, String name, String issuer, String clientId,
+                                    String rolesClaim, String rolesMapping) {
+            this(id, name, issuer, clientId);
+            this.rolesClaim = rolesClaim;
+            this.rolesMapping = rolesMapping;
+        }
+
         public String getId() { return id; }
         public void setId(String id) { this.id = id; }
         public String getName() { return name; }
@@ -251,5 +260,9 @@ public class BootstrapConfigDto {
         public void setIssuer(String issuer) { this.issuer = issuer; }
         public String getClientId() { return clientId; }
         public void setClientId(String clientId) { this.clientId = clientId; }
+        public String getRolesClaim() { return rolesClaim; }
+        public void setRolesClaim(String rolesClaim) { this.rolesClaim = rolesClaim; }
+        public String getRolesMapping() { return rolesMapping; }
+        public void setRolesMapping(String rolesMapping) { this.rolesMapping = rolesMapping; }
     }
 }

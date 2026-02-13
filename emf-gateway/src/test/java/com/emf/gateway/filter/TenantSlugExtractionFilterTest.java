@@ -275,17 +275,36 @@ class TenantSlugExtractionFilterTest {
     }
 
     @Test
-    void shouldPassThroughUnknownSlugWhenRequirePrefixFalse() {
-        // Cache is empty, so slug-shaped segment won't resolve
+    void shouldStripUnknownSlugAndPassThroughWhenRequirePrefixFalse() {
+        // Cache is empty, so slug-shaped segment won't resolve to a tenant ID,
+        // but the path should still be stripped so route matching works
         TenantSlugExtractionFilter filter = createFilter(true, false);
 
         MockServerHttpRequest request = MockServerHttpRequest.get("/unknown-org/api/users").build();
         MockServerWebExchange exchange = MockServerWebExchange.from(request);
 
+        final ServerWebExchange[] capturedExchange = new ServerWebExchange[1];
+        when(chain.filter(any(ServerWebExchange.class))).thenAnswer(invocation -> {
+            capturedExchange[0] = invocation.getArgument(0);
+            return Mono.empty();
+        });
+
         StepVerifier.create(filter.filter(exchange, chain))
                 .verifyComplete();
 
-        verify(chain).filter(exchange);
+        verify(chain).filter(any(ServerWebExchange.class));
+
+        // Path should be rewritten (slug stripped)
+        assertThat(capturedExchange[0]).isNotNull();
+        assertThat(capturedExchange[0].getRequest().getPath().value()).isEqualTo("/api/users");
+
+        // Slug attribute should be set (for header propagation)
+        assertThat(capturedExchange[0].getAttributes().get(TenantResolutionFilter.TENANT_SLUG_ATTR))
+                .isEqualTo("unknown-org");
+
+        // But tenant ID should NOT be set (slug wasn't in cache)
+        assertThat(capturedExchange[0].getAttributes().get(TenantResolutionFilter.TENANT_ID_ATTR))
+                .isNull();
     }
 
     // --- Slug pattern validation ---

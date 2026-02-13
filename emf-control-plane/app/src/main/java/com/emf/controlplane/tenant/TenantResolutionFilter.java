@@ -35,7 +35,6 @@ public class TenantResolutionFilter extends OncePerRequestFilter {
     private static final Set<String> EXEMPT_PATH_PREFIXES = Set.of(
             "/actuator",
             "/platform",
-            "/control/ui-bootstrap",
             "/control/bootstrap",
             "/control/tenants/slug-map",
             "/openapi",

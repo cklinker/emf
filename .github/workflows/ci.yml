@@ -13,6 +13,8 @@ env:
   JAVA_VERSION: '21'
   NODE_VERSION: '18'
   MAVEN_VERSION: '3.9.9'
+  # Override MAVEN_OPTS from runner env to use default ~/.m2/repository
+  MAVEN_OPTS: ''
 
 jobs:
   # ===========================================================================
@@ -30,7 +32,6 @@ jobs:
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: 'temurin'
-          cache: maven
 
       - name: Install Maven
         run: |
@@ -45,8 +46,6 @@ jobs:
       - name: Package runtime artifacts
         run: |
           mkdir -p /tmp/runtime-artifacts
-          cp emf-platform/runtime/runtime-core/target/runtime-core-*.jar /tmp/runtime-artifacts/
-          cp emf-platform/runtime/runtime-events/target/runtime-events-*.jar /tmp/runtime-artifacts/
           cp -r ~/.m2/repository/com/emf /tmp/runtime-artifacts/m2-emf
 
       - name: Upload runtime artifacts
@@ -72,7 +71,6 @@ jobs:
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: 'temurin'
-          cache: maven
 
       - name: Install Maven
         run: |
@@ -128,7 +126,6 @@ jobs:
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: 'temurin'
-          cache: maven
 
       - name: Install Maven
         run: |
@@ -184,7 +181,6 @@ jobs:
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: 'temurin'
-          cache: maven
 
       - name: Install Maven
         run: |

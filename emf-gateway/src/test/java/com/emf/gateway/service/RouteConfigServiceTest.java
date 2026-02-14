@@ -1,8 +1,10 @@
 package com.emf.gateway.service;
 
+import com.emf.gateway.authz.AuthzConfigCache;
 import com.emf.gateway.config.*;
 import com.emf.gateway.route.RouteDefinition;
 import com.emf.gateway.route.RouteRegistry;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import org.junit.jupiter.api.AfterEach;
@@ -27,6 +29,7 @@ class RouteConfigServiceTest {
     private MockWebServer mockWebServer;
     private RouteConfigService routeConfigService;
     private RouteRegistry routeRegistry;
+    private AuthzConfigCache authzConfigCache;
 
     private static final String WORKER_SERVICE_URL = "http://emf-worker:80";
 
@@ -37,10 +40,13 @@ class RouteConfigServiceTest {
 
         String baseUrl = mockWebServer.url("/").toString();
         routeRegistry = new RouteRegistry();
+        authzConfigCache = new AuthzConfigCache();
 
         routeConfigService = new RouteConfigService(
             WebClient.builder(),
             routeRegistry,
+            authzConfigCache,
+            new ObjectMapper(),
             baseUrl,
             "/control/bootstrap",
             WORKER_SERVICE_URL
@@ -339,5 +345,95 @@ class RouteConfigServiceTest {
         List<RouteDefinition> routes = routeRegistry.getAllRoutes();
         assertEquals(1, routes.size());
         assertEquals("valid-collection", routes.get(0).getId());
+    }
+
+    @Test
+    void testRefreshRoutes_WarmsAuthzConfigCache() throws InterruptedException {
+        // Arrange - bootstrap response with collectionAuthz data
+        String jsonResponse = """
+            {
+              "collections": [
+                {
+                  "id": "users-collection",
+                  "name": "users",
+                  "path": "/api/users",
+                  "fields": []
+                }
+              ],
+              "authorization": {
+                "roles": [],
+                "policies": [],
+                "routePolicies": [],
+                "fieldPolicies": [],
+                "collectionAuthz": [
+                  {
+                    "collectionId": "users-collection",
+                    "routePolicies": [
+                      {
+                        "operation": "GET",
+                        "policyId": "policy-1",
+                        "policyName": "allow-all",
+                        "policyRules": "{\\"roles\\": [\\"USER\\", \\"ADMIN\\"]}"
+                      },
+                      {
+                        "operation": "POST",
+                        "policyId": "policy-2",
+                        "policyName": "admin-only",
+                        "policyRules": "{\\"roles\\": [\\"ADMIN\\"]}"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+            """;
+
+        mockWebServer.enqueue(new MockResponse()
+            .setBody(jsonResponse)
+            .addHeader("Content-Type", "application/json"));
+
+        // Act
+        routeConfigService.refreshRoutes();
+        Thread.sleep(500);
+
+        // Assert - authz config cache should be populated
+        assertTrue(authzConfigCache.getConfig("users-collection").isPresent(),
+            "AuthzConfigCache should have entry for users-collection after warm-up");
+    }
+
+    @Test
+    void testRefreshRoutes_NoCollectionAuthz() throws InterruptedException {
+        // Arrange - bootstrap response without collectionAuthz
+        String jsonResponse = """
+            {
+              "collections": [
+                {
+                  "id": "tasks-collection",
+                  "name": "tasks",
+                  "path": "/api/tasks",
+                  "fields": []
+                }
+              ],
+              "authorization": {
+                "roles": [],
+                "policies": [],
+                "routePolicies": [],
+                "fieldPolicies": []
+              }
+            }
+            """;
+
+        mockWebServer.enqueue(new MockResponse()
+            .setBody(jsonResponse)
+            .addHeader("Content-Type", "application/json"));
+
+        // Act
+        routeConfigService.refreshRoutes();
+        Thread.sleep(500);
+
+        // Assert - routes should still be registered, no authz cache entry
+        assertEquals(1, routeRegistry.getAllRoutes().size());
+        assertTrue(authzConfigCache.getConfig("tasks-collection").isEmpty(),
+            "AuthzConfigCache should have no entry when no collectionAuthz data");
     }
 }

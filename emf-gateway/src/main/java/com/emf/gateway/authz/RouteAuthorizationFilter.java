@@ -114,14 +114,17 @@ public class RouteAuthorizationFilter implements GlobalFilter, Ordered {
 
     /**
      * Legacy role-based authorization: check route policies from authz config cache.
+     * Falls back to profile-based evaluation when the in-memory cache has no entry,
+     * which can happen after a gateway restart before Kafka events repopulate the cache.
      */
     private Mono<Void> evaluateWithPolicies(ServerWebExchange exchange, GatewayFilterChain chain,
                                              GatewayPrincipal principal, String collectionId, HttpMethod method) {
         Optional<AuthzConfig> authzConfigOpt = authzConfigCache.getConfig(collectionId);
 
         if (authzConfigOpt.isEmpty()) {
-            log.debug("No authorization config found for collection: {}, allowing request", collectionId);
-            return chain.filter(exchange);
+            log.debug("No authorization config in cache for collection: {}, falling back to profile-based evaluation",
+                    collectionId);
+            return evaluateWithProfiles(exchange, chain, principal, collectionId, method);
         }
 
         AuthzConfig authzConfig = authzConfigOpt.get();

@@ -20,6 +20,8 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.List;
 import java.util.Map;
@@ -29,8 +31,10 @@ import java.util.concurrent.CompletableFuture;
  * Component for publishing configuration change events to Kafka.
  *
  * <p>Payload construction from JPA entities happens synchronously on the caller's
- * thread (within the transaction) to avoid LazyInitializationException. Only the
- * Kafka send is performed asynchronously.
+ * thread (within the transaction) to avoid LazyInitializationException. The actual
+ * Kafka send is deferred until after the transaction commits (via
+ * {@link TransactionSynchronizationManager}) so that consumers always read
+ * committed data when they call back to the control-plane API.
  *
  * <p>This component is conditionally enabled based on the property
  * {@code emf.control-plane.kafka.enabled}. When disabled (e.g., in tests),
@@ -88,7 +92,7 @@ public class ConfigEventPublisher {
                 EVENT_TYPE_COLLECTION_CHANGED, generateCorrelationId(), payload);
 
         String topic = properties.getKafka().getTopics().getCollectionChanged();
-        sendEventAsync(topic, collection.getId(), event);
+        sendAfterCommit(topic, collection.getId(), event);
     }
 
     /**
@@ -117,7 +121,7 @@ public class ConfigEventPublisher {
                 EVENT_TYPE_AUTHZ_CHANGED, generateCorrelationId(), payload);
 
         String topic = properties.getKafka().getTopics().getAuthzChanged();
-        sendEventAsync(topic, collectionId, event);
+        sendAfterCommit(topic, collectionId, event);
     }
 
     /**
@@ -141,7 +145,7 @@ public class ConfigEventPublisher {
                 EVENT_TYPE_UI_CHANGED, generateCorrelationId(), payload);
 
         String topic = properties.getKafka().getTopics().getUiChanged();
-        sendEventAsync(topic, "ui-config", event);
+        sendAfterCommit(topic, "ui-config", event);
     }
 
     /**
@@ -163,7 +167,7 @@ public class ConfigEventPublisher {
                 EVENT_TYPE_OIDC_CHANGED, generateCorrelationId(), payload);
 
         String topic = properties.getKafka().getTopics().getOidcChanged();
-        sendEventAsync(topic, "oidc-config", event);
+        sendAfterCommit(topic, "oidc-config", event);
     }
 
     /**
@@ -191,7 +195,7 @@ public class ConfigEventPublisher {
                 "emf.worker.assignment.changed", generateCorrelationId(), payload);
 
         String topic = properties.getKafka().getTopics().getWorkerAssignmentChanged();
-        sendEventAsync(topic, collectionId, event);
+        sendAfterCommit(topic, collectionId, event);
     }
 
     /**
@@ -215,7 +219,7 @@ public class ConfigEventPublisher {
                 "emf.worker.status.changed", generateCorrelationId(), payload);
 
         String topic = properties.getKafka().getTopics().getWorkerStatusChanged();
-        sendEventAsync(topic, workerId, event);
+        sendAfterCommit(topic, workerId, event);
     }
 
     /**
@@ -230,6 +234,37 @@ public class ConfigEventPublisher {
             return requestId;
         }
         return java.util.UUID.randomUUID().toString();
+    }
+
+    /**
+     * Defers sending the Kafka event until after the current transaction commits.
+     *
+     * <p>This prevents a race condition where consumers receive the event and
+     * call back to the control-plane API before the transaction has committed,
+     * resulting in stale reads (e.g., worker sees old field list).
+     *
+     * <p>If no transaction synchronization is active (e.g., called outside a
+     * transaction), the event is sent immediately.
+     *
+     * @param topic The Kafka topic
+     * @param key The message key (used for partitioning)
+     * @param event The event to send
+     */
+    private void sendAfterCommit(String topic, String key, ConfigEvent<?> event) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            log.debug("Deferring Kafka event until after transaction commit: topic={}, eventId={}",
+                    topic, event.getEventId());
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    sendEventAsync(topic, key, event);
+                }
+            });
+        } else {
+            log.debug("No active transaction synchronization, sending event immediately: topic={}, eventId={}",
+                    topic, event.getEventId());
+            sendEventAsync(topic, key, event);
+        }
     }
 
     /**

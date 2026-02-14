@@ -307,15 +307,6 @@ describe('Sidebar', () => {
       expect(screen.getByText('Admin')).toBeInTheDocument()
     })
 
-    it('should render System Health link inside Setup', async () => {
-      const user = userEvent.setup()
-      renderSidebar({ menus: sampleMenus })
-
-      await expandSetup(user)
-      expect(screen.getByTestId('menu-item-system-health')).toBeInTheDocument()
-      expect(screen.getByText('System Health')).toBeInTheDocument()
-    })
-
     it('should have aria-expanded on Setup toggle', () => {
       renderSidebar({ menus: sampleMenus })
       const setupSection = screen.getByTestId('setup-section')

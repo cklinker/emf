@@ -21,6 +21,9 @@ public class UiMenu extends BaseEntity {
     @Column(name = "description", length = 500)
     private String description;
 
+    @Column(name = "display_order")
+    private Integer displayOrder = 0;
+
     @OneToMany(mappedBy = "menu", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @OrderBy("displayOrder ASC")
     private List<UiMenuItem> items = new ArrayList<>();
@@ -56,6 +59,14 @@ public class UiMenu extends BaseEntity {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public Integer getDisplayOrder() {
+        return displayOrder;
+    }
+
+    public void setDisplayOrder(Integer displayOrder) {
+        this.displayOrder = displayOrder;
     }
 
     public List<UiMenuItem> getItems() {

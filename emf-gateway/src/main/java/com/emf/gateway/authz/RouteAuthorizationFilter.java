@@ -83,14 +83,6 @@ public class RouteAuthorizationFilter implements GlobalFilter, Ordered {
         RouteDefinition route = routeOpt.get();
         String collectionId = route.getId();
 
-        // Control-plane routes are admin API endpoints protected by JWT authentication only,
-        // not data collection routes that need policy-based authorization
-        if ("control-plane".equals(collectionId)) {
-            log.debug("Allowing control-plane route for authenticated user: {}, path: {}",
-                    principal.getUsername(), path);
-            return chain.filter(exchange);
-        }
-
         log.debug("Checking authorization for user: {}, collection: {}, method: {}, path: {}",
                 principal.getUsername(), collectionId, method, path);
 

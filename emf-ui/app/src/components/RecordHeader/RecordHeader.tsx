@@ -16,8 +16,14 @@ import styles from './RecordHeader.module.css'
  * Props for the RecordHeader component
  */
 export interface RecordHeaderProps {
-  /** The record data including id, createdAt, updatedAt, and field values */
-  record: Record<string, unknown> & { id: string; createdAt?: string; updatedAt?: string }
+  /** The record data including id, created_at, updated_at, and field values */
+  record: Record<string, unknown> & {
+    id: string
+    createdAt?: string
+    updatedAt?: string
+    created_at?: string
+    updated_at?: string
+  }
   /** The schema definition for the record's collection */
   schema: {
     name: string
@@ -260,15 +266,19 @@ export function RecordHeader({
       {/* Bottom row: timestamps + record ID */}
       <div className={styles.headerBottom}>
         <span className={styles.timestamps} data-testid="record-header-timestamps">
-          {record.createdAt && (
+          {(record.created_at || record.createdAt) && (
             <>
-              {t('recordHeader.created')} {formatRelativeTime(record.createdAt, t)}
+              {t('recordHeader.created')}{' '}
+              {formatRelativeTime((record.created_at || record.createdAt)!, t)}
             </>
           )}
-          {record.createdAt && record.updatedAt && ' \u00B7 '}
-          {record.updatedAt && (
+          {(record.created_at || record.createdAt) &&
+            (record.updated_at || record.updatedAt) &&
+            ' \u00B7 '}
+          {(record.updated_at || record.updatedAt) && (
             <>
-              {t('recordHeader.updated')} {formatRelativeTime(record.updatedAt, t)}
+              {t('recordHeader.updated')}{' '}
+              {formatRelativeTime((record.updated_at || record.updatedAt)!, t)}
             </>
           )}
         </span>

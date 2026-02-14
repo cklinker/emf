@@ -127,6 +127,8 @@ export function wrapResource(
   delete data.attributes.id
   delete data.attributes.createdAt
   delete data.attributes.updatedAt
+  delete data.attributes.created_at
+  delete data.attributes.updated_at
   delete data.attributes.createdBy
   delete data.attributes.updatedBy
   delete data.attributes.created_by

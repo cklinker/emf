@@ -638,11 +638,11 @@ export function ResourceDetailPage({
           Metadata
         </h2>
         <div className={styles.metadataGrid}>
-          {resource.createdAt && (
+          {(resource.created_at || resource.createdAt) && (
             <div className={styles.metadataItem}>
               <span className={styles.metadataLabel}>{t('collections.created')}</span>
               <span className={styles.metadataValue} data-testid="created-at">
-                {formatDate(new Date(resource.createdAt as string), {
+                {formatDate(new Date((resource.created_at || resource.createdAt) as string), {
                   year: 'numeric',
                   month: 'long',
                   day: 'numeric',
@@ -652,11 +652,11 @@ export function ResourceDetailPage({
               </span>
             </div>
           )}
-          {resource.updatedAt && (
+          {(resource.updated_at || resource.updatedAt) && (
             <div className={styles.metadataItem}>
               <span className={styles.metadataLabel}>{t('collections.updated')}</span>
               <span className={styles.metadataValue} data-testid="updated-at">
-                {formatDate(new Date(resource.updatedAt as string), {
+                {formatDate(new Date((resource.updated_at || resource.updatedAt) as string), {
                   year: 'numeric',
                   month: 'long',
                   day: 'numeric',
@@ -764,8 +764,8 @@ export function ResourceDetailPage({
         collectionId={schema.id}
         collectionName={collectionName}
         recordId={resourceId}
-        recordCreatedAt={resource.createdAt as string | undefined}
-        recordUpdatedAt={resource.updatedAt as string | undefined}
+        recordCreatedAt={(resource.created_at || resource.createdAt) as string | undefined}
+        recordUpdatedAt={(resource.updated_at || resource.updatedAt) as string | undefined}
         apiClient={apiClient}
       />
 

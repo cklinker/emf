@@ -14,6 +14,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -265,6 +266,94 @@ public class SchemaMigrationEngine {
             newDefinition.name(), migrations.size());
     }
     
+    /**
+     * Reconciles the physical database table schema with the collection definition.
+     *
+     * <p>This method introspects the actual database columns using {@code information_schema.columns}
+     * and adds any columns that exist in the definition but not in the physical table.
+     *
+     * <p>This is called during collection initialization to handle the case where a table
+     * was created before new fields were added to the definition. {@code CREATE TABLE IF NOT EXISTS}
+     * will silently succeed even if the table is missing columns, so this method fills the gap.
+     *
+     * @param definition the current collection definition
+     */
+    public void reconcileSchema(CollectionDefinition definition) {
+        String tableName = getTableName(definition);
+
+        // Query actual columns in the database table
+        Set<String> existingColumns;
+        try {
+            existingColumns = getExistingColumns(tableName);
+        } catch (Exception e) {
+            log.warn("Could not introspect columns for table '{}': {}", tableName, e.getMessage());
+            return;
+        }
+
+        if (existingColumns.isEmpty()) {
+            // Table doesn't exist yet — nothing to reconcile
+            return;
+        }
+
+        // Find fields in the definition that don't have a corresponding column
+        List<MigrationAction> migrations = new ArrayList<>();
+        for (FieldDefinition field : definition.fields()) {
+            if (!field.type().hasPhysicalColumn()) {
+                continue; // Skip FORMULA, ROLLUP_SUMMARY
+            }
+
+            if (!existingColumns.contains(field.name().toLowerCase())) {
+                migrations.add(createAddColumnMigration(tableName, definition.name(), field));
+                log.info("Reconciliation: column '{}' missing from table '{}', will add",
+                    field.name(), tableName);
+            }
+
+            // Check companion columns
+            if (field.type() == FieldType.CURRENCY
+                    && !existingColumns.contains((field.name() + "_currency_code").toLowerCase())) {
+                // The companion column is included in the ADD COLUMN migration
+                // No separate action needed
+            }
+            if (field.type() == FieldType.GEOLOCATION
+                    && !existingColumns.contains((field.name() + "_longitude").toLowerCase())) {
+                // The companion column is included in the ADD COLUMN migration
+                // No separate action needed
+            }
+        }
+
+        // Execute any needed migrations
+        for (MigrationAction migration : migrations) {
+            executeMigration(migration);
+        }
+
+        if (!migrations.isEmpty()) {
+            log.info("Schema reconciliation completed for collection '{}': {} columns added",
+                definition.name(), migrations.size());
+        } else {
+            log.debug("Schema reconciliation for collection '{}': table is up to date",
+                definition.name());
+        }
+    }
+
+    /**
+     * Gets the set of existing column names in a database table.
+     * Uses {@code information_schema.columns} which is supported by PostgreSQL and H2.
+     *
+     * @param tableName the table name to introspect
+     * @return set of lowercase column names, or empty set if table doesn't exist
+     */
+    Set<String> getExistingColumns(String tableName) {
+        String sql = """
+            SELECT column_name FROM information_schema.columns
+            WHERE LOWER(table_name) = LOWER(?)
+            """;
+
+        List<String> columns = jdbcTemplate.query(sql,
+            (rs, rowNum) -> rs.getString("column_name").toLowerCase(), tableName);
+
+        return new HashSet<>(columns);
+    }
+
     /**
      * Detects schema differences between two collection definitions.
      * 

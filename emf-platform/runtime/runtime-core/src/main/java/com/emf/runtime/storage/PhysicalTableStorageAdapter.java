@@ -152,11 +152,16 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
             for (String stmt : postCreateStatements) {
                 jdbcTemplate.execute(stmt);
             }
-            
+
             // Record the migration in history
-            migrationEngine.recordMigration(definition.name(), 
+            migrationEngine.recordMigration(definition.name(),
                 SchemaMigrationEngine.MigrationType.CREATE_TABLE, sql.toString());
-            
+
+            // Reconcile schema: if the table already existed, CREATE TABLE IF NOT EXISTS
+            // was a no-op and the table may be missing columns added after its creation.
+            // This introspects the actual table columns and adds any missing ones.
+            migrationEngine.reconcileSchema(definition);
+
             log.info("Initialized table '{}' for collection '{}'", tableName, definition.name());
         } catch (DataAccessException e) {
             throw new StorageException("Failed to initialize table for collection: " + definition.name(), e);

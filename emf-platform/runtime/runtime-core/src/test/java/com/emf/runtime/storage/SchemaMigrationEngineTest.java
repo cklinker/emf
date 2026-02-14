@@ -21,6 +21,7 @@ import javax.sql.DataSource;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -649,6 +650,173 @@ class SchemaMigrationEngineTest {
         void shouldThrowForInvalidStringMigrationType() {
             assertThrows(IllegalArgumentException.class,
                 () -> migrationEngine.recordMigration("test", "INVALID_TYPE", "SQL"));
+        }
+    }
+
+    @Nested
+    @DisplayName("Schema Reconciliation Tests")
+    class SchemaReconciliationTests {
+
+        @BeforeEach
+        void cleanupTestTable() {
+            try {
+                jdbcTemplate.execute("DROP TABLE IF EXISTS tbl_test");
+            } catch (Exception e) {
+                // Ignore
+            }
+        }
+
+        @Test
+        @DisplayName("Should add missing columns when table exists without them")
+        void shouldAddMissingColumnsWhenTableExistsWithoutThem() {
+            // Create table with only 'name' column
+            jdbcTemplate.execute(
+                "CREATE TABLE tbl_test (id VARCHAR(36) PRIMARY KEY, " +
+                "created_at TIMESTAMP NOT NULL, updated_at TIMESTAMP NOT NULL, name TEXT)");
+
+            // Define collection with 'name' and 'description' columns
+            List<FieldDefinition> fields = List.of(
+                new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null),
+                new FieldDefinition("description", FieldType.STRING, true, false, false, null, null, null, null)
+            );
+            CollectionDefinition def = createCollection("test", fields);
+
+            // Reconcile schema
+            migrationEngine.reconcileSchema(def);
+
+            // Verify the 'description' column was added
+            jdbcTemplate.update(
+                "INSERT INTO tbl_test (id, created_at, updated_at, name, description) VALUES (?, ?, ?, ?, ?)",
+                "1", Instant.now(), Instant.now(), "Test", "Test Description"
+            );
+
+            Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM tbl_test WHERE description = 'Test Description'", Integer.class);
+            assertEquals(1, count);
+
+            // Verify migration was recorded
+            List<MigrationRecord> history = migrationEngine.getMigrationHistory("test");
+            assertTrue(history.stream().anyMatch(r -> r.migrationType() == MigrationType.ADD_COLUMN));
+        }
+
+        @Test
+        @DisplayName("Should do nothing when table has all columns")
+        void shouldDoNothingWhenTableHasAllColumns() {
+            // Create table with all columns
+            jdbcTemplate.execute(
+                "CREATE TABLE tbl_test (id VARCHAR(36) PRIMARY KEY, " +
+                "created_at TIMESTAMP NOT NULL, updated_at TIMESTAMP NOT NULL, " +
+                "name TEXT, description TEXT)");
+
+            List<FieldDefinition> fields = List.of(
+                new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null),
+                new FieldDefinition("description", FieldType.STRING, true, false, false, null, null, null, null)
+            );
+            CollectionDefinition def = createCollection("test", fields);
+
+            // Reconcile schema
+            migrationEngine.reconcileSchema(def);
+
+            // Verify no migrations were recorded
+            List<MigrationRecord> history = migrationEngine.getMigrationHistory("test");
+            assertTrue(history.isEmpty());
+        }
+
+        @Test
+        @DisplayName("Should do nothing when table does not exist")
+        void shouldDoNothingWhenTableDoesNotExist() {
+            List<FieldDefinition> fields = List.of(
+                new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null)
+            );
+            CollectionDefinition def = createCollection("test", fields);
+
+            // Reconcile schema on a non-existent table
+            migrationEngine.reconcileSchema(def);
+
+            // No migration should be recorded
+            List<MigrationRecord> history = migrationEngine.getMigrationHistory("test");
+            assertTrue(history.isEmpty());
+        }
+
+        @Test
+        @DisplayName("Should add multiple missing columns")
+        void shouldAddMultipleMissingColumns() {
+            // Create table with only 'name' column
+            jdbcTemplate.execute(
+                "CREATE TABLE tbl_test (id VARCHAR(36) PRIMARY KEY, " +
+                "created_at TIMESTAMP NOT NULL, updated_at TIMESTAMP NOT NULL, name TEXT)");
+
+            // Define collection with 'name', 'price', and 'quantity' columns
+            List<FieldDefinition> fields = List.of(
+                new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null),
+                new FieldDefinition("price", FieldType.DOUBLE, true, false, false, null, null, null, null),
+                new FieldDefinition("quantity", FieldType.INTEGER, true, false, false, null, null, null, null)
+            );
+            CollectionDefinition def = createCollection("test", fields);
+
+            // Reconcile schema
+            migrationEngine.reconcileSchema(def);
+
+            // Verify both columns were added
+            jdbcTemplate.update(
+                "INSERT INTO tbl_test (id, created_at, updated_at, name, price, quantity) VALUES (?, ?, ?, ?, ?, ?)",
+                "1", Instant.now(), Instant.now(), "Test", 9.99, 42
+            );
+
+            Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM tbl_test", Integer.class);
+            assertEquals(1, count);
+
+            // Verify two ADD_COLUMN migrations were recorded
+            List<MigrationRecord> history = migrationEngine.getMigrationHistory("test");
+            long addColumnCount = history.stream()
+                .filter(r -> r.migrationType() == MigrationType.ADD_COLUMN)
+                .count();
+            assertEquals(2, addColumnCount);
+        }
+
+        @Test
+        @DisplayName("Should handle case-insensitive column matching")
+        void shouldHandleCaseInsensitiveColumnMatching() {
+            // Create table with uppercase column name
+            jdbcTemplate.execute(
+                "CREATE TABLE tbl_test (id VARCHAR(36) PRIMARY KEY, " +
+                "created_at TIMESTAMP NOT NULL, updated_at TIMESTAMP NOT NULL, NAME TEXT)");
+
+            // Define collection with lowercase field name
+            List<FieldDefinition> fields = List.of(
+                new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null)
+            );
+            CollectionDefinition def = createCollection("test", fields);
+
+            // Reconcile schema — should not add duplicate column
+            migrationEngine.reconcileSchema(def);
+
+            // Verify no migrations were recorded (column already exists)
+            List<MigrationRecord> history = migrationEngine.getMigrationHistory("test");
+            assertTrue(history.isEmpty());
+        }
+
+        @Test
+        @DisplayName("Should return existing columns for a table")
+        void shouldReturnExistingColumnsForTable() {
+            jdbcTemplate.execute(
+                "CREATE TABLE tbl_test (id VARCHAR(36) PRIMARY KEY, " +
+                "created_at TIMESTAMP NOT NULL, name TEXT, price DOUBLE PRECISION)");
+
+            Set<String> columns = migrationEngine.getExistingColumns("tbl_test");
+
+            assertTrue(columns.contains("id"));
+            assertTrue(columns.contains("created_at"));
+            assertTrue(columns.contains("name"));
+            assertTrue(columns.contains("price"));
+        }
+
+        @Test
+        @DisplayName("Should return empty set for non-existent table")
+        void shouldReturnEmptySetForNonExistentTable() {
+            Set<String> columns = migrationEngine.getExistingColumns("non_existent_table");
+            assertTrue(columns.isEmpty());
         }
     }
 }

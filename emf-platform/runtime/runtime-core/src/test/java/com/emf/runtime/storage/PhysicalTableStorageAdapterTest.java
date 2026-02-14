@@ -126,6 +126,37 @@ class PhysicalTableStorageAdapterTest {
         }
         
         @Test
+        @DisplayName("Should reconcile missing columns when table already exists with fewer columns")
+        void shouldReconcileMissingColumns() {
+            // Pre-create the table with only 'name' and 'sku' columns (simulating older schema)
+            jdbcTemplate.execute(
+                "CREATE TABLE tbl_test_products (id VARCHAR(36) PRIMARY KEY, " +
+                "owner_id VARCHAR(36), " +
+                "created_at TIMESTAMP NOT NULL, updated_at TIMESTAMP NOT NULL, " +
+                "name TEXT NOT NULL, sku TEXT UNIQUE)");
+
+            // Initialize with full definition (which includes description, price, quantity, active)
+            // CREATE TABLE IF NOT EXISTS will be a no-op, but reconcileSchema should add missing columns
+            adapter.initializeCollection(testCollection);
+
+            // Verify we can insert data using all columns (including the newly added ones)
+            Map<String, Object> data = new HashMap<>();
+            data.put("id", "reconcile-1");
+            data.put("name", "Reconciled Product");
+            data.put("description", "Added by reconciliation");
+            data.put("price", 29.99);
+            data.put("quantity", 100);
+            data.put("active", true);
+            data.put("sku", "SKU-RECONCILE");
+            data.put("createdAt", Instant.now());
+            data.put("updatedAt", Instant.now());
+
+            Map<String, Object> created = adapter.create(testCollection, data);
+            assertNotNull(created);
+            assertEquals("Reconciled Product", created.get("name"));
+        }
+
+        @Test
         @DisplayName("Should create table with all field types")
         void shouldCreateTableWithAllFieldTypes() {
             List<FieldDefinition> fields = List.of(

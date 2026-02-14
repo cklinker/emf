@@ -122,6 +122,7 @@ export interface AppProps {
 function AuthCallbackPage(): React.ReactElement {
   const { isLoading, error } = useAuth()
   const navigate = useNavigate()
+  const { tenantBasePath } = useTenant()
 
   if (isLoading) {
     return <PageLoader fullPage message="Completing authentication..." />
@@ -149,7 +150,7 @@ function AuthCallbackPage(): React.ReactElement {
         <button
           onClick={() => {
             sessionStorage.removeItem('emf_auth_login_error')
-            navigate('login')
+            navigate(`${tenantBasePath}/login`)
           }}
           style={{
             marginTop: '1.5rem',
@@ -307,12 +308,14 @@ function ProtectedPageRoute({
   requiredRoles?: string[]
   requiredPolicies?: string[]
 }): React.ReactElement {
+  const { tenantBasePath } = useTenant()
+
   return (
     <ProtectedRoute
       requiredRoles={requiredRoles}
       requiredPolicies={requiredPolicies}
-      loginPath="login"
-      unauthorizedPath="unauthorized"
+      loginPath={`${tenantBasePath}/login`}
+      unauthorizedPath={`${tenantBasePath}/unauthorized`}
     >
       <AppLayout>{children}</AppLayout>
     </ProtectedRoute>

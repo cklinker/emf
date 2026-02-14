@@ -269,10 +269,11 @@ jobs:
 
   # ===========================================================================
   # Verify Docker images build successfully
+  # Docker builds use multi-stage Dockerfiles that compile from source,
+  # so they don't depend on test results — run in parallel with tests.
   # ===========================================================================
   build-check:
     name: Verify Docker Build (${{ matrix.service.name }})
-    needs: [test-control-plane, test-gateway, test-worker, test-frontend]
     runs-on: k8s-runner
     strategy:
       fail-fast: false
@@ -281,6 +282,7 @@ jobs:
           - { name: control-plane, file: emf-control-plane/Dockerfile }
           - { name: gateway, file: emf-gateway/Dockerfile }
           - { name: worker, file: emf-worker/Dockerfile }
+          - { name: ui, file: emf-ui/Dockerfile }
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

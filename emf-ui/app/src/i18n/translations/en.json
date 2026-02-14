@@ -93,7 +93,9 @@
     "migrations": "Migrations",
     "resources": "Resources",
     "plugins": "Plugins",
-    "settings": "Settings"
+    "settings": "Settings",
+    "menu": "Menu",
+    "noMenus": "No menus available"
   },
   "collections": {
     "title": "Collections",
@@ -111,6 +113,7 @@
     "status": "Status",
     "active": "Active",
     "inactive": "Inactive",
+    "field": "Field",
     "fields": "Fields",
     "addField": "Add Field",
     "editField": "Edit Field",
@@ -194,7 +197,10 @@
       "lookup": "Lookup",
       "master_detail": "Master-Detail",
       "formula": "Formula",
-      "rollup_summary": "Rollup Summary"
+      "rollup_summary": "Rollup Summary",
+      "double": "Double",
+      "integer": "Integer",
+      "long": "Long"
     },
     "validation": {
       "required": "Required",
@@ -487,7 +493,9 @@
     "date": "Date",
     "statusSuccess": "Success",
     "statusFailed": "Failed",
-    "statusPending": "Pending"
+    "statusPending": "Pending",
+    "historyNotAvailable": "Package history is not available yet.",
+    "historyNotAvailableHint": "This feature will be available in a future update."
   },
   "migrations": {
     "title": "Migrations",
@@ -1110,19 +1118,29 @@
   "relatedRecords": {
     "title": "Related Records",
     "noRelationships": "No related records found.",
+    "noRelatedRecords": "No related records found.",
     "loading": "Loading related records...",
     "viewAll": "View All",
     "records": "records",
-    "errorLoading": "Failed to load related records."
+    "errorLoading": "Failed to load related records.",
+    "tabsLabel": "Related collections",
+    "noRecordsInCollection": "No records in {{collection}}.",
+    "tableLabel": "{{collection}} records",
+    "created": "Created"
   },
   "activity": {
     "title": "Activity",
     "noActivity": "No activity recorded for this record.",
+    "empty": "No activity yet.",
     "showMore": "Show More",
     "showLess": "Show Less",
     "recordCreated": "Record created",
     "recordUpdated": "Record updated",
     "submittedForApproval": "Submitted for approval",
+    "approvalSubmitted": "Submitted for approval",
+    "approvalApproved": "Approved",
+    "approvalRejected": "Rejected",
+    "approvalRecalled": "Recalled",
     "approved": "Approved",
     "rejected": "Rejected",
     "recalled": "Recalled",
@@ -1173,7 +1191,9 @@
   },
   "summaryStats": {
     "records": "{{count}} records",
+    "recordCount": "{{count}} records",
     "shown": "{{count}} shown",
+    "filteredCount": "{{count}} filtered",
     "showingAll": "Showing all records",
     "clearFilters": "Clear filters",
     "sumOf": "Sum of {{field}}: {{value}}"

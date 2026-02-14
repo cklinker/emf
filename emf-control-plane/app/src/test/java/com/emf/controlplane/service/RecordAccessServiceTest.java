@@ -249,7 +249,7 @@ class RecordAccessServiceTest {
         }
 
         @Test
-        @DisplayName("should include owner_id clause when OWD is PRIVATE")
+        @DisplayName("should include created_by clause when OWD is PRIVATE")
         void includeOwnerClauseWhenPrivate() {
             OrgWideDefault owd = new OrgWideDefault(TENANT_ID, COLLECTION_ID, "PRIVATE");
             when(permissionResolver.resolveObjectPermission(USER_ID, COLLECTION_ID))
@@ -264,7 +264,7 @@ class RecordAccessServiceTest {
 
             String clause = service.buildSharingWhereClause(USER_ID, TENANT_ID, COLLECTION_ID);
 
-            assertThat(clause).contains("owner_id = 'user-1'");
+            assertThat(clause).contains("created_by = 'user-1'");
         }
     }
 }

@@ -666,6 +666,22 @@ export function ResourceDetailPage({
               </span>
             </div>
           )}
+          {resource.created_by && (
+            <div className={styles.metadataItem}>
+              <span className={styles.metadataLabel}>Created by</span>
+              <span className={styles.metadataValue} data-testid="created-by">
+                {String(resource.created_by)}
+              </span>
+            </div>
+          )}
+          {resource.updated_by && (
+            <div className={styles.metadataItem}>
+              <span className={styles.metadataLabel}>Last modified by</span>
+              <span className={styles.metadataValue} data-testid="updated-by">
+                {String(resource.updated_by)}
+              </span>
+            </div>
+          )}
         </div>
       </section>
 

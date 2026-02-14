@@ -31,7 +31,7 @@ import java.util.*;
  *   <li>Integrates with RollupSummaryService for ROLLUP_SUMMARY computation</li>
  *   <li>Integrates with FieldEncryptionService for ENCRYPTED field handling</li>
  *   <li>Integrates with AutoNumberService for AUTO_NUMBER generation</li>
- *   <li>Adds system fields (id, createdAt, updatedAt) automatically</li>
+ *   <li>Adds system fields (id, createdAt, updatedAt, createdBy, updatedBy) automatically</li>
  *   <li>Logs query performance metrics</li>
  * </ul>
  *
@@ -44,7 +44,7 @@ public class DefaultQueryEngine implements QueryEngine {
 
     private static final Logger logger = LoggerFactory.getLogger(DefaultQueryEngine.class);
 
-    private static final Set<String> SYSTEM_FIELDS = Set.of("id", "createdAt", "updatedAt");
+    private static final Set<String> SYSTEM_FIELDS = Set.of("id", "createdAt", "updatedAt", "createdBy", "updatedBy");
 
     private final StorageAdapter storageAdapter;
     private final ValidationEngine validationEngine;
@@ -190,9 +190,10 @@ public class DefaultQueryEngine implements QueryEngine {
         // Update timestamp
         recordData.put("updatedAt", Instant.now());
         
-        // Don't allow changing id or createdAt
+        // Don't allow changing id, createdAt, or createdBy
         recordData.remove("id");
         recordData.remove("createdAt");
+        recordData.remove("createdBy");
 
         // Encrypt ENCRYPTED fields before storage
         encryptFields(definition, recordData);
@@ -273,7 +274,7 @@ public class DefaultQueryEngine implements QueryEngine {
     
     /**
      * Checks if a field name is valid for the collection.
-     * System fields (id, createdAt, updatedAt) are always valid.
+     * System fields (id, createdAt, updatedAt, createdBy, updatedBy) are always valid.
      */
     private boolean isValidField(CollectionDefinition definition, String fieldName) {
         if (SYSTEM_FIELDS.contains(fieldName)) {

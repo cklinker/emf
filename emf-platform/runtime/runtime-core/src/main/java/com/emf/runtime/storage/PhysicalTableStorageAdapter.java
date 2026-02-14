@@ -79,7 +79,8 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         StringBuilder sql = new StringBuilder("CREATE TABLE IF NOT EXISTS ");
         sql.append(sanitizeIdentifier(tableName)).append(" (");
         sql.append("id VARCHAR(36) PRIMARY KEY, ");
-        sql.append("owner_id VARCHAR(36), ");
+        sql.append("created_by VARCHAR(36), ");
+        sql.append("updated_by VARCHAR(36), ");
         sql.append("created_at TIMESTAMP NOT NULL, ");
         sql.append("updated_at TIMESTAMP NOT NULL");
         
@@ -248,8 +249,10 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         // Add system fields
         columns.add("id");
         values.add(data.get("id"));
-        columns.add("owner_id");
-        values.add(data.get("ownerId"));
+        columns.add("created_by");
+        values.add(data.get("createdBy"));
+        columns.add("updated_by");
+        values.add(data.get("updatedBy"));
         columns.add("created_at");
         values.add(convertValueForStorage(data.get("createdAt"), FieldType.DATETIME));
         columns.add("updated_at");
@@ -313,7 +316,13 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         // Always update updated_at
         setClauses.add("updated_at = ?");
         values.add(convertValueForStorage(data.get("updatedAt"), FieldType.DATETIME));
-        
+
+        // Update audit field
+        if (data.containsKey("updatedBy")) {
+            setClauses.add("updated_by = ?");
+            values.add(data.get("updatedBy"));
+        }
+
         // Update user-defined fields
         for (FieldDefinition field : definition.fields()) {
             if (data.containsKey(field.name())) {
@@ -478,11 +487,13 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
             return "*";
         }
         
-        // Always include id, created_at, updated_at
+        // Always include id, created_at, updated_at, created_by, updated_by
         List<String> selectFields = new ArrayList<>();
         selectFields.add("id");
         selectFields.add("created_at");
         selectFields.add("updated_at");
+        selectFields.add("created_by");
+        selectFields.add("updated_by");
         
         for (String field : fields) {
             if (!selectFields.contains(field)) {

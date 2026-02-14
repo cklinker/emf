@@ -9,8 +9,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
-import java.util.Optional;
-
 /**
  * Evaluates authorization using profile-based permissions from the control plane.
  * Maps HTTP methods to CRUD permissions and checks the user's effective permissions.
@@ -77,17 +75,18 @@ public class ProfilePolicyEvaluator {
     }
 
     private Mono<EffectivePermissions> getEffectivePermissions(String userId) {
-        Optional<EffectivePermissions> cached = permissionCache.getPermissions(userId);
-        if (cached.isPresent()) {
-            return Mono.just(cached.get());
-        }
+        return permissionCache.getPermissions(userId)
+                .flatMap(opt -> opt.map(Mono::just)
+                        .orElseGet(() -> fetchFromControlPlane(userId)));
+    }
 
-        // Fetch from control plane
+    private Mono<EffectivePermissions> fetchFromControlPlane(String userId) {
         return controlPlaneClient.get()
                 .uri("/internal/permissions/{userId}", userId)
                 .retrieve()
                 .bodyToMono(EffectivePermissions.class)
-                .doOnNext(perms -> permissionCache.putPermissions(userId, perms))
+                .flatMap(perms -> permissionCache.putPermissions(userId, perms)
+                        .thenReturn(perms))
                 .doOnError(err -> log.warn("Failed to fetch permissions for user {}: {}",
                         userId, err.getMessage()))
                 .onErrorResume(err -> Mono.empty());

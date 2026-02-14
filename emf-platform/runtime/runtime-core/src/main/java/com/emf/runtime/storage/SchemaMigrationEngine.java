@@ -295,6 +295,9 @@ public class SchemaMigrationEngine {
             return;
         }
 
+        // Reconcile audit columns (owner_id -> created_by/updated_by migration)
+        reconcileAuditColumns(tableName, existingColumns);
+
         // Find fields in the definition that don't have a corresponding column
         List<MigrationAction> migrations = new ArrayList<>();
         for (FieldDefinition field : definition.fields()) {
@@ -332,6 +335,59 @@ public class SchemaMigrationEngine {
         } else {
             log.debug("Schema reconciliation for collection '{}': table is up to date",
                 definition.name());
+        }
+    }
+
+    /**
+     * Reconciles audit columns for a table, migrating from the legacy {@code owner_id}
+     * column to the new {@code created_by} and {@code updated_by} columns.
+     *
+     * <p>This method:
+     * <ul>
+     *   <li>Adds {@code created_by VARCHAR(36)} if it does not exist</li>
+     *   <li>Adds {@code updated_by VARCHAR(36)} if it does not exist</li>
+     *   <li>If {@code owner_id} exists and {@code created_by} was just added, copies
+     *       {@code owner_id} values into {@code created_by} for existing rows</li>
+     * </ul>
+     *
+     * @param tableName the table name to reconcile
+     * @param existingColumns the set of existing lowercase column names
+     */
+    void reconcileAuditColumns(String tableName, Set<String> existingColumns) {
+        boolean hasOwnerIdColumn = existingColumns.contains("owner_id");
+        boolean createdByAdded = false;
+
+        if (!existingColumns.contains("created_by")) {
+            String sql = "ALTER TABLE " + sanitizeIdentifier(tableName) + " ADD COLUMN created_by VARCHAR(36)";
+            try {
+                jdbcTemplate.execute(sql);
+                log.info("Added audit column 'created_by' to table '{}'", tableName);
+                createdByAdded = true;
+            } catch (Exception e) {
+                log.warn("Could not add 'created_by' column to table '{}': {}", tableName, e.getMessage());
+            }
+        }
+
+        if (!existingColumns.contains("updated_by")) {
+            String sql = "ALTER TABLE " + sanitizeIdentifier(tableName) + " ADD COLUMN updated_by VARCHAR(36)";
+            try {
+                jdbcTemplate.execute(sql);
+                log.info("Added audit column 'updated_by' to table '{}'", tableName);
+            } catch (Exception e) {
+                log.warn("Could not add 'updated_by' column to table '{}': {}", tableName, e.getMessage());
+            }
+        }
+
+        // Migrate owner_id data into created_by for existing rows
+        if (hasOwnerIdColumn && createdByAdded) {
+            String migrateSql = "UPDATE " + sanitizeIdentifier(tableName)
+                    + " SET created_by = owner_id WHERE created_by IS NULL";
+            try {
+                int updated = jdbcTemplate.update(migrateSql);
+                log.info("Migrated {} rows: copied owner_id to created_by in table '{}'", updated, tableName);
+            } catch (Exception e) {
+                log.warn("Could not migrate owner_id to created_by in table '{}': {}", tableName, e.getMessage());
+            }
         }
     }
 

@@ -127,6 +127,8 @@
     "viewVersion": "View Version",
     "created": "Created",
     "updated": "Updated",
+    "createdBy": "Created by",
+    "updatedBy": "Last modified by",
     "confirmDelete": "Are you sure you want to delete this collection?",
     "validationRules": "Validation Rules",
     "recordTypes": "Record Types",

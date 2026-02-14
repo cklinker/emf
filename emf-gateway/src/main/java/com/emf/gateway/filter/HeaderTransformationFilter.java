@@ -21,11 +21,12 @@ import java.util.stream.Collectors;
  * This filter:
  * - Preserves the Authorization header so downstream services can validate JWT tokens
  * - Adds X-Forwarded-User header with the authenticated principal's username
+ * - Adds X-User-Id header with the user's unique identifier (from JWT 'sub' claim)
  * - Adds X-Forwarded-Roles header with comma-separated list of principal's roles
  * - Preserves all other request headers
  *
- * The backend services can use the X-Forwarded-User and X-Forwarded-Roles headers
- * for lightweight identity extraction, or validate the JWT themselves using the
+ * The backend services can use the X-Forwarded-User, X-User-Id, and X-Forwarded-Roles
+ * headers for lightweight identity extraction, or validate the JWT themselves using the
  * preserved Authorization header.
  *
  * Validates: Requirements 9.4, 9.5, 9.6
@@ -36,6 +37,7 @@ public class HeaderTransformationFilter implements GlobalFilter, Ordered {
     private static final Logger log = LoggerFactory.getLogger(HeaderTransformationFilter.class);
     
     private static final String X_FORWARDED_USER_HEADER = "X-Forwarded-User";
+    private static final String X_USER_ID_HEADER = "X-User-Id";
     private static final String X_FORWARDED_ROLES_HEADER = "X-Forwarded-Roles";
     private static final String X_TENANT_ID_HEADER = "X-Tenant-ID";
     private static final String X_TENANT_SLUG_HEADER = "X-Tenant-Slug";
@@ -69,7 +71,11 @@ public class HeaderTransformationFilter implements GlobalFilter, Ordered {
                 .headers(headers -> {
                     // Add X-Forwarded-User header
                     headers.set(X_FORWARDED_USER_HEADER, principal.getUsername());
-                    
+
+                    // Add X-User-Id header (resolved from JWT sub claim)
+                    String userId = resolveUserId(principal);
+                    headers.set(X_USER_ID_HEADER, userId);
+
                     // Add X-Forwarded-Roles header with comma-separated roles
                     String roles = principal.getRoles().stream()
                             .collect(Collectors.joining(","));
@@ -106,6 +112,26 @@ public class HeaderTransformationFilter implements GlobalFilter, Ordered {
         return chain.filter(mutatedExchange);
     }
     
+    /**
+     * Resolves the user's unique identifier from JWT claims.
+     * Tries 'sub' claim first (standard OIDC), then 'user_id' claim,
+     * then falls back to the username.
+     *
+     * @param principal the authenticated gateway principal
+     * @return the resolved user ID
+     */
+    private String resolveUserId(GatewayPrincipal principal) {
+        Object sub = principal.getClaims().get("sub");
+        if (sub instanceof String s && !s.isEmpty()) {
+            return s;
+        }
+        Object userId = principal.getClaims().get("user_id");
+        if (userId instanceof String s && !s.isEmpty()) {
+            return s;
+        }
+        return principal.getUsername();
+    }
+
     @Override
     public int getOrder() {
         return 50; // Run after authentication (-100) and authorization (0), before forwarding

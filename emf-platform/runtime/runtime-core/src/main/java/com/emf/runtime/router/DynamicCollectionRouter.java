@@ -7,6 +7,7 @@ import com.emf.runtime.query.QueryResult;
 import com.emf.runtime.registry.CollectionRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -123,26 +124,34 @@ public class DynamicCollectionRouter {
     @PostMapping("/{collectionName}")
     public ResponseEntity<Map<String, Object>> create(
             @PathVariable("collectionName") String collectionName,
-            @RequestBody Map<String, Object> requestBody) {
-        
+            @RequestBody Map<String, Object> requestBody,
+            HttpServletRequest request) {
+
         logger.debug("Create request for collection '{}' with data: {}", collectionName, requestBody);
-        
+
         CollectionDefinition definition = registry.get(collectionName);
         if (definition == null) {
             logger.debug("Collection '{}' not found", collectionName);
             return ResponseEntity.notFound().build();
         }
-        
+
         // Extract attributes from JSON:API format
         Map<String, Object> attributes = extractAttributes(requestBody);
-        
+
         // Extract relationships from JSON:API format
         Map<String, Object> relationships = extractRelationships(requestBody);
-        
+
         // Merge attributes and relationships for storage
         Map<String, Object> data = new java.util.HashMap<>(attributes);
         data.putAll(relationships);
-        
+
+        // Inject audit fields from gateway-forwarded user ID
+        String userId = request.getHeader("X-User-Id");
+        if (userId != null) {
+            data.put("createdBy", userId);
+            data.put("updatedBy", userId);
+        }
+
         Map<String, Object> created = queryEngine.create(definition, data);
         
         // Return in JSON:API format
@@ -161,9 +170,10 @@ public class DynamicCollectionRouter {
     public ResponseEntity<Map<String, Object>> updatePut(
             @PathVariable("collectionName") String collectionName,
             @PathVariable("id") String id,
-            @RequestBody Map<String, Object> requestBody) {
-        
-        return performUpdate(collectionName, id, requestBody);
+            @RequestBody Map<String, Object> requestBody,
+            HttpServletRequest request) {
+
+        return performUpdate(collectionName, id, requestBody, request);
     }
     
     /**
@@ -178,42 +188,51 @@ public class DynamicCollectionRouter {
     public ResponseEntity<Map<String, Object>> updatePatch(
             @PathVariable("collectionName") String collectionName,
             @PathVariable("id") String id,
-            @RequestBody Map<String, Object> requestBody) {
-        
-        return performUpdate(collectionName, id, requestBody);
+            @RequestBody Map<String, Object> requestBody,
+            HttpServletRequest request) {
+
+        return performUpdate(collectionName, id, requestBody, request);
     }
     
     /**
      * Performs the update operation.
-     * 
+     *
      * @param collectionName the collection name
      * @param id the record ID
      * @param requestBody the JSON:API formatted request body with updated data
+     * @param request the HTTP servlet request
      * @return the updated record in JSON:API format, or 404 if collection or record not found
      */
     private ResponseEntity<Map<String, Object>> performUpdate(
             String collectionName,
             String id,
-            Map<String, Object> requestBody) {
-        
+            Map<String, Object> requestBody,
+            HttpServletRequest request) {
+
         logger.debug("Update request for collection '{}', id '{}' with data: {}", collectionName, id, requestBody);
-        
+
         CollectionDefinition definition = registry.get(collectionName);
         if (definition == null) {
             logger.debug("Collection '{}' not found", collectionName);
             return ResponseEntity.notFound().build();
         }
-        
+
         // Extract attributes from JSON:API format
         Map<String, Object> attributes = extractAttributes(requestBody);
-        
+
         // Extract relationships from JSON:API format
         Map<String, Object> relationships = extractRelationships(requestBody);
-        
+
         // Merge attributes and relationships for storage
         Map<String, Object> data = new java.util.HashMap<>(attributes);
         data.putAll(relationships);
-        
+
+        // Inject audit field from gateway-forwarded user ID
+        String userId = request.getHeader("X-User-Id");
+        if (userId != null) {
+            data.put("updatedBy", userId);
+        }
+
         Optional<Map<String, Object>> updated = queryEngine.update(definition, id, data);
         return updated.map(r -> ResponseEntity.ok(toJsonApiResponse(r, collectionName)))
                       .orElse(ResponseEntity.notFound().build());

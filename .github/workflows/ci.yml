@@ -42,11 +42,19 @@ jobs:
       - name: Build runtime-core and runtime-events
         run: mvn clean install -DskipTests -f emf-platform/pom.xml -pl runtime/runtime-core,runtime/runtime-events -am -B
 
-      - name: Save Maven local repo
-        uses: actions/cache/save@v4
+      - name: Package runtime artifacts
+        run: |
+          mkdir -p /tmp/runtime-artifacts
+          cp emf-platform/runtime/runtime-core/target/runtime-core-*.jar /tmp/runtime-artifacts/
+          cp emf-platform/runtime/runtime-events/target/runtime-events-*.jar /tmp/runtime-artifacts/
+          cp -r ~/.m2/repository/com/emf /tmp/runtime-artifacts/m2-emf
+
+      - name: Upload runtime artifacts
+        uses: actions/upload-artifact@v4
         with:
-          path: ~/.m2/repository
-          key: maven-runtime-${{ github.sha }}
+          name: runtime-modules
+          path: /tmp/runtime-artifacts/
+          retention-days: 1
 
   # ===========================================================================
   # Test Control Plane (unit + integration tests with JaCoCo coverage)
@@ -73,11 +81,16 @@ jobs:
             echo "/opt/apache-maven-${{ env.MAVEN_VERSION }}/bin" >> $GITHUB_PATH
           fi
 
-      - name: Restore runtime modules
-        uses: actions/cache/restore@v4
+      - name: Download runtime artifacts
+        uses: actions/download-artifact@v4
         with:
-          path: ~/.m2/repository
-          key: maven-runtime-${{ github.sha }}
+          name: runtime-modules
+          path: /tmp/runtime-artifacts
+
+      - name: Install runtime modules to local Maven repo
+        run: |
+          mkdir -p ~/.m2/repository/com/emf
+          cp -r /tmp/runtime-artifacts/m2-emf/* ~/.m2/repository/com/emf/
 
       - name: Run tests
         run: mvn verify -f emf-control-plane/pom.xml -B
@@ -124,11 +137,16 @@ jobs:
             echo "/opt/apache-maven-${{ env.MAVEN_VERSION }}/bin" >> $GITHUB_PATH
           fi
 
-      - name: Restore runtime modules
-        uses: actions/cache/restore@v4
+      - name: Download runtime artifacts
+        uses: actions/download-artifact@v4
         with:
-          path: ~/.m2/repository
-          key: maven-runtime-${{ github.sha }}
+          name: runtime-modules
+          path: /tmp/runtime-artifacts
+
+      - name: Install runtime modules to local Maven repo
+        run: |
+          mkdir -p ~/.m2/repository/com/emf
+          cp -r /tmp/runtime-artifacts/m2-emf/* ~/.m2/repository/com/emf/
 
       - name: Run tests
         run: mvn verify -f emf-gateway/pom.xml -B
@@ -175,11 +193,16 @@ jobs:
             echo "/opt/apache-maven-${{ env.MAVEN_VERSION }}/bin" >> $GITHUB_PATH
           fi
 
-      - name: Restore runtime modules
-        uses: actions/cache/restore@v4
+      - name: Download runtime artifacts
+        uses: actions/download-artifact@v4
         with:
-          path: ~/.m2/repository
-          key: maven-runtime-${{ github.sha }}
+          name: runtime-modules
+          path: /tmp/runtime-artifacts
+
+      - name: Install runtime modules to local Maven repo
+        run: |
+          mkdir -p ~/.m2/repository/com/emf
+          cp -r /tmp/runtime-artifacts/m2-emf/* ~/.m2/repository/com/emf/
 
       - name: Run tests
         run: mvn verify -f emf-worker/pom.xml -B

@@ -166,8 +166,8 @@ export function RelatedRecordsSection({
     ],
     queryFn: () => {
       const params = new URLSearchParams()
-      params.set(activeRelated!.referenceField.name, recordId)
-      params.set('pageSize', String(MAX_DISPLAY_RECORDS))
+      params.set(`filter[${activeRelated!.referenceField.name}][eq]`, recordId)
+      params.set('page[size]', String(MAX_DISPLAY_RECORDS))
       return apiClient.get<PaginatedResponse>(
         `/api/${activeRelated!.collection.name}?${params.toString()}`
       )

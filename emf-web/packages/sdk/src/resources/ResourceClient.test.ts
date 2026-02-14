@@ -168,17 +168,17 @@ describe('ResourceClient', () => {
       expect(result.data).toHaveLength(1);
     });
 
-    it('should include pagination query parameters (Requirement 3.2)', async () => {
+    it('should include JSON:API pagination query parameters (Requirement 3.2)', async () => {
       mockAxiosGet.mockResolvedValue({ data: validListResponse });
 
       await resourceClient.list({ page: 2, size: 20 });
 
       expect(mockAxiosGet).toHaveBeenCalledWith('/api/users', {
-        params: { page: '2', size: '20' },
+        params: { 'page[number]': '2', 'page[size]': '20' },
       });
     });
 
-    it('should include sort query parameters (Requirement 3.3)', async () => {
+    it('should include JSON:API sort query parameters (Requirement 3.3)', async () => {
       mockAxiosGet.mockResolvedValue({ data: validListResponse });
 
       await resourceClient.list({
@@ -189,11 +189,11 @@ describe('ResourceClient', () => {
       });
 
       expect(mockAxiosGet).toHaveBeenCalledWith('/api/users', {
-        params: { sort: ['name,asc', 'createdAt,desc'] },
+        params: { sort: 'name,-createdAt' },
       });
     });
 
-    it('should include filter query parameters (Requirement 3.4)', async () => {
+    it('should include JSON:API filter query parameters (Requirement 3.4)', async () => {
       mockAxiosGet.mockResolvedValue({ data: validListResponse });
 
       await resourceClient.list({
@@ -205,8 +205,8 @@ describe('ResourceClient', () => {
 
       expect(mockAxiosGet).toHaveBeenCalledWith('/api/users', {
         params: {
-          'status[eq]': 'active',
-          'age[gte]': '18',
+          'filter[status][eq]': 'active',
+          'filter[age][gte]': '18',
         },
       });
     });
@@ -422,7 +422,7 @@ describe('ResourceClient', () => {
     });
   });
 
-  describe('buildQueryParams()', () => {
+  describe('buildQueryParams() - JSON:API format', () => {
     it('should return empty object when no options provided', () => {
       const params = resourceClient.buildQueryParams();
       expect(params).toEqual({});
@@ -433,7 +433,7 @@ describe('ResourceClient', () => {
       expect(params).toEqual({});
     });
 
-    it('should build all query parameters correctly', () => {
+    it('should build all JSON:API query parameters correctly', () => {
       const params = resourceClient.buildQueryParams({
         page: 2,
         size: 25,
@@ -443,26 +443,39 @@ describe('ResourceClient', () => {
       });
 
       expect(params).toEqual({
-        page: '2',
-        size: '25',
-        sort: ['name,asc'],
-        'status[eq]': 'active',
+        'page[number]': '2',
+        'page[size]': '25',
+        sort: 'name',
+        'filter[status][eq]': 'active',
         fields: 'id,name',
+      });
+    });
+
+    it('should build sort with - prefix for descending', () => {
+      const params = resourceClient.buildQueryParams({
+        sort: [
+          { field: 'name', direction: 'asc' },
+          { field: 'createdAt', direction: 'desc' },
+        ],
+      });
+
+      expect(params).toEqual({
+        sort: 'name,-createdAt',
       });
     });
   });
 
-  describe('buildListUrl()', () => {
+  describe('buildListUrl() - JSON:API format', () => {
     it('should build URL without query params when no options', () => {
       const url = resourceClient.buildListUrl();
       expect(url).toBe('/api/users');
     });
 
-    it('should build URL with query params', () => {
+    it('should build URL with JSON:API query params', () => {
       const url = resourceClient.buildListUrl({ page: 1, size: 10 });
       expect(url).toContain('/api/users?');
-      expect(url).toContain('page=1');
-      expect(url).toContain('size=10');
+      expect(url).toContain('page%5Bnumber%5D=1');
+      expect(url).toContain('page%5Bsize%5D=10');
     });
   });
 });

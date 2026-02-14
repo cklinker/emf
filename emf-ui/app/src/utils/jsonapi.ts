@@ -35,6 +35,12 @@ export interface JsonApiCollectionResponse {
   total?: number
   page?: number
   pageSize?: number
+  metadata?: {
+    totalCount?: number
+    currentPage?: number
+    pageSize?: number
+    totalPages?: number
+  }
 }
 
 /**
@@ -95,9 +101,13 @@ export function unwrapResource<T extends Record<string, unknown> = Record<string
 }
 
 /**
- * Unwrap a collection JSON:API response into an array of flat objects.
+ * Unwrap a collection response into an array of flat objects.
  *
- * Input:  { data: [{ id: "1", type: "product", attributes: { name: "Test" } }], total: 1 }
+ * Handles multiple response formats:
+ * 1. Runtime format:   { data: [...], metadata: { totalCount, currentPage, pageSize, totalPages } }
+ * 2. JSON:API format:  { data: [{ id, type, attributes }], total, page, pageSize }
+ * 3. Already-flat:     { data: [...], total, page, pageSize }
+ *
  * Output: { data: [{ id: "1", name: "Test" }], total: 1, page: 1, pageSize: 20 }
  */
 export function unwrapCollection<T extends Record<string, unknown> = Record<string, unknown>>(
@@ -118,11 +128,17 @@ export function unwrapCollection<T extends Record<string, unknown> = Record<stri
         ? items.map((item) => flattenResource<T>(item))
         : (items as T[])
 
+    // Extract pagination from metadata envelope (runtime format) or top-level fields
+    const meta = jsonApiResponse.metadata
+    const total = meta?.totalCount ?? jsonApiResponse.total ?? flatItems.length
+    const page = meta?.currentPage ?? jsonApiResponse.page ?? 1
+    const pageSize = meta?.pageSize ?? jsonApiResponse.pageSize ?? flatItems.length
+
     return {
       data: flatItems,
-      total: jsonApiResponse.total ?? flatItems.length,
-      page: jsonApiResponse.page ?? 1,
-      pageSize: jsonApiResponse.pageSize ?? flatItems.length,
+      total,
+      page,
+      pageSize,
     }
   }
 

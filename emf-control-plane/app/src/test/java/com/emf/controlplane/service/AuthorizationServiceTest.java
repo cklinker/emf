@@ -298,7 +298,7 @@ class AuthorizationServiceTest {
             );
 
             when(collectionRepository.findByIdAndActiveTrue(collectionId)).thenReturn(Optional.of(collection));
-            when(fieldPolicyRepository.findByCollectionId(collectionId)).thenReturn(Collections.emptyList());
+            // fieldPolicyRepository.deleteByCollectionId is void - no stubbing needed
             when(policyRepository.findById("policy-1")).thenReturn(Optional.of(policy));
             when(routePolicyRepository.saveAll(anyList())).thenAnswer(invocation -> {
                 List<RoutePolicy> policies = invocation.getArgument(0);
@@ -338,7 +338,7 @@ class AuthorizationServiceTest {
             );
 
             when(collectionRepository.findByIdAndActiveTrue(collectionId)).thenReturn(Optional.of(collection));
-            when(fieldPolicyRepository.findByCollectionId(collectionId)).thenReturn(Collections.emptyList());
+            // fieldPolicyRepository.deleteByCollectionId is void - no stubbing needed
             when(fieldRepository.findByIdAndCollectionIdAndActiveTrue(fieldId, collectionId))
                     .thenReturn(Optional.of(field));
             when(policyRepository.findById("policy-1")).thenReturn(Optional.of(policy));
@@ -383,7 +383,7 @@ class AuthorizationServiceTest {
             );
 
             when(collectionRepository.findByIdAndActiveTrue(collectionId)).thenReturn(Optional.of(collection));
-            when(fieldPolicyRepository.findByCollectionId(collectionId)).thenReturn(Collections.emptyList());
+            // fieldPolicyRepository.deleteByCollectionId is void - no stubbing needed
             when(policyRepository.findById("policy-1")).thenReturn(Optional.of(readPolicy));
             when(policyRepository.findById("policy-2")).thenReturn(Optional.of(writePolicy));
             when(fieldRepository.findByIdAndCollectionIdAndActiveTrue(fieldId, collectionId))
@@ -435,7 +435,7 @@ class AuthorizationServiceTest {
             );
 
             when(collectionRepository.findByIdAndActiveTrue(collectionId)).thenReturn(Optional.of(collection));
-            when(fieldPolicyRepository.findByCollectionId(collectionId)).thenReturn(Collections.emptyList());
+            // fieldPolicyRepository.deleteByCollectionId is void - no stubbing needed
             when(policyRepository.findById("nonexistent-policy")).thenReturn(Optional.empty());
 
             // When/Then
@@ -460,7 +460,7 @@ class AuthorizationServiceTest {
             );
 
             when(collectionRepository.findByIdAndActiveTrue(collectionId)).thenReturn(Optional.of(collection));
-            when(fieldPolicyRepository.findByCollectionId(collectionId)).thenReturn(Collections.emptyList());
+            // fieldPolicyRepository.deleteByCollectionId is void - no stubbing needed
             when(fieldRepository.findByIdAndCollectionIdAndActiveTrue("nonexistent-field", collectionId))
                     .thenReturn(Optional.empty());
 
@@ -479,10 +479,6 @@ class AuthorizationServiceTest {
             Collection collection = createTestCollection(collectionId, "Test Collection");
             Policy policy = createTestPolicy("policy-1", "Read Policy");
 
-            // Existing field policy to be deleted
-            FieldPolicy existingFieldPolicy = new FieldPolicy();
-            existingFieldPolicy.setId("existing-fp");
-
             SetAuthorizationRequest.RoutePolicyRequest routePolicyRequest =
                     new SetAuthorizationRequest.RoutePolicyRequest("READ", "policy-1");
             SetAuthorizationRequest request = new SetAuthorizationRequest(
@@ -491,7 +487,7 @@ class AuthorizationServiceTest {
             );
 
             when(collectionRepository.findByIdAndActiveTrue(collectionId)).thenReturn(Optional.of(collection));
-            when(fieldPolicyRepository.findByCollectionId(collectionId)).thenReturn(List.of(existingFieldPolicy));
+            // deleteByCollectionId is void - no stubbing needed
             when(policyRepository.findById("policy-1")).thenReturn(Optional.of(policy));
             when(routePolicyRepository.saveAll(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
             when(fieldPolicyRepository.saveAll(anyList())).thenReturn(Collections.emptyList());
@@ -499,9 +495,9 @@ class AuthorizationServiceTest {
             // When
             authorizationService.setCollectionAuthorization(collectionId, request);
 
-            // Then
+            // Then - verify both delete methods are called before inserts
             verify(routePolicyRepository).deleteByCollectionId(collectionId);
-            verify(fieldPolicyRepository).deleteAll(List.of(existingFieldPolicy));
+            verify(fieldPolicyRepository).deleteByCollectionId(collectionId);
         }
 
         @Test
@@ -517,7 +513,7 @@ class AuthorizationServiceTest {
             );
 
             when(collectionRepository.findByIdAndActiveTrue(collectionId)).thenReturn(Optional.of(collection));
-            when(fieldPolicyRepository.findByCollectionId(collectionId)).thenReturn(Collections.emptyList());
+            // fieldPolicyRepository.deleteByCollectionId is void - no stubbing needed
             when(routePolicyRepository.saveAll(anyList())).thenReturn(Collections.emptyList());
             when(fieldPolicyRepository.saveAll(anyList())).thenReturn(Collections.emptyList());
 
@@ -585,7 +581,7 @@ class AuthorizationServiceTest {
 
             when(collectionRepository.findByIdAndActiveTrue(collectionId)).thenReturn(Optional.of(collection));
             when(routePolicyRepository.findByCollectionId(collectionId)).thenReturn(Collections.emptyList());
-            when(fieldPolicyRepository.findByCollectionId(collectionId)).thenReturn(Collections.emptyList());
+            // fieldPolicyRepository.deleteByCollectionId is void - no stubbing needed
 
             // When
             AuthorizationConfigDto result = authorizationService.getCollectionAuthorization(collectionId);

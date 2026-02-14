@@ -2,6 +2,7 @@ package com.emf.controlplane.repository;
 
 import com.emf.controlplane.entity.FieldPolicy;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -35,6 +36,15 @@ public interface FieldPolicyRepository extends JpaRepository<FieldPolicy, String
      */
     @Query("SELECT fp FROM FieldPolicy fp WHERE fp.field.collection.id = :collectionId")
     List<FieldPolicy> findByCollectionId(@Param("collectionId") String collectionId);
+
+    /**
+     * Delete all field policies for fields in a collection.
+     * Uses @Modifying with flushAutomatically to ensure deletes are flushed
+     * before subsequent inserts within the same transaction.
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("DELETE FROM FieldPolicy fp WHERE fp.field.collection.id = :collectionId")
+    void deleteByCollectionId(@Param("collectionId") String collectionId);
 
     /**
      * Delete all field policies for a field.

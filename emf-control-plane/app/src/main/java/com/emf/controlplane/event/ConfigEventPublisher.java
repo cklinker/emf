@@ -20,6 +20,8 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.List;
 import java.util.Map;
@@ -29,8 +31,9 @@ import java.util.concurrent.CompletableFuture;
  * Component for publishing configuration change events to Kafka.
  *
  * <p>Payload construction from JPA entities happens synchronously on the caller's
- * thread (within the transaction) to avoid LazyInitializationException. Only the
- * Kafka send is performed asynchronously.
+ * thread (within the transaction) to avoid LazyInitializationException. The Kafka
+ * send is deferred until after the transaction commits, ensuring that consumers
+ * can read the committed data when they receive the event.
  *
  * <p>This component is conditionally enabled based on the property
  * {@code emf.control-plane.kafka.enabled}. When disabled (e.g., in tests),
@@ -71,7 +74,8 @@ public class ConfigEventPublisher {
      * Publishes a collection changed event to Kafka.
      *
      * <p>Builds the payload synchronously from the JPA entity (to access lazy-loaded
-     * fields within the transaction), then sends to Kafka asynchronously.
+     * fields within the transaction), then defers the Kafka send until after the
+     * transaction commits so that consumers can read the committed data.
      *
      * @param collection The collection that changed
      * @param changeType The type of change (CREATED, UPDATED, DELETED)
@@ -88,13 +92,14 @@ public class ConfigEventPublisher {
                 EVENT_TYPE_COLLECTION_CHANGED, generateCorrelationId(), payload);
 
         String topic = properties.getKafka().getTopics().getCollectionChanged();
-        sendEventAsync(topic, collection.getId(), event);
+        sendAfterCommit(topic, collection.getId(), event);
     }
 
     /**
      * Publishes an authorization changed event to Kafka.
      *
-     * <p>Builds the payload synchronously from JPA entities, then sends asynchronously.
+     * <p>Builds the payload synchronously from JPA entities, then defers the send
+     * until after the transaction commits.
      *
      * @param collectionId The collection ID
      * @param collectionName The collection name
@@ -117,13 +122,14 @@ public class ConfigEventPublisher {
                 EVENT_TYPE_AUTHZ_CHANGED, generateCorrelationId(), payload);
 
         String topic = properties.getKafka().getTopics().getAuthzChanged();
-        sendEventAsync(topic, collectionId, event);
+        sendAfterCommit(topic, collectionId, event);
     }
 
     /**
      * Publishes a UI configuration changed event to Kafka.
      *
-     * <p>Builds the payload synchronously from JPA entities, then sends asynchronously.
+     * <p>Builds the payload synchronously from JPA entities, then defers the send
+     * until after the transaction commits.
      *
      * @param pages The list of active UI pages
      * @param menus The list of UI menus
@@ -141,13 +147,14 @@ public class ConfigEventPublisher {
                 EVENT_TYPE_UI_CHANGED, generateCorrelationId(), payload);
 
         String topic = properties.getKafka().getTopics().getUiChanged();
-        sendEventAsync(topic, "ui-config", event);
+        sendAfterCommit(topic, "ui-config", event);
     }
 
     /**
      * Publishes an OIDC configuration changed event to Kafka.
      *
-     * <p>Builds the payload synchronously from JPA entities, then sends asynchronously.
+     * <p>Builds the payload synchronously from JPA entities, then defers the send
+     * until after the transaction commits.
      *
      * @param providers The list of active OIDC providers
      *
@@ -163,7 +170,7 @@ public class ConfigEventPublisher {
                 EVENT_TYPE_OIDC_CHANGED, generateCorrelationId(), payload);
 
         String topic = properties.getKafka().getTopics().getOidcChanged();
-        sendEventAsync(topic, "oidc-config", event);
+        sendAfterCommit(topic, "oidc-config", event);
     }
 
     /**
@@ -191,7 +198,7 @@ public class ConfigEventPublisher {
                 "emf.worker.assignment.changed", generateCorrelationId(), payload);
 
         String topic = properties.getKafka().getTopics().getWorkerAssignmentChanged();
-        sendEventAsync(topic, collectionId, event);
+        sendAfterCommit(topic, collectionId, event);
     }
 
     /**
@@ -215,7 +222,7 @@ public class ConfigEventPublisher {
                 "emf.worker.status.changed", generateCorrelationId(), payload);
 
         String topic = properties.getKafka().getTopics().getWorkerStatusChanged();
-        sendEventAsync(topic, workerId, event);
+        sendAfterCommit(topic, workerId, event);
     }
 
     /**
@@ -230,6 +237,34 @@ public class ConfigEventPublisher {
             return requestId;
         }
         return java.util.UUID.randomUUID().toString();
+    }
+
+    /**
+     * Defers the Kafka send until after the current transaction commits.
+     *
+     * <p>If called within a transaction, registers a {@link TransactionSynchronization}
+     * callback that sends the event after the transaction successfully commits. This
+     * ensures that consumers (e.g., workers) can read the committed data when they
+     * receive the event and call back to the control-plane API.
+     *
+     * <p>If called outside a transaction, sends the event immediately.
+     *
+     * @param topic The Kafka topic
+     * @param key The message key (used for partitioning)
+     * @param event The event to send
+     */
+    private void sendAfterCommit(String topic, String key, ConfigEvent<?> event) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    sendEventAsync(topic, key, event);
+                }
+            });
+        } else {
+            // No active transaction — send immediately
+            sendEventAsync(topic, key, event);
+        }
     }
 
     /**

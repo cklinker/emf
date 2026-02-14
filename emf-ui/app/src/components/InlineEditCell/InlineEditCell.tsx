@@ -29,6 +29,22 @@ export type InlineEditFieldType =
   | 'datetime'
   | 'json'
   | 'reference'
+  | 'phone'
+  | 'email'
+  | 'url'
+  | 'external_id'
+  | 'picklist'
+  | 'currency'
+  | 'percent'
+  | 'encrypted'
+  | 'auto_number'
+  | 'rich_text'
+  | 'geolocation'
+  | 'multi_picklist'
+  | 'lookup'
+  | 'master_detail'
+  | 'formula'
+  | 'rollup_summary'
 
 /**
  * Props for the InlineEditCell component
@@ -106,15 +122,39 @@ function valueToInputString(value: unknown, fieldType: InlineEditFieldType): str
 function getInputType(fieldType: InlineEditFieldType): string {
   switch (fieldType) {
     case 'number':
+    case 'currency':
+    case 'percent':
       return 'number'
     case 'date':
       return 'date'
     case 'datetime':
       return 'datetime-local'
+    case 'phone':
+      return 'tel'
+    case 'email':
+      return 'email'
+    case 'url':
+      return 'url'
     default:
       return 'text'
   }
 }
+
+/**
+ * Non-editable field types that should show a hint instead of entering edit mode
+ */
+const NON_EDITABLE_TYPES: Set<InlineEditFieldType> = new Set([
+  'json',
+  'encrypted',
+  'auto_number',
+  'rich_text',
+  'geolocation',
+  'multi_picklist',
+  'lookup',
+  'master_detail',
+  'formula',
+  'rollup_summary',
+])
 
 /**
  * InlineEditCell Component
@@ -200,7 +240,7 @@ export function InlineEditCell({
   const handleCellClick = useCallback(() => {
     if (!enabled || mutation.isPending) return
 
-    if (fieldType === 'json') {
+    if (NON_EDITABLE_TYPES.has(fieldType)) {
       setShowJsonHint(true)
       setTimeout(() => setShowJsonHint(false), 2000)
       return
@@ -268,7 +308,7 @@ export function InlineEditCell({
   // Build cell class names
   const cellClassNames = [styles.cell]
 
-  if (enabled && fieldType !== 'json' && !isEditing) {
+  if (enabled && !NON_EDITABLE_TYPES.has(fieldType) && !isEditing) {
     cellClassNames.push(styles.cellEditable)
   }
   if (isEditing) {
@@ -283,7 +323,7 @@ export function InlineEditCell({
   if (mutation.isError && !isEditing) {
     cellClassNames.push(styles.cellError)
   }
-  if (fieldType === 'json' && enabled) {
+  if (NON_EDITABLE_TYPES.has(fieldType) && enabled) {
     cellClassNames.push(styles.nonEditable)
   }
 
@@ -338,10 +378,10 @@ export function InlineEditCell({
     <div
       className={cellClassNames.join(' ')}
       onClick={handleCellClick}
-      role={enabled && fieldType !== 'json' ? 'button' : undefined}
-      tabIndex={enabled && fieldType !== 'json' ? 0 : undefined}
+      role={enabled && !NON_EDITABLE_TYPES.has(fieldType) ? 'button' : undefined}
+      tabIndex={enabled && !NON_EDITABLE_TYPES.has(fieldType) ? 0 : undefined}
       onKeyDown={
-        enabled && fieldType !== 'json'
+        enabled && !NON_EDITABLE_TYPES.has(fieldType)
           ? (e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault()
@@ -351,12 +391,14 @@ export function InlineEditCell({
           : undefined
       }
       aria-label={
-        enabled && fieldType !== 'json' ? `Edit ${fieldName}: ${displayValue}` : undefined
+        enabled && !NON_EDITABLE_TYPES.has(fieldType)
+          ? `Edit ${fieldName}: ${displayValue}`
+          : undefined
       }
       data-testid={`inline-edit-cell-${fieldName}`}
     >
       <span className={styles.displayValue}>{displayValue}</span>
-      {enabled && fieldType !== 'json' && (
+      {enabled && !NON_EDITABLE_TYPES.has(fieldType) && (
         <span className={styles.pencilIcon} aria-hidden="true">
           &#9998;
         </span>

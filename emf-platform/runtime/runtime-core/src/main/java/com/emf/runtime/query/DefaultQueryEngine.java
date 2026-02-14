@@ -193,7 +193,10 @@ public class DefaultQueryEngine implements QueryEngine {
         // Don't allow changing id or createdAt
         recordData.remove("id");
         recordData.remove("createdAt");
-        
+
+        // Encrypt ENCRYPTED fields before storage
+        encryptFields(definition, recordData);
+
         // Coerce string values to expected types (e.g., "10" → 10.0 for DOUBLE fields)
         TypeCoercionService.coerce(definition, recordData);
 
@@ -289,9 +292,17 @@ public class DefaultQueryEngine implements QueryEngine {
         for (FieldDefinition field : definition.fields()) {
             if (field.type() == FieldType.AUTO_NUMBER && !data.containsKey(field.name())) {
                 String seqName = "seq_" + definition.name() + "_" + field.name();
-                // TODO: Read prefix/padding from field-type-specific config once FieldDefinition carries it
+                Map<String, Object> config = field.fieldTypeConfig();
                 String prefix = "";
                 int padding = 6;
+                if (config != null) {
+                    if (config.containsKey("prefix")) {
+                        prefix = config.get("prefix").toString();
+                    }
+                    if (config.containsKey("padding")) {
+                        padding = ((Number) config.get("padding")).intValue();
+                    }
+                }
                 try {
                     String value = autoNumberService.generateNext(seqName, prefix, padding);
                     data.put(field.name(), value);

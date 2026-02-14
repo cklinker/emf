@@ -56,8 +56,14 @@ public class PayloadAdapter {
         payload.setName(field.getName());
         payload.setType(field.getType());
         payload.setRequired(field.isRequired());
+        payload.setUnique(field.isUnique());
         payload.setDescription(field.getDescription());
         payload.setConstraints(field.getConstraints());
+        payload.setFieldTypeConfig(field.getFieldTypeConfig());
+        payload.setReferenceTarget(field.getReferenceTarget());
+        payload.setRelationshipType(field.getRelationshipType());
+        payload.setRelationshipName(field.getRelationshipName());
+        payload.setCascadeDelete(field.isCascadeDelete());
         return payload;
     }
 

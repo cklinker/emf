@@ -70,12 +70,12 @@ class JsonbStorageAdapterTest {
     
     private CollectionDefinition createTestCollection(String name) {
         List<FieldDefinition> fields = List.of(
-            new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null),
-            new FieldDefinition("description", FieldType.STRING, true, false, false, null, null, null, null),
-            new FieldDefinition("price", FieldType.DOUBLE, false, false, false, null, null, null, null),
-            new FieldDefinition("quantity", FieldType.INTEGER, true, false, false, null, null, null, null),
-            new FieldDefinition("active", FieldType.BOOLEAN, true, false, false, null, null, null, null),
-            new FieldDefinition("sku", FieldType.STRING, false, false, true, null, null, null, null)
+            new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null, null),
+            new FieldDefinition("description", FieldType.STRING, true, false, false, null, null, null, null, null),
+            new FieldDefinition("price", FieldType.DOUBLE, false, false, false, null, null, null, null, null),
+            new FieldDefinition("quantity", FieldType.INTEGER, true, false, false, null, null, null, null, null),
+            new FieldDefinition("active", FieldType.BOOLEAN, true, false, false, null, null, null, null, null),
+            new FieldDefinition("sku", FieldType.STRING, false, false, true, null, null, null, null, null)
         );
         
         StorageConfig storageConfig = StorageConfig.jsonbStore();
@@ -139,9 +139,9 @@ class JsonbStorageAdapterTest {
             
             // Add a new field to the collection
             List<FieldDefinition> newFields = List.of(
-                new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null),
-                new FieldDefinition("price", FieldType.DOUBLE, false, false, false, null, null, null, null),
-                new FieldDefinition("newField", FieldType.STRING, true, false, false, null, null, null, null)
+                new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null, null),
+                new FieldDefinition("price", FieldType.DOUBLE, false, false, false, null, null, null, null, null),
+                new FieldDefinition("newField", FieldType.STRING, true, false, false, null, null, null, null, null)
             );
             
             CollectionDefinition newDefinition = new CollectionDefinition(

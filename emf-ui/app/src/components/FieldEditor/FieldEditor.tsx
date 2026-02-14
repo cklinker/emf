@@ -89,6 +89,7 @@ export interface FieldDefinition {
   defaultValue?: unknown
   validation?: ValidationRule[]
   referenceTarget?: string
+  fieldTypeConfig?: string
   order: number
 }
 
@@ -237,12 +238,19 @@ export const fieldEditorSchema = z
     indexed: z.boolean(),
     defaultValue: z.string().optional().or(z.literal('')),
     referenceTarget: z.string().optional().or(z.literal('')),
+    autoNumberPrefix: z.string().optional().or(z.literal('')),
+    autoNumberPadding: z.coerce.number().min(1).max(10).optional(),
+    currencyCode: z.string().max(3).optional().or(z.literal('')),
+    currencyPrecision: z.coerce.number().min(0).max(6).optional(),
     validationRules: z.array(validationRuleSchema).optional(),
   })
   .refine(
     (data) => {
-      // Reference type requires referenceTarget
-      if (data.type === 'reference' && !data.referenceTarget) {
+      // Reference, lookup, and master_detail types require referenceTarget
+      if (
+        (data.type === 'reference' || data.type === 'lookup' || data.type === 'master_detail') &&
+        !data.referenceTarget
+      ) {
         return false
       }
       return true
@@ -292,6 +300,18 @@ export function FieldEditor({
   const { t } = useI18n()
   const isEditMode = !!field
 
+  // Parse existing fieldTypeConfig for default values
+  const parsedConfig = useMemo(() => {
+    if (field?.fieldTypeConfig) {
+      try {
+        return JSON.parse(field.fieldTypeConfig) as Record<string, unknown>
+      } catch {
+        return {}
+      }
+    }
+    return {}
+  }, [field?.fieldTypeConfig])
+
   // Initialize form with React Hook Form and Zod resolver
   const {
     register,
@@ -311,6 +331,10 @@ export function FieldEditor({
       indexed: field?.indexed ?? false,
       defaultValue: field?.defaultValue !== undefined ? String(field.defaultValue) : '',
       referenceTarget: field?.referenceTarget ?? '',
+      autoNumberPrefix: (parsedConfig.prefix as string) ?? '',
+      autoNumberPadding: (parsedConfig.padding as number) ?? 4,
+      currencyCode: (parsedConfig.currencyCode as string) ?? '',
+      currencyPrecision: (parsedConfig.precision as number) ?? 2,
       validationRules:
         field?.validation?.map((v) => ({
           type: v.type,
@@ -357,6 +381,10 @@ export function FieldEditor({
         indexed: field.indexed,
         defaultValue: field.defaultValue !== undefined ? String(field.defaultValue) : '',
         referenceTarget: field.referenceTarget ?? '',
+        autoNumberPrefix: (parsedConfig.prefix as string) ?? '',
+        autoNumberPadding: (parsedConfig.padding as number) ?? 4,
+        currencyCode: (parsedConfig.currencyCode as string) ?? '',
+        currencyPrecision: (parsedConfig.precision as number) ?? 2,
         validationRules:
           field.validation?.map((v) => ({
             type: v.type,
@@ -370,7 +398,7 @@ export function FieldEditor({
           })) ?? [],
       })
     }
-  }, [field, reset])
+  }, [field, reset, parsedConfig])
 
   // Handle form submission
   const handleFormSubmit = useCallback(
@@ -419,6 +447,23 @@ export function FieldEditor({
         }
       }
 
+      // Build fieldTypeConfig JSON for type-specific settings
+      let fieldTypeConfig: string | undefined = undefined
+      if (data.type === 'auto_number') {
+        const config: Record<string, unknown> = {}
+        if (data.autoNumberPrefix) config.prefix = data.autoNumberPrefix
+        if (data.autoNumberPadding !== undefined) config.padding = data.autoNumberPadding
+        if (Object.keys(config).length > 0) fieldTypeConfig = JSON.stringify(config)
+      } else if (data.type === 'currency') {
+        const config: Record<string, unknown> = {}
+        if (data.currencyCode) config.currencyCode = data.currencyCode
+        if (data.currencyPrecision !== undefined) config.precision = data.currencyPrecision
+        if (Object.keys(config).length > 0) fieldTypeConfig = JSON.stringify(config)
+      }
+
+      const needsReferenceTarget =
+        data.type === 'reference' || data.type === 'lookup' || data.type === 'master_detail'
+
       const fieldData: FieldDefinition = {
         id: field?.id ?? generateFieldId(),
         name: data.name,
@@ -429,7 +474,8 @@ export function FieldEditor({
         indexed: data.indexed,
         defaultValue: parsedDefaultValue,
         validation: validationRules.length > 0 ? validationRules : undefined,
-        referenceTarget: data.type === 'reference' ? data.referenceTarget : undefined,
+        referenceTarget: needsReferenceTarget ? data.referenceTarget : undefined,
+        fieldTypeConfig,
         order: field?.order ?? 0,
       }
 
@@ -579,8 +625,10 @@ export function FieldEditor({
         )}
       </div>
 
-      {/* Reference Target (only for reference type) */}
-      {watchedType === 'reference' && (
+      {/* Reference Target (for reference, lookup, and master_detail types) */}
+      {(watchedType === 'reference' ||
+        watchedType === 'lookup' ||
+        watchedType === 'master_detail') && (
         <div className={styles.fieldGroup}>
           <label htmlFor="field-reference-target" className={styles.label}>
             {t('fieldEditor.referenceTarget')}
@@ -622,6 +670,73 @@ export function FieldEditor({
           <span id="field-reference-target-hint" className={styles.hint}>
             {t('fieldEditor.referenceTargetHint')}
           </span>
+        </div>
+      )}
+
+      {/* Auto Number Config */}
+      {watchedType === 'auto_number' && (
+        <div className={styles.fieldGroup}>
+          <label htmlFor="field-auto-number-prefix" className={styles.label}>
+            {t('fields.config.prefix')}
+            <span className={styles.optional}>({t('common.optional')})</span>
+          </label>
+          <input
+            id="field-auto-number-prefix"
+            type="text"
+            className={styles.input}
+            placeholder={'e.g., TICKET-'}
+            disabled={isSubmitting}
+            data-testid="field-auto-number-prefix-input"
+            {...register('autoNumberPrefix')}
+          />
+
+          <label htmlFor="field-auto-number-padding" className={styles.label}>
+            {t('fields.config.padding')}
+          </label>
+          <input
+            id="field-auto-number-padding"
+            type="number"
+            className={styles.input}
+            min={1}
+            max={10}
+            disabled={isSubmitting}
+            data-testid="field-auto-number-padding-input"
+            {...register('autoNumberPadding')}
+          />
+        </div>
+      )}
+
+      {/* Currency Config */}
+      {watchedType === 'currency' && (
+        <div className={styles.fieldGroup}>
+          <label htmlFor="field-currency-code" className={styles.label}>
+            {t('fields.config.currencyCode')}
+            <span className={styles.optional}>({t('common.optional')})</span>
+          </label>
+          <input
+            id="field-currency-code"
+            type="text"
+            className={styles.input}
+            placeholder={'USD'}
+            maxLength={3}
+            disabled={isSubmitting}
+            data-testid="field-currency-code-input"
+            {...register('currencyCode')}
+          />
+
+          <label htmlFor="field-currency-precision" className={styles.label}>
+            {t('fields.config.precision')}
+          </label>
+          <input
+            id="field-currency-precision"
+            type="number"
+            className={styles.input}
+            min={0}
+            max={6}
+            disabled={isSubmitting}
+            data-testid="field-currency-precision-input"
+            {...register('currencyPrecision')}
+          />
         </div>
       )}
 

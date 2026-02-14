@@ -130,7 +130,30 @@ export interface FieldDefinition {
   id: string
   name: string
   displayName?: string
-  type: 'string' | 'number' | 'boolean' | 'date' | 'datetime' | 'json' | 'reference'
+  type:
+    | 'string'
+    | 'number'
+    | 'boolean'
+    | 'date'
+    | 'datetime'
+    | 'json'
+    | 'reference'
+    | 'picklist'
+    | 'multi_picklist'
+    | 'currency'
+    | 'percent'
+    | 'auto_number'
+    | 'phone'
+    | 'email'
+    | 'url'
+    | 'rich_text'
+    | 'encrypted'
+    | 'external_id'
+    | 'geolocation'
+    | 'lookup'
+    | 'master_detail'
+    | 'formula'
+    | 'rollup_summary'
   required: boolean
 }
 
@@ -826,6 +849,29 @@ export function ResourceListPage({
           })
         case 'json':
           return typeof value === 'object' ? JSON.stringify(value) : String(value)
+        case 'currency':
+          return typeof value === 'number'
+            ? value.toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })
+            : String(value)
+        case 'percent':
+          return typeof value === 'number' ? `${value.toFixed(2)}%` : String(value)
+        case 'encrypted':
+          return '••••••••'
+        case 'geolocation':
+          if (typeof value === 'object' && value !== null) {
+            const geo = value as Record<string, unknown>
+            return `${geo.latitude ?? '-'}, ${geo.longitude ?? '-'}`
+          }
+          return String(value)
+        case 'multi_picklist':
+          return Array.isArray(value) ? value.join(', ') : String(value)
+        case 'rich_text':
+          return String(value)
+            .replace(/<[^>]*>/g, '')
+            .substring(0, 100)
         default:
           return String(value)
       }

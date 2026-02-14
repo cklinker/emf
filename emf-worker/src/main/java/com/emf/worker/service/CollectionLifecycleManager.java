@@ -22,7 +22,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import com.emf.runtime.model.ReferenceConfig;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -285,9 +287,41 @@ public class CollectionLifecycleManager {
                         boolean required = Boolean.TRUE.equals(field.get("required"));
                         boolean unique = Boolean.TRUE.equals(field.get("unique"));
 
+                        // Parse relationship metadata into ReferenceConfig
+                        ReferenceConfig refConfig = null;
+                        String referenceTarget = (String) field.get("referenceTarget");
+                        String relationshipType = (String) field.get("relationshipType");
+                        if (referenceTarget != null && !referenceTarget.isBlank()) {
+                            boolean cascadeDelete = Boolean.TRUE.equals(field.get("cascadeDelete"));
+                            String relationshipName = (String) field.get("relationshipName");
+                            if ("MASTER_DETAIL".equals(relationshipType)) {
+                                refConfig = ReferenceConfig.masterDetail(referenceTarget, relationshipName);
+                            } else if ("LOOKUP".equals(relationshipType)) {
+                                refConfig = ReferenceConfig.lookup(referenceTarget, relationshipName);
+                            } else {
+                                refConfig = ReferenceConfig.toCollection(referenceTarget);
+                            }
+                        }
+
+                        // Parse fieldTypeConfig JSON into Map
+                        Map<String, Object> parsedFieldTypeConfig = null;
+                        Object fieldTypeConfigObj = field.get("fieldTypeConfig");
+                        if (fieldTypeConfigObj instanceof String ftcStr && !ftcStr.isBlank()) {
+                            try {
+                                parsedFieldTypeConfig = objectMapper.readValue(ftcStr,
+                                        objectMapper.getTypeFactory().constructMapType(HashMap.class, String.class, Object.class));
+                            } catch (Exception ex) {
+                                log.warn("Failed to parse fieldTypeConfig for field '{}': {}", fieldName, ex.getMessage());
+                            }
+                        } else if (fieldTypeConfigObj instanceof Map) {
+                            @SuppressWarnings("unchecked")
+                            Map<String, Object> configMap = (Map<String, Object>) fieldTypeConfigObj;
+                            parsedFieldTypeConfig = configMap;
+                        }
+
                         FieldDefinition fieldDef = new FieldDefinition(
                                 fieldName, fieldType, !required, false, unique,
-                                null, null, null, null);
+                                null, null, null, refConfig, parsedFieldTypeConfig);
                         fields.add(fieldDef);
                     } catch (IllegalArgumentException e) {
                         log.warn("Unknown field type '{}' for field '{}', defaulting to STRING",

@@ -30,12 +30,36 @@ export interface FieldDefinition {
   id: string
   name: string
   displayName?: string
-  type: 'string' | 'number' | 'boolean' | 'date' | 'datetime' | 'json' | 'reference'
+  type:
+    | 'string'
+    | 'number'
+    | 'boolean'
+    | 'date'
+    | 'datetime'
+    | 'json'
+    | 'reference'
+    | 'picklist'
+    | 'multi_picklist'
+    | 'currency'
+    | 'percent'
+    | 'auto_number'
+    | 'phone'
+    | 'email'
+    | 'url'
+    | 'rich_text'
+    | 'encrypted'
+    | 'external_id'
+    | 'geolocation'
+    | 'lookup'
+    | 'master_detail'
+    | 'formula'
+    | 'rollup_summary'
   required: boolean
   unique?: boolean
   indexed?: boolean
   defaultValue?: unknown
   referenceTarget?: string
+  enumValues?: string[]
   order?: number
   validation?: ValidationRule[]
 }
@@ -389,6 +413,68 @@ export function ResourceFormPage({
           }
           break
         }
+        case 'phone': {
+          if (typeof value === 'string' && value.trim()) {
+            const phoneRegex = /^[+]?[\d\s\-().]*$/
+            if (!phoneRegex.test(value)) {
+              return t('resourceForm.validation.invalidPhone', 'Invalid phone number format')
+            }
+          }
+          break
+        }
+        case 'email': {
+          if (typeof value === 'string' && value.trim()) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+            if (!emailRegex.test(value)) {
+              return t('resourceForm.validation.email', 'Invalid email address')
+            }
+          }
+          break
+        }
+        case 'url': {
+          if (typeof value === 'string' && value.trim()) {
+            try {
+              new URL(value)
+            } catch {
+              return t('resourceForm.validation.url', 'Invalid URL format')
+            }
+          }
+          break
+        }
+        case 'geolocation': {
+          if (typeof value === 'object' && value !== null) {
+            const geo = value as Record<string, unknown>
+            if (geo.latitude !== null && geo.latitude !== undefined) {
+              const lat = Number(geo.latitude)
+              if (isNaN(lat) || lat < -90 || lat > 90) {
+                return t(
+                  'resourceForm.validation.invalidLatitude',
+                  'Latitude must be between -90 and 90'
+                )
+              }
+            }
+            if (geo.longitude !== null && geo.longitude !== undefined) {
+              const lng = Number(geo.longitude)
+              if (isNaN(lng) || lng < -180 || lng > 180) {
+                return t(
+                  'resourceForm.validation.invalidLongitude',
+                  'Longitude must be between -180 and 180'
+                )
+              }
+            }
+          }
+          break
+        }
+        case 'currency':
+        case 'percent': {
+          if (value !== '' && value !== undefined && value !== null) {
+            const numValue = Number(value)
+            if (isNaN(numValue)) {
+              return t('resourceForm.validation.invalidNumber')
+            }
+          }
+          break
+        }
       }
 
       // Custom validation rules
@@ -562,7 +648,31 @@ export function ResourceFormPage({
             }
             break
           case 'reference':
+          case 'lookup':
+          case 'master_detail':
             if (value === '') {
+              value = null
+            }
+            break
+          case 'currency':
+          case 'percent':
+            if (value !== '' && value !== undefined && value !== null) {
+              value = Number(value)
+            } else {
+              value = null
+            }
+            break
+          case 'auto_number':
+            // Skip auto_number fields - they are auto-generated
+            return
+          case 'multi_picklist':
+            if (!Array.isArray(value)) {
+              value = value ? [value] : []
+            }
+            break
+          case 'geolocation':
+            // Ensure geolocation stays as an object
+            if (typeof value !== 'object' || value === null) {
               value = null
             }
             break
@@ -754,6 +864,240 @@ export function ResourceFormPage({
                 field.referenceTarget
                   ? t('resourceForm.referenceIdPlaceholder', { collection: field.referenceTarget })
                   : t('resourceForm.referenceId')
+              }
+            />
+          )
+          break
+
+        case 'picklist':
+          input = (
+            <select
+              id={fieldId}
+              value={String(value || '')}
+              onChange={(e) => handleFieldChange(field.name, e.target.value)}
+              className={styles.input}
+            >
+              <option value="">{t('common.select')}</option>
+              {(field.enumValues || []).map((val: string) => (
+                <option key={val} value={val}>
+                  {val}
+                </option>
+              ))}
+            </select>
+          )
+          break
+
+        case 'multi_picklist':
+          input = (
+            <div className={styles.checkboxGroup}>
+              {(field.enumValues || []).map((val: string) => (
+                <label key={val} className={styles.checkboxLabel}>
+                  <input
+                    type="checkbox"
+                    checked={Array.isArray(value) && value.includes(val)}
+                    onChange={(e) => {
+                      const current = Array.isArray(value) ? [...value] : []
+                      if (e.target.checked) {
+                        current.push(val)
+                      } else {
+                        const idx = current.indexOf(val)
+                        if (idx >= 0) current.splice(idx, 1)
+                      }
+                      handleFieldChange(field.name, current)
+                    }}
+                  />
+                  {val}
+                </label>
+              ))}
+              {(!field.enumValues || field.enumValues.length === 0) && (
+                <input
+                  type="text"
+                  id={fieldId}
+                  value={String(value || '')}
+                  onChange={(e) => handleFieldChange(field.name, e.target.value)}
+                  className={styles.input}
+                  placeholder={t('fields.types.multi_picklist')}
+                />
+              )}
+            </div>
+          )
+          break
+
+        case 'currency':
+          input = (
+            <input
+              {...commonProps}
+              type="number"
+              step="0.01"
+              value={value !== null && value !== undefined ? String(value) : ''}
+              onChange={(e) => handleFieldChange(field.name, e.target.value)}
+              className={`${styles.input} ${error ? styles.inputError : ''}`}
+              placeholder="0.00"
+            />
+          )
+          break
+
+        case 'percent':
+          input = (
+            <div className={styles.inputGroup}>
+              <input
+                {...commonProps}
+                type="number"
+                step="0.01"
+                value={value !== null && value !== undefined ? String(value) : ''}
+                onChange={(e) => handleFieldChange(field.name, e.target.value)}
+                className={`${styles.input} ${error ? styles.inputError : ''}`}
+                placeholder="0.00"
+              />
+              <span className={styles.inputSuffix}>%</span>
+            </div>
+          )
+          break
+
+        case 'auto_number':
+          input = (
+            <input
+              {...commonProps}
+              type="text"
+              value={String(value || '')}
+              className={styles.input}
+              disabled
+              placeholder={t('fields.autoGenerated', 'Auto-generated')}
+            />
+          )
+          break
+
+        case 'phone':
+          input = (
+            <input
+              {...commonProps}
+              type="tel"
+              value={String(value || '')}
+              onChange={(e) => handleFieldChange(field.name, e.target.value)}
+              className={`${styles.input} ${error ? styles.inputError : ''}`}
+              placeholder="+1 (555) 123-4567"
+            />
+          )
+          break
+
+        case 'email':
+          input = (
+            <input
+              {...commonProps}
+              type="email"
+              value={String(value || '')}
+              onChange={(e) => handleFieldChange(field.name, e.target.value)}
+              className={`${styles.input} ${error ? styles.inputError : ''}`}
+              placeholder="user@example.com"
+            />
+          )
+          break
+
+        case 'url':
+          input = (
+            <input
+              {...commonProps}
+              type="url"
+              value={String(value || '')}
+              onChange={(e) => handleFieldChange(field.name, e.target.value)}
+              className={`${styles.input} ${error ? styles.inputError : ''}`}
+              placeholder="https://example.com"
+            />
+          )
+          break
+
+        case 'rich_text':
+          input = (
+            <textarea
+              {...commonProps}
+              value={String(value || '')}
+              onChange={(e) => handleFieldChange(field.name, e.target.value)}
+              className={`${styles.textarea} ${error ? styles.inputError : ''}`}
+              rows={8}
+              placeholder={t('fields.types.rich_text')}
+            />
+          )
+          break
+
+        case 'encrypted':
+          input = (
+            <input
+              {...commonProps}
+              type="password"
+              value={String(value || '')}
+              onChange={(e) => handleFieldChange(field.name, e.target.value)}
+              className={`${styles.input} ${error ? styles.inputError : ''}`}
+              placeholder="••••••••"
+            />
+          )
+          break
+
+        case 'external_id':
+          input = (
+            <input
+              {...commonProps}
+              type="text"
+              value={String(value || '')}
+              onChange={(e) => handleFieldChange(field.name, e.target.value)}
+              className={`${styles.input} ${error ? styles.inputError : ''}`}
+              placeholder={t('fields.types.external_id')}
+            />
+          )
+          break
+
+        case 'geolocation': {
+          const geoValue =
+            typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {}
+          input = (
+            <div className={styles.inputGroup}>
+              <input
+                type="number"
+                step="0.000001"
+                min="-90"
+                max="90"
+                value={geoValue.latitude !== undefined ? String(geoValue.latitude) : ''}
+                onChange={(e) =>
+                  handleFieldChange(field.name, {
+                    ...geoValue,
+                    latitude: e.target.value ? Number(e.target.value) : null,
+                  })
+                }
+                className={`${styles.input} ${error ? styles.inputError : ''}`}
+                placeholder={t('fields.config.latitude', 'Latitude')}
+              />
+              <input
+                type="number"
+                step="0.000001"
+                min="-180"
+                max="180"
+                value={geoValue.longitude !== undefined ? String(geoValue.longitude) : ''}
+                onChange={(e) =>
+                  handleFieldChange(field.name, {
+                    ...geoValue,
+                    longitude: e.target.value ? Number(e.target.value) : null,
+                  })
+                }
+                className={`${styles.input} ${error ? styles.inputError : ''}`}
+                placeholder={t('fields.config.longitude', 'Longitude')}
+              />
+            </div>
+          )
+          break
+        }
+
+        case 'lookup':
+        case 'master_detail':
+          input = (
+            <input
+              {...commonProps}
+              type="text"
+              value={String(value || '')}
+              onChange={(e) => handleFieldChange(field.name, e.target.value)}
+              className={`${styles.input} ${error ? styles.inputError : ''}`}
+              placeholder={
+                field.referenceTarget
+                  ? `${t('fields.types.reference')} → ${field.referenceTarget}`
+                  : t('fields.types.reference')
               }
             />
           )

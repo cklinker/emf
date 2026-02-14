@@ -192,12 +192,12 @@ class SchemaMigrationEngineTest {
         @DisplayName("Should detect added fields")
         void shouldDetectAddedFields() {
             List<FieldDefinition> oldFields = List.of(
-                new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null)
+                new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null, null)
             );
             
             List<FieldDefinition> newFields = List.of(
-                new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null),
-                new FieldDefinition("description", FieldType.STRING, true, false, false, null, null, null, null)
+                new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null, null),
+                new FieldDefinition("description", FieldType.STRING, true, false, false, null, null, null, null, null)
             );
             
             CollectionDefinition oldDef = createCollection("test", oldFields);
@@ -216,12 +216,12 @@ class SchemaMigrationEngineTest {
         @DisplayName("Should detect removed fields")
         void shouldDetectRemovedFields() {
             List<FieldDefinition> oldFields = List.of(
-                new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null),
-                new FieldDefinition("description", FieldType.STRING, true, false, false, null, null, null, null)
+                new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null, null),
+                new FieldDefinition("description", FieldType.STRING, true, false, false, null, null, null, null, null)
             );
             
             List<FieldDefinition> newFields = List.of(
-                new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null)
+                new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null, null)
             );
             
             CollectionDefinition oldDef = createCollection("test", oldFields);
@@ -240,11 +240,11 @@ class SchemaMigrationEngineTest {
         @DisplayName("Should detect type changes")
         void shouldDetectTypeChanges() {
             List<FieldDefinition> oldFields = List.of(
-                new FieldDefinition("count", FieldType.INTEGER, false, false, false, null, null, null, null)
+                new FieldDefinition("count", FieldType.INTEGER, false, false, false, null, null, null, null, null)
             );
             
             List<FieldDefinition> newFields = List.of(
-                new FieldDefinition("count", FieldType.LONG, false, false, false, null, null, null, null)
+                new FieldDefinition("count", FieldType.LONG, false, false, false, null, null, null, null, null)
             );
             
             CollectionDefinition oldDef = createCollection("test", oldFields);
@@ -263,15 +263,15 @@ class SchemaMigrationEngineTest {
         @DisplayName("Should detect multiple changes")
         void shouldDetectMultipleChanges() {
             List<FieldDefinition> oldFields = List.of(
-                new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null),
-                new FieldDefinition("count", FieldType.INTEGER, false, false, false, null, null, null, null),
-                new FieldDefinition("old_field", FieldType.STRING, true, false, false, null, null, null, null)
+                new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null, null),
+                new FieldDefinition("count", FieldType.INTEGER, false, false, false, null, null, null, null, null),
+                new FieldDefinition("old_field", FieldType.STRING, true, false, false, null, null, null, null, null)
             );
             
             List<FieldDefinition> newFields = List.of(
-                new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null),
-                new FieldDefinition("count", FieldType.LONG, false, false, false, null, null, null, null),
-                new FieldDefinition("new_field", FieldType.BOOLEAN, true, false, false, null, null, null, null)
+                new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null, null),
+                new FieldDefinition("count", FieldType.LONG, false, false, false, null, null, null, null, null),
+                new FieldDefinition("new_field", FieldType.BOOLEAN, true, false, false, null, null, null, null, null)
             );
             
             CollectionDefinition oldDef = createCollection("test", oldFields);
@@ -291,7 +291,7 @@ class SchemaMigrationEngineTest {
         @DisplayName("Should return empty list when no changes")
         void shouldReturnEmptyListWhenNoChanges() {
             List<FieldDefinition> fields = List.of(
-                new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null)
+                new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null, null)
             );
             
             CollectionDefinition oldDef = createCollection("test", fields);
@@ -391,10 +391,10 @@ class SchemaMigrationEngineTest {
         @Test
         @DisplayName("Should throw IncompatibleSchemaChangeException for incompatible changes")
         void shouldThrowExceptionForIncompatibleChanges() {
-            FieldDefinition oldField = new FieldDefinition("count", FieldType.BOOLEAN, 
-                false, false, false, null, null, null, null);
-            FieldDefinition newField = new FieldDefinition("count", FieldType.INTEGER, 
-                false, false, false, null, null, null, null);
+            FieldDefinition oldField = new FieldDefinition("count", FieldType.BOOLEAN,
+                false, false, false, null, null, null, null, null);
+            FieldDefinition newField = new FieldDefinition("count", FieldType.INTEGER,
+                false, false, false, null, null, null, null, null);
             
             IncompatibleSchemaChangeException exception = assertThrows(
                 IncompatibleSchemaChangeException.class,
@@ -410,10 +410,10 @@ class SchemaMigrationEngineTest {
         @Test
         @DisplayName("Should not throw for compatible type changes")
         void shouldNotThrowForCompatibleChanges() {
-            FieldDefinition oldField = new FieldDefinition("count", FieldType.INTEGER, 
-                false, false, false, null, null, null, null);
-            FieldDefinition newField = new FieldDefinition("count", FieldType.LONG, 
-                false, false, false, null, null, null, null);
+            FieldDefinition oldField = new FieldDefinition("count", FieldType.INTEGER,
+                false, false, false, null, null, null, null, null);
+            FieldDefinition newField = new FieldDefinition("count", FieldType.LONG,
+                false, false, false, null, null, null, null, null);
             
             assertDoesNotThrow(() -> 
                 migrationEngine.validateTypeChange("test_collection", oldField, newField));
@@ -455,14 +455,14 @@ class SchemaMigrationEngineTest {
         void shouldAddColumnWhenFieldIsAdded() {
             // Create initial table
             List<FieldDefinition> oldFields = List.of(
-                new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null)
+                new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null, null)
             );
             setupTestTable("tbl_test", oldFields);
             
             // Define new schema with additional field
             List<FieldDefinition> newFields = List.of(
-                new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null),
-                new FieldDefinition("description", FieldType.STRING, true, false, false, null, null, null, null)
+                new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null, null),
+                new FieldDefinition("description", FieldType.STRING, true, false, false, null, null, null, null, null)
             );
             
             CollectionDefinition oldDef = createCollection("test", oldFields);
@@ -491,14 +491,14 @@ class SchemaMigrationEngineTest {
         void shouldDeprecateColumnWhenFieldIsRemoved() {
             // Create initial table with two fields
             List<FieldDefinition> oldFields = List.of(
-                new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null),
-                new FieldDefinition("old_field", FieldType.STRING, true, false, false, null, null, null, null)
+                new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null, null),
+                new FieldDefinition("old_field", FieldType.STRING, true, false, false, null, null, null, null, null)
             );
             setupTestTable("tbl_test", oldFields);
             
             // Define new schema without old_field
             List<FieldDefinition> newFields = List.of(
-                new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null)
+                new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null, null)
             );
             
             CollectionDefinition oldDef = createCollection("test", oldFields);
@@ -523,7 +523,7 @@ class SchemaMigrationEngineTest {
         void shouldAlterColumnTypeForCompatibleChanges() {
             // Create initial table with INTEGER field
             List<FieldDefinition> oldFields = List.of(
-                new FieldDefinition("count", FieldType.INTEGER, true, false, false, null, null, null, null)
+                new FieldDefinition("count", FieldType.INTEGER, true, false, false, null, null, null, null, null)
             );
             setupTestTable("tbl_test", oldFields);
             
@@ -535,7 +535,7 @@ class SchemaMigrationEngineTest {
             
             // Define new schema with LONG type
             List<FieldDefinition> newFields = List.of(
-                new FieldDefinition("count", FieldType.LONG, true, false, false, null, null, null, null)
+                new FieldDefinition("count", FieldType.LONG, true, false, false, null, null, null, null, null)
             );
             
             CollectionDefinition oldDef = createCollection("test", oldFields);
@@ -563,12 +563,12 @@ class SchemaMigrationEngineTest {
         @DisplayName("Should throw exception for incompatible type changes during migration")
         void shouldThrowExceptionForIncompatibleTypeChanges() {
             List<FieldDefinition> oldFields = List.of(
-                new FieldDefinition("flag", FieldType.BOOLEAN, true, false, false, null, null, null, null)
+                new FieldDefinition("flag", FieldType.BOOLEAN, true, false, false, null, null, null, null, null)
             );
             setupTestTable("tbl_test", oldFields);
             
             List<FieldDefinition> newFields = List.of(
-                new FieldDefinition("flag", FieldType.INTEGER, true, false, false, null, null, null, null)
+                new FieldDefinition("flag", FieldType.INTEGER, true, false, false, null, null, null, null, null)
             );
             
             CollectionDefinition oldDef = createCollection("test", oldFields);
@@ -583,17 +583,17 @@ class SchemaMigrationEngineTest {
         void shouldHandleMultipleChangesInSingleMigration() {
             // Create initial table
             List<FieldDefinition> oldFields = List.of(
-                new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null),
-                new FieldDefinition("count", FieldType.INTEGER, true, false, false, null, null, null, null),
-                new FieldDefinition("old_field", FieldType.STRING, true, false, false, null, null, null, null)
+                new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null, null),
+                new FieldDefinition("count", FieldType.INTEGER, true, false, false, null, null, null, null, null),
+                new FieldDefinition("old_field", FieldType.STRING, true, false, false, null, null, null, null, null)
             );
             setupTestTable("tbl_test", oldFields);
             
             // Define new schema with multiple changes
             List<FieldDefinition> newFields = List.of(
-                new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null),
-                new FieldDefinition("count", FieldType.LONG, true, false, false, null, null, null, null),
-                new FieldDefinition("new_field", FieldType.BOOLEAN, true, false, false, null, null, null, null)
+                new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null, null),
+                new FieldDefinition("count", FieldType.LONG, true, false, false, null, null, null, null, null),
+                new FieldDefinition("new_field", FieldType.BOOLEAN, true, false, false, null, null, null, null, null)
             );
             
             CollectionDefinition oldDef = createCollection("test", oldFields);
@@ -615,7 +615,7 @@ class SchemaMigrationEngineTest {
         @DisplayName("Should do nothing when schemas are identical")
         void shouldDoNothingWhenSchemasAreIdentical() {
             List<FieldDefinition> fields = List.of(
-                new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null)
+                new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null, null)
             );
             setupTestTable("tbl_test", fields);
             
@@ -676,8 +676,8 @@ class SchemaMigrationEngineTest {
 
             // Define collection with 'name' and 'description' columns
             List<FieldDefinition> fields = List.of(
-                new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null),
-                new FieldDefinition("description", FieldType.STRING, true, false, false, null, null, null, null)
+                new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null, null),
+                new FieldDefinition("description", FieldType.STRING, true, false, false, null, null, null, null, null)
             );
             CollectionDefinition def = createCollection("test", fields);
 
@@ -709,8 +709,8 @@ class SchemaMigrationEngineTest {
                 "name TEXT, description TEXT)");
 
             List<FieldDefinition> fields = List.of(
-                new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null),
-                new FieldDefinition("description", FieldType.STRING, true, false, false, null, null, null, null)
+                new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null, null),
+                new FieldDefinition("description", FieldType.STRING, true, false, false, null, null, null, null, null)
             );
             CollectionDefinition def = createCollection("test", fields);
 
@@ -726,7 +726,7 @@ class SchemaMigrationEngineTest {
         @DisplayName("Should do nothing when table does not exist")
         void shouldDoNothingWhenTableDoesNotExist() {
             List<FieldDefinition> fields = List.of(
-                new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null)
+                new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null, null)
             );
             CollectionDefinition def = createCollection("test", fields);
 
@@ -748,9 +748,9 @@ class SchemaMigrationEngineTest {
 
             // Define collection with 'name', 'price', and 'quantity' columns
             List<FieldDefinition> fields = List.of(
-                new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null),
-                new FieldDefinition("price", FieldType.DOUBLE, true, false, false, null, null, null, null),
-                new FieldDefinition("quantity", FieldType.INTEGER, true, false, false, null, null, null, null)
+                new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null, null),
+                new FieldDefinition("price", FieldType.DOUBLE, true, false, false, null, null, null, null, null),
+                new FieldDefinition("quantity", FieldType.INTEGER, true, false, false, null, null, null, null, null)
             );
             CollectionDefinition def = createCollection("test", fields);
 
@@ -785,7 +785,7 @@ class SchemaMigrationEngineTest {
 
             // Define collection with lowercase field name
             List<FieldDefinition> fields = List.of(
-                new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null)
+                new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null, null)
             );
             CollectionDefinition def = createCollection("test", fields);
 

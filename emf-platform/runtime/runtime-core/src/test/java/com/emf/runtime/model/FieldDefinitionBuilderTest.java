@@ -465,8 +465,8 @@ class FieldDefinitionBuilderTest {
             assertEquals("percentage", field.name());
             assertEquals(FieldType.INTEGER, field.type());
             assertFalse(field.nullable());
-            assertEquals(Integer.valueOf(0), rules.minValue());
-            assertEquals(Integer.valueOf(100), rules.maxValue());
+            assertEquals(0.0, rules.minValue());
+            assertEquals(100.0, rules.maxValue());
         }
     }
 

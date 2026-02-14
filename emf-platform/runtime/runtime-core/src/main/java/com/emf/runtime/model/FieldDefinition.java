@@ -1,6 +1,7 @@
 package com.emf.runtime.model;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -18,7 +19,8 @@ import java.util.Objects;
  * @param validationRules Validation constraints (min/max value, length, pattern)
  * @param enumValues List of allowed values for enum-type fields
  * @param referenceConfig Configuration for foreign key relationships
- * 
+ * @param fieldTypeConfig Type-specific configuration (e.g., auto-number prefix/padding, currency code)
+ *
  * @since 1.0.0
  */
 public record FieldDefinition(
@@ -30,7 +32,8 @@ public record FieldDefinition(
     Object defaultValue,
     ValidationRules validationRules,
     List<String> enumValues,
-    ReferenceConfig referenceConfig
+    ReferenceConfig referenceConfig,
+    Map<String, Object> fieldTypeConfig
 ) {
     /**
      * Compact constructor with validation and defensive copying.
@@ -41,9 +44,21 @@ public record FieldDefinition(
             throw new IllegalArgumentException("name cannot be blank");
         }
         Objects.requireNonNull(type, "type cannot be null");
-        
+
         // Defensive copy for enumValues
         enumValues = enumValues != null ? List.copyOf(enumValues) : null;
+        // Defensive copy for fieldTypeConfig
+        fieldTypeConfig = fieldTypeConfig != null ? Map.copyOf(fieldTypeConfig) : null;
+    }
+
+    /**
+     * Returns the value of a type-specific configuration key.
+     *
+     * @param key the configuration key
+     * @return the configuration value, or null if not present
+     */
+    public Object getConfigValue(String key) {
+        return fieldTypeConfig != null ? fieldTypeConfig.get(key) : null;
     }
     
     /**
@@ -53,7 +68,7 @@ public record FieldDefinition(
      * @return a nullable string field definition
      */
     public static FieldDefinition string(String name) {
-        return new FieldDefinition(name, FieldType.STRING, true, false, false, null, null, null, null);
+        return new FieldDefinition(name, FieldType.STRING, true, false, false, null, null, null, null, null);
     }
     
     /**
@@ -63,7 +78,7 @@ public record FieldDefinition(
      * @return a non-nullable string field definition
      */
     public static FieldDefinition requiredString(String name) {
-        return new FieldDefinition(name, FieldType.STRING, false, false, false, null, null, null, null);
+        return new FieldDefinition(name, FieldType.STRING, false, false, false, null, null, null, null, null);
     }
     
     /**
@@ -73,7 +88,7 @@ public record FieldDefinition(
      * @return a nullable integer field definition
      */
     public static FieldDefinition integer(String name) {
-        return new FieldDefinition(name, FieldType.INTEGER, true, false, false, null, null, null, null);
+        return new FieldDefinition(name, FieldType.INTEGER, true, false, false, null, null, null, null, null);
     }
     
     /**
@@ -83,7 +98,7 @@ public record FieldDefinition(
      * @return a non-nullable integer field definition
      */
     public static FieldDefinition requiredInteger(String name) {
-        return new FieldDefinition(name, FieldType.INTEGER, false, false, false, null, null, null, null);
+        return new FieldDefinition(name, FieldType.INTEGER, false, false, false, null, null, null, null, null);
     }
     
     /**
@@ -93,7 +108,7 @@ public record FieldDefinition(
      * @return a nullable long field definition
      */
     public static FieldDefinition longField(String name) {
-        return new FieldDefinition(name, FieldType.LONG, true, false, false, null, null, null, null);
+        return new FieldDefinition(name, FieldType.LONG, true, false, false, null, null, null, null, null);
     }
     
     /**
@@ -103,7 +118,7 @@ public record FieldDefinition(
      * @return a nullable double field definition
      */
     public static FieldDefinition doubleField(String name) {
-        return new FieldDefinition(name, FieldType.DOUBLE, true, false, false, null, null, null, null);
+        return new FieldDefinition(name, FieldType.DOUBLE, true, false, false, null, null, null, null, null);
     }
     
     /**
@@ -113,7 +128,7 @@ public record FieldDefinition(
      * @return a nullable boolean field definition
      */
     public static FieldDefinition bool(String name) {
-        return new FieldDefinition(name, FieldType.BOOLEAN, true, false, false, null, null, null, null);
+        return new FieldDefinition(name, FieldType.BOOLEAN, true, false, false, null, null, null, null, null);
     }
     
     /**
@@ -124,7 +139,7 @@ public record FieldDefinition(
      * @return a boolean field definition with default
      */
     public static FieldDefinition bool(String name, boolean defaultValue) {
-        return new FieldDefinition(name, FieldType.BOOLEAN, false, false, false, defaultValue, null, null, null);
+        return new FieldDefinition(name, FieldType.BOOLEAN, false, false, false, defaultValue, null, null, null, null);
     }
     
     /**
@@ -134,7 +149,7 @@ public record FieldDefinition(
      * @return a nullable date field definition
      */
     public static FieldDefinition date(String name) {
-        return new FieldDefinition(name, FieldType.DATE, true, false, false, null, null, null, null);
+        return new FieldDefinition(name, FieldType.DATE, true, false, false, null, null, null, null, null);
     }
     
     /**
@@ -144,7 +159,7 @@ public record FieldDefinition(
      * @return a nullable datetime field definition
      */
     public static FieldDefinition datetime(String name) {
-        return new FieldDefinition(name, FieldType.DATETIME, true, false, false, null, null, null, null);
+        return new FieldDefinition(name, FieldType.DATETIME, true, false, false, null, null, null, null, null);
     }
     
     /**
@@ -154,7 +169,7 @@ public record FieldDefinition(
      * @return a nullable JSON field definition
      */
     public static FieldDefinition json(String name) {
-        return new FieldDefinition(name, FieldType.JSON, true, false, false, null, null, null, null);
+        return new FieldDefinition(name, FieldType.JSON, true, false, false, null, null, null, null, null);
     }
     
     /**
@@ -166,7 +181,7 @@ public record FieldDefinition(
      */
     public static FieldDefinition enumField(String name, List<String> values) {
         Objects.requireNonNull(values, "values cannot be null");
-        return new FieldDefinition(name, FieldType.STRING, false, false, false, null, null, values, null);
+        return new FieldDefinition(name, FieldType.STRING, false, false, false, null, null, values, null, null);
     }
     
     /**
@@ -178,7 +193,7 @@ public record FieldDefinition(
      */
     public static FieldDefinition reference(String name, String targetCollection) {
         return new FieldDefinition(name, FieldType.STRING, true, false, false, null, null, null,
-            ReferenceConfig.toCollection(targetCollection));
+            ReferenceConfig.toCollection(targetCollection), null);
     }
 
     /**
@@ -191,7 +206,7 @@ public record FieldDefinition(
      */
     public static FieldDefinition lookup(String name, String targetCollection, String relationshipName) {
         return new FieldDefinition(name, FieldType.LOOKUP, true, false, false, null, null, null,
-            ReferenceConfig.lookup(targetCollection, relationshipName));
+            ReferenceConfig.lookup(targetCollection, relationshipName), null);
     }
 
     /**
@@ -204,6 +219,6 @@ public record FieldDefinition(
      */
     public static FieldDefinition masterDetail(String name, String targetCollection, String relationshipName) {
         return new FieldDefinition(name, FieldType.MASTER_DETAIL, false, false, false, null, null, null,
-            ReferenceConfig.masterDetail(targetCollection, relationshipName));
+            ReferenceConfig.masterDetail(targetCollection, relationshipName), null);
     }
 }

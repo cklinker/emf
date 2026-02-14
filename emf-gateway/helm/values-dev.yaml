@@ -66,6 +66,11 @@ config:
       windowDuration: "PT1M"
     enabled: true
 
+  cors:
+    allowedOriginPatterns:
+      - "https://*.emf.example.com"
+      - "http://localhost:[*]"
+
   logging:
     level:
       root: INFO

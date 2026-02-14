@@ -60,11 +60,23 @@ jobs:
             echo "/opt/apache-maven-${{ env.MAVEN_VERSION }}/bin" >> $GITHUB_PATH
           fi
 
+      - name: Clean stale Maven cache
+        run: rm -rf ~/.m2/repository/com/emf
+
       - name: Build runtime-core and runtime-events
         run: mvn clean install -DskipTests -f emf-platform/pom.xml -pl runtime/runtime-core,runtime/runtime-events -am -B
 
+      - name: Verify built artifacts
+        run: |
+          echo "--- FieldDefinition record components ---"
+          jar tf ~/.m2/repository/com/emf/runtime-core/1.0.0-SNAPSHOT/runtime-core-1.0.0-SNAPSHOT.jar | grep FieldDefinition
+          javap -p -cp ~/.m2/repository/com/emf/runtime-core/1.0.0-SNAPSHOT/runtime-core-1.0.0-SNAPSHOT.jar com.emf.runtime.model.FieldDefinition | head -20
+          echo "--- FieldPayload methods ---"
+          javap -p -cp ~/.m2/repository/com/emf/runtime-events/1.0.0-SNAPSHOT/runtime-events-1.0.0-SNAPSHOT.jar com.emf.runtime.event.CollectionChangedPayload.FieldPayload | head -30
+
       - name: Package runtime artifacts
         run: |
+          rm -rf /tmp/runtime-artifacts
           mkdir -p /tmp/runtime-artifacts
           cp -r ~/.m2/repository/com/emf /tmp/runtime-artifacts/m2-emf
 
@@ -107,6 +119,7 @@ jobs:
 
       - name: Install runtime modules to local Maven repo
         run: |
+          rm -rf ~/.m2/repository/com/emf
           mkdir -p ~/.m2/repository/com/emf
           cp -r /tmp/runtime-artifacts/m2-emf/* ~/.m2/repository/com/emf/
 
@@ -145,6 +158,7 @@ jobs:
 
       - name: Install runtime modules to local Maven repo
         run: |
+          rm -rf ~/.m2/repository/com/emf
           mkdir -p ~/.m2/repository/com/emf
           cp -r /tmp/runtime-artifacts/m2-emf/* ~/.m2/repository/com/emf/
 
@@ -183,6 +197,7 @@ jobs:
 
       - name: Install runtime modules to local Maven repo
         run: |
+          rm -rf ~/.m2/repository/com/emf
           mkdir -p ~/.m2/repository/com/emf
           cp -r /tmp/runtime-artifacts/m2-emf/* ~/.m2/repository/com/emf/
 

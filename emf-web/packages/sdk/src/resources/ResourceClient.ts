@@ -69,12 +69,13 @@ export class ResourceClient<T = unknown> {
   }
 
   /**
-   * Create a new resource
+   * Create a new resource (JSON:API format)
    */
   async create(data: Partial<T>): Promise<T> {
+    const body = this.wrapJsonApi(undefined, data as Record<string, unknown>);
     const response = await this.client
       .getAxiosInstance()
-      .post<T>(`/api/${this.resourceName}`, data);
+      .post<T>(`/api/${this.resourceName}`, body);
 
     // Validate response if validation is enabled
     if (this.client.isValidationEnabled()) {
@@ -90,12 +91,13 @@ export class ResourceClient<T = unknown> {
   }
 
   /**
-   * Update a resource (full replacement)
+   * Update a resource (full replacement via PATCH with JSON:API format)
    */
   async update(id: string, data: T): Promise<T> {
+    const body = this.wrapJsonApi(id, data as Record<string, unknown>);
     const response = await this.client
       .getAxiosInstance()
-      .put<T>(`/api/${this.resourceName}/${id}`, data);
+      .patch<T>(`/api/${this.resourceName}/${id}`, body);
 
     // Validate response if validation is enabled
     if (this.client.isValidationEnabled()) {
@@ -111,12 +113,13 @@ export class ResourceClient<T = unknown> {
   }
 
   /**
-   * Patch a resource (partial update)
+   * Patch a resource (partial update with JSON:API format)
    */
   async patch(id: string, data: Partial<T>): Promise<T> {
+    const body = this.wrapJsonApi(id, data as Record<string, unknown>);
     const response = await this.client
       .getAxiosInstance()
-      .patch<T>(`/api/${this.resourceName}/${id}`, data);
+      .patch<T>(`/api/${this.resourceName}/${id}`, body);
 
     // Validate response if validation is enabled
     if (this.client.isValidationEnabled()) {
@@ -143,6 +146,34 @@ export class ResourceClient<T = unknown> {
    */
   query(): QueryBuilder<T> {
     return new QueryBuilder<T>(this);
+  }
+
+  /**
+   * Wrap data in JSON:API request format.
+   *
+   * Produces: { data: { type, id?, attributes: { ... } } }
+   */
+  private wrapJsonApi(
+    id: string | undefined,
+    data: Record<string, unknown>
+  ): { data: { type: string; id?: string; attributes: Record<string, unknown> } } {
+    const attributes = { ...data };
+
+    // Remove system fields from attributes
+    delete attributes.id;
+    delete attributes.createdAt;
+    delete attributes.updatedAt;
+
+    const result: { type: string; id?: string; attributes: Record<string, unknown> } = {
+      type: this.resourceName,
+      attributes,
+    };
+
+    if (id) {
+      result.id = id;
+    }
+
+    return { data: result };
   }
 
   /**

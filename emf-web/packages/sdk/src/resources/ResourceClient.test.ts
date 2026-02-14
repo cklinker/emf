@@ -40,7 +40,6 @@ describe('ResourceClient', () => {
   let resourceClient: ResourceClient<{ id: string; name: string }>;
   let mockAxiosGet: ReturnType<typeof vi.fn>;
   let mockAxiosPost: ReturnType<typeof vi.fn>;
-  let mockAxiosPut: ReturnType<typeof vi.fn>;
   let mockAxiosPatch: ReturnType<typeof vi.fn>;
   let mockAxiosDelete: ReturnType<typeof vi.fn>;
 
@@ -52,7 +51,6 @@ describe('ResourceClient', () => {
     const axiosInstance = client.getAxiosInstance();
     mockAxiosGet = axiosInstance.get as ReturnType<typeof vi.fn>;
     mockAxiosPost = axiosInstance.post as ReturnType<typeof vi.fn>;
-    mockAxiosPut = axiosInstance.put as ReturnType<typeof vi.fn>;
     mockAxiosPatch = axiosInstance.patch as ReturnType<typeof vi.fn>;
     mockAxiosDelete = axiosInstance.delete as ReturnType<typeof vi.fn>;
   });
@@ -269,13 +267,37 @@ describe('ResourceClient', () => {
   });
 
   describe('create() - Requirements 4.2, 10.1, 10.2, 10.3', () => {
-    it('should send POST request to /api/{resourceName} with data (Requirement 4.2)', async () => {
+    it('should send POST request to /api/{resourceName} with JSON:API wrapped data (Requirement 4.2)', async () => {
       const newUser = { name: 'Charlie' };
       mockAxiosPost.mockResolvedValue({ data: { id: '456', name: 'Charlie' } });
 
       await resourceClient.create(newUser);
 
-      expect(mockAxiosPost).toHaveBeenCalledWith('/api/users', newUser);
+      expect(mockAxiosPost).toHaveBeenCalledWith('/api/users', {
+        data: {
+          type: 'users',
+          attributes: { name: 'Charlie' },
+        },
+      });
+    });
+
+    it('should strip system fields from JSON:API attributes', async () => {
+      const newUser = {
+        id: '456',
+        name: 'Charlie',
+        createdAt: '2024-01-01',
+        updatedAt: '2024-01-01',
+      };
+      mockAxiosPost.mockResolvedValue({ data: { id: '456', name: 'Charlie' } });
+
+      await resourceClient.create(newUser);
+
+      expect(mockAxiosPost).toHaveBeenCalledWith('/api/users', {
+        data: {
+          type: 'users',
+          attributes: { name: 'Charlie' },
+        },
+      });
     });
 
     it('should return the created resource (Requirement 10.2)', async () => {
@@ -310,18 +332,24 @@ describe('ResourceClient', () => {
   });
 
   describe('update() - Requirements 4.3, 10.1, 10.2, 10.3', () => {
-    it('should send PUT request to /api/{resourceName}/{id} with data (Requirement 4.3)', async () => {
+    it('should send PATCH request to /api/{resourceName}/{id} with JSON:API wrapped data (Requirement 4.3)', async () => {
       const updatedUser = { id: '123', name: 'Alice Updated' };
-      mockAxiosPut.mockResolvedValue({ data: updatedUser });
+      mockAxiosPatch.mockResolvedValue({ data: updatedUser });
 
       await resourceClient.update('123', updatedUser);
 
-      expect(mockAxiosPut).toHaveBeenCalledWith('/api/users/123', updatedUser);
+      expect(mockAxiosPatch).toHaveBeenCalledWith('/api/users/123', {
+        data: {
+          type: 'users',
+          id: '123',
+          attributes: { name: 'Alice Updated' },
+        },
+      });
     });
 
     it('should return the updated resource (Requirement 10.2)', async () => {
       const updatedUser = { id: '123', name: 'Alice Updated' };
-      mockAxiosPut.mockResolvedValue({ data: updatedUser });
+      mockAxiosPatch.mockResolvedValue({ data: updatedUser });
 
       const result = await resourceClient.update('123', updatedUser);
 
@@ -329,7 +357,7 @@ describe('ResourceClient', () => {
     });
 
     it('should throw ValidationError when response is null (Requirement 10.3)', async () => {
-      mockAxiosPut.mockResolvedValue({ data: null });
+      mockAxiosPatch.mockResolvedValue({ data: null });
 
       await expect(resourceClient.update('123', { id: '123', name: 'Test' })).rejects.toThrow(
         ValidationError
@@ -342,9 +370,9 @@ describe('ResourceClient', () => {
         validation: false,
       });
       const resourceNoValidation = clientNoValidation.resource('users');
-      const mockPut = clientNoValidation.getAxiosInstance().put as ReturnType<typeof vi.fn>;
+      const mockPatchFn = clientNoValidation.getAxiosInstance().patch as ReturnType<typeof vi.fn>;
 
-      mockPut.mockResolvedValue({ data: null });
+      mockPatchFn.mockResolvedValue({ data: null });
 
       const result = await resourceNoValidation.update('123', { id: '123', name: 'Test' });
       expect(result).toBeNull();
@@ -352,13 +380,19 @@ describe('ResourceClient', () => {
   });
 
   describe('patch() - Requirements 4.4, 10.1, 10.2, 10.3', () => {
-    it('should send PATCH request to /api/{resourceName}/{id} with partial data (Requirement 4.4)', async () => {
+    it('should send PATCH request to /api/{resourceName}/{id} with JSON:API wrapped partial data (Requirement 4.4)', async () => {
       const partialUpdate = { name: 'Alice Patched' };
       mockAxiosPatch.mockResolvedValue({ data: { id: '123', name: 'Alice Patched' } });
 
       await resourceClient.patch('123', partialUpdate);
 
-      expect(mockAxiosPatch).toHaveBeenCalledWith('/api/users/123', partialUpdate);
+      expect(mockAxiosPatch).toHaveBeenCalledWith('/api/users/123', {
+        data: {
+          type: 'users',
+          id: '123',
+          attributes: { name: 'Alice Patched' },
+        },
+      });
     });
 
     it('should return the patched resource (Requirement 10.2)', async () => {

@@ -130,10 +130,12 @@ export function ProtectedRoute({
   // Redirect to login if not authenticated
   // Requirement 2.1: Redirect unauthenticated users to OIDC provider login page
   if (!isAuthenticated) {
+    // Preserve query params (e.g. ?logged_out=true) when redirecting to login
+    const loginTarget = location.search ? `${loginPath}${location.search}` : loginPath
     // Store the current location to redirect back after login
     return (
       <Navigate
-        to={loginPath}
+        to={loginTarget}
         state={{ from: location }}
         replace
         data-testid="protected-route-redirect-login"

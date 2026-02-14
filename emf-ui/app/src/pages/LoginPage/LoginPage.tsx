@@ -9,8 +9,8 @@
  * - 2.2: Display provider selection page for multiple providers
  */
 
-import React, { useEffect, useRef, useState } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import React, { useEffect, useRef, useState, useMemo } from 'react'
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom'
 import { KeyRound } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { getTenantSlug } from '../../context/TenantContext'
@@ -40,9 +40,13 @@ export function LoginPage({ title }: LoginPageProps): React.ReactElement {
   const { t } = useI18n()
   const navigate = useNavigate()
   const location = useLocation()
+  const [searchParams] = useSearchParams()
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null)
   const [loginError, setLoginError] = useState<Error | null>(null)
   const [isLoggingIn, setIsLoggingIn] = useState(false)
+
+  // Check if user just logged out — skip auto-login so they can pick a different account
+  const justLoggedOut = useMemo(() => searchParams.get('logged_out') === 'true', [searchParams])
 
   // Get the redirect path from location state
   const from =
@@ -61,7 +65,7 @@ export function LoginPage({ title }: LoginPageProps): React.ReactElement {
   // Track whether auto-login has been attempted to prevent duplicate calls
   const autoLoginAttempted = useRef(false)
 
-  // Auto-login if only one provider (skip if there was a previous error)
+  // Auto-login if only one provider (skip if there was a previous error or user just logged out)
   useEffect(() => {
     if (
       !authLoading &&
@@ -69,7 +73,8 @@ export function LoginPage({ title }: LoginPageProps): React.ReactElement {
       providers.length === 1 &&
       !isAuthenticated &&
       !authError &&
-      !autoLoginAttempted.current
+      !autoLoginAttempted.current &&
+      !justLoggedOut
     ) {
       autoLoginAttempted.current = true
       // Clear any persisted login error and redirect directly
@@ -79,7 +84,7 @@ export function LoginPage({ title }: LoginPageProps): React.ReactElement {
       })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoading, configLoading, isAuthenticated, authError])
+  }, [authLoading, configLoading, isAuthenticated, authError, justLoggedOut])
 
   /**
    * Handle login with a specific provider

@@ -449,6 +449,11 @@ export function AuthProvider({
     setUser(null)
     setError(null)
 
+    // Build logout redirect with logged_out flag to prevent auto-login on return
+    const logoutRedirect = new URL(postLogoutRedirectUri)
+    logoutRedirect.searchParams.set('logged_out', 'true')
+    const logoutRedirectStr = logoutRedirect.toString()
+
     // If we have provider info, try to do OIDC logout
     if (providerId && storedTokens?.idToken) {
       const provider = providers.find((p) => p.id === providerId)
@@ -458,7 +463,7 @@ export function AuthProvider({
           if (discovery.end_session_endpoint) {
             const logoutUrl = new URL(discovery.end_session_endpoint)
             logoutUrl.searchParams.set('id_token_hint', storedTokens.idToken)
-            logoutUrl.searchParams.set('post_logout_redirect_uri', postLogoutRedirectUri)
+            logoutUrl.searchParams.set('post_logout_redirect_uri', logoutRedirectStr)
             window.location.href = logoutUrl.toString()
             return
           }
@@ -468,8 +473,8 @@ export function AuthProvider({
       }
     }
 
-    // Fallback: redirect to home
-    window.location.href = postLogoutRedirectUri
+    // Fallback: redirect to home with logged_out flag
+    window.location.href = logoutRedirectStr
   }, [providers, fetchDiscoveryDocument, postLogoutRedirectUri])
 
   /**

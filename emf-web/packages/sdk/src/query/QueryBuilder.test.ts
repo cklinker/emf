@@ -344,28 +344,41 @@ describe('QueryBuilder', () => {
     });
   });
 
-  describe('buildQueryParams()', () => {
-    it('should build query params string for pagination', () => {
+  describe('buildQueryParams() - JSON:API format', () => {
+    it('should build JSON:API pagination params', () => {
       queryBuilder.paginate(2, 25);
 
       const params = queryBuilder.buildQueryParams();
-      expect(params).toContain('page=2');
-      expect(params).toContain('size=25');
+      expect(params).toContain('page[number]=2');
+      expect(params).toContain('page[size]=25');
     });
 
-    it('should build query params string for sort', () => {
+    it('should build JSON:API sort param with - prefix for desc', () => {
       queryBuilder.sort('name', 'asc').sort('date', 'desc');
 
       const params = queryBuilder.buildQueryParams();
-      expect(params).toContain('sort=name,asc');
-      expect(params).toContain('sort=date,desc');
+      expect(params).toContain('sort=name,-date');
     });
 
-    it('should build query params string for filters', () => {
+    it('should build single ascending sort without prefix', () => {
+      queryBuilder.sort('name', 'asc');
+
+      const params = queryBuilder.buildQueryParams();
+      expect(params).toBe('sort=name');
+    });
+
+    it('should build single descending sort with - prefix', () => {
+      queryBuilder.sort('name', 'desc');
+
+      const params = queryBuilder.buildQueryParams();
+      expect(params).toBe('sort=-name');
+    });
+
+    it('should build JSON:API filter params with filter[] prefix', () => {
       queryBuilder.filter('status', 'eq', 'active');
 
       const params = queryBuilder.buildQueryParams();
-      expect(params).toContain('status[eq]=active');
+      expect(params).toContain('filter[status][eq]=active');
     });
 
     it('should build query params string for fields', () => {

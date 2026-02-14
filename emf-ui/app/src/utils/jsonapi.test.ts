@@ -163,5 +163,56 @@ describe('jsonapi utilities', () => {
 
       expect(result).toEqual(response)
     })
+
+    it('should unwrap runtime metadata envelope response', () => {
+      const response = {
+        data: [
+          { id: '1', name: 'Product A', price: 10 },
+          { id: '2', name: 'Product B', price: 20 },
+        ],
+        metadata: {
+          totalCount: 50,
+          currentPage: 2,
+          pageSize: 25,
+          totalPages: 2,
+        },
+      }
+
+      const result = unwrapCollection(response)
+
+      expect(result).toEqual({
+        data: [
+          { id: '1', name: 'Product A', price: 10 },
+          { id: '2', name: 'Product B', price: 20 },
+        ],
+        total: 50,
+        page: 2,
+        pageSize: 25,
+      })
+    })
+
+    it('should prefer metadata over top-level fields when both present', () => {
+      const response = {
+        data: [{ id: '1', name: 'Product A' }],
+        total: 999,
+        page: 99,
+        pageSize: 10,
+        metadata: {
+          totalCount: 100,
+          currentPage: 1,
+          pageSize: 20,
+          totalPages: 5,
+        },
+      }
+
+      const result = unwrapCollection(response)
+
+      expect(result).toEqual({
+        data: [{ id: '1', name: 'Product A' }],
+        total: 100,
+        page: 1,
+        pageSize: 20,
+      })
+    })
   })
 })

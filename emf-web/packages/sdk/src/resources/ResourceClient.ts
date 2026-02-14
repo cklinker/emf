@@ -146,7 +146,12 @@ export class ResourceClient<T = unknown> {
   }
 
   /**
-   * Build query parameters from list options
+   * Build JSON:API compliant query parameters from list options.
+   *
+   * Pagination: page[number]=N, page[size]=N
+   * Sorting:    sort=-field1,field2  (- prefix = descending)
+   * Filters:    filter[field][op]=value
+   * Fields:     fields=field1,field2
    */
   buildQueryParams(options?: ListOptions): Record<string, string | string[]> {
     const params: Record<string, string | string[]> = {};
@@ -156,20 +161,23 @@ export class ResourceClient<T = unknown> {
     }
 
     if (options.page !== undefined) {
-      params.page = String(options.page);
+      params['page[number]'] = String(options.page);
     }
 
     if (options.size !== undefined) {
-      params.size = String(options.size);
+      params['page[size]'] = String(options.size);
     }
 
     if (options.sort && options.sort.length > 0) {
-      params.sort = options.sort.map((s) => `${s.field},${s.direction}`);
+      const sortValue = options.sort
+        .map((s) => (s.direction === 'desc' ? `-${s.field}` : s.field))
+        .join(',');
+      params.sort = sortValue;
     }
 
     if (options.filters && options.filters.length > 0) {
       options.filters.forEach((filter) => {
-        params[`${filter.field}[${filter.operator}]`] = String(filter.value);
+        params[`filter[${filter.field}][${filter.operator}]`] = String(filter.value);
       });
     }
 

@@ -756,7 +756,7 @@ function MetricCardWidget({ component, apiClient }: WidgetRendererProps): React.
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['widget-data', component.id, collection],
-    queryFn: () => apiClient.get<PaginatedResponse>(`/api/${collection}?pageSize=10000`),
+    queryFn: () => apiClient.get<PaginatedResponse>(`/api/${collection}?page[size]=10000`),
     enabled: !!collection,
     staleTime: 30000,
   })
@@ -779,7 +779,7 @@ function MetricCardWidget({ component, apiClient }: WidgetRendererProps): React.
     )
   }
 
-  const records = data?.content || []
+  const records = data?.data || []
   const value = computeAggregation(records, aggField, aggFn)
 
   return (
@@ -802,7 +802,7 @@ function BarChartWidget({ component, apiClient }: WidgetRendererProps): React.Re
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['widget-data', component.id, collection],
-    queryFn: () => apiClient.get<PaginatedResponse>(`/api/${collection}?pageSize=10000`),
+    queryFn: () => apiClient.get<PaginatedResponse>(`/api/${collection}?page[size]=10000`),
     enabled: !!collection,
     staleTime: 30000,
   })
@@ -825,7 +825,7 @@ function BarChartWidget({ component, apiClient }: WidgetRendererProps): React.Re
     )
   }
 
-  const records = data?.content || []
+  const records = data?.data || []
 
   // Group by category field
   const groups: Record<string, Record<string, unknown>[]> = {}
@@ -883,7 +883,7 @@ function DataTableWidget({ component, apiClient }: WidgetRendererProps): React.R
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['widget-data', component.id, collection, rowLimit],
-    queryFn: () => apiClient.get<PaginatedResponse>(`/api/${collection}?pageSize=${rowLimit}`),
+    queryFn: () => apiClient.get<PaginatedResponse>(`/api/${collection}?page[size]=${rowLimit}`),
     enabled: !!collection,
     staleTime: 30000,
   })
@@ -906,7 +906,7 @@ function DataTableWidget({ component, apiClient }: WidgetRendererProps): React.R
     )
   }
 
-  const records = data?.content || []
+  const records = data?.data || []
   const displayColumns =
     columns.length > 0
       ? columns
@@ -959,9 +959,7 @@ function RecentRecordsWidget({ component, apiClient }: WidgetRendererProps): Rea
   const { data, isLoading, error } = useQuery({
     queryKey: ['widget-data', component.id, collection, rowLimit, 'recent'],
     queryFn: () =>
-      apiClient.get<PaginatedResponse>(
-        `/api/${collection}?sortField=createdAt&sortDirection=desc&pageSize=${rowLimit}`
-      ),
+      apiClient.get<PaginatedResponse>(`/api/${collection}?sort=-createdAt&page[size]=${rowLimit}`),
     enabled: !!collection,
     staleTime: 30000,
   })
@@ -984,7 +982,7 @@ function RecentRecordsWidget({ component, apiClient }: WidgetRendererProps): Rea
     )
   }
 
-  const records = data?.content || []
+  const records = data?.data || []
   const fields =
     displayFields.length > 0
       ? displayFields

@@ -76,29 +76,33 @@ export class QueryBuilder<T = unknown> {
   }
 
   /**
-   * Build query parameters string (for testing)
+   * Build JSON:API compliant query parameters string.
+   *
+   * Pagination: page[number]=N&page[size]=N
+   * Sorting:    sort=-field1,field2  (- prefix = descending)
+   * Filters:    filter[field][op]=value
+   * Fields:     fields=field1,field2
    */
   buildQueryParams(): string {
     const options = this.buildOptions();
     const params: string[] = [];
 
     if (options.page !== undefined) {
-      params.push(`page=${options.page}`);
+      params.push(`page[number]=${options.page}`);
     }
 
     if (options.size !== undefined) {
-      params.push(`size=${options.size}`);
+      params.push(`page[size]=${options.size}`);
     }
 
     if (options.sort) {
-      options.sort.forEach((s) => {
-        params.push(`sort=${s.field},${s.direction}`);
-      });
+      const sortParts = options.sort.map((s) => (s.direction === 'desc' ? `-${s.field}` : s.field));
+      params.push(`sort=${sortParts.join(',')}`);
     }
 
     if (options.filters) {
       options.filters.forEach((f) => {
-        params.push(`${f.field}[${f.operator}]=${String(f.value)}`);
+        params.push(`filter[${f.field}][${f.operator}]=${String(f.value)}`);
       });
     }
 

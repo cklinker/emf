@@ -261,24 +261,43 @@ interface FetchResourcesParams {
   filters?: FilterCondition[]
 }
 
+/**
+ * Map UI filter operators to JSON:API filter operators.
+ * The backend's FilterCondition supports: eq, neq, gt, lt, gte, lte, contains, starts, ends
+ */
+const FILTER_OPERATOR_MAP: Record<FilterOperator, string> = {
+  equals: 'eq',
+  not_equals: 'neq',
+  contains: 'contains',
+  starts_with: 'starts',
+  ends_with: 'ends',
+  greater_than: 'gt',
+  less_than: 'lt',
+  greater_than_or_equal: 'gte',
+  less_than_or_equal: 'lte',
+}
+
 async function fetchResources(
   apiClient: ApiClient,
   params: FetchResourcesParams
 ): Promise<PaginatedResponse> {
   const { collectionName, page, pageSize, sort, filters } = params
 
-  // Build query parameters
+  // Build JSON:API compliant query parameters
   const queryParams = new URLSearchParams()
-  queryParams.set('page', String(page))
-  queryParams.set('pageSize', String(pageSize))
+  queryParams.set('page[number]', String(page))
+  queryParams.set('page[size]', String(pageSize))
 
   if (sort) {
-    queryParams.set('sortField', sort.field)
-    queryParams.set('sortDirection', sort.direction)
+    const sortValue = sort.direction === 'desc' ? `-${sort.field}` : sort.field
+    queryParams.set('sort', sortValue)
   }
 
   if (filters && filters.length > 0) {
-    queryParams.set('filters', JSON.stringify(filters))
+    for (const filter of filters) {
+      const op = FILTER_OPERATOR_MAP[filter.operator] || filter.operator
+      queryParams.set(`filter[${filter.field}][${op}]`, filter.value)
+    }
   }
 
   const response = await apiClient.get(`/api/${collectionName}?${queryParams.toString()}`)

@@ -88,7 +88,9 @@
     "migrations": "الترحيلات",
     "resources": "الموارد",
     "plugins": "الإضافات",
-    "settings": "الإعدادات"
+    "settings": "الإعدادات",
+    "menu": "القائمة",
+    "noMenus": "لا توجد قوائم متاحة"
   },
   "collections": {
     "title": "المجموعات",
@@ -106,6 +108,7 @@
     "status": "الحالة",
     "active": "نشط",
     "inactive": "غير نشط",
+    "field": "حقل",
     "fields": "الحقول",
     "addField": "إضافة حقل",
     "editField": "تعديل الحقل",
@@ -129,7 +132,10 @@
       "date": "تاريخ",
       "datetime": "تاريخ ووقت",
       "json": "JSON",
-      "reference": "مرجع"
+      "reference": "مرجع",
+      "double": "مزدوج",
+      "integer": "عدد صحيح",
+      "long": "عدد صحيح طويل"
     },
     "validation": {
       "required": "مطلوب",
@@ -348,7 +354,9 @@
     "date": "التاريخ",
     "statusSuccess": "نجاح",
     "statusFailed": "فشل",
-    "statusPending": "قيد الانتظار"
+    "statusPending": "قيد الانتظار",
+    "historyNotAvailable": "سجل الحزم غير متاح بعد.",
+    "historyNotAvailableHint": "ستكون هذه الميزة متاحة في تحديث مستقبلي."
   },
   "migrations": {
     "title": "الترحيلات",

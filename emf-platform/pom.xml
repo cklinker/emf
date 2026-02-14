@@ -21,11 +21,13 @@
         <maven.compiler.source>${java.version}</maven.compiler.source>
         <maven.compiler.target>${java.version}</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        
+
         <!-- Spring Boot -->
         <spring-boot.version>3.2.2</spring-boot.version>
-        
-        <!-- Testing -->
+
+        <!-- Testing — override Spring Boot BOM for Java 24 compatibility -->
+        <mockito.version>5.21.0</mockito.version>
+        <byte-buddy.version>1.17.6</byte-buddy.version>
         <jqwik.version>1.8.2</jqwik.version>
         <testcontainers.version>1.19.3</testcontainers.version>
     </properties>

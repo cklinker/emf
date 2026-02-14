@@ -164,7 +164,15 @@
     "description": "Field history tracks changes to individual field values when records are updated.",
     "trackedFieldsNote": "Only fields with 'Track History' enabled will have their changes recorded.",
     "trackedFields": "History-Tracked Fields",
-    "noTrackedFields": "No fields have history tracking enabled yet."
+    "noTrackedFields": "No fields have history tracking enabled yet.",
+    "recentChanges": "Recent Changes",
+    "recordId": "Record",
+    "oldValue": "Old Value",
+    "newValue": "New Value",
+    "changedBy": "Changed By",
+    "changedAt": "Changed At",
+    "source": "Source",
+    "noChanges": "No field changes recorded yet."
   },
   "setupAudit": {
     "action": "Action",

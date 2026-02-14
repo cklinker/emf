@@ -98,8 +98,17 @@ export interface CollectionAuthz {
  * Route-level policy configuration
  */
 export interface RoutePolicyConfig {
-  operation: 'read' | 'create' | 'update' | 'delete'
+  operation: 'read' | 'create' | 'update' | 'delete' | 'list'
   policyId: string
+}
+
+/**
+ * Policy summary for dropdown selection
+ */
+export interface PolicySummary {
+  id: string
+  name: string
+  description?: string
 }
 
 /**

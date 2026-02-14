@@ -27,6 +27,8 @@ import {
 import { ValidationRuleEditor } from '../../components/ValidationRuleEditor'
 import { RecordTypeEditor } from '../../components/RecordTypeEditor'
 import { PicklistDependencyEditor } from '../../components/PicklistDependencyEditor'
+import { AuthorizationPanel } from '../../components/AuthorizationPanel'
+import type { RoutePolicyConfig, FieldPolicyConfig } from '../../components/AuthorizationPanel'
 import type {
   Collection,
   FieldDefinition,
@@ -35,6 +37,8 @@ import type {
   RecordType,
   PicklistDependency,
   SetupAuditTrailEntry,
+  PolicySummary,
+  FieldHistoryEntry,
 } from '../../types/collections'
 import styles from './CollectionDetailPage.module.css'
 
@@ -224,17 +228,53 @@ export function CollectionDetailPage({
     enabled: !!collectionId && activeTab === 'picklistDependencies' && picklistFieldIds.length > 0,
   })
 
-  // Fetch setup audit trail
+  // Fetch available policies for authorization panel
+  const { data: policies = [], isLoading: isLoadingPolicies } = useQuery({
+    queryKey: ['policies'],
+    queryFn: async () => {
+      const response = await apiClient.get<PolicySummary[]>('/control/policies')
+      return response
+    },
+    enabled: !!collectionId && activeTab === 'authorization',
+  })
+
+  // Fetch setup audit trail (filtered to this collection)
   const { data: setupAuditPage, isLoading: isLoadingAudit } = useQuery({
     queryKey: ['setup-audit', collectionId],
     queryFn: async () => {
       const response = await apiClient.get<{
         content: SetupAuditTrailEntry[]
         totalElements: number
-      }>('/control/audit?size=50')
+      }>(`/control/audit/entity/Collection/${collectionId}?size=50`)
       return response
     },
-    enabled: activeTab === 'setupAudit',
+    enabled: activeTab === 'setupAudit' && !!collectionId,
+  })
+
+  // Fetch field history for this collection (recent changes across all fields)
+  const { data: fieldHistoryPage, isLoading: isLoadingFieldHistory } = useQuery({
+    queryKey: ['field-history', collectionId],
+    queryFn: async () => {
+      // Fetch history for each tracked field
+      const trackedFields = collection?.fields?.filter((f) => f.trackHistory) ?? []
+      if (trackedFields.length === 0) return { content: [] as FieldHistoryEntry[] }
+      const results = await Promise.all(
+        trackedFields.map((field) =>
+          apiClient
+            .get<{
+              content: FieldHistoryEntry[]
+            }>(`/control/collections/${collectionId}/field-history/${field.name}?size=20`)
+            .catch(() => ({ content: [] as FieldHistoryEntry[] }))
+        )
+      )
+      // Merge and sort by changedAt descending
+      const allEntries = results.flatMap((r) => r.content || [])
+      allEntries.sort(
+        (a, b) => new Date(b.changedAt).getTime() - new Date(a.changedAt).getTime()
+      )
+      return { content: allEntries.slice(0, 50) }
+    },
+    enabled: activeTab === 'fieldHistory' && !!collectionId,
   })
 
   // Fetch all collections for reference field dropdown
@@ -469,6 +509,66 @@ export function CollectionDetailPage({
     },
   })
 
+  // --- Authorization mutation ---
+  const updateAuthzMutation = useMutation({
+    mutationFn: async (data: {
+      routePolicies: Array<{ operation: string; policyId: string }>
+      fieldPolicies: Array<{ fieldId: string; operation: string; policyId: string }>
+    }) => {
+      await apiClient.put(`/control/collections/${collectionId}/authz`, data)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['collection', collectionId] })
+      showToast(t('success.updated', { item: t('authorization.title') }), 'success')
+    },
+    onError: (error: Error) => {
+      showToast(error.message || t('errors.generic'), 'error')
+    },
+  })
+
+  // Handle route authorization change
+  const handleRouteAuthzChange = useCallback(
+    (routePolicies: RoutePolicyConfig[]) => {
+      // Map field policies to backend format (fieldName → fieldId)
+      const currentFieldPolicies = (collection?.authz?.fieldPolicies ?? [])
+        .filter((p) => p.policyId)
+        .map((p) => {
+          const field = collection?.fields?.find((f) => f.name === p.fieldName)
+          return { fieldId: field?.id ?? '', operation: p.operation, policyId: p.policyId }
+        })
+        .filter((p) => p.fieldId)
+      updateAuthzMutation.mutate({
+        routePolicies: routePolicies
+          .filter((p) => p.policyId)
+          .map((p) => ({ operation: p.operation, policyId: p.policyId! })),
+        fieldPolicies: currentFieldPolicies,
+      })
+    },
+    [collection, updateAuthzMutation]
+  )
+
+  // Handle field authorization change
+  const handleFieldAuthzChange = useCallback(
+    (fieldPolicies: FieldPolicyConfig[]) => {
+      // Map field policies to backend format (fieldName → fieldId)
+      const mappedFieldPolicies = fieldPolicies
+        .filter((p) => p.policyId)
+        .map((p) => {
+          const field = collection?.fields?.find((f) => f.name === p.fieldName)
+          return { fieldId: field?.id ?? '', operation: p.operation, policyId: p.policyId! }
+        })
+        .filter((p) => p.fieldId)
+      const currentRoutePolicies = (collection?.authz?.routePolicies ?? [])
+        .filter((p) => p.policyId)
+        .map((p) => ({ operation: p.operation, policyId: p.policyId }))
+      updateAuthzMutation.mutate({
+        routePolicies: currentRoutePolicies,
+        fieldPolicies: mappedFieldPolicies,
+      })
+    },
+    [collection, updateAuthzMutation]
+  )
+
   // Handle edit action
   const handleEdit = useCallback(() => {
     navigate(`/${getTenantSlug()}/collections/${collectionId}/edit`)
@@ -502,6 +602,7 @@ export function CollectionDetailPage({
         | 'authorization'
         | 'validationRules'
         | 'recordTypes'
+        | 'picklistDependencies'
         | 'fieldHistory'
         | 'setupAudit'
         | 'versions'
@@ -722,9 +823,11 @@ export function CollectionDetailPage({
 
   // Helper to resolve field name from ID
   const getFieldName = useCallback(
-    (fieldId: string): string => {
-      const field = collection?.fields?.find((f) => f.id === fieldId)
-      return field?.displayName || field?.name || fieldId
+    (fieldIdOrName: string): string => {
+      const field =
+        collection?.fields?.find((f) => f.id === fieldIdOrName) ||
+        collection?.fields?.find((f) => f.name === fieldIdOrName)
+      return field?.displayName || field?.name || fieldIdOrName
     },
     [collection]
   )
@@ -1112,93 +1215,21 @@ export function CollectionDetailPage({
           className={styles.tabPanel}
           data-testid="authorization-panel"
         >
-          <div className={styles.panelHeader}>
-            <h2 className={styles.panelTitle}>{t('authorization.title')}</h2>
-          </div>
-
-          {/* Route Authorization */}
-          <div className={styles.authzSection}>
-            <h3 className={styles.authzSectionTitle}>{t('authorization.routeAuthorization')}</h3>
-            {collection.authz?.routePolicies && collection.authz.routePolicies.length > 0 ? (
-              <div className={styles.tableContainer}>
-                <table
-                  className={styles.table}
-                  aria-label={t('authorization.routeAuthorization')}
-                  data-testid="route-policies-table"
-                >
-                  <thead>
-                    <tr>
-                      <th scope="col">Operation</th>
-                      <th scope="col">Policy</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {collection.authz.routePolicies.map((policy, index) => (
-                      <tr
-                        key={`${policy.operation}-${policy.policyId}`}
-                        data-testid={`route-policy-row-${index}`}
-                      >
-                        <td>
-                          <span className={styles.operationBadge}>
-                            {t(`authorization.operations.${policy.operation}`)}
-                          </span>
-                        </td>
-                        <td>{policy.policyId}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className={styles.emptyState} data-testid="route-policies-empty">
-                <p>{t('common.noData')}</p>
-              </div>
-            )}
-          </div>
-
-          {/* Field Authorization */}
-          <div className={styles.authzSection}>
-            <h3 className={styles.authzSectionTitle}>{t('authorization.fieldAuthorization')}</h3>
-            {collection.authz?.fieldPolicies && collection.authz.fieldPolicies.length > 0 ? (
-              <div className={styles.tableContainer}>
-                <table
-                  className={styles.table}
-                  aria-label={t('authorization.fieldAuthorization')}
-                  data-testid="field-policies-table"
-                >
-                  <thead>
-                    <tr>
-                      <th scope="col">{t('collections.fieldName')}</th>
-                      <th scope="col">Operation</th>
-                      <th scope="col">Policy</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {collection.authz.fieldPolicies.map((policy, index) => (
-                      <tr
-                        key={`${policy.fieldName}-${policy.operation}-${policy.policyId}`}
-                        data-testid={`field-policy-row-${index}`}
-                      >
-                        <td>{policy.fieldName}</td>
-                        <td>
-                          <span className={styles.operationBadge}>
-                            {policy.operation === 'read'
-                              ? t('authorization.operations.read')
-                              : 'Write'}
-                          </span>
-                        </td>
-                        <td>{policy.policyId}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className={styles.emptyState} data-testid="field-policies-empty">
-                <p>{t('common.noData')}</p>
-              </div>
-            )}
-          </div>
+          <AuthorizationPanel
+            collectionId={collectionId}
+            collectionName={collection.name}
+            fields={(collection.fields ?? []).map((f) => ({
+              id: f.id,
+              name: f.name,
+              displayName: f.displayName,
+            }))}
+            policies={policies}
+            authz={collection.authz}
+            onRouteAuthzChange={handleRouteAuthzChange}
+            onFieldAuthzChange={handleFieldAuthzChange}
+            isLoading={isLoadingPolicies}
+            isSaving={updateAuthzMutation.isPending}
+          />
         </section>
       )}
 
@@ -1534,7 +1565,7 @@ export function CollectionDetailPage({
                   {sortedFields
                     .filter((f: FieldDefinition) => f.trackHistory)
                     .map((f: FieldDefinition) => (
-                      <li key={f.id}>{f.name}</li>
+                      <li key={f.id}>{f.displayName || f.name}</li>
                     ))}
                   {sortedFields.filter((f: FieldDefinition) => f.trackHistory).length === 0 && (
                     <li className={styles.emptyNote}>{t('fieldHistory.noTrackedFields')}</li>
@@ -1543,6 +1574,63 @@ export function CollectionDetailPage({
               </div>
             )}
           </div>
+
+          {/* Recent Field Changes */}
+          {isLoadingFieldHistory ? (
+            <div className={styles.loadingContainer}>
+              <LoadingSpinner size="medium" label={t('common.loading')} />
+            </div>
+          ) : fieldHistoryPage?.content && fieldHistoryPage.content.length > 0 ? (
+            <>
+              <h3 className={styles.panelSubtitle}>{t('fieldHistory.recentChanges')}</h3>
+              <div className={styles.tableContainer}>
+                <table
+                  className={styles.table}
+                  aria-label={t('fieldHistory.recentChanges')}
+                  data-testid="field-history-table"
+                >
+                  <thead>
+                    <tr>
+                      <th scope="col">{t('collections.fieldName')}</th>
+                      <th scope="col">{t('fieldHistory.recordId')}</th>
+                      <th scope="col">{t('fieldHistory.oldValue')}</th>
+                      <th scope="col">{t('fieldHistory.newValue')}</th>
+                      <th scope="col">{t('fieldHistory.changedBy')}</th>
+                      <th scope="col">{t('fieldHistory.changedAt')}</th>
+                      <th scope="col">{t('fieldHistory.source')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {fieldHistoryPage.content.map((entry: FieldHistoryEntry) => (
+                      <tr key={entry.id}>
+                        <td className={styles.fieldNameCell}>
+                          {getFieldName(entry.fieldName) || entry.fieldName}
+                        </td>
+                        <td>
+                          <code className={styles.recordIdCode}>
+                            {entry.recordId.substring(0, 8)}...
+                          </code>
+                        </td>
+                        <td>{entry.oldValue != null ? String(entry.oldValue) : '-'}</td>
+                        <td>{entry.newValue != null ? String(entry.newValue) : '-'}</td>
+                        <td>{entry.changedBy || '-'}</td>
+                        <td>{new Date(entry.changedAt).toLocaleString()}</td>
+                        <td>
+                          <span className={styles.sourceTag}>{entry.changeSource}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : (
+            sortedFields.some((f: FieldDefinition) => f.trackHistory) && (
+              <div className={styles.emptyState} data-testid="field-history-empty">
+                <p>{t('fieldHistory.noChanges')}</p>
+              </div>
+            )
+          )}
         </section>
       )}
 

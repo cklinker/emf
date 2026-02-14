@@ -23,7 +23,7 @@ public interface UiMenuRepository extends JpaRepository<UiMenu, String> {
 
     List<UiMenu> findByTenantIdOrderByNameAsc(String tenantId);
 
-    @Query("SELECT DISTINCT m FROM UiMenu m LEFT JOIN FETCH m.items WHERE m.tenantId = :tenantId ORDER BY m.name ASC")
+    @Query("SELECT DISTINCT m FROM UiMenu m LEFT JOIN FETCH m.items WHERE m.tenantId = :tenantId ORDER BY m.displayOrder ASC, m.name ASC")
     List<UiMenu> findByTenantIdWithItemsOrderByNameAsc(@Param("tenantId") String tenantId);
 
     // ---- Legacy methods ----
@@ -34,6 +34,6 @@ public interface UiMenuRepository extends JpaRepository<UiMenu, String> {
 
     List<UiMenu> findAllByOrderByNameAsc();
 
-    @Query("SELECT DISTINCT m FROM UiMenu m LEFT JOIN FETCH m.items ORDER BY m.name ASC")
+    @Query("SELECT DISTINCT m FROM UiMenu m LEFT JOIN FETCH m.items ORDER BY m.displayOrder ASC, m.name ASC")
     List<UiMenu> findAllWithItemsOrderByNameAsc();
 }

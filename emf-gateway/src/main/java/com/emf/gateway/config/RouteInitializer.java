@@ -31,9 +31,10 @@ public class RouteInitializer implements ApplicationRunner {
     
     private static final Logger logger = LoggerFactory.getLogger(RouteInitializer.class);
     
-    private static final String CONTROL_PLANE_ROUTE_ID = "control-plane";
+    /** Well-known UUID for the __control-plane system collection (see V43 migration) */
+    private static final String CONTROL_PLANE_ROUTE_ID = "00000000-0000-0000-0000-000000000100";
     private static final String CONTROL_PLANE_PATH = "/control/**";
-    private static final String CONTROL_PLANE_COLLECTION_NAME = "control-plane";
+    private static final String CONTROL_PLANE_COLLECTION_NAME = "__control-plane";
     
     private final RouteRegistry routeRegistry;
     private final RouteConfigService routeConfigService;

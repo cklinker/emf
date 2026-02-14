@@ -77,8 +77,15 @@ public interface CollectionRepository extends JpaRepository<Collection, String> 
 
     long countByActiveTrue();
 
-    @Query("SELECT DISTINCT c FROM Collection c LEFT JOIN FETCH c.fields WHERE c.active = true")
+    @Query("SELECT DISTINCT c FROM Collection c LEFT JOIN FETCH c.fields WHERE c.active = true AND c.systemCollection = false")
     List<Collection> findByActiveTrueWithFields();
+
+    /**
+     * Finds ALL active collections with fields including system collections.
+     * Used by GatewayBootstrapService which needs system collections for authz cache warm-up.
+     */
+    @Query("SELECT DISTINCT c FROM Collection c LEFT JOIN FETCH c.fields WHERE c.active = true")
+    List<Collection> findAllActiveWithFields();
 
     /**
      * Counts active collections that have no READY assignment.

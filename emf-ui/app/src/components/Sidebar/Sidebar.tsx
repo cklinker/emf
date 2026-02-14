@@ -566,34 +566,6 @@ export function Sidebar({ menus, collapsed, onToggle, onItemClick }: SidebarProp
                 </ul>
               </div>
             ))}
-
-            {/* System Health & Workers links */}
-            <div className={styles.setupSubsection}>
-              <ul className={styles.menuList} role="menubar" aria-label={t('sidebar.monitoring')}>
-                <MenuItem
-                  item={{
-                    id: 'system-health',
-                    label: t('sidebar.systemHealth'),
-                    path: `/${getTenantSlug()}/system-health`,
-                    icon: 'health',
-                  }}
-                  level={0}
-                  collapsed={collapsed}
-                  onItemClick={onItemClick}
-                />
-                <MenuItem
-                  item={{
-                    id: 'workers',
-                    label: t('sidebar.workers'),
-                    path: `/${getTenantSlug()}/workers`,
-                    icon: 'workers',
-                  }}
-                  level={0}
-                  collapsed={collapsed}
-                  onItemClick={onItemClick}
-                />
-              </ul>
-            </div>
           </div>
         )}
       </div>

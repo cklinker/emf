@@ -54,21 +54,24 @@ public class GatewayBootstrapService {
     public GatewayBootstrapConfigDto getBootstrapConfig() {
         log.debug("Generating gateway bootstrap configuration");
 
-        // Fetch all active collections with fields eagerly loaded
-        List<Collection> collections = collectionRepository.findByActiveTrueWithFields();
+        // Fetch ALL active collections including system ones (needed for authz warm-up)
+        List<Collection> allCollections = collectionRepository.findAllActiveWithFields();
 
-        log.debug("Found {} active collections", collections.size());
+        log.debug("Found {} active collections (including system)", allCollections.size());
 
         // Build a map of collectionId → workerBaseUrl from READY assignments
         Map<String, String> workerUrlByCollection = buildWorkerUrlMap();
 
-        // Map collections to DTOs
-        List<GatewayBootstrapConfigDto.CollectionDto> collectionDtos = collections.stream()
+        // Map only non-system collections to route DTOs (system collections like control-plane
+        // are handled by RouteInitializer, not dynamic route creation)
+        List<GatewayBootstrapConfigDto.CollectionDto> collectionDtos = allCollections.stream()
+                .filter(c -> !c.isSystemCollection())
                 .map(c -> mapCollectionToDto(c, workerUrlByCollection.get(c.getId())))
                 .collect(Collectors.toList());
 
-        // Build per-collection authz data so the gateway can warm its AuthzConfigCache on startup
-        List<GatewayBootstrapConfigDto.CollectionAuthzDto> collectionAuthzList = buildCollectionAuthz(collections);
+        // Build per-collection authz data for ALL collections (including system) so the
+        // gateway can warm its AuthzConfigCache on startup
+        List<GatewayBootstrapConfigDto.CollectionAuthzDto> collectionAuthzList = buildCollectionAuthz(allCollections);
 
         GatewayBootstrapConfigDto.AuthorizationDto authorization = new GatewayBootstrapConfigDto.AuthorizationDto(
                 new ArrayList<>(),  // roles

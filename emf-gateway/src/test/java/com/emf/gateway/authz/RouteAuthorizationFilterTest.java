@@ -400,9 +400,9 @@ class RouteAuthorizationFilterTest {
     }
     
     @Test
-    void shouldAllowAuthenticatedAccessToControlPlaneRoutes() {
-        // Arrange - control-plane routes are admin API endpoints that should bypass
-        // collection-level authorization (JWT authentication is sufficient)
+    void shouldEvaluatePoliciesForControlPlaneRoutes() {
+        // Arrange - control-plane routes now go through normal policy evaluation
+        // instead of being unconditionally allowed
         GatewayPrincipal principal = new GatewayPrincipal("admin1", List.of("USER"), Map.of());
         MockServerHttpRequest request = MockServerHttpRequest
                 .get("/control/collections")
@@ -411,24 +411,70 @@ class RouteAuthorizationFilterTest {
         exchange.getAttributes().put("gateway.principal", principal);
 
         RouteDefinition route = new RouteDefinition(
-                "control-plane",
+                "00000000-0000-0000-0000-000000000100",
                 "/control/**",
                 "http://control-plane:8080",
-                "control-plane"
+                "__control-plane"
+        );
+
+        // Policy cache has an entry for the control-plane collection
+        RoutePolicy getPolicy = new RoutePolicy("GET", "policy-1", List.of("USER"));
+        AuthzConfig authzConfig = new AuthzConfig(
+                "00000000-0000-0000-0000-000000000100",
+                List.of(getPolicy),
+                Collections.emptyList()
         );
 
         when(routeRegistry.findByPath("/control/collections")).thenReturn(Optional.of(route));
+        when(authzConfigCache.getConfig("00000000-0000-0000-0000-000000000100")).thenReturn(Optional.of(authzConfig));
+        when(policyEvaluator.evaluate(any(RoutePolicy.class), any(GatewayPrincipal.class))).thenReturn(true);
 
         // Act
         StepVerifier.create(filter.filter(exchange, filterChain))
                 .expectComplete()
                 .verify();
 
-        // Assert - should allow without checking any policy evaluators
+        // Assert - should go through normal policy evaluation
         verify(filterChain).filter(exchange);
-        verify(policyEvaluator, never()).evaluate(any(RoutePolicy.class), any(GatewayPrincipal.class));
-        verify(profilePolicyEvaluator, never()).evaluate(any(GatewayPrincipal.class), any(String.class), any(HttpMethod.class));
-        assertThat(exchange.getResponse().getStatusCode()).isNull();
+        verify(policyEvaluator).evaluate(any(RoutePolicy.class), any(GatewayPrincipal.class));
+    }
+
+    @Test
+    void shouldDenyControlPlaneRoutesWhenPolicyDenies() {
+        // Arrange - control-plane routes can now be denied by policy
+        GatewayPrincipal principal = new GatewayPrincipal("viewer1", List.of("VIEWER"), Map.of());
+        MockServerHttpRequest request = MockServerHttpRequest
+                .delete("/control/collections/123")
+                .build();
+        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+        exchange.getAttributes().put("gateway.principal", principal);
+
+        RouteDefinition route = new RouteDefinition(
+                "00000000-0000-0000-0000-000000000100",
+                "/control/**",
+                "http://control-plane:8080",
+                "__control-plane"
+        );
+
+        RoutePolicy deletePolicy = new RoutePolicy("DELETE", "policy-1", List.of("ADMIN"));
+        AuthzConfig authzConfig = new AuthzConfig(
+                "00000000-0000-0000-0000-000000000100",
+                List.of(deletePolicy),
+                Collections.emptyList()
+        );
+
+        when(routeRegistry.findByPath("/control/collections/123")).thenReturn(Optional.of(route));
+        when(authzConfigCache.getConfig("00000000-0000-0000-0000-000000000100")).thenReturn(Optional.of(authzConfig));
+        when(policyEvaluator.evaluate(any(RoutePolicy.class), any(GatewayPrincipal.class))).thenReturn(false);
+
+        // Act
+        StepVerifier.create(filter.filter(exchange, filterChain))
+                .expectComplete()
+                .verify();
+
+        // Assert - should be denied
+        verify(filterChain, never()).filter(exchange);
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
     }
 
     @Test

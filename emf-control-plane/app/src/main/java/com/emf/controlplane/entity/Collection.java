@@ -33,6 +33,9 @@ public class Collection extends BaseEntity {
     @Column(name = "active", nullable = false)
     private boolean active = true;
 
+    @Column(name = "system_collection")
+    private boolean systemCollection = false;
+
     @Column(name = "current_version", nullable = false)
     private Integer currentVersion = 1;
 
@@ -109,6 +112,14 @@ public class Collection extends BaseEntity {
 
     public void setActive(boolean active) {
         this.active = active;
+    }
+
+    public boolean isSystemCollection() {
+        return systemCollection;
+    }
+
+    public void setSystemCollection(boolean systemCollection) {
+        this.systemCollection = systemCollection;
     }
 
     public Integer getCurrentVersion() {

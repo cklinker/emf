@@ -549,7 +549,7 @@ describe('ResourceFormPage', () => {
       expect(screen.getByTestId('field-organizationId')).toHaveValue('org-456')
     })
 
-    it('should submit form with PUT method in edit mode', async () => {
+    it('should submit form with PATCH method in edit mode', async () => {
       const user = userEvent.setup()
 
       const mockFetch = vi.fn().mockImplementation((url: string, options?: RequestInit) => {
@@ -569,7 +569,7 @@ describe('ResourceFormPage', () => {
             json: () => Promise.resolve(mockResource),
           })
         }
-        if (url.includes('/users/res-123') && options?.method === 'PUT') {
+        if (url.includes('/users/res-123') && options?.method === 'PATCH') {
           return Promise.resolve({
             ok: true,
             json: () => Promise.resolve({ ...mockResource, name: 'Jane Doe' }),
@@ -595,12 +595,12 @@ describe('ResourceFormPage', () => {
       // Submit form
       await user.click(screen.getByTestId('submit-button'))
 
-      // Verify API was called with PUT
+      // Verify API was called with PATCH
       await waitFor(() => {
-        const putCalls = mockFetch.mock.calls.filter(
-          (call) => call[1]?.method === 'PUT' && call[0].includes('/api/users/res-123')
+        const patchCalls = mockFetch.mock.calls.filter(
+          (call) => call[1]?.method === 'PATCH' && call[0].includes('/api/users/res-123')
         )
-        expect(putCalls.length).toBeGreaterThan(0)
+        expect(patchCalls.length).toBeGreaterThan(0)
       })
     })
 
@@ -624,7 +624,7 @@ describe('ResourceFormPage', () => {
             json: () => Promise.resolve(mockResource),
           })
         }
-        if (url.includes('/users/res-123') && options?.method === 'PUT') {
+        if (url.includes('/users/res-123') && options?.method === 'PATCH') {
           return Promise.resolve({
             ok: true,
             json: () => Promise.resolve(mockResource),
@@ -1166,15 +1166,16 @@ describe('ResourceFormPage', () => {
         )
       })
 
-      // Verify the body contains the values
+      // Verify the body contains the values in JSON:API format
       const postCall = (global.fetch as ReturnType<typeof vi.fn>).mock.calls.find(
         (call) => call[1]?.method === 'POST'
       ) as [string, RequestInit] | undefined
       expect(postCall).toBeDefined()
       if (postCall) {
         const body = JSON.parse(postCall[1].body as string)
-        expect(body.name).toBe('Test Name')
-        expect(body.email).toBe('test@example.com')
+        expect(body.data.type).toBe('users')
+        expect(body.data.attributes.name).toBe('Test Name')
+        expect(body.data.attributes.email).toBe('test@example.com')
       }
     })
 

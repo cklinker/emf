@@ -141,11 +141,17 @@ export function InlineEditCell({
   const inputRef = useRef<HTMLInputElement>(null)
   const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Patch mutation
+  // Patch mutation — send JSON:API formatted request
   const mutation = useMutation({
     mutationFn: async (newValue: unknown) => {
       return apiClient.patch(`/api/${collectionName}/${recordId}`, {
-        [fieldName]: newValue,
+        data: {
+          type: collectionName,
+          id: recordId,
+          attributes: {
+            [fieldName]: newValue,
+          },
+        },
       })
     },
     onSuccess: () => {

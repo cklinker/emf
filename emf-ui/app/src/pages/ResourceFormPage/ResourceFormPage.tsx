@@ -19,7 +19,7 @@ import { getTenantSlug } from '../../context/TenantContext'
 import { usePlugins } from '../../context/PluginContext'
 import { useApi } from '../../context/ApiContext'
 import { useToast, LoadingSpinner, ErrorMessage } from '../../components'
-import { unwrapResource } from '../../utils/jsonapi'
+import { unwrapResource, wrapResource } from '../../utils/jsonapi'
 import type { ApiClient } from '../../services/apiClient'
 import styles from './ResourceFormPage.module.css'
 
@@ -112,7 +112,9 @@ async function createResource(
   collectionName: string,
   data: FormData
 ): Promise<Resource> {
-  return apiClient.post(`/api/${collectionName}`, data)
+  const body = wrapResource(collectionName, data)
+  const response = await apiClient.post(`/api/${collectionName}`, body)
+  return unwrapResource<Resource>(response)
 }
 
 async function updateResource(
@@ -121,7 +123,9 @@ async function updateResource(
   resourceId: string,
   data: FormData
 ): Promise<Resource> {
-  return apiClient.put(`/api/${collectionName}/${resourceId}`, data)
+  const body = wrapResource(collectionName, data, resourceId)
+  const response = await apiClient.patch(`/api/${collectionName}/${resourceId}`, body)
+  return unwrapResource<Resource>(response)
 }
 
 /**

@@ -37,6 +37,7 @@ emf:
   kafka:
     topics:
       assignment-changed: emf.worker.assignment.changed
+      collection-changed: emf.config.collection.changed
 
 management:
   endpoints:

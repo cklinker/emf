@@ -141,6 +141,62 @@ public class CollectionLifecycleManager {
     }
 
     /**
+     * Refreshes a collection definition on this worker by fetching the latest
+     * schema from the control plane and migrating the storage schema.
+     *
+     * <p>This is called when a collection's fields change (e.g., a new field is added).
+     * It fetches the updated definition, re-registers it, and triggers schema migration
+     * (ALTER TABLE ADD COLUMN) for any new fields.
+     *
+     * @param collectionId the collection ID to refresh
+     */
+    @SuppressWarnings("unchecked")
+    public void refreshCollection(String collectionId) {
+        String collectionName = activeCollections.get(collectionId);
+        if (collectionName == null) {
+            log.warn("Cannot refresh unknown collection: {}", collectionId);
+            return;
+        }
+
+        log.info("Refreshing collection definition: '{}' (id={})", collectionName, collectionId);
+
+        try {
+            // Get the current definition before refresh
+            CollectionDefinition oldDefinition = collectionRegistry.get(collectionName);
+
+            // Fetch updated definition from control plane
+            String url = workerProperties.getControlPlaneUrl() + "/control/collections/" + collectionId;
+            ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
+
+            if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+                log.error("Failed to fetch updated collection definition for {}: status={}",
+                        collectionId, response.getStatusCode());
+                return;
+            }
+
+            Map<String, Object> collectionData = response.getBody();
+            CollectionDefinition newDefinition = buildCollectionDefinition(collectionName, collectionData);
+
+            // Re-register with updated definition
+            collectionRegistry.register(newDefinition);
+
+            // Migrate the storage schema (ALTER TABLE for new fields)
+            if (oldDefinition != null) {
+                storageAdapter.updateCollectionSchema(oldDefinition, newDefinition);
+                log.info("Schema migration completed for collection '{}' (id={})", collectionName, collectionId);
+            } else {
+                // No previous definition — initialize storage fresh
+                storageAdapter.initializeCollection(newDefinition);
+                log.info("Storage initialized for collection '{}' (id={})", collectionName, collectionId);
+            }
+
+        } catch (Exception e) {
+            log.error("Failed to refresh collection '{}' (id={}): {}",
+                    collectionName, collectionId, e.getMessage(), e);
+        }
+    }
+
+    /**
      * Tears down a collection on this worker by removing it from the local registry.
      * Data is not dropped -- it persists for potential reassignment to another worker.
      *

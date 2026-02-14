@@ -101,6 +101,37 @@ export function unwrapResource<T extends Record<string, unknown> = Record<string
 }
 
 /**
+ * Wrap a flat resource object into JSON:API request format.
+ *
+ * Input:  "products", { name: "Test", price: 10 }
+ * Output: { data: { type: "products", attributes: { name: "Test", price: 10 } } }
+ *
+ * Input:  "products", { name: "Test", price: 10 }, "123"
+ * Output: { data: { type: "products", id: "123", attributes: { name: "Test", price: 10 } } }
+ */
+export function wrapResource(
+  type: string,
+  attributes: Record<string, unknown>,
+  id?: string
+): { data: { type: string; id?: string; attributes: Record<string, unknown> } } {
+  const data: { type: string; id?: string; attributes: Record<string, unknown> } = {
+    type,
+    attributes: { ...attributes },
+  }
+
+  if (id) {
+    data.id = id
+  }
+
+  // Remove system fields from attributes — they belong at the top level or are server-managed
+  delete data.attributes.id
+  delete data.attributes.createdAt
+  delete data.attributes.updatedAt
+
+  return { data }
+}
+
+/**
  * Unwrap a collection response into an array of flat objects.
  *
  * Handles multiple response formats:

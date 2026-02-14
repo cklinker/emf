@@ -28,17 +28,19 @@
         <maven.compiler.source>${java.version}</maven.compiler.source>
         <maven.compiler.target>${java.version}</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        
+
         <!-- EMF Platform -->
         <emf-platform.version>1.0.0-SNAPSHOT</emf-platform.version>
-        
+
         <!-- OpenAPI -->
         <springdoc-openapi.version>2.3.0</springdoc-openapi.version>
-        
+
         <!-- OpenTelemetry -->
         <opentelemetry.version>1.34.1</opentelemetry.version>
-        
-        <!-- Testing -->
+
+        <!-- Testing — override Spring Boot BOM for Java 24 compatibility -->
+        <mockito.version>5.21.0</mockito.version>
+        <byte-buddy.version>1.17.6</byte-buddy.version>
         <jqwik.version>1.8.2</jqwik.version>
         <testcontainers.version>1.19.3</testcontainers.version>
     </properties>

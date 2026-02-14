@@ -24,6 +24,9 @@
         <maven.compiler.source>${java.version}</maven.compiler.source>
         <maven.compiler.target>${java.version}</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!-- Testing — override Spring Boot BOM for Java 24 compatibility -->
+        <mockito.version>5.21.0</mockito.version>
+        <byte-buddy.version>1.17.6</byte-buddy.version>
     </properties>
 
     <dependencies>

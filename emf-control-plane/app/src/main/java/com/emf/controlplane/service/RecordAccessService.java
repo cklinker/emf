@@ -22,7 +22,7 @@ import java.util.stream.Collectors;
  * 1. Object permission check (canRead/canEdit/canDelete via PermissionResolver)
  * 2. canViewAll/canModifyAll bypasses sharing
  * 3. OWD check (PUBLIC_READ_WRITE or PUBLIC_READ)
- * 4. Ownership check (record.owner_id == user.id)
+ * 4. Ownership check (record.created_by == user.id)
  * 5. Role hierarchy check (user's role above owner's role)
  * 6. Sharing rules check
  * 7. Manual share check
@@ -135,11 +135,11 @@ public class RecordAccessService {
         if ("PUBLIC_READ_WRITE".equals(internalAccess) || "PUBLIC_READ".equals(internalAccess)) return null;
 
         // OWD is PRIVATE - need to filter
-        // Build: owner_id = ? OR id IN (record shares) OR owner_id IN (subordinate user IDs)
+        // Build: created_by = ? OR id IN (record shares) OR created_by IN (subordinate user IDs)
         List<String> clauses = new ArrayList<>();
 
         // User's own records
-        clauses.add("owner_id = '" + sanitize(userId) + "'");
+        clauses.add("created_by = '" + sanitize(userId) + "'");
 
         // Records owned by subordinates (role hierarchy)
         Set<String> subordinateUserIds = getSubordinateUserIds(userId, tenantId);
@@ -147,7 +147,7 @@ public class RecordAccessService {
             String inClause = subordinateUserIds.stream()
                     .map(id -> "'" + sanitize(id) + "'")
                     .collect(Collectors.joining(","));
-            clauses.add("owner_id IN (" + inClause + ")");
+            clauses.add("created_by IN (" + inClause + ")");
         }
 
         // Records shared via sharing rules or manual shares

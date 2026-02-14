@@ -19,6 +19,7 @@ import { getTenantSlug } from '../../context/TenantContext'
 import { usePlugins } from '../../context/PluginContext'
 import { useApi } from '../../context/ApiContext'
 import { useToast, LoadingSpinner, ErrorMessage } from '../../components'
+import { unwrapResource } from '../../utils/jsonapi'
 import type { ApiClient } from '../../services/apiClient'
 import styles from './ResourceFormPage.module.css'
 
@@ -102,7 +103,8 @@ async function fetchResource(
   collectionName: string,
   resourceId: string
 ): Promise<Resource> {
-  return apiClient.get(`/api/${collectionName}/${resourceId}`)
+  const response = await apiClient.get(`/api/${collectionName}/${resourceId}`)
+  return unwrapResource<Resource>(response)
 }
 
 async function createResource(
@@ -226,7 +228,10 @@ export function ResourceFormPage({
   // Fetch clone source record when cloning
   const { data: cloneSource } = useQuery({
     queryKey: ['clone-source', collectionName, cloneSourceId],
-    queryFn: () => apiClient.get<Resource>(`/api/${collectionName}/${cloneSourceId}`),
+    queryFn: async () => {
+      const response = await apiClient.get(`/api/${collectionName}/${cloneSourceId}`)
+      return unwrapResource<Resource>(response)
+    },
     enabled: isCloneMode,
   })
 

@@ -20,6 +20,7 @@ import { useI18n } from '../../context/I18nContext'
 import { getTenantSlug } from '../../context/TenantContext'
 import { useApi } from '../../context/ApiContext'
 import { ApiClient } from '../../services/apiClient'
+import { unwrapCollection } from '../../utils/jsonapi'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
 import { useSavedViews } from '../../hooks/useSavedViews'
 import { ViewSelector } from '../../components/ViewSelector/ViewSelector'
@@ -280,7 +281,8 @@ async function fetchResources(
     queryParams.set('filters', JSON.stringify(filters))
   }
 
-  return apiClient.get(`/api/${collectionName}?${queryParams.toString()}`)
+  const response = await apiClient.get(`/api/${collectionName}?${queryParams.toString()}`)
+  return unwrapCollection<Resource>(response)
 }
 
 async function deleteResource(

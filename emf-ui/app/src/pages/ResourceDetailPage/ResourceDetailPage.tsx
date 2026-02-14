@@ -26,6 +26,7 @@ import { RelatedRecordsSection } from '../../components/RelatedRecordsSection/Re
 import { ActivityTimeline } from '../../components/ActivityTimeline/ActivityTimeline'
 import { NotesSection } from '../../components/NotesSection/NotesSection'
 import { AttachmentsSection } from '../../components/AttachmentsSection/AttachmentsSection'
+import { unwrapResource } from '../../utils/jsonapi'
 import type { ApiClient } from '../../services/apiClient'
 import styles from './ResourceDetailPage.module.css'
 
@@ -216,7 +217,8 @@ async function fetchResource(
   collectionName: string,
   resourceId: string
 ): Promise<Resource> {
-  return apiClient.get(`/api/${collectionName}/${resourceId}`)
+  const response = await apiClient.get(`/api/${collectionName}/${resourceId}`)
+  return unwrapResource<Resource>(response)
 }
 
 async function deleteResource(

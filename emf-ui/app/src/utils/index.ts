@@ -17,6 +17,10 @@ export {
 } from './routeGuards'
 export type { AuthorizationResult } from './routeGuards'
 
+// JSON:API response utilities
+export { flattenResource, unwrapResource, unwrapCollection } from './jsonapi'
+export type { JsonApiResource, JsonApiResponse, JsonApiCollectionResponse } from './jsonapi'
+
 // Export utility functions as they are implemented
 // Example exports:
 // export { formatDate, formatNumber, formatCurrency } from './formatters';

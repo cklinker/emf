@@ -103,6 +103,14 @@ export interface CollectionSummary {
 }
 
 /**
+ * Global picklist summary for picklist field dropdown
+ */
+export interface PicklistSummary {
+  id: string
+  name: string
+}
+
+/**
  * Props for the FieldEditor component
  */
 export interface FieldEditorProps {
@@ -112,6 +120,8 @@ export interface FieldEditorProps {
   field?: FieldDefinition
   /** Available collections for reference field dropdown */
   collections?: CollectionSummary[]
+  /** Available global picklists for picklist field dropdown */
+  picklists?: PicklistSummary[]
   /** Callback when form is submitted */
   onSave: (field: FieldDefinition) => Promise<void>
   /** Callback when form is cancelled */
@@ -242,6 +252,7 @@ export const fieldEditorSchema = z
     autoNumberPadding: z.coerce.number().min(1).max(10).optional(),
     currencyCode: z.string().max(3).optional().or(z.literal('')),
     currencyPrecision: z.coerce.number().min(0).max(6).optional(),
+    globalPicklistId: z.string().optional().or(z.literal('')),
     validationRules: z.array(validationRuleSchema).optional(),
   })
   .refine(
@@ -258,6 +269,19 @@ export const fieldEditorSchema = z
     {
       message: 'validation.referenceTargetRequired',
       path: ['referenceTarget'],
+    }
+  )
+  .refine(
+    (data) => {
+      // Picklist and multi_picklist types require globalPicklistId
+      if ((data.type === 'picklist' || data.type === 'multi_picklist') && !data.globalPicklistId) {
+        return false
+      }
+      return true
+    },
+    {
+      message: 'validation.picklistRequired',
+      path: ['globalPicklistId'],
     }
   )
 
@@ -292,6 +316,7 @@ export function FieldEditor({
   collectionId,
   field,
   collections = [],
+  picklists = [],
   onSave,
   onCancel,
   isSubmitting = false,
@@ -335,6 +360,7 @@ export function FieldEditor({
       autoNumberPadding: (parsedConfig.padding as number) ?? 4,
       currencyCode: (parsedConfig.currencyCode as string) ?? '',
       currencyPrecision: (parsedConfig.precision as number) ?? 2,
+      globalPicklistId: (parsedConfig.globalPicklistId as string) ?? '',
       validationRules:
         field?.validation?.map((v) => ({
           type: v.type,
@@ -385,6 +411,7 @@ export function FieldEditor({
         autoNumberPadding: (parsedConfig.padding as number) ?? 4,
         currencyCode: (parsedConfig.currencyCode as string) ?? '',
         currencyPrecision: (parsedConfig.precision as number) ?? 2,
+        globalPicklistId: (parsedConfig.globalPicklistId as string) ?? '',
         validationRules:
           field.validation?.map((v) => ({
             type: v.type,
@@ -459,6 +486,10 @@ export function FieldEditor({
         if (data.currencyCode) config.currencyCode = data.currencyCode
         if (data.currencyPrecision !== undefined) config.precision = data.currencyPrecision
         if (Object.keys(config).length > 0) fieldTypeConfig = JSON.stringify(config)
+      } else if (data.type === 'picklist' || data.type === 'multi_picklist') {
+        if (data.globalPicklistId) {
+          fieldTypeConfig = JSON.stringify({ globalPicklistId: data.globalPicklistId })
+        }
       }
 
       const needsReferenceTarget =
@@ -669,6 +700,50 @@ export function FieldEditor({
           )}
           <span id="field-reference-target-hint" className={styles.hint}>
             {t('fieldEditor.referenceTargetHint')}
+          </span>
+        </div>
+      )}
+
+      {/* Picklist Selection (for picklist and multi_picklist types) */}
+      {(watchedType === 'picklist' || watchedType === 'multi_picklist') && (
+        <div className={styles.fieldGroup}>
+          <label htmlFor="field-global-picklist" className={styles.label}>
+            {t('fieldEditor.globalPicklist')}
+            <span className={styles.required} aria-hidden="true">
+              *
+            </span>
+          </label>
+          <select
+            id="field-global-picklist"
+            className={`${styles.select} ${errors.globalPicklistId ? styles.inputError : ''}`}
+            disabled={isSubmitting}
+            aria-required="true"
+            aria-invalid={!!errors.globalPicklistId}
+            aria-describedby={
+              errors.globalPicklistId ? 'field-global-picklist-error' : 'field-global-picklist-hint'
+            }
+            data-testid="field-global-picklist-select"
+            {...register('globalPicklistId')}
+          >
+            <option value="">{t('fieldEditor.selectPicklist')}</option>
+            {picklists.map((picklist) => (
+              <option key={picklist.id} value={picklist.id}>
+                {picklist.name}
+              </option>
+            ))}
+          </select>
+          {errors.globalPicklistId && (
+            <span
+              id="field-global-picklist-error"
+              className={styles.errorMessage}
+              role="alert"
+              data-testid="field-global-picklist-error"
+            >
+              {getErrorMessage(errors.globalPicklistId.message)}
+            </span>
+          )}
+          <span id="field-global-picklist-hint" className={styles.hint}>
+            {t('fieldEditor.globalPicklistHint')}
           </span>
         </div>
       )}

@@ -739,13 +739,17 @@
     "patternPlaceholder": "مثال: ^[A-Z].*",
     "valuePlaceholder": "أدخل القيمة...",
     "removeRule": "إزالة قاعدة التحقق",
+    "globalPicklist": "قائمة الاختيار العامة",
+    "selectPicklist": "اختر قائمة اختيار...",
+    "globalPicklistHint": "اختر قائمة الاختيار العامة التي توفر القيم لهذا الحقل.",
     "validation": {
       "nameRequired": "اسم الحقل مطلوب",
       "nameTooLong": "يجب أن يكون اسم الحقل 50 حرفاً أو أقل",
       "nameFormat": "يجب أن يكون الاسم بأحرف صغيرة، يبدأ بحرف، ويحتوي فقط على أحرف وأرقام وشرطات سفلية",
       "displayNameTooLong": "يجب أن يكون اسم العرض 100 حرف أو أقل",
       "typeRequired": "نوع الحقل مطلوب",
-      "referenceTargetRequired": "المجموعة المستهدفة مطلوبة لحقول المرجع"
+      "referenceTargetRequired": "المجموعة المستهدفة مطلوبة لحقول المرجع",
+      "picklistRequired": "قائمة الاختيار العامة مطلوبة لحقول القوائم"
     }
   }
 }

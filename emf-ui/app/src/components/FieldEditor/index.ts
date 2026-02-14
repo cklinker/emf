@@ -18,5 +18,6 @@ export type {
   ValidationRule,
   ValidationRuleType,
   CollectionSummary,
+  PicklistSummary,
 } from './FieldEditor'
 export { default } from './FieldEditor'

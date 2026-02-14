@@ -155,8 +155,14 @@ public class CollectionChangedPayload {
         private String name;
         private String type;
         private boolean required;
+        private boolean unique;
         private String description;
         private String constraints;
+        private String fieldTypeConfig;
+        private String referenceTarget;
+        private String relationshipType;
+        private String relationshipName;
+        private boolean cascadeDelete;
 
         public FieldPayload() {
         }
@@ -193,6 +199,14 @@ public class CollectionChangedPayload {
             this.required = required;
         }
 
+        public boolean isUnique() {
+            return unique;
+        }
+
+        public void setUnique(boolean unique) {
+            this.unique = unique;
+        }
+
         public String getDescription() {
             return description;
         }
@@ -207,6 +221,46 @@ public class CollectionChangedPayload {
 
         public void setConstraints(String constraints) {
             this.constraints = constraints;
+        }
+
+        public String getFieldTypeConfig() {
+            return fieldTypeConfig;
+        }
+
+        public void setFieldTypeConfig(String fieldTypeConfig) {
+            this.fieldTypeConfig = fieldTypeConfig;
+        }
+
+        public String getReferenceTarget() {
+            return referenceTarget;
+        }
+
+        public void setReferenceTarget(String referenceTarget) {
+            this.referenceTarget = referenceTarget;
+        }
+
+        public String getRelationshipType() {
+            return relationshipType;
+        }
+
+        public void setRelationshipType(String relationshipType) {
+            this.relationshipType = relationshipType;
+        }
+
+        public String getRelationshipName() {
+            return relationshipName;
+        }
+
+        public void setRelationshipName(String relationshipName) {
+            this.relationshipName = relationshipName;
+        }
+
+        public boolean isCascadeDelete() {
+            return cascadeDelete;
+        }
+
+        public void setCascadeDelete(boolean cascadeDelete) {
+            this.cascadeDelete = cascadeDelete;
         }
     }
 }

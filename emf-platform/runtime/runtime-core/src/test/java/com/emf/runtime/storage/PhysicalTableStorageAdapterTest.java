@@ -74,12 +74,12 @@ class PhysicalTableStorageAdapterTest {
     
     private CollectionDefinition createTestCollection(String name) {
         List<FieldDefinition> fields = List.of(
-            new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null),
-            new FieldDefinition("description", FieldType.STRING, true, false, false, null, null, null, null),
-            new FieldDefinition("price", FieldType.DOUBLE, false, false, false, null, null, null, null),
-            new FieldDefinition("quantity", FieldType.INTEGER, true, false, false, null, null, null, null),
-            new FieldDefinition("active", FieldType.BOOLEAN, true, false, false, null, null, null, null),
-            new FieldDefinition("sku", FieldType.STRING, false, false, true, null, null, null, null)
+            new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null, null),
+            new FieldDefinition("description", FieldType.STRING, true, false, false, null, null, null, null, null),
+            new FieldDefinition("price", FieldType.DOUBLE, false, false, false, null, null, null, null, null),
+            new FieldDefinition("quantity", FieldType.INTEGER, true, false, false, null, null, null, null, null),
+            new FieldDefinition("active", FieldType.BOOLEAN, true, false, false, null, null, null, null, null),
+            new FieldDefinition("sku", FieldType.STRING, false, false, true, null, null, null, null, null)
         );
         
         StorageConfig storageConfig = new StorageConfig(
@@ -160,13 +160,13 @@ class PhysicalTableStorageAdapterTest {
         @DisplayName("Should create table with all field types")
         void shouldCreateTableWithAllFieldTypes() {
             List<FieldDefinition> fields = List.of(
-                new FieldDefinition("str_field", FieldType.STRING, true, false, false, null, null, null, null),
-                new FieldDefinition("int_field", FieldType.INTEGER, true, false, false, null, null, null, null),
-                new FieldDefinition("long_field", FieldType.LONG, true, false, false, null, null, null, null),
-                new FieldDefinition("double_field", FieldType.DOUBLE, true, false, false, null, null, null, null),
-                new FieldDefinition("bool_field", FieldType.BOOLEAN, true, false, false, null, null, null, null),
-                new FieldDefinition("date_field", FieldType.DATE, true, false, false, null, null, null, null),
-                new FieldDefinition("datetime_field", FieldType.DATETIME, true, false, false, null, null, null, null)
+                new FieldDefinition("str_field", FieldType.STRING, true, false, false, null, null, null, null, null),
+                new FieldDefinition("int_field", FieldType.INTEGER, true, false, false, null, null, null, null, null),
+                new FieldDefinition("long_field", FieldType.LONG, true, false, false, null, null, null, null, null),
+                new FieldDefinition("double_field", FieldType.DOUBLE, true, false, false, null, null, null, null, null),
+                new FieldDefinition("bool_field", FieldType.BOOLEAN, true, false, false, null, null, null, null, null),
+                new FieldDefinition("date_field", FieldType.DATE, true, false, false, null, null, null, null, null),
+                new FieldDefinition("datetime_field", FieldType.DATETIME, true, false, false, null, null, null, null, null)
             );
             
             CollectionDefinition allTypesCollection = new CollectionDefinition(

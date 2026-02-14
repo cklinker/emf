@@ -262,7 +262,7 @@ class TypeCoercionServiceTest {
         @DisplayName("Should coerce string to double for CURRENCY field")
         void shouldCoerceStringForCurrencyField() {
             FieldDefinition field = new FieldDefinition(
-                "amount", FieldType.CURRENCY, true, false, false, null, null, null, null
+                "amount", FieldType.CURRENCY, true, false, false, null, null, null, null, null
             );
             CollectionDefinition def = createTestCollection(field);
             Map<String, Object> data = new HashMap<>();
@@ -278,7 +278,7 @@ class TypeCoercionServiceTest {
         @DisplayName("Should coerce string to double for PERCENT field")
         void shouldCoerceStringForPercentField() {
             FieldDefinition field = new FieldDefinition(
-                "rate", FieldType.PERCENT, true, false, false, null, null, null, null
+                "rate", FieldType.PERCENT, true, false, false, null, null, null, null, null
             );
             CollectionDefinition def = createTestCollection(field);
             Map<String, Object> data = new HashMap<>();

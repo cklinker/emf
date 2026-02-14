@@ -38,7 +38,8 @@ class FieldDefinitionTest {
                 "A",
                 rules,
                 enumValues,
-                refConfig
+                refConfig,
+                null
             );
             
             assertEquals("status", field.name());
@@ -56,7 +57,7 @@ class FieldDefinitionTest {
         @DisplayName("Should throw NullPointerException when name is null")
         void shouldThrowWhenNameIsNull() {
             NullPointerException exception = assertThrows(NullPointerException.class, () -> {
-                new FieldDefinition(null, FieldType.STRING, true, false, false, null, null, null, null);
+                new FieldDefinition(null, FieldType.STRING, true, false, false, null, null, null, null, null);
             });
             assertEquals("name cannot be null", exception.getMessage());
         }
@@ -65,7 +66,7 @@ class FieldDefinitionTest {
         @DisplayName("Should throw IllegalArgumentException when name is blank")
         void shouldThrowWhenNameIsBlank() {
             IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
-                new FieldDefinition("  ", FieldType.STRING, true, false, false, null, null, null, null);
+                new FieldDefinition("  ", FieldType.STRING, true, false, false, null, null, null, null, null);
             });
             assertEquals("name cannot be blank", exception.getMessage());
         }
@@ -74,7 +75,7 @@ class FieldDefinitionTest {
         @DisplayName("Should throw NullPointerException when type is null")
         void shouldThrowWhenTypeIsNull() {
             NullPointerException exception = assertThrows(NullPointerException.class, () -> {
-                new FieldDefinition("field", null, true, false, false, null, null, null, null);
+                new FieldDefinition("field", null, true, false, false, null, null, null, null, null);
             });
             assertEquals("type cannot be null", exception.getMessage());
         }
@@ -88,6 +89,7 @@ class FieldDefinitionTest {
                 true,
                 false,
                 false,
+                null,
                 null,
                 null,
                 null,
@@ -121,6 +123,7 @@ class FieldDefinitionTest {
                 null,
                 null,
                 mutableList,
+                null,
                 null
             );
             
@@ -144,6 +147,7 @@ class FieldDefinitionTest {
                 null,
                 null,
                 List.of("A", "B"),
+                null,
                 null
             );
             
@@ -311,10 +315,10 @@ class FieldDefinitionTest {
         @DisplayName("Should be equal when all fields match")
         void shouldBeEqualWhenFieldsMatch() {
             FieldDefinition field1 = new FieldDefinition(
-                "name", FieldType.STRING, true, false, false, null, null, null, null
+                "name", FieldType.STRING, true, false, false, null, null, null, null, null
             );
             FieldDefinition field2 = new FieldDefinition(
-                "name", FieldType.STRING, true, false, false, null, null, null, null
+                "name", FieldType.STRING, true, false, false, null, null, null, null, null
             );
             
             assertEquals(field1, field2);
@@ -325,10 +329,10 @@ class FieldDefinitionTest {
         @DisplayName("Should not be equal when fields differ")
         void shouldNotBeEqualWhenFieldsDiffer() {
             FieldDefinition field1 = new FieldDefinition(
-                "name", FieldType.STRING, true, false, false, null, null, null, null
+                "name", FieldType.STRING, true, false, false, null, null, null, null, null
             );
             FieldDefinition field2 = new FieldDefinition(
-                "name", FieldType.INTEGER, true, false, false, null, null, null, null
+                "name", FieldType.INTEGER, true, false, false, null, null, null, null, null
             );
             
             assertNotEquals(field1, field2);

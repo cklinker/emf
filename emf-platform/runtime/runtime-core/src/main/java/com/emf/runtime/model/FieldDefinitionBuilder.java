@@ -1,6 +1,7 @@
 package com.emf.runtime.model;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Builder for constructing {@link FieldDefinition} instances.
@@ -32,7 +33,8 @@ public class FieldDefinitionBuilder {
     private ValidationRules validationRules;
     private List<String> enumValues;
     private ReferenceConfig referenceConfig;
-    
+    private Map<String, Object> fieldTypeConfig;
+
     /**
      * Creates a new field definition builder.
      */
@@ -137,7 +139,18 @@ public class FieldDefinitionBuilder {
         this.referenceConfig = referenceConfig;
         return this;
     }
-    
+
+    /**
+     * Sets the type-specific configuration for the field.
+     *
+     * @param fieldTypeConfig the type-specific configuration map
+     * @return this builder for method chaining
+     */
+    public FieldDefinitionBuilder fieldTypeConfig(Map<String, Object> fieldTypeConfig) {
+        this.fieldTypeConfig = fieldTypeConfig;
+        return this;
+    }
+
     /**
      * Builds the field definition.
      * 
@@ -161,7 +174,8 @@ public class FieldDefinitionBuilder {
             defaultValue,
             validationRules,
             enumValues,
-            referenceConfig
+            referenceConfig,
+            fieldTypeConfig
         );
     }
     

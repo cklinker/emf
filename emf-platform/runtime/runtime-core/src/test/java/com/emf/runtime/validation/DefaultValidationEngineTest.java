@@ -223,7 +223,7 @@ class DefaultValidationEngineTest {
         @DisplayName("Should reject string as boolean type")
         void shouldRejectStringAsBooleanType() {
             CollectionDefinition definition = createTestCollection(
-                new FieldDefinition("active", FieldType.BOOLEAN, false, false, false, null, null, null, null)
+                new FieldDefinition("active", FieldType.BOOLEAN, false, false, false, null, null, null, null, null)
             );
             
             ValidationResult result = validationEngine.validate(
@@ -250,7 +250,7 @@ class DefaultValidationEngineTest {
         @DisplayName("Should reject invalid date string")
         void shouldRejectInvalidDateString() {
             CollectionDefinition definition = createTestCollection(
-                new FieldDefinition("birthDate", FieldType.DATE, false, false, false, null, null, null, null)
+                new FieldDefinition("birthDate", FieldType.DATE, false, false, false, null, null, null, null, null)
             );
             
             ValidationResult result = validationEngine.validate(
@@ -322,10 +322,10 @@ class DefaultValidationEngineTest {
         void shouldRejectValueBelowMinimum() {
             FieldDefinition field = new FieldDefinition(
                 "age", FieldType.INTEGER, false, false, false, null,
-                ValidationRules.forNumeric(18.0, null), null, null
+                ValidationRules.forNumeric(18.0, null), null, null, null
             );
             CollectionDefinition definition = createTestCollection(field);
-            
+
             ValidationResult result = validationEngine.validate(
                 definition, Map.of("age", 15), OperationType.CREATE);
             
@@ -338,10 +338,10 @@ class DefaultValidationEngineTest {
         void shouldAcceptValueAtMinimum() {
             FieldDefinition field = new FieldDefinition(
                 "age", FieldType.INTEGER, false, false, false, null,
-                ValidationRules.forNumeric(18.0, null), null, null
+                ValidationRules.forNumeric(18.0, null), null, null, null
             );
             CollectionDefinition definition = createTestCollection(field);
-            
+
             ValidationResult result = validationEngine.validate(
                 definition, Map.of("age", 18), OperationType.CREATE);
             
@@ -353,10 +353,10 @@ class DefaultValidationEngineTest {
         void shouldRejectValueAboveMaximum() {
             FieldDefinition field = new FieldDefinition(
                 "score", FieldType.INTEGER, false, false, false, null,
-                ValidationRules.forNumeric(null, 100.0), null, null
+                ValidationRules.forNumeric(null, 100.0), null, null, null
             );
             CollectionDefinition definition = createTestCollection(field);
-            
+
             ValidationResult result = validationEngine.validate(
                 definition, Map.of("score", 150), OperationType.CREATE);
             
@@ -369,10 +369,10 @@ class DefaultValidationEngineTest {
         void shouldAcceptValueAtMaximum() {
             FieldDefinition field = new FieldDefinition(
                 "score", FieldType.INTEGER, false, false, false, null,
-                ValidationRules.forNumeric(null, 100.0), null, null
+                ValidationRules.forNumeric(null, 100.0), null, null, null
             );
             CollectionDefinition definition = createTestCollection(field);
-            
+
             ValidationResult result = validationEngine.validate(
                 definition, Map.of("score", 100), OperationType.CREATE);
             
@@ -384,7 +384,7 @@ class DefaultValidationEngineTest {
         void shouldValidateMinMaxForDoubleValues() {
             FieldDefinition field = new FieldDefinition(
                 "price", FieldType.DOUBLE, false, false, false, null,
-                ValidationRules.forNumeric(0.0, 1000.0), null, null
+                ValidationRules.forNumeric(0.0, 1000.0), null, null, null
             );
             CollectionDefinition definition = createTestCollection(field);
             
@@ -405,10 +405,10 @@ class DefaultValidationEngineTest {
         void shouldRejectStringBelowMinimumLength() {
             FieldDefinition field = new FieldDefinition(
                 "username", FieldType.STRING, false, false, false, null,
-                ValidationRules.forString(3, null), null, null
+                ValidationRules.forString(3, null), null, null, null
             );
             CollectionDefinition definition = createTestCollection(field);
-            
+
             ValidationResult result = validationEngine.validate(
                 definition, Map.of("username", "ab"), OperationType.CREATE);
             
@@ -421,10 +421,10 @@ class DefaultValidationEngineTest {
         void shouldAcceptStringAtMinimumLength() {
             FieldDefinition field = new FieldDefinition(
                 "username", FieldType.STRING, false, false, false, null,
-                ValidationRules.forString(3, null), null, null
+                ValidationRules.forString(3, null), null, null, null
             );
             CollectionDefinition definition = createTestCollection(field);
-            
+
             ValidationResult result = validationEngine.validate(
                 definition, Map.of("username", "abc"), OperationType.CREATE);
             
@@ -436,10 +436,10 @@ class DefaultValidationEngineTest {
         void shouldRejectStringExceedingMaximumLength() {
             FieldDefinition field = new FieldDefinition(
                 "code", FieldType.STRING, false, false, false, null,
-                ValidationRules.forString(null, 5), null, null
+                ValidationRules.forString(null, 5), null, null, null
             );
             CollectionDefinition definition = createTestCollection(field);
-            
+
             ValidationResult result = validationEngine.validate(
                 definition, Map.of("code", "ABCDEF"), OperationType.CREATE);
             
@@ -452,10 +452,10 @@ class DefaultValidationEngineTest {
         void shouldAcceptStringAtMaximumLength() {
             FieldDefinition field = new FieldDefinition(
                 "code", FieldType.STRING, false, false, false, null,
-                ValidationRules.forString(null, 5), null, null
+                ValidationRules.forString(null, 5), null, null, null
             );
             CollectionDefinition definition = createTestCollection(field);
-            
+
             ValidationResult result = validationEngine.validate(
                 definition, Map.of("code", "ABCDE"), OperationType.CREATE);
             
@@ -473,10 +473,10 @@ class DefaultValidationEngineTest {
             FieldDefinition field = new FieldDefinition(
                 "email", FieldType.STRING, false, false, false, null,
                 ValidationRules.forString(null, null, "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"),
-                null, null
+                null, null, null
             );
             CollectionDefinition definition = createTestCollection(field);
-            
+
             ValidationResult result = validationEngine.validate(
                 definition, Map.of("email", "not-an-email"), OperationType.CREATE);
             
@@ -490,10 +490,10 @@ class DefaultValidationEngineTest {
             FieldDefinition field = new FieldDefinition(
                 "email", FieldType.STRING, false, false, false, null,
                 ValidationRules.forString(null, null, "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"),
-                null, null
+                null, null, null
             );
             CollectionDefinition definition = createTestCollection(field);
-            
+
             ValidationResult result = validationEngine.validate(
                 definition, Map.of("email", "test@example.com"), OperationType.CREATE);
             
@@ -506,7 +506,7 @@ class DefaultValidationEngineTest {
             FieldDefinition field = new FieldDefinition(
                 "sku", FieldType.STRING, false, false, false, null,
                 ValidationRules.forString(null, null, "^[A-Z0-9-]+$"),
-                null, null
+                null, null, null
             );
             CollectionDefinition definition = createTestCollection(field);
             
@@ -530,10 +530,10 @@ class DefaultValidationEngineTest {
         @DisplayName("Should reject updates to immutable field")
         void shouldRejectUpdatesToImmutableField() {
             FieldDefinition field = new FieldDefinition(
-                "createdBy", FieldType.STRING, false, true, false, null, null, null, null
+                "createdBy", FieldType.STRING, false, true, false, null, null, null, null, null
             );
             CollectionDefinition definition = createTestCollection(field);
-            
+
             ValidationResult result = validationEngine.validate(
                 definition, Map.of("createdBy", "newUser"), OperationType.UPDATE);
             
@@ -545,10 +545,10 @@ class DefaultValidationEngineTest {
         @DisplayName("Should allow immutable field on CREATE")
         void shouldAllowImmutableFieldOnCreate() {
             FieldDefinition field = new FieldDefinition(
-                "createdBy", FieldType.STRING, false, true, false, null, null, null, null
+                "createdBy", FieldType.STRING, false, true, false, null, null, null, null, null
             );
             CollectionDefinition definition = createTestCollection(field);
-            
+
             ValidationResult result = validationEngine.validate(
                 definition, Map.of("createdBy", "user123"), OperationType.CREATE);
             
@@ -559,7 +559,7 @@ class DefaultValidationEngineTest {
         @DisplayName("Should skip immutable field not provided in UPDATE")
         void shouldSkipImmutableFieldNotProvidedInUpdate() {
             FieldDefinition immutableField = new FieldDefinition(
-                "createdBy", FieldType.STRING, false, true, false, null, null, null, null
+                "createdBy", FieldType.STRING, false, true, false, null, null, null, null, null
             );
             FieldDefinition mutableField = FieldDefinition.string("name");
             CollectionDefinition definition = createTestCollection(immutableField, mutableField);
@@ -580,7 +580,7 @@ class DefaultValidationEngineTest {
         @DisplayName("Should reject duplicate value for unique field")
         void shouldRejectDuplicateValueForUniqueField() {
             FieldDefinition field = new FieldDefinition(
-                "email", FieldType.STRING, false, false, true, null, null, null, null
+                "email", FieldType.STRING, false, false, true, null, null, null, null, null
             );
             CollectionDefinition definition = createTestCollection(field);
             
@@ -599,7 +599,7 @@ class DefaultValidationEngineTest {
         @DisplayName("Should accept unique value for unique field")
         void shouldAcceptUniqueValueForUniqueField() {
             FieldDefinition field = new FieldDefinition(
-                "email", FieldType.STRING, false, false, true, null, null, null, null
+                "email", FieldType.STRING, false, false, true, null, null, null, null, null
             );
             CollectionDefinition definition = createTestCollection(field);
             
@@ -617,7 +617,7 @@ class DefaultValidationEngineTest {
         @DisplayName("Should exclude current record ID when checking uniqueness on UPDATE")
         void shouldExcludeCurrentRecordIdOnUpdate() {
             FieldDefinition field = new FieldDefinition(
-                "email", FieldType.STRING, false, false, true, null, null, null, null
+                "email", FieldType.STRING, false, false, true, null, null, null, null, null
             );
             CollectionDefinition definition = createTestCollection(field);
             
@@ -802,7 +802,7 @@ class DefaultValidationEngineTest {
             FieldDefinition field = new FieldDefinition(
                 "password", FieldType.STRING, false, false, false, null,
                 ValidationRules.forString(8, 20, "^(?=.*[A-Z])(?=.*[0-9]).*$"),
-                null, null
+                null, null, null
             );
             CollectionDefinition definition = createTestCollection(field);
             
@@ -915,7 +915,7 @@ class DefaultValidationEngineTest {
         void shouldValidateProvidedFieldsInUpdate() {
             FieldDefinition field = new FieldDefinition(
                 "age", FieldType.INTEGER, false, false, false, null,
-                ValidationRules.forNumeric(0.0, 150.0), null, null
+                ValidationRules.forNumeric(0.0, 150.0), null, null, null
             );
             CollectionDefinition definition = createTestCollection(field);
             

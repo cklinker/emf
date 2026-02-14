@@ -137,6 +137,11 @@ config:
       windowDuration: "PT1M"  # ISO-8601 duration format (1 minute)
     enabled: true
 
+  # CORS configuration
+  cors:
+    allowedOriginPatterns:
+      - "*"
+
   # Logging configuration
   logging:
     level:

@@ -59,6 +59,10 @@ config:
       windowDuration: "PT1M"
     enabled: true
 
+  cors:
+    allowedOriginPatterns:
+      - "*"
+
   logging:
     level:
       root: INFO

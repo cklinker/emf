@@ -1061,13 +1061,17 @@
     "patternPlaceholder": "e.g., ^[A-Z].*",
     "valuePlaceholder": "Enter value...",
     "removeRule": "Remove validation rule",
+    "globalPicklist": "Global Picklist",
+    "selectPicklist": "Select a picklist...",
+    "globalPicklistHint": "Select the global picklist that provides values for this field.",
     "validation": {
       "nameRequired": "Field name is required",
       "nameTooLong": "Field name must be 50 characters or less",
       "nameFormat": "Name must be lowercase, start with a letter, and contain only letters, numbers, and underscores",
       "displayNameTooLong": "Display name must be 100 characters or less",
       "typeRequired": "Field type is required",
-      "referenceTargetRequired": "Target collection is required for reference fields"
+      "referenceTargetRequired": "Target collection is required for reference fields",
+      "picklistRequired": "A global picklist is required for picklist fields"
     }
   },
   "home": {

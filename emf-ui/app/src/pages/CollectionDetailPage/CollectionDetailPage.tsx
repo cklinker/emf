@@ -40,7 +40,30 @@ import type {
   PolicySummary,
   FieldHistoryEntry,
 } from '../../types/collections'
+import type { FieldType } from '../../types/collections'
 import styles from './CollectionDetailPage.module.css'
+
+/**
+ * Reverse mapping from backend canonical types (uppercase) to UI types (lowercase).
+ * The backend stores "DOUBLE" for what the UI calls "number", and "JSON" for "object".
+ * Most types simply lowercase (e.g., "STRING" → "string", "PICKLIST" → "picklist").
+ */
+const BACKEND_TYPE_TO_UI: Record<string, FieldType> = {
+  DOUBLE: 'number',
+  INTEGER: 'number',
+  LONG: 'number',
+  JSON: 'json',
+  ARRAY: 'json',
+}
+
+function normalizeFieldType(backendType: string): FieldType {
+  // Check explicit mapping first, then just lowercase
+  const upper = backendType.toUpperCase()
+  if (upper in BACKEND_TYPE_TO_UI) {
+    return BACKEND_TYPE_TO_UI[upper]
+  }
+  return backendType.toLowerCase() as FieldType
+}
 
 /**
  * Props for CollectionDetailPage component
@@ -148,6 +171,15 @@ export function CollectionDetailPage({
     queryKey: ['collection', collectionId],
     queryFn: async () => {
       const response = await apiClient.get<Collection>(`/control/collections/${collectionId}`)
+      // Normalize field types from backend canonical form to UI form.
+      // The backend stores types as uppercase enums (e.g., "STRING", "DOUBLE", "PICKLIST")
+      // but the UI uses lowercase aliases (e.g., "string", "number", "picklist").
+      if (response.fields) {
+        response.fields = response.fields.map((f) => ({
+          ...f,
+          type: normalizeFieldType(f.type),
+        }))
+      }
       return response
     },
     enabled: !!collectionId,
@@ -269,9 +301,7 @@ export function CollectionDetailPage({
       )
       // Merge and sort by changedAt descending
       const allEntries = results.flatMap((r) => r.content || [])
-      allEntries.sort(
-        (a, b) => new Date(b.changedAt).getTime() - new Date(a.changedAt).getTime()
-      )
+      allEntries.sort((a, b) => new Date(b.changedAt).getTime() - new Date(a.changedAt).getTime())
       return { content: allEntries.slice(0, 50) }
     },
     enabled: activeTab === 'fieldHistory' && !!collectionId,
@@ -290,6 +320,18 @@ export function CollectionDetailPage({
   })
 
   const allCollections = collectionsPage?.content || []
+
+  // Fetch global picklists for picklist field dropdown
+  const { data: globalPicklists = [] } = useQuery({
+    queryKey: ['global-picklists'],
+    queryFn: async () => {
+      const response = await apiClient.get<Array<{ id: string; name: string }>>(
+        '/control/picklists/global?tenantId=default'
+      )
+      return response
+    },
+    enabled: fieldEditorOpen,
+  })
 
   // Delete mutation
   const deleteMutation = useMutation({
@@ -640,6 +682,7 @@ export function CollectionDetailPage({
             indexed: fieldData.indexed,
             defaultValue: fieldData.defaultValue,
             referenceTarget: fieldData.referenceTarget,
+            fieldTypeConfig: fieldData.fieldTypeConfig,
             validation: fieldData.validation,
           },
         })
@@ -654,6 +697,7 @@ export function CollectionDetailPage({
           indexed: fieldData.indexed,
           defaultValue: fieldData.defaultValue,
           referenceTarget: fieldData.referenceTarget,
+          fieldTypeConfig: fieldData.fieldTypeConfig,
           validation: fieldData.validation,
         })
       }
@@ -1824,6 +1868,10 @@ export function CollectionDetailPage({
                 id: c.id,
                 name: c.name,
                 displayName: c.displayName || c.name,
+              }))}
+              picklists={globalPicklists.map((p) => ({
+                id: p.id,
+                name: p.name,
               }))}
               onSave={handleFieldSave}
               onCancel={handleFieldCancel}

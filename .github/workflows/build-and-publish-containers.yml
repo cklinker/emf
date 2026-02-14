@@ -220,10 +220,12 @@ jobs:
 
   # ===========================================================================
   # Build and Push Container Images
+  # Each service only waits for its own test suite, not all tests.
+  # Docker builds use multi-stage Dockerfiles that compile from source.
   # ===========================================================================
   build-gateway:
     name: Build & Push Gateway
-    needs: [test-control-plane, test-gateway, test-worker, test-frontend]
+    needs: [test-gateway]
     runs-on: k8s-runner
     outputs:
       image-tag: ${{ steps.meta.outputs.version }}
@@ -265,7 +267,7 @@ jobs:
 
   build-control-plane:
     name: Build & Push Control Plane
-    needs: [test-control-plane, test-gateway, test-worker, test-frontend]
+    needs: [test-control-plane]
     runs-on: k8s-runner
     outputs:
       image-tag: ${{ steps.meta.outputs.version }}
@@ -307,7 +309,7 @@ jobs:
 
   build-ui:
     name: Build & Push Admin UI
-    needs: [test-control-plane, test-gateway, test-worker, test-frontend]
+    needs: [test-frontend]
     runs-on: k8s-runner
     outputs:
       image-tag: ${{ steps.meta.outputs.version }}
@@ -349,7 +351,7 @@ jobs:
 
   build-worker:
     name: Build & Push Worker
-    needs: [test-control-plane, test-gateway, test-worker, test-frontend]
+    needs: [test-worker]
     runs-on: k8s-runner
     outputs:
       image-tag: ${{ steps.meta.outputs.version }}

@@ -206,11 +206,12 @@ public class AuthorizationService {
                 .orElseThrow(() -> new ResourceNotFoundException("Collection", collectionId));
 
         // Delete existing route policies for this collection
+        // Uses @Modifying(flushAutomatically=true) to ensure DELETE is flushed before INSERT
         routePolicyRepository.deleteByCollectionId(collectionId);
 
         // Delete existing field policies for fields in this collection
-        List<FieldPolicy> existingFieldPolicies = fieldPolicyRepository.findByCollectionId(collectionId);
-        fieldPolicyRepository.deleteAll(existingFieldPolicies);
+        // Uses @Modifying(flushAutomatically=true) to ensure DELETE is flushed before INSERT
+        fieldPolicyRepository.deleteByCollectionId(collectionId);
 
         // Create new route policies
         List<RoutePolicy> newRoutePolicies = new ArrayList<>();

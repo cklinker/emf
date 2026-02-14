@@ -64,7 +64,7 @@ spring:
 emf:
   gateway:
     # Feature flag: use profile-based permissions instead of legacy role-based policies
-    use-profiles: ${USE_PROFILES:false}
+    use-profiles: ${USE_PROFILES:true}
 
     # Tenant slug URL prefix configuration
     tenant-slug:

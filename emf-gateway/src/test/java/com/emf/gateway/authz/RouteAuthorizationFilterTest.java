@@ -25,6 +25,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 /**
@@ -136,33 +137,68 @@ class RouteAuthorizationFilterTest {
     }
     
     @Test
-    void shouldAllowRequestWhenNoAuthzConfigForCollection() {
-        // Arrange
+    void shouldFallbackToProfileEvaluationWhenNoAuthzConfigInCache() {
+        // Arrange - when legacy cache is empty, filter falls back to profile-based evaluation
         GatewayPrincipal principal = new GatewayPrincipal("user1", List.of("USER"), Map.of());
         MockServerHttpRequest request = MockServerHttpRequest
                 .get("/api/users")
                 .build();
         MockServerWebExchange exchange = MockServerWebExchange.from(request);
         exchange.getAttributes().put("gateway.principal", principal);
-        
+
         RouteDefinition route = new RouteDefinition(
                 "users-collection",
                 "/api/users/**",
                 "http://user-service:8080",
                 "users"
         );
-        
+
         when(routeRegistry.findByPath("/api/users")).thenReturn(Optional.of(route));
         when(authzConfigCache.getConfig("users-collection")).thenReturn(Optional.empty());
-        
+        when(profilePolicyEvaluator.evaluate(any(GatewayPrincipal.class), any(String.class), any(HttpMethod.class)))
+                .thenReturn(Mono.just(true));
+
         // Act
         StepVerifier.create(filter.filter(exchange, filterChain))
                 .expectComplete()
                 .verify();
-        
-        // Assert
+
+        // Assert — should delegate to profile evaluator instead of allowing by default
+        verify(profilePolicyEvaluator).evaluate(any(GatewayPrincipal.class), eq("users-collection"), eq(HttpMethod.GET));
         verify(filterChain).filter(exchange);
-        assertThat(exchange.getResponse().getStatusCode()).isNull(); // No error set
+    }
+
+    @Test
+    void shouldDenyWhenProfileEvaluationDeniesAndCacheIsEmpty() {
+        // Arrange - profile evaluator denies access when cache is empty
+        GatewayPrincipal principal = new GatewayPrincipal("user1", List.of("USER"), Map.of());
+        MockServerHttpRequest request = MockServerHttpRequest
+                .get("/api/users")
+                .build();
+        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+        exchange.getAttributes().put("gateway.principal", principal);
+
+        RouteDefinition route = new RouteDefinition(
+                "users-collection",
+                "/api/users/**",
+                "http://user-service:8080",
+                "users"
+        );
+
+        when(routeRegistry.findByPath("/api/users")).thenReturn(Optional.of(route));
+        when(authzConfigCache.getConfig("users-collection")).thenReturn(Optional.empty());
+        when(profilePolicyEvaluator.evaluate(any(GatewayPrincipal.class), any(String.class), any(HttpMethod.class)))
+                .thenReturn(Mono.just(false));
+
+        // Act
+        StepVerifier.create(filter.filter(exchange, filterChain))
+                .expectComplete()
+                .verify();
+
+        // Assert — should be denied by profile evaluator
+        verify(profilePolicyEvaluator).evaluate(any(GatewayPrincipal.class), eq("users-collection"), eq(HttpMethod.GET));
+        verify(filterChain, never()).filter(exchange);
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
     }
     
     @Test

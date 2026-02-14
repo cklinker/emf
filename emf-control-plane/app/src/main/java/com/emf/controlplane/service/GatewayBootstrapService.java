@@ -5,9 +5,11 @@ import com.emf.controlplane.dto.GatewayBootstrapConfigDto;
 import com.emf.controlplane.entity.Collection;
 import com.emf.controlplane.entity.CollectionAssignment;
 import com.emf.controlplane.entity.Field;
+import com.emf.controlplane.entity.RoutePolicy;
 import com.emf.controlplane.entity.Worker;
 import com.emf.controlplane.repository.CollectionAssignmentRepository;
 import com.emf.controlplane.repository.CollectionRepository;
+import com.emf.controlplane.repository.RoutePolicyRepository;
 import com.emf.controlplane.repository.WorkerRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,15 +31,18 @@ public class GatewayBootstrapService {
     private final CollectionRepository collectionRepository;
     private final CollectionAssignmentRepository assignmentRepository;
     private final WorkerRepository workerRepository;
+    private final RoutePolicyRepository routePolicyRepository;
     private final ControlPlaneProperties properties;
 
     public GatewayBootstrapService(CollectionRepository collectionRepository,
                                   CollectionAssignmentRepository assignmentRepository,
                                   WorkerRepository workerRepository,
+                                  RoutePolicyRepository routePolicyRepository,
                                   ControlPlaneProperties properties) {
         this.collectionRepository = collectionRepository;
         this.assignmentRepository = assignmentRepository;
         this.workerRepository = workerRepository;
+        this.routePolicyRepository = routePolicyRepository;
         this.properties = properties;
     }
 
@@ -62,13 +67,16 @@ public class GatewayBootstrapService {
                 .map(c -> mapCollectionToDto(c, workerUrlByCollection.get(c.getId())))
                 .collect(Collectors.toList());
 
-        // Create empty authorization config (to be implemented later)
+        // Build per-collection authz data so the gateway can warm its AuthzConfigCache on startup
+        List<GatewayBootstrapConfigDto.CollectionAuthzDto> collectionAuthzList = buildCollectionAuthz(collections);
+
         GatewayBootstrapConfigDto.AuthorizationDto authorization = new GatewayBootstrapConfigDto.AuthorizationDto(
                 new ArrayList<>(),  // roles
                 new ArrayList<>(),  // policies
                 new ArrayList<>(),  // routePolicies
                 new ArrayList<>()   // fieldPolicies
         );
+        authorization.setCollectionAuthz(collectionAuthzList);
 
         GatewayBootstrapConfigDto dto = new GatewayBootstrapConfigDto(
                 collectionDtos,
@@ -137,5 +145,34 @@ public class GatewayBootstrapService {
      */
     private String constructCollectionPath(Collection collection) {
         return "/api/" + collection.getName();
+    }
+
+    /**
+     * Builds per-collection authorization data for the gateway's AuthzConfigCache warm-up.
+     * Fetches all route policies and groups them by collection ID.
+     */
+    private List<GatewayBootstrapConfigDto.CollectionAuthzDto> buildCollectionAuthz(List<Collection> collections) {
+        List<GatewayBootstrapConfigDto.CollectionAuthzDto> result = new ArrayList<>();
+
+        for (Collection collection : collections) {
+            List<RoutePolicy> routePolicies = routePolicyRepository.findByCollectionId(collection.getId());
+            if (routePolicies.isEmpty()) {
+                continue;
+            }
+
+            List<GatewayBootstrapConfigDto.RoutePolicyEntry> entries = routePolicies.stream()
+                    .map(rp -> new GatewayBootstrapConfigDto.RoutePolicyEntry(
+                            rp.getOperation(),
+                            rp.getPolicy() != null ? rp.getPolicy().getId() : null,
+                            rp.getPolicy() != null ? rp.getPolicy().getName() : null,
+                            rp.getPolicy() != null ? rp.getPolicy().getRules() : null
+                    ))
+                    .collect(Collectors.toList());
+
+            result.add(new GatewayBootstrapConfigDto.CollectionAuthzDto(collection.getId(), entries));
+        }
+
+        log.debug("Built authz data for {} collections with route policies", result.size());
+        return result;
     }
 }

@@ -13,10 +13,11 @@ public class AuthorizationConfig {
     private List<PolicyConfig> policies;
     private List<RoutePolicyConfig> routePolicies;
     private List<FieldPolicyConfig> fieldPolicies;
-    
+    private List<CollectionAuthzConfig> collectionAuthz;
+
     public AuthorizationConfig() {
     }
-    
+
     public AuthorizationConfig(List<RoleConfig> roles, List<PolicyConfig> policies,
                               List<RoutePolicyConfig> routePolicies, List<FieldPolicyConfig> fieldPolicies) {
         this.roles = roles;
@@ -56,7 +57,15 @@ public class AuthorizationConfig {
     public void setFieldPolicies(List<FieldPolicyConfig> fieldPolicies) {
         this.fieldPolicies = fieldPolicies;
     }
-    
+
+    public List<CollectionAuthzConfig> getCollectionAuthz() {
+        return collectionAuthz;
+    }
+
+    public void setCollectionAuthz(List<CollectionAuthzConfig> collectionAuthz) {
+        this.collectionAuthz = collectionAuthz;
+    }
+
     @Override
     public String toString() {
         return "AuthorizationConfig{" +
@@ -64,6 +73,7 @@ public class AuthorizationConfig {
                ", policies=" + (policies != null ? policies.size() : 0) + " policies" +
                ", routePolicies=" + (routePolicies != null ? routePolicies.size() : 0) + " route policies" +
                ", fieldPolicies=" + (fieldPolicies != null ? fieldPolicies.size() : 0) + " field policies" +
+               ", collectionAuthz=" + (collectionAuthz != null ? collectionAuthz.size() : 0) + " collection authz" +
                '}';
     }
 }

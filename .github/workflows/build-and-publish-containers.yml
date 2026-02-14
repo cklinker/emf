@@ -38,10 +38,10 @@ env:
 
 jobs:
   # ===========================================================================
-  # Build shared runtime modules
+  # Build runtime + test all Java services in a single job
   # ===========================================================================
-  build-runtime:
-    name: Build Runtime Modules
+  test-java:
+    name: Build & Test Java
     runs-on: k8s-runner
     steps:
       - name: Checkout code
@@ -60,148 +60,27 @@ jobs:
             echo "/opt/apache-maven-${{ env.MAVEN_VERSION }}/bin" >> $GITHUB_PATH
           fi
 
-      - name: Clean stale Maven cache
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: maven-${{ runner.os }}-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            maven-${{ runner.os }}-
+
+      - name: Clean stale EMF artifacts
         run: rm -rf ~/.m2/repository/com/emf
 
-      - name: Build runtime-core and runtime-events
+      - name: Build runtime modules
         run: mvn clean install -DskipTests -f emf-platform/pom.xml -pl runtime/runtime-core,runtime/runtime-events -am -B
 
-      - name: Verify built artifacts
-        run: |
-          echo "--- FieldDefinition record components ---"
-          jar tf ~/.m2/repository/com/emf/runtime-core/1.0.0-SNAPSHOT/runtime-core-1.0.0-SNAPSHOT.jar | grep FieldDefinition
-          javap -p -cp ~/.m2/repository/com/emf/runtime-core/1.0.0-SNAPSHOT/runtime-core-1.0.0-SNAPSHOT.jar com.emf.runtime.model.FieldDefinition | head -20
-          echo "--- FieldPayload methods ---"
-          javap -p -cp ~/.m2/repository/com/emf/runtime-events/1.0.0-SNAPSHOT/runtime-events-1.0.0-SNAPSHOT.jar com.emf.runtime.event.CollectionChangedPayload.FieldPayload | head -30
-
-      - name: Package runtime artifacts
-        run: |
-          rm -rf /tmp/runtime-artifacts
-          mkdir -p /tmp/runtime-artifacts
-          cp -r ~/.m2/repository/com/emf /tmp/runtime-artifacts/m2-emf
-
-      - name: Upload runtime artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: runtime-modules
-          path: /tmp/runtime-artifacts/
-          retention-days: 1
-
-  # ===========================================================================
-  # Test Control Plane
-  # ===========================================================================
-  test-control-plane:
-    name: Test Control Plane
-    needs: build-runtime
-    runs-on: k8s-runner
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up JDK ${{ env.JAVA_VERSION }}
-        uses: actions/setup-java@v4
-        with:
-          java-version: ${{ env.JAVA_VERSION }}
-          distribution: 'temurin'
-
-      - name: Install Maven
-        run: |
-          if ! command -v mvn &> /dev/null; then
-            curl -fsSL https://archive.apache.org/dist/maven/maven-3/${{ env.MAVEN_VERSION }}/binaries/apache-maven-${{ env.MAVEN_VERSION }}-bin.tar.gz | tar xz -C /opt
-            echo "/opt/apache-maven-${{ env.MAVEN_VERSION }}/bin" >> $GITHUB_PATH
-          fi
-
-      - name: Download runtime artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: runtime-modules
-          path: /tmp/runtime-artifacts
-
-      - name: Install runtime modules to local Maven repo
-        run: |
-          rm -rf ~/.m2/repository/com/emf
-          mkdir -p ~/.m2/repository/com/emf
-          cp -r /tmp/runtime-artifacts/m2-emf/* ~/.m2/repository/com/emf/
-
-      - name: Run tests
+      - name: Test Control Plane
         run: mvn verify -f emf-control-plane/pom.xml -B
 
-  # ===========================================================================
-  # Test Gateway
-  # ===========================================================================
-  test-gateway:
-    name: Test Gateway
-    needs: build-runtime
-    runs-on: k8s-runner
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up JDK ${{ env.JAVA_VERSION }}
-        uses: actions/setup-java@v4
-        with:
-          java-version: ${{ env.JAVA_VERSION }}
-          distribution: 'temurin'
-
-      - name: Install Maven
-        run: |
-          if ! command -v mvn &> /dev/null; then
-            curl -fsSL https://archive.apache.org/dist/maven/maven-3/${{ env.MAVEN_VERSION }}/binaries/apache-maven-${{ env.MAVEN_VERSION }}-bin.tar.gz | tar xz -C /opt
-            echo "/opt/apache-maven-${{ env.MAVEN_VERSION }}/bin" >> $GITHUB_PATH
-          fi
-
-      - name: Download runtime artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: runtime-modules
-          path: /tmp/runtime-artifacts
-
-      - name: Install runtime modules to local Maven repo
-        run: |
-          rm -rf ~/.m2/repository/com/emf
-          mkdir -p ~/.m2/repository/com/emf
-          cp -r /tmp/runtime-artifacts/m2-emf/* ~/.m2/repository/com/emf/
-
-      - name: Run tests
+      - name: Test Gateway
         run: mvn verify -f emf-gateway/pom.xml -B
 
-  # ===========================================================================
-  # Test Worker
-  # ===========================================================================
-  test-worker:
-    name: Test Worker
-    needs: build-runtime
-    runs-on: k8s-runner
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up JDK ${{ env.JAVA_VERSION }}
-        uses: actions/setup-java@v4
-        with:
-          java-version: ${{ env.JAVA_VERSION }}
-          distribution: 'temurin'
-
-      - name: Install Maven
-        run: |
-          if ! command -v mvn &> /dev/null; then
-            curl -fsSL https://archive.apache.org/dist/maven/maven-3/${{ env.MAVEN_VERSION }}/binaries/apache-maven-${{ env.MAVEN_VERSION }}-bin.tar.gz | tar xz -C /opt
-            echo "/opt/apache-maven-${{ env.MAVEN_VERSION }}/bin" >> $GITHUB_PATH
-          fi
-
-      - name: Download runtime artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: runtime-modules
-          path: /tmp/runtime-artifacts
-
-      - name: Install runtime modules to local Maven repo
-        run: |
-          rm -rf ~/.m2/repository/com/emf
-          mkdir -p ~/.m2/repository/com/emf
-          cp -r /tmp/runtime-artifacts/m2-emf/* ~/.m2/repository/com/emf/
-
-      - name: Run tests
+      - name: Test Worker
         run: mvn verify -f emf-worker/pom.xml -B
 
   # ===========================================================================
@@ -222,28 +101,30 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
+      - name: Cache npm dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('emf-web/package-lock.json') }}
+          restore-keys: |
+            npm-${{ runner.os }}-
+
       - name: Install dependencies
-        run: npm install --prefer-offline --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
         timeout-minutes: 5
-        env:
-          npm_config_fetch_retries: 5
-          npm_config_fetch_retry_mintimeout: 10000
-          npm_config_fetch_retry_maxtimeout: 60000
 
       - name: Run tests
         run: npm run test
 
   # ===========================================================================
   # Build and Push Container Images
-  # Each service only waits for its own test suite, not all tests.
-  # Docker builds use multi-stage Dockerfiles that compile from source.
+  # All services built in a single job to avoid repeated checkouts and
+  # Docker Buildx setup across multiple K8s pods.
   # ===========================================================================
-  build-gateway:
-    name: Build & Push Gateway
-    needs: [test-gateway]
+  build-and-push:
+    name: Build & Push Images
+    needs: [test-java, test-frontend]
     runs-on: k8s-runner
-    outputs:
-      image-tag: ${{ steps.meta.outputs.version }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -258,152 +139,64 @@ jobs:
           username: ${{ env.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.DOCKERHUB_USERNAME }}/emf-gateway
-          tags: |
-            type=ref,event=branch
-            type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable={{is_default_branch}}
+      - name: Get short SHA
+        id: sha
+        run: echo "short=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
 
-      - name: Build and push Gateway
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: emf-gateway/Dockerfile
-          push: ${{ github.event_name != 'workflow_dispatch' || inputs.push_images }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          platforms: linux/amd64
-
-  build-control-plane:
-    name: Build & Push Control Plane
-    needs: [test-control-plane]
-    runs-on: k8s-runner
-    outputs:
-      image-tag: ${{ steps.meta.outputs.version }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to DockerHub
-        if: github.event_name != 'workflow_dispatch' || inputs.push_images
-        uses: docker/login-action@v3
-        with:
-          username: ${{ env.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.DOCKERHUB_USERNAME }}/emf-control-plane
-          tags: |
-            type=ref,event=branch
-            type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable={{is_default_branch}}
-
+      # --- Control Plane ---
       - name: Build and push Control Plane
         uses: docker/build-push-action@v5
         with:
           context: .
           file: emf-control-plane/Dockerfile
           push: ${{ github.event_name != 'workflow_dispatch' || inputs.push_images }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          tags: |
+            ${{ env.DOCKERHUB_USERNAME }}/emf-control-plane:latest
+            ${{ env.DOCKERHUB_USERNAME }}/emf-control-plane:main-${{ steps.sha.outputs.short }}
+          cache-from: type=gha,scope=control-plane
+          cache-to: type=gha,mode=max,scope=control-plane
           platforms: linux/amd64
 
-  build-ui:
-    name: Build & Push Admin UI
-    needs: [test-frontend]
-    runs-on: k8s-runner
-    outputs:
-      image-tag: ${{ steps.meta.outputs.version }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to DockerHub
-        if: github.event_name != 'workflow_dispatch' || inputs.push_images
-        uses: docker/login-action@v3
-        with:
-          username: ${{ env.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.DOCKERHUB_USERNAME }}/emf-ui
-          tags: |
-            type=ref,event=branch
-            type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable={{is_default_branch}}
-
-      - name: Build and push Admin UI
+      # --- Gateway ---
+      - name: Build and push Gateway
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: emf-ui/Dockerfile
+          file: emf-gateway/Dockerfile
           push: ${{ github.event_name != 'workflow_dispatch' || inputs.push_images }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          tags: |
+            ${{ env.DOCKERHUB_USERNAME }}/emf-gateway:latest
+            ${{ env.DOCKERHUB_USERNAME }}/emf-gateway:main-${{ steps.sha.outputs.short }}
+          cache-from: type=gha,scope=gateway
+          cache-to: type=gha,mode=max,scope=gateway
           platforms: linux/amd64
 
-  build-worker:
-    name: Build & Push Worker
-    needs: [test-worker]
-    runs-on: k8s-runner
-    outputs:
-      image-tag: ${{ steps.meta.outputs.version }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to DockerHub
-        if: github.event_name != 'workflow_dispatch' || inputs.push_images
-        uses: docker/login-action@v3
-        with:
-          username: ${{ env.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.DOCKERHUB_USERNAME }}/emf-worker
-          tags: |
-            type=ref,event=branch
-            type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable={{is_default_branch}}
-
+      # --- Worker ---
       - name: Build and push Worker
         uses: docker/build-push-action@v5
         with:
           context: .
           file: emf-worker/Dockerfile
           push: ${{ github.event_name != 'workflow_dispatch' || inputs.push_images }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          tags: |
+            ${{ env.DOCKERHUB_USERNAME }}/emf-worker:latest
+            ${{ env.DOCKERHUB_USERNAME }}/emf-worker:main-${{ steps.sha.outputs.short }}
+          cache-from: type=gha,scope=worker
+          cache-to: type=gha,mode=max,scope=worker
+          platforms: linux/amd64
+
+      # --- Admin UI ---
+      - name: Build and push Admin UI
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: emf-ui/Dockerfile
+          push: ${{ github.event_name != 'workflow_dispatch' || inputs.push_images }}
+          tags: |
+            ${{ env.DOCKERHUB_USERNAME }}/emf-ui:latest
+            ${{ env.DOCKERHUB_USERNAME }}/emf-ui:main-${{ steps.sha.outputs.short }}
+          cache-from: type=gha,scope=ui
+          cache-to: type=gha,mode=max,scope=ui
           platforms: linux/amd64
 
   # ===========================================================================
@@ -411,7 +204,7 @@ jobs:
   # ===========================================================================
   deploy:
     name: Update ArgoCD Manifests
-    needs: [build-gateway, build-control-plane, build-ui, build-worker]
+    needs: [build-and-push]
     if: github.ref == 'refs/heads/main' && (github.event_name != 'workflow_dispatch' || inputs.deploy)
     runs-on: k8s-runner
     steps:

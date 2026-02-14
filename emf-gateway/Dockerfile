@@ -1,25 +1,25 @@
 # Multi-stage build for EMF API Gateway
+# Optimized with dependency caching layers for fast rebuilds
 
 # =============================================================================
 # Stage 1: Build runtime-core and runtime-events dependencies
 # =============================================================================
-FROM maven:3.9-eclipse-temurin-21 AS runtime-core-builder
+FROM maven:3.9-eclipse-temurin-21 AS runtime-builder
 
 WORKDIR /emf-platform
 
-# Copy emf-platform parent pom
+# Copy only POMs first for dependency layer caching
 COPY emf-platform/pom.xml ./
-
-# Copy runtime parent pom
 COPY emf-platform/runtime/pom.xml ./runtime/
+COPY emf-platform/runtime/runtime-core/pom.xml ./runtime/runtime-core/
+COPY emf-platform/runtime/runtime-events/pom.xml ./runtime/runtime-events/
 
-# Copy runtime-core source
-COPY emf-platform/runtime/runtime-core ./runtime/runtime-core
+# Download runtime dependencies (cached unless pom.xml changes)
+RUN mvn dependency:go-offline -B -pl runtime/runtime-core,runtime/runtime-events -am || true
 
-# Copy runtime-events source (shared Kafka events)
-COPY emf-platform/runtime/runtime-events ./runtime/runtime-events
-
-# Build and install runtime modules to local Maven repository
+# Copy source and build
+COPY emf-platform/runtime/runtime-core/src ./runtime/runtime-core/src
+COPY emf-platform/runtime/runtime-events/src ./runtime/runtime-events/src
 RUN mvn clean install -DskipTests -pl runtime/runtime-core,runtime/runtime-events -am -B
 
 # =============================================================================
@@ -29,15 +29,18 @@ FROM maven:3.9-eclipse-temurin-21 AS builder
 
 WORKDIR /build
 
-# Copy Maven repository from runtime-core builder
-COPY --from=runtime-core-builder /root/.m2/repository /root/.m2/repository
+# Copy Maven repository from runtime builder
+COPY --from=runtime-builder /root/.m2/repository /root/.m2/repository
 
-# Copy Maven files for dependency resolution
+# Copy POM first for dependency layer caching
 COPY emf-gateway/pom.xml .
-COPY emf-gateway/src ./src
 
-# Build the application (skip tests for faster builds)
-RUN mvn clean package -DskipTests && \
+# Download dependencies (cached unless pom.xml changes)
+RUN mvn dependency:go-offline -B || true
+
+# Copy source and build
+COPY emf-gateway/src ./src
+RUN mvn clean package -DskipTests -B && \
     mv target/emf-gateway-*.jar target/emf-gateway.jar
 
 # =============================================================================
@@ -47,27 +50,19 @@ FROM eclipse-temurin:21-jre
 
 WORKDIR /app
 
-# Create non-root user for security
 RUN groupadd -r emf && useradd -r -g emf emf
 
-# Copy the JAR from builder stage
 COPY --from=builder /build/target/emf-gateway.jar app.jar
 
-# Change ownership to non-root user
 RUN chown -R emf:emf /app
 
-# Switch to non-root user
 USER emf
 
-# Expose the application port
 EXPOSE 8080
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
   CMD curl -f http://localhost:8080/actuator/health || exit 1
 
-# Set JVM options for container environment
 ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UseG1GC"
 
-# Run the application
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

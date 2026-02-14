@@ -343,6 +343,6 @@ As new phases are planned, their EPIC documents will follow the pattern `EPIC-PH
 
 ## CI/CD
 
-- **PR checks** (`.github/workflows/ci.yml`): build-runtime → test-control-plane + test-gateway + test-frontend → build-check → quality-gate
-- **Deploy** (`.github/workflows/build-and-publish-containers.yml`): On main push, builds Docker images, pushes to DockerHub, updates ArgoCD manifests in `homelab-argo` repo
+- **PR checks** (`.github/workflows/ci.yml`): test-java (build runtime + test control-plane, gateway, worker) + test-frontend → quality-gate
+- **Deploy** (`.github/workflows/build-and-publish-containers.yml`): On main push, test-java + test-frontend → build-and-push (all 4 images) → deploy → smoke-test
 - All CI checks must pass before a PR can be merged

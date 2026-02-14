@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.security.access.AccessDeniedException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -58,6 +59,26 @@ class ControlPlaneExceptionHandlerTest {
             assertThat(response.getBody()).isNotNull();
             assertThat(response.getBody().status()).isEqualTo(400);
             assertThat(response.getBody().errors()).isEmpty();
+        }
+    }
+
+    @Nested
+    @DisplayName("handleAccessDeniedException")
+    class HandleAccessDeniedExceptionTests {
+
+        @Test
+        @DisplayName("should return 403 with forbidden message")
+        void shouldReturn403WithForbiddenMessage() {
+            AccessDeniedException ex = new AccessDeniedException("Access Denied");
+
+            ResponseEntity<ErrorResponse> response = handler.handleAccessDeniedException(ex, request);
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+            assertThat(response.getBody()).isNotNull();
+            assertThat(response.getBody().status()).isEqualTo(403);
+            assertThat(response.getBody().error()).isEqualTo("Forbidden");
+            assertThat(response.getBody().message()).contains("insufficient permissions");
+            assertThat(response.getBody().path()).isEqualTo("/control/collections/123/validation-rules");
         }
     }
 

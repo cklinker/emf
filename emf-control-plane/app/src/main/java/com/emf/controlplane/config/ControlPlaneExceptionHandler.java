@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 
@@ -26,6 +27,7 @@ import java.util.UUID;
  * <p>Exception mapping:
  * <ul>
  *   <li>ValidationException → 400 Bad Request</li>
+ *   <li>AccessDeniedException → 403 Forbidden</li>
  *   <li>ResourceNotFoundException → 404 Not Found</li>
  *   <li>DuplicateResourceException → 409 Conflict</li>
  * </ul>
@@ -63,6 +65,28 @@ public class ControlPlaneExceptionHandler {
         );
 
         return ResponseEntity.badRequest().body(response);
+    }
+
+    /**
+     * Handles Spring Security access denied exceptions.
+     * Returns 403 Forbidden when a user lacks required roles/authorities.
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAccessDeniedException(
+            AccessDeniedException ex, HttpServletRequest request) {
+
+        String requestId = generateRequestId();
+        log.warn("Access denied [requestId={}]: {} {}", requestId, request.getMethod(), request.getRequestURI());
+
+        ErrorResponse response = ErrorResponse.of(
+                requestId,
+                HttpStatus.FORBIDDEN.value(),
+                "Forbidden",
+                "Access denied: insufficient permissions",
+                request.getRequestURI()
+        );
+
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
     }
 
     /**

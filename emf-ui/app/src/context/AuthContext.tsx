@@ -39,6 +39,7 @@ const STORAGE_KEYS = {
   PROVIDER_ID: 'emf_auth_provider_id',
   CALLBACK_PROCESSED: 'emf_auth_callback_processed',
   LOGIN_ERROR: 'emf_auth_login_error',
+  JUST_LOGGED_OUT: 'emf_auth_just_logged_out',
 } as const
 
 // Token refresh buffer (refresh 30 seconds before expiry)
@@ -424,6 +425,13 @@ export function AuthProvider({
         authUrl.searchParams.set('code_challenge', codeChallenge)
         authUrl.searchParams.set('code_challenge_method', 'S256')
 
+        // If user just logged out, force the IdP to show the login form
+        // instead of silently re-authenticating with the existing session
+        if (sessionStorage.getItem(STORAGE_KEYS.JUST_LOGGED_OUT) === 'true') {
+          authUrl.searchParams.set('prompt', 'login')
+          sessionStorage.removeItem(STORAGE_KEYS.JUST_LOGGED_OUT)
+        }
+
         // Redirect to authorization endpoint
         window.location.href = authUrl.toString()
       } catch (err) {
@@ -444,12 +452,20 @@ export function AuthProvider({
     const providerId = sessionStorage.getItem(STORAGE_KEYS.PROVIDER_ID)
     const storedTokens = getStoredTokens()
 
+    // Set logout flag BEFORE clearing storage so LoginPage knows to skip auto-login.
+    // This survives clearAuthStorage() because it's set after the clear,
+    // and it's more reliable than URL params which the IdP may strip.
+    sessionStorage.setItem(STORAGE_KEYS.JUST_LOGGED_OUT, 'true')
+
     // Clear local auth state
     clearAuthStorage()
     setUser(null)
     setError(null)
 
-    // Build logout redirect with logged_out flag to prevent auto-login on return
+    // Re-set the flag since clearAuthStorage just cleared it
+    sessionStorage.setItem(STORAGE_KEYS.JUST_LOGGED_OUT, 'true')
+
+    // Build logout redirect URL (keep ?logged_out=true as belt-and-suspenders with sessionStorage)
     const logoutRedirect = new URL(postLogoutRedirectUri)
     logoutRedirect.searchParams.set('logged_out', 'true')
     const logoutRedirectStr = logoutRedirect.toString()

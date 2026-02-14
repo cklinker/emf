@@ -45,8 +45,16 @@ export function LoginPage({ title }: LoginPageProps): React.ReactElement {
   const [loginError, setLoginError] = useState<Error | null>(null)
   const [isLoggingIn, setIsLoggingIn] = useState(false)
 
-  // Check if user just logged out — skip auto-login so they can pick a different account
-  const justLoggedOut = useMemo(() => searchParams.get('logged_out') === 'true', [searchParams])
+  // Check if user just logged out — skip auto-login so they can pick a different account.
+  // Uses sessionStorage flag (set by AuthContext.logout) as primary signal, because
+  // the OIDC provider may strip query params from the post_logout_redirect_uri.
+  // Also checks URL param as fallback.
+  const justLoggedOut = useMemo(
+    () =>
+      sessionStorage.getItem('emf_auth_just_logged_out') === 'true' ||
+      searchParams.get('logged_out') === 'true',
+    [searchParams]
+  )
 
   // Get the redirect path from location state
   const from =
@@ -94,8 +102,9 @@ export function LoginPage({ title }: LoginPageProps): React.ReactElement {
     setLoginError(null)
     setSelectedProvider(providerId)
 
-    // Clear any persisted login error (user is explicitly retrying)
+    // Clear any persisted login error and logout flag (user is explicitly logging in)
     sessionStorage.removeItem('emf_auth_login_error')
+    sessionStorage.removeItem('emf_auth_just_logged_out')
 
     try {
       await login(providerId)

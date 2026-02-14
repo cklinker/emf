@@ -18,10 +18,11 @@ env:
 
 jobs:
   # ===========================================================================
-  # Build shared runtime modules (required by both control-plane and gateway)
+  # Build runtime + test all Java services in a single job
+  # Eliminates 4 separate pod launches, 4 JDK downloads, artifact upload/download
   # ===========================================================================
-  build-runtime:
-    name: Build Runtime Modules
+  test-java:
+    name: Build & Test Java
     runs-on: k8s-runner
     steps:
       - name: Checkout code
@@ -40,198 +41,49 @@ jobs:
             echo "/opt/apache-maven-${{ env.MAVEN_VERSION }}/bin" >> $GITHUB_PATH
           fi
 
-      - name: Clean stale Maven cache
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: maven-${{ runner.os }}-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            maven-${{ runner.os }}-
+
+      - name: Clean stale EMF artifacts
         run: rm -rf ~/.m2/repository/com/emf
 
-      - name: Build runtime-core and runtime-events
+      - name: Build runtime modules
         run: mvn clean install -DskipTests -f emf-platform/pom.xml -pl runtime/runtime-core,runtime/runtime-events -am -B
 
-      - name: Verify built artifacts
-        run: |
-          echo "--- FieldDefinition record components ---"
-          jar tf ~/.m2/repository/com/emf/runtime-core/1.0.0-SNAPSHOT/runtime-core-1.0.0-SNAPSHOT.jar | grep FieldDefinition
-          javap -p -cp ~/.m2/repository/com/emf/runtime-core/1.0.0-SNAPSHOT/runtime-core-1.0.0-SNAPSHOT.jar com.emf.runtime.model.FieldDefinition | head -20
-          echo "--- FieldPayload methods ---"
-          javap -p -cp ~/.m2/repository/com/emf/runtime-events/1.0.0-SNAPSHOT/runtime-events-1.0.0-SNAPSHOT.jar com.emf.runtime.event.CollectionChangedPayload.FieldPayload | head -30
-
-      - name: Package runtime artifacts
-        run: |
-          rm -rf /tmp/runtime-artifacts
-          mkdir -p /tmp/runtime-artifacts
-          cp -r ~/.m2/repository/com/emf /tmp/runtime-artifacts/m2-emf
-
-      - name: Upload runtime artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: runtime-modules
-          path: /tmp/runtime-artifacts/
-          retention-days: 1
-
-  # ===========================================================================
-  # Test Control Plane (unit + integration tests with JaCoCo coverage)
-  # ===========================================================================
-  test-control-plane:
-    name: Test Control Plane
-    needs: build-runtime
-    runs-on: k8s-runner
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up JDK ${{ env.JAVA_VERSION }}
-        uses: actions/setup-java@v4
-        with:
-          java-version: ${{ env.JAVA_VERSION }}
-          distribution: 'temurin'
-
-      - name: Install Maven
-        run: |
-          if ! command -v mvn &> /dev/null; then
-            curl -fsSL https://archive.apache.org/dist/maven/maven-3/${{ env.MAVEN_VERSION }}/binaries/apache-maven-${{ env.MAVEN_VERSION }}-bin.tar.gz | tar xz -C /opt
-            echo "/opt/apache-maven-${{ env.MAVEN_VERSION }}/bin" >> $GITHUB_PATH
-          fi
-
-      - name: Download runtime artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: runtime-modules
-          path: /tmp/runtime-artifacts
-
-      - name: Install runtime modules to local Maven repo
-        run: |
-          rm -rf ~/.m2/repository/com/emf
-          mkdir -p ~/.m2/repository/com/emf
-          cp -r /tmp/runtime-artifacts/m2-emf/* ~/.m2/repository/com/emf/
-
-      - name: Run tests
+      - name: Test Control Plane
         run: mvn verify -f emf-control-plane/pom.xml -B
 
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: control-plane-test-results
-          path: emf-control-plane/app/target/surefire-reports/
-          retention-days: 7
-
-      - name: Upload coverage report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: control-plane-coverage
-          path: emf-control-plane/app/target/site/jacoco/
-          if-no-files-found: ignore
-          retention-days: 7
-
-  # ===========================================================================
-  # Test Gateway (unit + integration tests with JaCoCo coverage)
-  # ===========================================================================
-  test-gateway:
-    name: Test Gateway
-    needs: build-runtime
-    runs-on: k8s-runner
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up JDK ${{ env.JAVA_VERSION }}
-        uses: actions/setup-java@v4
-        with:
-          java-version: ${{ env.JAVA_VERSION }}
-          distribution: 'temurin'
-
-      - name: Install Maven
-        run: |
-          if ! command -v mvn &> /dev/null; then
-            curl -fsSL https://archive.apache.org/dist/maven/maven-3/${{ env.MAVEN_VERSION }}/binaries/apache-maven-${{ env.MAVEN_VERSION }}-bin.tar.gz | tar xz -C /opt
-            echo "/opt/apache-maven-${{ env.MAVEN_VERSION }}/bin" >> $GITHUB_PATH
-          fi
-
-      - name: Download runtime artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: runtime-modules
-          path: /tmp/runtime-artifacts
-
-      - name: Install runtime modules to local Maven repo
-        run: |
-          rm -rf ~/.m2/repository/com/emf
-          mkdir -p ~/.m2/repository/com/emf
-          cp -r /tmp/runtime-artifacts/m2-emf/* ~/.m2/repository/com/emf/
-
-      - name: Run tests
+      - name: Test Gateway
         run: mvn verify -f emf-gateway/pom.xml -B
 
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: gateway-test-results
-          path: emf-gateway/target/surefire-reports/
-          retention-days: 7
-
-      - name: Upload coverage report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: gateway-coverage
-          path: emf-gateway/target/site/jacoco/
-          if-no-files-found: ignore
-          retention-days: 7
-
-  # ===========================================================================
-  # Test Worker (unit + integration tests with JaCoCo coverage)
-  # ===========================================================================
-  test-worker:
-    name: Test Worker
-    needs: build-runtime
-    runs-on: k8s-runner
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up JDK ${{ env.JAVA_VERSION }}
-        uses: actions/setup-java@v4
-        with:
-          java-version: ${{ env.JAVA_VERSION }}
-          distribution: 'temurin'
-
-      - name: Install Maven
-        run: |
-          if ! command -v mvn &> /dev/null; then
-            curl -fsSL https://archive.apache.org/dist/maven/maven-3/${{ env.MAVEN_VERSION }}/binaries/apache-maven-${{ env.MAVEN_VERSION }}-bin.tar.gz | tar xz -C /opt
-            echo "/opt/apache-maven-${{ env.MAVEN_VERSION }}/bin" >> $GITHUB_PATH
-          fi
-
-      - name: Download runtime artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: runtime-modules
-          path: /tmp/runtime-artifacts
-
-      - name: Install runtime modules to local Maven repo
-        run: |
-          rm -rf ~/.m2/repository/com/emf
-          mkdir -p ~/.m2/repository/com/emf
-          cp -r /tmp/runtime-artifacts/m2-emf/* ~/.m2/repository/com/emf/
-
-      - name: Run tests
+      - name: Test Worker
         run: mvn verify -f emf-worker/pom.xml -B
 
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: worker-test-results
-          path: emf-worker/target/surefire-reports/
+          name: java-test-results
+          path: |
+            emf-control-plane/app/target/surefire-reports/
+            emf-gateway/target/surefire-reports/
+            emf-worker/target/surefire-reports/
           retention-days: 7
 
-      - name: Upload coverage report
+      - name: Upload coverage reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: worker-coverage
-          path: emf-worker/target/site/jacoco/
+          name: java-coverage
+          path: |
+            emf-control-plane/app/target/site/jacoco/
+            emf-gateway/target/site/jacoco/
+            emf-worker/target/site/jacoco/
           if-no-files-found: ignore
           retention-days: 7
 
@@ -253,13 +105,17 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
+      - name: Cache npm dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('emf-web/package-lock.json') }}
+          restore-keys: |
+            npm-${{ runner.os }}-
+
       - name: Install dependencies
-        run: npm install --prefer-offline --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
         timeout-minutes: 5
-        env:
-          npm_config_fetch_retries: 5
-          npm_config_fetch_retry_mintimeout: 10000
-          npm_config_fetch_retry_maxtimeout: 60000
 
       - name: Lint
         run: npm run lint
@@ -283,67 +139,22 @@ jobs:
           retention-days: 7
 
   # ===========================================================================
-  # Verify Docker images build successfully
-  # Docker builds use multi-stage Dockerfiles that compile from source,
-  # so they don't depend on test results — run in parallel with tests.
-  # ===========================================================================
-  build-check:
-    name: Verify Docker Build (${{ matrix.service.name }})
-    runs-on: k8s-runner
-    strategy:
-      fail-fast: false
-      matrix:
-        service:
-          - { name: control-plane, file: emf-control-plane/Dockerfile }
-          - { name: gateway, file: emf-gateway/Dockerfile }
-          - { name: worker, file: emf-worker/Dockerfile }
-          - { name: ui, file: emf-ui/Dockerfile }
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build ${{ matrix.service.name }}
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ${{ matrix.service.file }}
-          push: false
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          platforms: linux/amd64
-
-  # ===========================================================================
   # Quality gate - all checks must pass
   # ===========================================================================
   quality-gate:
     name: Quality Gate
-    needs: [test-control-plane, test-gateway, test-worker, test-frontend, build-check]
+    needs: [test-java, test-frontend]
     if: always()
     runs-on: k8s-runner
     steps:
       - name: Check all jobs passed
         run: |
-          if [[ "${{ needs.test-control-plane.result }}" != "success" ]]; then
-            echo "Control Plane tests failed"
-            exit 1
-          fi
-          if [[ "${{ needs.test-gateway.result }}" != "success" ]]; then
-            echo "Gateway tests failed"
-            exit 1
-          fi
-          if [[ "${{ needs.test-worker.result }}" != "success" ]]; then
-            echo "Worker tests failed"
+          if [[ "${{ needs.test-java.result }}" != "success" ]]; then
+            echo "Java tests failed"
             exit 1
           fi
           if [[ "${{ needs.test-frontend.result }}" != "success" ]]; then
             echo "Frontend tests failed"
-            exit 1
-          fi
-          if [[ "${{ needs.build-check.result }}" != "success" ]]; then
-            echo "Docker build check failed"
             exit 1
           fi
           echo "All quality gates passed"

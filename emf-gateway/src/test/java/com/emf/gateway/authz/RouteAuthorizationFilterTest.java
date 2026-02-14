@@ -400,6 +400,38 @@ class RouteAuthorizationFilterTest {
     }
     
     @Test
+    void shouldAllowAuthenticatedAccessToControlPlaneRoutes() {
+        // Arrange - control-plane routes are admin API endpoints that should bypass
+        // collection-level authorization (JWT authentication is sufficient)
+        GatewayPrincipal principal = new GatewayPrincipal("admin1", List.of("USER"), Map.of());
+        MockServerHttpRequest request = MockServerHttpRequest
+                .get("/control/collections")
+                .build();
+        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+        exchange.getAttributes().put("gateway.principal", principal);
+
+        RouteDefinition route = new RouteDefinition(
+                "control-plane",
+                "/control/**",
+                "http://control-plane:8080",
+                "control-plane"
+        );
+
+        when(routeRegistry.findByPath("/control/collections")).thenReturn(Optional.of(route));
+
+        // Act
+        StepVerifier.create(filter.filter(exchange, filterChain))
+                .expectComplete()
+                .verify();
+
+        // Assert - should allow without checking any policy evaluators
+        verify(filterChain).filter(exchange);
+        verify(policyEvaluator, never()).evaluate(any(RoutePolicy.class), any(GatewayPrincipal.class));
+        verify(profilePolicyEvaluator, never()).evaluate(any(GatewayPrincipal.class), any(String.class), any(HttpMethod.class));
+        assertThat(exchange.getResponse().getStatusCode()).isNull();
+    }
+
+    @Test
     void shouldReturnJsonErrorResponseOnForbidden() {
         // Arrange
         GatewayPrincipal principal = new GatewayPrincipal("user1", List.of("USER"), Map.of());

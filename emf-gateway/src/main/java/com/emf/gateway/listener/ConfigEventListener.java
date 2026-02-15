@@ -26,11 +26,20 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * All event processing is done asynchronously and handles malformed events gracefully
  * by logging errors and continuing to process subsequent events.
+ *
+ * System collections (e.g., __control-plane) are ignored because their routes are
+ * managed statically by {@link com.emf.gateway.config.RouteInitializer}.
  */
 @Component
 public class ConfigEventListener {
 
     private static final Logger logger = LoggerFactory.getLogger(ConfigEventListener.class);
+
+    /** Well-known UUID for the __control-plane system collection (see V43 migration). */
+    private static final String CONTROL_PLANE_COLLECTION_ID = "00000000-0000-0000-0000-000000000100";
+
+    /** Prefix used to identify system collections by name. */
+    private static final String SYSTEM_COLLECTION_PREFIX = "__";
 
     private final RouteRegistry routeRegistry;
     private final ObjectMapper objectMapper;
@@ -63,6 +72,18 @@ public class ConfigEventListener {
     }
 
     /**
+     * Checks whether a collection is a system collection whose route is managed
+     * statically by {@link com.emf.gateway.config.RouteInitializer}.
+     * System collection events must be ignored to prevent overwriting static routes.
+     */
+    private boolean isSystemCollection(String collectionId, String collectionName) {
+        if (CONTROL_PLANE_COLLECTION_ID.equals(collectionId)) {
+            return true;
+        }
+        return collectionName != null && collectionName.startsWith(SYSTEM_COLLECTION_PREFIX);
+    }
+
+    /**
      * Handles collection changed events from Kafka.
      */
     @KafkaListener(
@@ -84,6 +105,13 @@ public class ConfigEventListener {
 
             logger.debug("Processing collection change: id={}, name={}, changeType={}",
                         payload.getId(), payload.getName(), payload.getChangeType());
+
+            // Skip system collections — their routes are managed by RouteInitializer
+            if (isSystemCollection(payload.getId(), payload.getName())) {
+                logger.debug("Ignoring collection changed event for system collection: id={}, name={}",
+                            payload.getId(), payload.getName());
+                return;
+            }
 
             if (payload.getChangeType() == ChangeType.DELETED) {
                 routeRegistry.removeRoute(payload.getId());
@@ -172,6 +200,13 @@ public class ConfigEventListener {
 
             logger.info("Processing worker assignment: workerId={}, collectionId={}, collectionName={}, changeType={}",
                         workerId, collectionId, collectionName, changeType);
+
+            // Skip system collections — their routes are managed by RouteInitializer
+            if (isSystemCollection(collectionId, collectionName)) {
+                logger.debug("Ignoring worker assignment event for system collection: id={}, name={}",
+                            collectionId, collectionName);
+                return;
+            }
 
             if ("DELETED".equals(changeType)) {
                 routeRegistry.removeRoute(collectionId);

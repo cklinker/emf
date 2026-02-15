@@ -59,8 +59,7 @@ config:
     enabled: true
 
   cors:
-    allowedOriginPatterns:
-      - "*"
+    allowedOriginPattern: "*"
 
   logging:
     level:

@@ -69,19 +69,31 @@ public class RouteInitializer implements ApplicationRunner {
         logger.info("Initializing gateway routes");
 
         // Prime the tenant slug cache before route loading
-        tenantSlugCache.refresh();
+        try {
+            tenantSlugCache.refresh();
+        } catch (Exception e) {
+            logger.warn("Failed to prime tenant slug cache on startup; will retry on next cache refresh: {}", e.getMessage());
+        }
 
         // Add static control plane route first
         addControlPlaneRoute();
 
-        // Fetch and add dynamic routes from control plane
-        routeConfigService.refreshRoutes();
-        
-        // Trigger Spring Cloud Gateway to refresh its route cache
+        // Fetch and add dynamic routes from control plane.
+        // Wrapped in try-catch so the RefreshRoutesEvent always fires — the static
+        // control-plane route must be available even if dynamic route loading fails.
+        try {
+            routeConfigService.refreshRoutes();
+        } catch (Exception e) {
+            logger.error("Failed to load dynamic routes from control plane on startup: {}", e.getMessage(), e);
+        }
+
+        // Trigger Spring Cloud Gateway to refresh its route cache.
+        // This MUST run even if dynamic route loading failed, so that the static
+        // control-plane route is picked up by Spring Cloud Gateway.
         logger.info("Publishing RefreshRoutesEvent to update Gateway route cache");
         eventPublisher.publishEvent(new RefreshRoutesEvent(this));
-        
-        logger.info("Route initialization completed");
+
+        logger.info("Route initialization completed with {} routes", routeRegistry.size());
     }
     
     /**

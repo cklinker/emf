@@ -41,29 +41,6 @@ data:
           httpclient:
             connect-timeout: 5000
             response-timeout: 30s
-          globalcors:
-            corsConfigurations:
-              '[/**]':
-                allowedOriginPatterns:
-                  {{- range .Values.config.cors.allowedOriginPatterns }}
-                  - {{ . | quote }}
-                  {{- end }}
-                allowedMethods:
-                  - GET
-                  - POST
-                  - PUT
-                  - DELETE
-                  - PATCH
-                  - OPTIONS
-                allowedHeaders: "*"
-                allowCredentials: true
-                maxAge: 3600
-                exposedHeaders:
-                  - X-RateLimit-Limit
-                  - X-RateLimit-Remaining
-                  - X-RateLimit-Reset
-                  - Retry-After
-    
     emf:
       gateway:
         control-plane:

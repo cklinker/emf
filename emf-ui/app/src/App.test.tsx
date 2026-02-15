@@ -252,8 +252,6 @@ vi.mock('./pages', () => ({
   CollectionWizardPage: () => (
     <div data-testid="collection-wizard-page">Collection Wizard Page</div>
   ),
-  RolesPage: () => <div data-testid="roles-page">Roles Page</div>,
-  PoliciesPage: () => <div data-testid="policies-page">Policies Page</div>,
   OIDCProvidersPage: () => <div data-testid="oidc-providers-page">OIDC Providers Page</div>,
   PageBuilderPage: () => <div data-testid="page-builder-page">Page Builder Page</div>,
   MenuBuilderPage: () => <div data-testid="menu-builder-page">Menu Builder Page</div>,
@@ -284,10 +282,6 @@ vi.mock('./pages', () => ({
   PluginsPage: () => <div data-testid="plugins-page">Plugins Page</div>,
   UsersPage: () => <div data-testid="users-page">Users Page</div>,
   UserDetailPage: () => <div data-testid="user-detail-page">User Detail Page</div>,
-  ProfilesPage: () => <div data-testid="profiles-page">Profiles Page</div>,
-  PermissionSetsPage: () => <div data-testid="permission-sets-page">Permission Sets Page</div>,
-  SharingSettingsPage: () => <div data-testid="sharing-settings-page">Sharing Settings Page</div>,
-  RoleHierarchyPage: () => <div data-testid="role-hierarchy-page">Role Hierarchy Page</div>,
   SetupAuditTrailPage: () => <div data-testid="audit-trail-page">Audit Trail Page</div>,
   GovernorLimitsPage: () => <div data-testid="governor-limits-page">Governor Limits Page</div>,
   TenantsPage: () => <div data-testid="tenants-page">Tenants Page</div>,
@@ -405,14 +399,6 @@ describe('App', () => {
       })
     })
 
-    it('should redirect to login when accessing roles unauthenticated', async () => {
-      window.history.pushState({}, '', '/test-tenant/roles')
-      render(<App />)
-
-      await waitFor(() => {
-        expect(screen.getByTestId('redirect-to-login')).toBeInTheDocument()
-      })
-    })
   })
 
   describe('Protected Routes - Authenticated', () => {
@@ -459,24 +445,6 @@ describe('App', () => {
 
       await waitFor(() => {
         expect(screen.getByTestId('collection-detail-page')).toBeInTheDocument()
-      })
-    })
-
-    it('should render roles page at /:tenantSlug/roles when authenticated', async () => {
-      window.history.pushState({}, '', '/test-tenant/roles')
-      render(<App />)
-
-      await waitFor(() => {
-        expect(screen.getByTestId('roles-page')).toBeInTheDocument()
-      })
-    })
-
-    it('should render policies page at /:tenantSlug/policies when authenticated', async () => {
-      window.history.pushState({}, '', '/test-tenant/policies')
-      render(<App />)
-
-      await waitFor(() => {
-        expect(screen.getByTestId('policies-page')).toBeInTheDocument()
       })
     })
 
@@ -597,41 +565,6 @@ describe('App', () => {
       })
     })
 
-    it('should render profiles page at /:tenantSlug/profiles when authenticated', async () => {
-      window.history.pushState({}, '', '/test-tenant/profiles')
-      render(<App />)
-
-      await waitFor(() => {
-        expect(screen.getByTestId('profiles-page')).toBeInTheDocument()
-      })
-    })
-
-    it('should render permission sets page at /:tenantSlug/permission-sets when authenticated', async () => {
-      window.history.pushState({}, '', '/test-tenant/permission-sets')
-      render(<App />)
-
-      await waitFor(() => {
-        expect(screen.getByTestId('permission-sets-page')).toBeInTheDocument()
-      })
-    })
-
-    it('should render sharing settings page at /:tenantSlug/sharing when authenticated', async () => {
-      window.history.pushState({}, '', '/test-tenant/sharing')
-      render(<App />)
-
-      await waitFor(() => {
-        expect(screen.getByTestId('sharing-settings-page')).toBeInTheDocument()
-      })
-    })
-
-    it('should render role hierarchy page at /:tenantSlug/role-hierarchy when authenticated', async () => {
-      window.history.pushState({}, '', '/test-tenant/role-hierarchy')
-      render(<App />)
-
-      await waitFor(() => {
-        expect(screen.getByTestId('role-hierarchy-page')).toBeInTheDocument()
-      })
-    })
   })
 
   describe('Route Configuration', () => {
@@ -650,8 +583,6 @@ describe('App', () => {
         '/test-tenant/system-health',
         '/test-tenant/collections',
         '/test-tenant/collections/test',
-        '/test-tenant/roles',
-        '/test-tenant/policies',
         '/test-tenant/oidc-providers',
         '/test-tenant/pages',
         '/test-tenant/menus',
@@ -665,10 +596,6 @@ describe('App', () => {
         '/test-tenant/plugins',
         '/test-tenant/users',
         '/test-tenant/users/test-user-123',
-        '/test-tenant/profiles',
-        '/test-tenant/permission-sets',
-        '/test-tenant/sharing',
-        '/test-tenant/role-hierarchy',
         '/test-tenant/login',
         '/test-tenant/unauthorized',
       ]

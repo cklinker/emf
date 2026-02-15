@@ -72,7 +72,6 @@ public class ControlPlaneProperties {
 
         public static class Topics {
             private String collectionChanged = "config.collection.changed";
-            private String authzChanged = "config.authz.changed";
             private String uiChanged = "config.ui.changed";
             private String oidcChanged = "config.oidc.changed";
             private String workerAssignmentChanged = "emf.worker.assignment.changed";
@@ -84,14 +83,6 @@ public class ControlPlaneProperties {
 
             public void setCollectionChanged(String collectionChanged) {
                 this.collectionChanged = collectionChanged;
-            }
-
-            public String getAuthzChanged() {
-                return authzChanged;
-            }
-
-            public void setAuthzChanged(String authzChanged) {
-                this.authzChanged = authzChanged;
             }
 
             public String getUiChanged() {

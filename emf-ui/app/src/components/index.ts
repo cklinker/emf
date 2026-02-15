@@ -80,19 +80,6 @@ export type {
   CollectionSummary,
 } from './FieldEditor'
 
-// AuthorizationPanel component
-export { AuthorizationPanel, ROUTE_OPERATIONS, FIELD_OPERATIONS } from './AuthorizationPanel'
-export type {
-  AuthorizationPanelProps,
-  RouteOperation,
-  FieldOperation,
-  PolicySummary,
-  RoutePolicyConfig,
-  FieldPolicyConfig,
-  FieldDefinition as AuthorizationFieldDefinition,
-  CollectionAuthz,
-} from './AuthorizationPanel'
-
 // LiveRegion component for screen reader announcements
 export { LiveRegion, LiveRegionProvider, useAnnounce } from './LiveRegion'
 export type {

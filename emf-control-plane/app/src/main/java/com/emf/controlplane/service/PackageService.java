@@ -43,8 +43,6 @@ public class PackageService {
     private final PackageRepository packageRepository;
     private final CollectionRepository collectionRepository;
     private final FieldRepository fieldRepository;
-    private final RoleRepository roleRepository;
-    private final PolicyRepository policyRepository;
     private final OidcProviderRepository oidcProviderRepository;
     private final UiPageRepository uiPageRepository;
     private final UiMenuRepository uiMenuRepository;
@@ -54,8 +52,6 @@ public class PackageService {
             PackageRepository packageRepository,
             CollectionRepository collectionRepository,
             FieldRepository fieldRepository,
-            RoleRepository roleRepository,
-            PolicyRepository policyRepository,
             OidcProviderRepository oidcProviderRepository,
             UiPageRepository uiPageRepository,
             UiMenuRepository uiMenuRepository,
@@ -63,8 +59,6 @@ public class PackageService {
         this.packageRepository = packageRepository;
         this.collectionRepository = collectionRepository;
         this.fieldRepository = fieldRepository;
-        this.roleRepository = roleRepository;
-        this.policyRepository = policyRepository;
         this.oidcProviderRepository = oidcProviderRepository;
         this.uiPageRepository = uiPageRepository;
         this.uiMenuRepository = uiMenuRepository;
@@ -106,14 +100,6 @@ public class PackageService {
         List<PackageDto.PackageCollectionDto> collections = exportCollections(request, pkg);
         dto.setCollections(collections);
 
-        // Export roles
-        List<PackageDto.PackageRoleDto> roles = exportRoles(request, pkg);
-        dto.setRoles(roles);
-
-        // Export policies
-        List<PackageDto.PackagePolicyDto> policies = exportPolicies(request, pkg);
-        dto.setPolicies(policies);
-
         // Export OIDC providers
         List<PackageDto.PackageOidcProviderDto> oidcProviders = exportOidcProviders(request, pkg);
         dto.setOidcProviders(oidcProviders);
@@ -148,7 +134,7 @@ public class PackageService {
     @Transactional
     public ImportResultDto importPackage(ImportPackageRequest request, boolean dryRun) {
         PackageDto packageData = request.getPackageData();
-        log.info("Importing package: {} v{} (dryRun={})", 
+        log.info("Importing package: {} v{} (dryRun={})",
                 packageData.getName(), packageData.getVersion(), dryRun);
 
         // Validate the package
@@ -156,8 +142,8 @@ public class PackageService {
         if (!validationErrors.isEmpty()) {
             log.warn("Package validation failed with {} errors", validationErrors.size());
             return ImportResultDto.validationFailure(
-                    packageData.getName(), 
-                    packageData.getVersion(), 
+                    packageData.getName(),
+                    packageData.getVersion(),
                     validationErrors);
         }
 
@@ -212,20 +198,6 @@ public class PackageService {
             }
         }
 
-        // Validate roles
-        for (PackageDto.PackageRoleDto role : packageData.getRoles()) {
-            if (role.getName() == null || role.getName().isBlank()) {
-                errors.add("Role name is required for role ID: " + role.getId());
-            }
-        }
-
-        // Validate policies
-        for (PackageDto.PackagePolicyDto policy : packageData.getPolicies()) {
-            if (policy.getName() == null || policy.getName().isBlank()) {
-                errors.add("Policy name is required for policy ID: " + policy.getId());
-            }
-        }
-
         // Validate OIDC providers
         for (PackageDto.PackageOidcProviderDto provider : packageData.getOidcProviders()) {
             if (provider.getName() == null || provider.getName().isBlank()) {
@@ -237,32 +209,32 @@ public class PackageService {
             if (provider.getJwksUri() == null || provider.getJwksUri().isBlank()) {
                 errors.add("OIDC provider JWKS URI is required for provider: " + provider.getName());
             }
-            
+
             // Validate claim configurations (Requirements 9.3, 9.4)
             try {
                 validateClaimPath(provider.getRolesClaim(), "rolesClaim");
             } catch (ValidationException e) {
                 errors.add("OIDC provider " + provider.getName() + ": " + e.getMessage());
             }
-            
+
             try {
                 validateClaimPath(provider.getEmailClaim(), "emailClaim");
             } catch (ValidationException e) {
                 errors.add("OIDC provider " + provider.getName() + ": " + e.getMessage());
             }
-            
+
             try {
                 validateClaimPath(provider.getUsernameClaim(), "usernameClaim");
             } catch (ValidationException e) {
                 errors.add("OIDC provider " + provider.getName() + ": " + e.getMessage());
             }
-            
+
             try {
                 validateClaimPath(provider.getNameClaim(), "nameClaim");
             } catch (ValidationException e) {
                 errors.add("OIDC provider " + provider.getName() + ": " + e.getMessage());
             }
-            
+
             try {
                 validateRolesMapping(provider.getRolesMapping());
             } catch (ValidationException e) {
@@ -306,16 +278,6 @@ public class PackageService {
         // Preview collections
         for (PackageDto.PackageCollectionDto collection : packageData.getCollections()) {
             previewCollectionImport(collection, conflictStrategy, preview);
-        }
-
-        // Preview roles
-        for (PackageDto.PackageRoleDto role : packageData.getRoles()) {
-            previewRoleImport(role, conflictStrategy, preview);
-        }
-
-        // Preview policies
-        for (PackageDto.PackagePolicyDto policy : packageData.getPolicies()) {
-            previewPolicyImport(policy, conflictStrategy, preview);
         }
 
         // Preview OIDC providers
@@ -368,16 +330,6 @@ public class PackageService {
                 importCollection(collection, conflictStrategy, result, pkg);
             }
 
-            // Import roles
-            for (PackageDto.PackageRoleDto role : packageData.getRoles()) {
-                importRole(role, conflictStrategy, result, pkg);
-            }
-
-            // Import policies
-            for (PackageDto.PackagePolicyDto policy : packageData.getPolicies()) {
-                importPolicy(policy, conflictStrategy, result, pkg);
-            }
-
             // Import OIDC providers
             for (PackageDto.PackageOidcProviderDto provider : packageData.getOidcProviders()) {
                 importOidcProvider(provider, conflictStrategy, result, pkg);
@@ -399,7 +351,7 @@ public class PackageService {
             result.updateCounts();
 
             log.info("Import completed: {} created, {} updated, {} skipped, {} failed",
-                    result.getCreatedCount(), result.getUpdatedCount(), 
+                    result.getCreatedCount(), result.getUpdatedCount(),
                     result.getSkippedCount(), result.getFailedCount());
 
         } catch (Exception e) {
@@ -451,56 +403,6 @@ public class PackageService {
             // Add package item for tracking
             addPackageItem(pkg, "COLLECTION", collection.getId(), dto);
 
-            return dto;
-        }).collect(Collectors.toList());
-    }
-
-    private List<PackageDto.PackageRoleDto> exportRoles(ExportPackageRequest request, ConfigPackage pkg) {
-        List<Role> roles;
-        if (request.isExportAll()) {
-            roles = roleRepository.findAll();
-        } else if (!request.getRoleIds().isEmpty()) {
-            roles = request.getRoleIds().stream()
-                    .map(id -> roleRepository.findById(id)
-                            .orElseThrow(() -> new ResourceNotFoundException("Role", id)))
-                    .collect(Collectors.toList());
-        } else {
-            return new ArrayList<>();
-        }
-
-        return roles.stream().map(role -> {
-            PackageDto.PackageRoleDto dto = new PackageDto.PackageRoleDto(
-                    role.getId(),
-                    role.getName(),
-                    role.getDescription()
-            );
-            addPackageItem(pkg, "ROLE", role.getId(), dto);
-            return dto;
-        }).collect(Collectors.toList());
-    }
-
-    private List<PackageDto.PackagePolicyDto> exportPolicies(ExportPackageRequest request, ConfigPackage pkg) {
-        List<Policy> policies;
-        if (request.isExportAll()) {
-            policies = policyRepository.findAll();
-        } else if (!request.getPolicyIds().isEmpty()) {
-            policies = request.getPolicyIds().stream()
-                    .map(id -> policyRepository.findById(id)
-                            .orElseThrow(() -> new ResourceNotFoundException("Policy", id)))
-                    .collect(Collectors.toList());
-        } else {
-            return new ArrayList<>();
-        }
-
-        return policies.stream().map(policy -> {
-            PackageDto.PackagePolicyDto dto = new PackageDto.PackagePolicyDto(
-                    policy.getId(),
-                    policy.getName(),
-                    policy.getDescription(),
-                    policy.getExpression(),
-                    policy.getRules()
-            );
-            addPackageItem(pkg, "POLICY", policy.getId(), dto);
             return dto;
         }).collect(Collectors.toList());
     }
@@ -608,20 +510,6 @@ public class PackageService {
         addPreviewItem(preview, "COLLECTION", collection.getId(), collection.getName(), existing.isPresent(), strategy);
     }
 
-    private void previewRoleImport(PackageDto.PackageRoleDto role,
-                                   ImportPackageRequest.ConflictStrategy strategy,
-                                   ImportPreviewDto preview) {
-        Optional<Role> existing = roleRepository.findByName(role.getName());
-        addPreviewItem(preview, "ROLE", role.getId(), role.getName(), existing.isPresent(), strategy);
-    }
-
-    private void previewPolicyImport(PackageDto.PackagePolicyDto policy,
-                                     ImportPackageRequest.ConflictStrategy strategy,
-                                     ImportPreviewDto preview) {
-        Optional<Policy> existing = policyRepository.findByName(policy.getName());
-        addPreviewItem(preview, "POLICY", policy.getId(), policy.getName(), existing.isPresent(), strategy);
-    }
-
     private void previewOidcProviderImport(PackageDto.PackageOidcProviderDto provider,
                                            ImportPackageRequest.ConflictStrategy strategy,
                                            ImportPreviewDto preview) {
@@ -643,7 +531,7 @@ public class PackageService {
         addPreviewItem(preview, "UI_MENU", menu.getId(), menu.getName(), existing.isPresent(), strategy);
     }
 
-    private void addPreviewItem(ImportPreviewDto preview, String itemType, String itemId, 
+    private void addPreviewItem(ImportPreviewDto preview, String itemType, String itemId,
                                 String itemName, boolean exists, ImportPackageRequest.ConflictStrategy strategy) {
         ImportPreviewDto.ImportItemDto item = new ImportPreviewDto.ImportItemDto(itemType, itemId, itemName, null);
 
@@ -694,10 +582,10 @@ public class PackageService {
             Collection collection = existing.get();
             collection.setDescription(collectionDto.getDescription());
             collectionRepository.save(collection);
-            
+
             // Update fields
             importFields(collection, collectionDto.getFields());
-            
+
             result.addUpdatedItem(new ImportResultDto.ImportedItemDto(
                     "COLLECTION", collection.getId(), collection.getName(), "UPDATED"));
             addPackageItem(pkg, "COLLECTION", collection.getId(), collectionDto);
@@ -708,10 +596,10 @@ public class PackageService {
             collection.setActive(true);
             collection.setPath("/api/" + collectionDto.getName());
             collection = collectionRepository.save(collection);
-            
+
             // Import fields
             importFields(collection, collectionDto.getFields());
-            
+
             result.addCreatedItem(new ImportResultDto.ImportedItemDto(
                     "COLLECTION", collection.getId(), collection.getName(), "CREATED"));
             addPackageItem(pkg, "COLLECTION", collection.getId(), collectionDto);
@@ -722,7 +610,7 @@ public class PackageService {
         for (PackageDto.PackageFieldDto fieldDto : fieldDtos) {
             Optional<Field> existing = fieldRepository.findByCollectionIdAndNameAndActiveTrue(
                     collection.getId(), fieldDto.getName());
-            
+
             if (existing.isPresent()) {
                 Field field = existing.get();
                 field.setType(fieldDto.getType());
@@ -742,80 +630,13 @@ public class PackageService {
         }
     }
 
-    private void importRole(PackageDto.PackageRoleDto roleDto,
-                            ImportPackageRequest.ConflictStrategy strategy,
-                            ImportResultDto result,
-                            ConfigPackage pkg) {
-        Optional<Role> existing = roleRepository.findByName(roleDto.getName());
-
-        if (existing.isPresent()) {
-            if (strategy == ImportPackageRequest.ConflictStrategy.SKIP) {
-                result.addSkippedItem(new ImportResultDto.ImportedItemDto(
-                        "ROLE", roleDto.getId(), roleDto.getName(), "SKIPPED", "Already exists"));
-                return;
-            } else if (strategy == ImportPackageRequest.ConflictStrategy.FAIL) {
-                result.addFailedItem(new ImportResultDto.ImportedItemDto(
-                        "ROLE", roleDto.getId(), roleDto.getName(), "FAILED", "Already exists"));
-                return;
-            }
-            // OVERWRITE - update existing
-            Role role = existing.get();
-            role.setDescription(roleDto.getDescription());
-            roleRepository.save(role);
-            result.addUpdatedItem(new ImportResultDto.ImportedItemDto(
-                    "ROLE", role.getId(), role.getName(), "UPDATED"));
-            addPackageItem(pkg, "ROLE", role.getId(), roleDto);
-        } else {
-            // Create new
-            Role role = new Role(roleDto.getName(), roleDto.getDescription());
-            role = roleRepository.save(role);
-            result.addCreatedItem(new ImportResultDto.ImportedItemDto(
-                    "ROLE", role.getId(), role.getName(), "CREATED"));
-            addPackageItem(pkg, "ROLE", role.getId(), roleDto);
-        }
-    }
-
-    private void importPolicy(PackageDto.PackagePolicyDto policyDto,
-                              ImportPackageRequest.ConflictStrategy strategy,
-                              ImportResultDto result,
-                              ConfigPackage pkg) {
-        Optional<Policy> existing = policyRepository.findByName(policyDto.getName());
-
-        if (existing.isPresent()) {
-            if (strategy == ImportPackageRequest.ConflictStrategy.SKIP) {
-                result.addSkippedItem(new ImportResultDto.ImportedItemDto(
-                        "POLICY", policyDto.getId(), policyDto.getName(), "SKIPPED", "Already exists"));
-                return;
-            } else if (strategy == ImportPackageRequest.ConflictStrategy.FAIL) {
-                result.addFailedItem(new ImportResultDto.ImportedItemDto(
-                        "POLICY", policyDto.getId(), policyDto.getName(), "FAILED", "Already exists"));
-                return;
-            }
-            // OVERWRITE - update existing
-            Policy policy = existing.get();
-            policy.setDescription(policyDto.getDescription());
-            policy.setRules(policyDto.getRules());
-            policyRepository.save(policy);
-            result.addUpdatedItem(new ImportResultDto.ImportedItemDto(
-                    "POLICY", policy.getId(), policy.getName(), "UPDATED"));
-            addPackageItem(pkg, "POLICY", policy.getId(), policyDto);
-        } else {
-            // Create new
-            Policy policy = new Policy(policyDto.getName(), policyDto.getDescription(), policyDto.getExpression(), policyDto.getRules());
-            policy = policyRepository.save(policy);
-            result.addCreatedItem(new ImportResultDto.ImportedItemDto(
-                    "POLICY", policy.getId(), policy.getName(), "CREATED"));
-            addPackageItem(pkg, "POLICY", policy.getId(), policyDto);
-        }
-    }
-
     private void importOidcProvider(PackageDto.PackageOidcProviderDto providerDto,
                                     ImportPackageRequest.ConflictStrategy strategy,
                                     ImportResultDto result,
                                     ConfigPackage pkg) {
         // Apply defaults for missing claim fields (Requirement 9.3)
         applyClaimDefaults(providerDto);
-        
+
         Optional<OidcProvider> existing = oidcProviderRepository.findByNameAndActiveTrue(providerDto.getName());
 
         if (existing.isPresent()) {
@@ -940,7 +761,7 @@ public class PackageService {
         // Clear existing items and add new ones
         menu.getItems().clear();
         for (PackageDto.PackageUiMenuItemDto itemDto : itemDtos) {
-            UiMenuItem item = new UiMenuItem(itemDto.getLabel(), itemDto.getPath(), 
+            UiMenuItem item = new UiMenuItem(itemDto.getLabel(), itemDto.getPath(),
                     itemDto.getDisplayOrder() != null ? itemDto.getDisplayOrder() : 0);
             item.setIcon(itemDto.getIcon());
             item.setActive(true);
@@ -989,9 +810,9 @@ public class PackageService {
     @Transactional(readOnly = true)
     public List<PackageDto> getPackageHistory() {
         log.info("Retrieving package history");
-        
+
         List<ConfigPackage> packages = packageRepository.findAllByOrderByCreatedAtDesc();
-        
+
         return packages.stream().map(pkg -> {
             PackageDto dto = new PackageDto(
                     pkg.getId(),
@@ -1000,25 +821,17 @@ public class PackageService {
                     pkg.getDescription(),
                     pkg.getCreatedAt()
             );
-            
+
             // Count items by type
             int collectionCount = 0;
-            int roleCount = 0;
-            int policyCount = 0;
             int oidcProviderCount = 0;
             int uiPageCount = 0;
             int uiMenuCount = 0;
-            
+
             for (PackageItem item : pkg.getItems()) {
                 switch (item.getItemType()) {
                     case "COLLECTION":
                         collectionCount++;
-                        break;
-                    case "ROLE":
-                        roleCount++;
-                        break;
-                    case "POLICY":
-                        policyCount++;
                         break;
                     case "OIDC_PROVIDER":
                         oidcProviderCount++;
@@ -1031,15 +844,13 @@ public class PackageService {
                         break;
                 }
             }
-            
+
             // Set empty lists with counts for history view
             dto.setCollections(new ArrayList<>());
-            dto.setRoles(new ArrayList<>());
-            dto.setPolicies(new ArrayList<>());
             dto.setOidcProviders(new ArrayList<>());
             dto.setUiPages(new ArrayList<>());
             dto.setUiMenus(new ArrayList<>());
-            
+
             return dto;
         }).collect(Collectors.toList());
     }
@@ -1049,26 +860,26 @@ public class PackageService {
     /**
      * Validates claim path format.
      * Claim paths should be alphanumeric with dots and underscores, max 200 characters.
-     * 
+     *
      * @param claimPath The claim path to validate
      * @param fieldName The field name for error messages
      * @throws ValidationException if the claim path is invalid
-     * 
+     *
      * Validates: Requirements 9.3, 9.4
      */
     private void validateClaimPath(String claimPath, String fieldName) {
         if (claimPath == null || claimPath.isBlank()) {
             return; // null or empty is valid (will use defaults)
         }
-        
+
         if (claimPath.length() > 200) {
-            throw new ValidationException(fieldName, 
+            throw new ValidationException(fieldName,
                 "Claim path must not exceed 200 characters");
         }
-        
+
         // Validate claim path format (alphanumeric, dots, underscores)
         if (!claimPath.matches("^[a-zA-Z0-9_.]+$")) {
-            throw new ValidationException(fieldName, 
+            throw new ValidationException(fieldName,
                 "Claim path must contain only letters, numbers, dots, and underscores");
         }
     }
@@ -1076,22 +887,22 @@ public class PackageService {
     /**
      * Validates roles mapping JSON format.
      * The roles mapping should be a valid JSON object that maps external role names to internal role names.
-     * 
+     *
      * @param rolesMapping The roles mapping JSON string
      * @throws ValidationException if the JSON is invalid
-     * 
+     *
      * Validates: Requirements 9.3, 9.4
      */
     private void validateRolesMapping(String rolesMapping) {
         if (rolesMapping == null || rolesMapping.isBlank()) {
             return; // null or empty is valid
         }
-        
+
         try {
             // Attempt to parse as JSON to validate format
             objectMapper.readTree(rolesMapping);
         } catch (Exception e) {
-            throw new ValidationException("rolesMapping", 
+            throw new ValidationException("rolesMapping",
                 "Invalid JSON format: " + e.getMessage());
         }
     }
@@ -1099,9 +910,9 @@ public class PackageService {
     /**
      * Applies default values for missing claim fields.
      * This ensures backward compatibility when importing packages that don't have claim fields.
-     * 
+     *
      * @param providerDto The OIDC provider DTO to apply defaults to
-     * 
+     *
      * Validates: Requirement 9.3
      */
     private void applyClaimDefaults(PackageDto.PackageOidcProviderDto providerDto) {

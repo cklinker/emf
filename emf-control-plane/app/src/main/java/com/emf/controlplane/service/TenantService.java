@@ -35,17 +35,14 @@ public class TenantService {
     private final TenantRepository tenantRepository;
     private final ObjectMapper objectMapper;
     private final TenantSchemaManager tenantSchemaManager;
-    private final DefaultProfileSeeder defaultProfileSeeder;
 
     public TenantService(
             TenantRepository tenantRepository,
             ObjectMapper objectMapper,
-            @Nullable TenantSchemaManager tenantSchemaManager,
-            @Nullable DefaultProfileSeeder defaultProfileSeeder) {
+            @Nullable TenantSchemaManager tenantSchemaManager) {
         this.tenantRepository = tenantRepository;
         this.objectMapper = objectMapper;
         this.tenantSchemaManager = tenantSchemaManager;
-        this.defaultProfileSeeder = defaultProfileSeeder;
     }
 
     /**
@@ -86,11 +83,6 @@ public class TenantService {
         // Provision default data for the new tenant
         if (tenantSchemaManager != null) {
             tenantSchemaManager.provisionTenant(tenant.getId(), tenant.getSlug());
-        }
-
-        // Seed default profiles (System Administrator, Standard User, Read Only, Minimum Access)
-        if (defaultProfileSeeder != null) {
-            defaultProfileSeeder.seedDefaultProfiles(tenant.getId());
         }
 
         // Transition to ACTIVE after provisioning

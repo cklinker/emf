@@ -83,7 +83,6 @@ emf:
       enabled: false
       topics:
         collection-changed: test.config.collection.changed
-        authz-changed: test.config.authz.changed
         ui-changed: test.config.ui.changed
         oidc-changed: test.config.oidc.changed
     cache:

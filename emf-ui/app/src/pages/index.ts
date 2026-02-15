@@ -21,14 +21,6 @@ export type { CollectionFormPageProps } from './CollectionFormPage'
 export { CollectionWizardPage } from './CollectionWizardPage'
 export type { CollectionWizardPageProps } from './CollectionWizardPage'
 
-// RolesPage - Authorization roles management page
-export { RolesPage } from './RolesPage'
-export type { RolesPageProps, Role } from './RolesPage'
-
-// PoliciesPage - Authorization policies management page
-export { PoliciesPage } from './PoliciesPage'
-export type { PoliciesPageProps, Policy } from './PoliciesPage'
-
 // OIDCProvidersPage - OIDC providers management page
 export { OIDCProvidersPage } from './OIDCProvidersPage'
 export type { OIDCProvidersPageProps, OIDCProvider } from './OIDCProvidersPage'
@@ -149,22 +141,6 @@ export type { LoginPageProps } from './LoginPage'
 // UnauthorizedPage - Access denied page
 export { UnauthorizedPage } from './UnauthorizedPage'
 export type { UnauthorizedPageProps } from './UnauthorizedPage'
-
-// ProfilesPage - Profile-based permission management page
-export { ProfilesPage } from './ProfilesPage'
-export type { ProfilesPageProps } from './ProfilesPage'
-
-// PermissionSetsPage - Permission set management page
-export { PermissionSetsPage } from './PermissionSetsPage'
-export type { PermissionSetsPageProps } from './PermissionSetsPage'
-
-// SharingSettingsPage - Record-level sharing settings
-export { SharingSettingsPage } from './SharingSettingsPage'
-export type { SharingSettingsPageProps } from './SharingSettingsPage'
-
-// RoleHierarchyPage - Role hierarchy visualization
-export { RoleHierarchyPage } from './RoleHierarchyPage'
-export type { RoleHierarchyPageProps } from './RoleHierarchyPage'
 
 // SetupAuditTrailPage - Configuration audit trail
 export { SetupAuditTrailPage } from './SetupAuditTrailPage'

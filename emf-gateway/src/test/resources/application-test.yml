@@ -38,7 +38,6 @@ emf:
     kafka:
       topics:
         collection-changed: emf.collection.changed
-        authz-changed: emf.authz.changed
     rate-limit:
       default:
         requests-per-window: 100

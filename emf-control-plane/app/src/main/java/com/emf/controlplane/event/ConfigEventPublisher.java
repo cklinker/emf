@@ -2,12 +2,9 @@ package com.emf.controlplane.event;
 
 import com.emf.controlplane.config.ControlPlaneProperties;
 import com.emf.controlplane.entity.Collection;
-import com.emf.controlplane.entity.FieldPolicy;
 import com.emf.controlplane.entity.OidcProvider;
-import com.emf.controlplane.entity.RoutePolicy;
 import com.emf.controlplane.entity.UiMenu;
 import com.emf.controlplane.entity.UiPage;
-import com.emf.runtime.event.AuthzChangedPayload;
 import com.emf.runtime.event.ChangeType;
 import com.emf.runtime.event.CollectionChangedPayload;
 import com.emf.runtime.event.ConfigEvent;
@@ -57,7 +54,6 @@ public class ConfigEventPublisher {
     private static final Logger log = LoggerFactory.getLogger(ConfigEventPublisher.class);
 
     private static final String EVENT_TYPE_COLLECTION_CHANGED = "emf.config.collection.changed";
-    private static final String EVENT_TYPE_AUTHZ_CHANGED = "emf.config.authz.changed";
     private static final String EVENT_TYPE_UI_CHANGED = "emf.config.ui.changed";
     private static final String EVENT_TYPE_OIDC_CHANGED = "emf.config.oidc.changed";
 
@@ -93,35 +89,6 @@ public class ConfigEventPublisher {
 
         String topic = properties.getKafka().getTopics().getCollectionChanged();
         sendAfterCommit(topic, collection.getId(), event);
-    }
-
-    /**
-     * Publishes an authorization changed event to Kafka.
-     *
-     * <p>Builds the payload synchronously from JPA entities, then sends asynchronously.
-     *
-     * @param collectionId The collection ID
-     * @param collectionName The collection name
-     * @param routePolicies The route policies for the collection
-     * @param fieldPolicies The field policies for the collection
-     *
-     * Validates: Requirements 10.2, 10.5, 10.6
-     */
-    public void publishAuthzChanged(
-            String collectionId,
-            String collectionName,
-            List<RoutePolicy> routePolicies,
-            List<FieldPolicy> fieldPolicies) {
-        log.info("Publishing authz changed event: collectionId={}", collectionId);
-
-        // Build payload synchronously (accesses lazy-loaded JPA relations within the transaction)
-        AuthzChangedPayload payload = PayloadAdapter.toAuthzPayload(
-                collectionId, collectionName, routePolicies, fieldPolicies);
-        ConfigEvent<AuthzChangedPayload> event = EventFactory.createEvent(
-                EVENT_TYPE_AUTHZ_CHANGED, generateCorrelationId(), payload);
-
-        String topic = properties.getKafka().getTopics().getAuthzChanged();
-        sendAfterCommit(topic, collectionId, event);
     }
 
     /**

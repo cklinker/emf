@@ -48,9 +48,6 @@ public class User {
     @Column(name = "timezone", length = 50)
     private String timezone = "UTC";
 
-    @Column(name = "profile_id", length = 36)
-    private String profileId;
-
     @Column(name = "manager_id", length = 36)
     private String managerId;
 
@@ -121,9 +118,6 @@ public class User {
 
     public String getTimezone() { return timezone; }
     public void setTimezone(String timezone) { this.timezone = timezone; }
-
-    public String getProfileId() { return profileId; }
-    public void setProfileId(String profileId) { this.profileId = profileId; }
 
     public String getManagerId() { return managerId; }
     public void setManagerId(String managerId) { this.managerId = managerId; }

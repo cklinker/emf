@@ -24,11 +24,11 @@ import static org.mockito.Mockito.*;
 
 /**
  * Tests for PackageService claim configuration validation during import.
- * 
+ *
  * Tests task 6.2: Update PackageService import validation
  * - Validate claim configurations during import
  * - Apply defaults for missing claim fields
- * 
+ *
  * Requirements tested: 9.3, 9.4
  */
 @ExtendWith(MockitoExtension.class)
@@ -37,25 +37,19 @@ class PackageServiceClaimValidationTest {
 
     @Mock
     private PackageRepository packageRepository;
-    
+
     @Mock
     private CollectionRepository collectionRepository;
-    
+
     @Mock
     private FieldRepository fieldRepository;
-    
-    @Mock
-    private RoleRepository roleRepository;
-    
-    @Mock
-    private PolicyRepository policyRepository;
-    
+
     @Mock
     private OidcProviderRepository oidcProviderRepository;
-    
+
     @Mock
     private UiPageRepository uiPageRepository;
-    
+
     @Mock
     private UiMenuRepository uiMenuRepository;
 
@@ -73,8 +67,6 @@ class PackageServiceClaimValidationTest {
             packageRepository,
             collectionRepository,
             fieldRepository,
-            roleRepository,
-            policyRepository,
             oidcProviderRepository,
             uiPageRepository,
             uiMenuRepository,
@@ -99,7 +91,7 @@ class PackageServiceClaimValidationTest {
 
             // Then
             assertThat(errors).isNotEmpty();
-            assertThat(errors).anyMatch(error -> 
+            assertThat(errors).anyMatch(error ->
                 error.contains("test-provider") && error.contains("Invalid JSON format"));
         }
 
@@ -117,7 +109,7 @@ class PackageServiceClaimValidationTest {
 
             // Then
             assertThat(errors).isNotEmpty();
-            assertThat(errors).anyMatch(error -> 
+            assertThat(errors).anyMatch(error ->
                 error.contains("test-provider") && error.contains("must not exceed 200 characters"));
         }
 
@@ -134,8 +126,8 @@ class PackageServiceClaimValidationTest {
 
             // Then
             assertThat(errors).isNotEmpty();
-            assertThat(errors).anyMatch(error -> 
-                error.contains("test-provider") && 
+            assertThat(errors).anyMatch(error ->
+                error.contains("test-provider") &&
                 error.contains("must contain only letters, numbers, dots, and underscores"));
         }
 

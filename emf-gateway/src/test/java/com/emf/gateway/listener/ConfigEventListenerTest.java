@@ -1,10 +1,7 @@
 package com.emf.gateway.listener;
 
-import com.emf.gateway.authz.AuthzConfig;
-import com.emf.gateway.authz.AuthzConfigCache;
 import com.emf.gateway.route.RouteDefinition;
 import com.emf.gateway.route.RouteRegistry;
-import com.emf.runtime.event.AuthzChangedPayload;
 import com.emf.runtime.event.ChangeType;
 import com.emf.runtime.event.CollectionChangedPayload;
 import com.emf.runtime.event.ConfigEvent;
@@ -19,15 +16,12 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 /**
@@ -42,9 +36,6 @@ class ConfigEventListenerTest {
     @Mock
     private RouteRegistry routeRegistry;
 
-    @Mock
-    private AuthzConfigCache authzConfigCache;
-
     private ObjectMapper objectMapper;
     private ConfigEventListener listener;
 
@@ -53,7 +44,7 @@ class ConfigEventListenerTest {
     @BeforeEach
     void setUp() {
         objectMapper = new ObjectMapper();
-        listener = new ConfigEventListener(routeRegistry, authzConfigCache, objectMapper, event -> {}, WORKER_SERVICE_URL);
+        listener = new ConfigEventListener(routeRegistry, objectMapper, event -> {}, WORKER_SERVICE_URL);
     }
 
     @Nested
@@ -156,149 +147,6 @@ class ConfigEventListenerTest {
             assertDoesNotThrow(() -> listener.handleCollectionChanged(event));
             verify(routeRegistry, never()).updateRoute(any());
             verify(routeRegistry, never()).removeRoute(any());
-        }
-    }
-
-    @Nested
-    @DisplayName("Authorization Changed Event Tests")
-    class AuthzChangedTests {
-
-        @Test
-        @DisplayName("Should update authz config when authorization changes")
-        void shouldUpdateAuthzConfigWhenAuthorizationChanges() {
-            // Arrange
-            AuthzChangedPayload payload = new AuthzChangedPayload();
-            payload.setCollectionId("collection-1");
-            payload.setCollectionName("users");
-
-            // Add route policies
-            List<AuthzChangedPayload.RoutePolicyPayload> routePolicies = new ArrayList<>();
-            AuthzChangedPayload.RoutePolicyPayload routePolicy = new AuthzChangedPayload.RoutePolicyPayload();
-            routePolicy.setId("rp-1");
-            routePolicy.setOperation("POST");
-            routePolicy.setPolicyId("policy-1");
-            routePolicy.setPolicyRules("{\"roles\": [\"ADMIN\"]}");
-            routePolicies.add(routePolicy);
-            payload.setRoutePolicies(routePolicies);
-
-            // Add field policies
-            List<AuthzChangedPayload.FieldPolicyPayload> fieldPolicies = new ArrayList<>();
-            AuthzChangedPayload.FieldPolicyPayload fieldPolicy = new AuthzChangedPayload.FieldPolicyPayload();
-            fieldPolicy.setId("fp-1");
-            fieldPolicy.setFieldName("email");
-            fieldPolicy.setPolicyId("policy-1");
-            fieldPolicy.setPolicyRules("{\"roles\": [\"ADMIN\"]}");
-            fieldPolicies.add(fieldPolicy);
-            payload.setFieldPolicies(fieldPolicies);
-
-            ConfigEvent<AuthzChangedPayload> event = new ConfigEvent<>(
-                UUID.randomUUID().toString(),
-                "config.authz.changed",
-                UUID.randomUUID().toString(),
-                Instant.now(),
-                payload
-            );
-
-            // Act
-            listener.handleAuthzChanged(event);
-
-            // Assert
-            ArgumentCaptor<AuthzConfig> configCaptor = ArgumentCaptor.forClass(AuthzConfig.class);
-            verify(authzConfigCache).updateConfig(eq("collection-1"), configCaptor.capture());
-
-            AuthzConfig capturedConfig = configCaptor.getValue();
-            assertEquals("collection-1", capturedConfig.getCollectionId());
-            assertEquals(1, capturedConfig.getRoutePolicies().size());
-            assertEquals(1, capturedConfig.getFieldPolicies().size());
-
-            // Verify route policy
-            assertEquals("POST", capturedConfig.getRoutePolicies().get(0).getMethod());
-            assertEquals("policy-1", capturedConfig.getRoutePolicies().get(0).getPolicyId());
-            assertTrue(capturedConfig.getRoutePolicies().get(0).getRoles().contains("ADMIN"));
-
-            // Verify field policy
-            assertEquals("email", capturedConfig.getFieldPolicies().get(0).getFieldName());
-            assertEquals("policy-1", capturedConfig.getFieldPolicies().get(0).getPolicyId());
-            assertTrue(capturedConfig.getFieldPolicies().get(0).getRoles().contains("ADMIN"));
-        }
-
-        @Test
-        @DisplayName("Should handle empty policies")
-        void shouldHandleEmptyPolicies() {
-            // Arrange
-            AuthzChangedPayload payload = new AuthzChangedPayload();
-            payload.setCollectionId("collection-1");
-            payload.setCollectionName("users");
-            payload.setRoutePolicies(new ArrayList<>());
-            payload.setFieldPolicies(new ArrayList<>());
-
-            ConfigEvent<AuthzChangedPayload> event = new ConfigEvent<>(
-                UUID.randomUUID().toString(),
-                "config.authz.changed",
-                UUID.randomUUID().toString(),
-                Instant.now(),
-                payload
-            );
-
-            // Act
-            listener.handleAuthzChanged(event);
-
-            // Assert
-            ArgumentCaptor<AuthzConfig> configCaptor = ArgumentCaptor.forClass(AuthzConfig.class);
-            verify(authzConfigCache).updateConfig(eq("collection-1"), configCaptor.capture());
-
-            AuthzConfig capturedConfig = configCaptor.getValue();
-            assertEquals(0, capturedConfig.getRoutePolicies().size());
-            assertEquals(0, capturedConfig.getFieldPolicies().size());
-        }
-
-        @Test
-        @DisplayName("Should handle null payload gracefully")
-        void shouldHandleNullPayloadGracefully() {
-            // Arrange
-            ConfigEvent<AuthzChangedPayload> event = new ConfigEvent<>(
-                UUID.randomUUID().toString(),
-                "config.authz.changed",
-                UUID.randomUUID().toString(),
-                Instant.now(),
-                null
-            );
-
-            // Act & Assert - should not throw exception
-            assertDoesNotThrow(() -> listener.handleAuthzChanged(event));
-            verify(authzConfigCache, never()).updateConfig(any(), any());
-        }
-
-        @Test
-        @DisplayName("Should handle malformed policy rules JSON gracefully")
-        void shouldHandleMalformedPolicyRulesGracefully() {
-            // Arrange
-            AuthzChangedPayload payload = new AuthzChangedPayload();
-            payload.setCollectionId("collection-1");
-            payload.setCollectionName("users");
-
-            List<AuthzChangedPayload.RoutePolicyPayload> routePolicies = new ArrayList<>();
-            AuthzChangedPayload.RoutePolicyPayload routePolicy = new AuthzChangedPayload.RoutePolicyPayload();
-            routePolicy.setId("rp-1");
-            routePolicy.setOperation("POST");
-            routePolicy.setPolicyId("policy-1");
-            routePolicy.setPolicyRules("invalid json");
-            routePolicies.add(routePolicy);
-            payload.setRoutePolicies(routePolicies);
-
-            ConfigEvent<AuthzChangedPayload> event = new ConfigEvent<>(
-                UUID.randomUUID().toString(),
-                "config.authz.changed",
-                UUID.randomUUID().toString(),
-                Instant.now(),
-                payload
-            );
-
-            // Act & Assert - should not throw exception
-            assertDoesNotThrow(() -> listener.handleAuthzChanged(event));
-
-            // Should still update cache with empty roles
-            verify(authzConfigCache).updateConfig(eq("collection-1"), any(AuthzConfig.class));
         }
     }
 

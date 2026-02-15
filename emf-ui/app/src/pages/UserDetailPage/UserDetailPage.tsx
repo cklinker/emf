@@ -304,7 +304,9 @@ export function UserDetailPage({ testId = 'user-detail-page' }: UserDetailPagePr
           <div className={styles.infoRow}>
             <div className={styles.infoItem}>
               <span className={styles.infoLabel}>{t('users.lastLogin')}</span>
-              <span>{user.lastLoginAt ? formatDate(user.lastLoginAt) : t('users.never')}</span>
+              <span>
+                {user.lastLoginAt ? formatDate(new Date(user.lastLoginAt)) : t('users.never')}
+              </span>
             </div>
             <div className={styles.infoItem}>
               <span className={styles.infoLabel}>{t('users.loginCount')}</span>
@@ -316,7 +318,7 @@ export function UserDetailPage({ testId = 'user-detail-page' }: UserDetailPagePr
             </div>
             <div className={styles.infoItem}>
               <span className={styles.infoLabel}>{t('users.created')}</span>
-              <span>{formatDate(user.createdAt)}</span>
+              <span>{formatDate(new Date(user.createdAt))}</span>
             </div>
           </div>
 
@@ -366,7 +368,7 @@ export function UserDetailPage({ testId = 'user-detail-page' }: UserDetailPagePr
                 <tbody>
                   {historyEntries.map((entry) => (
                     <tr key={entry.id}>
-                      <td>{formatDate(entry.loginTime)}</td>
+                      <td>{formatDate(new Date(entry.loginTime))}</td>
                       <td>{entry.loginType}</td>
                       <td>
                         <LoginStatusLabel status={entry.status} />

@@ -2,8 +2,12 @@ package com.emf.runtime.query;
 
 import com.emf.runtime.model.*;
 import com.emf.runtime.storage.StorageAdapter;
+import com.emf.runtime.validation.CustomValidationRuleEngine;
 import com.emf.runtime.validation.DefaultValidationEngine;
+import com.emf.runtime.validation.OperationType;
+import com.emf.runtime.validation.RecordValidationException;
 import com.emf.runtime.validation.ValidationEngine;
+import com.emf.runtime.validation.ValidationError;
 import com.emf.runtime.validation.ValidationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -385,30 +389,148 @@ class DefaultQueryEngineTest {
     @Nested
     @DisplayName("delete Tests")
     class DeleteTests {
-        
+
         @Test
         @DisplayName("Should delete existing record")
         void shouldDeleteExistingRecord() {
             String id = "test-id";
-            
+
             when(storageAdapter.delete(testCollection, id)).thenReturn(true);
-            
+
             boolean result = queryEngine.delete(testCollection, id);
-            
+
             assertTrue(result);
             verify(storageAdapter).delete(testCollection, id);
         }
-        
+
         @Test
         @DisplayName("Should return false when record not found")
         void shouldReturnFalseWhenRecordNotFound() {
             String id = "nonexistent";
-            
+
             when(storageAdapter.delete(testCollection, id)).thenReturn(false);
-            
+
             boolean result = queryEngine.delete(testCollection, id);
-            
+
             assertFalse(result);
+        }
+    }
+
+    @Nested
+    @DisplayName("Custom Validation Rule Tests")
+    class CustomValidationRuleTests {
+
+        private CustomValidationRuleEngine customRuleEngine;
+        private DefaultQueryEngine engineWithRules;
+
+        @BeforeEach
+        void setUp() {
+            customRuleEngine = mock(CustomValidationRuleEngine.class);
+            engineWithRules = new DefaultQueryEngine(
+                    storageAdapter, validationEngine, null, null, null, null, customRuleEngine);
+        }
+
+        @Test
+        @DisplayName("Should evaluate custom rules on create")
+        void shouldEvaluateCustomRulesOnCreate() {
+            Map<String, Object> inputData = new HashMap<>();
+            inputData.put("name", "Test");
+            inputData.put("price", 10.0);
+
+            when(validationEngine.validate(eq(testCollection), any(), any()))
+                    .thenReturn(com.emf.runtime.validation.ValidationResult.success());
+            when(storageAdapter.create(eq(testCollection), any()))
+                    .thenAnswer(invocation -> invocation.getArgument(1));
+
+            engineWithRules.create(testCollection, inputData);
+
+            verify(customRuleEngine).evaluate(
+                    eq("products"), any(), eq(OperationType.CREATE));
+        }
+
+        @Test
+        @DisplayName("Should throw RecordValidationException when custom rule fails on create")
+        void shouldThrowWhenCustomRuleFailsOnCreate() {
+            Map<String, Object> inputData = new HashMap<>();
+            inputData.put("name", "Test");
+            inputData.put("price", -5.0);
+
+            when(validationEngine.validate(eq(testCollection), any(), any()))
+                    .thenReturn(com.emf.runtime.validation.ValidationResult.success());
+            doThrow(new RecordValidationException(List.of(
+                    new ValidationError("positive_price", "Price must be positive", "price"))))
+                    .when(customRuleEngine).evaluate(eq("products"), any(), eq(OperationType.CREATE));
+
+            assertThrows(RecordValidationException.class, () ->
+                    engineWithRules.create(testCollection, inputData));
+
+            verify(storageAdapter, never()).create(any(), any());
+        }
+
+        @Test
+        @DisplayName("Should evaluate custom rules on update with merged data")
+        void shouldEvaluateCustomRulesOnUpdate() {
+            String id = "test-id";
+            Map<String, Object> existingRecord = new HashMap<>();
+            existingRecord.put("id", id);
+            existingRecord.put("name", "Test");
+            existingRecord.put("price", 50.0);
+
+            Map<String, Object> updateData = new HashMap<>();
+            updateData.put("price", 99.0);
+
+            when(storageAdapter.getById(testCollection, id)).thenReturn(Optional.of(existingRecord));
+            when(validationEngine.validate(eq(testCollection), any(), any(), eq(id)))
+                    .thenReturn(com.emf.runtime.validation.ValidationResult.success());
+            when(storageAdapter.update(eq(testCollection), eq(id), any()))
+                    .thenAnswer(invocation -> Optional.of(invocation.getArgument(2)));
+
+            engineWithRules.update(testCollection, id, updateData);
+
+            verify(customRuleEngine).evaluate(
+                    eq("products"), any(), eq(OperationType.UPDATE));
+        }
+
+        @Test
+        @DisplayName("Should throw RecordValidationException when custom rule fails on update")
+        void shouldThrowWhenCustomRuleFailsOnUpdate() {
+            String id = "test-id";
+            Map<String, Object> existingRecord = new HashMap<>();
+            existingRecord.put("id", id);
+            existingRecord.put("name", "Test");
+            existingRecord.put("price", 50.0);
+
+            Map<String, Object> updateData = new HashMap<>();
+            updateData.put("price", -10.0);
+
+            when(storageAdapter.getById(testCollection, id)).thenReturn(Optional.of(existingRecord));
+            when(validationEngine.validate(eq(testCollection), any(), any(), eq(id)))
+                    .thenReturn(com.emf.runtime.validation.ValidationResult.success());
+            doThrow(new RecordValidationException(List.of(
+                    new ValidationError("positive_price", "Price must be positive", "price"))))
+                    .when(customRuleEngine).evaluate(eq("products"), any(), eq(OperationType.UPDATE));
+
+            assertThrows(RecordValidationException.class, () ->
+                    engineWithRules.update(testCollection, id, updateData));
+
+            verify(storageAdapter, never()).update(any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("Should skip custom rules when engine is null")
+        void shouldSkipCustomRulesWhenEngineIsNull() {
+            // The default queryEngine has no customRuleEngine
+            Map<String, Object> inputData = new HashMap<>();
+            inputData.put("name", "Test");
+            inputData.put("price", 10.0);
+
+            when(validationEngine.validate(eq(testCollection), any(), any()))
+                    .thenReturn(com.emf.runtime.validation.ValidationResult.success());
+            when(storageAdapter.create(eq(testCollection), any()))
+                    .thenAnswer(invocation -> invocation.getArgument(1));
+
+            assertDoesNotThrow(() ->
+                    queryEngine.create(testCollection, inputData));
         }
     }
 }

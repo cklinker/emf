@@ -8,6 +8,7 @@ import com.emf.runtime.service.FieldEncryptionService;
 import com.emf.runtime.service.RollupSummaryService;
 import com.emf.runtime.formula.FormulaEvaluator;
 import com.emf.runtime.storage.StorageAdapter;
+import com.emf.runtime.validation.CustomValidationRuleEngine;
 import com.emf.runtime.validation.OperationType;
 import com.emf.runtime.validation.TypeCoercionService;
 import com.emf.runtime.validation.ValidationEngine;
@@ -52,19 +53,32 @@ public class DefaultQueryEngine implements QueryEngine {
     private final AutoNumberService autoNumberService;
     private final FormulaEvaluator formulaEvaluator;
     private final RollupSummaryService rollupSummaryService;
+    private final CustomValidationRuleEngine customValidationRuleEngine;
 
     /**
      * Creates a new DefaultQueryEngine with all services.
      */
     public DefaultQueryEngine(StorageAdapter storageAdapter, ValidationEngine validationEngine,
                               FieldEncryptionService encryptionService, AutoNumberService autoNumberService,
-                              FormulaEvaluator formulaEvaluator, RollupSummaryService rollupSummaryService) {
+                              FormulaEvaluator formulaEvaluator, RollupSummaryService rollupSummaryService,
+                              CustomValidationRuleEngine customValidationRuleEngine) {
         this.storageAdapter = Objects.requireNonNull(storageAdapter, "storageAdapter cannot be null");
         this.validationEngine = validationEngine;
         this.encryptionService = encryptionService;
         this.autoNumberService = autoNumberService;
         this.formulaEvaluator = formulaEvaluator;
         this.rollupSummaryService = rollupSummaryService;
+        this.customValidationRuleEngine = customValidationRuleEngine;
+    }
+
+    /**
+     * Creates a new DefaultQueryEngine with all services (backward compatible).
+     */
+    public DefaultQueryEngine(StorageAdapter storageAdapter, ValidationEngine validationEngine,
+                              FieldEncryptionService encryptionService, AutoNumberService autoNumberService,
+                              FormulaEvaluator formulaEvaluator, RollupSummaryService rollupSummaryService) {
+        this(storageAdapter, validationEngine, encryptionService, autoNumberService,
+             formulaEvaluator, rollupSummaryService, null);
     }
 
     /**
@@ -74,7 +88,7 @@ public class DefaultQueryEngine implements QueryEngine {
      * @param validationEngine the validation engine for data validation (may be null)
      */
     public DefaultQueryEngine(StorageAdapter storageAdapter, ValidationEngine validationEngine) {
-        this(storageAdapter, validationEngine, null, null, null, null);
+        this(storageAdapter, validationEngine, null, null, null, null, null);
     }
 
     /**
@@ -156,19 +170,24 @@ public class DefaultQueryEngine implements QueryEngine {
         // Coerce string values to expected types (e.g., "10" → 10.0 for DOUBLE fields)
         TypeCoercionService.coerce(definition, recordData);
 
-        // Validate data
+        // Validate data (field-level constraints)
         if (validationEngine != null) {
             ValidationResult validation = validationEngine.validate(definition, recordData, OperationType.CREATE);
             if (!validation.valid()) {
                 throw new ValidationException(validation);
             }
         }
-        
+
+        // Evaluate custom validation rules (formula-based)
+        if (customValidationRuleEngine != null) {
+            customValidationRuleEngine.evaluate(definition.name(), recordData, OperationType.CREATE);
+        }
+
         // Persist via storage adapter
         Map<String, Object> created = storageAdapter.create(definition, recordData);
-        
+
         logger.debug("Created record '{}' in collection '{}'", id, definition.name());
-        
+
         return created;
     }
 
@@ -201,24 +220,29 @@ public class DefaultQueryEngine implements QueryEngine {
         // Coerce string values to expected types (e.g., "10" → 10.0 for DOUBLE fields)
         TypeCoercionService.coerce(definition, recordData);
 
-        // Validate data
-        if (validationEngine != null) {
-            // Merge with existing data for validation
-            Map<String, Object> mergedData = new HashMap<>(existing.get());
-            mergedData.putAll(recordData);
+        // Merge with existing data for validation
+        Map<String, Object> mergedData = new HashMap<>(existing.get());
+        mergedData.putAll(recordData);
 
+        // Validate data (field-level constraints)
+        if (validationEngine != null) {
             ValidationResult validation = validationEngine.validate(definition, mergedData, OperationType.UPDATE, id);
             if (!validation.valid()) {
                 throw new ValidationException(validation);
             }
         }
-        
+
+        // Evaluate custom validation rules (formula-based) against the merged record
+        if (customValidationRuleEngine != null) {
+            customValidationRuleEngine.evaluate(definition.name(), mergedData, OperationType.UPDATE);
+        }
+
         // Persist via storage adapter
         Optional<Map<String, Object>> updated = storageAdapter.update(definition, id, recordData);
-        
-        updated.ifPresent(record -> 
+
+        updated.ifPresent(record ->
             logger.debug("Updated record '{}' in collection '{}'", id, definition.name()));
-        
+
         return updated;
     }
     

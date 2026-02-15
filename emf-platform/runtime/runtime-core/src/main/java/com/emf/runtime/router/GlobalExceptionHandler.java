@@ -3,6 +3,7 @@ package com.emf.runtime.router;
 import com.emf.runtime.query.InvalidQueryException;
 import com.emf.runtime.storage.StorageException;
 import com.emf.runtime.storage.UniqueConstraintViolationException;
+import com.emf.runtime.validation.RecordValidationException;
 import com.emf.runtime.validation.ValidationException;
 import com.emf.runtime.validation.ValidationResult;
 import jakarta.servlet.http.HttpServletRequest;
@@ -69,6 +70,36 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(response);
     }
     
+    /**
+     * Handles record validation rule exceptions (custom formula-based rules).
+     * Returns 400 Bad Request with validation rule error details.
+     */
+    @ExceptionHandler(RecordValidationException.class)
+    public ResponseEntity<ErrorResponse> handleRecordValidationException(
+            RecordValidationException ex, HttpServletRequest request) {
+
+        String requestId = generateRequestId();
+        logger.warn("Record validation rule(s) failed [requestId={}]: {}", requestId, ex.getMessage());
+
+        List<ErrorResponse.FieldErrorResponse> fieldErrors = ex.getErrors().stream()
+            .map(e -> new ErrorResponse.FieldErrorResponse(
+                e.errorField() != null ? e.errorField() : e.ruleName(),
+                e.errorMessage(),
+                "validationRule"))
+            .collect(Collectors.toList());
+
+        ErrorResponse response = ErrorResponse.withErrors(
+            requestId,
+            HttpStatus.BAD_REQUEST.value(),
+            "Bad Request",
+            ex.getMessage(),
+            request.getRequestURI(),
+            fieldErrors
+        );
+
+        return ResponseEntity.badRequest().body(response);
+    }
+
     /**
      * Handles invalid query exceptions.
      * Returns 400 Bad Request.

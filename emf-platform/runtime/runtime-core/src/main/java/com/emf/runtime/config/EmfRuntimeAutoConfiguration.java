@@ -13,8 +13,12 @@ import com.emf.runtime.storage.JsonbStorageAdapter;
 import com.emf.runtime.storage.PhysicalTableStorageAdapter;
 import com.emf.runtime.storage.SchemaMigrationEngine;
 import com.emf.runtime.storage.StorageAdapter;
+import com.emf.runtime.validation.CustomValidationRuleEngine;
 import com.emf.runtime.validation.DefaultValidationEngine;
 import com.emf.runtime.validation.ValidationEngine;
+import com.emf.runtime.validation.ValidationRuleEvaluator;
+import com.emf.runtime.validation.ValidationRuleRegistry;
+import org.springframework.beans.factory.annotation.Autowired;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -102,12 +106,40 @@ public class EmfRuntimeAutoConfiguration {
     }
     
     /**
+     * Creates the validation rule registry bean.
+     * Stores validation rule definitions loaded from the control plane.
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    public ValidationRuleRegistry validationRuleRegistry() {
+        return new ValidationRuleRegistry();
+    }
+
+    /**
+     * Creates the custom validation rule engine bean.
+     * Only created when both a ValidationRuleRegistry and ValidationRuleEvaluator are available.
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    public CustomValidationRuleEngine customValidationRuleEngine(
+            ValidationRuleRegistry validationRuleRegistry,
+            @Autowired(required = false) ValidationRuleEvaluator validationRuleEvaluator) {
+        if (validationRuleEvaluator == null) {
+            return null;
+        }
+        return new CustomValidationRuleEngine(validationRuleRegistry, validationRuleEvaluator);
+    }
+
+    /**
      * Creates the query engine bean.
      */
     @Bean
     @ConditionalOnMissingBean
-    public QueryEngine queryEngine(StorageAdapter storageAdapter, ValidationEngine validationEngine) {
-        return new DefaultQueryEngine(storageAdapter, validationEngine);
+    public QueryEngine queryEngine(StorageAdapter storageAdapter,
+                                    ValidationEngine validationEngine,
+                                    @Autowired(required = false) CustomValidationRuleEngine customValidationRuleEngine) {
+        return new DefaultQueryEngine(storageAdapter, validationEngine,
+                null, null, null, null, customValidationRuleEngine);
     }
 
     /**

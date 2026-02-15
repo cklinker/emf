@@ -8,6 +8,8 @@ import com.emf.runtime.model.FieldType;
 import com.emf.runtime.model.StorageMode;
 import com.emf.runtime.registry.CollectionRegistry;
 import com.emf.runtime.storage.StorageAdapter;
+import com.emf.runtime.validation.ValidationRuleDefinition;
+import com.emf.runtime.validation.ValidationRuleRegistry;
 import com.emf.worker.config.WorkerMetricsConfig;
 import com.emf.worker.config.WorkerProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -55,6 +57,11 @@ public class CollectionLifecycleManager {
     private final ObjectMapper objectMapper;
 
     /**
+     * Optional validation rule registry for storing custom validation rules.
+     */
+    private ValidationRuleRegistry validationRuleRegistry;
+
+    /**
      * Optional metrics config for updating initializing collection count.
      * Injected lazily to avoid circular dependency (MetricsConfig depends on this bean).
      */
@@ -76,6 +83,11 @@ public class CollectionLifecycleManager {
         this.restTemplate = restTemplate;
         this.workerProperties = workerProperties;
         this.objectMapper = objectMapper;
+    }
+
+    @Autowired(required = false)
+    public void setValidationRuleRegistry(ValidationRuleRegistry validationRuleRegistry) {
+        this.validationRuleRegistry = validationRuleRegistry;
     }
 
     @Autowired(required = false)
@@ -124,6 +136,9 @@ public class CollectionLifecycleManager {
 
             // Initialize storage (creates database table if needed)
             storageAdapter.initializeCollection(definition);
+
+            // Fetch and register validation rules
+            fetchAndRegisterValidationRules(collectionId, collectionName);
 
             // Track as active
             activeCollections.put(collectionId, collectionName);
@@ -192,6 +207,9 @@ public class CollectionLifecycleManager {
                 log.info("Storage initialized for collection '{}' (id={})", collectionName, collectionId);
             }
 
+            // Refresh validation rules
+            fetchAndRegisterValidationRules(collectionId, collectionName);
+
         } catch (Exception e) {
             log.error("Failed to refresh collection '{}' (id={}): {}",
                     collectionName, collectionId, e.getMessage(), e);
@@ -208,6 +226,9 @@ public class CollectionLifecycleManager {
         String collectionName = activeCollections.remove(collectionId);
         if (collectionName != null) {
             collectionRegistry.unregister(collectionName);
+            if (validationRuleRegistry != null) {
+                validationRuleRegistry.unregister(collectionName);
+            }
             log.info("Torn down collection '{}' (id={})", collectionName, collectionId);
         } else {
             log.warn("Attempted to tear down unknown collection: {}", collectionId);
@@ -333,6 +354,66 @@ public class CollectionLifecycleManager {
         }
 
         return fields;
+    }
+
+    /**
+     * Fetches validation rules from the control plane and registers them
+     * in the local validation rule registry.
+     *
+     * @param collectionId   the collection ID
+     * @param collectionName the collection name (used as registry key)
+     */
+    @SuppressWarnings("unchecked")
+    private void fetchAndRegisterValidationRules(String collectionId, String collectionName) {
+        if (validationRuleRegistry == null) {
+            return;
+        }
+
+        try {
+            String url = workerProperties.getControlPlaneUrl()
+                    + "/control/collections/" + collectionId + "/validation-rules";
+            ResponseEntity<List> response = restTemplate.getForEntity(url, List.class);
+
+            if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+                log.warn("Failed to fetch validation rules for collection '{}': status={}",
+                        collectionName, response.getStatusCode());
+                validationRuleRegistry.register(collectionName, List.of());
+                return;
+            }
+
+            List<?> rulesList = response.getBody();
+            List<ValidationRuleDefinition> rules = new ArrayList<>();
+
+            for (Object ruleObj : rulesList) {
+                if (ruleObj instanceof Map<?, ?> ruleMap) {
+                    Map<String, Object> rule = (Map<String, Object>) ruleMap;
+                    String name = (String) rule.get("name");
+                    String formula = (String) rule.get("errorConditionFormula");
+                    String errorMessage = (String) rule.get("errorMessage");
+                    String errorField = (String) rule.get("errorField");
+                    String evaluateOn = (String) rule.get("evaluateOn");
+                    boolean active = Boolean.TRUE.equals(rule.get("active"));
+
+                    if (name != null && formula != null && errorMessage != null) {
+                        rules.add(new ValidationRuleDefinition(
+                                name, formula, errorMessage, errorField,
+                                evaluateOn != null ? evaluateOn : "CREATE_AND_UPDATE",
+                                active));
+                    }
+                }
+            }
+
+            validationRuleRegistry.register(collectionName, rules);
+            long activeCount = rules.stream().filter(ValidationRuleDefinition::active).count();
+            log.info("Registered {} validation rules ({} active) for collection '{}'",
+                    rules.size(), activeCount, collectionName);
+
+        } catch (Exception e) {
+            log.warn("Failed to fetch validation rules for collection '{}': {}",
+                    collectionName, e.getMessage());
+            // Register empty list so validation doesn't fail if rules can't be fetched
+            validationRuleRegistry.register(collectionName, List.of());
+        }
     }
 
     /**

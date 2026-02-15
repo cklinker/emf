@@ -21,7 +21,13 @@ import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { AuthWrapper, setupAuthMocks, wrapFetchMock } from '../../test/testUtils'
+import {
+  AuthWrapper,
+  setupAuthMocks,
+  mockAxios,
+  resetMockAxios,
+  createAxiosError,
+} from '../../test/testUtils'
 import { ResourceFormPage } from './ResourceFormPage'
 import type { CollectionSchema, Resource } from './ResourceFormPage'
 import { PluginProvider } from '../../context/PluginContext'
@@ -170,23 +176,21 @@ function renderWithProviders(
 
 describe('ResourceFormPage', () => {
   let cleanupAuthMocks: () => void
-  let originalFetch: typeof global.fetch
 
   beforeEach(() => {
     cleanupAuthMocks = setupAuthMocks()
-    originalFetch = global.fetch
+    resetMockAxios()
     mockNavigate.mockReset()
   })
 
   afterEach(() => {
     cleanupAuthMocks()
-    global.fetch = originalFetch
     vi.clearAllMocks()
   })
 
   describe('Loading State', () => {
     it('should display loading spinner while fetching schema', () => {
-      global.fetch = vi.fn(() => new Promise(() => {})) as typeof global.fetch // Never resolves
+      mockAxios.get.mockImplementation(() => new Promise(() => {})) // Never resolves
 
       renderWithProviders(<ResourceFormPage />)
 
@@ -196,7 +200,7 @@ describe('ResourceFormPage', () => {
 
   describe('Error State', () => {
     it('should display error message when schema fetch fails', async () => {
-      global.fetch = vi.fn().mockRejectedValue(new Error('Failed to fetch')) as typeof global.fetch
+      mockAxios.get.mockRejectedValue(createAxiosError(500))
 
       renderWithProviders(<ResourceFormPage />)
 
@@ -206,16 +210,13 @@ describe('ResourceFormPage', () => {
     })
 
     it('should display error message when resource fetch fails in edit mode', async () => {
-      global.fetch = vi.fn().mockImplementation((url: string) => {
+      mockAxios.get.mockImplementation((url: string) => {
         if (url.includes('/control/collections/')) {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve(mockSchema),
-          })
+          return Promise.resolve({ data: mockSchema })
         }
         // Resource fetch fails
-        return Promise.reject(new Error('Resource not found'))
-      }) as typeof global.fetch
+        return Promise.reject(createAxiosError(404))
+      })
 
       renderWithProviders(<ResourceFormPage />, {
         route: '/resources/users/res-123/edit',
@@ -229,16 +230,12 @@ describe('ResourceFormPage', () => {
 
   describe('Create Mode', () => {
     beforeEach(() => {
-      const mockFetch = vi.fn().mockImplementation((url: string) => {
+      mockAxios.get.mockImplementation((url: string) => {
         if (url.includes('/control/collections/')) {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve(mockSchema),
-          })
+          return Promise.resolve({ data: mockSchema })
         }
-        return Promise.reject(new Error('Not found'))
-      }) as typeof global.fetch
-      wrapFetchMock(mockFetch)
+        return Promise.reject(createAxiosError(404))
+      })
     })
 
     it('should render form with all fields from schema', async () => {
@@ -393,23 +390,15 @@ describe('ResourceFormPage', () => {
     it('should submit form with valid data', async () => {
       const user = userEvent.setup()
 
-      const mockFetch = vi.fn().mockImplementation((url: string, options?: RequestInit) => {
+      mockAxios.get.mockImplementation((url: string) => {
         if (url.includes('/control/collections/')) {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve(mockSchema),
-          })
+          return Promise.resolve({ data: mockSchema })
         }
-        if (url.includes('/api/users') && options?.method === 'POST') {
-          return Promise.resolve({
-            ok: true,
-            json: () =>
-              Promise.resolve({ id: 'new-res-123', name: 'John Doe', email: 'john@example.com' }),
-          })
-        }
-        return Promise.reject(new Error('Not found'))
-      }) as typeof global.fetch
-      wrapFetchMock(mockFetch)
+        return Promise.reject(createAxiosError(404))
+      })
+      mockAxios.post.mockResolvedValueOnce({
+        data: { id: 'new-res-123', name: 'John Doe', email: 'john@example.com' },
+      })
 
       renderWithProviders(<ResourceFormPage />)
 
@@ -427,8 +416,8 @@ describe('ResourceFormPage', () => {
 
       // Verify API was called
       await waitFor(() => {
-        const postCalls = mockFetch.mock.calls.filter(
-          (call) => call[1]?.method === 'POST' && call[0].includes('/api/users')
+        const postCalls = mockAxios.post.mock.calls.filter((call: unknown[]) =>
+          (call[0] as string).includes('/api/users')
         )
         expect(postCalls.length).toBeGreaterThan(0)
       })
@@ -437,23 +426,15 @@ describe('ResourceFormPage', () => {
     it('should navigate to resource detail after successful create', async () => {
       const user = userEvent.setup()
 
-      const mockFetch = vi.fn().mockImplementation((url: string, options?: RequestInit) => {
+      mockAxios.get.mockImplementation((url: string) => {
         if (url.includes('/control/collections/')) {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve(mockSchema),
-          })
+          return Promise.resolve({ data: mockSchema })
         }
-        if (url.includes('/api/users') && options?.method === 'POST') {
-          return Promise.resolve({
-            ok: true,
-            json: () =>
-              Promise.resolve({ id: 'new-res-123', name: 'John Doe', email: 'john@example.com' }),
-          })
-        }
-        return Promise.reject(new Error('Not found'))
-      }) as typeof global.fetch
-      wrapFetchMock(mockFetch)
+        return Promise.reject(createAxiosError(404))
+      })
+      mockAxios.post.mockResolvedValueOnce({
+        data: { id: 'new-res-123', name: 'John Doe', email: 'john@example.com' },
+      })
 
       renderWithProviders(<ResourceFormPage />)
 
@@ -493,22 +474,15 @@ describe('ResourceFormPage', () => {
 
   describe('Edit Mode', () => {
     beforeEach(() => {
-      const mockFetch = vi.fn().mockImplementation((url: string) => {
+      mockAxios.get.mockImplementation((url: string) => {
         if (url.includes('/control/collections/')) {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve(mockSchema),
-          })
+          return Promise.resolve({ data: mockSchema })
         }
         if (url.includes('/users/res-123') && !url.includes('/control')) {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve(mockResource),
-          })
+          return Promise.resolve({ data: mockResource })
         }
-        return Promise.reject(new Error('Not found'))
-      }) as typeof global.fetch
-      wrapFetchMock(mockFetch)
+        return Promise.reject(createAxiosError(404))
+      })
     })
 
     it('should display page title for edit mode', async () => {
@@ -552,32 +526,18 @@ describe('ResourceFormPage', () => {
     it('should submit form with PATCH method in edit mode', async () => {
       const user = userEvent.setup()
 
-      const mockFetch = vi.fn().mockImplementation((url: string, options?: RequestInit) => {
+      mockAxios.get.mockImplementation((url: string) => {
         if (url.includes('/control/collections/')) {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve(mockSchema),
-          })
+          return Promise.resolve({ data: mockSchema })
         }
-        if (
-          url.includes('/users/res-123') &&
-          !url.includes('/control') &&
-          (!options || !options.method || options.method === 'GET')
-        ) {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve(mockResource),
-          })
+        if (url.includes('/users/res-123') && !url.includes('/control')) {
+          return Promise.resolve({ data: mockResource })
         }
-        if (url.includes('/users/res-123') && options?.method === 'PATCH') {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve({ ...mockResource, name: 'Jane Doe' }),
-          })
-        }
-        return Promise.reject(new Error('Not found'))
-      }) as typeof global.fetch
-      wrapFetchMock(mockFetch)
+        return Promise.reject(createAxiosError(404))
+      })
+      mockAxios.patch.mockResolvedValueOnce({
+        data: { ...mockResource, name: 'Jane Doe' },
+      })
 
       renderWithProviders(<ResourceFormPage />, {
         route: '/resources/users/res-123/edit',
@@ -597,8 +557,8 @@ describe('ResourceFormPage', () => {
 
       // Verify API was called with PATCH
       await waitFor(() => {
-        const patchCalls = mockFetch.mock.calls.filter(
-          (call) => call[1]?.method === 'PATCH' && call[0].includes('/api/users/res-123')
+        const patchCalls = mockAxios.patch.mock.calls.filter((call: unknown[]) =>
+          (call[0] as string).includes('/api/users/res-123')
         )
         expect(patchCalls.length).toBeGreaterThan(0)
       })
@@ -607,32 +567,18 @@ describe('ResourceFormPage', () => {
     it('should navigate to resource detail after successful update', async () => {
       const user = userEvent.setup()
 
-      const mockFetch = vi.fn().mockImplementation((url: string, options?: RequestInit) => {
+      mockAxios.get.mockImplementation((url: string) => {
         if (url.includes('/control/collections/')) {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve(mockSchema),
-          })
+          return Promise.resolve({ data: mockSchema })
         }
-        if (
-          url.includes('/users/res-123') &&
-          !url.includes('/control') &&
-          (!options || !options.method || options.method === 'GET')
-        ) {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve(mockResource),
-          })
+        if (url.includes('/users/res-123') && !url.includes('/control')) {
+          return Promise.resolve({ data: mockResource })
         }
-        if (url.includes('/users/res-123') && options?.method === 'PATCH') {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve(mockResource),
-          })
-        }
-        return Promise.reject(new Error('Not found'))
-      }) as typeof global.fetch
-      wrapFetchMock(mockFetch)
+        return Promise.reject(createAxiosError(404))
+      })
+      mockAxios.patch.mockResolvedValueOnce({
+        data: mockResource,
+      })
 
       renderWithProviders(<ResourceFormPage />, {
         route: '/resources/users/res-123/edit',
@@ -671,16 +617,12 @@ describe('ResourceFormPage', () => {
 
   describe('Field Type Handling', () => {
     beforeEach(() => {
-      const mockFetch = vi.fn().mockImplementation((url: string) => {
+      mockAxios.get.mockImplementation((url: string) => {
         if (url.includes('/control/collections/')) {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve(mockSchema),
-          })
+          return Promise.resolve({ data: mockSchema })
         }
-        return Promise.reject(new Error('Not found'))
-      }) as typeof global.fetch
-      wrapFetchMock(mockFetch)
+        return Promise.reject(createAxiosError(404))
+      })
     })
 
     it('should handle boolean field toggle', async () => {
@@ -730,16 +672,12 @@ describe('ResourceFormPage', () => {
 
   describe('Validation Rules', () => {
     beforeEach(() => {
-      const mockFetch = vi.fn().mockImplementation((url: string) => {
+      mockAxios.get.mockImplementation((url: string) => {
         if (url.includes('/control/collections/')) {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve(mockSchema),
-          })
+          return Promise.resolve({ data: mockSchema })
         }
-        return Promise.reject(new Error('Not found'))
-      }) as typeof global.fetch
-      wrapFetchMock(mockFetch)
+        return Promise.reject(createAxiosError(404))
+      })
     })
 
     it('should validate min value for number fields', async () => {
@@ -818,16 +756,12 @@ describe('ResourceFormPage', () => {
 
   describe('Accessibility', () => {
     beforeEach(() => {
-      const mockFetch = vi.fn().mockImplementation((url: string) => {
+      mockAxios.get.mockImplementation((url: string) => {
         if (url.includes('/control/collections/')) {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve(mockSchema),
-          })
+          return Promise.resolve({ data: mockSchema })
         }
-        return Promise.reject(new Error('Not found'))
-      }) as typeof global.fetch
-      wrapFetchMock(mockFetch)
+        return Promise.reject(createAxiosError(404))
+      })
     })
 
     it('should have proper labels for all form fields', async () => {
@@ -894,19 +828,17 @@ describe('ResourceFormPage', () => {
 
   describe('Empty Schema', () => {
     it('should display empty state when schema has no fields', async () => {
-      global.fetch = vi.fn().mockImplementation((url: string) => {
+      mockAxios.get.mockImplementation((url: string) => {
         if (url.includes('/control/collections/')) {
           return Promise.resolve({
-            ok: true,
-            json: () =>
-              Promise.resolve({
-                ...mockSchema,
-                fields: [],
-              }),
+            data: {
+              ...mockSchema,
+              fields: [],
+            },
           })
         }
-        return Promise.reject(new Error('Not found'))
-      }) as typeof global.fetch
+        return Promise.reject(createAxiosError(404))
+      })
 
       renderWithProviders(<ResourceFormPage />)
 
@@ -916,19 +848,17 @@ describe('ResourceFormPage', () => {
     })
 
     it('should disable submit button when schema has no fields', async () => {
-      global.fetch = vi.fn().mockImplementation((url: string) => {
+      mockAxios.get.mockImplementation((url: string) => {
         if (url.includes('/control/collections/')) {
           return Promise.resolve({
-            ok: true,
-            json: () =>
-              Promise.resolve({
-                ...mockSchema,
-                fields: [],
-              }),
+            data: {
+              ...mockSchema,
+              fields: [],
+            },
           })
         }
-        return Promise.reject(new Error('Not found'))
-      }) as typeof global.fetch
+        return Promise.reject(createAxiosError(404))
+      })
 
       renderWithProviders(<ResourceFormPage />)
 
@@ -978,16 +908,12 @@ describe('ResourceFormPage', () => {
     )
 
     beforeEach(() => {
-      const mockFetch = vi.fn().mockImplementation((url: string) => {
+      mockAxios.get.mockImplementation((url: string) => {
         if (url.includes('/control/collections/')) {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve(mockSchema),
-          })
+          return Promise.resolve({ data: mockSchema })
         }
-        return Promise.reject(new Error('Not found'))
-      }) as typeof global.fetch
-      wrapFetchMock(mockFetch)
+        return Promise.reject(createAxiosError(404))
+      })
     })
 
     it('should use custom renderer when registered for a field type', async () => {
@@ -1120,22 +1046,15 @@ describe('ResourceFormPage', () => {
         },
       }
 
-      global.fetch = vi.fn().mockImplementation((url: string, options?: RequestInit) => {
+      mockAxios.get.mockImplementation((url: string) => {
         if (url.includes('/control/collections/')) {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve(mockSchema),
-          })
+          return Promise.resolve({ data: mockSchema })
         }
-        if (options?.method === 'POST') {
-          return Promise.resolve({
-            ok: true,
-            json: () =>
-              Promise.resolve({ id: 'new-res-123', name: 'Test Name', email: 'test@example.com' }),
-          })
-        }
-        return Promise.reject(new Error('Not found'))
-      }) as typeof global.fetch
+        return Promise.reject(createAxiosError(404))
+      })
+      mockAxios.post.mockResolvedValueOnce({
+        data: { id: 'new-res-123', name: 'Test Name', email: 'test@example.com' },
+      })
 
       renderWithProviders(<ResourceFormPage />, {
         plugins: [customPlugin],
@@ -1158,21 +1077,16 @@ describe('ResourceFormPage', () => {
 
       // Verify API was called with the values from custom renderer
       await waitFor(() => {
-        expect(global.fetch).toHaveBeenCalledWith(
-          '/api/users',
-          expect.objectContaining({
-            method: 'POST',
-          })
-        )
+        expect(mockAxios.post).toHaveBeenCalledWith('/api/users', expect.anything())
       })
 
       // Verify the body contains the values in JSON:API format
-      const postCall = (global.fetch as ReturnType<typeof vi.fn>).mock.calls.find(
-        (call) => call[1]?.method === 'POST'
-      ) as [string, RequestInit] | undefined
+      const postCall = mockAxios.post.mock.calls.find((call: unknown[]) =>
+        (call[0] as string).includes('/api/users')
+      ) as [string, unknown] | undefined
       expect(postCall).toBeDefined()
       if (postCall) {
-        const body = JSON.parse(postCall[1].body as string)
+        const body = postCall[1] as { data: { type: string; attributes: Record<string, unknown> } }
         expect(body.data.type).toBe('users')
         expect(body.data.attributes.name).toBe('Test Name')
         expect(body.data.attributes.email).toBe('test@example.com')
@@ -1235,15 +1149,12 @@ describe('ResourceFormPage', () => {
         ],
       }
 
-      global.fetch = vi.fn().mockImplementation((url: string) => {
+      mockAxios.get.mockImplementation((url: string) => {
         if (url.includes('/control/collections/')) {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve(schemaWithCustomType),
-          })
+          return Promise.resolve({ data: schemaWithCustomType })
         }
-        return Promise.reject(new Error('Not found'))
-      }) as typeof global.fetch
+        return Promise.reject(createAxiosError(404))
+      })
 
       const customPlugin: Plugin = {
         id: 'test-plugin',

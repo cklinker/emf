@@ -30,7 +30,13 @@ import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { BrowserRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { createTestWrapper, setupAuthMocks, wrapFetchMock } from '../../test/testUtils'
+import {
+  createTestWrapper,
+  setupAuthMocks,
+  mockAxios,
+  resetMockAxios,
+  createAxiosError,
+} from '../../test/testUtils'
 import { PageBuilderPage } from './PageBuilderPage'
 import type { UIPage } from './PageBuilderPage'
 import { PluginProvider } from '../../context/PluginContext'
@@ -85,42 +91,12 @@ const mockPages: UIPage[] = [
   },
 ]
 
-// Mock fetch function
-const mockFetch = vi.fn()
-
-// Helper to create a proper Response-like object
-function createMockResponse(data: unknown, ok = true, status = 200): Response {
-  return {
-    ok,
-    status,
-    json: () => Promise.resolve(data),
-    text: () => Promise.resolve(JSON.stringify(data)),
-    clone: function () {
-      return this
-    },
-    headers: new Headers(),
-    redirected: false,
-    statusText: ok ? 'OK' : 'Error',
-    type: 'basic' as ResponseType,
-    url: '',
-    body: null,
-    bodyUsed: false,
-    arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
-    blob: () => Promise.resolve(new Blob()),
-    formData: () => Promise.resolve(new FormData()),
-    bytes: () => Promise.resolve(new Uint8Array()),
-  } as Response
-}
-
-global.fetch = mockFetch
-
 describe('PageBuilderPage', () => {
   let cleanupAuthMocks: () => void
 
   beforeEach(() => {
     cleanupAuthMocks = setupAuthMocks()
-    mockFetch.mockReset()
-    wrapFetchMock(mockFetch)
+    resetMockAxios()
   })
 
   afterEach(() => {
@@ -130,9 +106,8 @@ describe('PageBuilderPage', () => {
 
   describe('Loading State', () => {
     it('should display loading spinner while fetching pages', async () => {
-      mockFetch.mockImplementation(
-        () =>
-          new Promise((resolve) => setTimeout(() => resolve(createMockResponse(mockPages)), 100))
+      mockAxios.get.mockImplementation(
+        () => new Promise((resolve) => setTimeout(() => resolve({ data: mockPages }), 100))
       )
 
       render(<PageBuilderPage />, { wrapper: createTestWrapper() })
@@ -143,7 +118,7 @@ describe('PageBuilderPage', () => {
 
   describe('Error State', () => {
     it('should display error message when fetch fails', async () => {
-      mockFetch.mockResolvedValue(createMockResponse(null, false, 500))
+      mockAxios.get.mockRejectedValue(createAxiosError(500))
 
       render(<PageBuilderPage />, { wrapper: createTestWrapper() })
 
@@ -153,7 +128,7 @@ describe('PageBuilderPage', () => {
     })
 
     it('should display retry button on error', async () => {
-      mockFetch.mockResolvedValue(createMockResponse(null, false, 500))
+      mockAxios.get.mockRejectedValue(createAxiosError(500))
 
       render(<PageBuilderPage />, { wrapper: createTestWrapper() })
 
@@ -163,9 +138,9 @@ describe('PageBuilderPage', () => {
     })
 
     it('should retry fetching when retry button is clicked', async () => {
-      mockFetch
-        .mockResolvedValueOnce(createMockResponse(null, false, 500))
-        .mockResolvedValueOnce(createMockResponse(mockPages))
+      mockAxios.get
+        .mockRejectedValueOnce(createAxiosError(500))
+        .mockResolvedValueOnce({ data: mockPages })
 
       const user = userEvent.setup()
       render(<PageBuilderPage />, { wrapper: createTestWrapper() })
@@ -184,7 +159,7 @@ describe('PageBuilderPage', () => {
 
   describe('Pages List Display', () => {
     beforeEach(() => {
-      mockFetch.mockResolvedValue(createMockResponse(mockPages))
+      mockAxios.get.mockResolvedValue({ data: mockPages })
     })
 
     it('should display all pages in the table', async () => {
@@ -255,7 +230,7 @@ describe('PageBuilderPage', () => {
 
   describe('Empty State', () => {
     it('should display empty state when no pages exist', async () => {
-      mockFetch.mockResolvedValue(createMockResponse([]))
+      mockAxios.get.mockResolvedValue({ data: [] })
 
       render(<PageBuilderPage />, { wrapper: createTestWrapper() })
 
@@ -267,7 +242,7 @@ describe('PageBuilderPage', () => {
 
   describe('Create Page', () => {
     beforeEach(() => {
-      mockFetch.mockResolvedValue(createMockResponse(mockPages))
+      mockAxios.get.mockResolvedValue({ data: mockPages })
     })
 
     it('should open create form when clicking create button', async () => {
@@ -408,11 +383,11 @@ describe('PageBuilderPage', () => {
         updatedAt: '2024-01-20T10:00:00Z',
       }
 
-      mockFetch
-        .mockResolvedValueOnce(createMockResponse(mockPages)) // Initial fetch
-        .mockResolvedValueOnce(createMockResponse(newPage)) // Create
-        .mockResolvedValueOnce(createMockResponse(newPage)) // Fetch new page for editor
-        .mockResolvedValueOnce(createMockResponse([...mockPages, newPage])) // Refetch
+      mockAxios.get
+        .mockResolvedValueOnce({ data: mockPages }) // Initial fetch
+        .mockResolvedValueOnce({ data: newPage }) // Fetch new page for editor
+        .mockResolvedValueOnce({ data: [...mockPages, newPage] }) // Refetch
+      mockAxios.post.mockResolvedValueOnce({ data: newPage }) // Create
 
       render(<PageBuilderPage />, { wrapper: createTestWrapper() })
 
@@ -440,7 +415,7 @@ describe('PageBuilderPage', () => {
 
   describe('Delete Page', () => {
     beforeEach(() => {
-      mockFetch.mockResolvedValue(createMockResponse(mockPages))
+      mockAxios.get.mockResolvedValue({ data: mockPages })
     })
 
     it('should open delete confirmation dialog when clicking delete', async () => {
@@ -483,10 +458,10 @@ describe('PageBuilderPage', () => {
     it('should delete page when confirming deletion', async () => {
       const user = userEvent.setup()
 
-      mockFetch
-        .mockResolvedValueOnce(createMockResponse(mockPages)) // Initial fetch
-        .mockResolvedValueOnce(createMockResponse(null)) // Delete
-        .mockResolvedValueOnce(createMockResponse(mockPages.slice(1))) // Refetch
+      mockAxios.get
+        .mockResolvedValueOnce({ data: mockPages }) // Initial fetch
+        .mockResolvedValueOnce({ data: mockPages.slice(1) }) // Refetch
+      mockAxios.delete.mockResolvedValueOnce({ data: null }) // Delete
 
       render(<PageBuilderPage />, { wrapper: createTestWrapper() })
 
@@ -510,12 +485,11 @@ describe('PageBuilderPage', () => {
 
   describe('Page Editor', () => {
     beforeEach(() => {
-      mockFetch.mockImplementation((url: string | URL | Request) => {
-        const urlStr = typeof url === 'string' ? url : url.toString()
-        if (urlStr.includes('/control/ui/pages/2')) {
-          return Promise.resolve(createMockResponse(mockPages[1]))
+      mockAxios.get.mockImplementation((url: string) => {
+        if (url.includes('/control/ui/pages/2')) {
+          return Promise.resolve({ data: mockPages[1] })
         }
-        return Promise.resolve(createMockResponse(mockPages))
+        return Promise.resolve({ data: mockPages })
       })
     })
 
@@ -575,12 +549,11 @@ describe('PageBuilderPage', () => {
 
   describe('Component Palette', () => {
     beforeEach(() => {
-      mockFetch.mockImplementation((url: string | URL | Request) => {
-        const urlStr = typeof url === 'string' ? url : url.toString()
-        if (urlStr.includes('/control/ui/pages/1')) {
-          return Promise.resolve(createMockResponse(mockPages[0]))
+      mockAxios.get.mockImplementation((url: string) => {
+        if (url.includes('/control/ui/pages/1')) {
+          return Promise.resolve({ data: mockPages[0] })
         }
-        return Promise.resolve(createMockResponse(mockPages))
+        return Promise.resolve({ data: mockPages })
       })
     })
 
@@ -632,12 +605,11 @@ describe('PageBuilderPage', () => {
 
   describe('Property Panel', () => {
     beforeEach(() => {
-      mockFetch.mockImplementation((url: string | URL | Request) => {
-        const urlStr = typeof url === 'string' ? url : url.toString()
-        if (urlStr.includes('/control/ui/pages/1')) {
-          return Promise.resolve(createMockResponse(mockPages[0]))
+      mockAxios.get.mockImplementation((url: string) => {
+        if (url.includes('/control/ui/pages/1')) {
+          return Promise.resolve({ data: mockPages[0] })
         }
-        return Promise.resolve(createMockResponse(mockPages))
+        return Promise.resolve({ data: mockPages })
       })
     })
 
@@ -714,7 +686,7 @@ describe('PageBuilderPage', () => {
 
   describe('Canvas', () => {
     beforeEach(() => {
-      mockFetch.mockResolvedValue(createMockResponse(mockPages))
+      mockAxios.get.mockResolvedValue({ data: mockPages })
     })
 
     it('should display empty state when no components', async () => {
@@ -825,12 +797,11 @@ describe('PageBuilderPage', () => {
 
   describe('Save Page', () => {
     beforeEach(() => {
-      mockFetch.mockImplementation((url: string | URL | Request) => {
-        const urlStr = typeof url === 'string' ? url : url.toString()
-        if (urlStr.includes('/control/ui/pages/1')) {
-          return Promise.resolve(createMockResponse(mockPages[0]))
+      mockAxios.get.mockImplementation((url: string) => {
+        if (url.includes('/control/ui/pages/1')) {
+          return Promise.resolve({ data: mockPages[0] })
         }
-        return Promise.resolve(createMockResponse(mockPages))
+        return Promise.resolve({ data: mockPages })
       })
     })
 
@@ -874,16 +845,13 @@ describe('PageBuilderPage', () => {
     it('should save page when save button is clicked', async () => {
       const user = userEvent.setup()
 
-      mockFetch.mockImplementation((url: string | URL | Request, options?: RequestInit) => {
-        const urlStr = typeof url === 'string' ? url : url.toString()
-        if (options?.method === 'PUT') {
-          return Promise.resolve(createMockResponse({ ...mockPages[0], components: [] }))
+      mockAxios.get.mockImplementation((url: string) => {
+        if (url.includes('/control/ui/pages/1')) {
+          return Promise.resolve({ data: mockPages[0] })
         }
-        if (urlStr.includes('/control/ui/pages/1')) {
-          return Promise.resolve(createMockResponse(mockPages[0]))
-        }
-        return Promise.resolve(createMockResponse(mockPages))
+        return Promise.resolve({ data: mockPages })
       })
+      mockAxios.put.mockResolvedValueOnce({ data: { ...mockPages[0], components: [] } })
 
       render(<PageBuilderPage />, { wrapper: createTestWrapper() })
 
@@ -914,12 +882,11 @@ describe('PageBuilderPage', () => {
 
   describe('Preview Mode (Requirement 7.7)', () => {
     beforeEach(() => {
-      mockFetch.mockImplementation((url: string | URL | Request) => {
-        const urlStr = typeof url === 'string' ? url : url.toString()
-        if (urlStr.includes('/control/ui/pages/1')) {
-          return Promise.resolve(createMockResponse(mockPages[0]))
+      mockAxios.get.mockImplementation((url: string) => {
+        if (url.includes('/control/ui/pages/1')) {
+          return Promise.resolve({ data: mockPages[0] })
         }
-        return Promise.resolve(createMockResponse(mockPages))
+        return Promise.resolve({ data: mockPages })
       })
     })
 
@@ -1111,8 +1078,7 @@ describe('PageBuilderPage', () => {
 
   describe('Publish Page (Requirement 7.9)', () => {
     beforeEach(() => {
-      mockFetch.mockResolvedValue(createMockResponse(mockPages))
-      wrapFetchMock(mockFetch)
+      mockAxios.get.mockResolvedValue({ data: mockPages })
     })
 
     it('should display publish button for draft pages', async () => {
@@ -1136,15 +1102,13 @@ describe('PageBuilderPage', () => {
       // Requires debugging page detail view loading and state management
       const user = userEvent.setup()
 
-      mockFetch.mockImplementation((url: string | URL | Request) => {
-        const urlStr = typeof url === 'string' ? url : url.toString()
+      mockAxios.get.mockImplementation((url: string) => {
         // Match the page ID from the URL
-        if (urlStr.match(/\/control\/ui\/pages\/\d+$/)) {
-          return Promise.resolve(createMockResponse(mockPages[0]))
+        if (url.match(/\/control\/ui\/pages\/\d+$/)) {
+          return Promise.resolve({ data: mockPages[0] })
         }
-        return Promise.resolve(createMockResponse(mockPages))
+        return Promise.resolve({ data: mockPages })
       })
-      wrapFetchMock(mockFetch)
 
       render(<PageBuilderPage />, { wrapper: createTestWrapper() })
 
@@ -1166,17 +1130,13 @@ describe('PageBuilderPage', () => {
     it('should publish page when clicking publish button', async () => {
       const user = userEvent.setup()
 
-      mockFetch.mockImplementation((url: string | URL | Request, options?: RequestInit) => {
-        const urlStr = typeof url === 'string' ? url : url.toString()
-        if (options?.method === 'PUT' && urlStr.includes('/publish')) {
-          return Promise.resolve(createMockResponse({ ...mockPages[1], published: true }))
+      mockAxios.get.mockImplementation((url: string) => {
+        if (url.includes('/control/ui/pages/2')) {
+          return Promise.resolve({ data: mockPages[1] })
         }
-        if (urlStr.includes('/control/ui/pages/2')) {
-          return Promise.resolve(createMockResponse(mockPages[1]))
-        }
-        return Promise.resolve(createMockResponse(mockPages))
+        return Promise.resolve({ data: mockPages })
       })
-      wrapFetchMock(mockFetch)
+      mockAxios.post.mockResolvedValueOnce({ data: { ...mockPages[1], published: true } })
 
       render(<PageBuilderPage />, { wrapper: createTestWrapper() })
 
@@ -1202,18 +1162,14 @@ describe('PageBuilderPage', () => {
       // Requires debugging page detail view loading and state management
       const user = userEvent.setup()
 
-      mockFetch.mockImplementation((url: string | URL | Request, options?: RequestInit) => {
-        const urlStr = typeof url === 'string' ? url : url.toString()
-        if (options?.method === 'PUT' && urlStr.includes('/unpublish')) {
-          return Promise.resolve(createMockResponse({ ...mockPages[0], published: false }))
-        }
+      mockAxios.get.mockImplementation((url: string) => {
         // Match the page ID from the URL
-        if (urlStr.match(/\/control\/ui\/pages\/\d+$/)) {
-          return Promise.resolve(createMockResponse(mockPages[0]))
+        if (url.match(/\/control\/ui\/pages\/\d+$/)) {
+          return Promise.resolve({ data: mockPages[0] })
         }
-        return Promise.resolve(createMockResponse(mockPages))
+        return Promise.resolve({ data: mockPages })
       })
-      wrapFetchMock(mockFetch)
+      mockAxios.post.mockResolvedValueOnce({ data: { ...mockPages[0], published: false } })
 
       render(<PageBuilderPage />, { wrapper: createTestWrapper() })
 
@@ -1263,7 +1219,7 @@ describe('PageBuilderPage', () => {
 
   describe('Duplicate Page (Requirement 7.10)', () => {
     beforeEach(() => {
-      mockFetch.mockResolvedValue(createMockResponse(mockPages))
+      mockAxios.get.mockResolvedValue({ data: mockPages })
     })
 
     it('should display duplicate button in list view', async () => {
@@ -1278,12 +1234,11 @@ describe('PageBuilderPage', () => {
     it('should display duplicate button in editor view', async () => {
       const user = userEvent.setup()
 
-      mockFetch.mockImplementation((url: string | URL | Request) => {
-        const urlStr = typeof url === 'string' ? url : url.toString()
-        if (urlStr.includes('/control/ui/pages/1')) {
-          return Promise.resolve(createMockResponse(mockPages[0]))
+      mockAxios.get.mockImplementation((url: string) => {
+        if (url.includes('/control/ui/pages/1')) {
+          return Promise.resolve({ data: mockPages[0] })
         }
-        return Promise.resolve(createMockResponse(mockPages))
+        return Promise.resolve({ data: mockPages })
       })
 
       render(<PageBuilderPage />, { wrapper: createTestWrapper() })
@@ -1313,31 +1268,28 @@ describe('PageBuilderPage', () => {
         updatedAt: '2024-01-20T10:00:00Z',
       }
 
-      mockFetch.mockImplementation((url: string | URL | Request, options?: RequestInit) => {
-        const urlStr = typeof url === 'string' ? url : url.toString()
-        if (options?.method === 'POST' && urlStr.includes('/duplicate')) {
-          return Promise.resolve(
-            createMockResponse({
+      mockAxios.get.mockImplementation((url: string) => {
+        if (url.includes('/control/ui/pages/4')) {
+          return Promise.resolve({
+            data: {
               content: duplicatedPage,
               totalElements: duplicatedPage.length,
               totalPages: 1,
               size: 1000,
               number: 0,
-            })
-          )
+            },
+          })
         }
-        if (urlStr.includes('/control/ui/pages/4')) {
-          return Promise.resolve(
-            createMockResponse({
-              content: duplicatedPage,
-              totalElements: duplicatedPage.length,
-              totalPages: 1,
-              size: 1000,
-              number: 0,
-            })
-          )
-        }
-        return Promise.resolve(createMockResponse(mockPages))
+        return Promise.resolve({ data: mockPages })
+      })
+      mockAxios.post.mockResolvedValueOnce({
+        data: {
+          content: duplicatedPage,
+          totalElements: duplicatedPage.length,
+          totalPages: 1,
+          size: 1000,
+          number: 0,
+        },
       })
 
       render(<PageBuilderPage />, { wrapper: createTestWrapper() })
@@ -1367,34 +1319,31 @@ describe('PageBuilderPage', () => {
         updatedAt: '2024-01-20T10:00:00Z',
       }
 
-      mockFetch.mockImplementation((url: string | URL | Request, options?: RequestInit) => {
-        const urlStr = typeof url === 'string' ? url : url.toString()
-        if (options?.method === 'POST' && urlStr.includes('/duplicate')) {
-          return Promise.resolve(
-            createMockResponse({
+      mockAxios.get.mockImplementation((url: string) => {
+        if (url.includes('/control/ui/pages/4')) {
+          return Promise.resolve({
+            data: {
               content: duplicatedPage,
               totalElements: duplicatedPage.length,
               totalPages: 1,
               size: 1000,
               number: 0,
-            })
-          )
+            },
+          })
         }
-        if (urlStr.includes('/control/ui/pages/4')) {
-          return Promise.resolve(
-            createMockResponse({
-              content: duplicatedPage,
-              totalElements: duplicatedPage.length,
-              totalPages: 1,
-              size: 1000,
-              number: 0,
-            })
-          )
+        if (url.includes('/control/ui/pages/1')) {
+          return Promise.resolve({ data: mockPages[0] })
         }
-        if (urlStr.includes('/control/ui/pages/1')) {
-          return Promise.resolve(createMockResponse(mockPages[0]))
-        }
-        return Promise.resolve(createMockResponse(mockPages))
+        return Promise.resolve({ data: mockPages })
+      })
+      mockAxios.post.mockResolvedValueOnce({
+        data: {
+          content: duplicatedPage,
+          totalElements: duplicatedPage.length,
+          totalPages: 1,
+          size: 1000,
+          number: 0,
+        },
       })
 
       render(<PageBuilderPage />, { wrapper: createTestWrapper() })
@@ -1437,31 +1386,28 @@ describe('PageBuilderPage', () => {
         updatedAt: '2024-01-20T10:00:00Z',
       }
 
-      mockFetch.mockImplementation((url: string | URL | Request, options?: RequestInit) => {
-        const urlStr = typeof url === 'string' ? url : url.toString()
-        if (options?.method === 'POST' && urlStr.includes('/duplicate')) {
-          return Promise.resolve(
-            createMockResponse({
+      mockAxios.get.mockImplementation((url: string) => {
+        if (url.includes('/control/ui/pages/4')) {
+          return Promise.resolve({
+            data: {
               content: duplicatedPage,
               totalElements: duplicatedPage.length,
               totalPages: 1,
               size: 1000,
               number: 0,
-            })
-          )
+            },
+          })
         }
-        if (urlStr.includes('/control/ui/pages/4')) {
-          return Promise.resolve(
-            createMockResponse({
-              content: duplicatedPage,
-              totalElements: duplicatedPage.length,
-              totalPages: 1,
-              size: 1000,
-              number: 0,
-            })
-          )
-        }
-        return Promise.resolve(createMockResponse(mockPages))
+        return Promise.resolve({ data: mockPages })
+      })
+      mockAxios.post.mockResolvedValueOnce({
+        data: {
+          content: duplicatedPage,
+          totalElements: duplicatedPage.length,
+          totalPages: 1,
+          size: 1000,
+          number: 0,
+        },
       })
 
       render(<PageBuilderPage />, { wrapper: createTestWrapper() })
@@ -1492,7 +1438,7 @@ describe('PageBuilderPage', () => {
 
   describe('Accessibility', () => {
     beforeEach(() => {
-      mockFetch.mockResolvedValue(createMockResponse(mockPages))
+      mockAxios.get.mockResolvedValue({ data: mockPages })
     })
 
     it('should have accessible table structure', async () => {
@@ -1590,14 +1536,12 @@ describe('PageBuilderPage', () => {
     it('should fall back to default rendering for unregistered component types', async () => {
       const user = userEvent.setup()
 
-      mockFetch.mockImplementation((url: string | URL | Request) => {
-        const urlStr = typeof url === 'string' ? url : url.toString()
-        if (urlStr.includes('/control/ui/pages/1')) {
-          return Promise.resolve(createMockResponse(mockPages[0]))
+      mockAxios.get.mockImplementation((url: string) => {
+        if (url.includes('/control/ui/pages/1')) {
+          return Promise.resolve({ data: mockPages[0] })
         }
-        return Promise.resolve(createMockResponse(mockPages))
+        return Promise.resolve({ data: mockPages })
       })
-      wrapFetchMock(mockFetch)
 
       render(<PageBuilderPage />, { wrapper: createTestWrapper() })
 
@@ -1666,19 +1610,17 @@ describe('PageBuilderPage', () => {
       }
 
       // Mock page without components - we'll add one via the palette
-      mockFetch.mockImplementation((url: string | URL | Request) => {
-        const urlStr = typeof url === 'string' ? url : url.toString()
-        if (urlStr.includes('/control/ui/pages/1')) {
-          return Promise.resolve(
-            createMockResponse({
+      mockAxios.get.mockImplementation((url: string) => {
+        if (url.includes('/control/ui/pages/1')) {
+          return Promise.resolve({
+            data: {
               ...mockPages[0],
               components: [],
-            })
-          )
+            },
+          })
         }
-        return Promise.resolve(createMockResponse(mockPages))
+        return Promise.resolve({ data: mockPages })
       })
-      wrapFetchMock(mockFetch)
 
       render(<PageBuilderPage />, { wrapper: WrapperWithPlugin })
 
@@ -1750,19 +1692,17 @@ describe('PageBuilderPage', () => {
       }
 
       // Mock page without components
-      mockFetch.mockImplementation((url: string | URL | Request) => {
-        const urlStr = typeof url === 'string' ? url : url.toString()
-        if (urlStr.includes('/control/ui/pages/1')) {
-          return Promise.resolve(
-            createMockResponse({
+      mockAxios.get.mockImplementation((url: string) => {
+        if (url.includes('/control/ui/pages/1')) {
+          return Promise.resolve({
+            data: {
               ...mockPages[0],
               components: [],
-            })
-          )
+            },
+          })
         }
-        return Promise.resolve(createMockResponse(mockPages))
+        return Promise.resolve({ data: mockPages })
       })
-      wrapFetchMock(mockFetch)
 
       render(<PageBuilderPage />, { wrapper: WrapperWithPlugin })
 

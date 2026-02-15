@@ -18,7 +18,13 @@ import React from 'react'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { createTestWrapper, setupAuthMocks, wrapFetchMock } from '../../test/testUtils'
+import {
+  createTestWrapper,
+  setupAuthMocks,
+  mockAxios,
+  resetMockAxios,
+  createAxiosError,
+} from '../../test/testUtils'
 import { ResourceBrowserPage } from './ResourceBrowserPage'
 
 // Mock navigate function
@@ -67,46 +73,21 @@ const mockCollections = [
   },
 ]
 
-// Mock fetch function with proper Response objects
-const mockFetch = vi.fn()
-
-// Helper to create a proper Response-like object
-function createMockResponse(data: unknown, ok = true, status = 200): Response {
-  return {
-    ok,
-    status,
-    json: () => Promise.resolve(data),
-    text: () => Promise.resolve(JSON.stringify(data)),
-    clone: function () {
-      return this
-    },
-    headers: new Headers(),
-    redirected: false,
-    statusText: ok ? 'OK' : 'Error',
-    type: 'basic' as ResponseType,
-    url: '',
-    body: null,
-    bodyUsed: false,
-    arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
-    blob: () => Promise.resolve(new Blob()),
-    formData: () => Promise.resolve(new FormData()),
-    bytes: () => Promise.resolve(new Uint8Array()),
-  } as Response
+// Mock data response helper
+const mockCollectionsResponse = {
+  content: mockCollections,
+  totalElements: mockCollections.length,
+  totalPages: 1,
+  size: 1000,
+  number: 0,
 }
-
-global.fetch = mockFetch
-
-/**
- * Create a wrapper component with all required providers
- */
 
 describe('ResourceBrowserPage', () => {
   let cleanupAuthMocks: () => void
 
   beforeEach(() => {
     cleanupAuthMocks = setupAuthMocks()
-    mockFetch.mockReset()
-    wrapFetchMock(mockFetch)
+    resetMockAxios()
     mockNavigate.mockReset()
   })
 
@@ -118,10 +99,10 @@ describe('ResourceBrowserPage', () => {
   describe('Loading State', () => {
     it('should display loading spinner while fetching collections', async () => {
       // Mock a delayed response
-      mockFetch.mockImplementation(
+      mockAxios.get.mockImplementation(
         () =>
           new Promise((resolve) =>
-            setTimeout(() => resolve(createMockResponse(mockCollections)), 100)
+            setTimeout(() => resolve({ data: mockCollectionsResponse }), 100)
           )
       )
 
@@ -134,8 +115,7 @@ describe('ResourceBrowserPage', () => {
 
   describe('Error State', () => {
     it('should display error message when fetch fails', async () => {
-      mockFetch.mockResolvedValue(createMockResponse(null, false, 500))
-      wrapFetchMock(mockFetch)
+      mockAxios.get.mockRejectedValue(createAxiosError(500))
 
       render(<ResourceBrowserPage />, { wrapper: createTestWrapper() })
 
@@ -145,8 +125,7 @@ describe('ResourceBrowserPage', () => {
     })
 
     it('should display retry button on error', async () => {
-      mockFetch.mockResolvedValue(createMockResponse(null, false, 500))
-      wrapFetchMock(mockFetch)
+      mockAxios.get.mockRejectedValue(createAxiosError(500))
 
       render(<ResourceBrowserPage />, { wrapper: createTestWrapper() })
 
@@ -156,17 +135,9 @@ describe('ResourceBrowserPage', () => {
     })
 
     it('should retry fetch when clicking retry button', async () => {
-      mockFetch.mockResolvedValueOnce(createMockResponse(null, false, 500))
-      mockFetch.mockResolvedValueOnce(
-        createMockResponse({
-          content: mockCollections,
-          totalElements: mockCollections.length,
-          totalPages: 1,
-          size: 1000,
-          number: 0,
-        })
-      )
-      wrapFetchMock(mockFetch)
+      mockAxios.get
+        .mockRejectedValueOnce(createAxiosError(500))
+        .mockResolvedValueOnce({ data: mockCollectionsResponse })
 
       const user = userEvent.setup()
       render(<ResourceBrowserPage />, { wrapper: createTestWrapper() })
@@ -185,16 +156,7 @@ describe('ResourceBrowserPage', () => {
 
   describe('Collections Display', () => {
     beforeEach(() => {
-      mockFetch.mockResolvedValue(
-        createMockResponse({
-          content: mockCollections,
-          totalElements: mockCollections.length,
-          totalPages: 1,
-          size: 1000,
-          number: 0,
-        })
-      )
-      wrapFetchMock(mockFetch)
+      mockAxios.get.mockResolvedValue({ data: mockCollectionsResponse })
     })
 
     it('should display page title', async () => {
@@ -268,15 +230,7 @@ describe('ResourceBrowserPage', () => {
 
   describe('Search Filtering', () => {
     beforeEach(() => {
-      mockFetch.mockResolvedValue(
-        createMockResponse({
-          content: mockCollections,
-          totalElements: mockCollections.length,
-          totalPages: 1,
-          size: 1000,
-          number: 0,
-        })
-      )
+      mockAxios.get.mockResolvedValue({ data: mockCollectionsResponse })
     })
 
     it('should filter collections by name', async () => {
@@ -410,15 +364,7 @@ describe('ResourceBrowserPage', () => {
 
   describe('Navigation', () => {
     beforeEach(() => {
-      mockFetch.mockResolvedValue(
-        createMockResponse({
-          content: mockCollections,
-          totalElements: mockCollections.length,
-          totalPages: 1,
-          size: 1000,
-          number: 0,
-        })
-      )
+      mockAxios.get.mockResolvedValue({ data: mockCollectionsResponse })
     })
 
     it('should navigate to collection data view when clicking a collection card', async () => {
@@ -466,7 +412,7 @@ describe('ResourceBrowserPage', () => {
 
   describe('Empty State', () => {
     it('should show empty state when no collections exist', async () => {
-      mockFetch.mockResolvedValue(createMockResponse([]))
+      mockAxios.get.mockResolvedValue({ data: [] })
 
       render(<ResourceBrowserPage />, { wrapper: createTestWrapper() })
 
@@ -477,15 +423,15 @@ describe('ResourceBrowserPage', () => {
 
     it('should show empty state when all collections are inactive', async () => {
       const inactiveCollections = mockCollections.map((c) => ({ ...c, active: false }))
-      mockFetch.mockResolvedValue(
-        createMockResponse({
+      mockAxios.get.mockResolvedValue({
+        data: {
           content: inactiveCollections,
           totalElements: inactiveCollections.length,
           totalPages: 1,
           size: 1000,
           number: 0,
-        })
-      )
+        },
+      })
 
       render(<ResourceBrowserPage />, { wrapper: createTestWrapper() })
 
@@ -497,15 +443,7 @@ describe('ResourceBrowserPage', () => {
 
   describe('Accessibility', () => {
     beforeEach(() => {
-      mockFetch.mockResolvedValue(
-        createMockResponse({
-          content: mockCollections,
-          totalElements: mockCollections.length,
-          totalPages: 1,
-          size: 1000,
-          number: 0,
-        })
-      )
+      mockAxios.get.mockResolvedValue({ data: mockCollectionsResponse })
     })
 
     it('should have accessible search input', async () => {

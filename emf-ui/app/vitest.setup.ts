@@ -3,6 +3,28 @@ import { cleanup } from '@testing-library/react'
 import { afterEach, beforeAll, afterAll, vi } from 'vitest'
 import { setupServer } from 'msw/node'
 import { http, HttpResponse } from 'msw'
+import { mockAxios } from './src/test/testUtils'
+
+// ─── Global Axios mock ──────────────────────────────────────────────────────
+// All API calls flow through EMFClient's Axios instance.
+// Mock `axios.create()` so it returns the shared `mockAxios` instance from testUtils.
+// This ensures every test that renders components using `useApi()` gets mock responses.
+vi.mock('axios', async () => {
+  const actual = await vi.importActual('axios')
+  return {
+    ...actual,
+    default: {
+      ...(actual as Record<string, unknown>).default,
+      create: vi.fn(() => mockAxios),
+      isAxiosError: (error: unknown) =>
+        error !== null &&
+        error !== undefined &&
+        typeof error === 'object' &&
+        'isAxiosError' in error &&
+        (error as { isAxiosError: boolean }).isAxiosError === true,
+    },
+  }
+})
 
 // Cleanup after each test
 afterEach(() => {

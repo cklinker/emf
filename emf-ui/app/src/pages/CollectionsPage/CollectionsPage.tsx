@@ -32,6 +32,7 @@ export interface Collection {
   description?: string
   storageMode: 'PHYSICAL_TABLE' | 'JSONB'
   active: boolean
+  systemCollection?: boolean
   currentVersion: number
   createdAt: string
   updatedAt: string
@@ -85,6 +86,9 @@ export function CollectionsPage({
   const { apiClient } = useApi()
   const { showToast } = useToast()
 
+  // Show system collections toggle
+  const [showSystem, setShowSystem] = useState(false)
+
   // Filter state
   const [filters, setFilters] = useState<CollectionFilters>({
     name: '',
@@ -112,8 +116,11 @@ export function CollectionsPage({
     error,
     refetch,
   } = useQuery({
-    queryKey: ['collections'],
-    queryFn: () => apiClient.get<PageResponse<Collection>>('/control/collections?size=1000'),
+    queryKey: ['collections', { showSystem }],
+    queryFn: () =>
+      apiClient.get<PageResponse<Collection>>(
+        `/control/collections?size=1000${showSystem ? '&includeSystem=true' : ''}`
+      ),
   })
 
   // Extract collections from paginated response
@@ -198,6 +205,12 @@ export function CollectionsPage({
   const handleStatusFilterChange = useCallback((event: React.ChangeEvent<HTMLSelectElement>) => {
     setFilters((prev) => ({ ...prev, status: event.target.value as CollectionFilters['status'] }))
     setPage(1) // Reset to first page when filtering
+  }, [])
+
+  // Handle show system collections toggle
+  const handleShowSystemChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    setShowSystem(event.target.checked)
+    setPage(1) // Reset to first page when toggling
   }, [])
 
   // Handle sort change
@@ -343,6 +356,17 @@ export function CollectionsPage({
             <option value="active">{t('collections.active')}</option>
             <option value="inactive">{t('collections.inactive')}</option>
           </select>
+        </div>
+        <div className={styles.filterGroup}>
+          <label className={styles.checkboxLabel}>
+            <input
+              type="checkbox"
+              checked={showSystem}
+              onChange={handleShowSystemChange}
+              data-testid="show-system-toggle"
+            />
+            <span>{t('collections.showSystem')}</span>
+          </label>
         </div>
       </div>
 

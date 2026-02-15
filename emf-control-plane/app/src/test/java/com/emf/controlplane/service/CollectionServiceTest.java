@@ -80,17 +80,17 @@ class CollectionServiceTest {
             Collection collection = createTestCollection("test-id", "Test Collection");
             Page<Collection> expectedPage = new PageImpl<>(List.of(collection), pageable, 1);
             
-            when(collectionRepository.findByActiveTrue(pageable)).thenReturn(expectedPage);
+            when(collectionRepository.findByActiveTrueExcludeSystem(pageable)).thenReturn(expectedPage);
 
             // When
-            Page<Collection> result = collectionService.listCollections(null, null, pageable);
+            Page<Collection> result = collectionService.listCollections(null, null, pageable, false);
 
             // Then
             assertThat(result).isNotNull();
             assertThat(result.getContent()).hasSize(1);
             assertThat(result.getContent().get(0).getName()).isEqualTo("Test Collection");
-            verify(collectionRepository).findByActiveTrue(pageable);
-            verify(collectionRepository, never()).findByActiveAndSearchTerm(anyString(), any());
+            verify(collectionRepository).findByActiveTrueExcludeSystem(pageable);
+            verify(collectionRepository, never()).findByActiveAndSearchTermExcludeSystem(anyString(), any());
         }
 
         @Test
@@ -101,17 +101,17 @@ class CollectionServiceTest {
             String filter = "test";
             Collection collection = createTestCollection("test-id", "Test Collection");
             Page<Collection> expectedPage = new PageImpl<>(List.of(collection), pageable, 1);
-            
-            when(collectionRepository.findByActiveAndSearchTerm(filter, pageable)).thenReturn(expectedPage);
+
+            when(collectionRepository.findByActiveAndSearchTermExcludeSystem(filter, pageable)).thenReturn(expectedPage);
 
             // When
-            Page<Collection> result = collectionService.listCollections(filter, null, pageable);
+            Page<Collection> result = collectionService.listCollections(filter, null, pageable, false);
 
             // Then
             assertThat(result).isNotNull();
             assertThat(result.getContent()).hasSize(1);
-            verify(collectionRepository).findByActiveAndSearchTerm(filter, pageable);
-            verify(collectionRepository, never()).findByActiveTrue(any());
+            verify(collectionRepository).findByActiveAndSearchTermExcludeSystem(filter, pageable);
+            verify(collectionRepository, never()).findByActiveTrueExcludeSystem(any());
         }
 
         @Test
@@ -121,11 +121,11 @@ class CollectionServiceTest {
             Pageable pageable = PageRequest.of(0, 10);
             String filter = "nonexistent";
             Page<Collection> emptyPage = new PageImpl<>(Collections.emptyList(), pageable, 0);
-            
-            when(collectionRepository.findByActiveAndSearchTerm(filter, pageable)).thenReturn(emptyPage);
+
+            when(collectionRepository.findByActiveAndSearchTermExcludeSystem(filter, pageable)).thenReturn(emptyPage);
 
             // When
-            Page<Collection> result = collectionService.listCollections(filter, null, pageable);
+            Page<Collection> result = collectionService.listCollections(filter, null, pageable, false);
 
             // Then
             assertThat(result).isNotNull();
@@ -140,16 +140,16 @@ class CollectionServiceTest {
             Pageable pageable = PageRequest.of(0, 10);
             Collection collection = createTestCollection("test-id", "Test Collection");
             Page<Collection> expectedPage = new PageImpl<>(List.of(collection), pageable, 1);
-            
-            when(collectionRepository.findByActiveTrue(pageable)).thenReturn(expectedPage);
+
+            when(collectionRepository.findByActiveTrueExcludeSystem(pageable)).thenReturn(expectedPage);
 
             // When
-            Page<Collection> result = collectionService.listCollections("   ", null, pageable);
+            Page<Collection> result = collectionService.listCollections("   ", null, pageable, false);
 
             // Then
             assertThat(result).isNotNull();
-            verify(collectionRepository).findByActiveTrue(pageable);
-            verify(collectionRepository, never()).findByActiveAndSearchTerm(anyString(), any());
+            verify(collectionRepository).findByActiveTrueExcludeSystem(pageable);
+            verify(collectionRepository, never()).findByActiveAndSearchTermExcludeSystem(anyString(), any());
         }
     }
 

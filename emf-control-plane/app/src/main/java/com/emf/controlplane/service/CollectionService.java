@@ -71,28 +71,33 @@ public class CollectionService {
 
     /**
      * Lists collections with pagination, filtering, and sorting support.
-     * Only returns active collections.
-     * 
+     * Only returns active collections. System collections are excluded by default.
+     *
      * @param filter Optional filter string to search by name or description
      * @param sort Optional sort criteria (handled by Pageable)
      * @param pageable Pagination and sorting parameters
+     * @param includeSystem Whether to include system collections (default: false)
      * @return Page of active collections matching the criteria
-     * 
+     *
      * Validates: Requirement 1.1
      */
     @Transactional(readOnly = true)
-    public Page<Collection> listCollections(String filter, String sort, Pageable pageable) {
+    public Page<Collection> listCollections(String filter, String sort, Pageable pageable, boolean includeSystem) {
         String tenantId = TenantContextHolder.getTenantId();
-        log.debug("Listing collections for tenant: {} with filter: {}", tenantId, filter);
+        log.debug("Listing collections for tenant: {} with filter: {}, includeSystem: {}", tenantId, filter, includeSystem);
 
         // When tenant is set, try tenant-scoped first; if empty, fall back to global
         // This handles collections created before multi-tenancy (no tenantId set)
         if (tenantId != null) {
             Page<Collection> result;
             if (filter != null && !filter.isBlank()) {
-                result = collectionRepository.findByTenantIdAndActiveAndSearchTerm(tenantId, filter.trim(), pageable);
+                result = includeSystem
+                        ? collectionRepository.findByTenantIdAndActiveAndSearchTerm(tenantId, filter.trim(), pageable)
+                        : collectionRepository.findByTenantIdAndActiveAndSearchTermExcludeSystem(tenantId, filter.trim(), pageable);
             } else {
-                result = collectionRepository.findByTenantIdAndActiveTrue(tenantId, pageable);
+                result = includeSystem
+                        ? collectionRepository.findByTenantIdAndActiveTrue(tenantId, pageable)
+                        : collectionRepository.findByTenantIdAndActiveTrueExcludeSystem(tenantId, pageable);
             }
             if (!result.isEmpty()) {
                 return result;
@@ -101,9 +106,13 @@ public class CollectionService {
         }
 
         if (filter != null && !filter.isBlank()) {
-            return collectionRepository.findByActiveAndSearchTerm(filter.trim(), pageable);
+            return includeSystem
+                    ? collectionRepository.findByActiveAndSearchTerm(filter.trim(), pageable)
+                    : collectionRepository.findByActiveAndSearchTermExcludeSystem(filter.trim(), pageable);
         }
-        return collectionRepository.findByActiveTrue(pageable);
+        return includeSystem
+                ? collectionRepository.findByActiveTrue(pageable)
+                : collectionRepository.findByActiveTrueExcludeSystem(pageable);
     }
 
     /**

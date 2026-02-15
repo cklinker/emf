@@ -10,13 +10,14 @@
  * - 2.6: Clear tokens and redirect on logout (via onLogout callback)
  */
 
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { Search } from 'lucide-react'
 import type { BrandingConfig } from '../../types/config'
 import type { User } from '../../types/auth'
 import { useAppShell } from '../AppShell'
 import { SearchModal } from '../SearchModal'
 import { RecentItemsDropdown } from '../RecentItemsDropdown'
+import { getGravatarUrl } from '../../utils/gravatar'
 import styles from './Header.module.css'
 
 /**
@@ -37,6 +38,7 @@ export interface HeaderProps {
 export function Header({ branding, user, onLogout }: HeaderProps): JSX.Element {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
+  const [gravatarFailed, setGravatarFailed] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
 
@@ -122,6 +124,12 @@ export function Header({ branding, user, onLogout }: HeaderProps): JSX.Element {
     return userData.name || userData.email || 'User'
   }
 
+  // Compute Gravatar URL once (only when email changes)
+  const gravatarUrl = useMemo(() => getGravatarUrl(user?.email, 64), [user?.email])
+
+  // Resolve the avatar image URL: OIDC picture > Gravatar > initials fallback
+  const avatarImageUrl = user?.picture || (!gravatarFailed && gravatarUrl) || null
+
   const isMobile = screenSize === 'mobile'
 
   return (
@@ -185,11 +193,12 @@ export function Header({ branding, user, onLogout }: HeaderProps): JSX.Element {
                 data-testid="user-menu-button"
               >
                 <div className={styles.avatar} aria-hidden="true">
-                  {user.picture ? (
+                  {avatarImageUrl ? (
                     <img
-                      src={user.picture}
+                      src={avatarImageUrl}
                       alt=""
                       className={styles.avatarImage}
+                      onError={() => setGravatarFailed(true)}
                       data-testid="user-avatar-image"
                     />
                   ) : (

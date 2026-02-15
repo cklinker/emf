@@ -5,8 +5,11 @@
  * @returns Human-readable relative time (e.g., "Just now", "5m ago", "2h ago", "Yesterday")
  */
 export function formatRelativeTime(date: string | Date): string {
+  const d = typeof date === 'string' ? new Date(date) : date
+  if (!(d instanceof Date) || isNaN(d.getTime())) return String(date)
+
   const now = Date.now()
-  const then = typeof date === 'string' ? new Date(date).getTime() : date.getTime()
+  const then = d.getTime()
   const diffMs = now - then
 
   if (diffMs < 0) return 'Just now'
@@ -21,6 +24,5 @@ export function formatRelativeTime(date: string | Date): string {
   if (diffDays === 1) return 'Yesterday'
   if (diffDays < 7) return `${diffDays}d ago`
 
-  const d = typeof date === 'string' ? new Date(date) : date
   return d.toLocaleDateString()
 }

@@ -335,11 +335,18 @@ export function I18nProvider({
   const formatDate = useCallback(
     (date: Date, options?: Intl.DateTimeFormatOptions): string => {
       try {
+        // Guard against non-Date values that may slip through at runtime
+        if (!(date instanceof Date) || isNaN(date.getTime())) {
+          return String(date ?? '')
+        }
         const formatter = new Intl.DateTimeFormat(locale, options)
         return formatter.format(date)
       } catch (error) {
         console.error('[I18n] Error formatting date:', error)
-        return date.toLocaleDateString()
+        if (date instanceof Date) {
+          return date.toLocaleDateString()
+        }
+        return String(date ?? '')
       }
     },
     [locale]

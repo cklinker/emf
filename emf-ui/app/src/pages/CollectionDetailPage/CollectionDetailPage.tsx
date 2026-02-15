@@ -17,7 +17,6 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { getTenantSlug } from '../../context/TenantContext'
-import { getTenantId } from '../../hooks/useTenantId'
 import { useApi } from '../../context/ApiContext'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
 import {
@@ -312,7 +311,7 @@ export function CollectionDetailPage({
     queryKey: ['global-picklists'],
     queryFn: async () => {
       const response = await apiClient.get<Array<{ id: string; name: string }>>(
-        `/control/picklists/global?tenantId=${getTenantId()}`
+        '/control/picklists/global'
       )
       return response
     },

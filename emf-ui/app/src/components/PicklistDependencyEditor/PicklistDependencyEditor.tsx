@@ -150,7 +150,11 @@ export function PicklistDependencyEditor({
         <div className={styles.modalBody}>
           {picklistFields.length < 2 ? (
             <div className={styles.emptyState}>
-              <p>{t('picklistDependencies.noPicklistFields')}</p>
+              <p>
+                {picklistFields.length === 0
+                  ? t('picklistDependencies.noPicklistFields')
+                  : t('picklistDependencies.needTwoPicklistFields')}
+              </p>
             </div>
           ) : (
             <>

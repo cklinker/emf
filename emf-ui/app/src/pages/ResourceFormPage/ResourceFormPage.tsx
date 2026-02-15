@@ -60,6 +60,7 @@ export interface FieldDefinition {
   indexed?: boolean
   defaultValue?: unknown
   referenceTarget?: string
+  fieldTypeConfig?: string
   enumValues?: string[]
   order?: number
   validation?: ValidationRule[]
@@ -115,12 +116,50 @@ export interface ResourceFormPageProps {
   testId?: string
 }
 
+/**
+ * Reverse mapping from backend canonical types (uppercase) to UI types (lowercase).
+ * The backend stores "DOUBLE" for what the UI calls "number", etc.
+ */
+const BACKEND_TYPE_TO_UI: Record<string, FieldDefinition['type']> = {
+  DOUBLE: 'number',
+  INTEGER: 'number',
+  LONG: 'number',
+  JSON: 'json',
+  ARRAY: 'json',
+}
+
+function normalizeFieldType(backendType: string): FieldDefinition['type'] {
+  const upper = backendType.toUpperCase()
+  if (upper in BACKEND_TYPE_TO_UI) {
+    return BACKEND_TYPE_TO_UI[upper]
+  }
+  return backendType.toLowerCase() as FieldDefinition['type']
+}
+
+/** Picklist value returned from the API */
+interface PicklistValueDto {
+  value: string
+  label: string
+  isDefault: boolean
+  active: boolean
+  sortOrder: number
+}
+
 // API functions using apiClient
 async function fetchCollectionSchema(
   apiClient: ApiClient,
   collectionName: string
 ): Promise<CollectionSchema> {
-  return apiClient.get(`/control/collections/${collectionName}`)
+  const response = await apiClient.get<CollectionSchema>(`/control/collections/${collectionName}`)
+  // Normalize field types from backend canonical form (e.g. "PICKLIST") to
+  // UI form (e.g. "picklist") so switch-case rendering works correctly.
+  if (response.fields) {
+    response.fields = response.fields.map((f) => ({
+      ...f,
+      type: normalizeFieldType(f.type),
+    }))
+  }
+  return response
 }
 
 async function fetchResource(
@@ -275,6 +314,55 @@ export function ResourceFormPage({
     enabled: !!collectionName,
   })
 
+  // Identify picklist fields so we can fetch their values
+  const picklistFields = useMemo(() => {
+    if (!schema?.fields) return []
+    return schema.fields.filter((f) => f.type === 'picklist' || f.type === 'multi_picklist')
+  }, [schema])
+
+  // Fetch picklist values for all picklist/multi_picklist fields.
+  // We use the field's fieldTypeConfig.globalPicklistId to resolve values,
+  // falling back to the field-level picklist values endpoint.
+  const { data: picklistValuesMap } = useQuery({
+    queryKey: ['picklist-values-for-form', collectionName, picklistFields.map((f) => f.id)],
+    queryFn: async () => {
+      const map: Record<string, string[]> = {}
+      await Promise.all(
+        picklistFields.map(async (field) => {
+          try {
+            // Try field-level endpoint which resolves global picklist automatically
+            const values = await apiClient.get<PicklistValueDto[]>(
+              `/control/picklists/fields/${field.id}/values`
+            )
+            map[field.id] = values
+              .filter((v) => v.active)
+              .sort((a, b) => a.sortOrder - b.sortOrder)
+              .map((v) => v.value)
+          } catch {
+            map[field.id] = []
+          }
+        })
+      )
+      return map
+    },
+    enabled: picklistFields.length > 0,
+  })
+
+  // Merge picklist values into the schema fields as enumValues
+  const schemaWithPicklistValues = useMemo<CollectionSchema | undefined>(() => {
+    if (!schema) return undefined
+    if (!picklistValuesMap || picklistFields.length === 0) return schema
+    return {
+      ...schema,
+      fields: schema.fields.map((f) => {
+        if ((f.type === 'picklist' || f.type === 'multi_picklist') && picklistValuesMap[f.id]) {
+          return { ...f, enumValues: picklistValuesMap[f.id] }
+        }
+        return f
+      }),
+    }
+  }, [schema, picklistValuesMap, picklistFields])
+
   // Fetch resource data for edit mode
   const {
     data: resource,
@@ -302,12 +390,14 @@ export function ResourceFormPage({
   // Compute initial form data based on schema and resource (or clone source)
   // In edit/clone mode, wait for the resource data before initializing to avoid
   // populating with empty defaults that then block re-initialization.
+  // Use schemaWithPicklistValues so picklist defaults are resolved correctly.
+  const effectiveSchema = schemaWithPicklistValues
   const computedInitialData = useMemo(() => {
-    if (!schema) return null
+    if (!effectiveSchema) return null
     if (isEditMode) {
       // Wait for resource to load before initializing form
       if (!resource) return null
-      return populateFormData(schema, resource)
+      return populateFormData(effectiveSchema, resource)
     }
     if (isCloneMode) {
       // Wait for clone source to load before initializing form
@@ -317,10 +407,10 @@ export function ResourceFormPage({
           ([key]) => key !== 'id' && key !== 'createdAt' && key !== 'updatedAt'
         )
       ) as Resource
-      return populateFormData(schema, cloneData)
+      return populateFormData(effectiveSchema, cloneData)
     }
-    return initializeFormData(schema)
-  }, [schema, resource, isEditMode, isCloneMode, cloneSource])
+    return initializeFormData(effectiveSchema)
+  }, [effectiveSchema, resource, isEditMode, isCloneMode, cloneSource])
 
   // Initialize form data when data becomes available or resource changes
   if (computedInitialData && initializedKey !== currentResourceKey) {
@@ -331,13 +421,13 @@ export function ResourceFormPage({
 
   // Sort fields by order
   const sortedFields = useMemo(() => {
-    if (!schema?.fields) return []
-    return [...schema.fields].sort((a, b) => {
+    if (!effectiveSchema?.fields) return []
+    return [...effectiveSchema.fields].sort((a, b) => {
       const orderA = a.order ?? 0
       const orderB = b.order ?? 0
       return orderA - orderB
     })
-  }, [schema])
+  }, [effectiveSchema])
 
   // Create mutation
   const createMutation = useMutation({
@@ -1200,7 +1290,7 @@ export function ResourceFormPage({
   }
 
   // Not found state
-  if (!schema) {
+  if (!effectiveSchema) {
     return (
       <div className={styles.container} data-testid={testId}>
         <ErrorMessage error={new Error(t('errors.notFound'))} />
@@ -1224,7 +1314,7 @@ export function ResourceFormPage({
               to={`/${getTenantSlug()}/resources/${collectionName}`}
               className={styles.breadcrumbLink}
             >
-              {schema.displayName}
+              {effectiveSchema.displayName}
             </Link>
             <span className={styles.breadcrumbSeparator} aria-hidden="true">
               /
@@ -1233,7 +1323,7 @@ export function ResourceFormPage({
               {isEditMode
                 ? t('resources.editRecord')
                 : isCloneMode
-                  ? t('resources.cloneRecord', { collection: schema.displayName })
+                  ? t('resources.cloneRecord', { collection: effectiveSchema.displayName })
                   : t('resources.createRecord')}
             </span>
           </nav>
@@ -1241,7 +1331,7 @@ export function ResourceFormPage({
             {isEditMode
               ? t('resources.editRecord')
               : isCloneMode
-                ? t('resources.cloneRecord', { collection: schema.displayName })
+                ? t('resources.cloneRecord', { collection: effectiveSchema.displayName })
                 : t('resources.createRecord')}
           </h1>
           {isEditMode && resourceId && (

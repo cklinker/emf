@@ -37,9 +37,51 @@ export interface FieldDefinition {
   id: string
   name: string
   displayName?: string
-  type: 'string' | 'number' | 'boolean' | 'date' | 'datetime' | 'json' | 'reference'
+  type:
+    | 'string'
+    | 'number'
+    | 'boolean'
+    | 'date'
+    | 'datetime'
+    | 'json'
+    | 'reference'
+    | 'picklist'
+    | 'multi_picklist'
+    | 'currency'
+    | 'percent'
+    | 'auto_number'
+    | 'phone'
+    | 'email'
+    | 'url'
+    | 'rich_text'
+    | 'encrypted'
+    | 'external_id'
+    | 'geolocation'
+    | 'lookup'
+    | 'master_detail'
+    | 'formula'
+    | 'rollup_summary'
   required: boolean
   referenceTarget?: string
+}
+
+/**
+ * Reverse mapping from backend canonical types (uppercase) to UI types (lowercase).
+ */
+const BACKEND_TYPE_TO_UI: Record<string, FieldDefinition['type']> = {
+  DOUBLE: 'number',
+  INTEGER: 'number',
+  LONG: 'number',
+  JSON: 'json',
+  ARRAY: 'json',
+}
+
+function normalizeFieldType(backendType: string): FieldDefinition['type'] {
+  const upper = backendType.toUpperCase()
+  if (upper in BACKEND_TYPE_TO_UI) {
+    return BACKEND_TYPE_TO_UI[upper]
+  }
+  return backendType.toLowerCase() as FieldDefinition['type']
 }
 
 /**
@@ -209,7 +251,16 @@ async function fetchCollectionSchema(
   apiClient: ApiClient,
   collectionName: string
 ): Promise<CollectionSchema> {
-  return apiClient.get(`/control/collections/${collectionName}`)
+  const response = await apiClient.get<CollectionSchema>(`/control/collections/${collectionName}`)
+  // Normalize field types from backend canonical form (e.g. "PICKLIST") to
+  // UI form (e.g. "picklist") so type display and rendering works correctly.
+  if (response.fields) {
+    response.fields = response.fields.map((f) => ({
+      ...f,
+      type: normalizeFieldType(f.type),
+    }))
+  }
+  return response
 }
 
 async function fetchResource(

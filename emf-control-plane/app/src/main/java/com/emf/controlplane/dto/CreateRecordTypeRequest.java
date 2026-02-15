@@ -1,5 +1,6 @@
 package com.emf.controlplane.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
@@ -12,6 +13,7 @@ public class CreateRecordTypeRequest {
     @Size(max = 500, message = "Description must be at most 500 characters")
     private String description;
 
+    @JsonProperty("isDefault")
     private boolean isDefault;
 
     public CreateRecordTypeRequest() {}
@@ -22,6 +24,7 @@ public class CreateRecordTypeRequest {
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
 
+    @JsonProperty("isDefault")
     public boolean isDefault() { return isDefault; }
     public void setDefault(boolean isDefault) { this.isDefault = isDefault; }
 }

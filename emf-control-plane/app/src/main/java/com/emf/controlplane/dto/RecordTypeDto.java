@@ -1,6 +1,7 @@
 package com.emf.controlplane.dto;
 
 import com.emf.controlplane.entity.RecordType;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.time.Instant;
 
@@ -11,6 +12,7 @@ public class RecordTypeDto {
     private String name;
     private String description;
     private boolean active;
+    @JsonProperty("isDefault")
     private boolean isDefault;
     private Instant createdAt;
     private Instant updatedAt;
@@ -46,6 +48,7 @@ public class RecordTypeDto {
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }
 
+    @JsonProperty("isDefault")
     public boolean isDefault() { return isDefault; }
     public void setDefault(boolean isDefault) { this.isDefault = isDefault; }
 

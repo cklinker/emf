@@ -75,7 +75,7 @@ public class DynamicRouteLocator implements RouteLocator {
 
             // Create a path matching async predicate
             AsyncPredicate<ServerWebExchange> pathPredicate = exchange -> {
-                String requestPath = exchange.getRequest().getURI().getPath();
+                String requestPath = exchange.getRequest().getPath().value();
                 boolean matches = matchesPath(requestPath, routeDefinition.getPath());
                 return Mono.just(matches);
             };

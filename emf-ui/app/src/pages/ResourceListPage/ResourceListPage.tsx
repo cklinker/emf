@@ -158,6 +158,25 @@ export interface FieldDefinition {
 }
 
 /**
+ * Reverse mapping from backend canonical types (uppercase) to UI types (lowercase).
+ */
+const BACKEND_TYPE_TO_UI: Record<string, FieldDefinition['type']> = {
+  DOUBLE: 'number',
+  INTEGER: 'number',
+  LONG: 'number',
+  JSON: 'json',
+  ARRAY: 'json',
+}
+
+function normalizeFieldType(backendType: string): FieldDefinition['type'] {
+  const upper = backendType.toUpperCase()
+  if (upper in BACKEND_TYPE_TO_UI) {
+    return BACKEND_TYPE_TO_UI[upper]
+  }
+  return backendType.toLowerCase() as FieldDefinition['type']
+}
+
+/**
  * Collection schema interface
  */
 export interface CollectionSchema {
@@ -271,8 +290,15 @@ async function fetchCollectionSchema(
   }
 
   // Now fetch the full collection details by ID
-  const schema = await apiClient.get(`/control/collections/${collection.id}`)
+  const schema = await apiClient.get<CollectionSchema>(`/control/collections/${collection.id}`)
   console.log('[fetchCollectionSchema] Collection schema:', schema)
+  // Normalize field types from backend canonical form to UI form
+  if (schema.fields) {
+    schema.fields = schema.fields.map((f) => ({
+      ...f,
+      type: normalizeFieldType(f.type),
+    }))
+  }
   return schema
 }
 

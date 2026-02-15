@@ -66,8 +66,7 @@ config:
     enabled: true
 
   cors:
-    allowedOriginPatterns:
-      - "https://*.emf.example.com"
+    allowedOriginPattern: "https://*.emf.example.com"
 
   logging:
     level:

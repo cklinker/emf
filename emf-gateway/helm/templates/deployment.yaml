@@ -88,6 +88,8 @@ spec:
         - name: SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI
           value: {{ .Values.config.jwt.jwkSetUri | quote }}
         {{- end }}
+        - name: CORS_ALLOWED_ORIGIN_PATTERN
+          value: {{ .Values.config.cors.allowedOriginPattern | default "*" | quote }}
         - name: EMF_GATEWAY_RATE_LIMIT_DEFAULT_REQUESTS_PER_WINDOW
           value: {{ .Values.config.rateLimit.default.requestsPerWindow | quote }}
         - name: EMF_GATEWAY_RATE_LIMIT_DEFAULT_WINDOW_DURATION

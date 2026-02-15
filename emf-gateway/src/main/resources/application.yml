@@ -38,21 +38,6 @@ spring:
     gateway:
       default-filters:
         - name: RequestTime
-      globalcors:
-        corsConfigurations:
-          '[/**]':
-            allowedOriginPatterns:
-              - ${CORS_ALLOWED_ORIGIN_PATTERN:*}
-            allowedMethods:
-              - GET
-              - POST
-              - PUT
-              - PATCH
-              - DELETE
-              - OPTIONS
-            allowedHeaders: "*"
-            allowCredentials: true
-            maxAge: 3600
       httpclient:
         connect-timeout: 5000
         response-timeout: 30s

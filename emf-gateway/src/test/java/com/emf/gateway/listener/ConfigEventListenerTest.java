@@ -148,6 +148,56 @@ class ConfigEventListenerTest {
             verify(routeRegistry, never()).updateRoute(any());
             verify(routeRegistry, never()).removeRoute(any());
         }
+
+        @Test
+        @DisplayName("Should ignore collection changed event for control-plane system collection by ID")
+        void shouldIgnoreControlPlaneCollectionById() {
+            // Arrange
+            CollectionChangedPayload payload = new CollectionChangedPayload();
+            payload.setId("00000000-0000-0000-0000-000000000100");
+            payload.setName("__control-plane");
+            payload.setChangeType(ChangeType.CREATED);
+
+            ConfigEvent<CollectionChangedPayload> event = new ConfigEvent<>(
+                UUID.randomUUID().toString(),
+                "config.collection.changed",
+                UUID.randomUUID().toString(),
+                Instant.now(),
+                payload
+            );
+
+            // Act
+            listener.handleCollectionChanged(event);
+
+            // Assert — route registry must NOT be touched
+            verify(routeRegistry, never()).updateRoute(any());
+            verify(routeRegistry, never()).removeRoute(any());
+        }
+
+        @Test
+        @DisplayName("Should ignore collection changed event for any system collection by name prefix")
+        void shouldIgnoreSystemCollectionByNamePrefix() {
+            // Arrange
+            CollectionChangedPayload payload = new CollectionChangedPayload();
+            payload.setId("some-other-id");
+            payload.setName("__internal-metrics");
+            payload.setChangeType(ChangeType.UPDATED);
+
+            ConfigEvent<CollectionChangedPayload> event = new ConfigEvent<>(
+                UUID.randomUUID().toString(),
+                "config.collection.changed",
+                UUID.randomUUID().toString(),
+                Instant.now(),
+                payload
+            );
+
+            // Act
+            listener.handleCollectionChanged(event);
+
+            // Assert
+            verify(routeRegistry, never()).updateRoute(any());
+            verify(routeRegistry, never()).removeRoute(any());
+        }
     }
 
     @Nested
@@ -253,6 +303,86 @@ class ConfigEventListenerTest {
             listener.handleWorkerAssignmentChanged(event);
 
             // Assert - should not add route when required fields are missing
+            verify(routeRegistry, never()).updateRoute(any());
+        }
+
+        @Test
+        @DisplayName("Should ignore worker assignment event for control-plane system collection by ID")
+        void shouldIgnoreControlPlaneWorkerAssignmentById() {
+            // Arrange
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("workerId", "worker-1");
+            payload.put("collectionId", "00000000-0000-0000-0000-000000000100");
+            payload.put("workerBaseUrl", "http://worker-1:8080");
+            payload.put("collectionName", "__control-plane");
+            payload.put("changeType", "CREATED");
+
+            ConfigEvent<Object> event = new ConfigEvent<>(
+                UUID.randomUUID().toString(),
+                "emf.worker.assignment.changed",
+                UUID.randomUUID().toString(),
+                Instant.now(),
+                payload
+            );
+
+            // Act
+            listener.handleWorkerAssignmentChanged(event);
+
+            // Assert — must NOT overwrite the static control-plane route
+            verify(routeRegistry, never()).updateRoute(any());
+            verify(routeRegistry, never()).removeRoute(any());
+        }
+
+        @Test
+        @DisplayName("Should ignore worker assignment event for system collection by name prefix")
+        void shouldIgnoreSystemCollectionWorkerAssignmentByName() {
+            // Arrange
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("workerId", "worker-1");
+            payload.put("collectionId", "some-other-id");
+            payload.put("workerBaseUrl", "http://worker-1:8080");
+            payload.put("collectionName", "__internal-metrics");
+            payload.put("changeType", "CREATED");
+
+            ConfigEvent<Object> event = new ConfigEvent<>(
+                UUID.randomUUID().toString(),
+                "emf.worker.assignment.changed",
+                UUID.randomUUID().toString(),
+                Instant.now(),
+                payload
+            );
+
+            // Act
+            listener.handleWorkerAssignmentChanged(event);
+
+            // Assert
+            verify(routeRegistry, never()).updateRoute(any());
+            verify(routeRegistry, never()).removeRoute(any());
+        }
+
+        @Test
+        @DisplayName("Should ignore DELETED worker assignment event for system collection")
+        void shouldIgnoreDeletedWorkerAssignmentForSystemCollection() {
+            // Arrange
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("workerId", "worker-1");
+            payload.put("collectionId", "00000000-0000-0000-0000-000000000100");
+            payload.put("collectionName", "__control-plane");
+            payload.put("changeType", "DELETED");
+
+            ConfigEvent<Object> event = new ConfigEvent<>(
+                UUID.randomUUID().toString(),
+                "emf.worker.assignment.changed",
+                UUID.randomUUID().toString(),
+                Instant.now(),
+                payload
+            );
+
+            // Act
+            listener.handleWorkerAssignmentChanged(event);
+
+            // Assert — must NOT remove the static control-plane route
+            verify(routeRegistry, never()).removeRoute(any());
             verify(routeRegistry, never()).updateRoute(any());
         }
     }

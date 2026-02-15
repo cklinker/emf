@@ -239,6 +239,10 @@ public class WorkerService {
         try {
             List<Collection> activeCollections = collectionRepository.findByActiveTrue();
             for (Collection collection : activeCollections) {
+                // Skip system collections — they don't need worker assignments
+                if (collection.isSystemCollection()) {
+                    continue;
+                }
                 List<CollectionAssignment> assignments = assignmentRepository.findByCollectionId(collection.getId());
                 boolean hasActive = assignments.stream()
                         .anyMatch(a -> "READY".equals(a.getStatus()) || "PENDING".equals(a.getStatus()));

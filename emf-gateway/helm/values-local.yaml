@@ -32,7 +32,6 @@ config:
     consumerGroupId: "emf-gateway-local"
     topics:
       collectionChanged: "emf.config.collection.changed"
-      authzChanged: "emf.config.authz.changed"
       serviceChanged: "emf.config.service.changed"
     autoOffsetReset: "earliest"  # Start from beginning for local testing
     enableAutoCommit: true

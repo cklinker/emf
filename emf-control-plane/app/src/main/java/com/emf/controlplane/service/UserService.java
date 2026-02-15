@@ -77,7 +77,6 @@ public class UserService {
         user.setUsername(request.getUsername());
         user.setLocale(request.getLocale() != null ? request.getLocale() : "en_US");
         user.setTimezone(request.getTimezone() != null ? request.getTimezone() : "UTC");
-        user.setProfileId(request.getProfileId());
         user.setStatus("ACTIVE");
 
         user = userRepository.save(user);
@@ -114,7 +113,6 @@ public class UserService {
         if (request.getUsername() != null) user.setUsername(request.getUsername());
         if (request.getLocale() != null) user.setLocale(request.getLocale());
         if (request.getTimezone() != null) user.setTimezone(request.getTimezone());
-        if (request.getProfileId() != null) user.setProfileId(request.getProfileId());
 
         if (request.getManagerId() != null) {
             String tenantId = TenantContextHolder.getTenantId();

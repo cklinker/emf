@@ -553,95 +553,6 @@ describe('CollectionDetailPage', () => {
     })
   })
 
-  describe('Authorization Configuration Display', () => {
-    beforeEach(() => {
-      setupCollectionHandlers()
-    })
-
-    it('should switch to authorization tab when clicked', async () => {
-      const user = userEvent.setup()
-
-      render(
-        <TestWrapper>
-          <CollectionDetailPage />
-        </TestWrapper>
-      )
-
-      await waitFor(() => {
-        expect(screen.getByTestId('authorization-tab')).toBeInTheDocument()
-      })
-
-      await user.click(screen.getByTestId('authorization-tab'))
-
-      expect(screen.getByTestId('authorization-panel')).toBeInTheDocument()
-    })
-
-    it('should display route policies table', async () => {
-      const user = userEvent.setup()
-
-      render(
-        <TestWrapper>
-          <CollectionDetailPage />
-        </TestWrapper>
-      )
-
-      await waitFor(() => {
-        expect(screen.getByTestId('authorization-tab')).toBeInTheDocument()
-      })
-
-      await user.click(screen.getByTestId('authorization-tab'))
-
-      expect(screen.getByTestId('route-policies-table')).toBeInTheDocument()
-      expect(screen.getByTestId('route-policy-row-0')).toBeInTheDocument()
-      expect(screen.getByTestId('route-policy-row-1')).toBeInTheDocument()
-    })
-
-    it('should display field policies table', async () => {
-      const user = userEvent.setup()
-
-      render(
-        <TestWrapper>
-          <CollectionDetailPage />
-        </TestWrapper>
-      )
-
-      await waitFor(() => {
-        expect(screen.getByTestId('authorization-tab')).toBeInTheDocument()
-      })
-
-      await user.click(screen.getByTestId('authorization-tab'))
-
-      expect(screen.getByTestId('field-policies-table')).toBeInTheDocument()
-      expect(screen.getByTestId('field-policy-row-0')).toBeInTheDocument()
-      expect(screen.getByTestId('field-policy-row-1')).toBeInTheDocument()
-    })
-
-    it('should display empty state when no route policies', async () => {
-      const collectionNoAuthz = {
-        ...mockCollection,
-        authz: { routePolicies: [], fieldPolicies: [] },
-      }
-      setupCollectionHandlers(collectionNoAuthz)
-
-      const user = userEvent.setup()
-
-      render(
-        <TestWrapper>
-          <CollectionDetailPage />
-        </TestWrapper>
-      )
-
-      await waitFor(() => {
-        expect(screen.getByTestId('authorization-tab')).toBeInTheDocument()
-      })
-
-      await user.click(screen.getByTestId('authorization-tab'))
-
-      expect(screen.getByTestId('route-policies-empty')).toBeInTheDocument()
-      expect(screen.getByTestId('field-policies-empty')).toBeInTheDocument()
-    })
-  })
-
   describe('Version History Display', () => {
     it('should switch to versions tab when clicked', async () => {
       setupCollectionHandlers()
@@ -977,7 +888,7 @@ describe('CollectionDetailPage', () => {
 
       await waitFor(() => {
         expect(screen.getByRole('tablist')).toBeInTheDocument()
-        expect(screen.getAllByRole('tab')).toHaveLength(3)
+        expect(screen.getAllByRole('tab')).toHaveLength(7)
         expect(screen.getByRole('tabpanel')).toBeInTheDocument()
       })
     })

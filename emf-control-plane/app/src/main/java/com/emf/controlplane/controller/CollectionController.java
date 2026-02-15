@@ -2,7 +2,6 @@ package com.emf.controlplane.controller;
 
 import com.emf.controlplane.config.CacheConfig;
 import com.emf.controlplane.dto.AddFieldRequest;
-import com.emf.controlplane.dto.AuthorizationConfigDto;
 import com.emf.controlplane.dto.CollectionDto;
 import com.emf.controlplane.dto.CollectionVersionDto;
 import com.emf.controlplane.dto.CreateCollectionRequest;
@@ -12,7 +11,6 @@ import com.emf.controlplane.dto.UpdateFieldRequest;
 import com.emf.controlplane.entity.Collection;
 import com.emf.controlplane.entity.CollectionVersion;
 import com.emf.controlplane.entity.Field;
-import com.emf.controlplane.service.AuthorizationService;
 import com.emf.controlplane.service.CollectionService;
 import com.emf.controlplane.service.FieldService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -70,12 +68,10 @@ public class CollectionController {
 
     private final CollectionService collectionService;
     private final FieldService fieldService;
-    private final AuthorizationService authorizationService;
 
-    public CollectionController(CollectionService collectionService, FieldService fieldService, AuthorizationService authorizationService) {
+    public CollectionController(CollectionService collectionService, FieldService fieldService) {
         this.collectionService = collectionService;
         this.fieldService = fieldService;
-        this.authorizationService = authorizationService;
     }
 
     /**
@@ -192,10 +188,7 @@ public class CollectionController {
                 .map(FieldDto::fromEntity)
                 .collect(Collectors.toList());
 
-        // Fetch authorization config
-        AuthorizationConfigDto authz = authorizationService.getCollectionAuthorization(collectionId);
-
-        return CollectionDto.fromEntityWithDetails(collection, fieldDtos, authz);
+        return CollectionDto.fromEntityWithDetails(collection, fieldDtos);
     }
 
     /**

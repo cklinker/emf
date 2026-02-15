@@ -186,7 +186,6 @@ emf:
       enabled: ${KAFKA_EVENTS_ENABLED:false}
       topics:
         collection-changed: emf.config.collection.changed
-        authz-changed: emf.config.authz.changed
         ui-changed: emf.config.ui.changed
         oidc-changed: emf.config.oidc.changed
         worker-assignment-changed: emf.worker.assignment.changed

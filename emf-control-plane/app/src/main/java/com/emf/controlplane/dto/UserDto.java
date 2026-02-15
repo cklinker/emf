@@ -17,7 +17,6 @@ public class UserDto {
     private String status;
     private String locale;
     private String timezone;
-    private String profileId;
     private String managerId;
     private Instant lastLoginAt;
     private Integer loginCount;
@@ -39,7 +38,6 @@ public class UserDto {
         dto.status = user.getStatus();
         dto.locale = user.getLocale();
         dto.timezone = user.getTimezone();
-        dto.profileId = user.getProfileId();
         dto.managerId = user.getManagerId();
         dto.lastLoginAt = user.getLastLoginAt();
         dto.loginCount = user.getLoginCount();
@@ -74,9 +72,6 @@ public class UserDto {
 
     public String getTimezone() { return timezone; }
     public void setTimezone(String timezone) { this.timezone = timezone; }
-
-    public String getProfileId() { return profileId; }
-    public void setProfileId(String profileId) { this.profileId = profileId; }
 
     public String getManagerId() { return managerId; }
     public void setManagerId(String managerId) { this.managerId = managerId; }

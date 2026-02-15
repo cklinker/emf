@@ -1,11 +1,7 @@
 package com.emf.gateway.integration;
 
-import com.emf.gateway.authz.AuthzConfig;
-import com.emf.gateway.authz.AuthzConfigCache;
-import com.emf.gateway.authz.RoutePolicy;
 import com.emf.gateway.route.RouteDefinition;
 import com.emf.gateway.route.RouteRegistry;
-import com.emf.runtime.event.AuthzChangedPayload;
 import com.emf.runtime.event.ChangeType;
 import com.emf.runtime.event.CollectionChangedPayload;
 import com.emf.runtime.event.ConfigEvent;
@@ -25,7 +21,6 @@ import org.springframework.test.context.ActiveProfiles;
 
 import java.time.Instant;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -40,7 +35,6 @@ import static org.awaitility.Awaitility.await;
  * Tests that the gateway:
  * - Subscribes to Kafka topics for configuration changes
  * - Processes collection changed events and updates route registry
- * - Processes authorization changed events and updates authz cache
  * - Handles malformed events gracefully
  *
  * Validates: Requirements 2.1, 2.2, 2.4, 2.5, 2.7
@@ -50,8 +44,7 @@ import static org.awaitility.Awaitility.await;
 @EmbeddedKafka(
     partitions = 1,
     topics = {
-        "test.collection.changed",
-        "test.authz.changed"
+        "test.collection.changed"
     },
     brokerProperties = {
         "listeners=PLAINTEXT://localhost:9092",
@@ -63,9 +56,6 @@ class KafkaConfigurationUpdateIntegrationTest {
 
     @Autowired
     private RouteRegistry routeRegistry;
-
-    @Autowired
-    private AuthzConfigCache authzConfigCache;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -150,44 +140,6 @@ class KafkaConfigurationUpdateIntegrationTest {
             Optional<RouteDefinition> route = routeRegistry.findByPath("/api/existing-collection/**");
             assertThat(route).isPresent();
             // Verify the route was updated (implementation may vary)
-        });
-    }
-
-    @Test
-    void testAuthzChangedEvent_UpdatesAuthzCache() {
-        // Arrange - create authz changed event
-        AuthzChangedPayload payload = new AuthzChangedPayload();
-        payload.setCollectionId("protected-collection");
-        payload.setCollectionName("protected");
-
-        AuthzChangedPayload.RoutePolicyPayload routePolicy = new AuthzChangedPayload.RoutePolicyPayload();
-        routePolicy.setOperation("POST");
-        routePolicy.setPolicyId("admin-only");
-        routePolicy.setPolicyRules("{\"roles\":[\"ADMIN\"]}");
-        payload.setRoutePolicies(List.of(routePolicy));
-
-        AuthzChangedPayload.FieldPolicyPayload fieldPolicy = new AuthzChangedPayload.FieldPolicyPayload();
-        fieldPolicy.setFieldName("email");
-        fieldPolicy.setPolicyId("admin-only");
-        fieldPolicy.setPolicyRules("{\"roles\":[\"ADMIN\"]}");
-        payload.setFieldPolicies(List.of(fieldPolicy));
-
-        ConfigEvent<AuthzChangedPayload> event = new ConfigEvent<>();
-        event.setEventId(UUID.randomUUID().toString());
-        event.setEventType("config.authz.changed");
-        event.setCorrelationId(UUID.randomUUID().toString());
-        event.setTimestamp(Instant.now());
-        event.setPayload(payload);
-
-        // Act - publish event to Kafka
-        kafkaTemplate.send("test.authz.changed", event);
-
-        // Assert - wait for event to be processed and verify authz config updated
-        await().atMost(5, TimeUnit.SECONDS).untilAsserted(() -> {
-            Optional<AuthzConfig> config = authzConfigCache.getConfig("protected-collection");
-            assertThat(config).isPresent();
-            assertThat(config.get().getRoutePolicies()).hasSizeGreaterThanOrEqualTo(0);
-            assertThat(config.get().getFieldPolicies()).hasSizeGreaterThanOrEqualTo(0);
         });
     }
 

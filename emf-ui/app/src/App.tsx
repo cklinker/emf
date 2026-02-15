@@ -49,8 +49,6 @@ import {
   CollectionDetailPage,
   CollectionFormPage,
   CollectionWizardPage,
-  RolesPage,
-  PoliciesPage,
   OIDCProvidersPage,
   PageBuilderPage,
   MenuBuilderPage,
@@ -63,10 +61,6 @@ import {
   PluginsPage,
   UsersPage,
   UserDetailPage,
-  ProfilesPage,
-  PermissionSetsPage,
-  SharingSettingsPage,
-  RoleHierarchyPage,
   SetupAuditTrailPage,
   GovernorLimitsPage,
   TenantsPage,
@@ -432,24 +426,6 @@ function TenantRoutes(): React.ReactElement {
         }
       />
 
-      {/* Authorization routes */}
-      <Route
-        path="roles"
-        element={
-          <ProtectedPageRoute>
-            <RolesPage />
-          </ProtectedPageRoute>
-        }
-      />
-      <Route
-        path="policies"
-        element={
-          <ProtectedPageRoute>
-            <PoliciesPage />
-          </ProtectedPageRoute>
-        }
-      />
-
       {/* OIDC Providers route */}
       <Route
         path="oidc-providers"
@@ -674,42 +650,6 @@ function TenantRoutes(): React.ReactElement {
         element={
           <ProtectedPageRoute>
             <UserDetailPage />
-          </ProtectedPageRoute>
-        }
-      />
-
-      {/* Profile & Permission Set routes */}
-      <Route
-        path="profiles"
-        element={
-          <ProtectedPageRoute>
-            <ProfilesPage />
-          </ProtectedPageRoute>
-        }
-      />
-      <Route
-        path="permission-sets"
-        element={
-          <ProtectedPageRoute>
-            <PermissionSetsPage />
-          </ProtectedPageRoute>
-        }
-      />
-
-      {/* Sharing Settings routes */}
-      <Route
-        path="sharing"
-        element={
-          <ProtectedPageRoute>
-            <SharingSettingsPage />
-          </ProtectedPageRoute>
-        }
-      />
-      <Route
-        path="role-hierarchy"
-        element={
-          <ProtectedPageRoute>
-            <RoleHierarchyPage />
           </ProtectedPageRoute>
         }
       />

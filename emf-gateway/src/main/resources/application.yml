@@ -63,9 +63,6 @@ spring:
 # EMF Gateway specific configuration
 emf:
   gateway:
-    # Feature flag: use profile-based permissions instead of legacy role-based policies
-    use-profiles: ${USE_PROFILES:true}
-
     # Tenant slug URL prefix configuration
     tenant-slug:
       enabled: ${TENANT_SLUG_ENABLED:true}
@@ -85,7 +82,6 @@ emf:
     kafka:
       topics:
         collection-changed: emf.config.collection.changed
-        authz-changed: emf.config.authz.changed
         worker-assignment-changed: emf.worker.assignment.changed
     
     # Default rate limiting configuration

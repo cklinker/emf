@@ -12,8 +12,6 @@ import reactor.core.publisher.Mono;
 /**
  * Evaluates authorization using profile-based permissions from the control plane.
  * Maps HTTP methods to CRUD permissions and checks the user's effective permissions.
- *
- * Activated via the feature flag emf.gateway.use-profiles=true.
  */
 @Component
 public class ProfilePolicyEvaluator {

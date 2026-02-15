@@ -29,8 +29,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 
-import java.util.List;
-import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -99,13 +97,15 @@ public class CollectionController {
             @RequestParam(required = false) String filter,
             @Parameter(description = "Sort criteria (e.g., 'name,asc' or 'createdAt,desc')")
             @RequestParam(required = false) String sort,
+            @Parameter(description = "Include system collections (default: false)")
+            @RequestParam(required = false, defaultValue = "false") boolean includeSystem,
             @PageableDefault(size = 20, sort = "name") Pageable pageable) {
-        
-        log.debug("REST request to list collections - filter: {}, sort: {}, pageable: {}", filter, sort, pageable);
-        
-        Page<Collection> collections = collectionService.listCollections(filter, sort, pageable);
+
+        log.debug("REST request to list collections - filter: {}, sort: {}, includeSystem: {}, pageable: {}", filter, sort, includeSystem, pageable);
+
+        Page<Collection> collections = collectionService.listCollections(filter, sort, pageable, includeSystem);
         Page<CollectionDto> dtos = collections.map(CollectionDto::fromEntity);
-        
+
         return ResponseEntity.ok(dtos);
     }
 

@@ -17,6 +17,7 @@ public class CollectionDto {
     private String description;
     private String storageMode;
     private boolean active;
+    private boolean systemCollection;
     private Integer currentVersion;
     private List<FieldDto> fields;
     private Instant createdAt;
@@ -26,8 +27,8 @@ public class CollectionDto {
     }
 
     public CollectionDto(String id, String name, String displayName, String description,
-                         String storageMode, boolean active, Integer currentVersion,
-                         List<FieldDto> fields,
+                         String storageMode, boolean active, boolean systemCollection,
+                         Integer currentVersion, List<FieldDto> fields,
                          Instant createdAt, Instant updatedAt) {
         this.id = id;
         this.name = name;
@@ -35,6 +36,7 @@ public class CollectionDto {
         this.description = description;
         this.storageMode = storageMode;
         this.active = active;
+        this.systemCollection = systemCollection;
         this.currentVersion = currentVersion;
         this.fields = fields;
         this.createdAt = createdAt;
@@ -58,6 +60,7 @@ public class CollectionDto {
                 collection.getDescription(),
                 collection.getStorageMode(),
                 collection.isActive(),
+                collection.isSystemCollection(),
                 collection.getCurrentVersion(),
                 null, // fields - populated separately to avoid circular references
                 collection.getCreatedAt(),
@@ -83,6 +86,7 @@ public class CollectionDto {
                 collection.getDescription(),
                 collection.getStorageMode(),
                 collection.isActive(),
+                collection.isSystemCollection(),
                 collection.getCurrentVersion(),
                 fields,
                 collection.getCreatedAt(),
@@ -138,6 +142,14 @@ public class CollectionDto {
         this.active = active;
     }
 
+    public boolean isSystemCollection() {
+        return systemCollection;
+    }
+
+    public void setSystemCollection(boolean systemCollection) {
+        this.systemCollection = systemCollection;
+    }
+
     public Integer getCurrentVersion() {
         return currentVersion;
     }
@@ -179,6 +191,7 @@ public class CollectionDto {
                 ", description='" + description + '\'' +
                 ", storageMode='" + storageMode + '\'' +
                 ", active=" + active +
+                ", systemCollection=" + systemCollection +
                 ", currentVersion=" + currentVersion +
                 ", fieldsCount=" + (fields != null ? fields.size() : 0) +
                 ", createdAt=" + createdAt +
@@ -192,6 +205,7 @@ public class CollectionDto {
         if (o == null || getClass() != o.getClass()) return false;
         CollectionDto that = (CollectionDto) o;
         return active == that.active &&
+                systemCollection == that.systemCollection &&
                 java.util.Objects.equals(id, that.id) &&
                 java.util.Objects.equals(name, that.name) &&
                 java.util.Objects.equals(displayName, that.displayName) &&
@@ -204,6 +218,6 @@ public class CollectionDto {
 
     @Override
     public int hashCode() {
-        return java.util.Objects.hash(id, name, displayName, description, storageMode, active, currentVersion, createdAt, updatedAt);
+        return java.util.Objects.hash(id, name, displayName, description, storageMode, active, systemCollection, currentVersion, createdAt, updatedAt);
     }
 }

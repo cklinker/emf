@@ -122,6 +122,24 @@
   color: var(--color-text-placeholder, #9ca3af);
 }
 
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm, 0.5rem);
+  font-size: var(--font-size-sm, 0.875rem);
+  font-weight: var(--font-weight-medium, 500);
+  color: var(--color-text-secondary, #666666);
+  cursor: pointer;
+  padding-top: var(--spacing-md, 1rem);
+}
+
+.checkboxLabel input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--color-button-primary, #0066cc);
+}
+
 /* Table Container */
 .tableContainer {
   overflow-x: auto;

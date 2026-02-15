@@ -133,7 +133,8 @@
     "validationRules": "Validation Rules",
     "recordTypes": "Record Types",
     "fieldHistory": "Field History",
-    "setupAudit": "Setup Audit"
+    "setupAudit": "Setup Audit",
+    "showSystem": "Show system collections"
   },
   "validationRules": {
     "formula": "Formula",

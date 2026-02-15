@@ -21,6 +21,9 @@ public interface CollectionRepository extends JpaRepository<Collection, String> 
 
     Page<Collection> findByTenantIdAndActiveTrue(String tenantId, Pageable pageable);
 
+    @Query("SELECT c FROM Collection c WHERE c.tenantId = :tenantId AND c.active = true AND c.systemCollection = false")
+    Page<Collection> findByTenantIdAndActiveTrueExcludeSystem(@Param("tenantId") String tenantId, Pageable pageable);
+
     List<Collection> findByTenantIdAndActiveTrue(String tenantId);
 
     Optional<Collection> findByIdAndTenantIdAndActiveTrue(String id, String tenantId);
@@ -46,6 +49,13 @@ public interface CollectionRepository extends JpaRepository<Collection, String> 
                                                           @Param("search") String search,
                                                           Pageable pageable);
 
+    @Query("SELECT c FROM Collection c WHERE c.tenantId = :tenantId AND c.active = true AND c.systemCollection = false AND " +
+           "(LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+           "LOWER(c.description) LIKE LOWER(CONCAT('%', :search, '%')))")
+    Page<Collection> findByTenantIdAndActiveAndSearchTermExcludeSystem(@Param("tenantId") String tenantId,
+                                                                       @Param("search") String search,
+                                                                       Pageable pageable);
+
     long countByTenantIdAndActiveTrue(String tenantId);
 
     @Query("SELECT DISTINCT c FROM Collection c LEFT JOIN FETCH c.fields WHERE c.tenantId = :tenantId AND c.active = true")
@@ -54,6 +64,9 @@ public interface CollectionRepository extends JpaRepository<Collection, String> 
     // ---- Legacy methods (kept for platform-level operations) ----
 
     Page<Collection> findByActiveTrue(Pageable pageable);
+
+    @Query("SELECT c FROM Collection c WHERE c.active = true AND c.systemCollection = false")
+    Page<Collection> findByActiveTrueExcludeSystem(Pageable pageable);
 
     List<Collection> findByActiveTrue();
 
@@ -74,6 +87,11 @@ public interface CollectionRepository extends JpaRepository<Collection, String> 
            "(LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
            "LOWER(c.description) LIKE LOWER(CONCAT('%', :search, '%')))")
     Page<Collection> findByActiveAndSearchTerm(@Param("search") String search, Pageable pageable);
+
+    @Query("SELECT c FROM Collection c WHERE c.active = true AND c.systemCollection = false AND " +
+           "(LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+           "LOWER(c.description) LIKE LOWER(CONCAT('%', :search, '%')))")
+    Page<Collection> findByActiveAndSearchTermExcludeSystem(@Param("search") String search, Pageable pageable);
 
     long countByActiveTrue();
 

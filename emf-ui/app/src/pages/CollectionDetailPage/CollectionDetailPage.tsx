@@ -1419,7 +1419,11 @@ export function CollectionDetailPage({
           </div>
           {picklistFieldIds.length < 2 ? (
             <div className={styles.emptyState} data-testid="dependencies-no-fields">
-              <p>{t('picklistDependencies.noPicklistFields')}</p>
+              <p>
+                {picklistFieldIds.length === 0
+                  ? t('picklistDependencies.noPicklistFields')
+                  : t('picklistDependencies.needTwoPicklistFields')}
+              </p>
             </div>
           ) : isLoadingDependencies ? (
             <div className={styles.loadingContainer}>

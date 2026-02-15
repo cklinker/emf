@@ -383,6 +383,7 @@
     "selectControllingField": "Select controlling field...",
     "selectDependentField": "Select dependent field...",
     "noPicklistFields": "This collection has no picklist fields.",
+    "needTwoPicklistFields": "Picklist dependencies require at least two picklist fields. This collection has only one picklist field.",
     "noDependencies": "No picklist dependencies defined.",
     "mappingHint": "Check which dependent values should be available when each controlling value is selected.",
     "saved": "Picklist dependency saved successfully",

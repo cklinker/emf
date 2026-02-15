@@ -38,6 +38,15 @@ vi.mock('../RecentItemsDropdown', () => ({
   RecentItemsDropdown: () => <div data-testid="recent-items-dropdown">Recent</div>,
 }))
 
+// Mock Gravatar utility — return null by default so initials tests work;
+// individual tests can override via mockGetGravatarUrl.mockReturnValue(...)
+vi.mock('../../utils/gravatar', () => ({
+  getGravatarUrl: vi.fn(() => null),
+}))
+
+import { getGravatarUrl } from '../../utils/gravatar'
+const mockGetGravatarUrl = vi.mocked(getGravatarUrl)
+
 // Import the mocked module to control it in tests
 import { useAppShell } from '../AppShell'
 const mockUseAppShell = vi.mocked(useAppShell)
@@ -66,6 +75,8 @@ describe('Header', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    // Default: Gravatar returns null so initials are shown
+    mockGetGravatarUrl.mockReturnValue(null)
     mockUseAppShell.mockReturnValue({
       screenSize: 'desktop',
       sidebarCollapsed: false,
@@ -174,6 +185,43 @@ describe('Header', () => {
       render(<Header {...defaultProps} user={userWithoutName} />)
       const userName = screen.getByTestId('user-name')
       expect(userName).toHaveTextContent('john.doe@example.com')
+    })
+
+    it('should display Gravatar image when available', () => {
+      mockGetGravatarUrl.mockReturnValue('https://www.gravatar.com/avatar/abc123?s=64&d=404')
+      render(<Header {...defaultProps} />)
+      const avatarImage = screen.getByTestId('user-avatar-image')
+      expect(avatarImage).toBeInTheDocument()
+      expect(avatarImage).toHaveAttribute(
+        'src',
+        'https://www.gravatar.com/avatar/abc123?s=64&d=404'
+      )
+    })
+
+    it('should prefer OIDC picture over Gravatar', () => {
+      mockGetGravatarUrl.mockReturnValue('https://www.gravatar.com/avatar/abc123?s=64&d=404')
+      const userWithPicture = { ...defaultUser, picture: '/oidc-avatar.jpg' }
+      render(<Header {...defaultProps} user={userWithPicture} />)
+      const avatarImage = screen.getByTestId('user-avatar-image')
+      expect(avatarImage).toHaveAttribute('src', '/oidc-avatar.jpg')
+    })
+
+    it('should fall back to initials when Gravatar image fails to load', async () => {
+      mockGetGravatarUrl.mockReturnValue('https://www.gravatar.com/avatar/abc123?s=64&d=404')
+      render(<Header {...defaultProps} />)
+
+      // Initially shows Gravatar image
+      const avatarImage = screen.getByTestId('user-avatar-image')
+      expect(avatarImage).toBeInTheDocument()
+
+      // Simulate image load error (Gravatar returned 404)
+      fireEvent.error(avatarImage)
+
+      // Should now show initials
+      await waitFor(() => {
+        expect(screen.getByTestId('user-avatar-initials')).toBeInTheDocument()
+        expect(screen.getByTestId('user-avatar-initials')).toHaveTextContent('JD')
+      })
     })
   })
 

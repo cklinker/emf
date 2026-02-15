@@ -86,7 +86,12 @@ public class PolicyEvaluator {
         if (principal == null || role == null) {
             return false;
         }
-        
+
+        // Wildcard "*" matches any authenticated principal
+        if ("*".equals(role)) {
+            return true;
+        }
+
         return principal.getRoles().contains(role);
     }
 }

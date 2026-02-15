@@ -95,6 +95,9 @@ public class RouteAuthorizationFilter implements GlobalFilter, Ordered {
 
     /**
      * Profile-based authorization: check effective permissions from control plane.
+     * Falls back to legacy route-policy evaluation (from bootstrap authz cache)
+     * when profile permissions deny access, enabling policy-managed collections
+     * like __control-plane to work alongside profile-based permissions.
      */
     private Mono<Void> evaluateWithProfiles(ServerWebExchange exchange, GatewayFilterChain chain,
                                              GatewayPrincipal principal, String collectionId, HttpMethod method) {
@@ -104,12 +107,41 @@ public class RouteAuthorizationFilter implements GlobalFilter, Ordered {
                         log.debug("User: {} authorized (profile) for collection: {}, method: {}",
                                 principal.getUsername(), collectionId, method);
                         return chain.filter(exchange);
-                    } else {
-                        log.warn("User: {} denied (profile) access to collection: {}, method: {}",
-                                principal.getUsername(), collectionId, method);
-                        return forbidden(exchange, "Insufficient permissions to access this resource");
                     }
+                    // Profile denied — fall back to legacy route-policy evaluation.
+                    // This allows policy-managed collections (e.g. __control-plane) to
+                    // authorize via route_policy rules from the bootstrap authz cache.
+                    return fallbackToPolicyEvaluation(exchange, chain, principal, collectionId, method);
                 });
+    }
+
+    /**
+     * Fallback authorization using legacy route-policy evaluation from the authz config cache.
+     */
+    private Mono<Void> fallbackToPolicyEvaluation(ServerWebExchange exchange, GatewayFilterChain chain,
+                                                    GatewayPrincipal principal, String collectionId, HttpMethod method) {
+        Optional<AuthzConfig> authzConfigOpt = authzConfigCache.getConfig(collectionId);
+
+        if (authzConfigOpt.isPresent()) {
+            AuthzConfig authzConfig = authzConfigOpt.get();
+            Optional<RoutePolicy> policyOpt = authzConfig.getRoutePolicies().stream()
+                    .filter(policy -> policy.getMethod().equalsIgnoreCase(method.name()))
+                    .findFirst();
+
+            if (policyOpt.isPresent()) {
+                RoutePolicy policy = policyOpt.get();
+                boolean allowed = policyEvaluator.evaluate(policy, principal);
+                if (allowed) {
+                    log.debug("User: {} authorized (policy fallback) for collection: {}, method: {}, policy: {}",
+                            principal.getUsername(), collectionId, method, policy.getPolicyId());
+                    return chain.filter(exchange);
+                }
+            }
+        }
+
+        log.warn("User: {} denied access to collection: {}, method: {}",
+                principal.getUsername(), collectionId, method);
+        return forbidden(exchange, "Insufficient permissions to access this resource");
     }
 
     /**

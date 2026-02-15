@@ -53,7 +53,7 @@ import org.springframework.kafka.core.KafkaTemplate;
  */
 @Configuration
 @EnableConfigurationProperties(EmfRuntimeProperties.class)
-@ComponentScan(basePackages = "com.emf.runtime.router")
+@ComponentScan(basePackages = "com.emf.runtime")
 public class EmfRuntimeAutoConfiguration {
     
     /**

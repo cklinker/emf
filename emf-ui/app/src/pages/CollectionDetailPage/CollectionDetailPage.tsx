@@ -25,6 +25,7 @@ import {
 } from '../../components/FieldEditor'
 import { ValidationRuleEditor } from '../../components/ValidationRuleEditor'
 import { RecordTypeEditor } from '../../components/RecordTypeEditor'
+import { RecordTypePicklistEditor } from '../../components/RecordTypePicklistEditor'
 import { PicklistDependencyEditor } from '../../components/PicklistDependencyEditor'
 import type {
   Collection,
@@ -134,6 +135,9 @@ export function CollectionDetailPage({
   const [editingRecordType, setEditingRecordType] = useState<RecordType | undefined>(undefined)
   const [deleteRecordTypeDialogOpen, setDeleteRecordTypeDialogOpen] = useState(false)
   const [recordTypeToDelete, setRecordTypeToDelete] = useState<RecordType | undefined>(undefined)
+  const [picklistOverrideRecordType, setPicklistOverrideRecordType] = useState<
+    RecordType | undefined
+  >(undefined)
 
   // Picklist dependency editor state
   const [dependencyEditorOpen, setDependencyEditorOpen] = useState(false)
@@ -744,6 +748,10 @@ export function CollectionDetailPage({
   const handleDeleteRecordTypeCancel = useCallback(() => {
     setDeleteRecordTypeDialogOpen(false)
     setRecordTypeToDelete(undefined)
+  }, [])
+
+  const handlePicklistOverrides = useCallback((rt: RecordType) => {
+    setPicklistOverrideRecordType(rt)
   }, [])
 
   // --- Picklist Dependency handlers ---
@@ -1359,6 +1367,15 @@ export function CollectionDetailPage({
                           </button>
                           <button
                             type="button"
+                            className={styles.actionButton}
+                            onClick={() => handlePicklistOverrides(rt)}
+                            aria-label={`${t('recordTypes.picklists')} ${rt.name}`}
+                            data-testid={`picklist-overrides-${index}`}
+                          >
+                            {t('recordTypes.picklists')}
+                          </button>
+                          <button
+                            type="button"
                             className={`${styles.actionButton} ${styles.actionButtonDanger}`}
                             onClick={() => handleDeleteRecordTypeClick(rt)}
                             aria-label={`${t('common.delete')} ${rt.name}`}
@@ -1840,6 +1857,20 @@ export function CollectionDetailPage({
             />
           </div>
         </div>
+      )}
+
+      {/* Record Type Picklist Override Editor Modal */}
+      {picklistOverrideRecordType && (
+        <RecordTypePicklistEditor
+          collectionId={collectionId}
+          recordType={picklistOverrideRecordType}
+          fields={sortedFields}
+          onClose={() => setPicklistOverrideRecordType(undefined)}
+          onSaved={() => {
+            queryClient.invalidateQueries({ queryKey: ['record-types', collectionId] })
+            setPicklistOverrideRecordType(undefined)
+          }}
+        />
       )}
     </div>
   )

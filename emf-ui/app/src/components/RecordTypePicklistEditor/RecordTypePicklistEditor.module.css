@@ -1,0 +1,351 @@
+/**
+ * RecordTypePicklistEditor Styles
+ */
+
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.modal {
+  background: #fff;
+  border-radius: 0.5rem;
+  box-shadow:
+    0 20px 25px -5px rgba(0, 0, 0, 0.1),
+    0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  max-width: 700px;
+  width: 100%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--color-border, #e5e7eb);
+  flex-shrink: 0;
+}
+
+.modalTitle {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+.modalCloseButton {
+  padding: 0.5rem;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: var(--color-text-secondary, #6b7280);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  border-radius: 0.25rem;
+  transition: all 0.2s;
+}
+
+.modalCloseButton:hover {
+  color: var(--color-text-primary, #1a1a1a);
+  background-color: var(--color-bg-secondary, #f9fafb);
+}
+
+.modalBody {
+  padding: 1.5rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.modalFooter {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--color-border, #e5e7eb);
+  flex-shrink: 0;
+}
+
+/* Field sections */
+.fieldSections {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.fieldSection {
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 0.375rem;
+  overflow: hidden;
+}
+
+.fieldSectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background-color: var(--color-bg-secondary, #f9fafb);
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font-size: 0.875rem;
+  transition: background-color 0.15s;
+}
+
+.fieldSectionHeader:hover {
+  background-color: var(--color-bg-hover, #f3f4f6);
+}
+
+.collapseIcon {
+  font-size: 0.625rem;
+  color: var(--color-text-secondary, #6b7280);
+  width: 0.75rem;
+  flex-shrink: 0;
+}
+
+.fieldSectionName {
+  font-weight: 600;
+  color: var(--color-text-primary, #1a1a1a);
+  flex: 1;
+}
+
+.fieldSectionBadge {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary, #6b7280);
+  font-weight: 400;
+}
+
+.fieldSectionBody {
+  padding: 1rem;
+  border-top: 1px solid var(--color-border, #e5e7eb);
+}
+
+/* Bulk actions */
+.bulkActions {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.bulkButton {
+  padding: 0.25rem 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-primary, #0066cc);
+  background: transparent;
+  border: 1px solid var(--color-primary, #0066cc);
+  border-radius: 0.25rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.bulkButton:hover:not(:disabled) {
+  background-color: var(--color-primary, #0066cc);
+  color: #fff;
+}
+
+.bulkButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Values list */
+.valuesList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  margin-bottom: 1rem;
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 0.25rem 0;
+}
+
+.valueItem {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0.5rem;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: background-color 0.1s;
+}
+
+.valueItem:hover {
+  background-color: var(--color-bg-secondary, #f9fafb);
+}
+
+.valueItem input[type='checkbox'] {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--color-primary, #0066cc);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.valueLabel {
+  color: var(--color-text-primary, #1a1a1a);
+  flex: 1;
+}
+
+.valueColor {
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  border: 1px solid var(--color-border, #d1d5db);
+  flex-shrink: 0;
+}
+
+/* Default value selector */
+.defaultValueGroup {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--color-border, #e5e7eb);
+}
+
+.defaultValueLabel {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-text-primary, #1a1a1a);
+  white-space: nowrap;
+}
+
+.select {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8125rem;
+  color: var(--color-text-primary, #1a1a1a);
+  background-color: #fff;
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: 0.375rem;
+  flex: 1;
+  transition: border-color 0.2s;
+}
+
+.select:focus {
+  outline: none;
+  border-color: var(--color-primary, #0066cc);
+  box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
+}
+
+.select:disabled {
+  background-color: var(--color-bg-secondary, #f9fafb);
+  color: var(--color-text-secondary, #6b7280);
+  cursor: not-allowed;
+}
+
+/* No values message */
+.noValues {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary, #6b7280);
+  text-align: center;
+  padding: 1rem;
+}
+
+/* Loading / empty states */
+.loadingContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 3rem;
+}
+
+.emptyState {
+  padding: 2rem;
+  text-align: center;
+  color: var(--color-text-secondary, #6b7280);
+  font-size: 0.875rem;
+}
+
+/* Buttons */
+.cancelButton {
+  padding: 0.625rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text-primary, #1a1a1a);
+  background-color: #fff;
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.cancelButton:hover {
+  background-color: var(--color-bg-secondary, #f9fafb);
+}
+
+.cancelButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.saveButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #fff;
+  background-color: var(--color-primary, #0066cc);
+  border: none;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.saveButton:hover {
+  background-color: var(--color-primary-dark, #0052a3);
+}
+
+.saveButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Dark theme support */
+[data-theme='dark'] .modal {
+  background: var(--color-bg-primary, #1a1a2e);
+}
+
+[data-theme='dark'] .fieldSectionHeader {
+  background-color: var(--color-bg-secondary, #16213e);
+}
+
+[data-theme='dark'] .fieldSectionHeader:hover {
+  background-color: var(--color-bg-hover, #1a1a3e);
+}
+
+[data-theme='dark'] .select {
+  background-color: var(--color-bg-primary, #1a1a2e);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .modal {
+    max-width: 100%;
+    margin: 0.5rem;
+  }
+
+  .defaultValueGroup {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .select {
+    width: 100%;
+  }
+}

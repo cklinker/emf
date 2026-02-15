@@ -123,7 +123,25 @@
     "created": "تاريخ الإنشاء",
     "updated": "تاريخ التحديث",
     "confirmDelete": "هل أنت متأكد من حذف هذه المجموعة؟",
-    "showSystem": "إظهار مجموعات النظام"
+    "showSystem": "إظهار مجموعات النظام",
+    "recordTypes": "أنواع السجلات"
+  },
+  "recordTypes": {
+    "default": "افتراضي",
+    "addRecordType": "إضافة نوع سجل",
+    "editRecordType": "تعديل نوع السجل",
+    "deleteRecordType": "حذف نوع السجل",
+    "confirmDelete": "هل أنت متأكد من حذف نوع السجل هذا؟ لا يمكن التراجع عن هذا الإجراء.",
+    "isDefaultLabel": "نوع السجل الافتراضي",
+    "isDefaultHint": "سيستخدم السجلات الجديدة نوع السجل هذا افتراضياً.",
+    "picklistOverrides": "تجاوزات قائمة الاختيار",
+    "noPicklistFields": "لا توجد حقول قائمة اختيار في هذه المجموعة للتكوين.",
+    "allValuesAvailable": "جميع القيم متاحة",
+    "restrictedValues": "{count} من {total} قيم متاحة",
+    "defaultValue": "القيمة الافتراضية",
+    "noDefault": "بدون افتراضي",
+    "overrideSaved": "تم حفظ تجاوزات قائمة الاختيار بنجاح",
+    "picklists": "قوائم الاختيار"
   },
   "fields": {
     "types": {

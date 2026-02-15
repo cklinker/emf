@@ -159,7 +159,15 @@
     "deleteRecordType": "Delete Record Type",
     "confirmDelete": "Are you sure you want to delete this record type? This action cannot be undone.",
     "isDefaultLabel": "Default Record Type",
-    "isDefaultHint": "New records will use this record type by default."
+    "isDefaultHint": "New records will use this record type by default.",
+    "picklistOverrides": "Picklist Overrides",
+    "noPicklistFields": "This collection has no picklist fields to configure.",
+    "allValuesAvailable": "All values available",
+    "restrictedValues": "{count} of {total} values available",
+    "defaultValue": "Default Value",
+    "noDefault": "No default",
+    "overrideSaved": "Picklist overrides saved successfully",
+    "picklists": "Picklists"
   },
   "fieldHistory": {
     "description": "Field history tracks changes to individual field values when records are updated.",

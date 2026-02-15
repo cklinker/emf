@@ -38,7 +38,7 @@ import static org.mockito.Mockito.when;
  * Tests the complete request processing pipeline:
  * 1. JwtAuthenticationFilter - validates JWT and extracts principal
  * 2. RateLimitFilter - checks rate limits (if configured)
- * 3. RouteAuthorizationFilter - validates route policies via ProfilePolicyEvaluator
+ * 3. RouteAuthorizationFilter - enforces authentication
  * 4. HeaderTransformationFilter - transforms headers for backend
  * 5. Backend routing - forwards to backend service
  * 6. FieldAuthorizationFilter - processes include parameters

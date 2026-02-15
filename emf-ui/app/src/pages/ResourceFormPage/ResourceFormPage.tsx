@@ -20,6 +20,7 @@ import { usePlugins } from '../../context/PluginContext'
 import { useApi } from '../../context/ApiContext'
 import { useToast, LoadingSpinner, ErrorMessage } from '../../components'
 import { unwrapResource, wrapResource } from '../../utils/jsonapi'
+import { ApiError } from '../../services/apiClient'
 import type { ApiClient } from '../../services/apiClient'
 import styles from './ResourceFormPage.module.css'
 
@@ -348,6 +349,13 @@ export function ResourceFormPage({
     },
     onError: (error: Error) => {
       showToast(error.message || t('errors.generic'), 'error')
+      if (error instanceof ApiError && error.fieldErrors.length > 0) {
+        const serverErrors: FormErrors = {}
+        for (const fe of error.fieldErrors) {
+          serverErrors[fe.field] = fe.message
+        }
+        setFormErrors((prev) => ({ ...prev, ...serverErrors }))
+      }
       setIsSubmitting(false)
     },
   })
@@ -363,6 +371,13 @@ export function ResourceFormPage({
     },
     onError: (error: Error) => {
       showToast(error.message || t('errors.generic'), 'error')
+      if (error instanceof ApiError && error.fieldErrors.length > 0) {
+        const serverErrors: FormErrors = {}
+        for (const fe of error.fieldErrors) {
+          serverErrors[fe.field] = fe.message
+        }
+        setFormErrors((prev) => ({ ...prev, ...serverErrors }))
+      }
       setIsSubmitting(false)
     },
   })

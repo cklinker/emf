@@ -302,10 +302,18 @@ export function ResourceDetailPage({
   })
 
   // Sharing: fetch shares for this record
+  // The sharing endpoint may not be implemented yet — return empty array on error
   const { data: shares } = useQuery({
     queryKey: ['record-shares', schema?.id, resourceId],
-    queryFn: () =>
-      apiClient.get<RecordShare[]>(`/control/sharing/records/${schema!.id}/${resourceId}`),
+    queryFn: async () => {
+      try {
+        return await apiClient.get<RecordShare[]>(
+          `/control/sharing/records/${schema!.id}/${resourceId}`
+        )
+      } catch {
+        return [] as RecordShare[]
+      }
+    },
     enabled: !!schema?.id && !!resourceId,
   })
 

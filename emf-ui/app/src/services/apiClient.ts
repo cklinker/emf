@@ -9,6 +9,74 @@
  * - 2.8: Trigger token refresh on 401 responses
  */
 
+/**
+ * Structured field-level error from the API
+ */
+export interface ApiFieldError {
+  field: string
+  message: string
+  code?: string
+}
+
+/**
+ * Custom API error that preserves the HTTP status code,
+ * server message, and field-level validation errors.
+ */
+export class ApiError extends Error {
+  public readonly status: number
+  public readonly serverMessage: string
+  public readonly fieldErrors: ApiFieldError[]
+
+  constructor(status: number, serverMessage: string, fieldErrors: ApiFieldError[] = []) {
+    // Build a user-friendly message
+    const fieldMessages = fieldErrors.map((e) => e.message).filter(Boolean)
+    const displayMessage =
+      fieldMessages.length > 0 ? fieldMessages.join('; ') : serverMessage || 'Request failed'
+    super(displayMessage)
+    this.name = 'ApiError'
+    this.status = status
+    this.serverMessage = serverMessage
+    this.fieldErrors = fieldErrors
+  }
+}
+
+/**
+ * Parse a non-ok Response into an ApiError.
+ * Attempts to read the JSON body for structured error details;
+ * falls back to the HTTP status text.
+ */
+async function parseErrorResponse(response: Response): Promise<ApiError> {
+  let serverMessage = response.statusText || 'Request failed'
+  let fieldErrors: ApiFieldError[] = []
+
+  try {
+    const body = await response.json()
+    if (body && typeof body === 'object') {
+      if (typeof body.message === 'string') {
+        serverMessage = body.message
+      }
+      if (Array.isArray(body.errors)) {
+        fieldErrors = body.errors
+          .filter(
+            (e: unknown): e is { field: string; message: string; code?: string } =>
+              typeof e === 'object' &&
+              e !== null &&
+              typeof (e as ApiFieldError).message === 'string'
+          )
+          .map((e: { field: string; message: string; code?: string }) => ({
+            field: e.field,
+            message: e.message,
+            code: e.code,
+          }))
+      }
+    }
+  } catch {
+    // Response body is not JSON — use the status text
+  }
+
+  return new ApiError(response.status, serverMessage, fieldErrors)
+}
+
 export interface ApiClientConfig {
   baseUrl?: string
   getAccessToken: () => Promise<string | null>
@@ -66,7 +134,7 @@ export class ApiClient {
     })
 
     if (!response.ok) {
-      throw new Error(`API request failed: ${response.statusText}`)
+      throw await parseErrorResponse(response)
     }
 
     return response.json()
@@ -83,7 +151,7 @@ export class ApiClient {
     })
 
     if (!response.ok) {
-      throw new Error(`API request failed: ${response.statusText}`)
+      throw await parseErrorResponse(response)
     }
 
     return response.json()
@@ -100,7 +168,7 @@ export class ApiClient {
     })
 
     if (!response.ok) {
-      throw new Error(`API request failed: ${response.statusText}`)
+      throw await parseErrorResponse(response)
     }
 
     return response.json()
@@ -117,7 +185,7 @@ export class ApiClient {
     })
 
     if (!response.ok) {
-      throw new Error(`API request failed: ${response.statusText}`)
+      throw await parseErrorResponse(response)
     }
 
     return response.json()
@@ -133,7 +201,7 @@ export class ApiClient {
     })
 
     if (!response.ok) {
-      throw new Error(`API request failed: ${response.statusText}`)
+      throw await parseErrorResponse(response)
     }
 
     // Handle 204 No Content

@@ -158,7 +158,7 @@ describe('CollectionsPage', () => {
       render(<CollectionsPage />, { wrapper: createTestWrapper() })
 
       await waitFor(() => {
-        expect(screen.getByText(/API request failed/i)).toBeInTheDocument()
+        expect(screen.getByTestId('error-message')).toBeInTheDocument()
       })
     })
 

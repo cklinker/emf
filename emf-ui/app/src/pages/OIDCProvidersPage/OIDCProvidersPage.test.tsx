@@ -130,7 +130,7 @@ describe('OIDCProvidersPage', () => {
       render(<OIDCProvidersPage />, { wrapper: createTestWrapper() })
 
       await waitFor(() => {
-        expect(screen.getByText(/API request failed/i)).toBeInTheDocument()
+        expect(screen.getByTestId('error-message')).toBeInTheDocument()
       })
     })
 

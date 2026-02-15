@@ -374,14 +374,8 @@ export function Sidebar({ menus, collapsed, onToggle, onItemClick }: SidebarProp
     const base = `/${slug}`
     const setupPaths = [
       `${base}/collections`,
-      `${base}/roles`,
-      `${base}/policies`,
       `${base}/oidc-providers`,
       `${base}/users`,
-      `${base}/profiles`,
-      `${base}/permission-sets`,
-      `${base}/sharing`,
-      `${base}/role-hierarchy`,
       `${base}/picklists`,
       `${base}/layouts`,
       `${base}/listviews`,

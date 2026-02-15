@@ -28,7 +28,13 @@ import React from 'react'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { createTestWrapper, setupAuthMocks, wrapFetchMock } from '../../test/testUtils'
+import {
+  createTestWrapper,
+  setupAuthMocks,
+  mockAxios,
+  resetMockAxios,
+  createAxiosError,
+} from '../../test/testUtils'
 import { MenuBuilderPage } from './MenuBuilderPage'
 import type { UIMenu } from './MenuBuilderPage'
 
@@ -96,42 +102,12 @@ const mockPolicies = [
   { id: 'viewer_policy', name: 'Viewer Access', description: 'Read-only access' },
 ]
 
-// Mock fetch function
-const mockFetch = vi.fn()
-
-// Helper to create a proper Response-like object
-function createMockResponse(data: unknown, ok = true, status = 200): Response {
-  return {
-    ok,
-    status,
-    json: () => Promise.resolve(data),
-    text: () => Promise.resolve(JSON.stringify(data)),
-    clone: function () {
-      return this
-    },
-    headers: new Headers(),
-    redirected: false,
-    statusText: ok ? 'OK' : 'Error',
-    type: 'basic' as ResponseType,
-    url: '',
-    body: null,
-    bodyUsed: false,
-    arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
-    blob: () => Promise.resolve(new Blob()),
-    formData: () => Promise.resolve(new FormData()),
-    bytes: () => Promise.resolve(new Uint8Array()),
-  } as Response
-}
-
-global.fetch = mockFetch
-
 describe('MenuBuilderPage', () => {
   let cleanupAuthMocks: () => void
 
   beforeEach(() => {
     cleanupAuthMocks = setupAuthMocks()
-    mockFetch.mockReset()
-    wrapFetchMock(mockFetch)
+    resetMockAxios()
   })
 
   afterEach(() => {
@@ -141,9 +117,8 @@ describe('MenuBuilderPage', () => {
 
   describe('Loading State', () => {
     it('should display loading spinner while fetching menus', async () => {
-      mockFetch.mockImplementation(
-        () =>
-          new Promise((resolve) => setTimeout(() => resolve(createMockResponse(mockMenus)), 100))
+      mockAxios.get.mockImplementation(
+        () => new Promise((resolve) => setTimeout(() => resolve({ data: mockMenus }), 100))
       )
 
       render(<MenuBuilderPage />, { wrapper: createTestWrapper() })
@@ -154,7 +129,7 @@ describe('MenuBuilderPage', () => {
 
   describe('Error State', () => {
     it('should display error message when fetch fails', async () => {
-      mockFetch.mockResolvedValue(createMockResponse(null, false, 500))
+      mockAxios.get.mockRejectedValue(createAxiosError(500))
 
       render(<MenuBuilderPage />, { wrapper: createTestWrapper() })
 
@@ -164,7 +139,7 @@ describe('MenuBuilderPage', () => {
     })
 
     it('should display retry button on error', async () => {
-      mockFetch.mockResolvedValue(createMockResponse(null, false, 500))
+      mockAxios.get.mockRejectedValue(createAxiosError(500))
 
       render(<MenuBuilderPage />, { wrapper: createTestWrapper() })
 
@@ -174,9 +149,9 @@ describe('MenuBuilderPage', () => {
     })
 
     it('should retry fetching when retry button is clicked', async () => {
-      mockFetch
-        .mockResolvedValueOnce(createMockResponse(null, false, 500))
-        .mockResolvedValueOnce(createMockResponse(mockMenus))
+      mockAxios.get
+        .mockRejectedValueOnce(createAxiosError(500))
+        .mockResolvedValueOnce({ data: mockMenus })
 
       const user = userEvent.setup()
       render(<MenuBuilderPage />, { wrapper: createTestWrapper() })
@@ -195,7 +170,7 @@ describe('MenuBuilderPage', () => {
 
   describe('Menus List Display', () => {
     beforeEach(() => {
-      mockFetch.mockResolvedValue(createMockResponse(mockMenus))
+      mockAxios.get.mockResolvedValue({ data: mockMenus })
     })
 
     it('should display all menus in the table', async () => {
@@ -235,7 +210,7 @@ describe('MenuBuilderPage', () => {
 
   describe('Empty State', () => {
     it('should display empty state when no menus exist', async () => {
-      mockFetch.mockResolvedValue(createMockResponse([]))
+      mockAxios.get.mockResolvedValue({ data: [] })
 
       render(<MenuBuilderPage />, { wrapper: createTestWrapper() })
 
@@ -247,7 +222,7 @@ describe('MenuBuilderPage', () => {
 
   describe('Create Menu', () => {
     beforeEach(() => {
-      mockFetch.mockResolvedValue(createMockResponse(mockMenus))
+      mockAxios.get.mockResolvedValue({ data: mockMenus })
     })
 
     it('should open create form when clicking create button', async () => {
@@ -360,10 +335,11 @@ describe('MenuBuilderPage', () => {
         updatedAt: '2024-01-20T10:00:00Z',
       }
 
-      mockFetch
-        .mockResolvedValueOnce(createMockResponse(mockMenus)) // Initial fetch
-        .mockResolvedValueOnce(createMockResponse(newMenu)) // Create
-        .mockResolvedValue(createMockResponse([...mockMenus, newMenu])) // All subsequent fetches
+      // Initial fetch returns menus, subsequent fetches return updated list
+      mockAxios.get
+        .mockResolvedValueOnce({ data: mockMenus }) // Initial fetch
+        .mockResolvedValue({ data: [...mockMenus, newMenu] }) // All subsequent fetches
+      mockAxios.post.mockResolvedValueOnce({ data: newMenu }) // Create
 
       render(<MenuBuilderPage />, { wrapper: createTestWrapper() })
 
@@ -388,7 +364,7 @@ describe('MenuBuilderPage', () => {
 
   describe('Delete Menu', () => {
     beforeEach(() => {
-      mockFetch.mockResolvedValue(createMockResponse(mockMenus))
+      mockAxios.get.mockResolvedValue({ data: mockMenus })
     })
 
     it('should open delete confirmation dialog when clicking delete', async () => {
@@ -431,10 +407,11 @@ describe('MenuBuilderPage', () => {
     it('should delete menu when confirming deletion', async () => {
       const user = userEvent.setup()
 
-      mockFetch
-        .mockResolvedValueOnce(createMockResponse(mockMenus)) // Initial fetch
-        .mockResolvedValueOnce(createMockResponse(null)) // Delete
-        .mockResolvedValueOnce(createMockResponse(mockMenus.slice(1))) // Refetch
+      // Initial fetch returns menus, refetch returns updated list
+      mockAxios.get
+        .mockResolvedValueOnce({ data: mockMenus }) // Initial fetch
+        .mockResolvedValueOnce({ data: mockMenus.slice(1) }) // Refetch
+      mockAxios.delete.mockResolvedValueOnce({ data: null }) // Delete
 
       render(<MenuBuilderPage />, { wrapper: createTestWrapper() })
 
@@ -458,23 +435,22 @@ describe('MenuBuilderPage', () => {
 
   describe('Menu Editor', () => {
     beforeEach(() => {
-      mockFetch.mockImplementation((url: string | URL | Request) => {
-        const urlStr = typeof url === 'string' ? url : url.toString()
-        if (urlStr.includes('/control/authz/policies')) {
-          return Promise.resolve(
-            createMockResponse({
+      mockAxios.get.mockImplementation((url: string) => {
+        if (url.includes('/control/authz/policies')) {
+          return Promise.resolve({
+            data: {
               content: mockPolicies,
               totalElements: mockPolicies.length,
               totalPages: 1,
               size: 1000,
               number: 0,
-            })
-          )
+            },
+          })
         }
-        if (urlStr.includes('/control/ui/menus/1') && !urlStr.endsWith('/menus')) {
-          return Promise.resolve(createMockResponse(mockMenus[0]))
+        if (url.includes('/control/policies')) {
+          return Promise.resolve({ data: mockPolicies })
         }
-        return Promise.resolve(createMockResponse(mockMenus))
+        return Promise.resolve({ data: mockMenus })
       })
     })
 
@@ -533,23 +509,22 @@ describe('MenuBuilderPage', () => {
 
   describe('Menu Tree View', () => {
     beforeEach(() => {
-      mockFetch.mockImplementation((url: string | URL | Request) => {
-        const urlStr = typeof url === 'string' ? url : url.toString()
-        if (urlStr.includes('/control/authz/policies')) {
-          return Promise.resolve(
-            createMockResponse({
+      mockAxios.get.mockImplementation((url: string) => {
+        if (url.includes('/control/authz/policies')) {
+          return Promise.resolve({
+            data: {
               content: mockPolicies,
               totalElements: mockPolicies.length,
               totalPages: 1,
               size: 1000,
               number: 0,
-            })
-          )
+            },
+          })
         }
-        if (urlStr.includes('/control/ui/menus/1') && !urlStr.endsWith('/menus')) {
-          return Promise.resolve(createMockResponse(mockMenus[0]))
+        if (url.includes('/control/policies')) {
+          return Promise.resolve({ data: mockPolicies })
         }
-        return Promise.resolve(createMockResponse(mockMenus))
+        return Promise.resolve({ data: mockMenus })
       })
     })
 
@@ -604,23 +579,22 @@ describe('MenuBuilderPage', () => {
 
   describe('Add Menu Item', () => {
     beforeEach(() => {
-      mockFetch.mockImplementation((url: string | URL | Request) => {
-        const urlStr = typeof url === 'string' ? url : url.toString()
-        if (urlStr.includes('/control/authz/policies')) {
-          return Promise.resolve(
-            createMockResponse({
+      mockAxios.get.mockImplementation((url: string) => {
+        if (url.includes('/control/authz/policies')) {
+          return Promise.resolve({
+            data: {
               content: mockPolicies,
               totalElements: mockPolicies.length,
               totalPages: 1,
               size: 1000,
               number: 0,
-            })
-          )
+            },
+          })
         }
-        if (urlStr.includes('/control/ui/menus/1') && !urlStr.endsWith('/menus')) {
-          return Promise.resolve(createMockResponse(mockMenus[0]))
+        if (url.includes('/control/policies')) {
+          return Promise.resolve({ data: mockPolicies })
         }
-        return Promise.resolve(createMockResponse(mockMenus))
+        return Promise.resolve({ data: mockMenus })
       })
     })
 
@@ -711,23 +685,22 @@ describe('MenuBuilderPage', () => {
 
   describe('Menu Preview', () => {
     beforeEach(() => {
-      mockFetch.mockImplementation((url: string | URL | Request) => {
-        const urlStr = typeof url === 'string' ? url : url.toString()
-        if (urlStr.includes('/control/authz/policies')) {
-          return Promise.resolve(
-            createMockResponse({
+      mockAxios.get.mockImplementation((url: string) => {
+        if (url.includes('/control/authz/policies')) {
+          return Promise.resolve({
+            data: {
               content: mockPolicies,
               totalElements: mockPolicies.length,
               totalPages: 1,
               size: 1000,
               number: 0,
-            })
-          )
+            },
+          })
         }
-        if (urlStr.includes('/control/ui/menus/1') && !urlStr.endsWith('/menus')) {
-          return Promise.resolve(createMockResponse(mockMenus[0]))
+        if (url.includes('/control/policies')) {
+          return Promise.resolve({ data: mockPolicies })
         }
-        return Promise.resolve(createMockResponse(mockMenus))
+        return Promise.resolve({ data: mockMenus })
       })
     })
 
@@ -765,23 +738,22 @@ describe('MenuBuilderPage', () => {
 
   describe('Save Menu', () => {
     beforeEach(() => {
-      mockFetch.mockImplementation((url: string | URL | Request) => {
-        const urlStr = typeof url === 'string' ? url : url.toString()
-        if (urlStr.includes('/control/authz/policies')) {
-          return Promise.resolve(
-            createMockResponse({
+      mockAxios.get.mockImplementation((url: string) => {
+        if (url.includes('/control/authz/policies')) {
+          return Promise.resolve({
+            data: {
               content: mockPolicies,
               totalElements: mockPolicies.length,
               totalPages: 1,
               size: 1000,
               number: 0,
-            })
-          )
+            },
+          })
         }
-        if (urlStr.includes('/control/ui/menus/1') && !urlStr.endsWith('/menus')) {
-          return Promise.resolve(createMockResponse(mockMenus[0]))
+        if (url.includes('/control/policies')) {
+          return Promise.resolve({ data: mockPolicies })
         }
-        return Promise.resolve(createMockResponse(mockMenus))
+        return Promise.resolve({ data: mockMenus })
       })
     })
 
@@ -830,27 +802,24 @@ describe('MenuBuilderPage', () => {
     })
 
     it('should save menu when save button is clicked', async () => {
-      mockFetch.mockImplementation((url: string | URL | Request, options?: RequestInit) => {
-        const urlStr = typeof url === 'string' ? url : url.toString()
-        if (urlStr.includes('/control/authz/policies')) {
-          return Promise.resolve(
-            createMockResponse({
+      mockAxios.get.mockImplementation((url: string) => {
+        if (url.includes('/control/authz/policies')) {
+          return Promise.resolve({
+            data: {
               content: mockPolicies,
               totalElements: mockPolicies.length,
               totalPages: 1,
               size: 1000,
               number: 0,
-            })
-          )
+            },
+          })
         }
-        if (options?.method === 'PUT') {
-          return Promise.resolve(createMockResponse({ ...mockMenus[0], items: [] }))
+        if (url.includes('/control/policies')) {
+          return Promise.resolve({ data: mockPolicies })
         }
-        if (urlStr.includes('/control/ui/menus/1') && !urlStr.endsWith('/menus')) {
-          return Promise.resolve(createMockResponse(mockMenus[0]))
-        }
-        return Promise.resolve(createMockResponse(mockMenus))
+        return Promise.resolve({ data: mockMenus })
       })
+      mockAxios.put.mockResolvedValueOnce({ data: { ...mockMenus[0], items: [] } })
 
       const user = userEvent.setup()
       render(<MenuBuilderPage />, { wrapper: createTestWrapper() })
@@ -889,28 +858,13 @@ describe('MenuBuilderPage', () => {
 
   describe('Access Policies Configuration', () => {
     beforeEach(() => {
-      mockFetch.mockImplementation((url: string | URL | Request) => {
-        let urlStr: string
-        if (typeof url === 'string') {
-          urlStr = url
-        } else if (url instanceof URL) {
-          urlStr = url.toString()
-        } else if (url instanceof Request) {
-          urlStr = url.url
-        } else {
-          urlStr = String(url)
-        }
-
+      mockAxios.get.mockImplementation((url: string) => {
         // Check for policies endpoint first (more specific)
-        if (urlStr.includes('/control/policies')) {
-          return Promise.resolve(createMockResponse(mockPolicies))
-        }
-        // Check for specific menu by ID
-        if (urlStr.match(/\/ui\/menus\/\d+$/)) {
-          return Promise.resolve(createMockResponse(mockMenus[0]))
+        if (url.includes('/control/policies')) {
+          return Promise.resolve({ data: mockPolicies })
         }
         // Default to menus list
-        return Promise.resolve(createMockResponse(mockMenus))
+        return Promise.resolve({ data: mockMenus })
       })
     })
 
@@ -1062,28 +1016,13 @@ describe('MenuBuilderPage', () => {
     })
 
     it('should display no policies message when no policies available', async () => {
-      mockFetch.mockImplementation((url: string | URL | Request) => {
-        let urlStr: string
-        if (typeof url === 'string') {
-          urlStr = url
-        } else if (url instanceof URL) {
-          urlStr = url.toString()
-        } else if (url instanceof Request) {
-          urlStr = url.url
-        } else {
-          urlStr = String(url)
-        }
-
+      mockAxios.get.mockImplementation((url: string) => {
         // Check for policies endpoint first - return empty array
-        if (urlStr.includes('/control/policies')) {
-          return Promise.resolve(createMockResponse([]))
-        }
-        // Check for specific menu by ID
-        if (urlStr.match(/\/ui\/menus\/\d+$/)) {
-          return Promise.resolve(createMockResponse(mockMenus[0]))
+        if (url.includes('/control/policies')) {
+          return Promise.resolve({ data: [] })
         }
         // Default to menus list
-        return Promise.resolve(createMockResponse(mockMenus))
+        return Promise.resolve({ data: mockMenus })
       })
 
       const user = userEvent.setup()
@@ -1117,28 +1056,13 @@ describe('MenuBuilderPage', () => {
 
   describe('Menu Preview with Policies', () => {
     beforeEach(() => {
-      mockFetch.mockImplementation((url: string | URL | Request) => {
-        let urlStr: string
-        if (typeof url === 'string') {
-          urlStr = url
-        } else if (url instanceof URL) {
-          urlStr = url.toString()
-        } else if (url instanceof Request) {
-          urlStr = url.url
-        } else {
-          urlStr = String(url)
-        }
-
+      mockAxios.get.mockImplementation((url: string) => {
         // Check for policies endpoint first (more specific)
-        if (urlStr.includes('/control/policies')) {
-          return Promise.resolve(createMockResponse(mockPolicies))
-        }
-        // Check for specific menu by ID
-        if (urlStr.match(/\/ui\/menus\/\d+$/)) {
-          return Promise.resolve(createMockResponse(mockMenus[0]))
+        if (url.includes('/control/policies')) {
+          return Promise.resolve({ data: mockPolicies })
         }
         // Default to menus list
-        return Promise.resolve(createMockResponse(mockMenus))
+        return Promise.resolve({ data: mockMenus })
       })
     })
 
@@ -1202,7 +1126,7 @@ describe('MenuBuilderPage', () => {
 
   describe('Accessibility', () => {
     beforeEach(() => {
-      mockFetch.mockResolvedValue(createMockResponse(mockMenus))
+      mockAxios.get.mockResolvedValue({ data: mockMenus })
     })
 
     it('should have accessible table structure', async () => {

@@ -27,7 +27,13 @@ import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { OIDCProvidersPage } from './OIDCProvidersPage'
 import type { OIDCProvider } from './OIDCProvidersPage'
-import { createTestWrapper, setupAuthMocks, wrapFetchMock } from '../../test/testUtils'
+import {
+  createTestWrapper,
+  setupAuthMocks,
+  mockAxios,
+  resetMockAxios,
+  createAxiosError,
+} from '../../test/testUtils'
 
 // Mock OIDC providers data
 const mockProviders: OIDCProvider[] = [
@@ -63,42 +69,12 @@ const mockProviders: OIDCProvider[] = [
   },
 ]
 
-// Mock fetch function with proper Response objects
-const mockFetch = vi.fn()
-
-// Helper to create a proper Response-like object
-function createMockResponse(data: unknown, ok = true, status = 200): Response {
-  return {
-    ok,
-    status,
-    json: () => Promise.resolve(data),
-    text: () => Promise.resolve(JSON.stringify(data)),
-    clone: function () {
-      return this
-    },
-    headers: new Headers(),
-    redirected: false,
-    statusText: ok ? 'OK' : 'Error',
-    type: 'basic' as ResponseType,
-    url: '',
-    body: null,
-    bodyUsed: false,
-    arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
-    blob: () => Promise.resolve(new Blob()),
-    formData: () => Promise.resolve(new FormData()),
-    bytes: () => Promise.resolve(new Uint8Array()),
-  } as Response
-}
-
-global.fetch = mockFetch
-
 describe('OIDCProvidersPage', () => {
   let cleanupAuthMocks: () => void
 
   beforeEach(() => {
     cleanupAuthMocks = setupAuthMocks()
-    mockFetch.mockReset()
-    wrapFetchMock(mockFetch)
+    resetMockAxios()
   })
 
   afterEach(() => {
@@ -109,11 +85,8 @@ describe('OIDCProvidersPage', () => {
   describe('Loading State', () => {
     it('should display loading spinner while fetching providers', async () => {
       // Mock a delayed response
-      mockFetch.mockImplementation(
-        () =>
-          new Promise((resolve) =>
-            setTimeout(() => resolve(createMockResponse(mockProviders)), 100)
-          )
+      mockAxios.get.mockImplementation(
+        () => new Promise((resolve) => setTimeout(() => resolve({ data: mockProviders }), 100))
       )
 
       render(<OIDCProvidersPage />, { wrapper: createTestWrapper() })
@@ -125,7 +98,7 @@ describe('OIDCProvidersPage', () => {
 
   describe('Error State', () => {
     it('should display error message when fetch fails', async () => {
-      mockFetch.mockResolvedValue(createMockResponse(null, false, 500))
+      mockAxios.get.mockRejectedValue(createAxiosError(500))
 
       render(<OIDCProvidersPage />, { wrapper: createTestWrapper() })
 
@@ -135,7 +108,7 @@ describe('OIDCProvidersPage', () => {
     })
 
     it('should display retry button on error', async () => {
-      mockFetch.mockResolvedValue(createMockResponse(null, false, 500))
+      mockAxios.get.mockRejectedValue(createAxiosError(500))
 
       render(<OIDCProvidersPage />, { wrapper: createTestWrapper() })
 
@@ -145,9 +118,9 @@ describe('OIDCProvidersPage', () => {
     })
 
     it('should retry fetching when retry button is clicked', async () => {
-      mockFetch
-        .mockResolvedValueOnce(createMockResponse(null, false, 500))
-        .mockResolvedValueOnce(createMockResponse(mockProviders))
+      mockAxios.get
+        .mockRejectedValueOnce(createAxiosError(500))
+        .mockResolvedValueOnce({ data: mockProviders })
 
       const user = userEvent.setup()
       render(<OIDCProvidersPage />, { wrapper: createTestWrapper() })
@@ -166,7 +139,7 @@ describe('OIDCProvidersPage', () => {
 
   describe('Providers List Display', () => {
     beforeEach(() => {
-      mockFetch.mockResolvedValue(createMockResponse(mockProviders))
+      mockAxios.get.mockResolvedValue({ data: mockProviders })
     })
 
     it('should display all providers in the table', async () => {
@@ -237,7 +210,7 @@ describe('OIDCProvidersPage', () => {
 
   describe('Empty State', () => {
     it('should display empty state when no providers exist', async () => {
-      mockFetch.mockResolvedValue(createMockResponse([]))
+      mockAxios.get.mockResolvedValue({ data: [] })
 
       render(<OIDCProvidersPage />, { wrapper: createTestWrapper() })
 
@@ -249,7 +222,7 @@ describe('OIDCProvidersPage', () => {
 
   describe('Add Provider', () => {
     beforeEach(() => {
-      mockFetch.mockResolvedValue(createMockResponse(mockProviders))
+      mockAxios.get.mockResolvedValue({ data: mockProviders })
     })
 
     it('should open add form when clicking add button', async () => {
@@ -344,10 +317,10 @@ describe('OIDCProvidersPage', () => {
         updatedAt: '2024-01-20T10:00:00Z',
       }
 
-      mockFetch
-        .mockResolvedValueOnce(createMockResponse(mockProviders)) // Initial fetch
-        .mockResolvedValueOnce(createMockResponse(newProvider)) // Create
-        .mockResolvedValueOnce(createMockResponse([...mockProviders, newProvider])) // Refetch
+      mockAxios.get
+        .mockResolvedValueOnce({ data: mockProviders }) // Initial fetch
+        .mockResolvedValueOnce({ data: [...mockProviders, newProvider] }) // Refetch
+      mockAxios.post.mockResolvedValueOnce({ data: newProvider }) // Create
 
       render(<OIDCProvidersPage />, { wrapper: createTestWrapper() })
 
@@ -471,7 +444,7 @@ describe('OIDCProvidersPage', () => {
 
   describe('Claim Mapping Validation', () => {
     beforeEach(() => {
-      mockFetch.mockResolvedValue(createMockResponse(mockProviders))
+      mockAxios.get.mockResolvedValue({ data: mockProviders })
     })
 
     it.skip('should show validation error for invalid JSON in rolesMapping', async () => {
@@ -527,10 +500,10 @@ describe('OIDCProvidersPage', () => {
         rolesMapping: '{"admin": "ADMIN", "user": "USER"}',
       }
 
-      mockFetch
-        .mockResolvedValueOnce(createMockResponse(mockProviders)) // Initial fetch
-        .mockResolvedValueOnce(createMockResponse(newProvider)) // Create
-        .mockResolvedValueOnce(createMockResponse([...mockProviders, newProvider])) // Refetch
+      mockAxios.get
+        .mockResolvedValueOnce({ data: mockProviders }) // Initial fetch
+        .mockResolvedValueOnce({ data: [...mockProviders, newProvider] }) // Refetch
+      mockAxios.post.mockResolvedValueOnce({ data: newProvider }) // Create
 
       render(<OIDCProvidersPage />, { wrapper: createTestWrapper() })
 
@@ -615,10 +588,10 @@ describe('OIDCProvidersPage', () => {
         rolesClaim: 'a'.repeat(200),
       }
 
-      mockFetch
-        .mockResolvedValueOnce(createMockResponse(mockProviders)) // Initial fetch
-        .mockResolvedValueOnce(createMockResponse(newProvider)) // Create
-        .mockResolvedValueOnce(createMockResponse([...mockProviders, newProvider])) // Refetch
+      mockAxios.get
+        .mockResolvedValueOnce({ data: mockProviders }) // Initial fetch
+        .mockResolvedValueOnce({ data: [...mockProviders, newProvider] }) // Refetch
+      mockAxios.post.mockResolvedValueOnce({ data: newProvider }) // Create
 
       render(<OIDCProvidersPage />, { wrapper: createTestWrapper() })
 
@@ -716,10 +689,10 @@ describe('OIDCProvidersPage', () => {
         updatedAt: '2024-01-20T10:00:00Z',
       }
 
-      mockFetch
-        .mockResolvedValueOnce(createMockResponse(mockProviders)) // Initial fetch
-        .mockResolvedValueOnce(createMockResponse(newProvider)) // Create
-        .mockResolvedValueOnce(createMockResponse([...mockProviders, newProvider])) // Refetch
+      mockAxios.get
+        .mockResolvedValueOnce({ data: mockProviders }) // Initial fetch
+        .mockResolvedValueOnce({ data: [...mockProviders, newProvider] }) // Refetch
+      mockAxios.post.mockResolvedValueOnce({ data: newProvider }) // Create
 
       render(<OIDCProvidersPage />, { wrapper: createTestWrapper() })
 
@@ -750,7 +723,7 @@ describe('OIDCProvidersPage', () => {
 
   describe('Edit Provider', () => {
     beforeEach(() => {
-      mockFetch.mockResolvedValue(createMockResponse(mockProviders))
+      mockAxios.get.mockResolvedValue({ data: mockProviders })
     })
 
     it('should open edit form with pre-populated values when clicking edit', async () => {
@@ -780,10 +753,10 @@ describe('OIDCProvidersPage', () => {
         name: 'Google Updated',
       }
 
-      mockFetch
-        .mockResolvedValueOnce(createMockResponse(mockProviders)) // Initial fetch
-        .mockResolvedValueOnce(createMockResponse(updatedProvider)) // Update
-        .mockResolvedValueOnce(createMockResponse([updatedProvider, ...mockProviders.slice(1)])) // Refetch
+      mockAxios.get
+        .mockResolvedValueOnce({ data: mockProviders }) // Initial fetch
+        .mockResolvedValueOnce({ data: [updatedProvider, ...mockProviders.slice(1)] }) // Refetch
+      mockAxios.put.mockResolvedValueOnce({ data: updatedProvider }) // Update
 
       render(<OIDCProvidersPage />, { wrapper: createTestWrapper() })
 
@@ -813,10 +786,10 @@ describe('OIDCProvidersPage', () => {
         name: 'Google Updated',
       }
 
-      mockFetch
-        .mockResolvedValueOnce(createMockResponse(mockProviders)) // Initial fetch
-        .mockResolvedValueOnce(createMockResponse(updatedProvider)) // Update
-        .mockResolvedValueOnce(createMockResponse([updatedProvider, ...mockProviders.slice(1)])) // Refetch
+      mockAxios.get
+        .mockResolvedValueOnce({ data: mockProviders }) // Initial fetch
+        .mockResolvedValueOnce({ data: [updatedProvider, ...mockProviders.slice(1)] }) // Refetch
+      mockAxios.put.mockResolvedValueOnce({ data: updatedProvider }) // Update
 
       render(<OIDCProvidersPage />, { wrapper: createTestWrapper() })
 
@@ -845,7 +818,7 @@ describe('OIDCProvidersPage', () => {
 
   describe('Delete Provider', () => {
     beforeEach(() => {
-      mockFetch.mockResolvedValue(createMockResponse(mockProviders))
+      mockAxios.get.mockResolvedValue({ data: mockProviders })
     })
 
     it('should open delete confirmation dialog when clicking delete', async () => {
@@ -890,10 +863,10 @@ describe('OIDCProvidersPage', () => {
     it('should delete provider when confirming deletion', async () => {
       const user = userEvent.setup()
 
-      mockFetch
-        .mockResolvedValueOnce(createMockResponse(mockProviders)) // Initial fetch
-        .mockResolvedValueOnce(createMockResponse(null)) // Delete
-        .mockResolvedValueOnce(createMockResponse(mockProviders.slice(1))) // Refetch
+      mockAxios.get
+        .mockResolvedValueOnce({ data: mockProviders }) // Initial fetch
+        .mockResolvedValueOnce({ data: mockProviders.slice(1) }) // Refetch
+      mockAxios.delete.mockResolvedValueOnce({ data: null }) // Delete
 
       render(<OIDCProvidersPage />, { wrapper: createTestWrapper() })
 
@@ -917,17 +890,15 @@ describe('OIDCProvidersPage', () => {
 
   describe('Test Connection', () => {
     beforeEach(() => {
-      mockFetch.mockResolvedValue(createMockResponse(mockProviders))
+      mockAxios.get.mockResolvedValue({ data: mockProviders })
     })
 
     it('should test connection when clicking test button', async () => {
       const user = userEvent.setup()
 
-      mockFetch
-        .mockResolvedValueOnce(createMockResponse(mockProviders)) // Initial fetch
-        .mockResolvedValueOnce(
-          createMockResponse({ success: true, message: 'Connection successful' })
-        ) // Test connection
+      mockAxios.post.mockResolvedValueOnce({
+        data: { success: true, message: 'Connection successful' },
+      }) // Test connection
 
       render(<OIDCProvidersPage />, { wrapper: createTestWrapper() })
 
@@ -945,11 +916,9 @@ describe('OIDCProvidersPage', () => {
     it('should show error when connection test fails', async () => {
       const user = userEvent.setup()
 
-      mockFetch
-        .mockResolvedValueOnce(createMockResponse(mockProviders)) // Initial fetch
-        .mockResolvedValueOnce(
-          createMockResponse({ message: 'Unable to reach issuer' }, false, 400)
-        ) // Test connection fails
+      mockAxios.post.mockRejectedValueOnce(
+        createAxiosError(400, { message: 'Unable to reach issuer' })
+      ) // Test connection fails
 
       render(<OIDCProvidersPage />, { wrapper: createTestWrapper() })
 
@@ -968,18 +937,15 @@ describe('OIDCProvidersPage', () => {
       const user = userEvent.setup()
 
       // Mock a delayed response
-      mockFetch
-        .mockResolvedValueOnce(createMockResponse(mockProviders)) // Initial fetch
-        .mockImplementationOnce(
-          () =>
-            new Promise((resolve) =>
-              setTimeout(
-                () =>
-                  resolve(createMockResponse({ success: true, message: 'Connection successful' })),
-                100
-              )
+      mockAxios.post.mockImplementationOnce(
+        () =>
+          new Promise((resolve) =>
+            setTimeout(
+              () => resolve({ data: { success: true, message: 'Connection successful' } }),
+              100
             )
-        )
+          )
+      )
 
       render(<OIDCProvidersPage />, { wrapper: createTestWrapper() })
 
@@ -997,7 +963,7 @@ describe('OIDCProvidersPage', () => {
 
   describe('Accessibility', () => {
     beforeEach(() => {
-      mockFetch.mockResolvedValue(createMockResponse(mockProviders))
+      mockAxios.get.mockResolvedValue({ data: mockProviders })
     })
 
     it('should have accessible table structure', async () => {

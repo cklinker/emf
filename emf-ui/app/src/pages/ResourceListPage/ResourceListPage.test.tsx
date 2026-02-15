@@ -14,11 +14,16 @@ import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { createTestWrapper, setupAuthMocks, AuthWrapper } from '../../test/testUtils'
+import {
+  createTestWrapper,
+  setupAuthMocks,
+  AuthWrapper,
+  mockAxios,
+  resetMockAxios,
+  createAxiosError,
+} from '../../test/testUtils'
 import { ResourceListPage, CollectionSchema, Resource } from './ResourceListPage'
 import { escapeCSVValue, recordsToCSV, recordsToJSON } from './ResourceListPage'
-import { http, HttpResponse } from 'msw'
-import { server } from '../../../vitest.setup'
 
 // Mock useNavigate
 const mockNavigate = vi.fn()
@@ -90,25 +95,28 @@ function createTestQueryClient() {
   })
 }
 
-// Helper to set up standard MSW handlers for ResourceListPage tests
+// Helper to set up standard Axios mocks for ResourceListPage tests
 function setupResourceListHandlers() {
-  server.use(
-    http.get('/control/collections', () => {
-      return HttpResponse.json({
-        content: [mockSchema],
-        totalElements: 1,
-        totalPages: 1,
-        size: 1000,
-        number: 0,
+  mockAxios.get.mockImplementation((url: string) => {
+    if (url === '/control/collections') {
+      return Promise.resolve({
+        data: {
+          content: [mockSchema],
+          totalElements: 1,
+          totalPages: 1,
+          size: 1000,
+          number: 0,
+        },
       })
-    }),
-    http.get('/control/collections/:id', () => {
-      return HttpResponse.json(mockSchema)
-    }),
-    http.get('/api/users', () => {
-      return HttpResponse.json(mockPaginatedResponse)
-    })
-  )
+    }
+    if (url.startsWith('/control/collections/')) {
+      return Promise.resolve({ data: mockSchema })
+    }
+    if (url.startsWith('/api/users')) {
+      return Promise.resolve({ data: mockPaginatedResponse })
+    }
+    return Promise.reject(createAxiosError(404))
+  })
 }
 
 // Helper to render with providers and routing
@@ -133,10 +141,9 @@ describe('ResourceListPage', () => {
 
   beforeEach(() => {
     cleanupAuthMocks = setupAuthMocks()
+    resetMockAxios()
     vi.clearAllMocks()
     mockNavigate.mockClear()
-    // Reset MSW handlers
-    server.resetHandlers()
   })
 
   afterEach(() => {
@@ -293,26 +300,17 @@ describe('ResourceListPage', () => {
 
   describe('Loading and Error States', () => {
     it.skip('should display loading spinner while fetching schema', async () => {
-      // SKIPPED: MSW handlers not intercepting requests properly
-      // Set up MSW to never resolve
-      server.use(
-        http.get('/control/collections', () => {
-          return new Promise(() => {})
-        })
-      )
+      // SKIPPED: Component resolves to error state before loading spinner can be asserted
+      // Mock a delayed response that never resolves during the assertion
+      mockAxios.get.mockImplementation(() => new Promise(() => {}))
 
       renderWithProviders(<ResourceListPage />)
 
       expect(screen.getByTestId('loading-spinner')).toBeInTheDocument()
     })
 
-    it.skip('should display error message when schema fetch fails', async () => {
-      // SKIPPED: MSW handlers not intercepting requests properly
-      server.use(
-        http.get('/control/collections', () => {
-          return new HttpResponse(null, { status: 500 })
-        })
-      )
+    it('should display error message when schema fetch fails', async () => {
+      mockAxios.get.mockRejectedValue(createAxiosError(500))
 
       renderWithProviders(<ResourceListPage />)
 
@@ -323,29 +321,12 @@ describe('ResourceListPage', () => {
   })
 
   describe.skip('Data Table Display - Requirement 11.2', () => {
-    // SKIPPED: MSW handlers not intercepting requests - component shows "resource not found"
+    // SKIPPED: Component rendering issues - needs further investigation
     beforeEach(() => {
-      server.use(
-        http.get('/control/collections', () => {
-          return HttpResponse.json({
-            content: [mockSchema],
-            totalElements: 1,
-            totalPages: 1,
-            size: 1000,
-            number: 0,
-          })
-        }),
-        http.get('/control/collections/:id', () => {
-          return HttpResponse.json(mockSchema)
-        }),
-        http.get('/api/users', () => {
-          return HttpResponse.json(mockPaginatedResponse)
-        })
-      )
+      setupResourceListHandlers()
     })
 
     it('should display paginated data table with records', async () => {
-      setupResourceListHandlers()
       renderWithProviders(<ResourceListPage />)
 
       await waitFor(() => {
@@ -380,11 +361,26 @@ describe('ResourceListPage', () => {
     })
 
     it('should display empty state when no records', async () => {
-      server.use(
-        http.get('/api/users', () => {
-          return HttpResponse.json({ data: [], total: 0, page: 1, pageSize: 25 })
-        })
-      )
+      mockAxios.get.mockImplementation((url: string) => {
+        if (url === '/control/collections') {
+          return Promise.resolve({
+            data: {
+              content: [mockSchema],
+              totalElements: 1,
+              totalPages: 1,
+              size: 1000,
+              number: 0,
+            },
+          })
+        }
+        if (url.startsWith('/control/collections/')) {
+          return Promise.resolve({ data: mockSchema })
+        }
+        if (url.startsWith('/api/users')) {
+          return Promise.resolve({ data: { data: [], total: 0, page: 1, pageSize: 25 } })
+        }
+        return Promise.reject(createAxiosError(404))
+      })
 
       renderWithProviders(<ResourceListPage />)
 
@@ -395,7 +391,7 @@ describe('ResourceListPage', () => {
   })
 
   describe.skip('Column Sorting', () => {
-    // SKIPPED: MSW handlers not intercepting requests
+    // SKIPPED: Component rendering issues - needs further investigation
     beforeEach(() => {
       setupResourceListHandlers()
     })
@@ -455,7 +451,7 @@ describe('ResourceListPage', () => {
   })
 
   describe.skip('Filter Builder - Requirements 11.3, 11.4, 11.5', () => {
-    // SKIPPED: MSW handlers not intercepting requests
+    // SKIPPED: Component rendering issues - needs further investigation
     beforeEach(() => {
       setupResourceListHandlers()
     })
@@ -581,7 +577,7 @@ describe('ResourceListPage', () => {
   })
 
   describe.skip('Column Selection', () => {
-    // SKIPPED: MSW handlers not intercepting requests
+    // SKIPPED: Component rendering issues - needs further investigation
     beforeEach(() => {
       setupResourceListHandlers()
     })
@@ -626,7 +622,7 @@ describe('ResourceListPage', () => {
   })
 
   describe.skip('Bulk Selection - Requirement 11.11', () => {
-    // SKIPPED: MSW handlers not intercepting requests
+    // SKIPPED: Component rendering issues - needs further investigation
     beforeEach(() => {
       setupResourceListHandlers()
     })
@@ -714,7 +710,7 @@ describe('ResourceListPage', () => {
   })
 
   describe.skip('Export Functionality - Requirement 11.12', () => {
-    // SKIPPED: MSW handlers not intercepting requests
+    // SKIPPED: Component rendering issues - needs further investigation
     beforeEach(() => {
       setupResourceListHandlers()
     })
@@ -809,7 +805,7 @@ describe('ResourceListPage', () => {
   })
 
   describe.skip('Navigation', () => {
-    // SKIPPED: MSW handlers not intercepting requests
+    // SKIPPED: Component rendering issues - needs further investigation
     beforeEach(() => {
       setupResourceListHandlers()
     })
@@ -855,14 +851,28 @@ describe('ResourceListPage', () => {
   })
 
   describe.skip('Pagination', () => {
-    // SKIPPED: MSW handlers not intercepting requests
+    // SKIPPED: Component rendering issues - needs further investigation
     beforeEach(() => {
-      setupResourceListHandlers()
-      server.use(
-        http.get('/api/users', () => {
-          return HttpResponse.json({ ...mockPaginatedResponse, total: 100 })
-        })
-      )
+      mockAxios.get.mockImplementation((url: string) => {
+        if (url === '/control/collections') {
+          return Promise.resolve({
+            data: {
+              content: [mockSchema],
+              totalElements: 1,
+              totalPages: 1,
+              size: 1000,
+              number: 0,
+            },
+          })
+        }
+        if (url.startsWith('/control/collections/')) {
+          return Promise.resolve({ data: mockSchema })
+        }
+        if (url.startsWith('/api/users')) {
+          return Promise.resolve({ data: { ...mockPaginatedResponse, total: 100 } })
+        }
+        return Promise.reject(createAxiosError(404))
+      })
     })
 
     it('should change page when next button is clicked', async () => {
@@ -911,7 +921,7 @@ describe('ResourceListPage', () => {
   })
 
   describe.skip('Accessibility', () => {
-    // SKIPPED: MSW handlers not intercepting requests
+    // SKIPPED: Component rendering issues - needs further investigation
     beforeEach(() => {
       setupResourceListHandlers()
     })

@@ -18,19 +18,18 @@
  */
 
 import React from 'react'
-import { describe, it, expect, vi, beforeEach, afterEach, beforeAll, afterAll } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
-import { http, HttpResponse } from 'msw'
-import { setupServer } from 'msw/node'
 import { CollectionDetailPage } from './CollectionDetailPage'
 import { I18nProvider } from '../../context/I18nContext'
 import { ToastProvider } from '../../components/Toast'
 import { AuthProvider } from '../../context/AuthContext'
 import { ApiProvider } from '../../context/ApiContext'
 import { PluginProvider } from '../../context/PluginContext'
+import { mockAxios, resetMockAxios, createAxiosError } from '../../test/testUtils'
 import type { Collection, CollectionVersion } from '../../types/collections'
 
 // Mock navigate function
@@ -105,26 +104,7 @@ const mockVersions: CollectionVersion[] = [
   { id: 'ver-1', version: 1, schema: '{}', createdAt: '2024-01-15T10:30:00Z' },
 ]
 
-// Setup MSW server for this test file
-const server = setupServer(
-  // Add bootstrap config handler
-  http.get('/control/ui-bootstrap', () => {
-    return HttpResponse.json({
-      oidcProviders: [
-        {
-          id: 'test-provider',
-          name: 'Test Provider',
-          issuer: 'https://test.example.com',
-          clientId: 'test-client-id',
-        },
-      ],
-    })
-  })
-)
-
 beforeAll(() => {
-  server.listen({ onUnhandledRequest: 'bypass' })
-
   // Mock sessionStorage for auth
   const mockSessionStorage: Record<string, string> = {
     emf_auth_tokens: JSON.stringify({
@@ -156,8 +136,6 @@ beforeAll(() => {
     writable: true,
   })
 })
-afterEach(() => server.resetHandlers())
-afterAll(() => server.close())
 
 // Create a fresh QueryClient for each test
 function createTestQueryClient() {
@@ -202,26 +180,53 @@ function TestWrapper({
   )
 }
 
-// Helper to setup MSW handlers for collection data
-function setupCollectionHandlers(collection: Collection = mockCollection) {
-  server.use(
-    http.get('/control/collections/:collectionId', () => {
-      return HttpResponse.json(collection)
-    })
-  )
+// Default GET handler for all endpoints used by CollectionDetailPage
+function createGetHandler(
+  collection: Collection = mockCollection,
+  versions: CollectionVersion[] = []
+) {
+  return (url: string) => {
+    if (url.match(/\/control\/collections\/[^/]+\/versions/)) {
+      return Promise.resolve({ data: versions })
+    }
+    if (url.match(/\/control\/collections\/[^/]+\/validation-rules/)) {
+      return Promise.resolve({ data: [] })
+    }
+    if (url.match(/\/control\/collections\/[^/]+\/record-types/)) {
+      return Promise.resolve({ data: [] })
+    }
+    if (url.match(/\/control\/collections\/[^/]+$/)) {
+      return Promise.resolve({ data: collection })
+    }
+    if (url.match(/\/control\/collections$/)) {
+      return Promise.resolve({ data: { content: [] } })
+    }
+    if (url.match(/\/control\/picklists\/global/)) {
+      return Promise.resolve({ data: [] })
+    }
+    if (url.match(/\/control\/picklists/)) {
+      return Promise.resolve({ data: [] })
+    }
+    return Promise.resolve({ data: [] })
+  }
 }
 
-// Helper to setup MSW handlers for versions
-function setupVersionsHandlers(versions: CollectionVersion[] = mockVersions) {
-  server.use(
-    http.get('/control/collections/:collectionId/versions', () => {
-      return HttpResponse.json(versions)
-    })
-  )
+// Helper to setup Axios mock handlers for collection data
+function setupCollectionHandlers(collection: Collection = mockCollection) {
+  mockAxios.get.mockImplementation(createGetHandler(collection))
+}
+
+// Helper to setup Axios mock handlers for collection + versions
+function setupCollectionAndVersionsHandlers(
+  collection: Collection = mockCollection,
+  versions: CollectionVersion[] = mockVersions
+) {
+  mockAxios.get.mockImplementation(createGetHandler(collection, versions))
 }
 
 describe('CollectionDetailPage', () => {
   beforeEach(() => {
+    resetMockAxios()
     mockNavigate.mockReset()
   })
 
@@ -232,11 +237,8 @@ describe('CollectionDetailPage', () => {
   describe('Loading State', () => {
     it('should display loading spinner while fetching collection', async () => {
       // Setup a delayed response
-      server.use(
-        http.get('/control/collections/:collectionId', async () => {
-          await new Promise((resolve) => setTimeout(resolve, 100))
-          return HttpResponse.json(mockCollection)
-        })
+      mockAxios.get.mockImplementation(
+        () => new Promise((resolve) => setTimeout(() => resolve({ data: mockCollection }), 100))
       )
 
       render(
@@ -252,11 +254,7 @@ describe('CollectionDetailPage', () => {
 
   describe('Error State', () => {
     it('should display error message when fetch fails', async () => {
-      server.use(
-        http.get('/control/collections/:collectionId', () => {
-          return new HttpResponse(null, { status: 500 })
-        })
-      )
+      mockAxios.get.mockRejectedValue(createAxiosError(500))
 
       render(
         <TestWrapper>
@@ -270,11 +268,7 @@ describe('CollectionDetailPage', () => {
     })
 
     it('should display not found error for 404 response', async () => {
-      server.use(
-        http.get('/control/collections/:collectionId', () => {
-          return new HttpResponse(null, { status: 404 })
-        })
-      )
+      mockAxios.get.mockRejectedValue(createAxiosError(404))
 
       render(
         <TestWrapper>
@@ -289,15 +283,16 @@ describe('CollectionDetailPage', () => {
 
     it('should allow retry on error', async () => {
       let callCount = 0
-      server.use(
-        http.get('/control/collections/:collectionId', () => {
+      mockAxios.get.mockImplementation((url: string) => {
+        if (url.match(/\/control\/collections\/[^/]+$/)) {
           callCount++
           if (callCount === 1) {
-            return new HttpResponse(null, { status: 500 })
+            return Promise.reject(createAxiosError(500))
           }
-          return HttpResponse.json(mockCollection)
-        })
-      )
+          return Promise.resolve({ data: mockCollection })
+        }
+        return Promise.resolve({ data: {} })
+      })
 
       render(
         <TestWrapper>
@@ -555,8 +550,7 @@ describe('CollectionDetailPage', () => {
 
   describe('Version History Display', () => {
     it('should switch to versions tab when clicked', async () => {
-      setupCollectionHandlers()
-      setupVersionsHandlers()
+      setupCollectionAndVersionsHandlers()
 
       const user = userEvent.setup()
 
@@ -578,8 +572,7 @@ describe('CollectionDetailPage', () => {
     })
 
     it('should display versions table with all versions', async () => {
-      setupCollectionHandlers()
-      setupVersionsHandlers()
+      setupCollectionAndVersionsHandlers()
 
       const user = userEvent.setup()
 
@@ -604,8 +597,7 @@ describe('CollectionDetailPage', () => {
     })
 
     it('should display view button for each version', async () => {
-      setupCollectionHandlers()
-      setupVersionsHandlers()
+      setupCollectionAndVersionsHandlers()
 
       const user = userEvent.setup()
 
@@ -629,8 +621,7 @@ describe('CollectionDetailPage', () => {
     })
 
     it('should mark current version', async () => {
-      setupCollectionHandlers()
-      setupVersionsHandlers()
+      setupCollectionAndVersionsHandlers()
 
       const user = userEvent.setup()
 
@@ -745,11 +736,7 @@ describe('CollectionDetailPage', () => {
     it('should call delete API and navigate when confirmed', async () => {
       // Setup handlers for collection load and delete
       setupCollectionHandlers()
-      server.use(
-        http.delete('/control/collections/:id', () => {
-          return HttpResponse.json({})
-        })
-      )
+      mockAxios.delete.mockResolvedValueOnce({ data: {} })
 
       const user = userEvent.setup()
 
@@ -818,12 +805,8 @@ describe('CollectionDetailPage', () => {
     })
 
     it('should open field editor modal when add field button is clicked', async () => {
-      // Setup handler for collections list (needed by field editor)
-      server.use(
-        http.get('/control/collections', () => {
-          return HttpResponse.json({ content: [] })
-        })
-      )
+      // Override get handler to also handle collections list (needed by field editor)
+      mockAxios.get.mockImplementation(createGetHandler())
 
       const user = userEvent.setup()
 
@@ -846,12 +829,8 @@ describe('CollectionDetailPage', () => {
     })
 
     it('should open field editor modal when edit field button is clicked', async () => {
-      // Setup handler for collections list (needed by field editor)
-      server.use(
-        http.get('/control/collections', () => {
-          return HttpResponse.json({ content: [] })
-        })
-      )
+      // Override get handler to also handle collections list (needed by field editor)
+      mockAxios.get.mockImplementation(createGetHandler())
 
       const user = userEvent.setup()
 

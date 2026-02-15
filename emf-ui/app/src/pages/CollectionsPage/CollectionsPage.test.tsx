@@ -24,7 +24,13 @@ import React from 'react'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { createTestWrapper, setupAuthMocks, wrapFetchMock } from '../../test/testUtils'
+import {
+  createTestWrapper,
+  setupAuthMocks,
+  mockAxios,
+  resetMockAxios,
+  createAxiosError,
+} from '../../test/testUtils'
 import { CollectionsPage, Collection } from './CollectionsPage'
 
 // Mock navigate function
@@ -74,35 +80,6 @@ const mockCollections: Collection[] = [
   },
 ]
 
-// Mock fetch function with proper Response objects
-const mockFetch = vi.fn()
-
-// Helper to create a proper Response-like object
-function createMockResponse(data: unknown, ok = true, status = 200): Response {
-  return {
-    ok,
-    status,
-    json: () => Promise.resolve(data),
-    text: () => Promise.resolve(JSON.stringify(data)),
-    clone: function () {
-      return this
-    },
-    headers: new Headers(),
-    redirected: false,
-    statusText: ok ? 'OK' : 'Error',
-    type: 'basic' as ResponseType,
-    url: '',
-    body: null,
-    bodyUsed: false,
-    arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
-    blob: () => Promise.resolve(new Blob()),
-    formData: () => Promise.resolve(new FormData()),
-    bytes: () => Promise.resolve(new Uint8Array()),
-  } as Response
-}
-
-global.fetch = mockFetch
-
 /**
  * Create a wrapper component with all required providers
  */
@@ -112,8 +89,7 @@ describe('CollectionsPage', () => {
 
   beforeEach(() => {
     cleanupAuthMocks = setupAuthMocks()
-    mockFetch.mockReset()
-    wrapFetchMock(mockFetch)
+    resetMockAxios()
     mockNavigate.mockReset()
   })
 
@@ -125,20 +101,20 @@ describe('CollectionsPage', () => {
   describe('Loading State', () => {
     it('should display loading spinner while fetching collections', async () => {
       // Mock a delayed response
-      mockFetch.mockImplementation(
+      mockAxios.get.mockImplementation(
         () =>
           new Promise((resolve) =>
             setTimeout(
               () =>
-                resolve(
-                  createMockResponse({
+                resolve({
+                  data: {
                     content: mockCollections,
                     totalElements: mockCollections.length,
                     totalPages: 1,
                     size: 1000,
                     number: 0,
-                  })
-                ),
+                  },
+                }),
               100
             )
           )
@@ -153,7 +129,7 @@ describe('CollectionsPage', () => {
 
   describe('Error State', () => {
     it('should display error message when fetch fails', async () => {
-      mockFetch.mockResolvedValue(createMockResponse(null, false, 500))
+      mockAxios.get.mockRejectedValue(createAxiosError(500))
 
       render(<CollectionsPage />, { wrapper: createTestWrapper() })
 
@@ -163,7 +139,7 @@ describe('CollectionsPage', () => {
     })
 
     it('should display retry button on error', async () => {
-      mockFetch.mockResolvedValue(createMockResponse(null, false, 500))
+      mockAxios.get.mockRejectedValue(createAxiosError(500))
 
       render(<CollectionsPage />, { wrapper: createTestWrapper() })
 
@@ -175,15 +151,15 @@ describe('CollectionsPage', () => {
 
   describe('Collections List Display', () => {
     beforeEach(() => {
-      mockFetch.mockResolvedValue(
-        createMockResponse({
+      mockAxios.get.mockResolvedValue({
+        data: {
           content: mockCollections,
           totalElements: mockCollections.length,
           totalPages: 1,
           size: 1000,
           number: 0,
-        })
-      )
+        },
+      })
     })
 
     it('should display all collections in the table', async () => {
@@ -235,15 +211,15 @@ describe('CollectionsPage', () => {
 
   describe('Filtering', () => {
     beforeEach(() => {
-      mockFetch.mockResolvedValue(
-        createMockResponse({
+      mockAxios.get.mockResolvedValue({
+        data: {
           content: mockCollections,
           totalElements: mockCollections.length,
           totalPages: 1,
           size: 1000,
           number: 0,
-        })
-      )
+        },
+      })
     })
 
     it('should filter collections by name', async () => {
@@ -337,15 +313,15 @@ describe('CollectionsPage', () => {
 
   describe('Sorting', () => {
     beforeEach(() => {
-      mockFetch.mockResolvedValue(
-        createMockResponse({
+      mockAxios.get.mockResolvedValue({
+        data: {
           content: mockCollections,
           totalElements: mockCollections.length,
           totalPages: 1,
           size: 1000,
           number: 0,
-        })
-      )
+        },
+      })
     })
 
     it('should sort collections by name ascending by default', async () => {
@@ -439,15 +415,15 @@ describe('CollectionsPage', () => {
 
   describe('Actions', () => {
     beforeEach(() => {
-      mockFetch.mockResolvedValue(
-        createMockResponse({
+      mockAxios.get.mockResolvedValue({
+        data: {
           content: mockCollections,
           totalElements: mockCollections.length,
           totalPages: 1,
           size: 1000,
           number: 0,
-        })
-      )
+        },
+      })
     })
 
     it('should navigate to create page when clicking create button', async () => {
@@ -535,16 +511,7 @@ describe('CollectionsPage', () => {
 
     it('should call delete API when confirming deletion', async () => {
       const user = userEvent.setup()
-      // First call returns collections
-      mockFetch.mockResolvedValue(
-        createMockResponse({
-          content: mockCollections,
-          totalElements: mockCollections.length,
-          totalPages: 1,
-          size: 1000,
-          number: 0,
-        })
-      )
+      // First call returns collections (already set in beforeEach)
 
       render(<CollectionsPage />, { wrapper: createTestWrapper() })
 
@@ -553,20 +520,19 @@ describe('CollectionsPage', () => {
       })
 
       // Clear mock calls after initial load
-      mockFetch.mockClear()
+      resetMockAxios()
 
       // Mock the delete response, then the refetch
-      mockFetch
-        .mockResolvedValueOnce(createMockResponse(null)) // DELETE response
-        .mockResolvedValue(
-          createMockResponse({
-            content: mockCollections.filter((c) => c.name !== 'orders'),
-            totalElements: 2,
-            totalPages: 1,
-            size: 1000,
-            number: 0,
-          })
-        ) // Refetch
+      mockAxios.delete.mockResolvedValueOnce({ data: null })
+      mockAxios.get.mockResolvedValue({
+        data: {
+          content: mockCollections.filter((c) => c.name !== 'orders'),
+          totalElements: 2,
+          totalPages: 1,
+          size: 1000,
+          number: 0,
+        },
+      })
 
       // Click delete on the first row (orders after sorting)
       const deleteButton = screen.getByTestId('delete-button-0')
@@ -600,15 +566,15 @@ describe('CollectionsPage', () => {
         updatedAt: new Date(2024, 0, i + 1).toISOString(),
       }))
 
-      mockFetch.mockResolvedValue(
-        createMockResponse({
+      mockAxios.get.mockResolvedValue({
+        data: {
           content: manyCollections,
           totalElements: manyCollections.length,
           totalPages: 2,
           size: 1000,
           number: 0,
-        })
-      )
+        },
+      })
 
       render(<CollectionsPage />, { wrapper: createTestWrapper() })
 
@@ -631,15 +597,15 @@ describe('CollectionsPage', () => {
         updatedAt: new Date(2024, 0, i + 1).toISOString(),
       }))
 
-      mockFetch.mockResolvedValue(
-        createMockResponse({
+      mockAxios.get.mockResolvedValue({
+        data: {
           content: manyCollections,
           totalElements: manyCollections.length,
           totalPages: 2,
           size: 1000,
           number: 0,
-        })
-      )
+        },
+      })
 
       const user = userEvent.setup()
       render(<CollectionsPage />, { wrapper: createTestWrapper() })
@@ -668,15 +634,15 @@ describe('CollectionsPage', () => {
         updatedAt: new Date(2024, 0, i + 1).toISOString(),
       }))
 
-      mockFetch.mockResolvedValue(
-        createMockResponse({
+      mockAxios.get.mockResolvedValue({
+        data: {
           content: manyCollections,
           totalElements: manyCollections.length,
           totalPages: 2,
           size: 1000,
           number: 0,
-        })
-      )
+        },
+      })
 
       render(<CollectionsPage />, { wrapper: createTestWrapper() })
 
@@ -700,15 +666,15 @@ describe('CollectionsPage', () => {
         updatedAt: new Date(2024, 0, i + 1).toISOString(),
       }))
 
-      mockFetch.mockResolvedValue(
-        createMockResponse({
+      mockAxios.get.mockResolvedValue({
+        data: {
           content: manyCollections,
           totalElements: manyCollections.length,
           totalPages: 2,
           size: 1000,
           number: 0,
-        })
-      )
+        },
+      })
 
       const user = userEvent.setup()
       render(<CollectionsPage />, { wrapper: createTestWrapper() })
@@ -728,15 +694,15 @@ describe('CollectionsPage', () => {
 
   describe('Accessibility', () => {
     beforeEach(() => {
-      mockFetch.mockResolvedValue(
-        createMockResponse({
+      mockAxios.get.mockResolvedValue({
+        data: {
           content: mockCollections,
           totalElements: mockCollections.length,
           totalPages: 1,
           size: 1000,
           number: 0,
-        })
-      )
+        },
+      })
     })
 
     it('should have accessible table structure', async () => {

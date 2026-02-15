@@ -2,6 +2,11 @@
  * Test Utilities
  *
  * Shared utilities for testing React components with all required providers.
+ *
+ * All API calls in the app flow through the SDK's EMFClient Axios instance.
+ * Tests mock `axios` at the module level so that `axios.create()` returns a
+ * controllable mock instance. Page-level tests use `getMockAxiosInstance()`
+ * to set up response mocks on the shared Axios instance.
  */
 
 import React from 'react'
@@ -12,6 +17,7 @@ import { ToastProvider } from '../components/Toast'
 import { ApiProvider } from '../context/ApiContext'
 import { AuthProvider } from '../context/AuthContext'
 import { PluginProvider } from '../context/PluginContext'
+import { vi } from 'vitest'
 
 /**
  * Mock bootstrap config response
@@ -81,8 +87,11 @@ function createBootstrapFetchWrapper(baseFetch: typeof fetch): typeof fetch {
 }
 
 /**
- * Setup mock fetch for bootstrap config and authentication
- * This should be called once at the start of each test file
+ * Setup mock fetch for bootstrap config and authentication.
+ * This should be called once at the start of each test file.
+ *
+ * Note: Bootstrap config is still fetched via native `fetch` (in AuthContext),
+ * so we keep the fetch mock for that. All API calls go through Axios.
  */
 // eslint-disable-next-line react-refresh/only-export-components
 export function setupAuthMocks() {
@@ -127,12 +136,92 @@ export function setupAuthMocks() {
 }
 
 /**
- * Wrap a test's fetch mock to also handle bootstrap config
- * Call this after setting up your test's fetch mock
+ * Wrap a test's fetch mock to also handle bootstrap config.
+ * Call this after setting up your test's fetch mock.
+ *
+ * Note: This is still needed because bootstrap config (AuthContext) uses
+ * native fetch. Page-level API mocking now uses mockAxios instead.
  */
 // eslint-disable-next-line react-refresh/only-export-components
 export function wrapFetchMock(testFetchMock: typeof fetch) {
   global.fetch = createBootstrapFetchWrapper(testFetchMock)
+}
+
+/**
+ * Shared mock Axios instance used by all tests.
+ *
+ * When axios.create() is called (by EMFClient), it returns this mock instance.
+ * Tests can set up response mocks via:
+ *   mockAxios.get.mockResolvedValueOnce({ data: ... })
+ *   mockAxios.post.mockRejectedValueOnce(createAxiosError(400, ...))
+ */
+// eslint-disable-next-line react-refresh/only-export-components
+export const mockAxios = {
+  get: vi.fn(),
+  post: vi.fn(),
+  put: vi.fn(),
+  patch: vi.fn(),
+  delete: vi.fn(),
+  defaults: {
+    baseURL: '',
+    headers: { 'Content-Type': 'application/json' },
+  },
+  interceptors: {
+    request: { use: vi.fn(), eject: vi.fn() },
+    response: { use: vi.fn(), eject: vi.fn() },
+  },
+}
+
+/**
+ * Get the mock Axios instance for setting up response mocks in tests.
+ *
+ * Usage in test files:
+ *   const mockAxios = getMockAxiosInstance()
+ *   mockAxios.get.mockResolvedValueOnce({ data: { content: [...] } })
+ */
+// eslint-disable-next-line react-refresh/only-export-components
+export function getMockAxiosInstance() {
+  return mockAxios
+}
+
+/**
+ * Reset all mock Axios method calls.
+ * Call this in beforeEach() to ensure clean state.
+ */
+// eslint-disable-next-line react-refresh/only-export-components
+export function resetMockAxios() {
+  mockAxios.get.mockReset()
+  mockAxios.post.mockReset()
+  mockAxios.put.mockReset()
+  mockAxios.patch.mockReset()
+  mockAxios.delete.mockReset()
+}
+
+/**
+ * Helper to create an Axios-style error for mocking rejected API calls.
+ *
+ * Usage:
+ *   mockAxios.get.mockRejectedValueOnce(createAxiosError(400, { message: 'Bad request', errors: [...] }))
+ */
+// eslint-disable-next-line react-refresh/only-export-components
+export function createAxiosError(
+  status: number,
+  data?: unknown,
+  statusText?: string
+): {
+  isAxiosError: true
+  response: { status: number; data: unknown; statusText: string }
+  message: string
+} {
+  return {
+    isAxiosError: true,
+    response: {
+      status,
+      data: data ?? null,
+      statusText: statusText || (status >= 400 && status < 500 ? 'Bad Request' : 'Server Error'),
+    },
+    message: `Request failed with status code ${status}`,
+  }
 }
 
 /**

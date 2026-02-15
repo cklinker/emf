@@ -14,12 +14,16 @@
 
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { createTestWrapper, setupAuthMocks } from '../../test/testUtils'
+import {
+  createTestWrapper,
+  setupAuthMocks,
+  mockAxios,
+  resetMockAxios,
+  createAxiosError,
+} from '../../test/testUtils'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { http, HttpResponse } from 'msw'
 import { PackagesPage } from './PackagesPage'
-import { server } from '../../../vitest.setup'
 
 // Mock URL.createObjectURL and revokeObjectURL
 global.URL.createObjectURL = vi.fn(() => 'blob:mock-url')
@@ -91,39 +95,42 @@ const mockImportResult = {
   errors: [],
 }
 
-// Helper to setup MSW handlers
-function setupMswHandlers(overrides: Record<string, unknown> = {}) {
-  server.use(
-    http.get('/control/packages/history', () => {
-      return HttpResponse.json(overrides.history ?? mockPackageHistory)
-    }),
-    http.get('/control/collections', () => {
-      return HttpResponse.json(overrides.collections ?? mockCollections)
-    }),
-    http.get('/control/roles', () => {
-      return HttpResponse.json(overrides.roles ?? mockRoles)
-    }),
-    http.get('/control/policies', () => {
-      return HttpResponse.json(overrides.policies ?? mockPolicies)
-    }),
-    http.get('/control/ui/pages', () => {
-      return HttpResponse.json(overrides.pages ?? mockPages)
-    }),
-    http.get('/control/ui/menus', () => {
-      return HttpResponse.json(overrides.menus ?? mockMenus)
-    }),
-    http.post('/control/packages/export', () => {
-      return new HttpResponse(JSON.stringify({}), {
-        headers: { 'Content-Type': 'application/json' },
-      })
-    }),
-    http.post('/control/packages/import/preview', () => {
-      return HttpResponse.json(overrides.importPreview ?? mockImportPreview)
-    }),
-    http.post('/control/packages/import', () => {
-      return HttpResponse.json(overrides.importResult ?? mockImportResult)
-    })
-  )
+// Helper to setup Axios mocks for all endpoints
+function setupAxiosMocks(overrides: Record<string, unknown> = {}) {
+  mockAxios.get.mockImplementation((url: string) => {
+    if (url.includes('/control/packages/history')) {
+      return Promise.resolve({ data: overrides.history ?? mockPackageHistory })
+    }
+    if (url.includes('/control/collections')) {
+      return Promise.resolve({ data: overrides.collections ?? mockCollections })
+    }
+    if (url.includes('/control/roles')) {
+      return Promise.resolve({ data: overrides.roles ?? mockRoles })
+    }
+    if (url.includes('/control/policies')) {
+      return Promise.resolve({ data: overrides.policies ?? mockPolicies })
+    }
+    if (url.includes('/control/ui/pages')) {
+      return Promise.resolve({ data: overrides.pages ?? mockPages })
+    }
+    if (url.includes('/control/ui/menus')) {
+      return Promise.resolve({ data: overrides.menus ?? mockMenus })
+    }
+    return Promise.resolve({ data: {} })
+  })
+
+  mockAxios.post.mockImplementation((url: string) => {
+    if (url.includes('/control/packages/export')) {
+      return Promise.resolve({ data: {} })
+    }
+    if (url.includes('/control/packages/import/preview')) {
+      return Promise.resolve({ data: overrides.importPreview ?? mockImportPreview })
+    }
+    if (url.includes('/control/packages/import')) {
+      return Promise.resolve({ data: overrides.importResult ?? mockImportResult })
+    }
+    return Promise.resolve({ data: {} })
+  })
 }
 
 describe('PackagesPage', () => {
@@ -131,8 +138,8 @@ describe('PackagesPage', () => {
 
   beforeEach(() => {
     cleanupAuthMocks = setupAuthMocks()
-    vi.clearAllMocks()
-    setupMswHandlers()
+    resetMockAxios()
+    setupAxiosMocks()
   })
 
   afterEach(() => {
@@ -306,14 +313,19 @@ describe('PackagesPage', () => {
 
     it('triggers export when export button is clicked', async () => {
       let exportCalled = false
-      server.use(
-        http.post('/control/packages/export', () => {
+      mockAxios.post.mockImplementation((url: string) => {
+        if (url.includes('/control/packages/export')) {
           exportCalled = true
-          return new HttpResponse(JSON.stringify({}), {
-            headers: { 'Content-Type': 'application/json' },
-          })
-        })
-      )
+          return Promise.resolve({ data: {} })
+        }
+        if (url.includes('/control/packages/import/preview')) {
+          return Promise.resolve({ data: mockImportPreview })
+        }
+        if (url.includes('/control/packages/import')) {
+          return Promise.resolve({ data: mockImportResult })
+        }
+        return Promise.resolve({ data: {} })
+      })
 
       const user = userEvent.setup()
       render(<PackagesPage />, { wrapper: createTestWrapper() })
@@ -453,12 +465,19 @@ describe('PackagesPage', () => {
 
     it('triggers dry run when dry run button is clicked', async () => {
       let dryRunCalled = false
-      server.use(
-        http.post('/control/packages/import', () => {
+      mockAxios.post.mockImplementation((url: string) => {
+        if (url.includes('/control/packages/import/preview')) {
+          return Promise.resolve({ data: mockImportPreview })
+        }
+        if (url.includes('/control/packages/import')) {
           dryRunCalled = true
-          return HttpResponse.json(mockImportResult)
-        })
-      )
+          return Promise.resolve({ data: mockImportResult })
+        }
+        if (url.includes('/control/packages/export')) {
+          return Promise.resolve({ data: {} })
+        }
+        return Promise.resolve({ data: {} })
+      })
 
       const user = userEvent.setup()
       render(<PackagesPage />, { wrapper: createTestWrapper() })
@@ -569,11 +588,7 @@ describe('PackagesPage', () => {
     })
 
     it('displays empty state when no history', async () => {
-      server.use(
-        http.get('/control/packages/history', () => {
-          return HttpResponse.json([])
-        })
-      )
+      setupAxiosMocks({ history: [] })
       const user = userEvent.setup()
       render(<PackagesPage />, { wrapper: createTestWrapper() })
 
@@ -602,11 +617,27 @@ describe('PackagesPage', () => {
 
   describe('Error Handling', () => {
     it('handles history fetch error', async () => {
-      server.use(
-        http.get('/control/packages/history', () => {
-          return new HttpResponse(null, { status: 500 })
-        })
-      )
+      mockAxios.get.mockImplementation((url: string) => {
+        if (url.includes('/control/packages/history')) {
+          return Promise.reject(createAxiosError(500))
+        }
+        if (url.includes('/control/collections')) {
+          return Promise.resolve({ data: mockCollections })
+        }
+        if (url.includes('/control/roles')) {
+          return Promise.resolve({ data: mockRoles })
+        }
+        if (url.includes('/control/policies')) {
+          return Promise.resolve({ data: mockPolicies })
+        }
+        if (url.includes('/control/ui/pages')) {
+          return Promise.resolve({ data: mockPages })
+        }
+        if (url.includes('/control/ui/menus')) {
+          return Promise.resolve({ data: mockMenus })
+        }
+        return Promise.resolve({ data: {} })
+      })
 
       const user = userEvent.setup()
       render(<PackagesPage />, { wrapper: createTestWrapper() })
@@ -619,11 +650,18 @@ describe('PackagesPage', () => {
     })
 
     it('handles export error gracefully', async () => {
-      server.use(
-        http.post('/control/packages/export', () => {
-          return HttpResponse.json({ message: 'Export failed' }, { status: 500 })
-        })
-      )
+      mockAxios.post.mockImplementation((url: string) => {
+        if (url.includes('/control/packages/export')) {
+          return Promise.reject(createAxiosError(500, { message: 'Export failed' }))
+        }
+        if (url.includes('/control/packages/import/preview')) {
+          return Promise.resolve({ data: mockImportPreview })
+        }
+        if (url.includes('/control/packages/import')) {
+          return Promise.resolve({ data: mockImportResult })
+        }
+        return Promise.resolve({ data: {} })
+      })
 
       const user = userEvent.setup()
       render(<PackagesPage />, { wrapper: createTestWrapper() })
@@ -642,11 +680,18 @@ describe('PackagesPage', () => {
     })
 
     it('handles import preview error gracefully - Requirement 9.9', async () => {
-      server.use(
-        http.post('/control/packages/import/preview', () => {
-          return HttpResponse.json({ message: 'Invalid package format' }, { status: 400 })
-        })
-      )
+      mockAxios.post.mockImplementation((url: string) => {
+        if (url.includes('/control/packages/import/preview')) {
+          return Promise.reject(createAxiosError(400, { message: 'Invalid package format' }))
+        }
+        if (url.includes('/control/packages/export')) {
+          return Promise.resolve({ data: {} })
+        }
+        if (url.includes('/control/packages/import')) {
+          return Promise.resolve({ data: mockImportResult })
+        }
+        return Promise.resolve({ data: {} })
+      })
 
       const user = userEvent.setup()
       render(<PackagesPage />, { wrapper: createTestWrapper() })
@@ -668,11 +713,18 @@ describe('PackagesPage', () => {
     })
 
     it('handles import execution error gracefully - Requirement 9.9', async () => {
-      server.use(
-        http.post('/control/packages/import', () => {
-          return HttpResponse.json({ message: 'Import failed: database error' }, { status: 500 })
-        })
-      )
+      mockAxios.post.mockImplementation((url: string) => {
+        if (url.includes('/control/packages/import/preview')) {
+          return Promise.resolve({ data: mockImportPreview })
+        }
+        if (url.includes('/control/packages/import')) {
+          return Promise.reject(createAxiosError(500, { message: 'Import failed: database error' }))
+        }
+        if (url.includes('/control/packages/export')) {
+          return Promise.resolve({ data: {} })
+        }
+        return Promise.resolve({ data: {} })
+      })
 
       const user = userEvent.setup()
       render(<PackagesPage />, { wrapper: createTestWrapper() })
@@ -710,11 +762,18 @@ describe('PackagesPage', () => {
         ],
       }
 
-      server.use(
-        http.post('/control/packages/import', () => {
-          return HttpResponse.json(importResultWithErrors)
-        })
-      )
+      mockAxios.post.mockImplementation((url: string) => {
+        if (url.includes('/control/packages/import/preview')) {
+          return Promise.resolve({ data: mockImportPreview })
+        }
+        if (url.includes('/control/packages/import')) {
+          return Promise.resolve({ data: importResultWithErrors })
+        }
+        if (url.includes('/control/packages/export')) {
+          return Promise.resolve({ data: {} })
+        }
+        return Promise.resolve({ data: {} })
+      })
 
       const user = userEvent.setup()
       render(<PackagesPage />, { wrapper: createTestWrapper() })

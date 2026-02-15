@@ -20,7 +20,13 @@ import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { MemoryRouter, Routes, Route, BrowserRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { AuthWrapper, setupAuthMocks, wrapFetchMock } from '../../test/testUtils'
+import {
+  AuthWrapper,
+  setupAuthMocks,
+  mockAxios,
+  resetMockAxios,
+  createAxiosError,
+} from '../../test/testUtils'
 import { ResourceDetailPage } from './ResourceDetailPage'
 import type { CollectionSchema, Resource } from './ResourceDetailPage'
 
@@ -264,21 +270,18 @@ describe('ResourceDetailPage', () => {
 
   beforeEach(() => {
     cleanupAuthMocks = setupAuthMocks()
-    vi.clearAllMocks()
+    resetMockAxios()
   })
 
   afterEach(() => {
     cleanupAuthMocks()
-    vi.restoreAllMocks()
+    vi.clearAllMocks()
   })
 
   describe('Loading State', () => {
     it('should display loading spinner while fetching data', async () => {
-      // Mock fetch to delay response
-      const mockFetch = vi.fn().mockImplementation(
-        () => new Promise(() => {}) // Never resolves
-      )
-      wrapFetchMock(mockFetch)
+      // Mock axios to delay response (never resolves)
+      mockAxios.get.mockImplementation(() => new Promise(() => {}))
 
       renderWithProviders(<ResourceDetailPage />)
 
@@ -288,10 +291,7 @@ describe('ResourceDetailPage', () => {
 
   describe('Error States', () => {
     it('should display error message when schema fetch fails', async () => {
-      const mockFetch = vi
-        .fn()
-        .mockRejectedValueOnce(new Error('Failed to fetch collection schema'))
-      wrapFetchMock(mockFetch)
+      mockAxios.get.mockRejectedValueOnce(createAxiosError(500))
 
       renderWithProviders(<ResourceDetailPage />)
 
@@ -301,14 +301,12 @@ describe('ResourceDetailPage', () => {
     })
 
     it('should display error message when resource fetch fails', async () => {
-      const mockFetch = vi
-        .fn()
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve(mockSchema),
-        })
-        .mockRejectedValueOnce(new Error('Failed to fetch resource'))
-      wrapFetchMock(mockFetch)
+      mockAxios.get.mockImplementation((url: string) => {
+        if (url.includes('/control/collections/')) {
+          return Promise.resolve({ data: mockSchema })
+        }
+        return Promise.reject(createAxiosError(500))
+      })
 
       renderWithProviders(<ResourceDetailPage />)
 
@@ -318,17 +316,12 @@ describe('ResourceDetailPage', () => {
     })
 
     it('should display not found error when resource returns 404', async () => {
-      const mockFetch = vi
-        .fn()
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve(mockSchema),
-        })
-        .mockResolvedValueOnce({
-          ok: false,
-          status: 404,
-        })
-      wrapFetchMock(mockFetch)
+      mockAxios.get.mockImplementation((url: string) => {
+        if (url.includes('/control/collections/')) {
+          return Promise.resolve({ data: mockSchema })
+        }
+        return Promise.reject(createAxiosError(404))
+      })
 
       renderWithProviders(<ResourceDetailPage />)
 
@@ -340,17 +333,16 @@ describe('ResourceDetailPage', () => {
 
   describe('Successful Data Display', () => {
     beforeEach(() => {
-      const mockFetch = vi
-        .fn()
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve(mockSchema),
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve(mockResource),
-        })
-      wrapFetchMock(mockFetch)
+      mockAxios.get.mockImplementation((url: string) => {
+        if (url.includes('/control/collections/')) {
+          return Promise.resolve({ data: mockSchema })
+        }
+        if (url.includes('/api/')) {
+          return Promise.resolve({ data: mockResource })
+        }
+        // sharing endpoint
+        return Promise.resolve({ data: [] })
+      })
     })
 
     it('should display the record header', async () => {
@@ -448,17 +440,15 @@ describe('ResourceDetailPage', () => {
 
   describe('Navigation', () => {
     beforeEach(() => {
-      const mockFetch = vi
-        .fn()
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve(mockSchema),
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve(mockResource),
-        })
-      wrapFetchMock(mockFetch)
+      mockAxios.get.mockImplementation((url: string) => {
+        if (url.includes('/control/collections/')) {
+          return Promise.resolve({ data: mockSchema })
+        }
+        if (url.includes('/api/')) {
+          return Promise.resolve({ data: mockResource })
+        }
+        return Promise.resolve({ data: [] })
+      })
     })
 
     it('should navigate back to list when back button is clicked', async () => {
@@ -490,17 +480,15 @@ describe('ResourceDetailPage', () => {
 
   describe('Delete Functionality - Requirement 11.10', () => {
     beforeEach(() => {
-      const mockFetch = vi
-        .fn()
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve(mockSchema),
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve(mockResource),
-        })
-      wrapFetchMock(mockFetch)
+      mockAxios.get.mockImplementation((url: string) => {
+        if (url.includes('/control/collections/')) {
+          return Promise.resolve({ data: mockSchema })
+        }
+        if (url.includes('/api/')) {
+          return Promise.resolve({ data: mockResource })
+        }
+        return Promise.resolve({ data: [] })
+      })
     })
 
     it('should open confirmation dialog when delete button is clicked', async () => {
@@ -535,26 +523,8 @@ describe('ResourceDetailPage', () => {
     it('should delete resource and navigate when confirmed', async () => {
       const user = userEvent.setup()
 
-      // Set up complete mock including sharing query and delete response
-      const mockFetch = vi
-        .fn()
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve(mockSchema),
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve(mockResource),
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve([]),
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve({}),
-        })
-      wrapFetchMock(mockFetch)
+      // Set up delete response mock
+      mockAxios.delete.mockResolvedValueOnce({ data: {} })
 
       renderWithProviders(<ResourceDetailPage />)
 
@@ -574,23 +544,8 @@ describe('ResourceDetailPage', () => {
     it('should show error toast when delete fails', async () => {
       const user = userEvent.setup()
 
-      // Set up complete mock including sharing query and failed delete response
-      const mockFetch = vi
-        .fn()
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve(mockSchema),
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve(mockResource),
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve([]),
-        })
-        .mockRejectedValueOnce(new Error('Failed to delete resource'))
-      wrapFetchMock(mockFetch)
+      // Set up failed delete response mock
+      mockAxios.delete.mockRejectedValueOnce(createAxiosError(500))
 
       renderWithProviders(<ResourceDetailPage />)
 
@@ -602,7 +557,7 @@ describe('ResourceDetailPage', () => {
       await user.click(screen.getByText('Confirm'))
 
       await waitFor(() => {
-        expect(mockShowToast).toHaveBeenCalledWith('Failed to delete resource', 'error')
+        expect(mockShowToast).toHaveBeenCalledWith(expect.any(String), 'error')
       })
     })
   })
@@ -616,17 +571,15 @@ describe('ResourceDetailPage', () => {
         age: undefined as unknown as number,
       }
 
-      const mockFetch = vi
-        .fn()
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve(mockSchema),
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve(resourceWithNulls),
-        })
-      wrapFetchMock(mockFetch)
+      mockAxios.get.mockImplementation((url: string) => {
+        if (url.includes('/control/collections/')) {
+          return Promise.resolve({ data: mockSchema })
+        }
+        if (url.includes('/api/')) {
+          return Promise.resolve({ data: resourceWithNulls })
+        }
+        return Promise.resolve({ data: [] })
+      })
 
       renderWithProviders(<ResourceDetailPage />)
 
@@ -647,17 +600,15 @@ describe('ResourceDetailPage', () => {
         active: false,
       }
 
-      const mockFetch = vi
-        .fn()
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve(mockSchema),
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve(resourceWithFalse),
-        })
-      wrapFetchMock(mockFetch)
+      mockAxios.get.mockImplementation((url: string) => {
+        if (url.includes('/control/collections/')) {
+          return Promise.resolve({ data: mockSchema })
+        }
+        if (url.includes('/api/')) {
+          return Promise.resolve({ data: resourceWithFalse })
+        }
+        return Promise.resolve({ data: [] })
+      })
 
       renderWithProviders(<ResourceDetailPage />)
 
@@ -669,17 +620,17 @@ describe('ResourceDetailPage', () => {
 
   describe('Props Override', () => {
     it('should use props over route params when provided', async () => {
-      const mockFetch = vi
-        .fn()
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve({ ...mockSchema, name: 'products', displayName: 'Products' }),
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve({ ...mockResource, id: 'prod-789' }),
-        })
-      wrapFetchMock(mockFetch)
+      mockAxios.get.mockImplementation((url: string) => {
+        if (url.includes('/control/collections/')) {
+          return Promise.resolve({
+            data: { ...mockSchema, name: 'products', displayName: 'Products' },
+          })
+        }
+        if (url.includes('/api/')) {
+          return Promise.resolve({ data: { ...mockResource, id: 'prod-789' } })
+        }
+        return Promise.resolve({ data: [] })
+      })
 
       render(
         <QueryClientProvider client={createTestQueryClient()}>
@@ -700,17 +651,15 @@ describe('ResourceDetailPage', () => {
 
   describe('Accessibility', () => {
     beforeEach(() => {
-      const mockFetch = vi
-        .fn()
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve(mockSchema),
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve(mockResource),
-        })
-      wrapFetchMock(mockFetch)
+      mockAxios.get.mockImplementation((url: string) => {
+        if (url.includes('/control/collections/')) {
+          return Promise.resolve({ data: mockSchema })
+        }
+        if (url.includes('/api/')) {
+          return Promise.resolve({ data: mockResource })
+        }
+        return Promise.resolve({ data: [] })
+      })
     })
 
     it('should have proper aria labels on buttons', async () => {

@@ -31,6 +31,10 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': resolve(__dirname, './src'),
+      // Ensure all packages (including symlinked @emf/sdk) resolve the same
+      // axios instance so that vi.mock('axios') in vitest.setup.ts intercepts
+      // all Axios usage, including EMFClient's internal axios.create().
+      axios: resolve(__dirname, 'node_modules/axios'),
     },
   },
 })

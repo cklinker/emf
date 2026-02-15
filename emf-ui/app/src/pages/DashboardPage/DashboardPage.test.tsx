@@ -25,37 +25,15 @@
 import React from 'react'
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { createTestWrapper, setupAuthMocks, wrapFetchMock } from '../../test/testUtils'
+import {
+  createTestWrapper,
+  setupAuthMocks,
+  mockAxios,
+  resetMockAxios,
+  createAxiosError,
+} from '../../test/testUtils'
 import { DashboardPage } from './DashboardPage'
 import type { DashboardData, HealthStatus, RecentError } from './DashboardPage'
-
-// Mock fetch function
-const mockFetch = vi.fn()
-global.fetch = mockFetch
-
-// Helper to create a proper Response-like object
-function createMockResponse(data: unknown, ok = true, status = 200): Response {
-  return {
-    ok,
-    status,
-    json: () => Promise.resolve(data),
-    text: () => Promise.resolve(JSON.stringify(data)),
-    clone: function () {
-      return this
-    },
-    headers: new Headers(),
-    redirected: false,
-    statusText: ok ? 'OK' : 'Error',
-    type: 'basic' as ResponseType,
-    url: '',
-    body: null,
-    bodyUsed: false,
-    arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
-    blob: () => Promise.resolve(new Blob()),
-    formData: () => Promise.resolve(new FormData()),
-    bytes: () => Promise.resolve(new Uint8Array()),
-  } as Response
-}
 
 // Mock dashboard data
 const mockHealthStatuses: HealthStatus[] = [
@@ -154,8 +132,7 @@ describe('DashboardPage', () => {
 
   beforeEach(() => {
     cleanupAuthMocks = setupAuthMocks()
-    mockFetch.mockReset()
-    wrapFetchMock(mockFetch)
+    resetMockAxios()
   })
 
   afterEach(() => {
@@ -166,11 +143,8 @@ describe('DashboardPage', () => {
   describe('Loading State', () => {
     it('should display loading spinner while fetching dashboard data', async () => {
       // Mock a delayed response
-      mockFetch.mockImplementation(
-        () =>
-          new Promise((resolve) =>
-            setTimeout(() => resolve(createMockResponse(mockDashboardData)), 100)
-          )
+      mockAxios.get.mockImplementation(
+        () => new Promise((resolve) => setTimeout(() => resolve({ data: mockDashboardData }), 100))
       )
 
       render(<DashboardPage />, { wrapper: createTestWrapper() })
@@ -182,7 +156,7 @@ describe('DashboardPage', () => {
 
   describe('Error State', () => {
     it('should display error message when fetch fails', async () => {
-      mockFetch.mockResolvedValue(createMockResponse(null, false, 500))
+      mockAxios.get.mockRejectedValue(createAxiosError(500))
 
       render(<DashboardPage />, { wrapper: createTestWrapper() })
 
@@ -192,7 +166,7 @@ describe('DashboardPage', () => {
     })
 
     it('should display retry button on error', async () => {
-      mockFetch.mockResolvedValue(createMockResponse(null, false, 500))
+      mockAxios.get.mockRejectedValue(createAxiosError(500))
 
       render(<DashboardPage />, { wrapper: createTestWrapper() })
 
@@ -204,7 +178,7 @@ describe('DashboardPage', () => {
 
   describe('Health Status Display', () => {
     beforeEach(() => {
-      mockFetch.mockResolvedValue(createMockResponse(mockDashboardData))
+      mockAxios.get.mockResolvedValue({ data: mockDashboardData })
     })
 
     it('should display page title', async () => {
@@ -279,15 +253,15 @@ describe('DashboardPage', () => {
 
   describe('Metrics Display', () => {
     beforeEach(() => {
-      mockFetch.mockResolvedValue(
-        createMockResponse({
+      mockAxios.get.mockResolvedValue({
+        data: {
           content: mockDashboardData,
           totalElements: mockDashboardData.length,
           totalPages: 1,
           size: 1000,
           number: 0,
-        })
-      )
+        },
+      })
     })
 
     it('should display metrics section', async () => {
@@ -357,7 +331,7 @@ describe('DashboardPage', () => {
 
   describe('Recent Errors Display', () => {
     beforeEach(() => {
-      mockFetch.mockResolvedValue(createMockResponse(mockDashboardData))
+      mockAxios.get.mockResolvedValue({ data: mockDashboardData })
     })
 
     it('should display recent errors section', async () => {
@@ -437,7 +411,7 @@ describe('DashboardPage', () => {
         ...mockDashboardData,
         recentErrors: [],
       }
-      mockFetch.mockResolvedValue(createMockResponse(dataWithNoErrors))
+      mockAxios.get.mockResolvedValue({ data: dataWithNoErrors })
 
       render(<DashboardPage />, { wrapper: createTestWrapper() })
 
@@ -449,7 +423,7 @@ describe('DashboardPage', () => {
 
   describe('Accessibility', () => {
     beforeEach(() => {
-      mockFetch.mockResolvedValue(createMockResponse(mockDashboardData))
+      mockAxios.get.mockResolvedValue({ data: mockDashboardData })
     })
 
     it('should have proper heading hierarchy', async () => {
@@ -485,15 +459,15 @@ describe('DashboardPage', () => {
 
   describe('Time Range Selector', () => {
     beforeEach(() => {
-      mockFetch.mockResolvedValue(
-        createMockResponse({
+      mockAxios.get.mockResolvedValue({
+        data: {
           content: mockDashboardData,
           totalElements: mockDashboardData.length,
           totalPages: 1,
           size: 1000,
           number: 0,
-        })
-      )
+        },
+      })
     })
 
     it('should display time range selector', async () => {
@@ -546,25 +520,25 @@ describe('DashboardPage', () => {
       })
 
       // Clear previous calls
-      mockFetch.mockClear()
-      mockFetch.mockResolvedValue(
-        createMockResponse({
+      mockAxios.get.mockClear()
+      mockAxios.get.mockResolvedValue({
+        data: {
           content: mockDashboardData,
           totalElements: mockDashboardData.length,
           totalPages: 1,
           size: 1000,
           number: 0,
-        })
-      )
+        },
+      })
 
       const select = screen.getByLabelText(/time range/i)
       fireEvent.change(select, { target: { value: '1h' } })
 
       await waitFor(() => {
-        // Check that fetch was called with a Request object containing the timeRange parameter
-        expect(mockFetch).toHaveBeenCalled()
-        const lastCall = mockFetch.mock.calls[mockFetch.mock.calls.length - 1]
-        const url = typeof lastCall[0] === 'string' ? lastCall[0] : lastCall[0]?.url
+        // Check that axios.get was called with a URL containing the timeRange parameter
+        expect(mockAxios.get).toHaveBeenCalled()
+        const lastCall = mockAxios.get.mock.calls[mockAxios.get.mock.calls.length - 1]
+        const url = lastCall[0]
         expect(url).toContain('timeRange=1h')
       })
     })
@@ -572,15 +546,15 @@ describe('DashboardPage', () => {
 
   describe('Auto-Refresh Interval Selector', () => {
     beforeEach(() => {
-      mockFetch.mockResolvedValue(
-        createMockResponse({
+      mockAxios.get.mockResolvedValue({
+        data: {
           content: mockDashboardData,
           totalElements: mockDashboardData.length,
           totalPages: 1,
           size: 1000,
           number: 0,
-        })
-      )
+        },
+      })
     })
 
     it('should display auto-refresh selector', async () => {
@@ -641,7 +615,7 @@ describe('DashboardPage', () => {
 
   describe('Health Alerts', () => {
     it('should display health alerts when services are unhealthy', async () => {
-      mockFetch.mockResolvedValue(createMockResponse(mockDashboardData))
+      mockAxios.get.mockResolvedValue({ data: mockDashboardData })
 
       render(<DashboardPage />, { wrapper: createTestWrapper() })
 
@@ -651,7 +625,7 @@ describe('DashboardPage', () => {
     })
 
     it('should display alert for unhealthy Kafka service', async () => {
-      mockFetch.mockResolvedValue(createMockResponse(mockDashboardData))
+      mockAxios.get.mockResolvedValue({ data: mockDashboardData })
 
       render(<DashboardPage />, { wrapper: createTestWrapper() })
 
@@ -672,7 +646,7 @@ describe('DashboardPage', () => {
           status: 'healthy' as const,
         })),
       }
-      mockFetch.mockResolvedValue(createMockResponse(healthyData))
+      mockAxios.get.mockResolvedValue({ data: healthyData })
 
       render(<DashboardPage />, { wrapper: createTestWrapper() })
 
@@ -684,7 +658,7 @@ describe('DashboardPage', () => {
     })
 
     it('should have accessible health alerts with role="alert"', async () => {
-      mockFetch.mockResolvedValue(createMockResponse(mockDashboardData))
+      mockAxios.get.mockResolvedValue({ data: mockDashboardData })
 
       render(<DashboardPage />, { wrapper: createTestWrapper() })
 
@@ -695,7 +669,7 @@ describe('DashboardPage', () => {
     })
 
     it('should display health alerts title', async () => {
-      mockFetch.mockResolvedValue(createMockResponse(mockDashboardData))
+      mockAxios.get.mockResolvedValue({ data: mockDashboardData })
 
       render(<DashboardPage />, { wrapper: createTestWrapper() })
 
@@ -707,7 +681,7 @@ describe('DashboardPage', () => {
 
   describe('Dashboard Controls', () => {
     beforeEach(() => {
-      mockFetch.mockResolvedValue(createMockResponse(mockDashboardData))
+      mockAxios.get.mockResolvedValue({ data: mockDashboardData })
     })
 
     it('should display dashboard controls container', async () => {

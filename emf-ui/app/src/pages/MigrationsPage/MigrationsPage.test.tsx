@@ -19,12 +19,16 @@
 
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { createTestWrapper, setupAuthMocks } from '../../test/testUtils'
+import {
+  createTestWrapper,
+  setupAuthMocks,
+  mockAxios,
+  resetMockAxios,
+  createAxiosError,
+} from '../../test/testUtils'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { http, HttpResponse } from 'msw'
 import { MigrationsPage } from './MigrationsPage'
-import { server } from '../../../vitest.setup'
 
 // Create a wrapper with all required providers
 
@@ -232,61 +236,80 @@ const mockMigrationPlan = {
   ],
 }
 
-// Helper to setup MSW handlers
-function setupMswHandlers(overrides: Record<string, unknown> = {}) {
-  server.use(
-    http.get('/control/migrations', () => {
-      return HttpResponse.json(overrides.history ?? mockMigrationHistory)
-    }),
-    http.get('/control/migrations/:id', ({ params }) => {
-      const id = params.id
+// Helper to setup Axios mocks for all endpoints
+function setupAxiosMocks(overrides: Record<string, unknown> = {}) {
+  mockAxios.get.mockImplementation((url: string) => {
+    if (url.match(/\/control\/migrations\/[^/]+$/) && !url.endsWith('/control/migrations')) {
+      const id = url.split('/').pop()
       if (overrides.details) {
-        return HttpResponse.json(overrides.details)
+        return Promise.resolve({ data: overrides.details })
       }
       const migration = mockMigrationHistory.find((m) => m.id === id)
       if (migration) {
-        return HttpResponse.json(migration)
+        return Promise.resolve({ data: migration })
       }
-      return HttpResponse.json(mockMigrationDetails)
-    }),
-    http.get('/control/collections', () => {
-      const collections = overrides.collections ?? mockCollections
-      // Return paginated format
-      return HttpResponse.json({
-        content: collections,
-        totalElements: Array.isArray(collections) ? collections.length : 0,
-        totalPages: 1,
-        size: 1000,
-        number: 0,
-      })
-    }),
-    http.get('/control/collections/:id/versions', ({ params }) => {
-      const id = params.id
+      return Promise.resolve({ data: mockMigrationDetails })
+    }
+    if (url.includes('/control/migrations')) {
+      return Promise.resolve({ data: overrides.history ?? mockMigrationHistory })
+    }
+    if (url.match(/\/control\/collections\/[^/]+\/versions/)) {
+      const parts = url.split('/')
+      const idIndex = parts.indexOf('collections') + 1
+      const id = parts[idIndex]
       const collection = mockCollections.find((c) => c.id === id)
       if (collection && collection.availableVersions) {
-        // Return versions in the expected format
-        return HttpResponse.json(collection.availableVersions.map((v: number) => ({ version: v })))
+        return Promise.resolve({
+          data: collection.availableVersions.map((v: number) => ({ version: v })),
+        })
       }
-      return HttpResponse.json([])
-    }),
-    http.post('/control/migrations/plan', async ({ request }) => {
-      if (overrides.planError) {
-        return new HttpResponse(null, { status: 500 })
-      }
-      const body = (await request.json()) as { collectionId: string; targetVersion: number }
-      const collection = mockCollections.find((c) => c.id === body.collectionId)
-      if (overrides.plan) {
-        return HttpResponse.json(overrides.plan)
-      }
-      return HttpResponse.json({
-        ...mockMigrationPlan,
-        collectionId: body.collectionId,
-        collectionName: collection?.displayName || collection?.name || 'Unknown',
-        fromVersion: collection?.currentVersion || 1,
-        toVersion: body.targetVersion,
+      return Promise.resolve({ data: [] })
+    }
+    if (url.includes('/control/collections')) {
+      const collections = overrides.collections ?? mockCollections
+      return Promise.resolve({
+        data: {
+          content: collections,
+          totalElements: Array.isArray(collections) ? collections.length : 0,
+          totalPages: 1,
+          size: 1000,
+          number: 0,
+        },
       })
-    })
-  )
+    }
+    return Promise.resolve({ data: {} })
+  })
+
+  mockAxios.post.mockImplementation((url: string, body?: unknown) => {
+    if (url.includes('/control/migrations/plan')) {
+      if (overrides.planError) {
+        return Promise.reject(createAxiosError(500))
+      }
+      const typedBody = body as { collectionId: string; targetVersion: number } | undefined
+      const collection = typedBody
+        ? mockCollections.find((c) => c.id === typedBody.collectionId)
+        : undefined
+      if (overrides.plan) {
+        return Promise.resolve({ data: overrides.plan })
+      }
+      return Promise.resolve({
+        data: {
+          ...mockMigrationPlan,
+          collectionId: typedBody?.collectionId ?? mockMigrationPlan.collectionId,
+          collectionName: collection?.displayName || collection?.name || 'Unknown',
+          fromVersion: collection?.currentVersion || 1,
+          toVersion: typedBody?.targetVersion ?? mockMigrationPlan.toVersion,
+        },
+      })
+    }
+    if (url.match(/\/control\/migrations\/[^/]+\/rollback/)) {
+      return Promise.resolve({ data: {} })
+    }
+    if (url.includes('/control/migrations/execute')) {
+      return Promise.resolve({ data: {} })
+    }
+    return Promise.resolve({ data: {} })
+  })
 }
 
 describe('MigrationsPage', () => {
@@ -294,8 +317,8 @@ describe('MigrationsPage', () => {
 
   beforeEach(() => {
     cleanupAuthMocks = setupAuthMocks()
-    vi.clearAllMocks()
-    setupMswHandlers()
+    resetMockAxios()
+    setupAxiosMocks()
   })
 
   afterEach(() => {
@@ -416,11 +439,23 @@ describe('MigrationsPage', () => {
     })
 
     it('displays empty state when no migrations', async () => {
-      server.use(
-        http.get('/control/migrations', () => {
-          return HttpResponse.json([])
-        })
-      )
+      mockAxios.get.mockImplementation((url: string) => {
+        if (url.includes('/control/migrations')) {
+          return Promise.resolve({ data: [] })
+        }
+        if (url.includes('/control/collections')) {
+          return Promise.resolve({
+            data: {
+              content: mockCollections,
+              totalElements: mockCollections.length,
+              totalPages: 1,
+              size: 1000,
+              number: 0,
+            },
+          })
+        }
+        return Promise.resolve({ data: {} })
+      })
 
       render(<MigrationsPage />, { wrapper: createTestWrapper() })
 
@@ -589,11 +624,23 @@ describe('MigrationsPage', () => {
 
   describe('Error Handling', () => {
     it('handles history fetch error', async () => {
-      server.use(
-        http.get('/control/migrations', () => {
-          return new HttpResponse(null, { status: 500 })
-        })
-      )
+      mockAxios.get.mockImplementation((url: string) => {
+        if (url.includes('/control/migrations')) {
+          return Promise.reject(createAxiosError(500))
+        }
+        if (url.includes('/control/collections')) {
+          return Promise.resolve({
+            data: {
+              content: mockCollections,
+              totalElements: mockCollections.length,
+              totalPages: 1,
+              size: 1000,
+              number: 0,
+            },
+          })
+        }
+        return Promise.resolve({ data: {} })
+      })
 
       render(<MigrationsPage />, { wrapper: createTestWrapper() })
 
@@ -603,11 +650,38 @@ describe('MigrationsPage', () => {
     })
 
     it('handles details fetch error', async () => {
-      server.use(
-        http.get('/control/migrations/:id', () => {
-          return new HttpResponse(null, { status: 500 })
-        })
-      )
+      mockAxios.get.mockImplementation((url: string) => {
+        if (url.match(/\/control\/migrations\/[^/]+$/) && !url.endsWith('/control/migrations')) {
+          return Promise.reject(createAxiosError(500))
+        }
+        if (url.includes('/control/migrations')) {
+          return Promise.resolve({ data: mockMigrationHistory })
+        }
+        if (url.match(/\/control\/collections\/[^/]+\/versions/)) {
+          const parts = url.split('/')
+          const idIndex = parts.indexOf('collections') + 1
+          const id = parts[idIndex]
+          const collection = mockCollections.find((c) => c.id === id)
+          if (collection && collection.availableVersions) {
+            return Promise.resolve({
+              data: collection.availableVersions.map((v: number) => ({ version: v })),
+            })
+          }
+          return Promise.resolve({ data: [] })
+        }
+        if (url.includes('/control/collections')) {
+          return Promise.resolve({
+            data: {
+              content: mockCollections,
+              totalElements: mockCollections.length,
+              totalPages: 1,
+              size: 1000,
+              number: 0,
+            },
+          })
+        }
+        return Promise.resolve({ data: {} })
+      })
 
       const user = userEvent.setup()
       render(<MigrationsPage />, { wrapper: createTestWrapper() })
@@ -630,11 +704,23 @@ describe('MigrationsPage', () => {
     })
 
     it('displays retry button on error', async () => {
-      server.use(
-        http.get('/control/migrations', () => {
-          return new HttpResponse(null, { status: 500 })
-        })
-      )
+      mockAxios.get.mockImplementation((url: string) => {
+        if (url.includes('/control/migrations')) {
+          return Promise.reject(createAxiosError(500))
+        }
+        if (url.includes('/control/collections')) {
+          return Promise.resolve({
+            data: {
+              content: mockCollections,
+              totalElements: mockCollections.length,
+              totalPages: 1,
+              size: 1000,
+              number: 0,
+            },
+          })
+        }
+        return Promise.resolve({ data: {} })
+      })
 
       render(<MigrationsPage />, { wrapper: createTestWrapper() })
 
@@ -1213,7 +1299,7 @@ describe('MigrationsPage', () => {
 
   describe('Migration Planning Error Handling', () => {
     it('handles plan creation error', async () => {
-      setupMswHandlers({ planError: true })
+      setupAxiosMocks({ planError: true })
 
       const user = userEvent.setup()
       render(<MigrationsPage />, { wrapper: createTestWrapper() })
@@ -1238,11 +1324,15 @@ describe('MigrationsPage', () => {
     })
 
     it('handles collections fetch error in planning form', async () => {
-      server.use(
-        http.get('/control/collections', () => {
-          return new HttpResponse(null, { status: 500 })
-        })
-      )
+      mockAxios.get.mockImplementation((url: string) => {
+        if (url.includes('/control/collections')) {
+          return Promise.reject(createAxiosError(500))
+        }
+        if (url.includes('/control/migrations')) {
+          return Promise.resolve({ data: mockMigrationHistory })
+        }
+        return Promise.resolve({ data: {} })
+      })
 
       const user = userEvent.setup()
       render(<MigrationsPage />, { wrapper: createTestWrapper() })
@@ -1344,74 +1434,82 @@ describe('MigrationsPage', () => {
       status: 'rolled_back',
     }
 
-    function setupExecutionHandlers(
+    function setupExecutionMocks(
       options: {
         executeError?: boolean
         runStatus?: 'running' | 'completed' | 'failed' | 'rolled_back'
         rollbackError?: boolean
       } = {}
     ) {
-      server.use(
-        http.get('/control/migrations', () => {
-          return HttpResponse.json(mockMigrationHistory)
-        }),
-        http.get('/control/collections', () => {
-          // Return paginated format
-          return HttpResponse.json({
-            content: mockCollections,
-            totalElements: mockCollections.length,
-            totalPages: 1,
-            size: 1000,
-            number: 0,
-          })
-        }),
-        http.get('/control/collections/:id/versions', ({ params }) => {
-          const id = params.id
-          const collection = mockCollections.find((c) => c.id === id)
-          if (collection && collection.availableVersions) {
-            return HttpResponse.json(
-              collection.availableVersions.map((v: number) => ({ version: v }))
-            )
-          }
-          return HttpResponse.json([])
-        }),
-        http.post('/control/migrations/plan', () => {
-          return HttpResponse.json(mockMigrationPlan)
-        }),
-        http.post('/control/migrations/execute', () => {
-          if (options.executeError) {
-            return HttpResponse.json({ message: 'Failed to start migration' }, { status: 500 })
-          }
-          return HttpResponse.json(mockExecutionResponse)
-        }),
-        http.get('/control/migrations/:id', ({ params }) => {
-          const id = params.id
+      mockAxios.get.mockImplementation((url: string) => {
+        if (url.match(/\/control\/migrations\/[^/]+$/) && !url.endsWith('/control/migrations')) {
+          const id = url.split('/').pop()
           if (id === 'run-new-1') {
             switch (options.runStatus) {
               case 'completed':
-                return HttpResponse.json(mockCompletedMigration)
+                return Promise.resolve({ data: mockCompletedMigration })
               case 'failed':
-                return HttpResponse.json(mockFailedMigration)
+                return Promise.resolve({ data: mockFailedMigration })
               case 'rolled_back':
-                return HttpResponse.json(mockRolledBackMigration)
+                return Promise.resolve({ data: mockRolledBackMigration })
               default:
-                return HttpResponse.json(mockRunningMigration)
+                return Promise.resolve({ data: mockRunningMigration })
             }
           }
           const migration = mockMigrationHistory.find((m) => m.id === id)
-          return HttpResponse.json(migration || mockMigrationDetails)
-        }),
-        http.post('/control/migrations/:id/rollback', () => {
-          if (options.rollbackError) {
-            return HttpResponse.json({ message: 'Rollback failed' }, { status: 500 })
+          return Promise.resolve({ data: migration || mockMigrationDetails })
+        }
+        if (url.includes('/control/migrations')) {
+          return Promise.resolve({ data: mockMigrationHistory })
+        }
+        if (url.match(/\/control\/collections\/[^/]+\/versions/)) {
+          const parts = url.split('/')
+          const idIndex = parts.indexOf('collections') + 1
+          const id = parts[idIndex]
+          const collection = mockCollections.find((c) => c.id === id)
+          if (collection && collection.availableVersions) {
+            return Promise.resolve({
+              data: collection.availableVersions.map((v: number) => ({ version: v })),
+            })
           }
-          return HttpResponse.json(mockRolledBackMigration)
-        })
-      )
+          return Promise.resolve({ data: [] })
+        }
+        if (url.includes('/control/collections')) {
+          return Promise.resolve({
+            data: {
+              content: mockCollections,
+              totalElements: mockCollections.length,
+              totalPages: 1,
+              size: 1000,
+              number: 0,
+            },
+          })
+        }
+        return Promise.resolve({ data: {} })
+      })
+
+      mockAxios.post.mockImplementation((url: string) => {
+        if (url.includes('/control/migrations/plan')) {
+          return Promise.resolve({ data: mockMigrationPlan })
+        }
+        if (url.includes('/control/migrations/execute')) {
+          if (options.executeError) {
+            return Promise.reject(createAxiosError(500, { message: 'Failed to start migration' }))
+          }
+          return Promise.resolve({ data: mockExecutionResponse })
+        }
+        if (url.match(/\/control\/migrations\/[^/]+\/rollback/)) {
+          if (options.rollbackError) {
+            return Promise.reject(createAxiosError(500, { message: 'Rollback failed' }))
+          }
+          return Promise.resolve({ data: mockRolledBackMigration })
+        }
+        return Promise.resolve({ data: {} })
+      })
     }
 
     it('displays Execute Migration button in plan display', async () => {
-      setupExecutionHandlers()
+      setupExecutionMocks()
       const user = userEvent.setup()
       render(<MigrationsPage />, { wrapper: createTestWrapper() })
 
@@ -1439,7 +1537,7 @@ describe('MigrationsPage', () => {
     })
 
     it('opens execution modal when Execute Migration is clicked', async () => {
-      setupExecutionHandlers()
+      setupExecutionMocks()
       const user = userEvent.setup()
       render(<MigrationsPage />, { wrapper: createTestWrapper() })
 
@@ -1469,7 +1567,7 @@ describe('MigrationsPage', () => {
     })
 
     it('displays progress tracking during execution - Requirement 10.5', async () => {
-      setupExecutionHandlers({ runStatus: 'running' })
+      setupExecutionMocks({ runStatus: 'running' })
       const user = userEvent.setup()
       render(<MigrationsPage />, { wrapper: createTestWrapper() })
 
@@ -1504,7 +1602,7 @@ describe('MigrationsPage', () => {
     })
 
     it('displays step-by-step progress - Requirement 10.5', async () => {
-      setupExecutionHandlers({ runStatus: 'running' })
+      setupExecutionMocks({ runStatus: 'running' })
       const user = userEvent.setup()
       render(<MigrationsPage />, { wrapper: createTestWrapper() })
 
@@ -1539,7 +1637,7 @@ describe('MigrationsPage', () => {
     })
 
     it('displays success message when migration completes - Requirement 10.5', async () => {
-      setupExecutionHandlers({ runStatus: 'completed' })
+      setupExecutionMocks({ runStatus: 'completed' })
       const user = userEvent.setup()
       render(<MigrationsPage />, { wrapper: createTestWrapper() })
 
@@ -1571,7 +1669,7 @@ describe('MigrationsPage', () => {
     })
 
     it('handles execution errors gracefully - Requirement 10.6', async () => {
-      setupExecutionHandlers({ executeError: true })
+      setupExecutionMocks({ executeError: true })
       const user = userEvent.setup()
       render(<MigrationsPage />, { wrapper: createTestWrapper() })
 
@@ -1601,7 +1699,7 @@ describe('MigrationsPage', () => {
     })
 
     it('displays failure message when migration fails - Requirement 10.6', async () => {
-      setupExecutionHandlers({ runStatus: 'failed' })
+      setupExecutionMocks({ runStatus: 'failed' })
       const user = userEvent.setup()
       render(<MigrationsPage />, { wrapper: createTestWrapper() })
 
@@ -1633,7 +1731,7 @@ describe('MigrationsPage', () => {
     })
 
     it('displays step error details when a step fails - Requirement 10.6', async () => {
-      setupExecutionHandlers({ runStatus: 'failed' })
+      setupExecutionMocks({ runStatus: 'failed' })
       const user = userEvent.setup()
       render(<MigrationsPage />, { wrapper: createTestWrapper() })
 
@@ -1665,7 +1763,7 @@ describe('MigrationsPage', () => {
     })
 
     it('offers rollback option on failure - Requirement 10.7', async () => {
-      setupExecutionHandlers({ runStatus: 'failed' })
+      setupExecutionMocks({ runStatus: 'failed' })
       const user = userEvent.setup()
       render(<MigrationsPage />, { wrapper: createTestWrapper() })
 
@@ -1699,52 +1797,61 @@ describe('MigrationsPage', () => {
     it('executes rollback when rollback button is clicked - Requirement 10.7', async () => {
       // Start with failed status, then return rolled_back after rollback
       let rollbackCalled = false
-      server.use(
-        http.get('/control/migrations', () => {
-          return HttpResponse.json(mockMigrationHistory)
-        }),
-        http.get('/control/collections', () => {
-          // Return paginated format
-          return HttpResponse.json({
-            content: mockCollections,
-            totalElements: mockCollections.length,
-            totalPages: 1,
-            size: 1000,
-            number: 0,
-          })
-        }),
-        http.get('/control/collections/:id/versions', ({ params }) => {
-          const id = params.id
-          const collection = mockCollections.find((c) => c.id === id)
-          if (collection && collection.availableVersions) {
-            return HttpResponse.json(
-              collection.availableVersions.map((v: number) => ({ version: v }))
-            )
-          }
-          return HttpResponse.json([])
-        }),
-        http.post('/control/migrations/plan', () => {
-          return HttpResponse.json(mockMigrationPlan)
-        }),
-        http.post('/control/migrations/execute', () => {
-          return HttpResponse.json(mockExecutionResponse)
-        }),
-        http.get('/control/migrations/:id', ({ params }) => {
-          const id = params.id
+
+      mockAxios.get.mockImplementation((url: string) => {
+        if (url.match(/\/control\/migrations\/[^/]+$/) && !url.endsWith('/control/migrations')) {
+          const id = url.split('/').pop()
           if (id === 'run-new-1') {
             if (rollbackCalled) {
-              return HttpResponse.json(mockRolledBackMigration)
+              return Promise.resolve({ data: mockRolledBackMigration })
             }
-            return HttpResponse.json(mockFailedMigration)
+            return Promise.resolve({ data: mockFailedMigration })
           }
           const migration = mockMigrationHistory.find((m) => m.id === id)
-          return HttpResponse.json(migration || mockMigrationDetails)
-        }),
-        http.post('/control/migrations/:id/rollback', () => {
+          return Promise.resolve({ data: migration || mockMigrationDetails })
+        }
+        if (url.includes('/control/migrations')) {
+          return Promise.resolve({ data: mockMigrationHistory })
+        }
+        if (url.match(/\/control\/collections\/[^/]+\/versions/)) {
+          const parts = url.split('/')
+          const idIndex = parts.indexOf('collections') + 1
+          const id = parts[idIndex]
+          const collection = mockCollections.find((c) => c.id === id)
+          if (collection && collection.availableVersions) {
+            return Promise.resolve({
+              data: collection.availableVersions.map((v: number) => ({ version: v })),
+            })
+          }
+          return Promise.resolve({ data: [] })
+        }
+        if (url.includes('/control/collections')) {
+          return Promise.resolve({
+            data: {
+              content: mockCollections,
+              totalElements: mockCollections.length,
+              totalPages: 1,
+              size: 1000,
+              number: 0,
+            },
+          })
+        }
+        return Promise.resolve({ data: {} })
+      })
+
+      mockAxios.post.mockImplementation((url: string) => {
+        if (url.includes('/control/migrations/plan')) {
+          return Promise.resolve({ data: mockMigrationPlan })
+        }
+        if (url.includes('/control/migrations/execute')) {
+          return Promise.resolve({ data: mockExecutionResponse })
+        }
+        if (url.match(/\/control\/migrations\/[^/]+\/rollback/)) {
           rollbackCalled = true
-          return HttpResponse.json(mockRolledBackMigration)
-        })
-      )
+          return Promise.resolve({ data: mockRolledBackMigration })
+        }
+        return Promise.resolve({ data: {} })
+      })
 
       const user = userEvent.setup()
       render(<MigrationsPage />, { wrapper: createTestWrapper() })
@@ -1783,7 +1890,7 @@ describe('MigrationsPage', () => {
     })
 
     it('handles rollback error - Requirement 10.7', async () => {
-      setupExecutionHandlers({ runStatus: 'failed', rollbackError: true })
+      setupExecutionMocks({ runStatus: 'failed', rollbackError: true })
       const user = userEvent.setup()
       render(<MigrationsPage />, { wrapper: createTestWrapper() })
 
@@ -1819,7 +1926,7 @@ describe('MigrationsPage', () => {
     })
 
     it('has proper accessibility attributes for execution modal', async () => {
-      setupExecutionHandlers({ runStatus: 'running' })
+      setupExecutionMocks({ runStatus: 'running' })
       const user = userEvent.setup()
       render(<MigrationsPage />, { wrapper: createTestWrapper() })
 
@@ -1852,7 +1959,7 @@ describe('MigrationsPage', () => {
     })
 
     it('closes execution modal when close button is clicked after completion', async () => {
-      setupExecutionHandlers({ runStatus: 'completed' })
+      setupExecutionMocks({ runStatus: 'completed' })
       const user = userEvent.setup()
       render(<MigrationsPage />, { wrapper: createTestWrapper() })
 

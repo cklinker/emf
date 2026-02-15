@@ -55,8 +55,6 @@ spec:
           value: {{ .Values.config.kafka.consumerGroupId | quote }}
         - name: EMF_GATEWAY_KAFKA_TOPICS_COLLECTION_CHANGED
           value: {{ .Values.config.kafka.topics.collectionChanged | quote }}
-        - name: EMF_GATEWAY_KAFKA_TOPICS_AUTHZ_CHANGED
-          value: {{ .Values.config.kafka.topics.authzChanged | quote }}
         - name: EMF_GATEWAY_KAFKA_TOPICS_SERVICE_CHANGED
           value: {{ .Values.config.kafka.topics.serviceChanged | quote }}
         - name: SPRING_KAFKA_CONSUMER_AUTO_OFFSET_RESET

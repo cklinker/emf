@@ -656,10 +656,10 @@ describe('MigrationsPage', () => {
       await user.click(screen.getByTestId('view-details-mig-1'))
 
       await waitFor(() => {
-        const modal = screen.getByTestId('migration-details-modal')
-        expect(modal).toHaveAttribute('role', 'dialog')
-        expect(modal).toHaveAttribute('aria-modal', 'true')
-        expect(modal).toHaveAttribute('aria-labelledby', 'migration-details-title')
+        expect(screen.getByTestId('migration-details-modal')).toBeInTheDocument()
+        const dialog = screen.getByRole('dialog')
+        expect(dialog).toHaveAttribute('aria-modal', 'true')
+        expect(dialog).toHaveAttribute('aria-labelledby', 'migration-details-title')
       })
     })
 
@@ -908,10 +908,10 @@ describe('MigrationsPage', () => {
       await user.click(screen.getByTestId('plan-migration-button'))
 
       await waitFor(() => {
-        const modal = screen.getByTestId('plan-migration-modal')
-        expect(modal).toHaveAttribute('role', 'dialog')
-        expect(modal).toHaveAttribute('aria-modal', 'true')
-        expect(modal).toHaveAttribute('aria-labelledby', 'plan-migration-title')
+        expect(screen.getByTestId('plan-migration-modal')).toBeInTheDocument()
+        const dialog = screen.getByRole('dialog')
+        expect(dialog).toHaveAttribute('aria-modal', 'true')
+        expect(dialog).toHaveAttribute('aria-labelledby', 'plan-migration-title')
       })
     })
   })
@@ -1203,10 +1203,10 @@ describe('MigrationsPage', () => {
       await user.click(screen.getByTestId('create-plan-button'))
 
       await waitFor(() => {
-        const modal = screen.getByTestId('migration-plan-modal')
-        expect(modal).toHaveAttribute('role', 'dialog')
-        expect(modal).toHaveAttribute('aria-modal', 'true')
-        expect(modal).toHaveAttribute('aria-labelledby', 'migration-plan-title')
+        expect(screen.getByTestId('migration-plan-modal')).toBeInTheDocument()
+        const dialog = screen.getByRole('dialog')
+        expect(dialog).toHaveAttribute('aria-modal', 'true')
+        expect(dialog).toHaveAttribute('aria-labelledby', 'migration-plan-title')
       })
     })
   })

@@ -57,7 +57,6 @@ emf.gateway.control-plane.url: ${CONTROL_PLANE_URL:http://localhost:8080}
 spring.kafka.bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
 emf.gateway.kafka.topics:
   collection-changed: emf.config.collection.changed
-  authz-changed: emf.config.authz.changed
   service-changed: emf.config.service.changed
 ```
 

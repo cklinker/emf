@@ -19,7 +19,6 @@ public class CollectionDto {
     private boolean active;
     private Integer currentVersion;
     private List<FieldDto> fields;
-    private AuthorizationConfigDto authz;
     private Instant createdAt;
     private Instant updatedAt;
 
@@ -28,7 +27,7 @@ public class CollectionDto {
 
     public CollectionDto(String id, String name, String displayName, String description,
                          String storageMode, boolean active, Integer currentVersion,
-                         List<FieldDto> fields, AuthorizationConfigDto authz,
+                         List<FieldDto> fields,
                          Instant createdAt, Instant updatedAt) {
         this.id = id;
         this.name = name;
@@ -38,7 +37,6 @@ public class CollectionDto {
         this.active = active;
         this.currentVersion = currentVersion;
         this.fields = fields;
-        this.authz = authz;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
     }
@@ -62,21 +60,19 @@ public class CollectionDto {
                 collection.isActive(),
                 collection.getCurrentVersion(),
                 null, // fields - populated separately to avoid circular references
-                null, // authz - populated separately
                 collection.getCreatedAt(),
                 collection.getUpdatedAt()
         );
     }
 
     /**
-     * Creates a CollectionDto from a Collection entity with fields and authz.
+     * Creates a CollectionDto from a Collection entity with fields.
      *
      * @param collection The collection entity to convert
      * @param fields The fields for this collection
-     * @param authz The authorization config for this collection
      * @return A new CollectionDto with complete data
      */
-    public static CollectionDto fromEntityWithDetails(Collection collection, List<FieldDto> fields, AuthorizationConfigDto authz) {
+    public static CollectionDto fromEntityWithDetails(Collection collection, List<FieldDto> fields) {
         if (collection == null) {
             return null;
         }
@@ -89,7 +85,6 @@ public class CollectionDto {
                 collection.isActive(),
                 collection.getCurrentVersion(),
                 fields,
-                authz,
                 collection.getCreatedAt(),
                 collection.getUpdatedAt()
         );
@@ -157,14 +152,6 @@ public class CollectionDto {
 
     public void setFields(List<FieldDto> fields) {
         this.fields = fields;
-    }
-
-    public AuthorizationConfigDto getAuthz() {
-        return authz;
-    }
-
-    public void setAuthz(AuthorizationConfigDto authz) {
-        this.authz = authz;
     }
 
     public Instant getCreatedAt() {

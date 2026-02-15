@@ -4,7 +4,6 @@
  * Displays detailed information about a single collection including:
  * - Collection metadata (name, displayName, description, storageMode, status)
  * - Fields list with field details
- * - Authorization configuration (route and field policies)
  * - Version history
  *
  * Requirements:
@@ -27,8 +26,6 @@ import {
 import { ValidationRuleEditor } from '../../components/ValidationRuleEditor'
 import { RecordTypeEditor } from '../../components/RecordTypeEditor'
 import { PicklistDependencyEditor } from '../../components/PicklistDependencyEditor'
-import { AuthorizationPanel } from '../../components/AuthorizationPanel'
-import type { RoutePolicyConfig, FieldPolicyConfig } from '../../components/AuthorizationPanel'
 import type {
   Collection,
   FieldDefinition,
@@ -37,7 +34,6 @@ import type {
   RecordType,
   PicklistDependency,
   SetupAuditTrailEntry,
-  PolicySummary,
   FieldHistoryEntry,
 } from '../../types/collections'
 import type { FieldType } from '../../types/collections'
@@ -152,7 +148,6 @@ export function CollectionDetailPage({
   // Active tab state for sections
   const [activeTab, setActiveTab] = useState<
     | 'fields'
-    | 'authorization'
     | 'validationRules'
     | 'recordTypes'
     | 'picklistDependencies'
@@ -258,16 +253,6 @@ export function CollectionDetailPage({
       return deduped
     },
     enabled: !!collectionId && activeTab === 'picklistDependencies' && picklistFieldIds.length > 0,
-  })
-
-  // Fetch available policies for authorization panel
-  const { data: policies = [], isLoading: isLoadingPolicies } = useQuery({
-    queryKey: ['policies'],
-    queryFn: async () => {
-      const response = await apiClient.get<PolicySummary[]>('/control/policies')
-      return response
-    },
-    enabled: !!collectionId && activeTab === 'authorization',
   })
 
   // Fetch setup audit trail (filtered to this collection)
@@ -551,66 +536,6 @@ export function CollectionDetailPage({
     },
   })
 
-  // --- Authorization mutation ---
-  const updateAuthzMutation = useMutation({
-    mutationFn: async (data: {
-      routePolicies: Array<{ operation: string; policyId: string }>
-      fieldPolicies: Array<{ fieldId: string; operation: string; policyId: string }>
-    }) => {
-      await apiClient.put(`/control/collections/${collectionId}/authz`, data)
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['collection', collectionId] })
-      showToast(t('success.updated', { item: t('authorization.title') }), 'success')
-    },
-    onError: (error: Error) => {
-      showToast(error.message || t('errors.generic'), 'error')
-    },
-  })
-
-  // Handle route authorization change
-  const handleRouteAuthzChange = useCallback(
-    (routePolicies: RoutePolicyConfig[]) => {
-      // Map field policies to backend format (fieldName → fieldId)
-      const currentFieldPolicies = (collection?.authz?.fieldPolicies ?? [])
-        .filter((p) => p.policyId)
-        .map((p) => {
-          const field = collection?.fields?.find((f) => f.name === p.fieldName)
-          return { fieldId: field?.id ?? '', operation: p.operation, policyId: p.policyId }
-        })
-        .filter((p) => p.fieldId)
-      updateAuthzMutation.mutate({
-        routePolicies: routePolicies
-          .filter((p) => p.policyId)
-          .map((p) => ({ operation: p.operation, policyId: p.policyId! })),
-        fieldPolicies: currentFieldPolicies,
-      })
-    },
-    [collection, updateAuthzMutation]
-  )
-
-  // Handle field authorization change
-  const handleFieldAuthzChange = useCallback(
-    (fieldPolicies: FieldPolicyConfig[]) => {
-      // Map field policies to backend format (fieldName → fieldId)
-      const mappedFieldPolicies = fieldPolicies
-        .filter((p) => p.policyId)
-        .map((p) => {
-          const field = collection?.fields?.find((f) => f.name === p.fieldName)
-          return { fieldId: field?.id ?? '', operation: p.operation, policyId: p.policyId! }
-        })
-        .filter((p) => p.fieldId)
-      const currentRoutePolicies = (collection?.authz?.routePolicies ?? [])
-        .filter((p) => p.policyId)
-        .map((p) => ({ operation: p.operation, policyId: p.policyId }))
-      updateAuthzMutation.mutate({
-        routePolicies: currentRoutePolicies,
-        fieldPolicies: mappedFieldPolicies,
-      })
-    },
-    [collection, updateAuthzMutation]
-  )
-
   // Handle edit action
   const handleEdit = useCallback(() => {
     navigate(`/${getTenantSlug()}/collections/${collectionId}/edit`)
@@ -641,7 +566,6 @@ export function CollectionDetailPage({
     (
       tab:
         | 'fields'
-        | 'authorization'
         | 'validationRules'
         | 'recordTypes'
         | 'picklistDependencies'
@@ -1054,18 +978,6 @@ export function CollectionDetailPage({
         <button
           type="button"
           role="tab"
-          className={`${styles.tab} ${activeTab === 'authorization' ? styles.tabActive : ''}`}
-          onClick={() => handleTabChange('authorization')}
-          aria-selected={activeTab === 'authorization'}
-          aria-controls="authorization-panel"
-          id="authorization-tab"
-          data-testid="authorization-tab"
-        >
-          {t('authorization.title')}
-        </button>
-        <button
-          type="button"
-          role="tab"
           className={`${styles.tab} ${activeTab === 'validationRules' ? styles.tabActive : ''}`}
           onClick={() => handleTabChange('validationRules')}
           aria-selected={activeTab === 'validationRules'}
@@ -1247,33 +1159,6 @@ export function CollectionDetailPage({
               </table>
             </div>
           )}
-        </section>
-      )}
-
-      {/* Authorization Panel */}
-      {activeTab === 'authorization' && (
-        <section
-          id="authorization-panel"
-          role="tabpanel"
-          aria-labelledby="authorization-tab"
-          className={styles.tabPanel}
-          data-testid="authorization-panel"
-        >
-          <AuthorizationPanel
-            collectionId={collectionId}
-            collectionName={collection.name}
-            fields={(collection.fields ?? []).map((f) => ({
-              id: f.id,
-              name: f.name,
-              displayName: f.displayName,
-            }))}
-            policies={policies}
-            authz={collection.authz}
-            onRouteAuthzChange={handleRouteAuthzChange}
-            onFieldAuthzChange={handleFieldAuthzChange}
-            isLoading={isLoadingPolicies}
-            isSaving={updateAuthzMutation.isPending}
-          />
         </section>
       )}
 

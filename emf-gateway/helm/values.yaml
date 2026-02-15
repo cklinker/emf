@@ -106,7 +106,6 @@ config:
     consumerGroupId: "emf-gateway"
     topics:
       collectionChanged: "emf.config.collection.changed"
-      authzChanged: "emf.config.authz.changed"
       serviceChanged: "emf.config.service.changed"
     autoOffsetReset: "latest"
     enableAutoCommit: true

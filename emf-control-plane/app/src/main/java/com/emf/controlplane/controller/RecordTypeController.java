@@ -4,6 +4,7 @@ import com.emf.controlplane.dto.*;
 import com.emf.controlplane.entity.RecordType;
 import com.emf.controlplane.entity.RecordTypePicklist;
 import com.emf.controlplane.service.RecordTypeService;
+import com.emf.controlplane.tenant.TenantContextHolder;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -48,9 +49,9 @@ public class RecordTypeController {
     @Operation(summary = "Create a record type")
     public ResponseEntity<RecordTypeDto> createRecordType(
             @PathVariable String collectionId,
-            @RequestParam(defaultValue = "default") String tenantId,
             @Valid @RequestBody CreateRecordTypeRequest request) {
         log.info("REST request to create record type: {}", request.getName());
+        String tenantId = TenantContextHolder.requireTenantId();
         RecordType created = recordTypeService.createRecordType(collectionId, tenantId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(RecordTypeDto.fromEntity(created));
     }

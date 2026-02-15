@@ -5,6 +5,7 @@ import com.emf.controlplane.entity.GlobalPicklist;
 import com.emf.controlplane.entity.PicklistDependency;
 import com.emf.controlplane.entity.PicklistValue;
 import com.emf.controlplane.service.PicklistService;
+import com.emf.controlplane.tenant.TenantContextHolder;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -37,8 +38,8 @@ public class PicklistController {
 
     @GetMapping("/global")
     @Operation(summary = "List global picklists")
-    public ResponseEntity<List<GlobalPicklistDto>> listGlobalPicklists(
-            @RequestParam(defaultValue = "default") String tenantId) {
+    public ResponseEntity<List<GlobalPicklistDto>> listGlobalPicklists() {
+        String tenantId = TenantContextHolder.requireTenantId();
         List<GlobalPicklist> picklists = picklistService.listGlobalPicklists(tenantId);
         List<GlobalPicklistDto> dtos = picklists.stream()
                 .map(GlobalPicklistDto::fromEntity)
@@ -50,9 +51,9 @@ public class PicklistController {
     @PreAuthorize("hasRole('ADMIN') or hasAuthority('CUSTOMIZE_APPLICATION')")
     @Operation(summary = "Create global picklist")
     public ResponseEntity<GlobalPicklistDto> createGlobalPicklist(
-            @RequestParam(defaultValue = "default") String tenantId,
             @Valid @RequestBody CreateGlobalPicklistRequest request) {
         log.info("REST request to create global picklist: {}", request.getName());
+        String tenantId = TenantContextHolder.requireTenantId();
         GlobalPicklist created = picklistService.createGlobalPicklist(tenantId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(GlobalPicklistDto.fromEntity(created));
     }

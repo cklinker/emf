@@ -5,6 +5,7 @@ import com.emf.controlplane.dto.UpdateValidationRuleRequest;
 import com.emf.controlplane.dto.ValidationRuleDto;
 import com.emf.controlplane.entity.ValidationRule;
 import com.emf.controlplane.service.ValidationRuleService;
+import com.emf.controlplane.tenant.TenantContextHolder;
 import com.emf.runtime.validation.ValidationError;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -51,9 +52,9 @@ public class ValidationRuleController {
     @Operation(summary = "Create a validation rule")
     public ResponseEntity<ValidationRuleDto> createRule(
             @PathVariable String collectionId,
-            @RequestParam(defaultValue = "default") String tenantId,
             @Valid @RequestBody CreateValidationRuleRequest request) {
         log.info("REST request to create validation rule: {}", request.getName());
+        String tenantId = TenantContextHolder.requireTenantId();
         ValidationRule created = validationRuleService.createRule(collectionId, tenantId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(ValidationRuleDto.fromEntity(created));
     }

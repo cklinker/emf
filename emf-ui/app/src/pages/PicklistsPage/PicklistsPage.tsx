@@ -4,7 +4,7 @@ import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
 import { PicklistValuesEditor } from '../../components/PicklistValuesEditor'
-import { getTenantId } from '../../hooks'
+
 import styles from './PicklistsPage.module.css'
 
 interface GlobalPicklist {
@@ -279,14 +279,14 @@ export function PicklistsPage({
   } = useQuery({
     queryKey: ['picklists'],
     queryFn: () =>
-      apiClient.get<GlobalPicklist[]>(`/control/picklists/global?tenantId=${getTenantId()}`),
+      apiClient.get<GlobalPicklist[]>('/control/picklists/global'),
   })
 
   const picklistList = picklists ?? []
 
   const createMutation = useMutation({
     mutationFn: (data: PicklistFormData) =>
-      apiClient.post<GlobalPicklist>(`/control/picklists/global?tenantId=${getTenantId()}`, data),
+      apiClient.post<GlobalPicklist>('/control/picklists/global', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['picklists'] })
       showToast(t('success.created', { item: t('picklists.title') }), 'success')

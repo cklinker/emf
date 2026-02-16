@@ -4,6 +4,7 @@ import com.emf.controlplane.entity.CollectionAssignment;
 import com.emf.controlplane.entity.Worker;
 import com.emf.controlplane.event.ConfigEventPublisher;
 import com.emf.controlplane.repository.CollectionAssignmentRepository;
+import com.emf.controlplane.repository.CollectionRepository;
 import com.emf.controlplane.repository.WorkerRepository;
 import com.emf.runtime.event.ChangeType;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,6 +38,9 @@ class WorkerRebalanceServiceTest {
     private CollectionAssignmentRepository assignmentRepository;
 
     @Mock
+    private CollectionRepository collectionRepository;
+
+    @Mock
     private ConfigEventPublisher eventPublisher;
 
     private WorkerRebalanceService rebalanceService;
@@ -44,7 +48,7 @@ class WorkerRebalanceServiceTest {
     @BeforeEach
     void setUp() {
         rebalanceService = new WorkerRebalanceService(
-                workerRepository, assignmentRepository, eventPublisher);
+                workerRepository, assignmentRepository, collectionRepository, eventPublisher);
     }
 
     private Worker createWorker(String id, String status, int currentLoad, int capacity) {
@@ -391,7 +395,7 @@ class WorkerRebalanceServiceTest {
         @DisplayName("should work without event publisher")
         void shouldWorkWithoutEventPublisher() {
             WorkerRebalanceService serviceNoEvents = new WorkerRebalanceService(
-                    workerRepository, assignmentRepository, null);
+                    workerRepository, assignmentRepository, collectionRepository, null);
 
             Worker w1 = createWorker("w1", "READY", 10, 50);
             Worker w2 = createWorker("w2", "READY", 0, 50);

@@ -1,6 +1,8 @@
 package com.emf.controlplane.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "layout_field")
@@ -26,6 +28,16 @@ public class LayoutField extends BaseEntity {
     @Column(name = "is_read_only_on_layout")
     private boolean readOnlyOnLayout = false;
 
+    @Column(name = "label_override", length = 200)
+    private String labelOverride;
+
+    @Column(name = "help_text_override", length = 500)
+    private String helpTextOverride;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "visibility_rule", columnDefinition = "jsonb")
+    private String visibilityRule;
+
     public LayoutField() { super(); }
 
     public LayoutSection getSection() { return section; }
@@ -45,4 +57,13 @@ public class LayoutField extends BaseEntity {
 
     public boolean isReadOnlyOnLayout() { return readOnlyOnLayout; }
     public void setReadOnlyOnLayout(boolean readOnlyOnLayout) { this.readOnlyOnLayout = readOnlyOnLayout; }
+
+    public String getLabelOverride() { return labelOverride; }
+    public void setLabelOverride(String labelOverride) { this.labelOverride = labelOverride; }
+
+    public String getHelpTextOverride() { return helpTextOverride; }
+    public void setHelpTextOverride(String helpTextOverride) { this.helpTextOverride = helpTextOverride; }
+
+    public String getVisibilityRule() { return visibilityRule; }
+    public void setVisibilityRule(String visibilityRule) { this.visibilityRule = visibilityRule; }
 }

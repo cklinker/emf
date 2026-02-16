@@ -48,6 +48,17 @@ export type {
   SetPicklistOverrideRequest,
   FieldHistoryEntry,
   SetupAuditTrailEntry,
+  PageLayout,
+  LayoutSection,
+  LayoutFieldPlacement,
+  LayoutRelatedList,
+  VisibilityRule,
+  CreatePageLayoutRequest,
+  CreateLayoutSectionRequest,
+  CreateFieldPlacementRequest,
+  CreateRelatedListRequest,
+  LayoutAssignment,
+  LayoutAssignmentRequest,
 } from './admin/types';
 
 // Authentication

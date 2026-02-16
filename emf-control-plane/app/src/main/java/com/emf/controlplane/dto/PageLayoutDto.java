@@ -65,6 +65,10 @@ public class PageLayoutDto {
         private int sortOrder;
         private boolean collapsed;
         private String style;
+        private String sectionType;
+        private String tabGroup;
+        private String tabLabel;
+        private String visibilityRule;
         private List<FieldPlacementDto> fields;
 
         public static SectionDto fromEntity(LayoutSection entity) {
@@ -75,6 +79,10 @@ public class PageLayoutDto {
             dto.setSortOrder(entity.getSortOrder());
             dto.setCollapsed(entity.isCollapsed());
             dto.setStyle(entity.getStyle());
+            dto.setSectionType(entity.getSectionType());
+            dto.setTabGroup(entity.getTabGroup());
+            dto.setTabLabel(entity.getTabLabel());
+            dto.setVisibilityRule(entity.getVisibilityRule());
             dto.setFields(entity.getFields().stream().map(FieldPlacementDto::fromEntity).toList());
             return dto;
         }
@@ -91,6 +99,14 @@ public class PageLayoutDto {
         public void setCollapsed(boolean collapsed) { this.collapsed = collapsed; }
         public String getStyle() { return style; }
         public void setStyle(String style) { this.style = style; }
+        public String getSectionType() { return sectionType; }
+        public void setSectionType(String sectionType) { this.sectionType = sectionType; }
+        public String getTabGroup() { return tabGroup; }
+        public void setTabGroup(String tabGroup) { this.tabGroup = tabGroup; }
+        public String getTabLabel() { return tabLabel; }
+        public void setTabLabel(String tabLabel) { this.tabLabel = tabLabel; }
+        public String getVisibilityRule() { return visibilityRule; }
+        public void setVisibilityRule(String visibilityRule) { this.visibilityRule = visibilityRule; }
         public List<FieldPlacementDto> getFields() { return fields; }
         public void setFields(List<FieldPlacementDto> fields) { this.fields = fields; }
     }
@@ -99,20 +115,30 @@ public class PageLayoutDto {
         private String id;
         private String fieldId;
         private String fieldName;
+        private String fieldType;
+        private String fieldDisplayName;
         private int columnNumber;
         private int sortOrder;
         private boolean requiredOnLayout;
         private boolean readOnlyOnLayout;
+        private String labelOverride;
+        private String helpTextOverride;
+        private String visibilityRule;
 
         public static FieldPlacementDto fromEntity(LayoutField entity) {
             FieldPlacementDto dto = new FieldPlacementDto();
             dto.setId(entity.getId());
             dto.setFieldId(entity.getField().getId());
             dto.setFieldName(entity.getField().getName());
+            dto.setFieldType(entity.getField().getType());
+            dto.setFieldDisplayName(entity.getField().getDisplayName());
             dto.setColumnNumber(entity.getColumnNumber());
             dto.setSortOrder(entity.getSortOrder());
             dto.setRequiredOnLayout(entity.isRequiredOnLayout());
             dto.setReadOnlyOnLayout(entity.isReadOnlyOnLayout());
+            dto.setLabelOverride(entity.getLabelOverride());
+            dto.setHelpTextOverride(entity.getHelpTextOverride());
+            dto.setVisibilityRule(entity.getVisibilityRule());
             return dto;
         }
 
@@ -122,6 +148,10 @@ public class PageLayoutDto {
         public void setFieldId(String fieldId) { this.fieldId = fieldId; }
         public String getFieldName() { return fieldName; }
         public void setFieldName(String fieldName) { this.fieldName = fieldName; }
+        public String getFieldType() { return fieldType; }
+        public void setFieldType(String fieldType) { this.fieldType = fieldType; }
+        public String getFieldDisplayName() { return fieldDisplayName; }
+        public void setFieldDisplayName(String fieldDisplayName) { this.fieldDisplayName = fieldDisplayName; }
         public int getColumnNumber() { return columnNumber; }
         public void setColumnNumber(int columnNumber) { this.columnNumber = columnNumber; }
         public int getSortOrder() { return sortOrder; }
@@ -130,6 +160,12 @@ public class PageLayoutDto {
         public void setRequiredOnLayout(boolean requiredOnLayout) { this.requiredOnLayout = requiredOnLayout; }
         public boolean isReadOnlyOnLayout() { return readOnlyOnLayout; }
         public void setReadOnlyOnLayout(boolean readOnlyOnLayout) { this.readOnlyOnLayout = readOnlyOnLayout; }
+        public String getLabelOverride() { return labelOverride; }
+        public void setLabelOverride(String labelOverride) { this.labelOverride = labelOverride; }
+        public String getHelpTextOverride() { return helpTextOverride; }
+        public void setHelpTextOverride(String helpTextOverride) { this.helpTextOverride = helpTextOverride; }
+        public String getVisibilityRule() { return visibilityRule; }
+        public void setVisibilityRule(String visibilityRule) { this.visibilityRule = visibilityRule; }
     }
 
     public static class RelatedListDto {

@@ -1,14 +1,16 @@
 package com.emf.controlplane.dto;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Bootstrap configuration for the API Gateway.
- * Contains collections needed for routing.
+ * Contains collections needed for routing and per-tenant governor limits.
  */
 public class GatewayBootstrapConfigDto {
 
     private List<CollectionDto> collections;
+    private Map<String, GovernorLimitDto> governorLimits;
 
     public GatewayBootstrapConfigDto() {
     }
@@ -17,12 +19,42 @@ public class GatewayBootstrapConfigDto {
         this.collections = collections;
     }
 
+    public GatewayBootstrapConfigDto(List<CollectionDto> collections, Map<String, GovernorLimitDto> governorLimits) {
+        this.collections = collections;
+        this.governorLimits = governorLimits;
+    }
+
     public List<CollectionDto> getCollections() {
         return collections;
     }
 
     public void setCollections(List<CollectionDto> collections) {
         this.collections = collections;
+    }
+
+    public Map<String, GovernorLimitDto> getGovernorLimits() {
+        return governorLimits;
+    }
+
+    public void setGovernorLimits(Map<String, GovernorLimitDto> governorLimits) {
+        this.governorLimits = governorLimits;
+    }
+
+    /**
+     * Governor limit configuration for a tenant, used by the gateway for rate limiting.
+     */
+    public static class GovernorLimitDto {
+        private int apiCallsPerDay;
+
+        public GovernorLimitDto() {
+        }
+
+        public GovernorLimitDto(int apiCallsPerDay) {
+            this.apiCallsPerDay = apiCallsPerDay;
+        }
+
+        public int getApiCallsPerDay() { return apiCallsPerDay; }
+        public void setApiCallsPerDay(int apiCallsPerDay) { this.apiCallsPerDay = apiCallsPerDay; }
     }
 
     /**

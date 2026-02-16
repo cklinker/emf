@@ -2,6 +2,7 @@ package com.emf.gateway.service;
 
 import com.emf.gateway.config.BootstrapConfig;
 import com.emf.gateway.config.CollectionConfig;
+import com.emf.gateway.ratelimit.TenantGovernorLimitCache;
 import com.emf.gateway.route.RouteDefinition;
 import com.emf.gateway.route.RouteRegistry;
 import org.slf4j.Logger;
@@ -18,6 +19,7 @@ import reactor.core.publisher.Mono;
  * - Fetching initial bootstrap configuration when the gateway starts
  * - Parsing bootstrap response into RouteDefinition objects
  * - Validating required fields before adding routes to the registry
+ * - Loading per-tenant governor limits for rate limiting
  * - Refreshing routes on demand
  */
 @Service
@@ -27,6 +29,7 @@ public class RouteConfigService {
 
     private final WebClient webClient;
     private final RouteRegistry routeRegistry;
+    private final TenantGovernorLimitCache governorLimitCache;
     private final String controlPlaneUrl;
     private final String bootstrapPath;
     private final String workerServiceUrl;
@@ -34,11 +37,13 @@ public class RouteConfigService {
     public RouteConfigService(
             WebClient.Builder webClientBuilder,
             RouteRegistry routeRegistry,
+            TenantGovernorLimitCache governorLimitCache,
             @Value("${emf.gateway.control-plane.url}") String controlPlaneUrl,
             @Value("${emf.gateway.control-plane.bootstrap-path}") String bootstrapPath,
             @Value("${emf.gateway.worker-service-url:http://emf-worker:80}") String workerServiceUrl) {
         this.webClient = webClientBuilder.baseUrl(controlPlaneUrl).build();
         this.routeRegistry = routeRegistry;
+        this.governorLimitCache = governorLimitCache;
         this.controlPlaneUrl = controlPlaneUrl;
         this.bootstrapPath = bootstrapPath;
         this.workerServiceUrl = workerServiceUrl;
@@ -94,6 +99,15 @@ public class RouteConfigService {
                                   validRoutes, invalidRoutes);
                     } else {
                         logger.warn("No collections found in bootstrap configuration");
+                    }
+
+                    // Load per-tenant governor limits for rate limiting
+                    if (config.getGovernorLimits() != null) {
+                        governorLimitCache.loadFromBootstrap(config.getGovernorLimits());
+                        logger.info("Loaded governor limits for {} tenants",
+                                config.getGovernorLimits().size());
+                    } else {
+                        logger.warn("No governor limits found in bootstrap configuration");
                     }
                 })
                 .doOnError(error -> {

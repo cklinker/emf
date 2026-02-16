@@ -1,18 +1,22 @@
 package com.emf.controlplane.service;
 
 import com.emf.controlplane.config.ControlPlaneProperties;
+import com.emf.controlplane.dto.GovernorLimits;
 import com.emf.controlplane.dto.GatewayBootstrapConfigDto;
 import com.emf.controlplane.entity.Collection;
 import com.emf.controlplane.entity.CollectionAssignment;
 import com.emf.controlplane.entity.Field;
+import com.emf.controlplane.entity.Tenant;
 import com.emf.controlplane.entity.Worker;
 import com.emf.controlplane.repository.CollectionAssignmentRepository;
 import com.emf.controlplane.repository.CollectionRepository;
+import com.emf.controlplane.repository.TenantRepository;
 import com.emf.controlplane.repository.WorkerRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -28,15 +32,21 @@ public class GatewayBootstrapService {
     private final CollectionRepository collectionRepository;
     private final CollectionAssignmentRepository assignmentRepository;
     private final WorkerRepository workerRepository;
+    private final TenantRepository tenantRepository;
+    private final TenantService tenantService;
     private final ControlPlaneProperties properties;
 
     public GatewayBootstrapService(CollectionRepository collectionRepository,
                                   CollectionAssignmentRepository assignmentRepository,
                                   WorkerRepository workerRepository,
+                                  TenantRepository tenantRepository,
+                                  TenantService tenantService,
                                   ControlPlaneProperties properties) {
         this.collectionRepository = collectionRepository;
         this.assignmentRepository = assignmentRepository;
         this.workerRepository = workerRepository;
+        this.tenantRepository = tenantRepository;
+        this.tenantService = tenantService;
         this.properties = properties;
     }
 
@@ -63,9 +73,13 @@ public class GatewayBootstrapService {
                 .map(c -> mapCollectionToDto(c, workerUrlByCollection.get(c.getId())))
                 .collect(Collectors.toList());
 
-        GatewayBootstrapConfigDto dto = new GatewayBootstrapConfigDto(collectionDtos);
+        // Build per-tenant governor limits for gateway rate limiting
+        Map<String, GatewayBootstrapConfigDto.GovernorLimitDto> governorLimits = buildGovernorLimitsMap();
 
-        log.info("Generated gateway bootstrap config with {} collections", collectionDtos.size());
+        GatewayBootstrapConfigDto dto = new GatewayBootstrapConfigDto(collectionDtos, governorLimits);
+
+        log.info("Generated gateway bootstrap config with {} collections and {} tenant governor limits",
+                collectionDtos.size(), governorLimits.size());
 
         return dto;
     }
@@ -111,6 +125,29 @@ public class GatewayBootstrapService {
                         a -> workerBaseUrls.get(a.getWorkerId()),
                         (url1, url2) -> url1
                 ));
+    }
+
+    /**
+     * Builds a map of tenant ID → governor limit DTO for all active tenants.
+     * The gateway uses this to apply per-tenant rate limiting based on apiCallsPerDay.
+     */
+    private Map<String, GatewayBootstrapConfigDto.GovernorLimitDto> buildGovernorLimitsMap() {
+        List<Tenant> activeTenants = tenantRepository.findByStatus("ACTIVE");
+        Map<String, GatewayBootstrapConfigDto.GovernorLimitDto> limitsMap = new HashMap<>();
+
+        for (Tenant tenant : activeTenants) {
+            try {
+                GovernorLimits limits = tenantService.getGovernorLimits(tenant.getId());
+                limitsMap.put(tenant.getId(),
+                        new GatewayBootstrapConfigDto.GovernorLimitDto(limits.apiCallsPerDay()));
+            } catch (Exception e) {
+                log.warn("Failed to get governor limits for tenant {}, using defaults", tenant.getId(), e);
+                limitsMap.put(tenant.getId(),
+                        new GatewayBootstrapConfigDto.GovernorLimitDto(GovernorLimits.defaults().apiCallsPerDay()));
+            }
+        }
+
+        return limitsMap;
     }
 
     private String constructCollectionPath(Collection collection) {

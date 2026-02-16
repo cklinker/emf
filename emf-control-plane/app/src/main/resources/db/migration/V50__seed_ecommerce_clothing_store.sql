@@ -2,7 +2,7 @@
 -- V50: Seed E-Commerce Clothing Store (Threadline Clothing Co.)
 --
 -- Creates a complete e-commerce demo dataset:
---   - 1 tenant, 1 profile, 1 user
+--   - 1 tenant, 1 user
 --   - 10 global picklists with ~60 values
 --   - 9 collections with ~100 fields
 --   - 9 page layouts with sections and field placements
@@ -12,7 +12,7 @@
 -- ============================================================================
 
 -- ============================================================================
--- SECTION 1: TENANT, PROFILE, PLATFORM USER
+-- SECTION 1: TENANT, PLATFORM USER
 -- ============================================================================
 
 INSERT INTO tenant (id, slug, name, edition, status, settings, limits, created_at, updated_at)
@@ -27,18 +27,11 @@ VALUES (
     NOW(), NOW()
 ) ON CONFLICT (slug) DO NOTHING;
 
-INSERT INTO profile (id, tenant_id, name, description, is_system, created_at, updated_at)
-VALUES (
-    'ec000000-0000-0000-0000-000000000010',
-    'ec000000-0000-0000-0000-000000000001',
-    'System Administrator',
-    'Full access profile for Threadline Clothing',
-    true,
-    NOW(), NOW()
-) ON CONFLICT (tenant_id, name) DO NOTHING;
+-- Note: profile table was dropped in V47. Layout assignments use profile_id as
+-- a simple string identifier without FK constraint.
 
 INSERT INTO platform_user (id, tenant_id, email, username, first_name, last_name, status,
-                           locale, timezone, profile_id, login_count, mfa_enabled, settings,
+                           locale, timezone, login_count, mfa_enabled, settings,
                            created_at, updated_at)
 VALUES (
     'ec000000-0000-0000-0000-000000000020',
@@ -50,7 +43,6 @@ VALUES (
     'ACTIVE',
     'en_US',
     'America/New_York',
-    'ec000000-0000-0000-0000-000000000010',
     0,
     false,
     '{}',

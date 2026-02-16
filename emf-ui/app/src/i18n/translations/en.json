@@ -1074,6 +1074,8 @@
     "globalPicklist": "Global Picklist",
     "selectPicklist": "Select a picklist...",
     "globalPicklistHint": "Select the global picklist that provides values for this field.",
+    "descriptionPlaceholder": "Enter a description for this field...",
+    "trackHistory": "Track History",
     "validation": {
       "nameRequired": "Field name is required",
       "nameTooLong": "Field name must be 50 characters or less",
@@ -1081,7 +1083,8 @@
       "displayNameTooLong": "Display name must be 100 characters or less",
       "typeRequired": "Field type is required",
       "referenceTargetRequired": "Target collection is required for reference fields",
-      "picklistRequired": "A global picklist is required for picklist fields"
+      "picklistRequired": "A global picklist is required for picklist fields",
+      "descriptionTooLong": "Description must be 500 characters or less"
     }
   },
   "home": {

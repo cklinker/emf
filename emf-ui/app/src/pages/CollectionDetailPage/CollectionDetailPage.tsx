@@ -612,6 +612,9 @@ export function CollectionDetailPage({
             referenceTarget: fieldData.referenceTarget,
             fieldTypeConfig: fieldData.fieldTypeConfig,
             validation: fieldData.validation,
+            description: fieldData.description,
+            trackHistory: fieldData.trackHistory,
+            constraints: fieldData.constraints,
           },
         })
       } else {
@@ -627,6 +630,9 @@ export function CollectionDetailPage({
           referenceTarget: fieldData.referenceTarget,
           fieldTypeConfig: fieldData.fieldTypeConfig,
           validation: fieldData.validation,
+          description: fieldData.description,
+          trackHistory: fieldData.trackHistory,
+          constraints: fieldData.constraints,
         })
       }
     },
@@ -1160,9 +1166,11 @@ export function CollectionDetailPage({
                     <th scope="col">{t('collections.fieldName')}</th>
                     <th scope="col">{t('collections.displayName')}</th>
                     <th scope="col">{t('collections.fieldType')}</th>
+                    <th scope="col">{t('collections.description')}</th>
                     <th scope="col">{t('fields.validation.required')}</th>
                     <th scope="col">{t('fields.validation.unique')}</th>
                     <th scope="col">{t('fields.validation.indexed')}</th>
+                    <th scope="col">{t('fieldEditor.trackHistory')}</th>
                     <th scope="col">{t('fields.relationship')}</th>
                     <th scope="col">{t('common.actions')}</th>
                   </tr>
@@ -1191,6 +1199,17 @@ export function CollectionDetailPage({
                           {getFieldTypeDisplay(field.type, t)}
                         </span>
                       </td>
+                      <td className={styles.descriptionCell}>
+                        {field.description ? (
+                          <span title={field.description}>
+                            {field.description.length > 50
+                              ? `${field.description.substring(0, 50)}...`
+                              : field.description}
+                          </span>
+                        ) : (
+                          '-'
+                        )}
+                      </td>
                       <td>
                         <span className={field.required ? styles.checkMark : styles.crossMark}>
                           {field.required ? '✓' : '✕'}
@@ -1204,6 +1223,11 @@ export function CollectionDetailPage({
                       <td>
                         <span className={field.indexed ? styles.checkMark : styles.crossMark}>
                           {field.indexed ? '✓' : '✕'}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={field.trackHistory ? styles.checkMark : styles.crossMark}>
+                          {field.trackHistory ? '✓' : '✕'}
                         </span>
                       </td>
                       <td>

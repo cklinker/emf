@@ -761,6 +761,8 @@
     "globalPicklist": "قائمة الاختيار العامة",
     "selectPicklist": "اختر قائمة اختيار...",
     "globalPicklistHint": "اختر قائمة الاختيار العامة التي توفر القيم لهذا الحقل.",
+    "descriptionPlaceholder": "أدخل وصفاً لهذا الحقل...",
+    "trackHistory": "تتبع السجل",
     "validation": {
       "nameRequired": "اسم الحقل مطلوب",
       "nameTooLong": "يجب أن يكون اسم الحقل 50 حرفاً أو أقل",
@@ -768,7 +770,8 @@
       "displayNameTooLong": "يجب أن يكون اسم العرض 100 حرف أو أقل",
       "typeRequired": "نوع الحقل مطلوب",
       "referenceTargetRequired": "المجموعة المستهدفة مطلوبة لحقول المرجع",
-      "picklistRequired": "قائمة الاختيار العامة مطلوبة لحقول القوائم"
+      "picklistRequired": "قائمة الاختيار العامة مطلوبة لحقول القوائم",
+      "descriptionTooLong": "يجب ألا يتجاوز الوصف 500 حرف"
     }
   }
 }

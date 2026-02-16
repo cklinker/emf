@@ -118,6 +118,11 @@
   color: var(--color-text-placeholder-dark, #6b7280);
 }
 
+.textarea {
+  resize: vertical;
+  min-height: 3rem;
+}
+
 /* Input Error State */
 .inputError {
   border-color: var(--color-error, #dc2626);

@@ -91,6 +91,9 @@ export interface FieldDefinition {
   referenceTarget?: string
   fieldTypeConfig?: string
   order: number
+  description?: string
+  trackHistory?: boolean
+  constraints?: string
 }
 
 /**
@@ -253,6 +256,8 @@ export const fieldEditorSchema = z
     currencyCode: z.string().max(3).optional().or(z.literal('')),
     currencyPrecision: z.coerce.number().min(0).max(6).optional(),
     globalPicklistId: z.string().optional().or(z.literal('')),
+    description: z.string().max(500, 'validation.descriptionTooLong').optional().or(z.literal('')),
+    trackHistory: z.boolean(),
     validationRules: z.array(validationRuleSchema).optional(),
   })
   .refine(
@@ -361,6 +366,8 @@ export function FieldEditor({
       currencyCode: (parsedConfig.currencyCode as string) ?? '',
       currencyPrecision: (parsedConfig.precision as number) ?? 2,
       globalPicklistId: (parsedConfig.globalPicklistId as string) ?? '',
+      description: field?.description ?? '',
+      trackHistory: field?.trackHistory ?? false,
       validationRules:
         field?.validation?.map((v) => ({
           type: v.type,
@@ -412,6 +419,8 @@ export function FieldEditor({
         currencyCode: (parsedConfig.currencyCode as string) ?? '',
         currencyPrecision: (parsedConfig.precision as number) ?? 2,
         globalPicklistId: (parsedConfig.globalPicklistId as string) ?? '',
+        description: field.description ?? '',
+        trackHistory: field.trackHistory ?? false,
         validationRules:
           field.validation?.map((v) => ({
             type: v.type,
@@ -495,6 +504,21 @@ export function FieldEditor({
       const needsReferenceTarget =
         data.type === 'reference' || data.type === 'lookup' || data.type === 'master_detail'
 
+      // Map validation rules to constraints JSON for backend
+      let constraints: string | undefined = undefined
+      if (validationRules.length > 0) {
+        const constraintObj: Record<string, unknown> = {}
+        for (const rule of validationRules) {
+          if (rule.type === 'min' && rule.value !== undefined) constraintObj.min = rule.value
+          else if (rule.type === 'max' && rule.value !== undefined) constraintObj.max = rule.value
+          else if (rule.type === 'pattern' && rule.value !== undefined)
+            constraintObj.pattern = rule.value
+          else if (rule.type === 'email') constraintObj.email = true
+          else if (rule.type === 'url') constraintObj.url = true
+        }
+        if (Object.keys(constraintObj).length > 0) constraints = JSON.stringify(constraintObj)
+      }
+
       const fieldData: FieldDefinition = {
         id: field?.id ?? generateFieldId(),
         name: data.name,
@@ -508,6 +532,9 @@ export function FieldEditor({
         referenceTarget: needsReferenceTarget ? data.referenceTarget : undefined,
         fieldTypeConfig,
         order: field?.order ?? 0,
+        description: data.description || undefined,
+        trackHistory: data.trackHistory,
+        constraints,
       }
 
       await onSave(fieldData)
@@ -858,6 +885,49 @@ export function FieldEditor({
             {t('fields.validation.indexed')}
           </label>
         </div>
+
+        <div className={styles.checkboxGroup}>
+          <input
+            id="field-track-history"
+            type="checkbox"
+            className={styles.checkbox}
+            disabled={isSubmitting}
+            data-testid="field-track-history-checkbox"
+            {...register('trackHistory')}
+          />
+          <label htmlFor="field-track-history" className={styles.checkboxLabel}>
+            {t('fieldEditor.trackHistory')}
+          </label>
+        </div>
+      </div>
+
+      {/* Description */}
+      <div className={styles.fieldGroup}>
+        <label htmlFor="field-description" className={styles.label}>
+          {t('collections.description')}
+          <span className={styles.optional}>({t('common.optional')})</span>
+        </label>
+        <textarea
+          id="field-description"
+          className={`${styles.textarea} ${errors.description ? styles.inputError : ''}`}
+          placeholder={t('fieldEditor.descriptionPlaceholder')}
+          rows={3}
+          disabled={isSubmitting}
+          aria-invalid={!!errors.description}
+          aria-describedby={errors.description ? 'field-description-error' : undefined}
+          data-testid="field-description-input"
+          {...register('description')}
+        />
+        {errors.description && (
+          <span
+            id="field-description-error"
+            className={styles.errorMessage}
+            role="alert"
+            data-testid="field-description-error"
+          >
+            {getErrorMessage(errors.description.message)}
+          </span>
+        )}
       </div>
 
       {/* Default Value */}

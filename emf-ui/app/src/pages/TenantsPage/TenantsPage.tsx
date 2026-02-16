@@ -31,12 +31,76 @@ export interface Tenant {
 }
 
 /**
+ * Governor limits for a tenant
+ */
+interface GovernorLimitsData {
+  apiCallsPerDay: number
+  storageGb: number
+  maxUsers: number
+  maxCollections: number
+  maxFieldsPerCollection: number
+  maxWorkflows: number
+  maxReports: number
+}
+
+const DEFAULT_GOVERNOR_LIMITS: GovernorLimitsData = {
+  apiCallsPerDay: 100_000,
+  storageGb: 10,
+  maxUsers: 100,
+  maxCollections: 200,
+  maxFieldsPerCollection: 500,
+  maxWorkflows: 50,
+  maxReports: 200,
+}
+
+/**
+ * Parse governor limits from the tenant's limits JSON string.
+ * The API stores limits as a JSONB column with snake_case keys.
+ */
+function parseLimits(limitsJson?: string): GovernorLimitsData {
+  if (!limitsJson || limitsJson === '{}') {
+    return { ...DEFAULT_GOVERNOR_LIMITS }
+  }
+  try {
+    const parsed = JSON.parse(limitsJson)
+    return {
+      apiCallsPerDay: parsed.api_calls_per_day ?? DEFAULT_GOVERNOR_LIMITS.apiCallsPerDay,
+      storageGb: parsed.storage_gb ?? DEFAULT_GOVERNOR_LIMITS.storageGb,
+      maxUsers: parsed.max_users ?? DEFAULT_GOVERNOR_LIMITS.maxUsers,
+      maxCollections: parsed.max_collections ?? DEFAULT_GOVERNOR_LIMITS.maxCollections,
+      maxFieldsPerCollection:
+        parsed.max_fields_per_collection ?? DEFAULT_GOVERNOR_LIMITS.maxFieldsPerCollection,
+      maxWorkflows: parsed.max_workflows ?? DEFAULT_GOVERNOR_LIMITS.maxWorkflows,
+      maxReports: parsed.max_reports ?? DEFAULT_GOVERNOR_LIMITS.maxReports,
+    }
+  } catch {
+    return { ...DEFAULT_GOVERNOR_LIMITS }
+  }
+}
+
+/**
+ * Convert governor limits to snake_case map for the API.
+ */
+function limitsToApiFormat(limits: GovernorLimitsData): Record<string, number> {
+  return {
+    api_calls_per_day: limits.apiCallsPerDay,
+    storage_gb: limits.storageGb,
+    max_users: limits.maxUsers,
+    max_collections: limits.maxCollections,
+    max_fields_per_collection: limits.maxFieldsPerCollection,
+    max_workflows: limits.maxWorkflows,
+    max_reports: limits.maxReports,
+  }
+}
+
+/**
  * Form data for creating/editing a tenant
  */
 interface TenantFormData {
   slug: string
   name: string
   edition: string
+  limits: GovernorLimitsData
 }
 
 /**
@@ -84,6 +148,24 @@ function validateForm(data: TenantFormData, isEditing: boolean): FormErrors {
   return errors
 }
 
+/** Limit field descriptor for rendering */
+interface LimitField {
+  key: keyof GovernorLimitsData
+  label: string
+  min: number
+  max: number
+}
+
+const LIMIT_FIELDS: LimitField[] = [
+  { key: 'apiCallsPerDay', label: 'API Calls Per Day', min: 0, max: 10_000_000 },
+  { key: 'storageGb', label: 'Storage (GB)', min: 1, max: 10_000 },
+  { key: 'maxUsers', label: 'Max Users', min: 1, max: 100_000 },
+  { key: 'maxCollections', label: 'Max Collections', min: 1, max: 10_000 },
+  { key: 'maxFieldsPerCollection', label: 'Max Fields Per Collection', min: 1, max: 10_000 },
+  { key: 'maxWorkflows', label: 'Max Workflows', min: 0, max: 10_000 },
+  { key: 'maxReports', label: 'Max Reports', min: 0, max: 10_000 },
+]
+
 /**
  * TenantForm Component — Modal form for creating and editing tenants.
  */
@@ -105,6 +187,7 @@ function TenantForm({
     slug: tenant?.slug ?? '',
     name: tenant?.name ?? '',
     edition: tenant?.edition ?? 'PROFESSIONAL',
+    limits: parseLimits(tenant?.limits),
   })
   const [errors, setErrors] = useState<FormErrors>({})
   const [touched, setTouched] = useState<Record<string, boolean>>({})
@@ -115,7 +198,7 @@ function TenantForm({
   }, [])
 
   const handleChange = useCallback(
-    (field: keyof TenantFormData, value: string) => {
+    (field: 'slug' | 'name' | 'edition', value: string) => {
       setFormData((prev) => ({ ...prev, [field]: value }))
       if (errors[field]) {
         setErrors((prev) => ({ ...prev, [field]: undefined }))
@@ -124,8 +207,18 @@ function TenantForm({
     [errors]
   )
 
+  const handleLimitChange = useCallback((key: keyof GovernorLimitsData, value: string) => {
+    const numValue = value === '' ? 0 : parseInt(value, 10)
+    if (!isNaN(numValue)) {
+      setFormData((prev) => ({
+        ...prev,
+        limits: { ...prev.limits, [key]: numValue },
+      }))
+    }
+  }, [])
+
   const handleBlur = useCallback(
-    (field: keyof TenantFormData) => {
+    (field: 'slug' | 'name' | 'edition') => {
       setTouched((prev) => ({ ...prev, [field]: true }))
       const validationErrors = validateForm(formData, isEditing)
       if (validationErrors[field]) {
@@ -267,6 +360,30 @@ function TenantForm({
               </select>
             </div>
 
+            <fieldset className={styles.limitsFieldset} data-testid="governor-limits-section">
+              <legend className={styles.limitsLegend}>Governor Limits</legend>
+              <div className={styles.limitsGrid}>
+                {LIMIT_FIELDS.map((field) => (
+                  <div key={field.key} className={styles.limitField}>
+                    <label htmlFor={`limit-${field.key}`} className={styles.limitLabel}>
+                      {field.label}
+                    </label>
+                    <input
+                      id={`limit-${field.key}`}
+                      type="number"
+                      className={styles.formInput}
+                      value={formData.limits[field.key]}
+                      onChange={(e) => handleLimitChange(field.key, e.target.value)}
+                      min={field.min}
+                      max={field.max}
+                      disabled={isSubmitting}
+                      data-testid={`limit-${field.key}-input`}
+                    />
+                  </div>
+                ))}
+              </div>
+            </fieldset>
+
             <div className={styles.formActions}>
               <button
                 type="button"
@@ -349,6 +466,7 @@ export function TenantsPage({ testId = 'tenants-page' }: TenantsPageProps): Reac
         slug: data.slug,
         name: data.name,
         edition: data.edition,
+        limits: limitsToApiFormat(data.limits),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tenants'] })
@@ -366,6 +484,7 @@ export function TenantsPage({ testId = 'tenants-page' }: TenantsPageProps): Reac
       apiClient.put<Tenant>(`/control/tenants/${id}`, {
         name: data.name,
         edition: data.edition,
+        limits: limitsToApiFormat(data.limits),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tenants'] })

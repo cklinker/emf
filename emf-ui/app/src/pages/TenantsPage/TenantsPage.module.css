@@ -242,7 +242,7 @@
     0 20px 25px -5px rgba(0, 0, 0, 0.1),
     0 10px 10px -5px rgba(0, 0, 0, 0.04);
   width: 100%;
-  max-width: 500px;
+  max-width: 600px;
   max-height: 90vh;
   overflow-y: auto;
   animation: modalEnter 0.2s ease-out;
@@ -396,6 +396,39 @@
   cursor: not-allowed;
 }
 
+/* Governor Limits Fieldset */
+.limitsFieldset {
+  margin: 0;
+  padding: var(--spacing-md, 1rem);
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: var(--border-radius-md, 0.375rem);
+}
+
+.limitsLegend {
+  padding: 0 var(--spacing-xs, 0.25rem);
+  font-size: var(--font-size-sm, 0.875rem);
+  font-weight: var(--font-weight-semibold, 600);
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+.limitsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-md, 1rem);
+}
+
+.limitField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs, 0.25rem);
+}
+
+.limitLabel {
+  font-size: var(--font-size-xs, 0.75rem);
+  font-weight: var(--font-weight-medium, 500);
+  color: var(--color-text-secondary, #666666);
+}
+
 /* Responsive */
 @media (max-width: 767px) {
   .container {
@@ -414,6 +447,10 @@
   .actions {
     flex-direction: column;
     gap: var(--spacing-xs, 0.25rem);
+  }
+
+  .limitsGrid {
+    grid-template-columns: 1fr;
   }
 }
 

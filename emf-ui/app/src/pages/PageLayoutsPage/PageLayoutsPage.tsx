@@ -1,10 +1,16 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react'
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
 import { getTenantId } from '../../hooks'
 import styles from './PageLayoutsPage.module.css'
+
+interface CollectionSummary {
+  id: string
+  name: string
+  displayName: string
+}
 
 interface PageLayout {
   id: string
@@ -47,14 +53,15 @@ function validateForm(data: PageLayoutFormData): FormErrors {
   if (data.description && data.description.length > 500) {
     errors.description = 'Description must be 500 characters or fewer'
   }
-  if (!data.collectionId.trim()) {
-    errors.collectionId = 'Collection ID is required'
+  if (!data.collectionId) {
+    errors.collectionId = 'Collection is required'
   }
   return errors
 }
 
 interface PageLayoutFormProps {
   layout?: PageLayout
+  collections: CollectionSummary[]
   onSubmit: (data: PageLayoutFormData) => void
   onCancel: () => void
   isSubmitting: boolean
@@ -62,6 +69,7 @@ interface PageLayoutFormProps {
 
 function PageLayoutForm({
   layout,
+  collections,
   onSubmit,
   onCancel,
   isSubmitting,
@@ -233,24 +241,29 @@ function PageLayoutForm({
 
             <div className={styles.formGroup}>
               <label htmlFor="layout-collection-id" className={styles.formLabel}>
-                Collection ID
+                Collection
                 <span className={styles.required} aria-hidden="true">
                   *
                 </span>
               </label>
-              <input
+              <select
                 id="layout-collection-id"
-                type="text"
                 className={`${styles.formInput} ${touched.collectionId && errors.collectionId ? styles.hasError : ''}`}
                 value={formData.collectionId}
                 onChange={(e) => handleChange('collectionId', e.target.value)}
                 onBlur={() => handleBlur('collectionId')}
-                placeholder="Enter collection ID"
                 aria-required="true"
                 aria-invalid={touched.collectionId && !!errors.collectionId}
-                disabled={isSubmitting}
+                disabled={isSubmitting || isEditing}
                 data-testid="layout-collection-id-input"
-              />
+              >
+                <option value="">Select a collection</option>
+                {collections.map((col) => (
+                  <option key={col.id} value={col.id}>
+                    {col.displayName || col.name}
+                  </option>
+                ))}
+              </select>
               {touched.collectionId && errors.collectionId && (
                 <span className={styles.formError} role="alert">
                   {errors.collectionId}
@@ -320,6 +333,25 @@ export function PageLayoutsPage({
     queryKey: ['pageLayouts'],
     queryFn: () => apiClient.get<PageLayout[]>(`/control/layouts?tenantId=${getTenantId()}`),
   })
+
+  const { data: collectionsData } = useQuery({
+    queryKey: ['collections-for-layouts'],
+    queryFn: () =>
+      apiClient.get<{ content: CollectionSummary[] }>('/control/collections?size=1000'),
+  })
+
+  const collections = useMemo<CollectionSummary[]>(
+    () => collectionsData?.content ?? [],
+    [collectionsData]
+  )
+
+  const collectionMap = useMemo(() => {
+    const map = new Map<string, CollectionSummary>()
+    for (const col of collections) {
+      map.set(col.id, col)
+    }
+    return map
+  }, [collections])
 
   const layoutList = layouts ?? []
 
@@ -407,6 +439,14 @@ export function PageLayoutsPage({
     setLayoutToDelete(null)
   }, [])
 
+  const getCollectionName = useCallback(
+    (collectionId: string): string => {
+      const col = collectionMap.get(collectionId)
+      return col ? col.displayName || col.name : collectionId
+    },
+    [collectionMap]
+  )
+
   if (isLoading) {
     return (
       <div className={styles.container} data-testid={testId}>
@@ -488,7 +528,7 @@ export function PageLayoutsPage({
                   data-testid={`layout-row-${index}`}
                 >
                   <td role="gridcell">{layout.name}</td>
-                  <td role="gridcell">{layout.collectionId}</td>
+                  <td role="gridcell">{getCollectionName(layout.collectionId)}</td>
                   <td role="gridcell">
                     <span className={styles.badge}>{layout.layoutType}</span>
                   </td>
@@ -538,6 +578,7 @@ export function PageLayoutsPage({
       {isFormOpen && (
         <PageLayoutForm
           layout={editingLayout}
+          collections={collections}
           onSubmit={handleFormSubmit}
           onCancel={handleCloseForm}
           isSubmitting={isSubmitting}

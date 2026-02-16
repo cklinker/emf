@@ -318,6 +318,39 @@
   background-color: var(--color-surface-hover, #f9fafb);
 }
 
+/* Drag handle column */
+.dragHandleCol {
+  width: 2rem;
+  padding: 0 !important;
+}
+
+.dragHandleCell {
+  width: 2rem;
+  padding: 0 0.25rem !important;
+  text-align: center;
+  cursor: grab;
+}
+
+.dragHandleCell:active {
+  cursor: grabbing;
+}
+
+.dragHandle {
+  font-size: 1rem;
+  color: var(--color-text-muted, #9ca3af);
+  user-select: none;
+  line-height: 1;
+}
+
+.tableRow:hover .dragHandle {
+  color: var(--color-text-secondary, #6b7280);
+}
+
+.dragOver {
+  border-top: 2px solid var(--color-primary, #3b82f6);
+  background-color: var(--color-primary-light, #eff6ff);
+}
+
 /* Field Name Cell */
 .fieldNameCell {
   font-weight: var(--font-weight-medium, 500);

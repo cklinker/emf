@@ -7,6 +7,7 @@ import com.emf.controlplane.dto.CollectionVersionDto;
 import com.emf.controlplane.dto.CreateCollectionRequest;
 import com.emf.controlplane.dto.FieldDto;
 import com.emf.controlplane.dto.UpdateCollectionRequest;
+import com.emf.controlplane.dto.ReorderFieldsRequest;
 import com.emf.controlplane.dto.UpdateFieldRequest;
 import com.emf.controlplane.entity.Collection;
 import com.emf.controlplane.entity.CollectionVersion;
@@ -439,13 +440,44 @@ public class CollectionController {
     }
 
     /**
+     * Bulk-reorders fields in a collection.
+     * Accepts an ordered list of field IDs; position in the list determines the new order (0-based).
+     * Creates a single new CollectionVersion for the entire reorder operation.
+     * Requires ADMIN role authorization.
+     *
+     * @param id The collection ID
+     */
+    @PutMapping("/{id}/fields/reorder")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(
+            summary = "Reorder fields",
+            description = "Bulk-reorders fields in a collection. The position of each field ID in the list becomes its new order. Creates a single new version."
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "204", description = "Fields reordered successfully"),
+            @ApiResponse(responseCode = "400", description = "Invalid request - field IDs don't match active fields"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized"),
+            @ApiResponse(responseCode = "403", description = "Forbidden - requires ADMIN role"),
+            @ApiResponse(responseCode = "404", description = "Collection not found")
+    })
+    public ResponseEntity<Void> reorderFields(
+            @Parameter(description = "Collection ID", required = true)
+            @PathVariable String id,
+            @Valid @RequestBody ReorderFieldsRequest request) {
+
+        log.info("REST request to reorder fields in collection: {}", id);
+        fieldService.reorderFields(id, request.getFieldIds());
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
      * Soft-deletes a field by marking it as inactive.
      * Creates a new CollectionVersion with the field marked as inactive.
      * Requires ADMIN role authorization.
-     * 
+     *
      * @param id The collection ID
      * @param fieldId The field ID to delete
-     * 
+     *
      * Validates: Requirement 2.5
      */
     @DeleteMapping("/{id}/fields/{fieldId}")

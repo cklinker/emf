@@ -18,7 +18,9 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
+import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -674,13 +676,36 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
     }
     
     /**
-     * Reconstructs structured values from companion columns for CURRENCY and GEOLOCATION fields.
-     * CURRENCY: combines primary column (amount) with _currency_code companion into a value + code.
-     * GEOLOCATION: combines primary column (latitude) with _longitude companion into a Map.
+     * Post-processes query results to convert JDBC-specific types into
+     * JSON-serializable Java types and reconstructs structured values
+     * from companion columns.
+     *
+     * <ul>
+     *   <li>MULTI_PICKLIST: converts {@code java.sql.Array} (PgArray) to {@code List<String>}</li>
+     *   <li>CURRENCY: combines primary column (amount) with _currency_code companion</li>
+     *   <li>GEOLOCATION: combines primary column (latitude) with _longitude companion into a Map</li>
+     * </ul>
      */
     private void reconstructCompanionColumns(CollectionDefinition definition, List<Map<String, Object>> records) {
         for (FieldDefinition field : definition.fields()) {
-            if (field.type() == FieldType.CURRENCY) {
+            if (field.type() == FieldType.MULTI_PICKLIST) {
+                for (Map<String, Object> record : records) {
+                    Object value = record.get(field.name());
+                    if (value instanceof java.sql.Array sqlArray) {
+                        try {
+                            Object array = sqlArray.getArray();
+                            if (array instanceof String[] strings) {
+                                record.put(field.name(), Arrays.asList(strings));
+                            } else {
+                                record.put(field.name(), List.of());
+                            }
+                        } catch (SQLException e) {
+                            log.warn("Failed to convert SQL array for field '{}': {}", field.name(), e.getMessage());
+                            record.put(field.name(), List.of());
+                        }
+                    }
+                }
+            } else if (field.type() == FieldType.CURRENCY) {
                 String codeKey = field.name() + "_currency_code";
                 for (Map<String, Object> record : records) {
                     // Ensure currency_code is accessible via the companion key name

@@ -289,7 +289,21 @@ public class CollectionService {
         if (request.getDescription() != null) {
             collection.setDescription(request.getDescription());
         }
-        
+
+        // Update display field if provided
+        if (request.getDisplayFieldId() != null) {
+            if (request.getDisplayFieldId().isEmpty()) {
+                // Empty string means clear the display field
+                collection.setDisplayFieldId(null);
+            } else {
+                // Validate the field belongs to this collection and is active
+                Field displayField = fieldRepository.findByIdAndCollectionIdAndActiveTrue(
+                        request.getDisplayFieldId(), collection.getId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Field", request.getDisplayFieldId()));
+                collection.setDisplayFieldId(displayField.getId());
+            }
+        }
+
         // Increment version and create new version record
         collection.setCurrentVersion(collection.getCurrentVersion() + 1);
         createNewVersion(collection);

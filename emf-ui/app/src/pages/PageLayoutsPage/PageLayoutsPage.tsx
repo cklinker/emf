@@ -325,7 +325,10 @@ export function PageLayoutsPage({
 
   const createMutation = useMutation({
     mutationFn: (data: PageLayoutFormData) =>
-      apiClient.post<PageLayout>(`/control/layouts?tenantId=${getTenantId()}`, data),
+      apiClient.post<PageLayout>(
+        `/control/layouts?tenantId=${getTenantId()}&collectionId=${encodeURIComponent(data.collectionId)}`,
+        data
+      ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pageLayouts'] })
       showToast('Layout created successfully', 'success')

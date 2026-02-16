@@ -11,6 +11,8 @@ import java.util.List;
 @Repository
 public interface ListViewRepository extends JpaRepository<ListView, String> {
 
+    List<ListView> findByTenantIdOrderByNameAsc(String tenantId);
+
     List<ListView> findByTenantIdAndCollectionIdOrderByNameAsc(String tenantId, String collectionId);
 
     @Query("SELECT v FROM ListView v WHERE v.tenantId = :tenantId AND v.collection.id = :collectionId " +

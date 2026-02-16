@@ -37,6 +37,9 @@ public class PageLayoutService {
 
     @Transactional(readOnly = true)
     public List<PageLayout> listLayouts(String tenantId, String collectionId) {
+        if (collectionId == null) {
+            return layoutRepository.findByTenantIdOrderByNameAsc(tenantId);
+        }
         return layoutRepository.findByTenantIdAndCollectionIdOrderByNameAsc(tenantId, collectionId);
     }
 

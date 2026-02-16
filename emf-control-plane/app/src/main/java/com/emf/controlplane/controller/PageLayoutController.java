@@ -24,13 +24,12 @@ public class PageLayoutController {
     public List<PageLayoutDto> listLayouts(
             @RequestParam String tenantId,
             @RequestParam(required = false) String collectionId) {
-        return layoutService.listLayouts(tenantId, collectionId).stream()
-                .map(PageLayoutDto::fromEntity).toList();
+        return layoutService.listLayoutDtos(tenantId, collectionId);
     }
 
     @GetMapping("/{id}")
     public PageLayoutDto getLayout(@PathVariable String id) {
-        return PageLayoutDto.fromEntity(layoutService.getLayout(id));
+        return layoutService.getLayoutDto(id);
     }
 
     @PostMapping
@@ -38,15 +37,15 @@ public class PageLayoutController {
             @RequestParam String tenantId,
             @RequestParam String collectionId,
             @RequestBody CreatePageLayoutRequest request) {
-        var layout = layoutService.createLayout(tenantId, collectionId, request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(PageLayoutDto.fromEntity(layout));
+        var dto = layoutService.createLayout(tenantId, collectionId, request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(dto);
     }
 
     @PutMapping("/{id}")
     public PageLayoutDto updateLayout(
             @PathVariable String id,
             @RequestBody CreatePageLayoutRequest request) {
-        return PageLayoutDto.fromEntity(layoutService.updateLayout(id, request));
+        return layoutService.updateLayout(id, request);
     }
 
     @DeleteMapping("/{id}")
@@ -82,10 +81,10 @@ public class PageLayoutController {
             @RequestParam String collectionId,
             @RequestParam(required = false) String recordTypeId,
             @RequestParam String profileId) {
-        var layout = layoutService.getLayoutForUser(tenantId, collectionId, recordTypeId, profileId);
-        if (layout == null) {
+        var dto = layoutService.getLayoutForUser(tenantId, collectionId, recordTypeId, profileId);
+        if (dto == null) {
             return ResponseEntity.noContent().build();
         }
-        return ResponseEntity.ok(PageLayoutDto.fromEntity(layout));
+        return ResponseEntity.ok(dto);
     }
 }

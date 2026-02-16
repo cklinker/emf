@@ -2,6 +2,7 @@ package com.emf.controlplane.service;
 
 import com.emf.controlplane.audit.SetupAudited;
 import com.emf.controlplane.dto.CreatePageLayoutRequest;
+import com.emf.controlplane.dto.PageLayoutDto;
 import com.emf.controlplane.entity.*;
 import com.emf.controlplane.exception.DuplicateResourceException;
 import com.emf.controlplane.exception.ResourceNotFoundException;
@@ -36,11 +37,21 @@ public class PageLayoutService {
     }
 
     @Transactional(readOnly = true)
-    public List<PageLayout> listLayouts(String tenantId, String collectionId) {
+    public List<PageLayoutDto> listLayoutDtos(String tenantId, String collectionId) {
+        List<PageLayout> layouts;
         if (collectionId == null) {
-            return layoutRepository.findByTenantIdOrderByNameAsc(tenantId);
+            layouts = layoutRepository.findByTenantIdOrderByNameAsc(tenantId);
+        } else {
+            layouts = layoutRepository.findByTenantIdAndCollectionIdOrderByNameAsc(tenantId, collectionId);
         }
-        return layoutRepository.findByTenantIdAndCollectionIdOrderByNameAsc(tenantId, collectionId);
+        return layouts.stream().map(PageLayoutDto::fromEntity).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public PageLayoutDto getLayoutDto(String id) {
+        PageLayout layout = layoutRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("PageLayout", id));
+        return PageLayoutDto.fromEntity(layout);
     }
 
     @Transactional(readOnly = true)
@@ -51,7 +62,7 @@ public class PageLayoutService {
 
     @Transactional
     @SetupAudited(section = "Page Layouts", entityType = "PageLayout")
-    public PageLayout createLayout(String tenantId, String collectionId, CreatePageLayoutRequest request) {
+    public PageLayoutDto createLayout(String tenantId, String collectionId, CreatePageLayoutRequest request) {
         log.info("Creating page layout '{}' for collection: {}", request.getName(), collectionId);
 
         Collection collection = collectionService.getCollection(collectionId);
@@ -87,12 +98,13 @@ public class PageLayoutService {
             }
         }
 
-        return layoutRepository.save(layout);
+        layout = layoutRepository.save(layout);
+        return PageLayoutDto.fromEntity(layout);
     }
 
     @Transactional
     @SetupAudited(section = "Page Layouts", entityType = "PageLayout")
-    public PageLayout updateLayout(String id, CreatePageLayoutRequest request) {
+    public PageLayoutDto updateLayout(String id, CreatePageLayoutRequest request) {
         log.info("Updating page layout: {}", id);
         PageLayout layout = getLayout(id);
 
@@ -130,7 +142,8 @@ public class PageLayoutService {
             }
         }
 
-        return layoutRepository.save(layout);
+        layout = layoutRepository.save(layout);
+        return PageLayoutDto.fromEntity(layout);
     }
 
     @Transactional
@@ -182,29 +195,37 @@ public class PageLayoutService {
     }
 
     @Transactional(readOnly = true)
-    public PageLayout getLayoutForUser(String tenantId, String collectionId,
+    public PageLayoutDto getLayoutForUser(String tenantId, String collectionId,
                                         String recordTypeId, String profileId) {
+        PageLayout layout = null;
+
         // Try exact match: profile + record type
         if (recordTypeId != null) {
             var assignment = assignmentRepository
                     .findByTenantIdAndCollectionIdAndProfileIdAndRecordTypeId(
                             tenantId, collectionId, profileId, recordTypeId);
             if (assignment.isPresent()) {
-                return assignment.get().getLayout();
+                layout = assignment.get().getLayout();
             }
         }
 
         // Fallback: profile with no record type
-        var defaultAssignment = assignmentRepository
-                .findByTenantIdAndCollectionIdAndProfileIdAndRecordTypeIdIsNull(
-                        tenantId, collectionId, profileId);
-        if (defaultAssignment.isPresent()) {
-            return defaultAssignment.get().getLayout();
+        if (layout == null) {
+            var defaultAssignment = assignmentRepository
+                    .findByTenantIdAndCollectionIdAndProfileIdAndRecordTypeIdIsNull(
+                            tenantId, collectionId, profileId);
+            if (defaultAssignment.isPresent()) {
+                layout = defaultAssignment.get().getLayout();
+            }
         }
 
         // Final fallback: default layout for collection
-        return layoutRepository.findByTenantIdAndCollectionIdAndIsDefaultTrue(tenantId, collectionId)
-                .orElse(null);
+        if (layout == null) {
+            layout = layoutRepository.findByTenantIdAndCollectionIdAndIsDefaultTrue(tenantId, collectionId)
+                    .orElse(null);
+        }
+
+        return layout != null ? PageLayoutDto.fromEntity(layout) : null;
     }
 
     private void clearDefaultLayout(String tenantId, String collectionId) {

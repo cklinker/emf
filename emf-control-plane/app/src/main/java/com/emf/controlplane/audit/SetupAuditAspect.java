@@ -78,6 +78,20 @@ public class SetupAuditAspect {
         if (result instanceof BaseEntity entity) {
             return entity.getId();
         }
+        // Also handle DTOs with getId() method
+        if (result != null) {
+            try {
+                var getIdMethod = result.getClass().getMethod("getId");
+                Object id = getIdMethod.invoke(result);
+                if (id != null) {
+                    return id.toString();
+                }
+            } catch (NoSuchMethodException e) {
+                // No getId method
+            } catch (Exception e) {
+                log.trace("Could not extract entity id from result: {}", e.getMessage());
+            }
+        }
         return null;
     }
 

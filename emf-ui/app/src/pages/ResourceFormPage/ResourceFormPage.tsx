@@ -18,7 +18,8 @@ import { useI18n } from '../../context/I18nContext'
 import { getTenantSlug } from '../../context/TenantContext'
 import { usePlugins } from '../../context/PluginContext'
 import { useApi } from '../../context/ApiContext'
-import { useToast, LoadingSpinner, ErrorMessage } from '../../components'
+import { useToast, LoadingSpinner, ErrorMessage, LookupSelect } from '../../components'
+import type { LookupOption } from '../../components'
 import { unwrapResource, wrapResource } from '../../utils/jsonapi'
 import { ApiError } from '../../services/apiClient'
 import type { ApiClient } from '../../services/apiClient'
@@ -60,8 +61,10 @@ export interface FieldDefinition {
   indexed?: boolean
   defaultValue?: unknown
   referenceTarget?: string
+  referenceCollectionId?: string
   fieldTypeConfig?: string
   enumValues?: string[]
+  lookupOptions?: LookupOption[]
   order?: number
   validation?: ValidationRule[]
 }
@@ -83,6 +86,8 @@ export interface CollectionSchema {
   name: string
   displayName: string
   description?: string
+  displayFieldId?: string
+  displayFieldName?: string
   fields: FieldDefinition[]
 }
 
@@ -348,20 +353,116 @@ export function ResourceFormPage({
     enabled: picklistFields.length > 0,
   })
 
-  // Merge picklist values into the schema fields as enumValues
+  // Identify lookup/master_detail/reference fields that need dropdown options
+  const lookupFields = useMemo(() => {
+    if (!schema?.fields) return []
+    return schema.fields.filter(
+      (f) =>
+        (f.type === 'lookup' || f.type === 'master_detail' || f.type === 'reference') &&
+        f.referenceTarget
+    )
+  }, [schema])
+
+  // Fetch lookup options for all lookup/master_detail/reference fields.
+  // For each target collection, fetch its schema (to find display field),
+  // then fetch records to build the options list.
+  const { data: lookupOptionsMap } = useQuery({
+    queryKey: ['lookup-options-for-form', collectionName, lookupFields.map((f) => f.id)],
+    queryFn: async () => {
+      const map: Record<string, LookupOption[]> = {}
+      // Group fields by target collection to avoid duplicate requests
+      const targetMap = new Map<string, FieldDefinition[]>()
+      for (const field of lookupFields) {
+        const target = field.referenceTarget!
+        if (!targetMap.has(target)) {
+          targetMap.set(target, [])
+        }
+        targetMap.get(target)!.push(field)
+      }
+
+      await Promise.all(
+        Array.from(targetMap.entries()).map(async ([targetName, fields]) => {
+          try {
+            // Fetch the target collection schema to find display field
+            const targetSchema = await apiClient.get<CollectionSchema>(
+              `/control/collections/${targetName}`
+            )
+
+            // Determine display field: displayFieldName → 'name' → first string field → 'id'
+            let displayFieldName = 'id'
+            if (targetSchema.displayFieldName) {
+              displayFieldName = targetSchema.displayFieldName
+            } else if (targetSchema.fields) {
+              const nameField = targetSchema.fields.find((f) => f.name.toLowerCase() === 'name')
+              if (nameField) {
+                displayFieldName = nameField.name
+              } else {
+                const firstStringField = targetSchema.fields.find(
+                  (f) => f.type.toUpperCase() === 'STRING'
+                )
+                if (firstStringField) {
+                  displayFieldName = firstStringField.name
+                }
+              }
+            }
+
+            // Fetch records from the target collection
+            const recordsResponse = await apiClient.get<Record<string, unknown>>(
+              `/api/${targetName}?page[size]=200`
+            )
+
+            // Extract records from JSON:API response
+            const data = recordsResponse?.data
+            const records: Array<Record<string, unknown>> = Array.isArray(data) ? data : []
+
+            // Build options from records
+            const options: LookupOption[] = records.map((record: Record<string, unknown>) => {
+              const attrs = (record.attributes || record) as Record<string, unknown>
+              const id = String(record.id || attrs.id || '')
+              const label = attrs[displayFieldName] ? String(attrs[displayFieldName]) : id
+              return { id, label }
+            })
+
+            // Assign to all fields targeting this collection
+            for (const field of fields) {
+              map[field.id] = options
+            }
+          } catch {
+            // If we fail to fetch options, leave the fields empty (graceful degradation)
+            for (const field of fields) {
+              map[field.id] = []
+            }
+          }
+        })
+      )
+      return map
+    },
+    enabled: lookupFields.length > 0,
+  })
+
+  // Merge picklist values and lookup options into the schema fields
   const schemaWithPicklistValues = useMemo<CollectionSchema | undefined>(() => {
     if (!schema) return undefined
-    if (!picklistValuesMap || picklistFields.length === 0) return schema
+    const hasPicklists = picklistValuesMap && picklistFields.length > 0
+    const hasLookups = lookupOptionsMap && lookupFields.length > 0
+    if (!hasPicklists && !hasLookups) return schema
     return {
       ...schema,
       fields: schema.fields.map((f) => {
-        if ((f.type === 'picklist' || f.type === 'multi_picklist') && picklistValuesMap[f.id]) {
-          return { ...f, enumValues: picklistValuesMap[f.id] }
+        let updated = f
+        if ((f.type === 'picklist' || f.type === 'multi_picklist') && picklistValuesMap?.[f.id]) {
+          updated = { ...updated, enumValues: picklistValuesMap[f.id] }
         }
-        return f
+        if (
+          (f.type === 'lookup' || f.type === 'master_detail' || f.type === 'reference') &&
+          lookupOptionsMap?.[f.id]
+        ) {
+          updated = { ...updated, lookupOptions: lookupOptionsMap[f.id] }
+        }
+        return updated
       }),
     }
-  }, [schema, picklistValuesMap, picklistFields])
+  }, [schema, picklistValuesMap, picklistFields, lookupOptionsMap, lookupFields])
 
   // Fetch resource data for edit mode
   const {
@@ -958,20 +1059,45 @@ export function ResourceFormPage({
           break
 
         case 'reference':
-          input = (
-            <input
-              {...commonProps}
-              type="text"
-              className={`${styles.input} ${error ? styles.inputError : ''}`}
-              value={String(value ?? '')}
-              onChange={(e) => handleFieldChange(field.name, e.target.value)}
-              placeholder={
-                field.referenceTarget
-                  ? t('resourceForm.referenceIdPlaceholder', { collection: field.referenceTarget })
-                  : t('resourceForm.referenceId')
-              }
-            />
-          )
+          if (field.lookupOptions && field.lookupOptions.length > 0) {
+            input = (
+              <LookupSelect
+                id={fieldId}
+                name={field.name}
+                value={String(value ?? '')}
+                options={field.lookupOptions}
+                onChange={(v) => handleFieldChange(field.name, v)}
+                placeholder={
+                  field.referenceTarget
+                    ? t('resourceForm.referenceIdPlaceholder', {
+                        collection: field.referenceTarget,
+                      })
+                    : t('resourceForm.referenceId')
+                }
+                required={field.required}
+                disabled={false}
+                error={!!error}
+                data-testid={`field-${field.name}`}
+              />
+            )
+          } else {
+            input = (
+              <input
+                {...commonProps}
+                type="text"
+                className={`${styles.input} ${error ? styles.inputError : ''}`}
+                value={String(value ?? '')}
+                onChange={(e) => handleFieldChange(field.name, e.target.value)}
+                placeholder={
+                  field.referenceTarget
+                    ? t('resourceForm.referenceIdPlaceholder', {
+                        collection: field.referenceTarget,
+                      })
+                    : t('resourceForm.referenceId')
+                }
+              />
+            )
+          }
           break
 
         case 'picklist':
@@ -1192,20 +1318,41 @@ export function ResourceFormPage({
 
         case 'lookup':
         case 'master_detail':
-          input = (
-            <input
-              {...commonProps}
-              type="text"
-              value={String(value || '')}
-              onChange={(e) => handleFieldChange(field.name, e.target.value)}
-              className={`${styles.input} ${error ? styles.inputError : ''}`}
-              placeholder={
-                field.referenceTarget
-                  ? `${t('fields.types.reference')} → ${field.referenceTarget}`
-                  : t('fields.types.reference')
-              }
-            />
-          )
+          if (field.lookupOptions && field.lookupOptions.length > 0) {
+            input = (
+              <LookupSelect
+                id={fieldId}
+                name={field.name}
+                value={String(value ?? '')}
+                options={field.lookupOptions}
+                onChange={(v) => handleFieldChange(field.name, v)}
+                placeholder={
+                  field.referenceTarget
+                    ? `${t('common.select')} ${field.referenceTarget}`
+                    : t('common.select')
+                }
+                required={field.required}
+                disabled={false}
+                error={!!error}
+                data-testid={`field-${field.name}`}
+              />
+            )
+          } else {
+            input = (
+              <input
+                {...commonProps}
+                type="text"
+                value={String(value || '')}
+                onChange={(e) => handleFieldChange(field.name, e.target.value)}
+                className={`${styles.input} ${error ? styles.inputError : ''}`}
+                placeholder={
+                  field.referenceTarget
+                    ? `${t('fields.types.reference')} → ${field.referenceTarget}`
+                    : t('fields.types.reference')
+                }
+              />
+            )
+          }
           break
 
         default:

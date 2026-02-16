@@ -39,6 +39,9 @@ public class Collection extends BaseEntity {
     @Column(name = "current_version", nullable = false)
     private Integer currentVersion = 1;
 
+    @Column(name = "display_field_id", length = 36)
+    private String displayFieldId;
+
     @OneToMany(mappedBy = "collection", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("name ASC")
     private List<Field> fields = new ArrayList<>();
@@ -128,6 +131,14 @@ public class Collection extends BaseEntity {
 
     public void setCurrentVersion(Integer currentVersion) {
         this.currentVersion = currentVersion;
+    }
+
+    public String getDisplayFieldId() {
+        return displayFieldId;
+    }
+
+    public void setDisplayFieldId(String displayFieldId) {
+        this.displayFieldId = displayFieldId;
     }
 
     public List<Field> getFields() {

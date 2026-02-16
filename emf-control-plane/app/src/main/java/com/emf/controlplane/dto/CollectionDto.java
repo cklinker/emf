@@ -19,6 +19,8 @@ public class CollectionDto {
     private boolean active;
     private boolean systemCollection;
     private Integer currentVersion;
+    private String displayFieldId;
+    private String displayFieldName;
     private List<FieldDto> fields;
     private Instant createdAt;
     private Instant updatedAt;
@@ -28,8 +30,8 @@ public class CollectionDto {
 
     public CollectionDto(String id, String name, String displayName, String description,
                          String storageMode, boolean active, boolean systemCollection,
-                         Integer currentVersion, List<FieldDto> fields,
-                         Instant createdAt, Instant updatedAt) {
+                         Integer currentVersion, String displayFieldId, String displayFieldName,
+                         List<FieldDto> fields, Instant createdAt, Instant updatedAt) {
         this.id = id;
         this.name = name;
         this.displayName = displayName;
@@ -38,6 +40,8 @@ public class CollectionDto {
         this.active = active;
         this.systemCollection = systemCollection;
         this.currentVersion = currentVersion;
+        this.displayFieldId = displayFieldId;
+        this.displayFieldName = displayFieldName;
         this.fields = fields;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
@@ -62,6 +66,8 @@ public class CollectionDto {
                 collection.isActive(),
                 collection.isSystemCollection(),
                 collection.getCurrentVersion(),
+                collection.getDisplayFieldId(),
+                null, // displayFieldName - resolved when fields are available
                 null, // fields - populated separately to avoid circular references
                 collection.getCreatedAt(),
                 collection.getUpdatedAt()
@@ -70,6 +76,7 @@ public class CollectionDto {
 
     /**
      * Creates a CollectionDto from a Collection entity with fields.
+     * Resolves the display field name from the field list.
      *
      * @param collection The collection entity to convert
      * @param fields The fields for this collection
@@ -78,6 +85,14 @@ public class CollectionDto {
     public static CollectionDto fromEntityWithDetails(Collection collection, List<FieldDto> fields) {
         if (collection == null) {
             return null;
+        }
+        String displayFieldName = null;
+        if (collection.getDisplayFieldId() != null && fields != null) {
+            displayFieldName = fields.stream()
+                    .filter(f -> f.getId().equals(collection.getDisplayFieldId()))
+                    .map(FieldDto::getName)
+                    .findFirst()
+                    .orElse(null);
         }
         return new CollectionDto(
                 collection.getId(),
@@ -88,6 +103,8 @@ public class CollectionDto {
                 collection.isActive(),
                 collection.isSystemCollection(),
                 collection.getCurrentVersion(),
+                collection.getDisplayFieldId(),
+                displayFieldName,
                 fields,
                 collection.getCreatedAt(),
                 collection.getUpdatedAt()
@@ -158,6 +175,22 @@ public class CollectionDto {
         this.currentVersion = currentVersion;
     }
 
+    public String getDisplayFieldId() {
+        return displayFieldId;
+    }
+
+    public void setDisplayFieldId(String displayFieldId) {
+        this.displayFieldId = displayFieldId;
+    }
+
+    public String getDisplayFieldName() {
+        return displayFieldName;
+    }
+
+    public void setDisplayFieldName(String displayFieldName) {
+        this.displayFieldName = displayFieldName;
+    }
+
     public List<FieldDto> getFields() {
         return fields;
     }
@@ -193,6 +226,8 @@ public class CollectionDto {
                 ", active=" + active +
                 ", systemCollection=" + systemCollection +
                 ", currentVersion=" + currentVersion +
+                ", displayFieldId='" + displayFieldId + '\'' +
+                ", displayFieldName='" + displayFieldName + '\'' +
                 ", fieldsCount=" + (fields != null ? fields.size() : 0) +
                 ", createdAt=" + createdAt +
                 ", updatedAt=" + updatedAt +
@@ -212,12 +247,15 @@ public class CollectionDto {
                 java.util.Objects.equals(description, that.description) &&
                 java.util.Objects.equals(storageMode, that.storageMode) &&
                 java.util.Objects.equals(currentVersion, that.currentVersion) &&
+                java.util.Objects.equals(displayFieldId, that.displayFieldId) &&
+                java.util.Objects.equals(displayFieldName, that.displayFieldName) &&
                 java.util.Objects.equals(createdAt, that.createdAt) &&
                 java.util.Objects.equals(updatedAt, that.updatedAt);
     }
 
     @Override
     public int hashCode() {
-        return java.util.Objects.hash(id, name, displayName, description, storageMode, active, systemCollection, currentVersion, createdAt, updatedAt);
+        return java.util.Objects.hash(id, name, displayName, description, storageMode, active,
+                systemCollection, currentVersion, displayFieldId, displayFieldName, createdAt, updatedAt);
     }
 }

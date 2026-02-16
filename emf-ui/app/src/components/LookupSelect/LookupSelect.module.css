@@ -1,0 +1,182 @@
+/**
+ * LookupSelect Styles
+ *
+ * Searchable dropdown for selecting records from a related collection.
+ */
+
+.container {
+  position: relative;
+  width: 100%;
+}
+
+/* Trigger button — looks like an input */
+.trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 38px;
+  padding: var(--spacing-sm, 0.5rem) var(--spacing-md, 1rem);
+  font-size: var(--font-size-sm, 0.875rem);
+  color: var(--color-text-primary, #1a1a1a);
+  background-color: var(--color-surface-primary, #ffffff);
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: var(--border-radius-md, 0.375rem);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.trigger:hover:not(:disabled) {
+  border-color: var(--color-border-hover, #9ca3af);
+}
+
+.trigger:focus {
+  outline: none;
+  border-color: var(--color-focus-ring, #0066cc);
+  box-shadow: 0 0 0 3px var(--color-focus-ring-alpha, rgba(0, 102, 204, 0.2));
+}
+
+.triggerError {
+  border-color: var(--color-error, #dc2626);
+}
+
+.triggerDisabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background-color: var(--color-surface-secondary, #f5f5f5);
+}
+
+.triggerText {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.placeholder {
+  color: var(--color-text-tertiary, #9ca3af);
+}
+
+.unknownValue {
+  font-style: italic;
+  color: var(--color-text-secondary, #666666);
+}
+
+.triggerIcons {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs, 0.25rem);
+  margin-left: var(--spacing-sm, 0.5rem);
+  flex-shrink: 0;
+}
+
+.clearButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  font-size: 14px;
+  color: var(--color-text-secondary, #666666);
+  cursor: pointer;
+  border-radius: 50%;
+  transition: background-color 0.15s ease;
+}
+
+.clearButton:hover {
+  background-color: var(--color-surface-hover, #f9fafb);
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+.chevron {
+  font-size: 10px;
+  color: var(--color-text-secondary, #666666);
+  transition: transform 0.2s ease;
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+/* Dropdown panel */
+.dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 50;
+  background-color: var(--color-surface-primary, #ffffff);
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: var(--border-radius-md, 0.375rem);
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.searchInput {
+  width: 100%;
+  padding: var(--spacing-sm, 0.5rem) var(--spacing-md, 1rem);
+  font-size: var(--font-size-sm, 0.875rem);
+  color: var(--color-text-primary, #1a1a1a);
+  background-color: var(--color-surface-primary, #ffffff);
+  border: none;
+  border-bottom: 1px solid var(--color-border, #d1d5db);
+  border-radius: var(--border-radius-md, 0.375rem) var(--border-radius-md, 0.375rem) 0 0;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.searchInput:focus {
+  border-bottom-color: var(--color-focus-ring, #0066cc);
+}
+
+/* Options list */
+.optionsList {
+  list-style: none;
+  margin: 0;
+  padding: var(--spacing-xs, 0.25rem) 0;
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.option {
+  padding: var(--spacing-sm, 0.5rem) var(--spacing-md, 1rem);
+  font-size: var(--font-size-sm, 0.875rem);
+  color: var(--color-text-primary, #1a1a1a);
+  cursor: pointer;
+  transition: background-color 0.1s ease;
+}
+
+.option:hover {
+  background-color: var(--color-surface-hover, #f9fafb);
+}
+
+.optionSelected {
+  font-weight: var(--font-weight-medium, 500);
+  color: var(--color-button-primary, #0066cc);
+}
+
+.optionHighlighted {
+  background-color: var(--color-surface-hover, #f9fafb);
+}
+
+.noResults {
+  padding: var(--spacing-md, 1rem);
+  font-size: var(--font-size-sm, 0.875rem);
+  color: var(--color-text-secondary, #666666);
+  text-align: center;
+  cursor: default;
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .trigger,
+  .clearButton,
+  .chevron,
+  .option {
+    transition: none;
+  }
+}

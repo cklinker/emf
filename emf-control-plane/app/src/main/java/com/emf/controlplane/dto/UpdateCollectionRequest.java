@@ -13,6 +13,9 @@ public class UpdateCollectionRequest {
     @Size(max = 500, message = "Description must not exceed 500 characters")
     private String description;
 
+    @Size(max = 36, message = "Display field ID must not exceed 36 characters")
+    private String displayFieldId;
+
     public UpdateCollectionRequest() {
     }
 
@@ -37,11 +40,20 @@ public class UpdateCollectionRequest {
         this.description = description;
     }
 
+    public String getDisplayFieldId() {
+        return displayFieldId;
+    }
+
+    public void setDisplayFieldId(String displayFieldId) {
+        this.displayFieldId = displayFieldId;
+    }
+
     @Override
     public String toString() {
         return "UpdateCollectionRequest{" +
                 "name='" + name + '\'' +
                 ", description='" + description + '\'' +
+                ", displayFieldId='" + displayFieldId + '\'' +
                 '}';
     }
 }

@@ -1,10 +1,16 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react'
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
 import { getTenantId } from '../../hooks'
 import styles from './ListViewsPage.module.css'
+
+interface CollectionSummary {
+  id: string
+  name: string
+  displayName: string
+}
 
 interface ListView {
   id: string
@@ -48,8 +54,8 @@ function validateForm(data: ListViewFormData): FormErrors {
   } else if (data.name.length > 100) {
     errors.name = 'Name must be 100 characters or less'
   }
-  if (!data.collectionId.trim()) {
-    errors.collectionId = 'Collection ID is required'
+  if (!data.collectionId) {
+    errors.collectionId = 'Collection is required'
   }
   if (data.columns.trim()) {
     try {
@@ -70,6 +76,7 @@ function validateForm(data: ListViewFormData): FormErrors {
 
 interface ListViewFormProps {
   listView?: ListView
+  collections: CollectionSummary[]
   onSubmit: (data: ListViewFormData) => void
   onCancel: () => void
   isSubmitting: boolean
@@ -77,6 +84,7 @@ interface ListViewFormProps {
 
 function ListViewForm({
   listView,
+  collections,
   onSubmit,
   onCancel,
   isSubmitting,
@@ -205,24 +213,29 @@ function ListViewForm({
 
             <div className={styles.formGroup}>
               <label htmlFor="listview-collectionId" className={styles.formLabel}>
-                Collection ID
+                Collection
                 <span className={styles.required} aria-hidden="true">
                   *
                 </span>
               </label>
-              <input
+              <select
                 id="listview-collectionId"
-                type="text"
                 className={`${styles.formInput} ${touched.collectionId && errors.collectionId ? styles.hasError : ''}`}
                 value={formData.collectionId}
                 onChange={(e) => handleChange('collectionId', e.target.value)}
                 onBlur={() => handleBlur('collectionId')}
-                placeholder="Enter collection ID"
                 aria-required="true"
                 aria-invalid={touched.collectionId && !!errors.collectionId}
-                disabled={isSubmitting}
+                disabled={isSubmitting || isEditing}
                 data-testid="listview-collectionId-input"
-              />
+              >
+                <option value="">Select a collection</option>
+                {collections.map((col) => (
+                  <option key={col.id} value={col.id}>
+                    {col.displayName || col.name}
+                  </option>
+                ))}
+              </select>
               {touched.collectionId && errors.collectionId && (
                 <span className={styles.formError} role="alert">
                   {errors.collectionId}
@@ -376,6 +389,25 @@ export function ListViewsPage({
     queryFn: () => apiClient.get<ListView[]>(`/control/listviews?tenantId=${getTenantId()}`),
   })
 
+  const { data: collectionsData } = useQuery({
+    queryKey: ['collections-for-listviews'],
+    queryFn: () =>
+      apiClient.get<{ content: CollectionSummary[] }>('/control/collections?size=1000'),
+  })
+
+  const collections = useMemo<CollectionSummary[]>(
+    () => collectionsData?.content ?? [],
+    [collectionsData]
+  )
+
+  const collectionMap = useMemo(() => {
+    const map = new Map<string, CollectionSummary>()
+    for (const col of collections) {
+      map.set(col.id, col)
+    }
+    return map
+  }, [collections])
+
   const listViewList: ListView[] = listViews ?? []
 
   const createMutation = useMutation({
@@ -407,7 +439,6 @@ export function ListViewsPage({
     mutationFn: ({ id, data }: { id: string; data: ListViewFormData }) => {
       const payload = {
         name: data.name,
-        collectionId: data.collectionId,
         visibility: data.visibility,
         columns: data.columns.trim() || '[]',
         filters: data.filters.trim() || '[]',
@@ -480,6 +511,14 @@ export function ListViewsPage({
     setDeleteDialogOpen(false)
     setListViewToDelete(null)
   }, [])
+
+  const getCollectionName = useCallback(
+    (collectionId: string): string => {
+      const col = collectionMap.get(collectionId)
+      return col ? col.displayName || col.name : collectionId
+    },
+    [collectionMap]
+  )
 
   const getVisibilityBadgeClass = (visibility: string): string => {
     switch (visibility) {
@@ -573,7 +612,7 @@ export function ListViewsPage({
                   data-testid={`listview-row-${index}`}
                 >
                   <td role="gridcell">{lv.name}</td>
-                  <td role="gridcell">{lv.collectionId}</td>
+                  <td role="gridcell">{getCollectionName(lv.collectionId)}</td>
                   <td role="gridcell">
                     <span className={`${styles.badge} ${getVisibilityBadgeClass(lv.visibility)}`}>
                       {lv.visibility}
@@ -619,6 +658,7 @@ export function ListViewsPage({
       {isFormOpen && (
         <ListViewForm
           listView={editingListView}
+          collections={collections}
           onSubmit={handleFormSubmit}
           onCancel={handleCloseForm}
           isSubmitting={isSubmitting}

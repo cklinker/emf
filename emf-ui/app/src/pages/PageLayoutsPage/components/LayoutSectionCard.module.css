@@ -176,6 +176,26 @@
   font-size: 12px;
 }
 
+/* Spanning Field Indicator */
+.spanningFieldWrapper {
+  position: relative;
+}
+
+.spanBadge {
+  position: absolute;
+  top: -6px;
+  right: -4px;
+  padding: 1px 5px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--color-text-on-primary, #ffffff);
+  background-color: var(--color-primary, #2563eb);
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 1;
+}
+
 /* Responsive */
 @media (max-width: 767px) {
   .sectionHeader {

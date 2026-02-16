@@ -287,6 +287,7 @@ public class PageLayoutService {
         lf.setSection(section);
         lf.setField(field);
         lf.setColumnNumber(fieldReq.getColumnNumber());
+        lf.setColumnSpan(fieldReq.getColumnSpan());
         lf.setSortOrder(fieldReq.getSortOrder());
         lf.setRequiredOnLayout(fieldReq.isRequiredOnLayout());
         lf.setReadOnlyOnLayout(fieldReq.isReadOnlyOnLayout());

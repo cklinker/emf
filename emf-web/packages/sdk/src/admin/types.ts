@@ -926,6 +926,7 @@ export interface LayoutFieldPlacement {
   fieldType?: string;
   fieldDisplayName?: string;
   columnNumber: number;
+  columnSpan?: number;
   sortOrder: number;
   requiredOnLayout: boolean;
   readOnlyOnLayout: boolean;
@@ -971,6 +972,7 @@ export interface CreateLayoutSectionRequest {
 export interface CreateFieldPlacementRequest {
   fieldId: string;
   columnNumber?: number;
+  columnSpan?: number;
   sortOrder: number;
   requiredOnLayout?: boolean;
   readOnlyOnLayout?: boolean;

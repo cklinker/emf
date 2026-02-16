@@ -20,6 +20,7 @@ export interface EditorFieldPlacement {
   fieldType?: string
   fieldDisplayName?: string
   columnNumber: number
+  columnSpan?: number
   sortOrder: number
   requiredOnLayout: boolean
   readOnlyOnLayout: boolean

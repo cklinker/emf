@@ -102,6 +102,7 @@ interface ApiFieldPlacement {
   fieldType?: string
   fieldDisplayName?: string
   columnNumber: number
+  columnSpan?: number
   sortOrder: number
   requiredOnLayout: boolean
   readOnlyOnLayout: boolean
@@ -193,6 +194,7 @@ function apiFieldToEditor(f: ApiFieldPlacement): EditorFieldPlacement {
     fieldType: f.fieldType,
     fieldDisplayName: f.fieldDisplayName,
     columnNumber: f.columnNumber,
+    columnSpan: f.columnSpan,
     sortOrder: f.sortOrder,
     requiredOnLayout: f.requiredOnLayout,
     readOnlyOnLayout: f.readOnlyOnLayout,
@@ -232,6 +234,7 @@ function editorSectionsToApi(sections: EditorSection[]): {
   fields: {
     fieldId: string
     columnNumber: number
+    columnSpan?: number
     sortOrder: number
     requiredOnLayout: boolean
     readOnlyOnLayout: boolean
@@ -259,6 +262,7 @@ function editorSectionsToApi(sections: EditorSection[]): {
         .map((f) => ({
           fieldId: f.fieldId,
           columnNumber: f.columnNumber,
+          columnSpan: f.columnSpan && f.columnSpan > 1 ? f.columnSpan : undefined,
           sortOrder: f.sortOrder,
           requiredOnLayout: f.requiredOnLayout,
           readOnlyOnLayout: f.readOnlyOnLayout,

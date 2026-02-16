@@ -61,6 +61,7 @@ public class CreatePageLayoutRequest {
     public static class FieldPlacementRequest {
         private String fieldId;
         private int columnNumber = 1;
+        private int columnSpan = 1;
         private int sortOrder;
         private boolean requiredOnLayout;
         private boolean readOnlyOnLayout;
@@ -72,6 +73,8 @@ public class CreatePageLayoutRequest {
         public void setFieldId(String fieldId) { this.fieldId = fieldId; }
         public int getColumnNumber() { return columnNumber; }
         public void setColumnNumber(int columnNumber) { this.columnNumber = columnNumber; }
+        public int getColumnSpan() { return columnSpan; }
+        public void setColumnSpan(int columnSpan) { this.columnSpan = columnSpan; }
         public int getSortOrder() { return sortOrder; }
         public void setSortOrder(int sortOrder) { this.sortOrder = sortOrder; }
         public boolean isRequiredOnLayout() { return requiredOnLayout; }

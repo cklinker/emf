@@ -773,5 +773,95 @@
       "picklistRequired": "قائمة الاختيار العامة مطلوبة لحقول القوائم",
       "descriptionTooLong": "يجب ألا يتجاوز الوصف 500 حرف"
     }
+  },
+  "layouts": {
+    "title": "تخطيطات الصفحات",
+    "createLayout": "تخطيط جديد",
+    "editLayout": "تعديل التخطيط",
+    "deleteLayout": "حذف التخطيط",
+    "cloneLayout": "نسخ التخطيط",
+    "viewLayout": "عرض التخطيط",
+    "backToList": "العودة إلى التخطيطات",
+    "name": "الاسم",
+    "description": "الوصف",
+    "collection": "المجموعة",
+    "layoutType": "نوع التخطيط",
+    "default": "افتراضي",
+    "created": "تاريخ الإنشاء",
+    "updated": "تاريخ التحديث",
+    "actions": "الإجراءات",
+    "noLayouts": "لم يتم العثور على تخطيطات صفحات.",
+    "noLayoutsHint": "انقر على \"تخطيط جديد\" لإنشاء أول تخطيط صفحة.",
+    "confirmDelete": "هل أنت متأكد من حذف هذا التخطيط؟ لا يمكن التراجع عن هذا الإجراء.",
+    "namePlaceholder": "مثال: تخطيط تفاصيل الحساب",
+    "descriptionPlaceholder": "أدخل وصفاً لهذا التخطيط...",
+    "selectCollection": "اختر مجموعة...",
+    "validation": {
+      "nameRequired": "الاسم مطلوب",
+      "nameTooLong": "يجب أن يكون الاسم 100 حرف أو أقل",
+      "descriptionTooLong": "يجب أن يكون الوصف 500 حرف أو أقل",
+      "collectionRequired": "المجموعة مطلوبة"
+    },
+    "editor": {
+      "fieldPalette": "الحقول",
+      "relatedListPalette": "القوائم المرتبطة",
+      "searchFields": "بحث في الحقول...",
+      "addSection": "إضافة قسم",
+      "addRelatedList": "إضافة قائمة مرتبطة",
+      "newSection": "قسم جديد",
+      "noSections": "لا توجد أقسام بعد. انقر على \"إضافة قسم\" للبدء.",
+      "noFields": "اسحب الحقول من اللوحة لإضافتها إلى هذا القسم.",
+      "fieldAlreadyPlaced": "مُضاف",
+      "clickToAdd": "انقر للإضافة إلى القسم المحدد",
+      "save": "حفظ التخطيط",
+      "cancel": "إلغاء",
+      "unsavedChanges": "لديك تغييرات غير محفوظة. هل تريد تجاهلها؟",
+      "saveSuccess": "تم حفظ التخطيط بنجاح",
+      "saveError": "فشل حفظ التخطيط",
+      "removeField": "إزالة الحقل",
+      "removeSection": "إزالة القسم",
+      "columnsCount": "{{count}} عمود"
+    },
+    "properties": {
+      "sectionProperties": "خصائص القسم",
+      "fieldProperties": "خصائص الحقل",
+      "relatedListProperties": "خصائص القائمة المرتبطة",
+      "heading": "العنوان",
+      "columns": "الأعمدة",
+      "style": "النمط",
+      "collapsed": "مطوي افتراضياً",
+      "columnNumber": "العمود",
+      "requiredOnLayout": "مطلوب في التخطيط",
+      "readOnlyOnLayout": "للقراءة فقط في التخطيط",
+      "displayColumns": "أعمدة العرض",
+      "sortField": "حقل الترتيب",
+      "sortDirection": "اتجاه الترتيب",
+      "rowLimit": "حد الصفوف",
+      "selectItem": "اختر قسماً أو حقلاً أو قائمة مرتبطة لعرض خصائصه.",
+      "fieldName": "الحقل",
+      "fieldType": "النوع"
+    },
+    "viewer": {
+      "sections": "الأقسام",
+      "relatedLists": "القوائم المرتبطة",
+      "noSections": "هذا التخطيط لا يحتوي على أقسام.",
+      "noRelatedLists": "لم يتم تكوين قوائم مرتبطة.",
+      "fields": "حقول",
+      "column": "العمود",
+      "required": "مطلوب",
+      "readOnly": "للقراءة فقط",
+      "collapsed": "مطوي"
+    },
+    "types": {
+      "DETAIL": "تفاصيل",
+      "EDIT": "تعديل",
+      "MINI": "مصغر",
+      "LIST": "قائمة"
+    },
+    "styles": {
+      "DEFAULT": "افتراضي",
+      "CARD": "بطاقة",
+      "COMPACT": "مضغوط"
+    }
   }
 }

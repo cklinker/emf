@@ -1,6 +1,9 @@
 /**
  * PageLayoutsPage Styles
+ * Covers: list table, viewer, WYSIWYG editor (palette + canvas + properties)
  */
+
+/* ─── Container & Layout ──────────────────────────────────────────────────── */
 
 .container {
   padding: 2rem;
@@ -15,7 +18,8 @@
   min-height: 400px;
 }
 
-/* Header */
+/* ─── Header ──────────────────────────────────────────────────────────────── */
+
 .header {
   display: flex;
   justify-content: space-between;
@@ -31,6 +35,9 @@
 }
 
 .createButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
   padding: 0.75rem 1.5rem;
   font-size: 1rem;
   font-weight: 500;
@@ -51,7 +58,41 @@
   outline-offset: 2px;
 }
 
-/* Table */
+/* ─── Empty State ─────────────────────────────────────────────────────────── */
+
+.emptyState {
+  padding: 4rem 2rem;
+  text-align: center;
+  color: var(--color-text-secondary, #6b7280);
+  background: #fff;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.emptyIcon {
+  color: var(--color-text-secondary, #9ca3af);
+  margin-bottom: 0.5rem;
+}
+
+.emptyTitle {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--color-text-primary, #1a1a1a);
+  margin: 0;
+}
+
+.emptyHint {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary, #6b7280);
+  margin: 0;
+}
+
+/* ─── Table (List mode) ───────────────────────────────────────────────────── */
+
 .tableContainer {
   background: #fff;
   border: 1px solid var(--color-border, #e5e7eb);
@@ -98,15 +139,23 @@
   color: var(--color-text-primary, #1a1a1a);
 }
 
-.descriptionCell {
-  color: var(--color-text-secondary, #6b7280);
-  max-width: 300px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.nameLink {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-primary, #0066cc);
+  cursor: pointer;
+  text-decoration: none;
 }
 
-/* Badge */
+.nameLink:hover {
+  text-decoration: underline;
+}
+
+/* ─── Badges ──────────────────────────────────────────────────────────────── */
+
 .badge {
   display: inline-block;
   padding: 0.25rem 0.75rem;
@@ -137,7 +186,8 @@
   background-color: #f3f4f6;
 }
 
-/* Actions */
+/* ─── Actions ─────────────────────────────────────────────────────────────── */
+
 .actionsCell {
   text-align: right;
 }
@@ -149,8 +199,11 @@
 }
 
 .actionButton {
-  padding: 0.5rem 1rem;
-  font-size: 0.875rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 0.875rem;
+  font-size: 0.8125rem;
   font-weight: 500;
   color: var(--color-primary, #0066cc);
   background-color: transparent;
@@ -179,17 +232,8 @@
   background-color: #fef2f2;
 }
 
-/* Empty State */
-.emptyState {
-  padding: 4rem 2rem;
-  text-align: center;
-  color: var(--color-text-secondary, #6b7280);
-  background: #fff;
-  border: 1px solid var(--color-border, #e5e7eb);
-  border-radius: 0.5rem;
-}
+/* ─── Modal ───────────────────────────────────────────────────────────────── */
 
-/* Modal */
 .modalOverlay {
   position: fixed;
   top: 0;
@@ -232,9 +276,10 @@
 }
 
 .modalCloseButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 0.5rem;
-  font-size: 1.5rem;
-  line-height: 1;
   color: var(--color-text-secondary, #6b7280);
   background: transparent;
   border: none;
@@ -252,7 +297,8 @@
   padding: 1.5rem;
 }
 
-/* Form */
+/* ─── Form ────────────────────────────────────────────────────────────────── */
+
 .form {
   display: flex;
   flex-direction: column;
@@ -308,11 +354,6 @@
   font-family: inherit;
 }
 
-.formHint {
-  font-size: 0.75rem;
-  color: var(--color-text-secondary, #6b7280);
-}
-
 .formError {
   font-size: 0.75rem;
   color: #dc2626;
@@ -361,6 +402,9 @@
 }
 
 .submitButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
   padding: 0.625rem 1.25rem;
   font-size: 0.875rem;
   font-weight: 500;
@@ -381,7 +425,901 @@
   cursor: not-allowed;
 }
 
-/* Responsive */
+/* ─── Viewer ──────────────────────────────────────────────────────────────── */
+
+.viewerContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.viewerHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.viewerHeaderLeft {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.viewerTitle {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+.viewerDescription {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary, #6b7280);
+  margin: 0;
+}
+
+.viewerMeta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.metaItem {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary, #6b7280);
+}
+
+.viewerActions {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.viewerContent {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.viewerSection {
+  background: #fff;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.viewerSectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background-color: var(--color-bg-secondary, #f9fafb);
+  border-bottom: 1px solid var(--color-border, #e5e7eb);
+}
+
+.viewerSectionHeading {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+.viewerSectionMeta {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary, #6b7280);
+}
+
+.viewerSectionEmpty {
+  padding: 1.5rem;
+  text-align: center;
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary, #9ca3af);
+}
+
+.viewerFieldGrid {
+  display: grid;
+  gap: 0.5rem;
+  padding: 1rem;
+}
+
+.viewerFieldCard {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  background-color: var(--color-bg-secondary, #f9fafb);
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 0.375rem;
+}
+
+.viewerFieldName {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+.viewerFieldFlags {
+  display: flex;
+  gap: 0.375rem;
+}
+
+.viewerFieldFlag {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  color: #92400e;
+  background-color: #fef3c7;
+}
+
+.viewerRelatedSection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding-top: 0.5rem;
+  border-top: 2px solid var(--color-border, #e5e7eb);
+}
+
+.viewerRelatedGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 0.75rem;
+}
+
+.viewerRelatedCard {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background: #fff;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 0.375rem;
+}
+
+.viewerRelatedName {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+.viewerRelatedMeta {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary, #6b7280);
+}
+
+.viewerEmpty {
+  padding: 4rem 2rem;
+  text-align: center;
+  color: var(--color-text-secondary, #6b7280);
+  background: #fff;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.backButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 0.875rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-text-secondary, #6b7280);
+  background: transparent;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.backButton:hover {
+  color: var(--color-text-primary, #1a1a1a);
+  border-color: var(--color-text-secondary, #6b7280);
+  background-color: var(--color-bg-secondary, #f9fafb);
+}
+
+.editDashboardButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #fff;
+  background-color: var(--color-primary, #0066cc);
+  border: none;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.editDashboardButton:hover {
+  background-color: var(--color-primary-dark, #0052a3);
+}
+
+/* ─── Editor ──────────────────────────────────────────────────────────────── */
+
+.editorContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-height: calc(100vh - 8rem);
+}
+
+.editorToolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--color-border, #e5e7eb);
+}
+
+.editorToolbarLeft {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.editorToolbarRight {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.editorTitleGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.editorTitle {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+.editorSubtitle {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary, #6b7280);
+}
+
+.editorBody {
+  display: flex;
+  gap: 1.5rem;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ─── Field Palette (left panel) ──────────────────────────────────────────── */
+
+.palette {
+  width: 260px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 0.5rem;
+  overflow: hidden;
+  position: sticky;
+  top: 1rem;
+  align-self: flex-start;
+  max-height: calc(100vh - 12rem);
+}
+
+.paletteHeader {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--color-border, #e5e7eb);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.paletteSectionTitle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+.paletteSearch {
+  position: relative;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 0.625rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-text-secondary, #9ca3af);
+  pointer-events: none;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 0.5rem 0.625rem 0.5rem 2rem;
+  font-size: 0.8125rem;
+  color: var(--color-text-primary, #1a1a1a);
+  background-color: var(--color-bg-secondary, #f9fafb);
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 0.375rem;
+  box-sizing: border-box;
+}
+
+.searchInput:focus {
+  outline: none;
+  border-color: var(--color-primary, #0066cc);
+  background-color: #fff;
+}
+
+.paletteFieldList {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.5rem;
+}
+
+.paletteField {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.625rem;
+  border-radius: 0.375rem;
+  cursor: grab;
+  transition: background-color 0.15s;
+  font-size: 0.8125rem;
+}
+
+.paletteField:hover {
+  background-color: var(--color-bg-secondary, #f3f4f6);
+}
+
+.paletteField:active {
+  cursor: grabbing;
+}
+
+.paletteFieldPlaced {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.paletteFieldDragHandle {
+  color: var(--color-text-secondary, #9ca3af);
+  flex-shrink: 0;
+}
+
+.paletteFieldName {
+  flex: 1;
+  font-weight: 500;
+  color: var(--color-text-primary, #1a1a1a);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.paletteFieldType {
+  font-size: 0.6875rem;
+  color: var(--color-text-secondary, #9ca3af);
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.paletteFieldBadge {
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: #065f46;
+  background-color: #d1fae5;
+  padding: 0.125rem 0.375rem;
+  border-radius: 9999px;
+  flex-shrink: 0;
+}
+
+.paletteEmpty {
+  padding: 2rem 1rem;
+  text-align: center;
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary, #9ca3af);
+}
+
+/* ─── Canvas (center panel) ───────────────────────────────────────────────── */
+
+.canvas {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.canvasEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+  color: var(--color-text-secondary, #9ca3af);
+  background: #fff;
+  border: 2px dashed var(--color-border, #e5e7eb);
+  border-radius: 0.5rem;
+  text-align: center;
+  min-height: 300px;
+}
+
+.canvasEmpty p {
+  margin: 0.5rem 0 0;
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.canvasEmptyHint {
+  font-size: 0.8125rem !important;
+  font-weight: 400 !important;
+  color: var(--color-text-secondary, #9ca3af);
+}
+
+/* Section drop zone */
+.sectionDropZone {
+  height: 8px;
+  margin: 0 0.5rem;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.sectionDropZone.dropZoneActive {
+  height: 4px;
+  background-color: var(--color-primary, #0066cc);
+  margin: 4px 0.5rem;
+}
+
+/* Section card */
+.section {
+  background: #fff;
+  border: 2px solid var(--color-border, #e5e7eb);
+  border-radius: 0.5rem;
+  overflow: hidden;
+  transition: border-color 0.2s;
+  margin-bottom: 0;
+}
+
+.section:hover {
+  border-color: var(--color-primary-light, #93c5fd);
+}
+
+.sectionSelected {
+  border-color: var(--color-primary, #0066cc);
+  box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 0.75rem;
+  background-color: var(--color-bg-secondary, #f9fafb);
+  border-bottom: 1px solid var(--color-border, #e5e7eb);
+  cursor: grab;
+}
+
+.sectionHeader:active {
+  cursor: grabbing;
+}
+
+.sectionDragHandle {
+  color: var(--color-text-secondary, #9ca3af);
+  flex-shrink: 0;
+  cursor: grab;
+}
+
+.sectionDragHandle:active {
+  cursor: grabbing;
+}
+
+.sectionHeading {
+  flex: 1;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-primary, #1a1a1a);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sectionColumnBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--color-text-secondary, #6b7280);
+  background-color: var(--color-bg-secondary, #e5e7eb);
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  flex-shrink: 0;
+}
+
+.sectionCollapsedIcon {
+  color: var(--color-text-secondary, #9ca3af);
+  flex-shrink: 0;
+}
+
+.sectionActions {
+  display: flex;
+  gap: 0.25rem;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.sectionActionBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.375rem;
+  color: var(--color-text-secondary, #6b7280);
+  background: transparent;
+  border: none;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.sectionActionBtn:hover {
+  color: var(--color-text-primary, #1a1a1a);
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.sectionDeleteBtn:hover {
+  color: #dc2626;
+  background-color: #fef2f2;
+}
+
+/* Section body (field grid) */
+.sectionBody {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  min-height: 48px;
+  transition: background-color 0.2s;
+}
+
+.sectionBody.dropZoneActive {
+  background-color: #eff6ff;
+}
+
+.sectionEmptyDrop {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary, #9ca3af);
+  border: 2px dashed var(--color-border, #e5e7eb);
+  border-radius: 0.375rem;
+  text-align: center;
+}
+
+/* Field chip */
+.fieldChip {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.5rem;
+  background: #fff;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-size: 0.8125rem;
+}
+
+.fieldChip:hover {
+  border-color: var(--color-primary-light, #93c5fd);
+  background-color: #f0f7ff;
+}
+
+.fieldChipSelected {
+  border-color: var(--color-primary, #0066cc);
+  background-color: #eff6ff;
+  box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.1);
+}
+
+.fieldChip.dropZoneActive {
+  border-color: var(--color-primary, #0066cc);
+  border-style: dashed;
+  background-color: #eff6ff;
+}
+
+.fieldDragHandle {
+  color: var(--color-text-secondary, #9ca3af);
+  flex-shrink: 0;
+  cursor: grab;
+}
+
+.fieldDragHandle:active {
+  cursor: grabbing;
+}
+
+.fieldChipName {
+  flex: 1;
+  font-weight: 500;
+  color: var(--color-text-primary, #1a1a1a);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fieldChipType {
+  font-size: 0.625rem;
+  color: var(--color-text-secondary, #9ca3af);
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.fieldChipRequired {
+  color: #dc2626;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.fieldChipRemove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.125rem;
+  color: var(--color-text-secondary, #9ca3af);
+  background: transparent;
+  border: none;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+
+.fieldChipRemove:hover {
+  color: #dc2626;
+  background-color: #fef2f2;
+}
+
+/* Add Section / Related List buttons */
+.addSectionButton,
+.addRelatedListButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-primary, #0066cc);
+  background: #fff;
+  border: 2px dashed var(--color-border, #d1d5db);
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  width: 100%;
+  justify-content: center;
+  margin-top: 0.75rem;
+}
+
+.addSectionButton:hover,
+.addRelatedListButton:hover {
+  border-color: var(--color-primary, #0066cc);
+  background-color: #f0f7ff;
+}
+
+/* Related lists area in editor */
+.relatedListsArea {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 2px solid var(--color-border, #e5e7eb);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.relatedListsTitle {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+.relatedListCard {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: #fff;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.relatedListCard:hover {
+  border-color: var(--color-primary-light, #93c5fd);
+}
+
+.relatedListCardSelected {
+  border-color: var(--color-primary, #0066cc);
+  background-color: #eff6ff;
+}
+
+.relatedListName {
+  flex: 1;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+.relatedListMeta {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary, #6b7280);
+}
+
+.relatedListRemove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem;
+  color: var(--color-text-secondary, #9ca3af);
+  background: transparent;
+  border: none;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.relatedListRemove:hover {
+  color: #dc2626;
+  background-color: #fef2f2;
+}
+
+/* ─── Properties Panel (right panel) ──────────────────────────────────────── */
+
+.propertiesPanel {
+  width: 280px;
+  flex-shrink: 0;
+  background: #fff;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 0.5rem;
+  overflow-y: auto;
+  position: sticky;
+  top: 1rem;
+  align-self: flex-start;
+  max-height: calc(100vh - 12rem);
+}
+
+.propertiesPanelTitle {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin: 0;
+  padding: 0.75rem 1rem;
+  color: var(--color-text-primary, #1a1a1a);
+  border-bottom: 1px solid var(--color-border, #e5e7eb);
+}
+
+.propertiesEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+  text-align: center;
+  color: var(--color-text-secondary, #9ca3af);
+  gap: 0.5rem;
+}
+
+.propertiesEmpty p {
+  font-size: 0.8125rem;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.propertiesForm {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.propertiesSubtitle {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text-secondary, #6b7280);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--color-border, #e5e7eb);
+}
+
+.propertyGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.propertyLabel {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+.propertyInput {
+  padding: 0.5rem 0.625rem;
+  font-size: 0.8125rem;
+  color: var(--color-text-primary, #1a1a1a);
+  background-color: #fff;
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: 0.375rem;
+  transition: all 0.2s;
+}
+
+.propertyInput:focus {
+  outline: none;
+  border-color: var(--color-primary, #0066cc);
+  box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.1);
+}
+
+.propertyReadonly {
+  padding: 0.5rem 0.625rem;
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary, #6b7280);
+  background-color: var(--color-bg-secondary, #f9fafb);
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 0.375rem;
+}
+
+.propertyCheckboxGroup {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.propertyCheckboxGroup input[type='checkbox'] {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--color-primary, #0066cc);
+}
+
+/* ─── Responsive ──────────────────────────────────────────────────────────── */
+
+@media (max-width: 1024px) {
+  .editorBody {
+    flex-direction: column;
+  }
+
+  .palette {
+    width: 100%;
+    position: static;
+    max-height: 200px;
+    flex-direction: row;
+  }
+
+  .paletteHeader {
+    width: 200px;
+    flex-shrink: 0;
+  }
+
+  .paletteFieldList {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .propertiesPanel {
+    width: 100%;
+    position: static;
+    max-height: none;
+  }
+}
+
 @media (max-width: 768px) {
   .container {
     padding: 1rem;
@@ -411,5 +1349,19 @@
 
   .actionButton {
     width: 100%;
+  }
+
+  .viewerHeader {
+    flex-direction: column;
+  }
+
+  .editorToolbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .editorToolbarRight {
+    width: 100%;
+    justify-content: flex-end;
   }
 }

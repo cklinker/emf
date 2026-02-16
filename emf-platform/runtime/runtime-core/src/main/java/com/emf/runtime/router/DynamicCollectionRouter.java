@@ -4,10 +4,12 @@ import com.emf.runtime.model.CollectionDefinition;
 import com.emf.runtime.query.QueryEngine;
 import com.emf.runtime.query.QueryRequest;
 import com.emf.runtime.query.QueryResult;
+import com.emf.runtime.registry.CollectionOnDemandLoader;
 import com.emf.runtime.registry.CollectionRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -51,10 +53,17 @@ public class DynamicCollectionRouter {
     
     private final CollectionRegistry registry;
     private final QueryEngine queryEngine;
-    
+
+    /**
+     * Optional on-demand loader that fetches unknown collections from the
+     * control plane. When present, the router will try to load a collection
+     * before returning 404.
+     */
+    private CollectionOnDemandLoader onDemandLoader;
+
     /**
      * Creates a new DynamicCollectionRouter.
-     * 
+     *
      * @param registry the collection registry
      * @param queryEngine the query engine
      */
@@ -62,30 +71,37 @@ public class DynamicCollectionRouter {
         this.registry = Objects.requireNonNull(registry, "registry cannot be null");
         this.queryEngine = Objects.requireNonNull(queryEngine, "queryEngine cannot be null");
     }
+
+    @Autowired(required = false)
+    public void setOnDemandLoader(CollectionOnDemandLoader onDemandLoader) {
+        this.onDemandLoader = onDemandLoader;
+    }
     
     /**
      * Lists records from a collection with pagination, sorting, and filtering.
-     * 
+     *
      * @param collectionName the collection name
      * @param params query parameters for pagination, sorting, filtering, and field selection
+     * @param request the HTTP servlet request
      * @return the query result or 404 if collection not found
      */
     @GetMapping("/{collectionName}")
     public ResponseEntity<QueryResult> list(
             @PathVariable("collectionName") String collectionName,
-            @RequestParam(required = false) Map<String, String> params) {
-        
+            @RequestParam(required = false) Map<String, String> params,
+            HttpServletRequest request) {
+
         logger.debug("List request for collection '{}' with params: {}", collectionName, params);
-        
-        CollectionDefinition definition = registry.get(collectionName);
+
+        CollectionDefinition definition = resolveCollection(collectionName, request);
         if (definition == null) {
             logger.debug("Collection '{}' not found", collectionName);
             return ResponseEntity.notFound().build();
         }
-        
+
         QueryRequest queryRequest = QueryRequest.fromParams(params);
         QueryResult result = queryEngine.executeQuery(definition, queryRequest);
-        
+
         return ResponseEntity.ok(result);
     }
     
@@ -99,16 +115,17 @@ public class DynamicCollectionRouter {
     @GetMapping("/{collectionName}/{id}")
     public ResponseEntity<Map<String, Object>> get(
             @PathVariable("collectionName") String collectionName,
-            @PathVariable("id") String id) {
-        
+            @PathVariable("id") String id,
+            HttpServletRequest request) {
+
         logger.debug("Get request for collection '{}', id '{}'", collectionName, id);
-        
-        CollectionDefinition definition = registry.get(collectionName);
+
+        CollectionDefinition definition = resolveCollection(collectionName, request);
         if (definition == null) {
             logger.debug("Collection '{}' not found", collectionName);
             return ResponseEntity.notFound().build();
         }
-        
+
         Optional<Map<String, Object>> record = queryEngine.getById(definition, id);
         return record.map(r -> ResponseEntity.ok(toJsonApiResponse(r, collectionName)))
                      .orElse(ResponseEntity.notFound().build());
@@ -129,7 +146,7 @@ public class DynamicCollectionRouter {
 
         logger.debug("Create request for collection '{}' with data: {}", collectionName, requestBody);
 
-        CollectionDefinition definition = registry.get(collectionName);
+        CollectionDefinition definition = resolveCollection(collectionName, request);
         if (definition == null) {
             logger.debug("Collection '{}' not found", collectionName);
             return ResponseEntity.notFound().build();
@@ -211,7 +228,7 @@ public class DynamicCollectionRouter {
 
         logger.debug("Update request for collection '{}', id '{}' with data: {}", collectionName, id, requestBody);
 
-        CollectionDefinition definition = registry.get(collectionName);
+        CollectionDefinition definition = resolveCollection(collectionName, request);
         if (definition == null) {
             logger.debug("Collection '{}' not found", collectionName);
             return ResponseEntity.notFound().build();
@@ -248,11 +265,12 @@ public class DynamicCollectionRouter {
     @DeleteMapping("/{collectionName}/{id}")
     public ResponseEntity<Void> delete(
             @PathVariable("collectionName") String collectionName,
-            @PathVariable("id") String id) {
-        
+            @PathVariable("id") String id,
+            HttpServletRequest request) {
+
         logger.debug("Delete request for collection '{}', id '{}'", collectionName, id);
-        
-        CollectionDefinition definition = registry.get(collectionName);
+
+        CollectionDefinition definition = resolveCollection(collectionName, request);
         if (definition == null) {
             logger.debug("Collection '{}' not found", collectionName);
             return ResponseEntity.notFound().build();
@@ -263,6 +281,41 @@ public class DynamicCollectionRouter {
                        : ResponseEntity.notFound().build();
     }
     
+    /**
+     * Resolves a collection definition by name, with on-demand loading fallback.
+     *
+     * <p>First checks the local registry. If not found and an on-demand loader
+     * is configured, attempts to load the collection from the control plane
+     * using the tenant ID from the request's {@code X-Tenant-ID} header.
+     *
+     * @param collectionName the collection name
+     * @param request the HTTP servlet request (used to extract tenant ID)
+     * @return the collection definition, or {@code null} if not found
+     */
+    private CollectionDefinition resolveCollection(String collectionName, HttpServletRequest request) {
+        CollectionDefinition definition = registry.get(collectionName);
+        if (definition != null) {
+            return definition;
+        }
+
+        // Fallback: try to load on demand from the control plane
+        if (onDemandLoader != null) {
+            String tenantId = request.getHeader("X-Tenant-ID");
+            logger.info("Collection '{}' not in registry, attempting on-demand load (tenantId={})",
+                    collectionName, tenantId);
+            try {
+                definition = onDemandLoader.load(collectionName, tenantId);
+                if (definition != null) {
+                    logger.info("Successfully loaded collection '{}' on demand", collectionName);
+                }
+            } catch (Exception e) {
+                logger.warn("On-demand load failed for collection '{}': {}", collectionName, e.getMessage());
+            }
+        }
+
+        return definition;
+    }
+
     /**
      * Extracts attributes from a JSON:API formatted request body.
      * 

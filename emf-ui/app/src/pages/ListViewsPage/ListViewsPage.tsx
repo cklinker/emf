@@ -382,7 +382,6 @@ export function ListViewsPage({
     mutationFn: (data: ListViewFormData) => {
       const payload = {
         name: data.name,
-        collectionId: data.collectionId,
         visibility: data.visibility,
         columns: data.columns.trim() || '[]',
         filters: data.filters.trim() || '[]',
@@ -390,7 +389,7 @@ export function ListViewsPage({
         sortDirection: data.sortDirection,
       }
       return apiClient.post<ListView>(
-        `/control/listviews?tenantId=${getTenantId()}&userId=system`,
+        `/control/listviews?tenantId=${getTenantId()}&collectionId=${encodeURIComponent(data.collectionId)}&userId=system`,
         payload
       )
     },

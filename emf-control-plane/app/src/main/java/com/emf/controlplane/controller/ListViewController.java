@@ -22,7 +22,7 @@ public class ListViewController {
     @GetMapping
     public List<ListViewDto> listViews(
             @RequestParam String tenantId,
-            @RequestParam String collectionId,
+            @RequestParam(required = false) String collectionId,
             @RequestParam(required = false) String userId) {
         if (userId != null) {
             return listViewService.listViews(tenantId, collectionId, userId).stream()

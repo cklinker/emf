@@ -23,7 +23,7 @@ public class PageLayoutController {
     @GetMapping
     public List<PageLayoutDto> listLayouts(
             @RequestParam String tenantId,
-            @RequestParam String collectionId) {
+            @RequestParam(required = false) String collectionId) {
         return layoutService.listLayouts(tenantId, collectionId).stream()
                 .map(PageLayoutDto::fromEntity).toList();
     }

@@ -29,11 +29,17 @@ public class ListViewService {
 
     @Transactional(readOnly = true)
     public List<ListView> listViews(String tenantId, String collectionId, String userId) {
+        if (collectionId == null) {
+            return listViewRepository.findByTenantIdOrderByNameAsc(tenantId);
+        }
         return listViewRepository.findAccessibleViews(tenantId, collectionId, userId);
     }
 
     @Transactional(readOnly = true)
     public List<ListView> listAllViews(String tenantId, String collectionId) {
+        if (collectionId == null) {
+            return listViewRepository.findByTenantIdOrderByNameAsc(tenantId);
+        }
         return listViewRepository.findByTenantIdAndCollectionIdOrderByNameAsc(tenantId, collectionId);
     }
 

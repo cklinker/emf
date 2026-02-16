@@ -10,6 +10,8 @@ import java.util.Optional;
 @Repository
 public interface PageLayoutRepository extends JpaRepository<PageLayout, String> {
 
+    List<PageLayout> findByTenantIdOrderByNameAsc(String tenantId);
+
     List<PageLayout> findByTenantIdAndCollectionIdOrderByNameAsc(String tenantId, String collectionId);
 
     Optional<PageLayout> findByTenantIdAndCollectionIdAndName(String tenantId, String collectionId, String name);

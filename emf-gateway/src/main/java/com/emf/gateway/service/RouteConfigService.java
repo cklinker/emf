@@ -112,14 +112,15 @@ public class RouteConfigService {
                 path = path + "/**";
             }
 
-            String backendUrl = (collection.getWorkerBaseUrl() != null && !collection.getWorkerBaseUrl().isEmpty())
-                    ? collection.getWorkerBaseUrl()
-                    : workerServiceUrl;
-
+            // Always use the configured worker service URL (K8s Service DNS) instead
+            // of the pod-specific IP from the bootstrap response. Pod IPs are ephemeral
+            // and become stale when pods restart, causing routing failures. The K8s
+            // Service URL (e.g., http://emf-worker:80) is stable and load-balances
+            // across all worker pods.
             RouteDefinition route = new RouteDefinition(
                 collectionId,
                 path,
-                backendUrl,
+                workerServiceUrl,
                 collectionName
             );
 

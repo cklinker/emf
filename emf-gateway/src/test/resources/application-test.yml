@@ -38,10 +38,7 @@ emf:
     kafka:
       topics:
         collection-changed: emf.collection.changed
-    rate-limit:
-      default:
-        requests-per-window: 100
-        window-duration: PT1M
+    # Rate limiting is driven by per-tenant governor limits from the control plane
 
 # Disable actuator endpoints for tests
 management:

@@ -69,11 +69,9 @@ emf:
         collection-changed: emf.config.collection.changed
         worker-assignment-changed: emf.worker.assignment.changed
     
-    # Default rate limiting configuration
-    rate-limit:
-      default:
-        requests-per-window: 1000
-        window-duration: PT1M  # 1 minute
+    # Rate limiting is driven by per-tenant governor limits (apiCallsPerDay)
+    # fetched from the control plane during bootstrap.
+    # See TenantGovernorLimitCache for details.
 
 # Actuator configuration for health and metrics
 management:

@@ -1,6 +1,7 @@
 package com.emf.gateway.service;
 
 import com.emf.gateway.config.BootstrapConfig;
+import com.emf.gateway.ratelimit.TenantGovernorLimitCache;
 import com.emf.gateway.route.RouteDefinition;
 import com.emf.gateway.route.RouteRegistry;
 import okhttp3.mockwebserver.MockResponse;
@@ -27,6 +28,7 @@ class RouteConfigServiceTest {
     private MockWebServer mockWebServer;
     private RouteConfigService routeConfigService;
     private RouteRegistry routeRegistry;
+    private TenantGovernorLimitCache governorLimitCache;
 
     private static final String WORKER_SERVICE_URL = "http://emf-worker:80";
 
@@ -37,10 +39,12 @@ class RouteConfigServiceTest {
 
         String baseUrl = mockWebServer.url("/").toString();
         routeRegistry = new RouteRegistry();
+        governorLimitCache = new TenantGovernorLimitCache();
 
         routeConfigService = new RouteConfigService(
             WebClient.builder(),
             routeRegistry,
+            governorLimitCache,
             baseUrl,
             "/control/bootstrap",
             WORKER_SERVICE_URL

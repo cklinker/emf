@@ -296,8 +296,14 @@ function SectionRenderer({
       .filter((fp) => isVisible(fp.visibilityRule, record));
   }, [section.fields, record]);
 
-  // Group by column
+  // Check if any fields use column spanning
   const columnCount = section.columns || 1;
+  const hasSpanning = useMemo(
+    () => visibleFields.some((fp) => (fp.columnSpan ?? 1) > 1),
+    [visibleFields]
+  );
+
+  // Group by column (used when no spanning)
   const fieldsByColumn = useMemo(() => {
     const grouped: LayoutFieldPlacement[][] = Array.from({ length: columnCount }, () => []);
     for (const fp of visibleFields) {
@@ -343,7 +349,7 @@ function SectionRenderer({
         </div>
       )}
 
-      {(!collapsed || !isCollapsible) && (
+      {(!collapsed || !isCollapsible) && hasSpanning ? (
         <div
           className="emf-layout-renderer__section-body"
           style={{
@@ -352,11 +358,18 @@ function SectionRenderer({
             gap: '1rem',
           }}
         >
-          {fieldsByColumn.map((colFields, colIndex) => (
-            <div key={colIndex} className="emf-layout-renderer__column">
-              {colFields.map((fp) => (
+          {visibleFields.map((fp) => {
+            const span = Math.min(fp.columnSpan ?? 1, columnCount);
+            const colStart = Math.min(fp.columnNumber, columnCount - 1) + 1; // CSS grid is 1-based
+            return (
+              <div
+                key={fp.id}
+                className="emf-layout-renderer__field-cell"
+                style={{
+                  gridColumn: span > 1 ? `${colStart} / span ${span}` : undefined,
+                }}
+              >
                 <FieldCell
-                  key={fp.id}
                   placement={fp}
                   field={fieldMap.get(fp.fieldId) ?? fieldMap.get(fp.fieldName ?? '')}
                   record={record}
@@ -366,10 +379,39 @@ function SectionRenderer({
                   onChange={onChange}
                   customRenderers={customRenderers}
                 />
-              ))}
-            </div>
-          ))}
+              </div>
+            );
+          })}
         </div>
+      ) : (
+        (!collapsed || !isCollapsible) && (
+          <div
+            className="emf-layout-renderer__section-body"
+            style={{
+              display: 'grid',
+              gridTemplateColumns: `repeat(${columnCount}, 1fr)`,
+              gap: '1rem',
+            }}
+          >
+            {fieldsByColumn.map((colFields, colIndex) => (
+              <div key={colIndex} className="emf-layout-renderer__column">
+                {colFields.map((fp) => (
+                  <FieldCell
+                    key={fp.id}
+                    placement={fp}
+                    field={fieldMap.get(fp.fieldId) ?? fieldMap.get(fp.fieldName ?? '')}
+                    record={record}
+                    mode={mode}
+                    readOnlyOnLayout={fp.readOnlyOnLayout}
+                    requiredOnLayout={fp.requiredOnLayout}
+                    onChange={onChange}
+                    customRenderers={customRenderers}
+                  />
+                ))}
+              </div>
+            ))}
+          </div>
+        )
       )}
     </section>
   );

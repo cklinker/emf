@@ -28,6 +28,16 @@ export function FieldPropertyForm({
     return null
   }, [state.sections, fieldPlacementId])
 
+  // Find the section this field belongs to (needed for max column span)
+  const sectionColumns = useMemo(() => {
+    for (const section of state.sections) {
+      if (section.fields.some((f) => f.id === fieldPlacementId)) {
+        return section.columns
+      }
+    }
+    return 1
+  }, [state.sections, fieldPlacementId])
+
   const handleUpdate = useCallback(
     (updates: Partial<EditorFieldPlacement>) => {
       updateFieldPlacement(fieldPlacementId, updates)
@@ -60,6 +70,13 @@ export function FieldPropertyForm({
       handleUpdate({ readOnlyOnLayout: !fieldPlacement.readOnlyOnLayout })
     }
   }, [handleUpdate, fieldPlacement])
+
+  const handleColumnSpanChange = useCallback(
+    (span: number) => {
+      handleUpdate({ columnSpan: span })
+    },
+    [handleUpdate]
+  )
 
   const handleVisibilityRuleChange = useCallback(
     (value: string | undefined) => {
@@ -121,6 +138,30 @@ export function FieldPropertyForm({
           data-testid="field-prop-help-text"
         />
       </div>
+
+      {/* Column Span (only show for multi-column sections) */}
+      {sectionColumns > 1 && (
+        <>
+          <hr className={styles.sectionDivider} />
+          <div className={styles.formGroup}>
+            <span className={styles.formLabel}>Column Span</span>
+            <div className={styles.segmentedControl} data-testid="field-prop-column-span">
+              {Array.from({ length: sectionColumns }, (_, i) => i + 1).map((span) => (
+                <button
+                  key={span}
+                  type="button"
+                  className={`${styles.segmentButton} ${(fieldPlacement.columnSpan ?? 1) === span ? styles.segmentButtonActive : ''}`}
+                  onClick={() => handleColumnSpanChange(span)}
+                  aria-pressed={(fieldPlacement.columnSpan ?? 1) === span}
+                  data-testid={`field-prop-span-${span}`}
+                >
+                  {span}
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
 
       <hr className={styles.sectionDivider} />
 

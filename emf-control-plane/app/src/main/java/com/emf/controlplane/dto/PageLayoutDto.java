@@ -118,6 +118,7 @@ public class PageLayoutDto {
         private String fieldType;
         private String fieldDisplayName;
         private int columnNumber;
+        private int columnSpan = 1;
         private int sortOrder;
         private boolean requiredOnLayout;
         private boolean readOnlyOnLayout;
@@ -133,6 +134,7 @@ public class PageLayoutDto {
             dto.setFieldType(entity.getField().getType());
             dto.setFieldDisplayName(entity.getField().getDisplayName());
             dto.setColumnNumber(entity.getColumnNumber());
+            dto.setColumnSpan(entity.getColumnSpan());
             dto.setSortOrder(entity.getSortOrder());
             dto.setRequiredOnLayout(entity.isRequiredOnLayout());
             dto.setReadOnlyOnLayout(entity.isReadOnlyOnLayout());
@@ -154,6 +156,8 @@ public class PageLayoutDto {
         public void setFieldDisplayName(String fieldDisplayName) { this.fieldDisplayName = fieldDisplayName; }
         public int getColumnNumber() { return columnNumber; }
         public void setColumnNumber(int columnNumber) { this.columnNumber = columnNumber; }
+        public int getColumnSpan() { return columnSpan; }
+        public void setColumnSpan(int columnSpan) { this.columnSpan = columnSpan; }
         public int getSortOrder() { return sortOrder; }
         public void setSortOrder(int sortOrder) { this.sortOrder = sortOrder; }
         public boolean isRequiredOnLayout() { return requiredOnLayout; }

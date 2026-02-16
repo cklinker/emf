@@ -34,6 +34,9 @@ public class LayoutField extends BaseEntity {
     @Column(name = "help_text_override", length = 500)
     private String helpTextOverride;
 
+    @Column(name = "column_span")
+    private int columnSpan = 1;
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "visibility_rule", columnDefinition = "jsonb")
     private String visibilityRule;
@@ -63,6 +66,9 @@ public class LayoutField extends BaseEntity {
 
     public String getHelpTextOverride() { return helpTextOverride; }
     public void setHelpTextOverride(String helpTextOverride) { this.helpTextOverride = helpTextOverride; }
+
+    public int getColumnSpan() { return columnSpan; }
+    public void setColumnSpan(int columnSpan) { this.columnSpan = columnSpan; }
 
     public String getVisibilityRule() { return visibilityRule; }
     public void setVisibilityRule(String visibilityRule) { this.visibilityRule = visibilityRule; }

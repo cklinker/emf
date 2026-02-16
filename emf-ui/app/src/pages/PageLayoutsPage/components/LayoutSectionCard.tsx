@@ -286,9 +286,20 @@ export function LayoutSectionCard({
                   {fieldsInCol.length === 0 ? (
                     <div className={styles.columnEmpty}>Drop fields here</div>
                   ) : (
-                    fieldsInCol.map((fp) => (
-                      <LayoutFieldSlot key={fp.id} fieldPlacement={fp} sectionId={sectionId} />
-                    ))
+                    fieldsInCol.map((fp) => {
+                      const span = fp.columnSpan ?? 1
+                      const showSpanBadge = span > 1
+                      return (
+                        <div
+                          key={fp.id}
+                          className={showSpanBadge ? styles.spanningFieldWrapper : undefined}
+                          data-span={span > 1 ? span : undefined}
+                        >
+                          <LayoutFieldSlot fieldPlacement={fp} sectionId={sectionId} />
+                          {showSpanBadge && <span className={styles.spanBadge}>Span {span}</span>}
+                        </div>
+                      )
+                    })
                   )}
                 </div>
               )

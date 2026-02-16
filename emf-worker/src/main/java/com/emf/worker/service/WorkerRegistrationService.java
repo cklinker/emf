@@ -77,15 +77,12 @@ public class WorkerRegistrationService {
                 log.info("Registration attempt {} of {}", attempt, MAX_RETRIES);
 
                 // Build and send registration request
-                List<String> assignedCollections = register();
+                register();
 
-                // Initialize any pre-assigned collections
-                if (assignedCollections != null && !assignedCollections.isEmpty()) {
-                    log.info("Received {} pre-assigned collections", assignedCollections.size());
-                    for (String collectionId : assignedCollections) {
-                        lifecycleManager.initializeCollection(collectionId);
-                    }
-                }
+                // Fetch and initialize ALL active collections from the control plane.
+                // Every worker loads every collection so the K8s Service can
+                // load-balance requests across all worker pods.
+                initializeAllCollections();
 
                 // Mark as ready
                 status = "READY";
@@ -180,6 +177,52 @@ public class WorkerRegistrationService {
      */
     public String getStatus() {
         return status;
+    }
+
+    /**
+     * Fetches all active collections from the control plane bootstrap endpoint
+     * and initializes each one on this worker. This ensures every worker can
+     * serve every collection, allowing the K8s Service to load-balance requests.
+     */
+    @SuppressWarnings("unchecked")
+    private void initializeAllCollections() {
+        try {
+            String url = workerProperties.getControlPlaneUrl() + "/control/bootstrap";
+            log.info("Fetching all active collections from: {}", url);
+
+            ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
+
+            if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+                log.warn("Failed to fetch bootstrap config: status={}", response.getStatusCode());
+                return;
+            }
+
+            Object collectionsObj = response.getBody().get("collections");
+            if (!(collectionsObj instanceof List<?> collectionsList)) {
+                log.warn("No collections found in bootstrap response");
+                return;
+            }
+
+            log.info("Found {} collections to initialize", collectionsList.size());
+
+            for (Object item : collectionsList) {
+                if (item instanceof Map<?, ?> collectionMap) {
+                    String collectionId = (String) collectionMap.get("id");
+                    String collectionName = (String) collectionMap.get("name");
+                    if (collectionId != null) {
+                        try {
+                            lifecycleManager.initializeCollection(collectionId);
+                        } catch (Exception e) {
+                            log.warn("Failed to initialize collection '{}' (id={}): {}",
+                                    collectionName, collectionId, e.getMessage());
+                        }
+                    }
+                }
+            }
+
+        } catch (Exception e) {
+            log.warn("Failed to fetch collections from bootstrap endpoint: {}", e.getMessage());
+        }
     }
 
     /**

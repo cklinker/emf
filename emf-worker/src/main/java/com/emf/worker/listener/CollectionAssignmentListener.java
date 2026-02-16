@@ -1,6 +1,5 @@
 package com.emf.worker.listener;
 
-import com.emf.worker.config.WorkerProperties;
 import com.emf.worker.model.AssignmentEvent;
 import com.emf.worker.service.CollectionLifecycleManager;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -13,13 +12,14 @@ import org.springframework.stereotype.Component;
  * Kafka listener for collection assignment events.
  *
  * <p>Listens on the {@code emf.worker.assignment.changed} topic for events
- * that assign or unassign collections to/from workers. Only processes events
- * targeted at this worker's ID.
+ * that assign or unassign collections to/from workers. Every worker loads
+ * every collection so the K8s Service can load-balance requests across all
+ * worker pods.
  *
  * <p>Event change types:
  * <ul>
- *   <li><b>CREATED / ASSIGN:</b> Initialize the collection on this worker</li>
- *   <li><b>DELETED / UNASSIGN:</b> Tear down the collection on this worker</li>
+ *   <li><b>CREATED / ASSIGN:</b> Initialize the collection on this worker (regardless of target)</li>
+ *   <li><b>DELETED / UNASSIGN:</b> Ignored — collections are never torn down since all workers serve all collections</li>
  * </ul>
  */
 @Component
@@ -27,14 +27,11 @@ public class CollectionAssignmentListener {
 
     private static final Logger log = LoggerFactory.getLogger(CollectionAssignmentListener.class);
 
-    private final WorkerProperties workerProperties;
     private final CollectionLifecycleManager lifecycleManager;
     private final ObjectMapper objectMapper;
 
-    public CollectionAssignmentListener(WorkerProperties workerProperties,
-                                         CollectionLifecycleManager lifecycleManager,
+    public CollectionAssignmentListener(CollectionLifecycleManager lifecycleManager,
                                          ObjectMapper objectMapper) {
-        this.workerProperties = workerProperties;
         this.lifecycleManager = lifecycleManager;
         this.objectMapper = objectMapper;
     }
@@ -64,25 +61,26 @@ public class CollectionAssignmentListener {
                 return;
             }
 
-            // Only process events targeted at this worker
-            if (!workerProperties.getId().equals(event.workerId())) {
-                log.debug("Ignoring assignment event for worker '{}' (we are '{}')",
-                        event.workerId(), workerProperties.getId());
-                return;
-            }
-
             String changeType = event.changeType() != null ? event.changeType().toUpperCase() : "";
 
             switch (changeType) {
                 case "CREATED", "ASSIGN" -> {
-                    log.info("Received collection assignment: collectionId={}, name={}",
-                            event.collectionId(), event.collectionName());
-                    lifecycleManager.initializeCollection(event.collectionId());
+                    // Initialize collection regardless of target worker. Every worker
+                    // loads every collection so the K8s Service can load-balance
+                    // requests across all worker pods.
+                    if (!lifecycleManager.getActiveCollections().contains(event.collectionId())) {
+                        log.info("Initializing new collection from assignment event: collectionId={}, name={}, targetWorker={}",
+                                event.collectionId(), event.collectionName(), event.workerId());
+                        lifecycleManager.initializeCollection(event.collectionId());
+                    } else {
+                        log.debug("Collection already loaded, skipping: collectionId={}", event.collectionId());
+                    }
                 }
                 case "DELETED", "UNASSIGN" -> {
-                    log.info("Received collection unassignment: collectionId={}, name={}",
+                    // Do not tear down collections when an assignment is deleted.
+                    // Other workers may still route requests here via the K8s Service.
+                    log.debug("Ignoring collection unassignment (all workers serve all collections): collectionId={}, name={}",
                             event.collectionId(), event.collectionName());
-                    lifecycleManager.teardownCollection(event.collectionId());
                 }
                 default ->
                     log.warn("Unknown change type '{}' in assignment event for collection {}",

@@ -1,10 +1,40 @@
+/**
+ * PageLayoutsPage Component
+ *
+ * Visual page layout editor for creating and editing collection layouts.
+ * Provides a list of all layouts with CRUD, and a WYSIWYG drag-and-drop
+ * editor for composing layout sections, field placements, and related lists.
+ *
+ * Modes:
+ * - list: Table of existing layouts with create/edit/delete
+ * - editor: Three-panel drag-and-drop layout builder
+ */
+
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
 import { getTenantId } from '../../hooks'
+import {
+  LayoutEditorProvider,
+  useLayoutEditor,
+  LayoutToolbar,
+  FieldPalette,
+  PropertyPanel,
+  MobilePreview,
+} from './components'
+import type {
+  EditorSection,
+  EditorFieldPlacement,
+  EditorRelatedList,
+  AvailableField,
+} from './components/LayoutEditorContext'
 import styles from './PageLayoutsPage.module.css'
+
+// ---------------------------------------------------------------------------
+// Shared types
+// ---------------------------------------------------------------------------
 
 interface CollectionSummary {
   id: string
@@ -12,7 +42,22 @@ interface CollectionSummary {
   displayName: string
 }
 
-interface PageLayout {
+interface CollectionDetail {
+  id: string
+  name: string
+  displayName: string
+  fields: CollectionField[]
+}
+
+interface CollectionField {
+  id: string
+  name: string
+  displayName: string
+  type: string
+  required: boolean
+}
+
+interface PageLayoutSummary {
   id: string
   name: string
   description: string | null
@@ -21,6 +66,59 @@ interface PageLayout {
   isDefault: boolean
   createdAt: string
   updatedAt: string
+}
+
+interface PageLayoutDetail {
+  id: string
+  name: string
+  description: string | null
+  layoutType: string
+  collectionId: string
+  isDefault: boolean
+  sections: ApiSection[]
+  relatedLists: ApiRelatedList[]
+  createdAt: string
+  updatedAt: string
+}
+
+interface ApiSection {
+  id: string
+  heading: string
+  columns: number
+  sortOrder: number
+  collapsed: boolean
+  style: string
+  sectionType: string
+  tabGroup?: string
+  tabLabel?: string
+  visibilityRule?: string
+  fields: ApiFieldPlacement[]
+}
+
+interface ApiFieldPlacement {
+  id: string
+  fieldId: string
+  fieldName?: string
+  fieldType?: string
+  fieldDisplayName?: string
+  columnNumber: number
+  sortOrder: number
+  requiredOnLayout: boolean
+  readOnlyOnLayout: boolean
+  labelOverride?: string
+  helpTextOverride?: string
+  visibilityRule?: string
+}
+
+interface ApiRelatedList {
+  id: string
+  relatedCollectionId: string
+  relationshipField: string
+  displayColumns: string
+  sortField?: string
+  sortDirection: string
+  rowLimit: number
+  sortOrder: number
 }
 
 interface PageLayoutFormData {
@@ -37,11 +135,19 @@ interface FormErrors {
   collectionId?: string
 }
 
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
 export interface PageLayoutsPageProps {
   testId?: string
 }
 
 const LAYOUT_TYPES = ['DETAIL', 'EDIT', 'MINI', 'LIST'] as const
+
+// ---------------------------------------------------------------------------
+// Validation
+// ---------------------------------------------------------------------------
 
 function validateForm(data: PageLayoutFormData): FormErrors {
   const errors: FormErrors = {}
@@ -59,8 +165,139 @@ function validateForm(data: PageLayoutFormData): FormErrors {
   return errors
 }
 
+// ---------------------------------------------------------------------------
+// Mapping helpers: API → Editor state
+// ---------------------------------------------------------------------------
+
+function apiSectionToEditor(s: ApiSection): EditorSection {
+  return {
+    id: s.id,
+    heading: s.heading,
+    columns: s.columns,
+    sortOrder: s.sortOrder,
+    collapsed: s.collapsed,
+    style: s.style?.toLowerCase() ?? 'default',
+    sectionType: s.sectionType?.toLowerCase() ?? 'fields',
+    tabGroup: s.tabGroup,
+    tabLabel: s.tabLabel,
+    visibilityRule: s.visibilityRule,
+    fields: (s.fields ?? []).map(apiFieldToEditor),
+  }
+}
+
+function apiFieldToEditor(f: ApiFieldPlacement): EditorFieldPlacement {
+  return {
+    id: f.id,
+    fieldId: f.fieldId,
+    fieldName: f.fieldName,
+    fieldType: f.fieldType,
+    fieldDisplayName: f.fieldDisplayName,
+    columnNumber: f.columnNumber,
+    sortOrder: f.sortOrder,
+    requiredOnLayout: f.requiredOnLayout,
+    readOnlyOnLayout: f.readOnlyOnLayout,
+    labelOverride: f.labelOverride,
+    helpTextOverride: f.helpTextOverride,
+    visibilityRule: f.visibilityRule,
+  }
+}
+
+function apiRelatedListToEditor(r: ApiRelatedList): EditorRelatedList {
+  return {
+    id: r.id,
+    relatedCollectionId: r.relatedCollectionId,
+    relationshipFieldId: r.relationshipField,
+    displayColumns: r.displayColumns,
+    sortField: r.sortField,
+    sortDirection: r.sortDirection,
+    rowLimit: r.rowLimit,
+    sortOrder: r.sortOrder,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Mapping helpers: Editor state → API request
+// ---------------------------------------------------------------------------
+
+function editorSectionsToApi(sections: EditorSection[]): {
+  heading: string
+  columns: number
+  sortOrder: number
+  collapsed: boolean
+  style: string
+  sectionType: string
+  tabGroup?: string
+  tabLabel?: string
+  visibilityRule?: string
+  fields: {
+    fieldId: string
+    columnNumber: number
+    sortOrder: number
+    requiredOnLayout: boolean
+    readOnlyOnLayout: boolean
+    labelOverride?: string
+    helpTextOverride?: string
+    visibilityRule?: string
+  }[]
+}[] {
+  return sections
+    .slice()
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .map((s) => ({
+      heading: s.heading,
+      columns: s.columns,
+      sortOrder: s.sortOrder,
+      collapsed: s.collapsed,
+      style: s.style?.toUpperCase() ?? 'DEFAULT',
+      sectionType: s.sectionType?.toUpperCase() ?? 'STANDARD',
+      tabGroup: s.tabGroup || undefined,
+      tabLabel: s.tabLabel || undefined,
+      visibilityRule: s.visibilityRule || undefined,
+      fields: s.fields
+        .slice()
+        .sort((a, b) => a.sortOrder - b.sortOrder)
+        .map((f) => ({
+          fieldId: f.fieldId,
+          columnNumber: f.columnNumber,
+          sortOrder: f.sortOrder,
+          requiredOnLayout: f.requiredOnLayout,
+          readOnlyOnLayout: f.readOnlyOnLayout,
+          labelOverride: f.labelOverride || undefined,
+          helpTextOverride: f.helpTextOverride || undefined,
+          visibilityRule: f.visibilityRule || undefined,
+        })),
+    }))
+}
+
+function editorRelatedListsToApi(lists: EditorRelatedList[]): {
+  relatedCollectionId: string
+  relationshipFieldId: string
+  displayColumns: string
+  sortField?: string
+  sortDirection: string
+  rowLimit: number
+  sortOrder: number
+}[] {
+  return lists
+    .slice()
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .map((r) => ({
+      relatedCollectionId: r.relatedCollectionId,
+      relationshipFieldId: r.relationshipFieldId,
+      displayColumns: r.displayColumns,
+      sortField: r.sortField || undefined,
+      sortDirection: r.sortDirection,
+      rowLimit: r.rowLimit,
+      sortOrder: r.sortOrder,
+    }))
+}
+
+// ---------------------------------------------------------------------------
+// PageLayoutForm (modal for create/edit metadata)
+// ---------------------------------------------------------------------------
+
 interface PageLayoutFormProps {
-  layout?: PageLayout
+  layout?: PageLayoutSummary
   collections: CollectionSummary[]
   onSubmit: (data: PageLayoutFormData) => void
   onCancel: () => void
@@ -311,6 +548,131 @@ function PageLayoutForm({
   )
 }
 
+// ---------------------------------------------------------------------------
+// LayoutEditorView (editor mode, wrapped in LayoutEditorProvider)
+// ---------------------------------------------------------------------------
+
+interface LayoutEditorViewProps {
+  layoutId: string
+  onBack: () => void
+}
+
+function LayoutEditorViewInner({ layoutId, onBack }: LayoutEditorViewProps): React.ReactElement {
+  const { apiClient } = useApi()
+  const { showToast } = useToast()
+  const queryClient = useQueryClient()
+  const { state, setLayout, setAvailableFields, markSaved } = useLayoutEditor()
+
+  // Fetch layout detail
+  const { data: layoutDetail, isLoading: isLoadingLayout } = useQuery({
+    queryKey: ['pageLayout', layoutId],
+    queryFn: () => apiClient.get<PageLayoutDetail>(`/control/layouts/${layoutId}`),
+  })
+
+  // Fetch collection fields when we know the collectionId
+  const collectionId = layoutDetail?.collectionId ?? null
+  const { data: collectionDetail } = useQuery({
+    queryKey: ['collection-detail', collectionId],
+    queryFn: () => apiClient.get<CollectionDetail>(`/control/collections/${collectionId}`),
+    enabled: !!collectionId,
+  })
+
+  // Populate editor state when layout loads
+  useEffect(() => {
+    if (layoutDetail) {
+      const sections = (layoutDetail.sections ?? []).map(apiSectionToEditor)
+      const relatedLists = (layoutDetail.relatedLists ?? []).map(apiRelatedListToEditor)
+      setLayout(layoutDetail.collectionId, sections, relatedLists)
+    }
+  }, [layoutDetail, setLayout])
+
+  // Populate available fields when collection loads
+  useEffect(() => {
+    if (collectionDetail?.fields) {
+      const fields: AvailableField[] = collectionDetail.fields.map((f) => ({
+        id: f.id,
+        name: f.name,
+        displayName: f.displayName || f.name,
+        type: f.type,
+        required: f.required,
+      }))
+      setAvailableFields(fields)
+    }
+  }, [collectionDetail, setAvailableFields])
+
+  // Save mutation
+  const saveMutation = useMutation({
+    mutationFn: () => {
+      const payload = {
+        name: layoutDetail!.name,
+        description: layoutDetail!.description ?? '',
+        layoutType: layoutDetail!.layoutType,
+        isDefault: layoutDetail!.isDefault,
+        sections: editorSectionsToApi(state.sections),
+        relatedLists: editorRelatedListsToApi(state.relatedLists),
+      }
+      return apiClient.put(`/control/layouts/${layoutId}`, payload)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pageLayouts'] })
+      queryClient.invalidateQueries({ queryKey: ['pageLayout', layoutId] })
+      markSaved()
+      showToast('Layout saved successfully', 'success')
+    },
+    onError: (err: Error) => {
+      showToast(err.message || 'Failed to save layout', 'error')
+    },
+  })
+
+  const handleSave = useCallback(() => {
+    saveMutation.mutate()
+  }, [saveMutation])
+
+  const handleBack = useCallback(() => {
+    if (state.isDirty) {
+      const confirmed = window.confirm('You have unsaved changes. Are you sure you want to leave?')
+      if (!confirmed) return
+    }
+    onBack()
+  }, [state.isDirty, onBack])
+
+  if (isLoadingLayout) {
+    return (
+      <div className={styles.editorLoading}>
+        <LoadingSpinner size="large" label="Loading layout..." />
+      </div>
+    )
+  }
+
+  return (
+    <div className={styles.editorContainer} data-testid="layout-editor">
+      <LayoutToolbar
+        onBack={handleBack}
+        layoutName={layoutDetail?.name ?? 'Layout'}
+        onSave={handleSave}
+        isSaving={saveMutation.isPending}
+      />
+      <div className={styles.editorBody}>
+        <FieldPalette />
+        <MobilePreview />
+        <PropertyPanel />
+      </div>
+    </div>
+  )
+}
+
+function LayoutEditorView({ layoutId, onBack }: LayoutEditorViewProps): React.ReactElement {
+  return (
+    <LayoutEditorProvider>
+      <LayoutEditorViewInner layoutId={layoutId} onBack={onBack} />
+    </LayoutEditorProvider>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Main Page
+// ---------------------------------------------------------------------------
+
 export function PageLayoutsPage({
   testId = 'page-layouts-page',
 }: PageLayoutsPageProps): React.ReactElement {
@@ -319,10 +681,14 @@ export function PageLayoutsPage({
   const { apiClient } = useApi()
   const { showToast } = useToast()
 
+  // View mode: list or editor
+  const [viewMode, setViewMode] = useState<'list' | 'editor'>('list')
+  const [editingLayoutId, setEditingLayoutId] = useState<string | null>(null)
+
   const [isFormOpen, setIsFormOpen] = useState(false)
-  const [editingLayout, setEditingLayout] = useState<PageLayout | undefined>(undefined)
+  const [editingLayout, setEditingLayout] = useState<PageLayoutSummary | undefined>(undefined)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [layoutToDelete, setLayoutToDelete] = useState<PageLayout | null>(null)
+  const [layoutToDelete, setLayoutToDelete] = useState<PageLayoutSummary | null>(null)
 
   const {
     data: layouts,
@@ -331,7 +697,8 @@ export function PageLayoutsPage({
     refetch,
   } = useQuery({
     queryKey: ['pageLayouts'],
-    queryFn: () => apiClient.get<PageLayout[]>(`/control/layouts?tenantId=${getTenantId()}`),
+    queryFn: () => apiClient.get<PageLayoutSummary[]>(`/control/layouts?tenantId=${getTenantId()}`),
+    enabled: viewMode === 'list',
   })
 
   const { data: collectionsData } = useQuery({
@@ -357,14 +724,17 @@ export function PageLayoutsPage({
 
   const createMutation = useMutation({
     mutationFn: (data: PageLayoutFormData) =>
-      apiClient.post<PageLayout>(
+      apiClient.post<PageLayoutSummary>(
         `/control/layouts?tenantId=${getTenantId()}&collectionId=${encodeURIComponent(data.collectionId)}`,
         data
       ),
-    onSuccess: () => {
+    onSuccess: (newLayout) => {
       queryClient.invalidateQueries({ queryKey: ['pageLayouts'] })
       showToast('Layout created successfully', 'success')
       handleCloseForm()
+      // Open the editor for the new layout
+      setEditingLayoutId(newLayout.id)
+      setViewMode('editor')
     },
     onError: (err: Error) => {
       showToast(err.message || 'An error occurred', 'error')
@@ -373,7 +743,7 @@ export function PageLayoutsPage({
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: PageLayoutFormData }) =>
-      apiClient.put<PageLayout>(`/control/layouts/${id}`, data),
+      apiClient.put<PageLayoutSummary>(`/control/layouts/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pageLayouts'] })
       showToast('Layout updated successfully', 'success')
@@ -391,6 +761,10 @@ export function PageLayoutsPage({
       showToast('Layout deleted successfully', 'success')
       setDeleteDialogOpen(false)
       setLayoutToDelete(null)
+      if (editingLayoutId === layoutToDelete?.id) {
+        setViewMode('list')
+        setEditingLayoutId(null)
+      }
     },
     onError: (err: Error) => {
       showToast(err.message || 'An error occurred', 'error')
@@ -402,9 +776,14 @@ export function PageLayoutsPage({
     setIsFormOpen(true)
   }, [])
 
-  const handleEdit = useCallback((layout: PageLayout) => {
+  const handleEditMetadata = useCallback((layout: PageLayoutSummary) => {
     setEditingLayout(layout)
     setIsFormOpen(true)
+  }, [])
+
+  const handleDesign = useCallback((layout: PageLayoutSummary) => {
+    setEditingLayoutId(layout.id)
+    setViewMode('editor')
   }, [])
 
   const handleCloseForm = useCallback(() => {
@@ -423,7 +802,7 @@ export function PageLayoutsPage({
     [editingLayout, createMutation, updateMutation]
   )
 
-  const handleDeleteClick = useCallback((layout: PageLayout) => {
+  const handleDeleteClick = useCallback((layout: PageLayoutSummary) => {
     setLayoutToDelete(layout)
     setDeleteDialogOpen(true)
   }, [])
@@ -439,6 +818,11 @@ export function PageLayoutsPage({
     setLayoutToDelete(null)
   }, [])
 
+  const handleBackFromEditor = useCallback(() => {
+    setViewMode('list')
+    setEditingLayoutId(null)
+  }, [])
+
   const getCollectionName = useCallback(
     (collectionId: string): string => {
       const col = collectionMap.get(collectionId)
@@ -447,6 +831,12 @@ export function PageLayoutsPage({
     [collectionMap]
   )
 
+  // Editor mode
+  if (viewMode === 'editor' && editingLayoutId) {
+    return <LayoutEditorView layoutId={editingLayoutId} onBack={handleBackFromEditor} />
+  }
+
+  // List mode: loading
   if (isLoading) {
     return (
       <div className={styles.container} data-testid={testId}>
@@ -457,6 +847,7 @@ export function PageLayoutsPage({
     )
   }
 
+  // List mode: error
   if (error) {
     return (
       <div className={styles.container} data-testid={testId}>
@@ -470,6 +861,7 @@ export function PageLayoutsPage({
 
   const isSubmitting = createMutation.isPending || updateMutation.isPending
 
+  // List mode
   return (
     <div className={styles.container} data-testid={testId}>
       <header className={styles.header}>
@@ -550,8 +942,17 @@ export function PageLayoutsPage({
                     <div className={styles.actions}>
                       <button
                         type="button"
+                        className={`${styles.actionButton} ${styles.designButton}`}
+                        onClick={() => handleDesign(layout)}
+                        aria-label={`Design ${layout.name}`}
+                        data-testid={`design-button-${index}`}
+                      >
+                        Design
+                      </button>
+                      <button
+                        type="button"
                         className={styles.actionButton}
-                        onClick={() => handleEdit(layout)}
+                        onClick={() => handleEditMetadata(layout)}
                         aria-label={`Edit ${layout.name}`}
                         data-testid={`edit-button-${index}`}
                       >

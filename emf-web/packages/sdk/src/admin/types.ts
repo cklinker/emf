@@ -912,16 +912,26 @@ export interface LayoutSection {
   sortOrder: number;
   collapsed: boolean;
   style: 'DEFAULT' | 'COLLAPSIBLE' | 'CARD';
+  sectionType: 'STANDARD' | 'HIGHLIGHTS_PANEL' | 'BLANK_SPACE';
+  tabGroup?: string;
+  tabLabel?: string;
+  visibilityRule?: string;
   fields: LayoutFieldPlacement[];
 }
 
 export interface LayoutFieldPlacement {
   id: string;
   fieldId: string;
+  fieldName?: string;
+  fieldType?: string;
+  fieldDisplayName?: string;
   columnNumber: number;
   sortOrder: number;
   requiredOnLayout: boolean;
   readOnlyOnLayout: boolean;
+  labelOverride?: string;
+  helpTextOverride?: string;
+  visibilityRule?: string;
 }
 
 export interface LayoutRelatedList {
@@ -951,6 +961,10 @@ export interface CreateLayoutSectionRequest {
   sortOrder: number;
   collapsed?: boolean;
   style?: string;
+  sectionType?: string;
+  tabGroup?: string;
+  tabLabel?: string;
+  visibilityRule?: string;
   fields?: CreateFieldPlacementRequest[];
 }
 
@@ -960,6 +974,9 @@ export interface CreateFieldPlacementRequest {
   sortOrder: number;
   requiredOnLayout?: boolean;
   readOnlyOnLayout?: boolean;
+  labelOverride?: string;
+  helpTextOverride?: string;
+  visibilityRule?: string;
 }
 
 export interface CreateRelatedListRequest {
@@ -987,6 +1004,19 @@ export interface LayoutAssignmentRequest {
   profileId?: string;
   recordTypeId?: string;
   layoutId: string;
+}
+
+/**
+ * Visibility rule for conditional field/section display.
+ * The rule is stored as a JSON string in the API but this type
+ * represents the parsed structure for client-side evaluation.
+ */
+export interface VisibilityRule {
+  fieldName: string;
+  operator: 'EQUALS' | 'NOT_EQUALS' | 'CONTAINS' | 'IS_EMPTY' | 'IS_NOT_EMPTY';
+  value?: string;
+  logic?: 'AND' | 'OR';
+  conditions?: VisibilityRule[];
 }
 
 // --- List Views (Phase 3 Stream B) ---

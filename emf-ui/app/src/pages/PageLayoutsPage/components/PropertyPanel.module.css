@@ -1,0 +1,254 @@
+/**
+ * PropertyPanel Component Styles
+ *
+ * Right-side panel for editing properties of the currently
+ * selected section or field in the layout editor.
+ */
+
+/* Panel Container */
+.panel {
+  width: 300px;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-surface, #ffffff);
+  border-left: 1px solid var(--color-border, #e5e7eb);
+  overflow-y: auto;
+}
+
+/* Panel Header */
+.panelHeader {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-border, #e5e7eb);
+}
+
+.panelTitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary, #374151);
+}
+
+/* Empty State */
+.panelEmpty {
+  padding: 24px 16px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--color-text-placeholder, #9ca3af);
+}
+
+/* Panel Content */
+.panelContent {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Form Group */
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.formLabel {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-secondary, #6b7280);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Form Input */
+.formInput {
+  padding: 6px 10px;
+  font-size: 13px;
+  color: var(--color-text-primary, #374151);
+  background-color: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border-input, #d1d5db);
+  border-radius: 6px;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.formInput:focus {
+  outline: none;
+  border-color: var(--color-primary, #2563eb);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
+.formInput:disabled {
+  background-color: var(--color-bg-disabled, #f3f4f6);
+  color: var(--color-text-disabled, #9ca3af);
+  cursor: not-allowed;
+}
+
+.formInput::placeholder {
+  color: var(--color-text-placeholder, #9ca3af);
+}
+
+/* Form Textarea */
+.formTextarea {
+  resize: vertical;
+  min-height: 60px;
+  font-family: inherit;
+}
+
+/* Form Select */
+.formSelect {
+  padding: 6px 10px;
+  font-size: 13px;
+  color: var(--color-text-primary, #374151);
+  background-color: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border-input, #d1d5db);
+  border-radius: 6px;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 6px center;
+  background-repeat: no-repeat;
+  background-size: 1.25em 1.25em;
+  padding-right: 28px;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.formSelect:focus {
+  outline: none;
+  border-color: var(--color-primary, #2563eb);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
+.formSelect:disabled {
+  background-color: var(--color-bg-disabled, #f3f4f6);
+  color: var(--color-text-disabled, #9ca3af);
+  cursor: not-allowed;
+}
+
+/* Toggle Group */
+.toggleGroup {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+}
+
+.toggleLabel {
+  font-size: 13px;
+  color: var(--color-text-primary, #374151);
+}
+
+/* Toggle Switch */
+.toggle {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 10px;
+  background-color: var(--color-border-input, #d1d5db);
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.toggle:focus-visible {
+  outline: 2px solid var(--color-primary, #2563eb);
+  outline-offset: 2px;
+}
+
+.toggleActive {
+  background-color: var(--color-primary, #2563eb);
+}
+
+.toggleDot {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background-color: var(--color-surface, #ffffff);
+  transition: left 0.2s ease;
+}
+
+.toggleActive .toggleDot {
+  left: 18px;
+}
+
+/* Segmented Control */
+.segmentedControl {
+  display: flex;
+  border: 1px solid var(--color-border-input, #d1d5db);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.segmentButton {
+  flex: 1;
+  padding: 6px;
+  font-size: 12px;
+  text-align: center;
+  color: var(--color-text-secondary, #6b7280);
+  background-color: var(--color-surface, #ffffff);
+  border: none;
+  border-right: 1px solid var(--color-border-input, #d1d5db);
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.segmentButton:last-child {
+  border-right: none;
+}
+
+.segmentButton:hover:not(.segmentButtonActive) {
+  background-color: var(--color-surface-hover, #f3f4f6);
+}
+
+.segmentButton:focus-visible {
+  outline: 2px solid var(--color-primary, #2563eb);
+  outline-offset: -2px;
+}
+
+.segmentButtonActive {
+  background-color: var(--color-primary, #2563eb);
+  color: var(--color-text-on-primary, #ffffff);
+}
+
+/* Section Divider */
+.sectionDivider {
+  border: none;
+  border-top: 1px solid var(--color-border, #e5e7eb);
+  margin: 4px 0;
+}
+
+/* Read-Only Field Info */
+.fieldInfoReadOnly {
+  font-size: 13px;
+  color: var(--color-text-primary, #374151);
+  padding: 6px 0;
+}
+
+/* Responsive */
+@media (max-width: 767px) {
+  .panel {
+    width: 100%;
+    max-height: 300px;
+    border-left: none;
+    border-top: 1px solid var(--color-border, #e5e7eb);
+  }
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .formInput,
+  .formSelect,
+  .toggle,
+  .toggleDot,
+  .segmentButton {
+    transition: none;
+  }
+}

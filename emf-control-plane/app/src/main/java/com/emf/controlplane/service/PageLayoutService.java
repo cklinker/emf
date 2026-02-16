@@ -60,6 +60,8 @@ public class PageLayoutService {
             throw new DuplicateResourceException("PageLayout", "name", request.getName());
         }
 
+        validateRequest(request);
+
         PageLayout layout = new PageLayout(tenantId, collection, request.getName());
         layout.setDescription(request.getDescription());
         layout.setLayoutType(request.getLayoutType() != null ? request.getLayoutType() : "DETAIL");
@@ -73,46 +75,14 @@ public class PageLayoutService {
 
         if (request.getSections() != null) {
             for (CreatePageLayoutRequest.SectionRequest sectionReq : request.getSections()) {
-                LayoutSection section = new LayoutSection();
-                section.setLayout(layout);
-                section.setHeading(sectionReq.getHeading());
-                section.setColumns(sectionReq.getColumns());
-                section.setSortOrder(sectionReq.getSortOrder());
-                section.setCollapsed(sectionReq.isCollapsed());
-                section.setStyle(sectionReq.getStyle() != null ? sectionReq.getStyle() : "DEFAULT");
-
-                if (sectionReq.getFields() != null) {
-                    for (CreatePageLayoutRequest.FieldPlacementRequest fieldReq : sectionReq.getFields()) {
-                        Field field = fieldRepository.findById(fieldReq.getFieldId())
-                                .orElseThrow(() -> new ResourceNotFoundException("Field", fieldReq.getFieldId()));
-                        LayoutField lf = new LayoutField();
-                        lf.setSection(section);
-                        lf.setField(field);
-                        lf.setColumnNumber(fieldReq.getColumnNumber());
-                        lf.setSortOrder(fieldReq.getSortOrder());
-                        lf.setRequiredOnLayout(fieldReq.isRequiredOnLayout());
-                        lf.setReadOnlyOnLayout(fieldReq.isReadOnlyOnLayout());
-                        section.getFields().add(lf);
-                    }
-                }
+                LayoutSection section = buildSection(layout, sectionReq);
                 layout.getSections().add(section);
             }
         }
 
         if (request.getRelatedLists() != null) {
             for (CreatePageLayoutRequest.RelatedListRequest rlReq : request.getRelatedLists()) {
-                LayoutRelatedList rl = new LayoutRelatedList();
-                rl.setLayout(layout);
-                Collection relatedColl = collectionService.getCollection(rlReq.getRelatedCollectionId());
-                rl.setRelatedCollection(relatedColl);
-                Field relField = fieldRepository.findById(rlReq.getRelationshipFieldId())
-                        .orElseThrow(() -> new ResourceNotFoundException("Field", rlReq.getRelationshipFieldId()));
-                rl.setRelationshipField(relField);
-                rl.setDisplayColumns(rlReq.getDisplayColumns());
-                rl.setSortField(rlReq.getSortField());
-                rl.setSortDirection(rlReq.getSortDirection() != null ? rlReq.getSortDirection() : "DESC");
-                rl.setRowLimit(rlReq.getRowLimit());
-                rl.setSortOrder(rlReq.getSortOrder());
+                LayoutRelatedList rl = buildRelatedList(layout, rlReq);
                 layout.getRelatedLists().add(rl);
             }
         }
@@ -141,32 +111,13 @@ public class PageLayoutService {
             layout.setDefault(true);
         }
 
+        validateRequest(request);
+
         // Replace sections if provided
         if (request.getSections() != null) {
             layout.getSections().clear();
             for (CreatePageLayoutRequest.SectionRequest sectionReq : request.getSections()) {
-                LayoutSection section = new LayoutSection();
-                section.setLayout(layout);
-                section.setHeading(sectionReq.getHeading());
-                section.setColumns(sectionReq.getColumns());
-                section.setSortOrder(sectionReq.getSortOrder());
-                section.setCollapsed(sectionReq.isCollapsed());
-                section.setStyle(sectionReq.getStyle() != null ? sectionReq.getStyle() : "DEFAULT");
-
-                if (sectionReq.getFields() != null) {
-                    for (CreatePageLayoutRequest.FieldPlacementRequest fieldReq : sectionReq.getFields()) {
-                        Field field = fieldRepository.findById(fieldReq.getFieldId())
-                                .orElseThrow(() -> new ResourceNotFoundException("Field", fieldReq.getFieldId()));
-                        LayoutField lf = new LayoutField();
-                        lf.setSection(section);
-                        lf.setField(field);
-                        lf.setColumnNumber(fieldReq.getColumnNumber());
-                        lf.setSortOrder(fieldReq.getSortOrder());
-                        lf.setRequiredOnLayout(fieldReq.isRequiredOnLayout());
-                        lf.setReadOnlyOnLayout(fieldReq.isReadOnlyOnLayout());
-                        section.getFields().add(lf);
-                    }
-                }
+                LayoutSection section = buildSection(layout, sectionReq);
                 layout.getSections().add(section);
             }
         }
@@ -174,18 +125,7 @@ public class PageLayoutService {
         if (request.getRelatedLists() != null) {
             layout.getRelatedLists().clear();
             for (CreatePageLayoutRequest.RelatedListRequest rlReq : request.getRelatedLists()) {
-                LayoutRelatedList rl = new LayoutRelatedList();
-                rl.setLayout(layout);
-                Collection relatedColl = collectionService.getCollection(rlReq.getRelatedCollectionId());
-                rl.setRelatedCollection(relatedColl);
-                Field relField = fieldRepository.findById(rlReq.getRelationshipFieldId())
-                        .orElseThrow(() -> new ResourceNotFoundException("Field", rlReq.getRelationshipFieldId()));
-                rl.setRelationshipField(relField);
-                rl.setDisplayColumns(rlReq.getDisplayColumns());
-                rl.setSortField(rlReq.getSortField());
-                rl.setSortDirection(rlReq.getSortDirection() != null ? rlReq.getSortDirection() : "DESC");
-                rl.setRowLimit(rlReq.getRowLimit());
-                rl.setSortOrder(rlReq.getSortOrder());
+                LayoutRelatedList rl = buildRelatedList(layout, rlReq);
                 layout.getRelatedLists().add(rl);
             }
         }
@@ -273,5 +213,81 @@ public class PageLayoutService {
                     existing.setDefault(false);
                     layoutRepository.save(existing);
                 });
+    }
+
+    private void validateRequest(CreatePageLayoutRequest request) {
+        if (request.getSections() != null) {
+            long highlightsPanelCount = request.getSections().stream()
+                    .filter(s -> "HIGHLIGHTS_PANEL".equals(s.getSectionType()))
+                    .count();
+            if (highlightsPanelCount > 1) {
+                throw new IllegalArgumentException("A layout can have at most one Highlights Panel section");
+            }
+
+            for (CreatePageLayoutRequest.SectionRequest section : request.getSections()) {
+                if (section.getColumns() < 1 || section.getColumns() > 3) {
+                    throw new IllegalArgumentException("Section columns must be between 1 and 3");
+                }
+                boolean hasTabGroup = section.getTabGroup() != null && !section.getTabGroup().isBlank();
+                boolean hasTabLabel = section.getTabLabel() != null && !section.getTabLabel().isBlank();
+                if (hasTabGroup && !hasTabLabel) {
+                    throw new IllegalArgumentException("Tab label is required when tab group is set");
+                }
+            }
+        }
+    }
+
+    private LayoutSection buildSection(PageLayout layout, CreatePageLayoutRequest.SectionRequest sectionReq) {
+        LayoutSection section = new LayoutSection();
+        section.setLayout(layout);
+        section.setHeading(sectionReq.getHeading());
+        section.setColumns(sectionReq.getColumns());
+        section.setSortOrder(sectionReq.getSortOrder());
+        section.setCollapsed(sectionReq.isCollapsed());
+        section.setStyle(sectionReq.getStyle() != null ? sectionReq.getStyle() : "DEFAULT");
+        section.setSectionType(sectionReq.getSectionType() != null ? sectionReq.getSectionType() : "STANDARD");
+        section.setTabGroup(sectionReq.getTabGroup());
+        section.setTabLabel(sectionReq.getTabLabel());
+        section.setVisibilityRule(sectionReq.getVisibilityRule());
+
+        if (sectionReq.getFields() != null) {
+            for (CreatePageLayoutRequest.FieldPlacementRequest fieldReq : sectionReq.getFields()) {
+                LayoutField lf = buildLayoutField(section, fieldReq);
+                section.getFields().add(lf);
+            }
+        }
+        return section;
+    }
+
+    private LayoutField buildLayoutField(LayoutSection section, CreatePageLayoutRequest.FieldPlacementRequest fieldReq) {
+        Field field = fieldRepository.findById(fieldReq.getFieldId())
+                .orElseThrow(() -> new ResourceNotFoundException("Field", fieldReq.getFieldId()));
+        LayoutField lf = new LayoutField();
+        lf.setSection(section);
+        lf.setField(field);
+        lf.setColumnNumber(fieldReq.getColumnNumber());
+        lf.setSortOrder(fieldReq.getSortOrder());
+        lf.setRequiredOnLayout(fieldReq.isRequiredOnLayout());
+        lf.setReadOnlyOnLayout(fieldReq.isReadOnlyOnLayout());
+        lf.setLabelOverride(fieldReq.getLabelOverride());
+        lf.setHelpTextOverride(fieldReq.getHelpTextOverride());
+        lf.setVisibilityRule(fieldReq.getVisibilityRule());
+        return lf;
+    }
+
+    private LayoutRelatedList buildRelatedList(PageLayout layout, CreatePageLayoutRequest.RelatedListRequest rlReq) {
+        LayoutRelatedList rl = new LayoutRelatedList();
+        rl.setLayout(layout);
+        Collection relatedColl = collectionService.getCollection(rlReq.getRelatedCollectionId());
+        rl.setRelatedCollection(relatedColl);
+        Field relField = fieldRepository.findById(rlReq.getRelationshipFieldId())
+                .orElseThrow(() -> new ResourceNotFoundException("Field", rlReq.getRelationshipFieldId()));
+        rl.setRelationshipField(relField);
+        rl.setDisplayColumns(rlReq.getDisplayColumns());
+        rl.setSortField(rlReq.getSortField());
+        rl.setSortDirection(rlReq.getSortDirection() != null ? rlReq.getSortDirection() : "DESC");
+        rl.setRowLimit(rlReq.getRowLimit());
+        rl.setSortOrder(rlReq.getSortOrder());
+        return rl;
     }
 }

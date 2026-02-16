@@ -30,6 +30,10 @@ public class CreatePageLayoutRequest {
         private int sortOrder;
         private boolean collapsed;
         private String style;
+        private String sectionType;
+        private String tabGroup;
+        private String tabLabel;
+        private String visibilityRule;
         private List<FieldPlacementRequest> fields;
 
         public String getHeading() { return heading; }
@@ -42,6 +46,14 @@ public class CreatePageLayoutRequest {
         public void setCollapsed(boolean collapsed) { this.collapsed = collapsed; }
         public String getStyle() { return style; }
         public void setStyle(String style) { this.style = style; }
+        public String getSectionType() { return sectionType; }
+        public void setSectionType(String sectionType) { this.sectionType = sectionType; }
+        public String getTabGroup() { return tabGroup; }
+        public void setTabGroup(String tabGroup) { this.tabGroup = tabGroup; }
+        public String getTabLabel() { return tabLabel; }
+        public void setTabLabel(String tabLabel) { this.tabLabel = tabLabel; }
+        public String getVisibilityRule() { return visibilityRule; }
+        public void setVisibilityRule(String visibilityRule) { this.visibilityRule = visibilityRule; }
         public List<FieldPlacementRequest> getFields() { return fields; }
         public void setFields(List<FieldPlacementRequest> fields) { this.fields = fields; }
     }
@@ -52,6 +64,9 @@ public class CreatePageLayoutRequest {
         private int sortOrder;
         private boolean requiredOnLayout;
         private boolean readOnlyOnLayout;
+        private String labelOverride;
+        private String helpTextOverride;
+        private String visibilityRule;
 
         public String getFieldId() { return fieldId; }
         public void setFieldId(String fieldId) { this.fieldId = fieldId; }
@@ -63,6 +78,12 @@ public class CreatePageLayoutRequest {
         public void setRequiredOnLayout(boolean requiredOnLayout) { this.requiredOnLayout = requiredOnLayout; }
         public boolean isReadOnlyOnLayout() { return readOnlyOnLayout; }
         public void setReadOnlyOnLayout(boolean readOnlyOnLayout) { this.readOnlyOnLayout = readOnlyOnLayout; }
+        public String getLabelOverride() { return labelOverride; }
+        public void setLabelOverride(String labelOverride) { this.labelOverride = labelOverride; }
+        public String getHelpTextOverride() { return helpTextOverride; }
+        public void setHelpTextOverride(String helpTextOverride) { this.helpTextOverride = helpTextOverride; }
+        public String getVisibilityRule() { return visibilityRule; }
+        public void setVisibilityRule(String visibilityRule) { this.visibilityRule = visibilityRule; }
     }
 
     public static class RelatedListRequest {

@@ -1,0 +1,230 @@
+/**
+ * RelatedListPanel Component Styles
+ *
+ * Panel for managing related lists within the layout editor.
+ */
+
+/* Panel Container */
+.relatedListPanel {
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.relatedListTitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary, #374151);
+}
+
+/* Related List Item */
+.relatedListItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background-color: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.relatedListInfo {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.relatedListName {
+  font-weight: 500;
+  color: var(--color-text-primary, #111827);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.relatedListMeta {
+  font-size: 11px;
+  color: var(--color-text-secondary, #6b7280);
+}
+
+.relatedListDeleteButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  background-color: transparent;
+  color: var(--color-text-placeholder, #9ca3af);
+  border-radius: 4px;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.relatedListDeleteButton:hover {
+  background-color: var(--color-error-light, #fef2f2);
+  color: var(--color-error, #ef4444);
+}
+
+.relatedListDeleteButton:focus-visible {
+  outline: 2px solid var(--color-primary, #2563eb);
+  outline-offset: 2px;
+}
+
+/* Add Button */
+.addRelatedListButton {
+  width: 100%;
+  padding: 8px;
+  font-size: 13px;
+  color: var(--color-text-secondary, #6b7280);
+  background-color: var(--color-surface, #ffffff);
+  border: 1px dashed var(--color-border-input, #d1d5db);
+  border-radius: 6px;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.addRelatedListButton:hover {
+  border-color: var(--color-primary, #2563eb);
+  color: var(--color-primary, #2563eb);
+}
+
+.addRelatedListButton:focus-visible {
+  outline: 2px solid var(--color-primary, #2563eb);
+  outline-offset: 2px;
+}
+
+/* Form Modal */
+.formOverlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 1rem;
+}
+
+.formModal {
+  background-color: var(--color-surface, #ffffff);
+  border-radius: 8px;
+  box-shadow:
+    0 20px 25px -5px rgba(0, 0, 0, 0.1),
+    0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  max-width: 480px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 24px;
+}
+
+.formTitle {
+  margin: 0 0 16px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text-primary, #111827);
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.formLabel {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-secondary, #6b7280);
+}
+
+.formInput {
+  padding: 6px 10px;
+  font-size: 13px;
+  color: var(--color-text-primary, #374151);
+  background-color: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border-input, #d1d5db);
+  border-radius: 6px;
+}
+
+.formInput:focus {
+  outline: none;
+  border-color: var(--color-primary, #2563eb);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
+.formSelect {
+  padding: 6px 10px;
+  font-size: 13px;
+  color: var(--color-text-primary, #374151);
+  background-color: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border-input, #d1d5db);
+  border-radius: 6px;
+}
+
+.formSelect:focus {
+  outline: none;
+  border-color: var(--color-primary, #2563eb);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
+.formActions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+.cancelButton {
+  padding: 6px 12px;
+  font-size: 13px;
+  color: var(--color-text-primary, #374151);
+  background-color: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border-input, #d1d5db);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.cancelButton:hover {
+  background-color: var(--color-surface-hover, #f3f4f6);
+}
+
+.submitButton {
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-on-primary, #ffffff);
+  background-color: var(--color-primary, #2563eb);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.submitButton:hover {
+  background-color: var(--color-primary-hover, #1d4ed8);
+}
+
+/* Empty State */
+.emptyState {
+  padding: 16px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--color-text-placeholder, #9ca3af);
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .relatedListDeleteButton,
+  .addRelatedListButton {
+    transition: none;
+  }
+}

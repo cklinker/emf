@@ -52,6 +52,10 @@ export type {
   ResponsiveBreakpoints,
 } from './Layout/types';
 
+// LayoutRenderer
+export { LayoutRenderer } from './LayoutRenderer/LayoutRenderer';
+export type { LayoutRendererProps, FieldRendererFn } from './LayoutRenderer/types';
+
 // Hooks
 export { useResource } from './hooks/useResource';
 export { useResourceList } from './hooks/useResourceList';

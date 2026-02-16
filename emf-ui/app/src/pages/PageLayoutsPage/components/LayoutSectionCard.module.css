@@ -1,0 +1,202 @@
+/**
+ * LayoutSectionCard Component Styles
+ *
+ * Individual section card within the layout canvas.
+ * Contains a header with controls and a body with column grid for fields.
+ */
+
+/* Section Container */
+.section {
+  background-color: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 8px;
+  overflow: hidden;
+  transition: box-shadow 0.15s ease;
+}
+
+.sectionSelected {
+  border-color: var(--color-primary, #2563eb);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+}
+
+.sectionHighlight {
+  border-color: var(--color-warning, #f59e0b);
+  background-color: var(--color-warning-light, #fffbeb);
+}
+
+/* Section Header */
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background-color: var(--color-surface-secondary, #f9fafb);
+  border-bottom: 1px solid var(--color-border, #e5e7eb);
+  cursor: pointer;
+}
+
+.sectionHeader:focus-visible {
+  outline: 2px solid var(--color-primary, #2563eb);
+  outline-offset: -2px;
+}
+
+/* Drag Handle */
+.dragHandle {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: var(--color-text-placeholder, #9ca3af);
+  cursor: grab;
+}
+
+.dragHandle:active {
+  cursor: grabbing;
+}
+
+/* Section Heading */
+.sectionHeading {
+  flex: 1;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-primary, #111827);
+}
+
+/* Section Badge */
+.sectionBadge {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background-color: var(--color-surface-hover, #e5e7eb);
+  color: var(--color-text-secondary, #6b7280);
+}
+
+/* Section Actions */
+.sectionActions {
+  display: flex;
+  gap: 4px;
+}
+
+.sectionActionButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  background-color: transparent;
+  color: var(--color-text-placeholder, #9ca3af);
+  border-radius: 4px;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.sectionActionButton:hover {
+  background-color: var(--color-surface-hover, #e5e7eb);
+  color: var(--color-text-primary, #374151);
+}
+
+.sectionActionButton:focus-visible {
+  outline: 2px solid var(--color-primary, #2563eb);
+  outline-offset: 2px;
+}
+
+/* Column Selector */
+.columnSelector {
+  display: flex;
+  gap: 2px;
+}
+
+.columnButton {
+  padding: 2px 6px;
+  font-size: 11px;
+  color: var(--color-text-secondary, #6b7280);
+  background-color: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border-input, #d1d5db);
+  border-radius: 3px;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.columnButton:hover:not(.columnButtonActive) {
+  background-color: var(--color-surface-hover, #f3f4f6);
+}
+
+.columnButton:focus-visible {
+  outline: 2px solid var(--color-primary, #2563eb);
+  outline-offset: 1px;
+}
+
+.columnButtonActive {
+  background-color: var(--color-primary, #2563eb);
+  color: var(--color-text-on-primary, #ffffff);
+  border-color: var(--color-primary, #2563eb);
+}
+
+/* Section Body */
+.sectionBody {
+  padding: 16px;
+  min-height: 60px;
+}
+
+/* Column Grid */
+.columnGrid {
+  display: grid;
+  gap: 12px;
+}
+
+/* Individual Column */
+.column {
+  min-height: 40px;
+  padding: 4px;
+  border-radius: 6px;
+  transition: background-color 0.15s ease;
+}
+
+.columnDragOver {
+  background-color: var(--color-primary-light, #eff6ff);
+  outline: 2px dashed var(--color-primary, #2563eb);
+  outline-offset: -2px;
+}
+
+.columnEmpty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  border: 1px dashed var(--color-border, #e5e7eb);
+  border-radius: 6px;
+  color: var(--color-border-input, #d1d5db);
+  font-size: 12px;
+}
+
+/* Responsive */
+@media (max-width: 767px) {
+  .sectionHeader {
+    padding: 8px 12px;
+  }
+
+  .sectionBody {
+    padding: 12px;
+  }
+
+  .columnGrid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .section,
+  .sectionActionButton,
+  .columnButton,
+  .column {
+    transition: none;
+  }
+}

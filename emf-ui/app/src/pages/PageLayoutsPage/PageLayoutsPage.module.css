@@ -179,6 +179,18 @@
   background-color: #fef2f2;
 }
 
+.designButton {
+  color: #fff;
+  background-color: var(--color-primary, #0066cc);
+  border-color: var(--color-primary, #0066cc);
+}
+
+.designButton:hover {
+  background-color: var(--color-primary-dark, #0052a3);
+  border-color: var(--color-primary-dark, #0052a3);
+  color: #fff;
+}
+
 /* Empty State */
 .emptyState {
   padding: 4rem 2rem;
@@ -412,4 +424,32 @@
   .actionButton {
     width: 100%;
   }
+}
+
+/* ========================================================================
+   Editor Mode Styles
+   ======================================================================== */
+
+/* Editor Container — takes full viewport */
+.editorContainer {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Editor Body — three-panel layout */
+.editorBody {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Editor Loading */
+.editorLoading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
 }

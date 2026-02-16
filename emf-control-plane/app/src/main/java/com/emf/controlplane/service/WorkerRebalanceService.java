@@ -4,6 +4,7 @@ import com.emf.controlplane.entity.CollectionAssignment;
 import com.emf.controlplane.entity.Worker;
 import com.emf.controlplane.event.ConfigEventPublisher;
 import com.emf.controlplane.repository.CollectionAssignmentRepository;
+import com.emf.controlplane.repository.CollectionRepository;
 import com.emf.controlplane.repository.WorkerRepository;
 import com.emf.runtime.event.ChangeType;
 import org.slf4j.Logger;
@@ -42,14 +43,17 @@ public class WorkerRebalanceService {
 
     private final WorkerRepository workerRepository;
     private final CollectionAssignmentRepository assignmentRepository;
+    private final CollectionRepository collectionRepository;
     private final ConfigEventPublisher eventPublisher;
 
     public WorkerRebalanceService(
             WorkerRepository workerRepository,
             CollectionAssignmentRepository assignmentRepository,
+            CollectionRepository collectionRepository,
             @Nullable ConfigEventPublisher eventPublisher) {
         this.workerRepository = workerRepository;
         this.assignmentRepository = assignmentRepository;
+        this.collectionRepository = collectionRepository;
         this.eventPublisher = eventPublisher;
     }
 
@@ -295,12 +299,15 @@ public class WorkerRebalanceService {
 
         // Publish assignment changed events
         if (eventPublisher != null) {
+            String collectionName = collectionRepository.findById(assignment.getCollectionId())
+                    .map(c -> c.getName())
+                    .orElse(assignment.getCollectionId());
             eventPublisher.publishWorkerAssignmentChanged(
                     source.getId(), assignment.getCollectionId(),
-                    source.getBaseUrl(), assignment.getCollectionId(), ChangeType.DELETED);
+                    source.getBaseUrl(), collectionName, ChangeType.DELETED);
             eventPublisher.publishWorkerAssignmentChanged(
                     target.getId(), assignment.getCollectionId(),
-                    target.getBaseUrl(), assignment.getCollectionId(), ChangeType.CREATED);
+                    target.getBaseUrl(), collectionName, ChangeType.CREATED);
         }
     }
 

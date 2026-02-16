@@ -322,6 +322,59 @@ public class FieldService {
     }
 
     /**
+     * Bulk-reorders fields in a collection. Accepts an ordered list of field IDs
+     * and sets each field's {@code order} to its position (0-based) in the list.
+     * Creates a single new CollectionVersion for the entire reorder operation.
+     *
+     * @param collectionId The collection ID
+     * @param fieldIds     Ordered list of active field IDs
+     * @throws ResourceNotFoundException if the collection or any field does not exist
+     * @throws ValidationException       if the list doesn't match the active fields
+     */
+    @Transactional
+    @CacheEvict(value = CacheConfig.COLLECTIONS_CACHE, key = "#collectionId")
+    public void reorderFields(String collectionId, java.util.List<String> fieldIds) {
+        log.info("Reordering {} fields in collection: {}", fieldIds.size(), collectionId);
+
+        Collection collection = collectionRepository.findByIdAndActiveTrue(collectionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Collection", collectionId));
+
+        List<Field> activeFields = fieldRepository.findByCollectionIdAndActiveTrue(collectionId);
+
+        // Validate that the provided list matches the active fields exactly
+        Set<String> activeIds = activeFields.stream()
+                .map(Field::getId)
+                .collect(Collectors.toSet());
+        Set<String> requestedIds = new java.util.HashSet<>(fieldIds);
+
+        if (!activeIds.equals(requestedIds)) {
+            throw new ValidationException("fieldIds",
+                    "The provided field IDs must match the active fields in the collection");
+        }
+
+        // Build a lookup map and set the new order
+        Map<String, Field> fieldMap = activeFields.stream()
+                .collect(Collectors.toMap(Field::getId, f -> f));
+
+        for (int i = 0; i < fieldIds.size(); i++) {
+            Field field = fieldMap.get(fieldIds.get(i));
+            field.setOrder(i);
+        }
+
+        fieldRepository.saveAll(activeFields);
+
+        // Single version bump for the whole reorder
+        collection.setCurrentVersion(collection.getCurrentVersion() + 1);
+        createNewVersion(collection);
+        collectionRepository.save(collection);
+
+        publishCollectionChangedEvent(collection);
+
+        log.info("Reordered fields in collection: {}, new version: {}",
+                collectionId, collection.getCurrentVersion());
+    }
+
+    /**
      * Soft-deletes a field by marking it as inactive.
      * Creates a new CollectionVersion with the field marked as inactive.
      * Evicts the collection from cache after the field is deleted.

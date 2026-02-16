@@ -12,7 +12,7 @@
  * - 3.12: Display collection version history with ability to view previous versions
  */
 
-import React, { useState, useCallback, useMemo } from 'react'
+import React, { useState, useCallback, useMemo, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
@@ -612,6 +612,9 @@ export function CollectionDetailPage({
             referenceTarget: fieldData.referenceTarget,
             fieldTypeConfig: fieldData.fieldTypeConfig,
             validation: fieldData.validation,
+            description: fieldData.description,
+            trackHistory: fieldData.trackHistory,
+            constraints: fieldData.constraints,
           },
         })
       } else {
@@ -627,6 +630,9 @@ export function CollectionDetailPage({
           referenceTarget: fieldData.referenceTarget,
           fieldTypeConfig: fieldData.fieldTypeConfig,
           validation: fieldData.validation,
+          description: fieldData.description,
+          trackHistory: fieldData.trackHistory,
+          constraints: fieldData.constraints,
         })
       }
     },
@@ -813,6 +819,68 @@ export function CollectionDetailPage({
     if (!collection?.fields) return []
     return [...collection.fields].sort((a, b) => a.order - b.order)
   }, [collection])
+
+  // Drag-and-drop field reordering state
+  const dragIndexRef = useRef<number | null>(null)
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
+  const [localFieldOrder, setLocalFieldOrder] = useState<FieldDefinition[] | null>(null)
+
+  // The display list: use optimistic local order while dragging, otherwise sorted from server
+  const displayFields = localFieldOrder ?? sortedFields
+
+  const reorderFieldsMutation = useMutation({
+    mutationFn: async (fieldIds: string[]) => {
+      await apiClient.put(`/control/collections/${collectionId}/fields/reorder`, {
+        fieldIds,
+      })
+    },
+    onSuccess: () => {
+      refetchCollection()
+      setLocalFieldOrder(null)
+    },
+    onError: () => {
+      showToast(t('errors.generic'), 'error')
+      setLocalFieldOrder(null)
+    },
+  })
+
+  const handleDragStart = useCallback((index: number) => {
+    dragIndexRef.current = index
+  }, [])
+
+  const handleDragOver = useCallback((e: React.DragEvent, index: number) => {
+    e.preventDefault()
+    if (dragIndexRef.current === null || dragIndexRef.current === index) return
+    setDragOverIndex(index)
+  }, [])
+
+  const handleDragEnd = useCallback(() => {
+    dragIndexRef.current = null
+    setDragOverIndex(null)
+  }, [])
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent, dropIndex: number) => {
+      e.preventDefault()
+      const fromIndex = dragIndexRef.current
+      if (fromIndex === null || fromIndex === dropIndex) {
+        handleDragEnd()
+        return
+      }
+
+      // Compute new order optimistically
+      const newOrder = [...displayFields]
+      const [moved] = newOrder.splice(fromIndex, 1)
+      newOrder.splice(dropIndex, 0, moved)
+
+      setLocalFieldOrder(newOrder)
+      handleDragEnd()
+
+      // Persist to backend
+      reorderFieldsMutation.mutate(newOrder.map((f) => f.id))
+    },
+    [displayFields, handleDragEnd, reorderFieldsMutation]
+  )
 
   // Render loading state
   if (isLoadingCollection) {
@@ -1078,7 +1146,7 @@ export function CollectionDetailPage({
               {t('collections.addField')}
             </button>
           </div>
-          {sortedFields.length === 0 ? (
+          {displayFields.length === 0 ? (
             <div className={styles.emptyState} data-testid="fields-empty-state">
               <p>{t('common.noData')}</p>
               <button type="button" className={styles.addButton} onClick={handleAddField}>
@@ -1094,31 +1162,53 @@ export function CollectionDetailPage({
               >
                 <thead>
                   <tr>
-                    <th scope="col">#</th>
+                    <th scope="col" className={styles.dragHandleCol}></th>
                     <th scope="col">{t('collections.fieldName')}</th>
                     <th scope="col">{t('collections.displayName')}</th>
                     <th scope="col">{t('collections.fieldType')}</th>
+                    <th scope="col">{t('collections.description')}</th>
                     <th scope="col">{t('fields.validation.required')}</th>
                     <th scope="col">{t('fields.validation.unique')}</th>
                     <th scope="col">{t('fields.validation.indexed')}</th>
+                    <th scope="col">{t('fieldEditor.trackHistory')}</th>
                     <th scope="col">{t('fields.relationship')}</th>
                     <th scope="col">{t('common.actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedFields.map((field, index) => (
+                  {displayFields.map((field, index) => (
                     <tr
                       key={field.id}
-                      className={styles.tableRow}
+                      className={`${styles.tableRow} ${dragOverIndex === index ? styles.dragOver : ''}`}
                       data-testid={`field-row-${index}`}
+                      draggable
+                      onDragStart={() => handleDragStart(index)}
+                      onDragOver={(e) => handleDragOver(e, index)}
+                      onDragEnd={handleDragEnd}
+                      onDrop={(e) => handleDrop(e, index)}
                     >
-                      <td>{field.order}</td>
+                      <td className={styles.dragHandleCell}>
+                        <span className={styles.dragHandle} aria-label="Drag to reorder">
+                          ⠿
+                        </span>
+                      </td>
                       <td className={styles.fieldNameCell}>{field.name}</td>
                       <td>{field.displayName || '-'}</td>
                       <td>
                         <span className={styles.fieldTypeBadge}>
                           {getFieldTypeDisplay(field.type, t)}
                         </span>
+                      </td>
+                      <td className={styles.descriptionCell}>
+                        {field.description ? (
+                          <span title={field.description}>
+                            {field.description.length > 50
+                              ? `${field.description.substring(0, 50)}...`
+                              : field.description}
+                          </span>
+                        ) : (
+                          '-'
+                        )}
                       </td>
                       <td>
                         <span className={field.required ? styles.checkMark : styles.crossMark}>
@@ -1133,6 +1223,11 @@ export function CollectionDetailPage({
                       <td>
                         <span className={field.indexed ? styles.checkMark : styles.crossMark}>
                           {field.indexed ? '✓' : '✕'}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={field.trackHistory ? styles.checkMark : styles.crossMark}>
+                          {field.trackHistory ? '✓' : '✕'}
                         </span>
                       </td>
                       <td>

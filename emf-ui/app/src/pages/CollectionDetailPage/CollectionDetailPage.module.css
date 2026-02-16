@@ -359,6 +359,37 @@
   color: var(--color-text-tertiary, #9ca3af);
 }
 
+/* Drag Handle */
+.dragHandleCol {
+  width: 2rem;
+  padding: 0 !important;
+}
+
+.dragHandleCell {
+  width: 2rem;
+  padding: 0 0.25rem !important;
+  text-align: center;
+  cursor: grab;
+}
+
+.dragHandle {
+  font-size: 1rem;
+  color: var(--color-text-muted, #9ca3af);
+  user-select: none;
+}
+
+.dragOver {
+  border-top: 2px solid var(--color-primary, #3b82f6);
+  background-color: var(--color-primary-light, #eff6ff);
+}
+
+/* Description Cell */
+.descriptionCell {
+  max-width: 200px;
+  font-size: var(--font-size-xs, 0.75rem);
+  color: var(--color-text-secondary, #6b7280);
+}
+
 /* Operation Badge */
 .operationBadge {
   display: inline-flex;

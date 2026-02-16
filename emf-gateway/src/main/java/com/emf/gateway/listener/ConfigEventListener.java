@@ -15,7 +15,6 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Kafka listener for configuration change events from the control plane.
@@ -45,21 +44,6 @@ public class ConfigEventListener {
     private final ObjectMapper objectMapper;
     private final ApplicationEventPublisher applicationEventPublisher;
     private final String workerServiceUrl;
-
-    // Cache of service ID to base URL for building backend URLs
-    private final Map<String, String> serviceUrlCache = new ConcurrentHashMap<>();
-
-    /**
-     * Populates the service URL cache from bootstrap data.
-     * Called by RouteConfigService during startup so that subsequent
-     * collection-changed Kafka events can resolve service URLs.
-     */
-    public void populateServiceUrlCache(Map<String, String> serviceUrls) {
-        if (serviceUrls != null && !serviceUrls.isEmpty()) {
-            serviceUrlCache.putAll(serviceUrls);
-            logger.info("Populated service URL cache with {} entries from bootstrap", serviceUrls.size());
-        }
-    }
 
     public ConfigEventListener(RouteRegistry routeRegistry,
                               ObjectMapper objectMapper,
@@ -194,7 +178,6 @@ public class ConfigEventListener {
 
             String workerId = (String) payload.get("workerId");
             String collectionId = (String) payload.get("collectionId");
-            String workerBaseUrl = (String) payload.get("workerBaseUrl");
             String collectionName = (String) payload.get("collectionName");
             String changeType = (String) payload.get("changeType");
 
@@ -212,24 +195,27 @@ public class ConfigEventListener {
                 routeRegistry.removeRoute(collectionId);
                 logger.info("Removed route for unassigned collection: {}", collectionName);
             } else {
-                if (workerBaseUrl == null || collectionName == null || collectionId == null) {
+                if (collectionName == null || collectionId == null) {
                     logger.error("Missing required fields in worker assignment event: " +
-                                "collectionId={}, collectionName={}, workerBaseUrl={}",
-                                collectionId, collectionName, workerBaseUrl);
+                                "collectionId={}, collectionName={}",
+                                collectionId, collectionName);
                     return;
                 }
 
+                // Always use the configured worker service URL (K8s Service DNS) instead
+                // of the pod-specific IP from the event. Pod IPs are ephemeral and become
+                // stale when pods restart, causing routing failures.
                 String path = "/api/" + collectionName + "/**";
                 RouteDefinition route = new RouteDefinition(
                     collectionId,
                     path,
-                    workerBaseUrl,
+                    workerServiceUrl,
                     collectionName
                 );
 
                 routeRegistry.updateRoute(route);
                 logger.info("Added/updated route for worker-assigned collection: path={}, workerUrl={}",
-                            path, workerBaseUrl);
+                            path, workerServiceUrl);
             }
 
             applicationEventPublisher.publishEvent(new RefreshRoutesEvent(this));

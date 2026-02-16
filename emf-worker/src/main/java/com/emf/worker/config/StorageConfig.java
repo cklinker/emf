@@ -1,5 +1,7 @@
 package com.emf.worker.config;
 
+import com.emf.runtime.registry.CollectionOnDemandLoader;
+import com.emf.worker.service.CollectionLifecycleManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.client.RestTemplate;
@@ -24,5 +26,18 @@ public class StorageConfig {
     @Bean
     public RestTemplate restTemplate() {
         return new RestTemplate();
+    }
+
+    /**
+     * Creates the on-demand collection loader that fetches unknown collections
+     * from the control plane when a request arrives for a collection not yet
+     * loaded by this worker.
+     *
+     * @param lifecycleManager the collection lifecycle manager
+     * @return the on-demand loader
+     */
+    @Bean
+    public CollectionOnDemandLoader collectionOnDemandLoader(CollectionLifecycleManager lifecycleManager) {
+        return lifecycleManager::loadCollectionByName;
     }
 }

@@ -205,13 +205,13 @@ class ConfigEventListenerTest {
     class WorkerAssignmentChangedTests {
 
         @Test
-        @DisplayName("Should add route when collection is assigned to worker")
-        void shouldAddRouteWhenCollectionAssignedToWorker() {
-            // Arrange
+        @DisplayName("Should add route using configured service URL, not pod IP from event")
+        void shouldAddRouteUsingConfiguredServiceUrl() {
+            // Arrange - event contains pod-specific URL, but gateway should ignore it
             Map<String, Object> payload = new HashMap<>();
             payload.put("workerId", "worker-1");
             payload.put("collectionId", "collection-1");
-            payload.put("workerBaseUrl", "http://worker-1:8080");
+            payload.put("workerBaseUrl", "http://10.1.150.150:8080");
             payload.put("collectionName", "accounts");
             payload.put("changeType", "CREATED");
 
@@ -226,14 +226,14 @@ class ConfigEventListenerTest {
             // Act
             listener.handleWorkerAssignmentChanged(event);
 
-            // Assert
+            // Assert - should use configured worker service URL, not pod IP
             ArgumentCaptor<RouteDefinition> routeCaptor = ArgumentCaptor.forClass(RouteDefinition.class);
             verify(routeRegistry).updateRoute(routeCaptor.capture());
 
             RouteDefinition capturedRoute = routeCaptor.getValue();
             assertEquals("collection-1", capturedRoute.getId());
             assertEquals("/api/accounts/**", capturedRoute.getPath());
-            assertEquals("http://worker-1:8080", capturedRoute.getBackendUrl());
+            assertEquals(WORKER_SERVICE_URL, capturedRoute.getBackendUrl());
             assertEquals("accounts", capturedRoute.getCollectionName());
         }
 

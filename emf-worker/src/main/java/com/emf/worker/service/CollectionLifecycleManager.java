@@ -436,6 +436,75 @@ public class CollectionLifecycleManager {
         }
     }
 
+    /**
+     * Attempts to load and initialize a collection by name and tenant ID.
+     *
+     * <p>Looks up the collection from the control plane by name (scoped to the
+     * given tenant), then initializes it locally (register + storage + validation
+     * rules). If the collection is already loaded, returns the existing definition.
+     *
+     * <p>This method is thread-safe. Concurrent calls for the same collection
+     * will only initialize it once due to the {@code activeCollections} check.
+     *
+     * @param collectionName the collection name
+     * @param tenantId the tenant ID, may be {@code null}
+     * @return the loaded collection definition, or {@code null} if not found
+     */
+    @SuppressWarnings("unchecked")
+    public com.emf.runtime.model.CollectionDefinition loadCollectionByName(String collectionName, String tenantId) {
+        // Check if already loaded
+        com.emf.runtime.model.CollectionDefinition existing = collectionRegistry.get(collectionName);
+        if (existing != null) {
+            return existing;
+        }
+
+        try {
+            // Look up the collection by name from the control plane
+            // The control plane's /control/collections/{idOrName} endpoint supports name lookup
+            String url = workerProperties.getControlPlaneUrl() + "/control/collections/" + collectionName;
+
+            org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+            if (tenantId != null && !tenantId.isBlank()) {
+                headers.set("X-Tenant-ID", tenantId);
+            }
+            org.springframework.http.HttpEntity<Void> requestEntity = new org.springframework.http.HttpEntity<>(headers);
+
+            ResponseEntity<Map> response = restTemplate.exchange(
+                    url, org.springframework.http.HttpMethod.GET, requestEntity, Map.class);
+
+            if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+                log.warn("Collection '{}' not found on control plane (tenantId={})", collectionName, tenantId);
+                return null;
+            }
+
+            Map<String, Object> collectionData = response.getBody();
+            String collectionId = (String) collectionData.get("id");
+
+            if (collectionId == null) {
+                log.warn("Control plane returned collection '{}' without an ID", collectionName);
+                return null;
+            }
+
+            // Check again in case another thread initialized it while we were fetching
+            if (activeCollections.containsKey(collectionId)) {
+                return collectionRegistry.get(collectionName);
+            }
+
+            // Initialize the collection fully
+            initializeCollection(collectionId);
+
+            return collectionRegistry.get(collectionName);
+
+        } catch (org.springframework.web.client.HttpClientErrorException.NotFound e) {
+            log.debug("Collection '{}' does not exist on control plane (tenantId={})", collectionName, tenantId);
+            return null;
+        } catch (Exception e) {
+            log.warn("Failed to load collection '{}' on demand (tenantId={}): {}",
+                    collectionName, tenantId, e.getMessage());
+            return null;
+        }
+    }
+
     private String getStringOrDefault(Map<String, Object> data, String key, String defaultValue) {
         Object value = data.get(key);
         if (value instanceof String str && !str.isBlank()) {

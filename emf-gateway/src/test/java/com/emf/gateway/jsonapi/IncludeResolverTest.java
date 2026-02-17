@@ -351,6 +351,91 @@ class IncludeResolverTest {
         verify(valueOperations, never()).get(anyString());
     }
 
+    @Test
+    void resolveIncludes_withCollectionTypeAsIncludeName_shouldMatchByTargetType() {
+        // Given — include=categories should match a relationship keyed as "category_id"
+        // whose data.type is "categories"
+        List<String> includeParams = Collections.singletonList("categories");
+
+        ResourceObject product = new ResourceObject("products", "1");
+        product.addAttribute("name", "T-Shirt");
+        product.addRelationship("category_id",
+                new Relationship(new ResourceIdentifier("categories", "cat-1")));
+
+        List<ResourceObject> primaryData = Collections.singletonList(product);
+
+        String categoryJson = """
+            {
+                "type": "categories",
+                "id": "cat-1",
+                "attributes": {
+                    "name": "Clothing"
+                }
+            }
+            """;
+        when(valueOperations.get("jsonapi:categories:cat-1"))
+                .thenReturn(Mono.just(categoryJson));
+
+        // When
+        Mono<List<ResourceObject>> result = includeResolver.resolveIncludes(includeParams, primaryData);
+
+        // Then
+        StepVerifier.create(result)
+                .assertNext(resources -> {
+                    assertThat(resources).hasSize(1);
+                    assertThat(resources.get(0).getType()).isEqualTo("categories");
+                    assertThat(resources.get(0).getId()).isEqualTo("cat-1");
+                })
+                .verifyComplete();
+
+        verify(valueOperations).get("jsonapi:categories:cat-1");
+    }
+
+    @Test
+    void resolveIncludes_exactKeyMatchTakesPriorityOverTypeMatch() {
+        // Given — include=author should match by key even if another relationship
+        // has data.type "author"
+        List<String> includeParams = Collections.singletonList("author");
+
+        ResourceObject post = new ResourceObject("posts", "1");
+        post.addRelationship("author",
+                new Relationship(new ResourceIdentifier("users", "user-1")));
+        // Another relationship whose type happens to be "author" (unlikely but tests priority)
+        post.addRelationship("author_ref",
+                new Relationship(new ResourceIdentifier("author", "author-1")));
+
+        List<ResourceObject> primaryData = Collections.singletonList(post);
+
+        String userJson = """
+            {
+                "type": "users",
+                "id": "user-1",
+                "attributes": {
+                    "name": "John Doe",
+                    "email": "john@example.com"
+                }
+            }
+            """;
+        when(valueOperations.get("jsonapi:users:user-1"))
+                .thenReturn(Mono.just(userJson));
+
+        // When
+        Mono<List<ResourceObject>> result = includeResolver.resolveIncludes(includeParams, primaryData);
+
+        // Then
+        StepVerifier.create(result)
+                .assertNext(resources -> {
+                    assertThat(resources).hasSize(1);
+                    // Should match by key "author" → users:user-1, NOT by type "author" → author:author-1
+                    assertThat(resources.get(0).getType()).isEqualTo("users");
+                    assertThat(resources.get(0).getId()).isEqualTo("user-1");
+                })
+                .verifyComplete();
+
+        verify(valueOperations).get("jsonapi:users:user-1");
+        verify(valueOperations, never()).get("jsonapi:author:author-1");
+    }
+
     // Helper methods to create test data
 
     private List<ResourceObject> createPrimaryDataWithRelationships() {

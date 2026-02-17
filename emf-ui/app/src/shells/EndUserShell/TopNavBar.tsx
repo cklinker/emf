@@ -5,6 +5,9 @@
  * Contains: App launcher, app name, object tabs, search trigger,
  * notifications bell, user menu.
  *
+ * Responsive: On mobile (<768px), collection tabs collapse into a
+ * hamburger menu that opens a Sheet drawer.
+ *
  * Uses shadcn/ui components with Tailwind CSS.
  */
 
@@ -21,6 +24,9 @@ import {
   User,
   LayoutGrid,
   ChevronDown,
+  Menu,
+  Home,
+  Database,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -34,6 +40,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Separator } from '@/components/ui/separator'
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { useTheme } from '@/context/ThemeContext'
 import type { ThemeMode } from '@/context/ThemeContext'
 
@@ -82,6 +89,7 @@ export function TopNavBar({
   const navigate = useNavigate()
   const { mode, setMode, resolvedMode } = useTheme()
   const [activeTabIndex, setActiveTabIndex] = useState<number | null>(null)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const basePath = `/${tenantSlug}/app`
 
@@ -91,6 +99,14 @@ export function TopNavBar({
       navigate(`${basePath}/o/${tab.collectionName}`)
     },
     [navigate, basePath]
+  )
+
+  const handleMobileNavClick = useCallback(
+    (path: string) => {
+      setMobileMenuOpen(false)
+      navigate(path)
+    },
+    [navigate]
   )
 
   const handleThemeChange = useCallback(
@@ -111,8 +127,59 @@ export function TopNavBar({
 
   return (
     <header className="flex h-14 items-center border-b border-border bg-card px-4 shadow-sm">
-      {/* Left section: App launcher + name */}
-      <div className="flex items-center gap-3">
+      {/* Mobile hamburger menu (visible below md) */}
+      <div className="md:hidden">
+        <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+          <SheetTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Open menu">
+              <Menu className="h-4 w-4" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="left" className="w-72">
+            <SheetHeader>
+              <SheetTitle className="text-left">{appName}</SheetTitle>
+            </SheetHeader>
+            <nav className="mt-4 flex flex-col gap-1" aria-label="Mobile navigation">
+              <button
+                onClick={() => handleMobileNavClick(`${basePath}/home`)}
+                className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+              >
+                <Home className="h-4 w-4 text-muted-foreground" />
+                Home
+              </button>
+              {tabs.length > 0 && (
+                <>
+                  <Separator className="my-2" />
+                  <p className="px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Collections
+                  </p>
+                </>
+              )}
+              {tabs.map((tab) => (
+                <button
+                  key={tab.collectionName}
+                  onClick={() => handleMobileNavClick(`${basePath}/o/${tab.collectionName}`)}
+                  className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+                >
+                  <Database className="h-4 w-4 text-muted-foreground" />
+                  {tab.label}
+                </button>
+              ))}
+              <Separator className="my-2" />
+              <button
+                onClick={() => handleMobileNavClick(`/${tenantSlug}/setup`)}
+                className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent"
+              >
+                <Settings className="h-4 w-4" />
+                Switch to Setup
+              </button>
+            </nav>
+          </SheetContent>
+        </Sheet>
+      </div>
+
+      {/* Left section: App launcher + name (hidden on mobile for space) */}
+      <div className="hidden items-center gap-3 md:flex">
         <Button
           variant="ghost"
           size="icon"
@@ -131,9 +198,17 @@ export function TopNavBar({
         <Separator orientation="vertical" className="h-6" />
       </div>
 
-      {/* Center section: Object tabs */}
+      {/* Mobile: App name (visible on mobile only) */}
+      <Link
+        to={`${basePath}/home`}
+        className="ml-2 text-sm font-semibold text-foreground no-underline hover:text-primary md:hidden"
+      >
+        {appName}
+      </Link>
+
+      {/* Center section: Object tabs (hidden on mobile) */}
       <nav
-        className="ml-2 flex flex-1 items-center gap-1 overflow-x-auto"
+        className="ml-2 hidden flex-1 items-center gap-1 overflow-x-auto md:flex"
         role="navigation"
         aria-label="Object navigation"
       >
@@ -152,6 +227,9 @@ export function TopNavBar({
           </button>
         ))}
       </nav>
+
+      {/* Spacer for mobile */}
+      <div className="flex-1 md:hidden" />
 
       {/* Right section: Search, notifications, user menu */}
       <div className="flex items-center gap-1">
@@ -185,10 +263,15 @@ export function TopNavBar({
           )}
         </Button>
 
-        {/* Theme toggle */}
+        {/* Theme toggle (hidden on mobile to save space) */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Toggle theme">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="hidden h-8 w-8 md:inline-flex"
+              aria-label="Toggle theme"
+            >
               {resolvedMode === 'dark' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
             </Button>
           </DropdownMenuTrigger>
@@ -220,7 +303,7 @@ export function TopNavBar({
                   {userInitials}
                 </AvatarFallback>
               </Avatar>
-              <ChevronDown className="h-3 w-3 text-muted-foreground" />
+              <ChevronDown className="hidden h-3 w-3 text-muted-foreground md:block" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
@@ -233,6 +316,18 @@ export function TopNavBar({
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
+            {/* Theme toggle in user menu for mobile */}
+            <DropdownMenuItem
+              className="md:hidden"
+              onClick={() => handleThemeChange(resolvedMode === 'dark' ? 'light' : 'dark')}
+            >
+              {resolvedMode === 'dark' ? (
+                <Sun className="mr-2 h-4 w-4" />
+              ) : (
+                <Moon className="mr-2 h-4 w-4" />
+              )}
+              {resolvedMode === 'dark' ? 'Light Mode' : 'Dark Mode'}
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => navigate(`/${tenantSlug}/setup`)}>
               <Settings className="mr-2 h-4 w-4" />
               Switch to Setup

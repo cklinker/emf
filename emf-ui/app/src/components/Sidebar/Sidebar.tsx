@@ -18,6 +18,7 @@ import { useApi } from '../../context/ApiContext'
 import { useAuth } from '../../context/AuthContext'
 import { useFavorites } from '../../hooks/useFavorites'
 import { getTenantSlug } from '../../context/TenantContext'
+import { cn } from '@/lib/utils'
 import {
   Home,
   BarChart3,
@@ -59,7 +60,6 @@ import {
   ChevronRight,
   type LucideIcon,
 } from 'lucide-react'
-import styles from './Sidebar.module.css'
 
 /**
  * Props for the Sidebar component
@@ -158,6 +158,13 @@ function getIcon(iconName?: string): React.ReactNode {
   return <IconComponent size={16} />
 }
 
+const levelClasses: Record<number, string> = {
+  0: '',
+  1: 'pl-4',
+  2: 'pl-8',
+  3: 'pl-12',
+}
+
 /**
  * MenuItem component renders a single menu item with optional children
  */
@@ -199,21 +206,17 @@ function MenuItem({ item, level, collapsed, onItemClick }: MenuItemProps): JSX.E
   }, [hasChildren, onItemClick])
 
   const icon = getIcon(item.icon)
-  const itemClasses = [
-    styles.menuItem,
-    styles[`menuItem--level${Math.min(level, 3)}`],
-    isActive ? styles['menuItem--active'] : '',
-    collapsed ? styles['menuItem--collapsed'] : '',
-  ]
-    .filter(Boolean)
-    .join(' ')
+  const itemClasses = cn(
+    'list-none relative mx-2 my-1',
+    levelClasses[Math.min(level, 3)],
+    isActive && 'menuItem--active',
+    collapsed && 'mx-0'
+  )
 
-  const contentClasses = [
-    styles.menuItemContent,
-    hasChildren ? styles['menuItemContent--hasChildren'] : '',
-  ]
-    .filter(Boolean)
-    .join(' ')
+  const contentClasses = cn(
+    'flex items-center gap-2 w-full px-4 py-2 bg-transparent border-0 rounded text-sm font-medium no-underline text-left cursor-pointer transition-colors text-foreground hover:bg-accent/50',
+    collapsed && 'justify-center p-2 w-10 h-10'
+  )
 
   if (item.path && !hasChildren) {
     return (
@@ -221,18 +224,21 @@ function MenuItem({ item, level, collapsed, onItemClick }: MenuItemProps): JSX.E
         <NavLink
           to={item.path}
           className={({ isActive: linkActive }) =>
-            `${contentClasses} ${linkActive ? styles['menuItemContent--active'] : ''}`
+            cn(
+              contentClasses,
+              linkActive && 'bg-primary/10 text-primary font-semibold menuItemContent--active'
+            )
           }
           onClick={handleClick}
           title={collapsed ? item.label : undefined}
           aria-current={isActive ? 'page' : undefined}
         >
           {icon && (
-            <span className={styles.menuItemIcon} aria-hidden="true">
+            <span className="flex items-center justify-center w-5 h-5 shrink-0" aria-hidden="true">
               {icon}
             </span>
           )}
-          {!collapsed && <span className={styles.menuItemLabel}>{item.label}</span>}
+          {!collapsed && <span className="flex-1 truncate">{item.label}</span>}
         </NavLink>
       </li>
     )
@@ -250,15 +256,18 @@ function MenuItem({ item, level, collapsed, onItemClick }: MenuItemProps): JSX.E
           title={collapsed ? item.label : undefined}
         >
           {icon && (
-            <span className={styles.menuItemIcon} aria-hidden="true">
+            <span className="flex items-center justify-center w-5 h-5 shrink-0" aria-hidden="true">
               {icon}
             </span>
           )}
           {!collapsed && (
             <>
-              <span className={styles.menuItemLabel}>{item.label}</span>
+              <span className="flex-1 truncate">{item.label}</span>
               <span
-                className={`${styles.expandIcon} ${isExpanded ? styles['expandIcon--expanded'] : ''}`}
+                className={cn(
+                  'flex items-center justify-center w-4 h-4 text-[0.625rem] opacity-70 transition-transform duration-150 shrink-0',
+                  isExpanded && 'rotate-90 expandIcon--expanded'
+                )}
                 aria-hidden="true"
               >
                 <ChevronRight size={14} />
@@ -270,7 +279,10 @@ function MenuItem({ item, level, collapsed, onItemClick }: MenuItemProps): JSX.E
         {!collapsed && (
           <ul
             id={`submenu-${item.id}`}
-            className={`${styles.submenu} ${isExpanded ? styles['submenu--expanded'] : ''}`}
+            className={cn(
+              'list-none m-0 p-0 max-h-0 overflow-hidden transition-all duration-200',
+              isExpanded && 'max-h-[500px] submenu--expanded'
+            )}
             role="group"
             aria-label={`${item.label} submenu`}
           >
@@ -293,11 +305,11 @@ function MenuItem({ item, level, collapsed, onItemClick }: MenuItemProps): JSX.E
     <li className={itemClasses} data-testid={`menu-item-${item.id}`}>
       <span className={contentClasses} title={collapsed ? item.label : undefined}>
         {icon && (
-          <span className={styles.menuItemIcon} aria-hidden="true">
+          <span className="flex items-center justify-center w-5 h-5 shrink-0" aria-hidden="true">
             {icon}
           </span>
         )}
-        {!collapsed && <span className={styles.menuItemLabel}>{item.label}</span>}
+        {!collapsed && <span className="flex-1 truncate">{item.label}</span>}
       </span>
     </li>
   )
@@ -405,16 +417,23 @@ export function Sidebar({ menus, collapsed, onToggle, onItemClick }: SidebarProp
     }
   }, [location.pathname])
 
-  const sidebarClasses = [styles.sidebar, collapsed ? styles['sidebar--collapsed'] : '']
-    .filter(Boolean)
-    .join(' ')
-
   return (
-    <nav className={sidebarClasses} aria-label={t('navigation.main')} data-testid="sidebar">
+    <nav
+      className={cn(
+        'flex flex-col w-full h-full py-2 overflow-y-auto overflow-x-hidden',
+        collapsed && 'p-2 items-center'
+      )}
+      aria-label={t('navigation.main')}
+      data-testid="sidebar"
+    >
       {/* ==================== MY WORKSPACE ==================== */}
-      <div className={styles.menuSection} data-testid="workspace-section">
-        {!collapsed && <h2 className={styles.menuSectionTitle}>{t('sidebar.workspace')}</h2>}
-        <ul className={styles.menuList} role="menubar" aria-label={t('sidebar.workspace')}>
+      <div className="mb-4 last:mb-0" data-testid="workspace-section">
+        {!collapsed && (
+          <h2 className="m-0 px-4 py-2 text-[0.6875rem] font-semibold uppercase tracking-wider text-muted-foreground truncate">
+            {t('sidebar.workspace')}
+          </h2>
+        )}
+        <ul className="list-none m-0 p-0" role="menubar" aria-label={t('sidebar.workspace')}>
           <MenuItem
             item={{
               id: 'home',
@@ -458,9 +477,13 @@ export function Sidebar({ menus, collapsed, onToggle, onItemClick }: SidebarProp
       </div>
 
       {/* ==================== TOOLS ==================== */}
-      <div className={styles.menuSection} data-testid="tools-section">
-        {!collapsed && <h2 className={styles.menuSectionTitle}>{t('sidebar.tools')}</h2>}
-        <ul className={styles.menuList} role="menubar" aria-label={t('sidebar.tools')}>
+      <div className="mb-4 last:mb-0" data-testid="tools-section">
+        {!collapsed && (
+          <h2 className="m-0 px-4 py-2 text-[0.6875rem] font-semibold uppercase tracking-wider text-muted-foreground truncate">
+            {t('sidebar.tools')}
+          </h2>
+        )}
+        <ul className="list-none m-0 p-0" role="menubar" aria-label={t('sidebar.tools')}>
           <MenuItem
             item={{
               id: 'reports',
@@ -487,20 +510,25 @@ export function Sidebar({ menus, collapsed, onToggle, onItemClick }: SidebarProp
       </div>
 
       {/* ==================== SETUP (Collapsed by default) ==================== */}
-      <div className={styles.menuSection} data-testid="setup-section">
+      <div className="mb-4 last:mb-0" data-testid="setup-section">
         {!collapsed && (
           <button
             type="button"
-            className={styles.setupToggle}
+            className="flex items-center gap-2 w-full px-4 py-2 bg-transparent border-0 cursor-pointer text-muted-foreground transition-colors hover:text-foreground"
             onClick={toggleSetup}
             aria-expanded={setupExpanded}
           >
-            <span className={styles.setupToggleIcon} aria-hidden="true">
+            <span className="text-sm" aria-hidden="true">
               {getIcon('settings')}
             </span>
-            <span className={styles.menuSectionTitle}>{t('sidebar.setup')}</span>
+            <span className="m-0 p-0 flex-1 text-left text-[0.6875rem] font-semibold uppercase tracking-wider text-muted-foreground truncate">
+              {t('sidebar.setup')}
+            </span>
             <span
-              className={`${styles.expandIcon} ${setupExpanded ? styles['expandIcon--expanded'] : ''}`}
+              className={cn(
+                'flex items-center justify-center w-4 h-4 text-[0.625rem] opacity-70 transition-transform duration-150 shrink-0',
+                setupExpanded && 'rotate-90 expandIcon--expanded'
+              )}
               aria-hidden="true"
             >
               <ChevronRight size={14} />
@@ -510,24 +538,28 @@ export function Sidebar({ menus, collapsed, onToggle, onItemClick }: SidebarProp
         {collapsed && (
           <button
             type="button"
-            className={styles.menuItemContent}
+            className="flex items-center gap-2 w-full px-4 py-2 bg-transparent border-0 rounded text-sm font-medium no-underline text-left cursor-pointer transition-colors text-foreground hover:bg-accent/50 justify-center p-2 w-10 h-10"
             onClick={toggleSetup}
             title={t('sidebar.setup')}
           >
-            <span className={styles.menuItemIcon} aria-hidden="true">
+            <span className="flex items-center justify-center w-5 h-5 shrink-0" aria-hidden="true">
               {getIcon('settings')}
             </span>
           </button>
         )}
 
         {setupExpanded && !collapsed && (
-          <div className={styles.setupContent}>
+          <div className="border-t border-border pt-2 mt-1">
             {/* Render bootstrap menus as setup subsections */}
             {menus.map((menu) => (
-              <div key={menu.id} className={styles.setupSubsection}>
-                {menu.name && <h3 className={styles.setupSubsectionTitle}>{menu.name}</h3>}
+              <div key={menu.id} className="mb-2">
+                {menu.name && (
+                  <h3 className="m-0 px-4 py-1 text-[0.625rem] font-semibold uppercase tracking-wider text-muted-foreground">
+                    {menu.name}
+                  </h3>
+                )}
                 <ul
-                  className={styles.menuList}
+                  className="list-none m-0 p-0"
                   role="menubar"
                   aria-label={menu.name || t('navigation.menu')}
                 >
@@ -566,8 +598,13 @@ export function Sidebar({ menus, collapsed, onToggle, onItemClick }: SidebarProp
 
       {/* Empty state */}
       {menus.length === 0 && collectionsList.length === 0 && (
-        <div className={styles.emptyState} data-testid="sidebar-empty">
-          {!collapsed && <p className={styles.emptyStateText}>{t('navigation.noMenus')}</p>}
+        <div
+          className="flex items-center justify-center px-6 py-6 text-center"
+          data-testid="sidebar-empty"
+        >
+          {!collapsed && (
+            <p className="m-0 text-sm text-muted-foreground">{t('navigation.noMenus')}</p>
+          )}
         </div>
       )}
     </nav>

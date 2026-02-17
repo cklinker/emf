@@ -12,7 +12,6 @@ import { useI18n } from '../../context/I18nContext'
 import { useAuth } from '../../context/AuthContext'
 import { useRecentRecords } from '../../hooks/useRecentRecords'
 import { formatRelativeTime } from '../../utils/formatRelativeTime'
-import styles from './RecentItemsDropdown.module.css'
 
 export interface RecentItemsDropdownProps {
   testId?: string
@@ -74,11 +73,11 @@ export function RecentItemsDropdown({
   )
 
   return (
-    <div className={styles.container} ref={containerRef} data-testid={testId}>
+    <div className="relative" ref={containerRef} data-testid={testId}>
       <button
         ref={buttonRef}
         type="button"
-        className={styles.trigger}
+        className="flex items-center justify-center w-9 h-9 rounded-md hover:bg-accent cursor-pointer text-muted-foreground transition-colors border-0 bg-transparent"
         onClick={toggleOpen}
         aria-expanded={open}
         aria-haspopup="menu"
@@ -91,13 +90,17 @@ export function RecentItemsDropdown({
       </button>
 
       {open && (
-        <div className={styles.dropdown} role="menu" aria-label={t('recent.title')}>
-          <div className={styles.dropdownHeader}>
-            <span className={styles.dropdownTitle}>{t('recent.title')}</span>
+        <div
+          className="absolute right-0 top-full mt-1 w-80 max-h-[480px] bg-card border border-border rounded-lg shadow-lg z-50 overflow-hidden flex flex-col"
+          role="menu"
+          aria-label={t('recent.title')}
+        >
+          <div className="flex items-center justify-between px-4 py-2.5 border-b border-border">
+            <span className="text-sm font-semibold text-foreground">{t('recent.title')}</span>
             {displayRecords.length > 0 && (
               <button
                 type="button"
-                className={styles.clearButton}
+                className="text-xs text-primary hover:underline cursor-pointer bg-transparent border-0"
                 onClick={() => {
                   clearRecentRecords()
                   close()
@@ -109,26 +112,32 @@ export function RecentItemsDropdown({
           </div>
 
           {displayRecords.length === 0 ? (
-            <div className={styles.emptyState}>{t('recent.noRecent')}</div>
+            <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+              {t('recent.noRecent')}
+            </div>
           ) : (
-            <ul className={styles.list}>
+            <ul className="flex-1 overflow-y-auto list-none m-0 p-0">
               {displayRecords.map((record, idx) => (
                 <li key={`${record.collectionName}-${record.id}-${idx}`}>
                   <button
                     type="button"
-                    className={styles.item}
+                    className="flex items-center gap-3 w-full px-4 py-2.5 hover:bg-accent cursor-pointer border-0 bg-transparent text-left transition-colors"
                     onClick={() =>
                       handleNavigate(`/resources/${record.collectionName}/${record.id}`)
                     }
                     role="menuitem"
                   >
-                    <div className={styles.itemInfo}>
-                      <span className={styles.itemName}>{record.displayValue}</span>
-                      <span className={styles.itemCollection}>
+                    <div className="flex-1 min-w-0">
+                      <span className="block text-sm font-medium text-foreground truncate">
+                        {record.displayValue}
+                      </span>
+                      <span className="block text-xs text-muted-foreground truncate">
                         {record.collectionDisplayName || record.collectionName}
                       </span>
                     </div>
-                    <span className={styles.itemTime}>{formatRelativeTime(record.viewedAt)}</span>
+                    <span className="text-xs text-muted-foreground shrink-0 whitespace-nowrap">
+                      {formatRelativeTime(record.viewedAt)}
+                    </span>
                   </button>
                 </li>
               ))}

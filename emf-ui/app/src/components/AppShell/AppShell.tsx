@@ -25,7 +25,7 @@ import { useTheme } from '../../context/ThemeContext'
 import { useEscapeKey } from '../../hooks/useKeyboardShortcuts'
 import { SkipLinks } from '../SkipLinks'
 import { BREAKPOINTS, type ScreenSize } from './constants'
-import styles from './AppShell.module.css'
+import { cn } from '@/lib/utils'
 
 /**
  * AppShell context value for child components
@@ -218,29 +218,20 @@ export function AppShell({
     }
   }, [sidebarOpen, screenSize])
 
-  // Build class names
-  const appShellClasses = [
-    styles.appShell,
-    styles[`appShell--${screenSize}`],
-    styles[`appShell--${resolvedMode}`],
-  ]
-    .filter(Boolean)
-    .join(' ')
-
-  const sidebarClasses = [
-    styles.sidebar,
-    sidebarCollapsed && screenSize !== 'mobile' ? styles['sidebar--collapsed'] : '',
-    sidebarOpen && screenSize === 'mobile' ? styles['sidebar--open'] : '',
-  ]
-    .filter(Boolean)
-    .join(' ')
-
-  const contentClasses = [
-    styles.content,
-    sidebarCollapsed && screenSize !== 'mobile' ? styles['content--expanded'] : '',
-  ]
-    .filter(Boolean)
-    .join(' ')
+  // Build sidebar classes based on screen size
+  const sidebarClasses = cn(
+    // Base classes shared across all modes
+    'shrink-0 flex flex-col overflow-hidden border-r border-border bg-card transition-all duration-200',
+    // Desktop sidebar
+    screenSize === 'desktop' && [sidebarCollapsed ? 'w-16' : 'w-[250px]'],
+    // Tablet sidebar
+    screenSize === 'tablet' && [sidebarCollapsed ? 'w-16' : 'w-[220px]'],
+    // Mobile sidebar: fixed, slides from left
+    screenSize === 'mobile' && [
+      'fixed inset-y-0 left-0 z-50 w-[280px] max-w-[85vw] border-r-0 shadow-none transform transition-transform duration-200',
+      sidebarOpen ? 'translate-x-0 shadow-[4px_0_16px_rgba(0,0,0,0.1)]' : '-translate-x-full',
+    ]
+  )
 
   // Context value
   const contextValue: AppShellContextValue = {
@@ -255,7 +246,9 @@ export function AppShell({
   return (
     <AppShellContext.Provider value={contextValue}>
       <div
-        className={appShellClasses}
+        className={cn(
+          'flex flex-col h-screen w-screen overflow-hidden bg-background text-foreground'
+        )}
         data-screen-size={screenSize}
         data-theme={resolvedMode}
         style={
@@ -273,17 +266,20 @@ export function AppShell({
 
         {/* Header slot */}
         {header && (
-          <header className={styles.header} role="banner">
+          <header
+            className="h-[60px] shrink-0 border-b border-border flex items-center"
+            role="banner"
+          >
             {header}
           </header>
         )}
 
         {/* Main content area with sidebar and content */}
-        <div className={styles.main}>
+        <div className="flex flex-1 overflow-hidden relative">
           {/* Mobile overlay */}
           {screenSize === 'mobile' && sidebarOpen && (
             <div
-              className={styles.overlay}
+              className="fixed inset-0 z-40 bg-black/50"
               onClick={closeMobileSidebar}
               aria-hidden="true"
               data-testid="sidebar-overlay"
@@ -304,23 +300,35 @@ export function AppShell({
                 onClick={toggleSidebar}
                 aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
                 aria-expanded={!sidebarCollapsed}
-                className={styles.toggleButton}
+                className="flex items-center justify-center w-8 h-8 m-2 p-0 bg-transparent border border-border rounded cursor-pointer text-foreground hover:bg-accent focus:outline-2 focus:outline-primary focus:outline-offset-2 focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
                 data-testid="sidebar-toggle"
               >
-                <span className={styles.toggleIcon} aria-hidden="true">
-                  {sidebarCollapsed ? '›' : '‹'}
+                <span className="text-base leading-none" aria-hidden="true">
+                  {sidebarCollapsed ? '\u203A' : '\u2039'}
                 </span>
               </button>
             )}
 
             {/* Sidebar content */}
-            <div className={styles.sidebarContent}>{sidebar}</div>
+            <div
+              className={cn(
+                'flex-1 overflow-y-auto overflow-x-hidden',
+                sidebarCollapsed && screenSize !== 'mobile' && 'overflow-hidden'
+              )}
+            >
+              {sidebar}
+            </div>
           </aside>
 
           {/* Main content */}
           <main
             ref={mainContentRef}
-            className={contentClasses}
+            className={cn(
+              'flex-1 overflow-y-auto overflow-x-hidden bg-background focus:outline-none focus-visible:outline-2 focus-visible:outline-primary focus-visible:-outline-offset-2',
+              screenSize === 'desktop' && 'p-8',
+              screenSize === 'tablet' && 'p-6',
+              screenSize === 'mobile' && 'p-4 w-full'
+            )}
             role="main"
             id="main-content"
             tabIndex={-1}
@@ -337,10 +345,10 @@ export function AppShell({
             aria-label={sidebarOpen ? 'Close navigation menu' : 'Open navigation menu'}
             aria-expanded={sidebarOpen}
             aria-controls="mobile-sidebar"
-            className={styles.mobileToggleButton}
+            className="fixed bottom-6 right-6 z-[250] flex items-center justify-center w-14 h-14 p-0 bg-primary border-none rounded-full cursor-pointer text-primary-foreground shadow-lg hover:bg-primary/90 hover:scale-105 focus:outline-2 focus:outline-primary focus:outline-offset-2 focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 active:scale-95"
             data-testid="mobile-menu-toggle"
           >
-            <span className={styles.hamburgerIcon} aria-hidden="true">
+            <span className="text-2xl leading-none" aria-hidden="true">
               {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
             </span>
           </button>

@@ -13,7 +13,7 @@ import { useApi } from '../../context/ApiContext'
 import { useAuth } from '../../context/AuthContext'
 import { useRecentRecords } from '../../hooks/useRecentRecords'
 import { formatRelativeTime } from '../../utils/formatRelativeTime'
-import styles from './SearchModal.module.css'
+import { cn } from '@/lib/utils'
 
 export interface SearchModalProps {
   open: boolean
@@ -315,21 +315,25 @@ export function SearchModal({ open, onClose }: SearchModalProps): JSX.Element | 
 
   return (
     <div
-      className={styles.overlay}
+      className="fixed inset-0 z-[9999] bg-black/50 flex items-start justify-center pt-[15vh]"
       role="presentation"
       onClick={onClose}
       data-testid="search-modal-overlay"
     >
       {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
-      <div className={styles.modal} onClick={(e) => e.stopPropagation()} data-testid="search-modal">
-        <div className={styles.inputContainer}>
-          <span className={styles.searchIcon} aria-hidden="true">
+      <div
+        className="w-full max-w-[640px] mx-4 bg-card rounded-xl shadow-2xl border border-border overflow-hidden max-h-[60vh] flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+        data-testid="search-modal"
+      >
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
+          <span className="flex items-center text-muted-foreground shrink-0" aria-hidden="true">
             <Search size={18} />
           </span>
           <input
             ref={inputRef}
             type="text"
-            className={styles.input}
+            className="flex-1 bg-transparent border-0 outline-none text-base text-foreground placeholder:text-muted-foreground"
             placeholder={t('search.placeholder')}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -342,27 +346,40 @@ export function SearchModal({ open, onClose }: SearchModalProps): JSX.Element | 
             }
             data-testid="search-input"
           />
-          <kbd className={styles.kbd}>ESC</kbd>
+          <kbd className="text-xs px-1.5 py-0.5 rounded border border-border bg-muted font-mono text-muted-foreground shrink-0">
+            ESC
+          </kbd>
         </div>
 
-        <ul id="search-results" className={styles.results} role="listbox">
+        <ul
+          id="search-results"
+          className="flex-1 overflow-y-auto py-1 list-none m-0 p-0"
+          role="listbox"
+        >
           {/* Search history when no query */}
           {!query.trim() && searchHistory.length > 0 && (
             <>
-              <li className={styles.sectionLabel} role="presentation">
+              <li
+                className="flex items-center justify-between px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
+                role="presentation"
+              >
                 <span>{t('search.recentSearches')}</span>
-                <button className={styles.clearHistory} onClick={clearHistory} type="button">
+                <button
+                  className="text-xs text-primary hover:underline cursor-pointer bg-transparent border-0"
+                  onClick={clearHistory}
+                  type="button"
+                >
                   {t('common.clear')}
                 </button>
               </li>
               {searchHistory.map((term) => (
                 <li key={`history-${term}`}>
                   <button
-                    className={styles.historyItem}
+                    className="flex items-center gap-2 w-full px-4 py-2 text-sm text-foreground hover:bg-accent cursor-pointer bg-transparent border-0 text-left"
                     onClick={() => setQuery(term)}
                     type="button"
                   >
-                    <span className={styles.historyIcon} aria-hidden="true">
+                    <span className="text-muted-foreground shrink-0" aria-hidden="true">
                       <Clock size={14} />
                     </span>
                     {term}
@@ -374,15 +391,23 @@ export function SearchModal({ open, onClose }: SearchModalProps): JSX.Element | 
 
           {/* Results */}
           {!query.trim() && results.length > 0 && (
-            <li className={styles.sectionLabel} role="presentation">
+            <li
+              className="flex items-center justify-between px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
+              role="presentation"
+            >
               {t('search.recentlyViewed')}
             </li>
           )}
           {query.trim() && results.length > 0 && (
-            <li className={styles.sectionLabel} role="presentation">
+            <li
+              className="flex items-center justify-between px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
+              role="presentation"
+            >
               {t('search.results')}
               {searching && (
-                <span className={styles.searchingIndicator}>{t('common.loading')}</span>
+                <span className="ml-2 text-[11px] text-muted-foreground animate-pulse">
+                  {t('common.loading')}
+                </span>
               )}
             </li>
           )}
@@ -392,14 +417,20 @@ export function SearchModal({ open, onClose }: SearchModalProps): JSX.Element | 
               id={`search-result-${idx}`}
               role="option"
               aria-selected={idx === activeIndex}
-              className={`${styles.resultItem} ${idx === activeIndex ? styles.resultItemActive : ''}`}
+              className={cn(
+                'flex items-center gap-3 px-4 py-2 cursor-pointer hover:bg-accent transition-colors',
+                idx === activeIndex && 'bg-accent'
+              )}
               onClick={() => handleSelect(result)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleSelect(result)
               }}
               onMouseEnter={() => setActiveIndex(idx)}
             >
-              <span className={styles.resultIcon} aria-hidden="true">
+              <span
+                className="flex items-center justify-center w-8 h-8 rounded-md bg-muted text-muted-foreground shrink-0"
+                aria-hidden="true"
+              >
                 {result.type === 'page' ? (
                   <FileText size={16} />
                 ) : result.type === 'recent' ? (
@@ -408,11 +439,15 @@ export function SearchModal({ open, onClose }: SearchModalProps): JSX.Element | 
                   <ClipboardList size={16} />
                 )}
               </span>
-              <div className={styles.resultInfo}>
-                <span className={styles.resultTitle}>{result.title}</span>
-                <span className={styles.resultSubtitle}>{result.subtitle}</span>
+              <div className="flex-1 min-w-0">
+                <span className="block text-sm font-medium text-foreground truncate">
+                  {result.title}
+                </span>
+                <span className="block text-xs text-muted-foreground truncate">
+                  {result.subtitle}
+                </span>
               </div>
-              <span className={styles.resultType}>
+              <span className="text-xs text-muted-foreground shrink-0 px-2 py-0.5 rounded-full bg-muted">
                 {result.type === 'page'
                   ? t('search.typePage')
                   : result.type === 'recent'
@@ -423,10 +458,14 @@ export function SearchModal({ open, onClose }: SearchModalProps): JSX.Element | 
           ))}
 
           {query.trim() && results.length === 0 && !searching && (
-            <li className={styles.noResults}>{t('search.noResults')}</li>
+            <li className="px-4 py-8 text-center text-sm text-muted-foreground">
+              {t('search.noResults')}
+            </li>
           )}
           {query.trim() && searching && results.length === 0 && (
-            <li className={styles.noResults}>{t('common.loading')}</li>
+            <li className="px-4 py-8 text-center text-sm text-muted-foreground">
+              {t('common.loading')}
+            </li>
           )}
         </ul>
       </div>

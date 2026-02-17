@@ -13,7 +13,7 @@
 
 import { useEffect, useRef } from 'react'
 import { useI18n } from '../../context/I18nContext'
-import styles from './KeyboardShortcutsHelp.module.css'
+import { cn } from '@/lib/utils'
 
 export interface KeyboardShortcutsHelpProps {
   isOpen: boolean
@@ -102,7 +102,7 @@ export function KeyboardShortcutsHelp({ isOpen, onClose }: KeyboardShortcutsHelp
 
   return (
     <div
-      className={styles.overlay}
+      className={cn('fixed inset-0 z-[9999] bg-black/50 flex items-center justify-center p-4')}
       role="presentation"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose()
@@ -110,18 +110,28 @@ export function KeyboardShortcutsHelp({ isOpen, onClose }: KeyboardShortcutsHelp
       data-testid="keyboard-shortcuts-help"
     >
       <div
-        className={styles.modal}
+        className={cn(
+          'w-full max-w-[560px] max-h-[80vh] bg-card rounded-xl shadow-2xl border border-border overflow-y-auto'
+        )}
         role="dialog"
         aria-modal="true"
         aria-label={t('shortcuts.title')}
         ref={modalRef}
         tabIndex={-1}
       >
-        <div className={styles.header}>
-          <h2 className={styles.title}>{t('shortcuts.title')}</h2>
+        <div
+          className={cn(
+            'flex items-center justify-between px-6 py-4 border-b border-border sticky top-0 bg-card z-10'
+          )}
+        >
+          <h2 className={cn('text-lg font-semibold text-foreground m-0')}>
+            {t('shortcuts.title')}
+          </h2>
           <button
             type="button"
-            className={styles.closeButton}
+            className={cn(
+              'flex items-center justify-center w-8 h-8 rounded-md hover:bg-accent cursor-pointer text-xl text-muted-foreground transition-colors border-0 bg-transparent leading-none'
+            )}
             onClick={onClose}
             aria-label={t('common.close')}
           >
@@ -130,22 +140,37 @@ export function KeyboardShortcutsHelp({ isOpen, onClose }: KeyboardShortcutsHelp
         </div>
 
         {shortcutGroups.map((group) => (
-          <div key={group.titleKey} className={styles.group}>
-            <h3 className={styles.groupTitle}>{t(group.titleKey)}</h3>
+          <div
+            key={group.titleKey}
+            className={cn('px-6 py-4 border-b border-border last:border-b-0')}
+          >
+            <h3 className={cn('text-sm font-semibold text-foreground mb-3 m-0')}>
+              {t(group.titleKey)}
+            </h3>
             {group.shortcuts.map((shortcut) => (
-              <div key={shortcut.descriptionKey} className={styles.shortcutRow}>
-                <div className={styles.keys}>
+              <div
+                key={shortcut.descriptionKey}
+                className={cn('flex items-center justify-between py-1.5')}
+              >
+                <div className={cn('flex items-center gap-1')}>
                   {shortcut.keys.map((keyCombo, comboIdx) => (
-                    <span key={comboIdx} className={styles.keys}>
+                    <span key={comboIdx} className={cn('flex items-center gap-1')}>
                       {keyCombo.map((key, keyIdx) => (
-                        <kbd key={keyIdx} className={styles.kbd}>
+                        <kbd
+                          key={keyIdx}
+                          className={cn(
+                            'inline-flex items-center justify-center min-w-[24px] h-6 px-1.5 rounded border border-border bg-muted text-xs font-mono text-muted-foreground shadow-sm'
+                          )}
+                        >
                           {displayKey(key)}
                         </kbd>
                       ))}
                     </span>
                   ))}
                 </div>
-                <span className={styles.description}>{t(shortcut.descriptionKey)}</span>
+                <span className={cn('text-sm text-muted-foreground')}>
+                  {t(shortcut.descriptionKey)}
+                </span>
               </div>
             ))}
           </div>

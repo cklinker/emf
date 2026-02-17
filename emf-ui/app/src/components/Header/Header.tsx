@@ -18,7 +18,6 @@ import { useAppShell } from '../AppShell'
 import { SearchModal } from '../SearchModal'
 import { RecentItemsDropdown } from '../RecentItemsDropdown'
 import { getGravatarUrl } from '../../utils/gravatar'
-import styles from './Header.module.css'
 
 /**
  * Props for the Header component
@@ -134,19 +133,26 @@ export function Header({ branding, user, onLogout }: HeaderProps): JSX.Element {
 
   return (
     <>
-      <header className={styles.header} data-testid="header" role="banner">
+      <header
+        className="flex items-center gap-3 h-full px-4 bg-card border-b border-border"
+        data-testid="header"
+        role="banner"
+      >
         {/* Branding section */}
-        <div className={styles.branding}>
+        <div className="flex items-center gap-2 shrink-0">
           {branding.logoUrl && (
             <img
               src={branding.logoUrl}
               alt={`${branding.applicationName} logo`}
-              className={styles.logo}
+              className="h-8 w-8 object-contain"
               data-testid="header-logo"
             />
           )}
           {!isMobile && (
-            <h1 className={styles.appName} data-testid="header-app-name">
+            <h1
+              className="text-base font-semibold text-foreground truncate max-w-[200px]"
+              data-testid="header-app-name"
+            >
               {branding.applicationName}
             </h1>
           )}
@@ -155,36 +161,38 @@ export function Header({ branding, user, onLogout }: HeaderProps): JSX.Element {
         {/* Search trigger */}
         <button
           type="button"
-          className={styles.searchTrigger}
+          className="flex items-center gap-2 px-3 py-1.5 rounded-md border border-border bg-muted/50 text-muted-foreground text-sm cursor-pointer hover:bg-muted transition-colors"
           onClick={() => setSearchOpen(true)}
           aria-label="Search (Cmd+K)"
           data-testid="search-trigger"
         >
-          <span className={styles.searchTriggerIcon} aria-hidden="true">
+          <span className="flex items-center" aria-hidden="true">
             <Search size={16} />
           </span>
           {!isMobile && (
-            <span className={styles.searchTriggerText}>
+            <span className="flex items-center gap-2">
               Search...
-              <kbd className={styles.searchKbd}>&#x2318;K</kbd>
+              <kbd className="text-xs px-1.5 py-0.5 rounded border border-border bg-background font-mono">
+                &#x2318;K
+              </kbd>
             </span>
           )}
         </button>
 
         {/* Spacer to push items to the right */}
-        <div className={styles.spacer} aria-hidden="true" />
+        <div className="flex-1" aria-hidden="true" />
 
         {/* Recent items + User menu */}
         {user && (
-          <div className={styles.headerActions}>
+          <div className="flex items-center gap-2">
             <RecentItemsDropdown />
 
             {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
-            <div className={styles.userSection} onKeyDown={handleKeyDown}>
+            <div className="relative" onKeyDown={handleKeyDown}>
               <button
                 ref={buttonRef}
                 type="button"
-                className={styles.userButton}
+                className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-accent cursor-pointer transition-colors border-0 bg-transparent"
                 onClick={toggleMenu}
                 aria-expanded={isMenuOpen}
                 aria-haspopup="menu"
@@ -192,29 +200,38 @@ export function Header({ branding, user, onLogout }: HeaderProps): JSX.Element {
                 aria-label={`User menu for ${getDisplayName(user)}`}
                 data-testid="user-menu-button"
               >
-                <div className={styles.avatar} aria-hidden="true">
+                <div
+                  className="w-8 h-8 rounded-full overflow-hidden bg-primary/10 flex items-center justify-center shrink-0"
+                  aria-hidden="true"
+                >
                   {avatarImageUrl ? (
                     <img
                       src={avatarImageUrl}
                       alt=""
-                      className={styles.avatarImage}
+                      className="w-full h-full object-cover"
                       onError={() => setGravatarFailed(true)}
                       data-testid="user-avatar-image"
                     />
                   ) : (
-                    <span className={styles.avatarInitials} data-testid="user-avatar-initials">
+                    <span
+                      className="text-xs font-semibold text-primary"
+                      data-testid="user-avatar-initials"
+                    >
                       {getUserInitials(user.name, user.email)}
                     </span>
                   )}
                 </div>
 
                 {!isMobile && (
-                  <span className={styles.userName} data-testid="user-name">
+                  <span
+                    className="text-sm text-foreground truncate max-w-[120px]"
+                    data-testid="user-name"
+                  >
                     {getDisplayName(user)}
                   </span>
                 )}
 
-                <span className={styles.dropdownIcon} aria-hidden="true">
+                <span className="text-[10px] text-muted-foreground" aria-hidden="true">
                   {isMenuOpen ? '\u25B2' : '\u25BC'}
                 </span>
               </button>
@@ -223,26 +240,28 @@ export function Header({ branding, user, onLogout }: HeaderProps): JSX.Element {
                 <div
                   ref={menuRef}
                   id="user-dropdown-menu"
-                  className={styles.dropdownMenu}
+                  className="absolute right-0 top-full mt-1 w-64 bg-card border border-border rounded-lg shadow-lg z-50 py-1"
                   role="menu"
                   aria-label="User menu"
                   data-testid="user-dropdown-menu"
                 >
-                  <div className={styles.menuUserInfo} role="presentation">
-                    <span className={styles.menuUserName}>{getDisplayName(user)}</span>
-                    <span className={styles.menuUserEmail}>{user.email}</span>
+                  <div className="px-4 py-3" role="presentation">
+                    <span className="block text-sm font-medium text-foreground">
+                      {getDisplayName(user)}
+                    </span>
+                    <span className="block text-xs text-muted-foreground mt-0.5">{user.email}</span>
                   </div>
 
-                  <div className={styles.menuDivider} role="separator" aria-hidden="true" />
+                  <div className="h-px bg-border mx-2 my-1" role="separator" aria-hidden="true" />
 
                   <button
                     type="button"
-                    className={styles.menuItem}
+                    className="flex items-center gap-2 w-full px-4 py-2 text-sm text-foreground hover:bg-accent cursor-pointer border-0 bg-transparent text-left"
                     onClick={handleLogout}
                     role="menuitem"
                     data-testid="logout-button"
                   >
-                    <span className={styles.menuItemIcon} aria-hidden="true">
+                    <span className="text-muted-foreground" aria-hidden="true">
                       &#x238B;
                     </span>
                     <span>Logout</span>

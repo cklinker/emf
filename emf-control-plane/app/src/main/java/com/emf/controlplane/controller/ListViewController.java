@@ -3,6 +3,7 @@ package com.emf.controlplane.controller;
 import com.emf.controlplane.dto.CreateListViewRequest;
 import com.emf.controlplane.dto.ListViewDto;
 import com.emf.controlplane.service.ListViewService;
+import com.emf.controlplane.tenant.TenantContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -21,9 +22,9 @@ public class ListViewController {
 
     @GetMapping
     public List<ListViewDto> listViews(
-            @RequestParam String tenantId,
             @RequestParam(required = false) String collectionId,
             @RequestParam(required = false) String userId) {
+        String tenantId = TenantContextHolder.requireTenantId();
         if (userId != null) {
             return listViewService.listViews(tenantId, collectionId, userId).stream()
                     .map(ListViewDto::fromEntity).toList();
@@ -39,10 +40,10 @@ public class ListViewController {
 
     @PostMapping
     public ResponseEntity<ListViewDto> createView(
-            @RequestParam String tenantId,
             @RequestParam String collectionId,
             @RequestParam String userId,
             @RequestBody CreateListViewRequest request) {
+        String tenantId = TenantContextHolder.requireTenantId();
         var view = listViewService.createView(tenantId, collectionId, userId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(ListViewDto.fromEntity(view));
     }

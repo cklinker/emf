@@ -4,6 +4,7 @@ import com.emf.controlplane.dto.CreateEmailTemplateRequest;
 import com.emf.controlplane.dto.EmailLogDto;
 import com.emf.controlplane.dto.EmailTemplateDto;
 import com.emf.controlplane.service.EmailTemplateService;
+import com.emf.controlplane.tenant.TenantContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -21,7 +22,8 @@ public class EmailTemplateController {
     }
 
     @GetMapping
-    public List<EmailTemplateDto> listTemplates(@RequestParam String tenantId) {
+    public List<EmailTemplateDto> listTemplates() {
+        String tenantId = TenantContextHolder.requireTenantId();
         return emailTemplateService.listTemplates(tenantId).stream()
                 .map(EmailTemplateDto::fromEntity).toList();
     }
@@ -33,9 +35,9 @@ public class EmailTemplateController {
 
     @PostMapping
     public ResponseEntity<EmailTemplateDto> createTemplate(
-            @RequestParam String tenantId,
             @RequestParam String userId,
             @RequestBody CreateEmailTemplateRequest request) {
+        String tenantId = TenantContextHolder.requireTenantId();
         var template = emailTemplateService.createTemplate(tenantId, userId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(EmailTemplateDto.fromEntity(template));
     }
@@ -57,8 +59,8 @@ public class EmailTemplateController {
 
     @GetMapping("/logs")
     public List<EmailLogDto> listLogs(
-            @RequestParam String tenantId,
             @RequestParam(required = false) String status) {
+        String tenantId = TenantContextHolder.requireTenantId();
         if (status != null) {
             return emailTemplateService.listLogsByStatus(tenantId, status).stream()
                     .map(EmailLogDto::fromEntity).toList();

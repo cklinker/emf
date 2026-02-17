@@ -15,7 +15,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
-import { getTenantId } from '../../hooks'
+
 import {
   LayoutEditorProvider,
   useLayoutEditor,
@@ -701,7 +701,7 @@ export function PageLayoutsPage({
     refetch,
   } = useQuery({
     queryKey: ['pageLayouts'],
-    queryFn: () => apiClient.get<PageLayoutSummary[]>(`/control/layouts?tenantId=${getTenantId()}`),
+    queryFn: () => apiClient.get<PageLayoutSummary[]>(`/control/layouts`),
     enabled: viewMode === 'list',
   })
 
@@ -729,7 +729,7 @@ export function PageLayoutsPage({
   const createMutation = useMutation({
     mutationFn: (data: PageLayoutFormData) =>
       apiClient.post<PageLayoutSummary>(
-        `/control/layouts?tenantId=${getTenantId()}&collectionId=${encodeURIComponent(data.collectionId)}`,
+        `/control/layouts?collectionId=${encodeURIComponent(data.collectionId)}`,
         data
       ),
     onSuccess: (newLayout) => {

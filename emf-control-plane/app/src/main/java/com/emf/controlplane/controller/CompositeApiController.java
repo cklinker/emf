@@ -2,6 +2,7 @@ package com.emf.controlplane.controller;
 
 import com.emf.controlplane.dto.CompositeRequest;
 import com.emf.controlplane.dto.CompositeResponse;
+import com.emf.controlplane.tenant.TenantContextHolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -18,8 +19,8 @@ public class CompositeApiController {
 
     @PostMapping
     public ResponseEntity<CompositeResponse> executeComposite(
-            @RequestParam String tenantId,
             @RequestBody CompositeRequest request) {
+        String tenantId = TenantContextHolder.requireTenantId();
         log.info("Executing composite request with {} sub-requests for tenant: {}",
                 request.getRequests() != null ? request.getRequests().size() : 0, tenantId);
 

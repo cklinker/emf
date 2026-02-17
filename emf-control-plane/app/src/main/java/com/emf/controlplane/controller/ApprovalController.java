@@ -4,6 +4,7 @@ import com.emf.controlplane.dto.ApprovalInstanceDto;
 import com.emf.controlplane.dto.ApprovalProcessDto;
 import com.emf.controlplane.dto.CreateApprovalProcessRequest;
 import com.emf.controlplane.service.ApprovalService;
+import com.emf.controlplane.tenant.TenantContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -23,7 +24,8 @@ public class ApprovalController {
     // --- Process CRUD ---
 
     @GetMapping("/processes")
-    public List<ApprovalProcessDto> listProcesses(@RequestParam String tenantId) {
+    public List<ApprovalProcessDto> listProcesses() {
+        String tenantId = TenantContextHolder.requireTenantId();
         return approvalService.listProcesses(tenantId).stream()
                 .map(ApprovalProcessDto::fromEntity).toList();
     }
@@ -35,8 +37,8 @@ public class ApprovalController {
 
     @PostMapping("/processes")
     public ResponseEntity<ApprovalProcessDto> createProcess(
-            @RequestParam String tenantId,
             @RequestBody CreateApprovalProcessRequest request) {
+        String tenantId = TenantContextHolder.requireTenantId();
         var process = approvalService.createProcess(tenantId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApprovalProcessDto.fromEntity(process));
     }
@@ -57,7 +59,8 @@ public class ApprovalController {
     // --- Approval Instances ---
 
     @GetMapping("/instances")
-    public List<ApprovalInstanceDto> listInstances(@RequestParam String tenantId) {
+    public List<ApprovalInstanceDto> listInstances() {
+        String tenantId = TenantContextHolder.requireTenantId();
         return approvalService.listInstances(tenantId).stream()
                 .map(ApprovalInstanceDto::fromEntity).toList();
     }
@@ -75,11 +78,11 @@ public class ApprovalController {
 
     @PostMapping("/instances/submit")
     public ResponseEntity<ApprovalInstanceDto> submitForApproval(
-            @RequestParam String tenantId,
             @RequestParam String collectionId,
             @RequestParam String recordId,
             @RequestParam String processId,
             @RequestParam String userId) {
+        String tenantId = TenantContextHolder.requireTenantId();
         var instance = approvalService.submitForApproval(tenantId, collectionId, recordId, processId, userId);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApprovalInstanceDto.fromEntity(instance));
     }

@@ -10,7 +10,7 @@ import {
   ExecutionLogModal,
 } from '../../components'
 import type { LogColumn } from '../../components'
-import { getTenantId } from '../../hooks'
+
 import styles from './FlowsPage.module.css'
 
 interface Flow {
@@ -330,14 +330,14 @@ export function FlowsPage({ testId = 'flows-page' }: FlowsPageProps): React.Reac
     refetch,
   } = useQuery({
     queryKey: ['flows'],
-    queryFn: () => apiClient.get<Flow[]>(`/control/flows?tenantId=${getTenantId()}`),
+    queryFn: () => apiClient.get<Flow[]>(`/control/flows`),
   })
 
   const flowList: Flow[] = flows ?? []
 
   const createMutation = useMutation({
     mutationFn: (data: FlowFormData) =>
-      apiClient.post<Flow>(`/control/flows?tenantId=${getTenantId()}&userId=system`, data),
+      apiClient.post<Flow>(`/control/flows?userId=system`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['flows'] })
       showToast('Flow created successfully', 'success')
@@ -382,7 +382,7 @@ export function FlowsPage({ testId = 'flows-page' }: FlowsPageProps): React.Reac
     queryKey: ['flow-executions', execItemId],
     queryFn: () =>
       apiClient.get<FlowExecutionLog[]>(
-        `/control/flows/${execItemId}/executions?${new URLSearchParams({ tenantId: getTenantId() }).toString()}`
+        `/control/flows/${execItemId}/executions`
       ),
     enabled: !!execItemId,
   })
@@ -390,7 +390,7 @@ export function FlowsPage({ testId = 'flows-page' }: FlowsPageProps): React.Reac
   const executeMutation = useMutation({
     mutationFn: async (flowId: string) => {
       const resp = await apiClient.fetch(
-        `/control/flows/${flowId}/execute?${new URLSearchParams({ tenantId: getTenantId(), userId: 'system' }).toString()}`,
+        `/control/flows/${flowId}/execute?${new URLSearchParams({ userId: 'system' }).toString()}`,
         { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }
       )
       if (!resp.ok) {
@@ -412,7 +412,7 @@ export function FlowsPage({ testId = 'flows-page' }: FlowsPageProps): React.Reac
   const cancelMutation = useMutation({
     mutationFn: async (executionId: string) => {
       const resp = await apiClient.fetch(
-        `/control/flows/executions/${executionId}/cancel?${new URLSearchParams({ tenantId: getTenantId() }).toString()}`,
+        `/control/flows/executions/${executionId}/cancel`,
         { method: 'POST' }
       )
       if (!resp.ok) throw new Error(`Cancel failed: ${resp.statusText}`)

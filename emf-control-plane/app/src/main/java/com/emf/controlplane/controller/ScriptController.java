@@ -4,6 +4,7 @@ import com.emf.controlplane.dto.CreateScriptRequest;
 import com.emf.controlplane.dto.ScriptDto;
 import com.emf.controlplane.dto.ScriptExecutionLogDto;
 import com.emf.controlplane.service.ScriptService;
+import com.emf.controlplane.tenant.TenantContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -21,7 +22,8 @@ public class ScriptController {
     }
 
     @GetMapping
-    public List<ScriptDto> listScripts(@RequestParam String tenantId) {
+    public List<ScriptDto> listScripts() {
+        String tenantId = TenantContextHolder.requireTenantId();
         return scriptService.listScripts(tenantId).stream()
                 .map(ScriptDto::fromEntity).toList();
     }
@@ -33,9 +35,9 @@ public class ScriptController {
 
     @PostMapping
     public ResponseEntity<ScriptDto> createScript(
-            @RequestParam String tenantId,
             @RequestParam String userId,
             @RequestBody CreateScriptRequest request) {
+        String tenantId = TenantContextHolder.requireTenantId();
         var script = scriptService.createScript(tenantId, userId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(ScriptDto.fromEntity(script));
     }
@@ -56,7 +58,8 @@ public class ScriptController {
     // --- Execution Logs ---
 
     @GetMapping("/logs")
-    public List<ScriptExecutionLogDto> listLogs(@RequestParam String tenantId) {
+    public List<ScriptExecutionLogDto> listLogs() {
+        String tenantId = TenantContextHolder.requireTenantId();
         return scriptService.listExecutionLogs(tenantId).stream()
                 .map(ScriptExecutionLogDto::fromEntity).toList();
     }

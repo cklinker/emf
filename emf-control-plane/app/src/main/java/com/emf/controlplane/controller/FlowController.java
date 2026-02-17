@@ -4,6 +4,7 @@ import com.emf.controlplane.dto.CreateFlowRequest;
 import com.emf.controlplane.dto.FlowDto;
 import com.emf.controlplane.dto.FlowExecutionDto;
 import com.emf.controlplane.service.FlowService;
+import com.emf.controlplane.tenant.TenantContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -21,7 +22,8 @@ public class FlowController {
     }
 
     @GetMapping
-    public List<FlowDto> listFlows(@RequestParam String tenantId) {
+    public List<FlowDto> listFlows() {
+        String tenantId = TenantContextHolder.requireTenantId();
         return flowService.listFlows(tenantId).stream()
                 .map(FlowDto::fromEntity).toList();
     }
@@ -33,9 +35,9 @@ public class FlowController {
 
     @PostMapping
     public ResponseEntity<FlowDto> createFlow(
-            @RequestParam String tenantId,
             @RequestParam String userId,
             @RequestBody CreateFlowRequest request) {
+        String tenantId = TenantContextHolder.requireTenantId();
         var flow = flowService.createFlow(tenantId, userId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(FlowDto.fromEntity(flow));
     }
@@ -56,7 +58,8 @@ public class FlowController {
     // --- Executions ---
 
     @GetMapping("/executions")
-    public List<FlowExecutionDto> listExecutions(@RequestParam String tenantId) {
+    public List<FlowExecutionDto> listExecutions() {
+        String tenantId = TenantContextHolder.requireTenantId();
         return flowService.listExecutions(tenantId).stream()
                 .map(FlowExecutionDto::fromEntity).toList();
     }
@@ -75,9 +78,9 @@ public class FlowController {
     @PostMapping("/{id}/execute")
     public ResponseEntity<FlowExecutionDto> startExecution(
             @PathVariable String id,
-            @RequestParam String tenantId,
             @RequestParam String userId,
             @RequestParam(required = false) String triggerRecordId) {
+        String tenantId = TenantContextHolder.requireTenantId();
         var execution = flowService.startExecution(tenantId, id, userId, triggerRecordId);
         return ResponseEntity.status(HttpStatus.CREATED).body(FlowExecutionDto.fromEntity(execution));
     }

@@ -22,7 +22,7 @@ import {
   ChevronDown,
   ChevronRight,
 } from 'lucide-react'
-import { getTenantId } from '../../hooks'
+
 import styles from './ReportsPage.module.css'
 
 /* ─────────────────────────── Types ─────────────────────────── */
@@ -254,7 +254,7 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
     refetch,
   } = useQuery({
     queryKey: ['reports'],
-    queryFn: () => apiClient.get<Report[]>(`/control/reports?tenantId=${getTenantId()}`),
+    queryFn: () => apiClient.get<Report[]>(`/control/reports`),
   })
 
   const reportList = useMemo<Report[]>(() => reports ?? [], [reports])
@@ -307,7 +307,7 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
     queryKey: ['report-data', selectedReportId, collectionNameForViewer],
     queryFn: () =>
       apiClient.get<GatewayResponse>(
-        `/gateway/${collectionNameForViewer}?tenantId=${getTenantId()}&size=1000`
+        `/gateway/${collectionNameForViewer}?size=1000`
       ),
     enabled: viewMode === 'viewer' && !!selectedReportId && !!collectionNameForViewer,
   })
@@ -322,7 +322,7 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
   /* ────── Mutations ────── */
   const createMutation = useMutation({
     mutationFn: (data: Record<string, unknown>) =>
-      apiClient.post<Report>(`/control/reports?tenantId=${getTenantId()}&userId=system`, data),
+      apiClient.post<Report>(`/control/reports?userId=system`, data),
     onSuccess: (created: Report) => {
       queryClient.invalidateQueries({ queryKey: ['reports'] })
       showToast('Report created successfully', 'success')

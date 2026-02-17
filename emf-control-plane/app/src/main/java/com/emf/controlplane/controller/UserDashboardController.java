@@ -3,6 +3,7 @@ package com.emf.controlplane.controller;
 import com.emf.controlplane.dto.CreateDashboardRequest;
 import com.emf.controlplane.dto.UserDashboardDto;
 import com.emf.controlplane.service.UserDashboardService;
+import com.emf.controlplane.tenant.TenantContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -21,8 +22,8 @@ public class UserDashboardController {
 
     @GetMapping
     public List<UserDashboardDto> listDashboards(
-            @RequestParam String tenantId,
             @RequestParam(required = false) String userId) {
+        String tenantId = TenantContextHolder.requireTenantId();
         return dashboardService.listDashboards(tenantId, userId).stream()
                 .map(UserDashboardDto::fromEntity).toList();
     }
@@ -34,9 +35,9 @@ public class UserDashboardController {
 
     @PostMapping
     public ResponseEntity<UserDashboardDto> createDashboard(
-            @RequestParam String tenantId,
             @RequestParam String userId,
             @RequestBody CreateDashboardRequest request) {
+        String tenantId = TenantContextHolder.requireTenantId();
         var dashboard = dashboardService.createDashboard(tenantId, userId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(UserDashboardDto.fromEntity(dashboard));
     }

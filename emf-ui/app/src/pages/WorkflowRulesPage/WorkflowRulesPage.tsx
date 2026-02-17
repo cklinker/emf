@@ -10,7 +10,7 @@ import {
   ExecutionLogModal,
 } from '../../components'
 import type { LogColumn } from '../../components'
-import { getTenantId } from '../../hooks'
+
 import styles from './WorkflowRulesPage.module.css'
 
 interface WorkflowRule {
@@ -432,7 +432,7 @@ export function WorkflowRulesPage({
   } = useQuery({
     queryKey: ['workflow-rules'],
     queryFn: () =>
-      apiClient.get<WorkflowRule[]>(`/control/workflow-rules?tenantId=${getTenantId()}`),
+      apiClient.get<WorkflowRule[]>(`/control/workflow-rules`),
   })
 
   const workflowRuleList: WorkflowRule[] = workflowRules ?? []
@@ -440,7 +440,7 @@ export function WorkflowRulesPage({
   const createMutation = useMutation({
     mutationFn: (data: WorkflowRuleFormData) =>
       apiClient.post<WorkflowRule>(
-        `/control/workflow-rules?tenantId=${getTenantId()}&userId=system`,
+        `/control/workflow-rules?userId=system`,
         data
       ),
     onSuccess: () => {

@@ -5,6 +5,7 @@ import com.emf.controlplane.dto.ConnectedAppDto;
 import com.emf.controlplane.dto.ConnectedAppTokenDto;
 import com.emf.controlplane.dto.CreateConnectedAppRequest;
 import com.emf.controlplane.service.ConnectedAppService;
+import com.emf.controlplane.tenant.TenantContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -22,7 +23,8 @@ public class ConnectedAppController {
     }
 
     @GetMapping
-    public List<ConnectedAppDto> listApps(@RequestParam String tenantId) {
+    public List<ConnectedAppDto> listApps() {
+        String tenantId = TenantContextHolder.requireTenantId();
         return connectedAppService.listApps(tenantId).stream()
                 .map(ConnectedAppDto::fromEntity).toList();
     }
@@ -34,9 +36,9 @@ public class ConnectedAppController {
 
     @PostMapping
     public ResponseEntity<ConnectedAppCreatedResponse> createApp(
-            @RequestParam String tenantId,
             @RequestParam String userId,
             @RequestBody CreateConnectedAppRequest request) {
+        String tenantId = TenantContextHolder.requireTenantId();
         var result = connectedAppService.createApp(tenantId, userId, request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ConnectedAppCreatedResponse.fromEntity(result.getApp(), result.getPlaintextSecret()));

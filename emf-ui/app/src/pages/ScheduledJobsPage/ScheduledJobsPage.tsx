@@ -10,7 +10,7 @@ import {
   ExecutionLogModal,
 } from '../../components'
 import type { LogColumn } from '../../components'
-import { getTenantId } from '../../hooks'
+
 import styles from './ScheduledJobsPage.module.css'
 
 interface ScheduledJob {
@@ -427,7 +427,7 @@ export function ScheduledJobsPage({
   } = useQuery({
     queryKey: ['scheduled-jobs'],
     queryFn: () =>
-      apiClient.get<ScheduledJob[]>(`/control/scheduled-jobs?tenantId=${getTenantId()}`),
+      apiClient.get<ScheduledJob[]>(`/control/scheduled-jobs`),
   })
 
   const scheduledJobList: ScheduledJob[] = scheduledJobs ?? []
@@ -435,7 +435,7 @@ export function ScheduledJobsPage({
   const createMutation = useMutation({
     mutationFn: (data: ScheduledJobFormData) =>
       apiClient.post<ScheduledJob>(
-        `/control/scheduled-jobs?tenantId=${getTenantId()}&userId=system`,
+        `/control/scheduled-jobs?userId=system`,
         data
       ),
     onSuccess: () => {

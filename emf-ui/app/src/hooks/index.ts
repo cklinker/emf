@@ -58,3 +58,6 @@ export {
   type UseRecordMutationOptions,
   type UseRecordMutationReturn,
 } from './useRecordMutation'
+
+// Single record hook for fetching a record by ID
+export { useRecord, type UseRecordOptions, type UseRecordReturn } from './useRecord'

@@ -65,12 +65,12 @@ const mockFieldWithValidation: FieldDefinition = {
   order: 1,
 }
 
-// Mock reference field
+// Mock master_detail field
 const mockReferenceField: FieldDefinition = {
   id: 'field-789',
   name: 'user_ref',
   displayName: 'User Reference',
-  type: 'reference',
+  type: 'master_detail',
   required: false,
   unique: false,
   indexed: true,
@@ -234,14 +234,14 @@ describe('FieldEditor Component', () => {
       const select = screen.getByTestId('field-type-select')
       const options = select.querySelectorAll('option')
 
-      expect(options).toHaveLength(23)
+      expect(options).toHaveLength(21)
       expect(options[0]).toHaveValue('string')
       expect(options[1]).toHaveValue('number')
       expect(options[2]).toHaveValue('boolean')
       expect(options[3]).toHaveValue('date')
       expect(options[4]).toHaveValue('datetime')
       expect(options[5]).toHaveValue('json')
-      expect(options[6]).toHaveValue('reference')
+      expect(options[6]).toHaveValue('master_detail')
       expect(options[7]).toHaveValue('picklist')
       expect(options[8]).toHaveValue('multi_picklist')
       expect(options[9]).toHaveValue('currency')
@@ -258,7 +258,7 @@ describe('FieldEditor Component', () => {
       const user = userEvent.setup()
       renderWithProviders(<FieldEditor {...defaultProps} collections={mockCollections} />)
 
-      await user.selectOptions(screen.getByTestId('field-type-select'), 'reference')
+      await user.selectOptions(screen.getByTestId('field-type-select'), 'master_detail')
 
       expect(screen.getByTestId('field-reference-target-select')).toBeInTheDocument()
     })
@@ -273,7 +273,7 @@ describe('FieldEditor Component', () => {
       const user = userEvent.setup()
       renderWithProviders(<FieldEditor {...defaultProps} collections={mockCollections} />)
 
-      await user.selectOptions(screen.getByTestId('field-type-select'), 'reference')
+      await user.selectOptions(screen.getByTestId('field-type-select'), 'master_detail')
 
       const select = screen.getByTestId('field-reference-target-select')
       const options = select.querySelectorAll('option')
@@ -380,7 +380,7 @@ describe('FieldEditor Component', () => {
       const user = userEvent.setup()
       renderWithProviders(<FieldEditor {...defaultProps} collections={mockCollections} />)
 
-      await user.selectOptions(screen.getByTestId('field-type-select'), 'reference')
+      await user.selectOptions(screen.getByTestId('field-type-select'), 'master_detail')
 
       expect(screen.queryByText('Validation Rules')).not.toBeInTheDocument()
     })
@@ -497,7 +497,7 @@ describe('FieldEditor Component', () => {
       renderWithProviders(<FieldEditor {...defaultProps} collections={mockCollections} />)
 
       await user.type(screen.getByTestId('field-name-input'), 'my_ref')
-      await user.selectOptions(screen.getByTestId('field-type-select'), 'reference')
+      await user.selectOptions(screen.getByTestId('field-type-select'), 'master_detail')
 
       await user.click(screen.getByTestId('field-editor-submit'))
 
@@ -511,7 +511,7 @@ describe('FieldEditor Component', () => {
       renderWithProviders(<FieldEditor {...defaultProps} collections={mockCollections} />)
 
       await user.type(screen.getByTestId('field-name-input'), 'my_ref')
-      await user.selectOptions(screen.getByTestId('field-type-select'), 'reference')
+      await user.selectOptions(screen.getByTestId('field-type-select'), 'master_detail')
       await user.selectOptions(screen.getByTestId('field-reference-target-select'), 'users')
       await user.tab()
 
@@ -596,7 +596,7 @@ describe('FieldEditor Component', () => {
       )
 
       await user.type(screen.getByTestId('field-name-input'), 'user_ref')
-      await user.selectOptions(screen.getByTestId('field-type-select'), 'reference')
+      await user.selectOptions(screen.getByTestId('field-type-select'), 'master_detail')
       await user.selectOptions(screen.getByTestId('field-reference-target-select'), 'users')
 
       await user.click(screen.getByTestId('field-editor-submit'))
@@ -604,7 +604,7 @@ describe('FieldEditor Component', () => {
       await waitFor(() => {
         expect(onSave).toHaveBeenCalledWith(
           expect.objectContaining({
-            type: 'reference',
+            type: 'master_detail',
             referenceTarget: 'users',
           })
         )

@@ -200,12 +200,12 @@ describe('FieldsPanel Component', () => {
       expect(screen.queryByTestId('fields-panel-field-indexed-field-1')).not.toBeInTheDocument()
     })
 
-    it('should render reference target for reference fields', () => {
+    it('should render reference target for master_detail fields', () => {
       const fields = [
         createField({
           id: 'field-1',
           name: 'user_id',
-          type: 'reference',
+          type: 'master_detail' as FieldType,
           referenceTarget: 'users',
           order: 0,
         }),
@@ -635,7 +635,7 @@ describe('FieldsPanel Component', () => {
         createField({
           id: 'f7',
           name: 'reference_field',
-          type: 'reference',
+          type: 'master_detail' as FieldType,
           referenceTarget: 'users',
           order: 6,
         }),
@@ -649,7 +649,7 @@ describe('FieldsPanel Component', () => {
       expect(screen.getByTestId('fields-panel-field-type-f4')).toHaveTextContent('Date')
       expect(screen.getByTestId('fields-panel-field-type-f5')).toHaveTextContent('Date & Time')
       expect(screen.getByTestId('fields-panel-field-type-f6')).toHaveTextContent('JSON')
-      expect(screen.getByTestId('fields-panel-field-type-f7')).toHaveTextContent('Reference')
+      expect(screen.getByTestId('fields-panel-field-type-f7')).toHaveTextContent('Master-Detail')
     })
   })
 

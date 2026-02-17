@@ -57,7 +57,7 @@ public class FieldService {
             Map.entry("boolean", "BOOLEAN"),
             Map.entry("date", "DATE"),
             Map.entry("datetime", "DATETIME"),
-            Map.entry("reference", "REFERENCE"),
+            Map.entry("reference", "MASTER_DETAIL"),
             Map.entry("array", "ARRAY"),
             Map.entry("object", "JSON"),
             // All canonical types (accepted as lowercase)
@@ -77,7 +77,7 @@ public class FieldService {
             Map.entry("encrypted", "ENCRYPTED"),
             Map.entry("external_id", "EXTERNAL_ID"),
             Map.entry("geolocation", "GEOLOCATION"),
-            Map.entry("lookup", "LOOKUP"),
+            Map.entry("lookup", "MASTER_DETAIL"),
             Map.entry("master_detail", "MASTER_DETAIL"),
             Map.entry("formula", "FORMULA"),
             Map.entry("rollup_summary", "ROLLUP_SUMMARY")
@@ -685,13 +685,10 @@ public class FieldService {
     }
 
     /**
-     * Configures relationship metadata for LOOKUP and MASTER_DETAIL fields.
-     * Validates the target collection and enforces relationship rules:
-     * <ul>
-     *   <li>Target collection must exist and be active</li>
-     *   <li>MASTER_DETAIL: no self-referencing, max 2 per collection, always required + cascade</li>
-     *   <li>LOOKUP: nullable, no cascade delete</li>
-     * </ul>
+     * Configures relationship metadata for MASTER_DETAIL fields.
+     * Validates the target collection exists and is active.
+     * The required and cascadeDelete flags are user-configurable via the
+     * standard field flags — no forced overrides.
      */
     private void configureRelationshipField(Field field, String canonicalType,
                                             Collection collection, AddFieldRequest request) {
@@ -714,7 +711,7 @@ public class FieldService {
 
         if (parsedTargetCollection == null || parsedTargetCollection.isBlank()) {
             throw new ValidationException("fieldTypeConfig",
-                    canonicalType + " fields require fieldTypeConfig.targetCollection");
+                    "MASTER_DETAIL fields require fieldTypeConfig.targetCollection");
         }
 
         // Effectively final for lambda
@@ -732,29 +729,9 @@ public class FieldService {
                     ? targetCollection.getDisplayName() : targetCollectionName;
         }
 
-        if ("MASTER_DETAIL".equals(canonicalType)) {
-            // No self-referencing master-detail
-            if (targetCollection.getId().equals(collection.getId())) {
-                throw new ValidationException("fieldTypeConfig.targetCollection",
-                        "MASTER_DETAIL cannot reference its own collection");
-            }
-
-            // Max 2 master-detail fields per collection
-            long masterDetailCount = fieldRepository.countMasterDetailFieldsByCollectionId(collection.getId());
-            if (masterDetailCount >= 2) {
-                throw new ValidationException("type",
-                        "Collection already has the maximum of 2 MASTER_DETAIL relationships");
-            }
-
-            // Force required and cascade delete
-            field.setRequired(true);
-            field.setCascadeDelete(true);
-        } else {
-            // LOOKUP: nullable, no cascade
-            field.setCascadeDelete(false);
-        }
-
-        field.setRelationshipType(canonicalType);
+        // All relationship fields are now MASTER_DETAIL — required and cascadeDelete
+        // are user-configurable via the standard field flags.
+        field.setRelationshipType("MASTER_DETAIL");
         field.setRelationshipName(relationshipName);
         field.setReferenceCollectionId(targetCollection.getId());
         field.setReferenceTarget(targetCollectionName);

@@ -114,6 +114,21 @@ describe('Validation Schemas - Requirement 10.1', () => {
         expect(result.data.referenceTarget).toBe('users');
       }
     });
+
+    it('should validate master_detail field with referenceTarget', () => {
+      const field = {
+        name: 'accountId',
+        type: 'master_detail',
+        referenceTarget: 'accounts',
+      };
+
+      const result = FieldDefinitionSchema.safeParse(field);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.referenceTarget).toBe('accounts');
+      }
+    });
   });
 
   describe('AuthzConfigSchema', () => {

@@ -131,6 +131,8 @@ const BACKEND_TYPE_TO_UI: Record<string, FieldDefinition['type']> = {
   LONG: 'number',
   JSON: 'json',
   ARRAY: 'json',
+  REFERENCE: 'master_detail',
+  LOOKUP: 'master_detail',
 }
 
 function normalizeFieldType(backendType: string): FieldDefinition['type'] {
@@ -179,9 +181,10 @@ async function fetchResource(
 async function createResource(
   apiClient: ApiClient,
   collectionName: string,
-  data: FormData
+  data: FormData,
+  relationshipFields?: Record<string, string>
 ): Promise<Resource> {
-  const body = wrapResource(collectionName, data)
+  const body = wrapResource(collectionName, data, undefined, relationshipFields)
   const response = await apiClient.post(`/api/${collectionName}`, body)
   return unwrapResource<Resource>(response)
 }
@@ -190,9 +193,10 @@ async function updateResource(
   apiClient: ApiClient,
   collectionName: string,
   resourceId: string,
-  data: FormData
+  data: FormData,
+  relationshipFields?: Record<string, string>
 ): Promise<Resource> {
-  const body = wrapResource(collectionName, data, resourceId)
+  const body = wrapResource(collectionName, data, resourceId, relationshipFields)
   const response = await apiClient.patch(`/api/${collectionName}/${resourceId}`, body)
   return unwrapResource<Resource>(response)
 }
@@ -217,7 +221,7 @@ function getDefaultValueForType(field: FieldDefinition): unknown {
       return ''
     case 'json':
       return ''
-    case 'reference':
+    case 'master_detail':
       return ''
     default:
       return ''
@@ -353,24 +357,22 @@ export function ResourceFormPage({
     enabled: picklistFields.length > 0,
   })
 
-  // Identify lookup/master_detail/reference fields that need dropdown options.
+  // Identify master_detail fields that need dropdown options.
   // referenceCollectionId (UUID) is the canonical FK — always set by the backend.
   const lookupFields = useMemo(() => {
     if (!schema?.fields) return []
-    return schema.fields.filter(
-      (f) =>
-        (f.type === 'lookup' || f.type === 'master_detail' || f.type === 'reference') &&
-        f.referenceCollectionId
-    )
+    return schema.fields.filter((f) => f.type === 'master_detail' && f.referenceCollectionId)
   }, [schema])
 
-  // Fetch lookup options for all lookup/master_detail/reference fields.
+  // Fetch lookup options for all master_detail fields.
   // For each target collection, fetch its schema (to find display field),
   // then fetch records to build the options list.
-  const { data: lookupOptionsMap } = useQuery({
+  // Also builds a mapping from field name → target collection name for JSON:API relationships.
+  const { data: lookupData } = useQuery({
     queryKey: ['lookup-options-for-form', collectionName, lookupFields.map((f) => f.id)],
     queryFn: async () => {
-      const map: Record<string, LookupOption[]> = {}
+      const optionsMap: Record<string, LookupOption[]> = {}
+      const relFieldsMap: Record<string, string> = {}
       // Group fields by referenceCollectionId (UUID) to avoid duplicate requests.
       const targetMap = new Map<string, FieldDefinition[]>()
       for (const field of lookupFields) {
@@ -390,6 +392,11 @@ export function ResourceFormPage({
               `/control/collections/${targetCollectionId}`
             )
             const targetName = targetSchema.name
+
+            // Record the field name → target collection name mapping
+            for (const field of fields) {
+              relFieldsMap[field.name] = targetName
+            }
 
             // Determine display field: displayFieldName → 'name' → first string field → 'id'
             let displayFieldName = 'id'
@@ -428,20 +435,24 @@ export function ResourceFormPage({
 
             // Assign to all fields targeting this collection
             for (const field of fields) {
-              map[field.id] = options
+              optionsMap[field.id] = options
             }
           } catch {
             // If we fail to fetch options, leave the fields empty (graceful degradation)
             for (const field of fields) {
-              map[field.id] = []
+              optionsMap[field.id] = []
             }
           }
         })
       )
-      return map
+      return { optionsMap, relFieldsMap }
     },
     enabled: lookupFields.length > 0,
   })
+
+  const lookupOptionsMap = lookupData?.optionsMap
+  // Map from field name → target collection name for JSON:API relationship serialization
+  const relationshipFieldsMap = lookupData?.relFieldsMap
 
   // Merge picklist values and lookup options into the schema fields
   const schemaWithPicklistValues = useMemo<CollectionSchema | undefined>(() => {
@@ -456,10 +467,7 @@ export function ResourceFormPage({
         if ((f.type === 'picklist' || f.type === 'multi_picklist') && picklistValuesMap?.[f.id]) {
           updated = { ...updated, enumValues: picklistValuesMap[f.id] }
         }
-        if (
-          (f.type === 'lookup' || f.type === 'master_detail' || f.type === 'reference') &&
-          lookupOptionsMap?.[f.id]
-        ) {
+        if (f.type === 'master_detail' && lookupOptionsMap?.[f.id]) {
           updated = { ...updated, lookupOptions: lookupOptionsMap[f.id] }
         }
         return updated
@@ -535,7 +543,8 @@ export function ResourceFormPage({
 
   // Create mutation
   const createMutation = useMutation({
-    mutationFn: (data: FormData) => createResource(apiClient, collectionName, data),
+    mutationFn: (data: FormData) =>
+      createResource(apiClient, collectionName, data, relationshipFieldsMap),
     onSuccess: (newResource) => {
       queryClient.invalidateQueries({ queryKey: ['resources', collectionName] })
       showToast(t('success.created', { item: t('resources.record') }), 'success')
@@ -556,7 +565,8 @@ export function ResourceFormPage({
 
   // Update mutation
   const updateMutation = useMutation({
-    mutationFn: (data: FormData) => updateResource(apiClient, collectionName, resourceId!, data),
+    mutationFn: (data: FormData) =>
+      updateResource(apiClient, collectionName, resourceId!, data, relationshipFieldsMap),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['resources', collectionName] })
       queryClient.invalidateQueries({ queryKey: ['resource', collectionName, resourceId] })
@@ -856,8 +866,6 @@ export function ResourceFormPage({
               value = null
             }
             break
-          case 'reference':
-          case 'lookup':
           case 'master_detail':
             if (value === '') {
               value = null
@@ -936,7 +944,6 @@ export function ResourceFormPage({
             </label>
             <div className={styles.fieldTypeHint}>
               {t(`fields.types.${field.type.toLowerCase()}`)}
-              {field.referenceTarget && ` → ${field.referenceTarget}`}
             </div>
             <div data-testid={`custom-renderer-${field.name}`}>
               <CustomRenderer
@@ -1059,48 +1066,6 @@ export function ResourceFormPage({
               rows={5}
             />
           )
-          break
-
-        case 'reference':
-          if (field.lookupOptions && field.lookupOptions.length > 0) {
-            input = (
-              <LookupSelect
-                id={fieldId}
-                name={field.name}
-                value={String(value ?? '')}
-                options={field.lookupOptions}
-                onChange={(v) => handleFieldChange(field.name, v)}
-                placeholder={
-                  field.referenceTarget
-                    ? t('resourceForm.referenceIdPlaceholder', {
-                        collection: field.referenceTarget,
-                      })
-                    : t('resourceForm.referenceId')
-                }
-                required={field.required}
-                disabled={false}
-                error={!!error}
-                data-testid={`field-${field.name}`}
-              />
-            )
-          } else {
-            input = (
-              <input
-                {...commonProps}
-                type="text"
-                className={`${styles.input} ${error ? styles.inputError : ''}`}
-                value={String(value ?? '')}
-                onChange={(e) => handleFieldChange(field.name, e.target.value)}
-                placeholder={
-                  field.referenceTarget
-                    ? t('resourceForm.referenceIdPlaceholder', {
-                        collection: field.referenceTarget,
-                      })
-                    : t('resourceForm.referenceId')
-                }
-              />
-            )
-          }
           break
 
         case 'picklist':
@@ -1319,7 +1284,6 @@ export function ResourceFormPage({
           break
         }
 
-        case 'lookup':
         case 'master_detail':
           if (field.lookupOptions && field.lookupOptions.length > 0) {
             input = (
@@ -1329,11 +1293,7 @@ export function ResourceFormPage({
                 value={String(value ?? '')}
                 options={field.lookupOptions}
                 onChange={(v) => handleFieldChange(field.name, v)}
-                placeholder={
-                  field.referenceTarget
-                    ? `${t('common.select')} ${field.referenceTarget}`
-                    : t('common.select')
-                }
+                placeholder={t('common.select')}
                 required={field.required}
                 disabled={false}
                 error={!!error}
@@ -1348,11 +1308,7 @@ export function ResourceFormPage({
                 value={String(value || '')}
                 onChange={(e) => handleFieldChange(field.name, e.target.value)}
                 className={`${styles.input} ${error ? styles.inputError : ''}`}
-                placeholder={
-                  field.referenceTarget
-                    ? `${t('fields.types.reference')} → ${field.referenceTarget}`
-                    : t('fields.types.reference')
-                }
+                placeholder={t('fields.types.master_detail')}
               />
             )
           }
@@ -1378,7 +1334,6 @@ export function ResourceFormPage({
           </label>
           <div className={styles.fieldTypeHint}>
             {t(`fields.types.${field.type.toLowerCase()}`)}
-            {field.referenceTarget && ` → ${field.referenceTarget}`}
           </div>
           {input}
           {error && (

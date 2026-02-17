@@ -209,7 +209,7 @@ class FieldServiceTest {
             Collection collection = createTestCollection(collectionId, "Test Collection");
             collection.setCurrentVersion(1);
 
-            // Target collection for LOOKUP/MASTER_DETAIL types
+            // Target collection for MASTER_DETAIL type
             Collection targetCollection = createTestCollection("target-collection-id", "Target");
             targetCollection.setCurrentVersion(1);
 
@@ -220,13 +220,12 @@ class FieldServiceTest {
             when(collectionRepository.save(any(Collection.class))).thenAnswer(invocation -> invocation.getArgument(0));
             when(fieldRepository.findByCollectionIdAndActiveTrue(anyString())).thenReturn(Collections.emptyList());
             when(collectionRepository.findByNameAndActiveTrue("Target")).thenReturn(Optional.of(targetCollection));
-            when(fieldRepository.countMasterDetailFieldsByCollectionId(anyString())).thenReturn(0L);
 
             // When/Then - all valid types should work
             for (String type : FieldService.VALID_FIELD_TYPES) {
                 AddFieldRequest request;
                 String canonical = FieldService.TYPE_ALIASES.get(type);
-                if ("LOOKUP".equals(canonical) || "MASTER_DETAIL".equals(canonical)) {
+                if ("MASTER_DETAIL".equals(canonical)) {
                     request = new AddFieldRequest("field_" + type, type, false, null, null,
                             "{\"targetCollection\": \"Target\", \"relationshipName\": \"Target\"}");
                 } else {
@@ -299,22 +298,22 @@ class FieldServiceTest {
         }
 
         @Test
-        @DisplayName("should throw ValidationException for reference field without collection")
+        @DisplayName("should throw ValidationException for master_detail field without target collection")
         void shouldThrowExceptionForReferenceWithoutCollection() {
-            // Given
+            // Given — "reference" maps to MASTER_DETAIL via TYPE_ALIASES
             String collectionId = "test-collection-id";
             Collection collection = createTestCollection(collectionId, "Test Collection");
             String constraints = "{}";
             AddFieldRequest request = new AddFieldRequest("ref", "reference", false, null, constraints);
-            
+
             when(collectionRepository.findByIdAndActiveTrue(collectionId)).thenReturn(Optional.of(collection));
             when(fieldRepository.existsByCollectionIdAndNameAndActiveTrue(anyString(), anyString())).thenReturn(false);
 
             // When/Then
             assertThatThrownBy(() -> fieldService.addField(collectionId, request))
                     .isInstanceOf(ValidationException.class)
-                    .hasMessageContaining("collection")
-                    .hasMessageContaining("Reference fields must specify a target collection");
+                    .hasMessageContaining("MASTER_DETAIL")
+                    .hasMessageContaining("targetCollection");
         }
     }
 

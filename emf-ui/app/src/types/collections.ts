@@ -40,7 +40,7 @@ export interface FieldDefinition {
   active?: boolean
   description?: string
   constraints?: string
-  relationshipType?: 'LOOKUP' | 'MASTER_DETAIL'
+  relationshipType?: 'MASTER_DETAIL'
   relationshipName?: string
   cascadeDelete?: boolean
   referenceCollectionId?: string
@@ -50,7 +50,9 @@ export interface FieldDefinition {
 }
 
 /**
- * Supported field types
+ * Supported field types.
+ * 'reference' and 'lookup' are deprecated — all relationship fields are now 'master_detail'.
+ * They remain in the union for backward compatibility with pre-migration data.
  */
 export type FieldType =
   | 'string'
@@ -59,7 +61,7 @@ export type FieldType =
   | 'date'
   | 'datetime'
   | 'json'
-  | 'reference'
+  | 'reference' // @deprecated — use 'master_detail'
   | 'picklist'
   | 'multi_picklist'
   | 'currency'
@@ -72,7 +74,7 @@ export type FieldType =
   | 'encrypted'
   | 'external_id'
   | 'geolocation'
-  | 'lookup'
+  | 'lookup' // @deprecated — use 'master_detail'
   | 'master_detail'
   | 'formula'
   | 'rollup_summary'

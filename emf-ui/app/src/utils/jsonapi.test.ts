@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { flattenResource, unwrapResource, unwrapCollection } from './jsonapi'
+import { flattenResource, unwrapResource, unwrapCollection, wrapResource } from './jsonapi'
 
 describe('jsonapi utilities', () => {
   describe('flattenResource', () => {
@@ -32,6 +32,8 @@ describe('jsonapi utilities', () => {
         id: '123',
         name: 'Test',
         owner: 'user-1',
+        _rel_owner: { id: 'user-1', type: 'users' },
+        category: null,
       })
     })
 
@@ -81,6 +83,7 @@ describe('jsonapi utilities', () => {
         price: 10.0,
         created_at: '2026-02-13T17:47:54.855+00:00',
         updated_at: '2026-02-13T22:08:38.107+00:00',
+        owner: null,
       })
     })
 
@@ -99,6 +102,84 @@ describe('jsonapi utilities', () => {
     it('should handle null/undefined gracefully', () => {
       expect(unwrapResource(null)).toBeNull()
       expect(unwrapResource(undefined)).toBeUndefined()
+    })
+  })
+
+  describe('wrapResource', () => {
+    it('should wrap a flat object into JSON:API format', () => {
+      const result = wrapResource('products', { name: 'Test', price: 10 })
+
+      expect(result).toEqual({
+        data: {
+          type: 'products',
+          attributes: { name: 'Test', price: 10 },
+        },
+      })
+    })
+
+    it('should include id when provided', () => {
+      const result = wrapResource('products', { name: 'Test' }, '123')
+
+      expect(result).toEqual({
+        data: {
+          type: 'products',
+          id: '123',
+          attributes: { name: 'Test' },
+        },
+      })
+    })
+
+    it('should strip system fields from attributes', () => {
+      const result = wrapResource('products', {
+        id: '123',
+        name: 'Test',
+        createdAt: '2024-01-01',
+        updatedAt: '2024-01-02',
+      })
+
+      expect(result.data.attributes).toEqual({ name: 'Test' })
+    })
+
+    it('should strip _rel_ prefixed fields from attributes', () => {
+      const result = wrapResource('products', {
+        name: 'Test',
+        category: 'cat-1',
+        _rel_category: { type: 'categories', id: 'cat-1' },
+      })
+
+      expect(result.data.attributes).toEqual({ name: 'Test', category: 'cat-1' })
+    })
+
+    it('should move relationship fields to relationships section', () => {
+      const result = wrapResource('products', { name: 'Test', category: 'cat-1' }, undefined, {
+        category: 'categories',
+      })
+
+      expect(result).toEqual({
+        data: {
+          type: 'products',
+          attributes: { name: 'Test' },
+          relationships: {
+            category: { data: { type: 'categories', id: 'cat-1' } },
+          },
+        },
+      })
+    })
+
+    it('should set relationship data to null for empty values', () => {
+      const result = wrapResource('products', { name: 'Test', category: null }, undefined, {
+        category: 'categories',
+      })
+
+      expect(result).toEqual({
+        data: {
+          type: 'products',
+          attributes: { name: 'Test' },
+          relationships: {
+            category: { data: null },
+          },
+        },
+      })
     })
   })
 

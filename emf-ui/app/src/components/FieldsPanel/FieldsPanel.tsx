@@ -32,7 +32,15 @@ import styles from './FieldsPanel.module.css'
 /**
  * Field type enumeration
  */
-export type FieldType = 'string' | 'number' | 'boolean' | 'date' | 'datetime' | 'json' | 'reference'
+export type FieldType =
+  | 'string'
+  | 'number'
+  | 'boolean'
+  | 'date'
+  | 'datetime'
+  | 'json'
+  | 'reference'
+  | 'master_detail'
 
 /**
  * Validation rule interface
@@ -90,6 +98,7 @@ function getFieldTypeIcon(type: FieldType): React.ReactNode {
     case 'datetime':
       return <Clock size={14} />
     case 'reference':
+    case 'master_detail':
       return <Link2 size={14} />
     case 'string':
       return 'Aa'
@@ -428,14 +437,15 @@ export function FieldsPanel({
                   </span>
                 )}
 
-                {field.type === 'reference' && field.referenceTarget && (
-                  <span
-                    className={styles.referenceTarget}
-                    data-testid={`${testId}-field-reference-${field.id}`}
-                  >
-                    → {field.referenceTarget}
-                  </span>
-                )}
+                {(field.type === 'reference' || field.type === 'master_detail') &&
+                  field.referenceTarget && (
+                    <span
+                      className={styles.referenceTarget}
+                      data-testid={`${testId}-field-reference-${field.id}`}
+                    >
+                      → {field.referenceTarget}
+                    </span>
+                  )}
               </div>
             </div>
 

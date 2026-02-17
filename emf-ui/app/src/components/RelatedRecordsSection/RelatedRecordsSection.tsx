@@ -82,7 +82,7 @@ export interface RelatedRecordsSectionProps {
 }
 
 /** Reference field types that indicate a relationship */
-const REFERENCE_FIELD_TYPES = new Set(['reference', 'lookup', 'master_detail'])
+const REFERENCE_FIELD_TYPES = new Set(['master_detail'])
 
 /** Maximum number of records to display per tab */
 const MAX_DISPLAY_RECORDS = 5

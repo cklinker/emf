@@ -76,3 +76,17 @@ export {
   type FieldPermissionMap,
   type UseFieldPermissionsReturn,
 } from './useFieldPermissions'
+
+// Quick actions hook for fetching action definitions
+export {
+  useQuickActions,
+  type UseQuickActionsOptions,
+  type UseQuickActionsReturn,
+} from './useQuickActions'
+
+// Script execution hook for running server-side scripts
+export {
+  useScriptExecution,
+  type ExecuteScriptParams,
+  type UseScriptExecutionReturn,
+} from './useScriptExecution'

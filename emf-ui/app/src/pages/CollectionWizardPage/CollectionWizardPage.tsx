@@ -26,7 +26,7 @@ import {
 } from 'lucide-react'
 import { useI18n } from '../../context/I18nContext'
 import { getTenantSlug } from '../../context/TenantContext'
-import { getTenantId } from '../../hooks'
+
 import { useApi } from '../../context/ApiContext'
 import { useToast } from '../../components/Toast'
 import { LoadingSpinner } from '../../components'
@@ -411,7 +411,6 @@ export function CollectionWizardPage({
             method: 'GET',
             pathPattern: `/gateway/${collectionPath}/**`,
             policyId: authorization.readPolicyId,
-            tenantId: getTenantId(),
           })
         }
 
@@ -420,7 +419,6 @@ export function CollectionWizardPage({
             method: 'POST',
             pathPattern: `/gateway/${collectionPath}`,
             policyId: authorization.createPolicyId,
-            tenantId: getTenantId(),
           })
         }
 
@@ -429,7 +427,6 @@ export function CollectionWizardPage({
             method: 'PUT',
             pathPattern: `/gateway/${collectionPath}/**`,
             policyId: authorization.updatePolicyId,
-            tenantId: getTenantId(),
           })
         }
 
@@ -438,7 +435,6 @@ export function CollectionWizardPage({
             method: 'DELETE',
             pathPattern: `/gateway/${collectionPath}/**`,
             policyId: authorization.deletePolicyId,
-            tenantId: getTenantId(),
           })
         }
       }

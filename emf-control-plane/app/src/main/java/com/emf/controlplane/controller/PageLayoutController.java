@@ -4,6 +4,7 @@ import com.emf.controlplane.dto.CreatePageLayoutRequest;
 import com.emf.controlplane.dto.LayoutAssignmentDto;
 import com.emf.controlplane.dto.PageLayoutDto;
 import com.emf.controlplane.service.PageLayoutService;
+import com.emf.controlplane.tenant.TenantContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -22,8 +23,8 @@ public class PageLayoutController {
 
     @GetMapping
     public List<PageLayoutDto> listLayouts(
-            @RequestParam String tenantId,
             @RequestParam(required = false) String collectionId) {
+        String tenantId = TenantContextHolder.requireTenantId();
         return layoutService.listLayoutDtos(tenantId, collectionId);
     }
 
@@ -34,9 +35,9 @@ public class PageLayoutController {
 
     @PostMapping
     public ResponseEntity<PageLayoutDto> createLayout(
-            @RequestParam String tenantId,
             @RequestParam String collectionId,
             @RequestBody CreatePageLayoutRequest request) {
+        String tenantId = TenantContextHolder.requireTenantId();
         var dto = layoutService.createLayout(tenantId, collectionId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(dto);
     }
@@ -58,29 +59,29 @@ public class PageLayoutController {
 
     @GetMapping("/assignments")
     public List<LayoutAssignmentDto> listAssignments(
-            @RequestParam String tenantId,
             @RequestParam String collectionId) {
+        String tenantId = TenantContextHolder.requireTenantId();
         return layoutService.listAssignments(tenantId, collectionId).stream()
                 .map(LayoutAssignmentDto::fromEntity).toList();
     }
 
     @PutMapping("/assignments")
     public LayoutAssignmentDto assignLayout(
-            @RequestParam String tenantId,
             @RequestParam String collectionId,
             @RequestParam String profileId,
             @RequestParam(required = false) String recordTypeId,
             @RequestParam String layoutId) {
+        String tenantId = TenantContextHolder.requireTenantId();
         var assignment = layoutService.assignLayout(tenantId, collectionId, profileId, recordTypeId, layoutId);
         return LayoutAssignmentDto.fromEntity(assignment);
     }
 
     @GetMapping("/resolve")
     public ResponseEntity<PageLayoutDto> resolveLayout(
-            @RequestParam String tenantId,
             @RequestParam String collectionId,
             @RequestParam(required = false) String recordTypeId,
             @RequestParam String profileId) {
+        String tenantId = TenantContextHolder.requireTenantId();
         var dto = layoutService.getLayoutForUser(tenantId, collectionId, recordTypeId, profileId);
         if (dto == null) {
             return ResponseEntity.noContent().build();

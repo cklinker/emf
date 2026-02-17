@@ -4,6 +4,7 @@ import com.emf.controlplane.dto.CreateWorkflowRuleRequest;
 import com.emf.controlplane.dto.WorkflowRuleDto;
 import com.emf.controlplane.entity.WorkflowExecutionLog;
 import com.emf.controlplane.service.WorkflowRuleService;
+import com.emf.controlplane.tenant.TenantContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -21,7 +22,8 @@ public class WorkflowRuleController {
     }
 
     @GetMapping
-    public List<WorkflowRuleDto> listRules(@RequestParam String tenantId) {
+    public List<WorkflowRuleDto> listRules() {
+        String tenantId = TenantContextHolder.requireTenantId();
         return workflowRuleService.listRules(tenantId).stream()
                 .map(WorkflowRuleDto::fromEntity).toList();
     }
@@ -33,8 +35,8 @@ public class WorkflowRuleController {
 
     @PostMapping
     public ResponseEntity<WorkflowRuleDto> createRule(
-            @RequestParam String tenantId,
             @RequestBody CreateWorkflowRuleRequest request) {
+        String tenantId = TenantContextHolder.requireTenantId();
         var rule = workflowRuleService.createRule(tenantId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(WorkflowRuleDto.fromEntity(rule));
     }
@@ -55,7 +57,8 @@ public class WorkflowRuleController {
     // --- Execution Logs ---
 
     @GetMapping("/logs")
-    public List<WorkflowExecutionLog> listLogs(@RequestParam String tenantId) {
+    public List<WorkflowExecutionLog> listLogs() {
+        String tenantId = TenantContextHolder.requireTenantId();
         return workflowRuleService.listExecutionLogs(tenantId);
     }
 

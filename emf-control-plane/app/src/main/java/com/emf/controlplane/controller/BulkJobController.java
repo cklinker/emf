@@ -4,6 +4,7 @@ import com.emf.controlplane.dto.BulkJobDto;
 import com.emf.controlplane.dto.BulkJobResultDto;
 import com.emf.controlplane.dto.CreateBulkJobRequest;
 import com.emf.controlplane.service.BulkJobService;
+import com.emf.controlplane.tenant.TenantContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -21,7 +22,8 @@ public class BulkJobController {
     }
 
     @GetMapping
-    public List<BulkJobDto> listJobs(@RequestParam String tenantId) {
+    public List<BulkJobDto> listJobs() {
+        String tenantId = TenantContextHolder.requireTenantId();
         return bulkJobService.listJobs(tenantId).stream()
                 .map(BulkJobDto::fromEntity).toList();
     }
@@ -33,9 +35,9 @@ public class BulkJobController {
 
     @PostMapping
     public ResponseEntity<BulkJobDto> createJob(
-            @RequestParam String tenantId,
             @RequestParam String userId,
             @RequestBody CreateBulkJobRequest request) {
+        String tenantId = TenantContextHolder.requireTenantId();
         var job = bulkJobService.createJob(tenantId, userId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(BulkJobDto.fromEntity(job));
     }

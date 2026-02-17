@@ -4,6 +4,7 @@ import com.emf.controlplane.dto.CreateScheduledJobRequest;
 import com.emf.controlplane.dto.JobExecutionLogDto;
 import com.emf.controlplane.dto.ScheduledJobDto;
 import com.emf.controlplane.service.ScheduledJobService;
+import com.emf.controlplane.tenant.TenantContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -21,7 +22,8 @@ public class ScheduledJobController {
     }
 
     @GetMapping
-    public List<ScheduledJobDto> listJobs(@RequestParam String tenantId) {
+    public List<ScheduledJobDto> listJobs() {
+        String tenantId = TenantContextHolder.requireTenantId();
         return scheduledJobService.listJobs(tenantId).stream()
                 .map(ScheduledJobDto::fromEntity).toList();
     }
@@ -33,9 +35,9 @@ public class ScheduledJobController {
 
     @PostMapping
     public ResponseEntity<ScheduledJobDto> createJob(
-            @RequestParam String tenantId,
             @RequestParam String userId,
             @RequestBody CreateScheduledJobRequest request) {
+        String tenantId = TenantContextHolder.requireTenantId();
         var job = scheduledJobService.createJob(tenantId, userId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(ScheduledJobDto.fromEntity(job));
     }

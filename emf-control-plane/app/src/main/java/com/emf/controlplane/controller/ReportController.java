@@ -4,6 +4,7 @@ import com.emf.controlplane.dto.CreateReportRequest;
 import com.emf.controlplane.dto.ReportDto;
 import com.emf.controlplane.entity.ReportFolder;
 import com.emf.controlplane.service.ReportService;
+import com.emf.controlplane.tenant.TenantContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -22,8 +23,8 @@ public class ReportController {
 
     @GetMapping
     public List<ReportDto> listReports(
-            @RequestParam String tenantId,
             @RequestParam(required = false) String userId) {
+        String tenantId = TenantContextHolder.requireTenantId();
         if (userId != null) {
             return reportService.listReports(tenantId, userId).stream()
                     .map(ReportDto::fromEntity).toList();
@@ -39,9 +40,9 @@ public class ReportController {
 
     @PostMapping
     public ResponseEntity<ReportDto> createReport(
-            @RequestParam String tenantId,
             @RequestParam String userId,
             @RequestBody CreateReportRequest request) {
+        String tenantId = TenantContextHolder.requireTenantId();
         var report = reportService.createReport(tenantId, userId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(ReportDto.fromEntity(report));
     }
@@ -62,16 +63,17 @@ public class ReportController {
     // --- Folders ---
 
     @GetMapping("/folders")
-    public List<ReportFolder> listFolders(@RequestParam String tenantId) {
+    public List<ReportFolder> listFolders() {
+        String tenantId = TenantContextHolder.requireTenantId();
         return reportService.listFolders(tenantId);
     }
 
     @PostMapping("/folders")
     public ResponseEntity<ReportFolder> createFolder(
-            @RequestParam String tenantId,
             @RequestParam String userId,
             @RequestParam String name,
             @RequestParam(required = false) String accessLevel) {
+        String tenantId = TenantContextHolder.requireTenantId();
         var folder = reportService.createFolder(tenantId, userId, name, accessLevel);
         return ResponseEntity.status(HttpStatus.CREATED).body(folder);
     }

@@ -4,6 +4,7 @@ import com.emf.controlplane.dto.CreateWebhookRequest;
 import com.emf.controlplane.dto.WebhookDeliveryDto;
 import com.emf.controlplane.dto.WebhookDto;
 import com.emf.controlplane.service.WebhookService;
+import com.emf.controlplane.tenant.TenantContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -21,7 +22,8 @@ public class WebhookController {
     }
 
     @GetMapping
-    public List<WebhookDto> listWebhooks(@RequestParam String tenantId) {
+    public List<WebhookDto> listWebhooks() {
+        String tenantId = TenantContextHolder.requireTenantId();
         return webhookService.listWebhooks(tenantId).stream()
                 .map(WebhookDto::fromEntity).toList();
     }
@@ -33,9 +35,9 @@ public class WebhookController {
 
     @PostMapping
     public ResponseEntity<WebhookDto> createWebhook(
-            @RequestParam String tenantId,
             @RequestParam String userId,
             @RequestBody CreateWebhookRequest request) {
+        String tenantId = TenantContextHolder.requireTenantId();
         var webhook = webhookService.createWebhook(tenantId, userId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(WebhookDto.fromEntity(webhook));
     }

@@ -16,7 +16,7 @@
 import React, { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
-import { getTenantId } from '../../hooks'
+
 import type { ApiClient } from '../../services/apiClient'
 import styles from './ActivityTimeline.module.css'
 
@@ -218,9 +218,8 @@ export function ActivityTimeline({
     queryKey: ['activity-approvals', collectionId, recordId],
     queryFn: async () => {
       try {
-        const params = new URLSearchParams({ tenantId: getTenantId() })
         const instances = await apiClient.get<ApprovalInstance[]>(
-          `/control/approvals/instances?${params.toString()}`
+          `/control/approvals/instances`
         )
         // Filter client-side for instances matching this record
         return (instances || []).filter((instance) => instance.recordId === recordId)

@@ -18,7 +18,7 @@ import {
   AlertCircle,
   Loader2,
 } from 'lucide-react'
-import { getTenantId } from '../../hooks'
+
 import styles from './DashboardsPage.module.css'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -1581,7 +1581,7 @@ export function DashboardsPage({
     refetch,
   } = useQuery({
     queryKey: ['dashboards'],
-    queryFn: () => apiClient.get<Dashboard[]>(`/control/dashboards?tenantId=${getTenantId()}`),
+    queryFn: () => apiClient.get<Dashboard[]>(`/control/dashboards`),
   })
 
   const dashboardList: Dashboard[] = dashboards ?? []
@@ -1589,7 +1589,7 @@ export function DashboardsPage({
   const createMutation = useMutation({
     mutationFn: (data: DashboardFormData) =>
       apiClient.post<Dashboard>(
-        `/control/dashboards?tenantId=${getTenantId()}&userId=system`,
+        `/control/dashboards?userId=system`,
         data
       ),
     onSuccess: () => {

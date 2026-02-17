@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
-import { getTenantId } from '../../hooks'
+
 import styles from './ListViewsPage.module.css'
 
 interface CollectionSummary {
@@ -386,7 +386,7 @@ export function ListViewsPage({
     refetch,
   } = useQuery({
     queryKey: ['listviews'],
-    queryFn: () => apiClient.get<ListView[]>(`/control/listviews?tenantId=${getTenantId()}`),
+    queryFn: () => apiClient.get<ListView[]>(`/control/listviews`),
   })
 
   const { data: collectionsData } = useQuery({
@@ -421,7 +421,7 @@ export function ListViewsPage({
         sortDirection: data.sortDirection,
       }
       return apiClient.post<ListView>(
-        `/control/listviews?tenantId=${getTenantId()}&collectionId=${encodeURIComponent(data.collectionId)}&userId=system`,
+        `/control/listviews?collectionId=${encodeURIComponent(data.collectionId)}&userId=system`,
         payload
       )
     },

@@ -10,7 +10,7 @@ import {
   ExecutionLogModal,
 } from '../../components'
 import type { LogColumn } from '../../components'
-import { getTenantId } from '../../hooks'
+
 import styles from './ScriptsPage.module.css'
 
 interface Script {
@@ -410,14 +410,14 @@ export function ScriptsPage({ testId = 'scripts-page' }: ScriptsPageProps): Reac
     refetch,
   } = useQuery({
     queryKey: ['scripts'],
-    queryFn: () => apiClient.get<Script[]>(`/control/scripts?tenantId=${getTenantId()}`),
+    queryFn: () => apiClient.get<Script[]>(`/control/scripts`),
   })
 
   const scriptList: Script[] = scripts ?? []
 
   const createMutation = useMutation({
     mutationFn: (data: ScriptFormData) =>
-      apiClient.post<Script>(`/control/scripts?tenantId=${getTenantId()}&userId=system`, data),
+      apiClient.post<Script>(`/control/scripts?userId=system`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['scripts'] })
       showToast('Script created successfully', 'success')

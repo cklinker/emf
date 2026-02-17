@@ -1,6 +1,7 @@
 package com.emf.runtime.router;
 
 import com.emf.runtime.model.CollectionDefinition;
+import com.emf.runtime.model.FieldDefinition;
 import com.emf.runtime.query.QueryEngine;
 import com.emf.runtime.query.QueryRequest;
 import com.emf.runtime.query.QueryResult;
@@ -14,6 +15,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -86,7 +89,7 @@ public class DynamicCollectionRouter {
      * @return the query result or 404 if collection not found
      */
     @GetMapping("/{collectionName}")
-    public ResponseEntity<QueryResult> list(
+    public ResponseEntity<Map<String, Object>> list(
             @PathVariable("collectionName") String collectionName,
             @RequestParam(required = false) Map<String, String> params,
             HttpServletRequest request) {
@@ -102,7 +105,7 @@ public class DynamicCollectionRouter {
         QueryRequest queryRequest = QueryRequest.fromParams(params);
         QueryResult result = queryEngine.executeQuery(definition, queryRequest);
 
-        return ResponseEntity.ok(result);
+        return ResponseEntity.ok(toJsonApiListResponse(result, collectionName, definition));
     }
     
     /**
@@ -127,7 +130,7 @@ public class DynamicCollectionRouter {
         }
 
         Optional<Map<String, Object>> record = queryEngine.getById(definition, id);
-        return record.map(r -> ResponseEntity.ok(toJsonApiResponse(r, collectionName)))
+        return record.map(r -> ResponseEntity.ok(toJsonApiResponse(r, collectionName, definition)))
                      .orElse(ResponseEntity.notFound().build());
     }
 
@@ -172,7 +175,7 @@ public class DynamicCollectionRouter {
         Map<String, Object> created = queryEngine.create(definition, data);
         
         // Return in JSON:API format
-        return ResponseEntity.status(HttpStatus.CREATED).body(toJsonApiResponse(created, collectionName));
+        return ResponseEntity.status(HttpStatus.CREATED).body(toJsonApiResponse(created, collectionName, definition));
     }
     
     /**
@@ -251,7 +254,7 @@ public class DynamicCollectionRouter {
         }
 
         Optional<Map<String, Object>> updated = queryEngine.update(definition, id, data);
-        return updated.map(r -> ResponseEntity.ok(toJsonApiResponse(r, collectionName)))
+        return updated.map(r -> ResponseEntity.ok(toJsonApiResponse(r, collectionName, definition)))
                       .orElse(ResponseEntity.notFound().build());
     }
     
@@ -339,27 +342,27 @@ public class DynamicCollectionRouter {
     
     /**
      * Extracts relationships from a JSON:API formatted request body.
-     * Converts relationship references to foreign key fields.
-     * 
+     * Converts relationship references to field values using the relationship
+     * name directly as the field name (e.g., "category" → field "category").
+     *
      * @param requestBody the JSON:API request body
-     * @return the relationships as foreign key fields, or empty map if not found
+     * @return the relationships as field values, or empty map if not found
      */
     @SuppressWarnings("unchecked")
     private Map<String, Object> extractRelationships(Map<String, Object> requestBody) {
-        Map<String, Object> foreignKeys = new java.util.HashMap<>();
-        
+        Map<String, Object> fieldValues = new java.util.HashMap<>();
+
         if (requestBody.containsKey("data")) {
             Map<String, Object> data = (Map<String, Object>) requestBody.get("data");
             if (data != null && data.containsKey("relationships")) {
                 Object relationships = data.get("relationships");
                 if (relationships instanceof Map) {
                     Map<String, Object> relationshipsMap = (Map<String, Object>) relationships;
-                    
-                    // Convert each relationship to a foreign key field
+
                     for (Map.Entry<String, Object> entry : relationshipsMap.entrySet()) {
                         String relationshipName = entry.getKey();
                         Object relationshipValue = entry.getValue();
-                        
+
                         if (relationshipValue instanceof Map) {
                             Map<String, Object> relationship = (Map<String, Object>) relationshipValue;
                             if (relationship.containsKey("data")) {
@@ -367,11 +370,12 @@ public class DynamicCollectionRouter {
                                 if (relationshipData instanceof Map) {
                                     Map<String, Object> relData = (Map<String, Object>) relationshipData;
                                     if (relData.containsKey("id")) {
-                                        // Convert relationship name to foreign key field name
-                                        // e.g., "project" -> "project_id"
-                                        String foreignKeyField = relationshipName + "_id";
-                                        foreignKeys.put(foreignKeyField, relData.get("id"));
+                                        // Use relationship name directly as field name
+                                        fieldValues.put(relationshipName, relData.get("id"));
                                     }
+                                } else if (relationshipData == null) {
+                                    // Null relationship — clear the field
+                                    fieldValues.put(relationshipName, null);
                                 }
                             }
                         }
@@ -379,61 +383,109 @@ public class DynamicCollectionRouter {
                 }
             }
         }
-        
-        return foreignKeys;
+
+        return fieldValues;
     }
     
     /**
-     * Converts a record to JSON:API response format.
-     * 
+     * Converts a record to a JSON:API resource object using the collection
+     * definition to identify relationship fields.
+     *
+     * <p>Relationship fields (those with {@code type.isRelationship()}) are placed
+     * in the {@code relationships} section with their target collection as the
+     * JSON:API type. All other fields go in {@code attributes}.
+     *
      * @param record the record data
      * @param type the resource type (collection name)
-     * @return the JSON:API formatted response
+     * @param definition the collection definition for field metadata
+     * @return the JSON:API resource object
      */
-    private Map<String, Object> toJsonApiResponse(Map<String, Object> record, String type) {
-        Map<String, Object> response = new java.util.HashMap<>();
-        Map<String, Object> data = new java.util.HashMap<>();
-        
-        data.put("type", type);
-        data.put("id", record.get("id"));
-        
-        // Separate attributes from system fields and foreign keys
+    private Map<String, Object> toJsonApiResourceObject(Map<String, Object> record, String type,
+                                                         CollectionDefinition definition) {
+        Map<String, Object> resourceObject = new java.util.HashMap<>();
+
+        resourceObject.put("type", type);
+        resourceObject.put("id", record.get("id"));
+
         Map<String, Object> attributes = new java.util.HashMap<>();
         Map<String, Object> relationships = new java.util.HashMap<>();
-        
+
         for (Map.Entry<String, Object> entry : record.entrySet()) {
             String key = entry.getKey();
             Object value = entry.getValue();
-            
-            // Skip id (it's in the top level)
+
+            // Skip id — it's at the top level
             if ("id".equals(key)) {
                 continue;
             }
-            
-            // Check if it's a foreign key field (ends with _id)
-            if (key.endsWith("_id")) {
-                String relationshipName = key.substring(0, key.length() - 3);
+
+            // Use field schema to detect relationship fields
+            FieldDefinition fieldDef = definition.getField(key);
+            if (fieldDef != null && fieldDef.type().isRelationship()
+                    && fieldDef.referenceConfig() != null) {
+                String relType = fieldDef.referenceConfig().targetCollection();
                 Map<String, Object> relationshipData = new java.util.HashMap<>();
                 if (value != null) {
                     relationshipData.put("data", Map.of(
-                        "type", relationshipName + "s", // Pluralize (simple approach)
+                        "type", relType,
                         "id", value
                     ));
                 } else {
                     relationshipData.put("data", null);
                 }
-                relationships.put(relationshipName, relationshipData);
+                relationships.put(key, relationshipData);
             } else {
                 attributes.put(key, value);
             }
         }
-        
-        data.put("attributes", attributes);
+
+        resourceObject.put("attributes", attributes);
         if (!relationships.isEmpty()) {
-            data.put("relationships", relationships);
+            resourceObject.put("relationships", relationships);
         }
-        
-        response.put("data", data);
+
+        return resourceObject;
+    }
+
+    /**
+     * Wraps a single record in a JSON:API document envelope.
+     *
+     * @param record the record data
+     * @param type the resource type (collection name)
+     * @param definition the collection definition
+     * @return the JSON:API document with {@code data} key
+     */
+    private Map<String, Object> toJsonApiResponse(Map<String, Object> record, String type,
+                                                   CollectionDefinition definition) {
+        Map<String, Object> response = new java.util.HashMap<>();
+        response.put("data", toJsonApiResourceObject(record, type, definition));
+        return response;
+    }
+
+    /**
+     * Converts a QueryResult into a JSON:API list response with proper
+     * relationship formatting and pagination metadata.
+     *
+     * @param result the query result
+     * @param type the resource type (collection name)
+     * @param definition the collection definition
+     * @return the JSON:API document with {@code data} array and {@code metadata}
+     */
+    private Map<String, Object> toJsonApiListResponse(QueryResult result, String type,
+                                                       CollectionDefinition definition) {
+        List<Map<String, Object>> jsonApiData = new ArrayList<>();
+        for (Map<String, Object> record : result.data()) {
+            jsonApiData.add(toJsonApiResourceObject(record, type, definition));
+        }
+
+        Map<String, Object> response = new java.util.HashMap<>();
+        response.put("data", jsonApiData);
+        response.put("metadata", Map.of(
+            "totalCount", result.metadata().totalCount(),
+            "currentPage", result.metadata().currentPage(),
+            "pageSize", result.metadata().pageSize(),
+            "totalPages", result.metadata().totalPages()
+        ));
         return response;
     }
 }

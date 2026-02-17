@@ -146,7 +146,7 @@ export const FIELD_TYPES: FieldType[] = [
   'date',
   'datetime',
   'json',
-  'reference',
+  'master_detail',
   'picklist',
   'multi_picklist',
   'currency',
@@ -159,8 +159,6 @@ export const FIELD_TYPES: FieldType[] = [
   'encrypted',
   'external_id',
   'geolocation',
-  'lookup',
-  'master_detail',
   'formula',
   'rollup_summary',
 ]
@@ -262,11 +260,8 @@ export const fieldEditorSchema = z
   })
   .refine(
     (data) => {
-      // Reference, lookup, and master_detail types require referenceTarget
-      if (
-        (data.type === 'reference' || data.type === 'lookup' || data.type === 'master_detail') &&
-        !data.referenceTarget
-      ) {
+      // master_detail type requires referenceTarget
+      if (data.type === 'master_detail' && !data.referenceTarget) {
         return false
       }
       return true
@@ -501,8 +496,7 @@ export function FieldEditor({
         }
       }
 
-      const needsReferenceTarget =
-        data.type === 'reference' || data.type === 'lookup' || data.type === 'master_detail'
+      const needsReferenceTarget = data.type === 'master_detail'
 
       // Map validation rules to constraints JSON for backend
       let constraints: string | undefined = undefined
@@ -683,10 +677,8 @@ export function FieldEditor({
         )}
       </div>
 
-      {/* Reference Target (for reference, lookup, and master_detail types) */}
-      {(watchedType === 'reference' ||
-        watchedType === 'lookup' ||
-        watchedType === 'master_detail') && (
+      {/* Reference Target (for master_detail type) */}
+      {watchedType === 'master_detail' && (
         <div className={styles.fieldGroup}>
           <label htmlFor="field-reference-target" className={styles.label}>
             {t('fieldEditor.referenceTarget')}

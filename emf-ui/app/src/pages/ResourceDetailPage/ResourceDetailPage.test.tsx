@@ -212,9 +212,9 @@ const mockSchema: CollectionSchema = {
       id: 'f8',
       name: 'organizationId',
       displayName: 'Organization',
-      type: 'reference',
+      type: 'master_detail',
       required: false,
-      referenceTarget: 'organizations',
+      referenceCollectionId: 'org-collection-id',
     },
   ],
 }
@@ -334,8 +334,30 @@ describe('ResourceDetailPage', () => {
   describe('Successful Data Display', () => {
     beforeEach(() => {
       mockAxios.get.mockImplementation((url: string) => {
+        if (url.includes('/control/collections/users')) {
+          return Promise.resolve({ data: mockSchema })
+        }
+        // Lookup: fetch target collection schema by ID for master_detail resolution
+        if (url.includes('/control/collections/org-collection-id')) {
+          return Promise.resolve({
+            data: {
+              id: 'org-collection-id',
+              name: 'organizations',
+              displayName: 'Organizations',
+              fields: [{ name: 'name', type: 'STRING' }],
+            },
+          })
+        }
         if (url.includes('/control/collections/')) {
           return Promise.resolve({ data: mockSchema })
+        }
+        // Lookup: fetch target collection records for display name resolution
+        if (url.includes('/api/organizations')) {
+          return Promise.resolve({
+            data: {
+              data: [{ id: 'org-456', attributes: { name: 'Acme Corp' } }],
+            },
+          })
         }
         if (url.includes('/api/')) {
           return Promise.resolve({ data: mockResource })
@@ -426,7 +448,7 @@ describe('ResourceDetailPage', () => {
       })
     })
 
-    it('should render reference fields as links', async () => {
+    it('should render master_detail fields as links with display names', async () => {
       renderWithProviders(<ResourceDetailPage />)
 
       await waitFor(() => {
@@ -434,6 +456,8 @@ describe('ResourceDetailPage', () => {
         const link = referenceField.querySelector('a')
         expect(link).toBeInTheDocument()
         expect(link).toHaveAttribute('href', '/default/resources/organizations/org-456')
+        // Should display the resolved name, not the raw UUID
+        expect(link).toHaveTextContent('Acme Corp')
       })
     })
   })

@@ -168,6 +168,8 @@ const BACKEND_TYPE_TO_UI: Record<string, FieldDefinition['type']> = {
   LONG: 'number',
   JSON: 'json',
   ARRAY: 'json',
+  REFERENCE: 'master_detail',
+  LOOKUP: 'master_detail',
 }
 
 function normalizeFieldType(backendType: string): FieldDefinition['type'] {
@@ -502,15 +504,11 @@ export function ResourceListPage({
     },
   })
 
-  // Identify lookup/master_detail/reference fields so we can resolve their display values.
+  // Identify master_detail fields so we can resolve their display values.
   // referenceCollectionId (UUID) is the canonical FK — always set by the backend.
   const lookupFields = useMemo(() => {
     if (!schema?.fields) return []
-    return schema.fields.filter(
-      (f) =>
-        (f.type === 'lookup' || f.type === 'master_detail' || f.type === 'reference') &&
-        f.referenceCollectionId
-    )
+    return schema.fields.filter((f) => f.type === 'master_detail' && f.referenceCollectionId)
   }, [schema])
 
   // Fetch display labels for all lookup field values.
@@ -990,9 +988,7 @@ export function ResourceListPage({
           return String(value)
             .replace(/<[^>]*>/g, '')
             .substring(0, 100)
-        case 'lookup':
-        case 'master_detail':
-        case 'reference': {
+        case 'master_detail': {
           const strValue = String(value)
           const fieldMap = lookupDisplayMap?.[field.name]
           if (fieldMap && fieldMap[strValue]) {

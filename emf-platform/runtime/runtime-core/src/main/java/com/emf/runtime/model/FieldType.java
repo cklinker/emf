@@ -37,7 +37,8 @@ public enum FieldType {
 
     // --- New: Reference & Structure (Phase 2) ---
 
-    /** Generic foreign key reference. Maps to VARCHAR(36) in PostgreSQL. */
+    /** @deprecated Use {@link #MASTER_DETAIL} instead. Kept for deserialization compatibility. */
+    @Deprecated
     REFERENCE,
 
     /** Ordered list stored as JSON. Maps to JSONB in PostgreSQL. */
@@ -91,7 +92,8 @@ public enum FieldType {
 
     // --- New: Relationship Types ---
 
-    /** Lookup relationship with ON DELETE SET NULL. Maps to VARCHAR(36) in PostgreSQL. */
+    /** @deprecated Use {@link #MASTER_DETAIL} instead. Kept for deserialization compatibility. */
+    @Deprecated
     LOOKUP,
 
     /** Master-detail relationship with ON DELETE CASCADE, NOT NULL. Maps to VARCHAR(36) in PostgreSQL. */

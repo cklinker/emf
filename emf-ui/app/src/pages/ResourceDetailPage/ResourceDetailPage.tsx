@@ -63,6 +63,7 @@ export interface FieldDefinition {
     | 'rollup_summary'
   required: boolean
   referenceTarget?: string
+  referenceCollectionId?: string
 }
 
 /**
@@ -74,6 +75,8 @@ const BACKEND_TYPE_TO_UI: Record<string, FieldDefinition['type']> = {
   LONG: 'number',
   JSON: 'json',
   ARRAY: 'json',
+  REFERENCE: 'master_detail',
+  LOOKUP: 'master_detail',
 }
 
 function normalizeFieldType(backendType: string): FieldDefinition['type'] {
@@ -399,6 +402,93 @@ export function ResourceDetailPage({
     },
   })
 
+  // Identify master_detail fields for display name resolution
+  const lookupFields = useMemo(() => {
+    if (!schema?.fields) return []
+    return schema.fields.filter((f) => f.type === 'master_detail' && f.referenceCollectionId)
+  }, [schema])
+
+  // Fetch display labels for master_detail field values.
+  // Builds a map: { [fieldName]: { [recordId]: displayLabel } }
+  // Also tracks field name → target collection name for deep linking.
+  const { data: lookupData } = useQuery({
+    queryKey: ['lookup-display-detail', collectionName, resourceId, lookupFields.map((f) => f.id)],
+    queryFn: async () => {
+      const displayMap: Record<string, Record<string, string>> = {}
+      const targetNameMap: Record<string, string> = {}
+
+      const targetGroupMap = new Map<string, FieldDefinition[]>()
+      for (const field of lookupFields) {
+        const target = field.referenceCollectionId!
+        if (!targetGroupMap.has(target)) {
+          targetGroupMap.set(target, [])
+        }
+        targetGroupMap.get(target)!.push(field)
+      }
+
+      await Promise.all(
+        Array.from(targetGroupMap.entries()).map(async ([targetCollectionId, fields]) => {
+          try {
+            const targetSchema = await apiClient.get<{
+              name: string
+              displayFieldName?: string
+              fields?: Array<{ name: string; type: string }>
+            }>(`/control/collections/${targetCollectionId}`)
+            const targetName = targetSchema.name
+
+            for (const field of fields) {
+              targetNameMap[field.name] = targetName
+            }
+
+            let displayFieldName = 'id'
+            if (targetSchema.displayFieldName) {
+              displayFieldName = targetSchema.displayFieldName
+            } else if (targetSchema.fields) {
+              const nameField = targetSchema.fields.find((f) => f.name.toLowerCase() === 'name')
+              if (nameField) {
+                displayFieldName = nameField.name
+              } else {
+                const firstStringField = targetSchema.fields.find(
+                  (f) => f.type.toUpperCase() === 'STRING'
+                )
+                if (firstStringField) {
+                  displayFieldName = firstStringField.name
+                }
+              }
+            }
+
+            const recordsResponse = await apiClient.get<Record<string, unknown>>(
+              `/api/${targetName}?page[size]=200`
+            )
+            const data = recordsResponse?.data
+            const records: Array<Record<string, unknown>> = Array.isArray(data) ? data : []
+
+            const idToLabel: Record<string, string> = {}
+            for (const record of records) {
+              const attrs = (record.attributes || record) as Record<string, unknown>
+              const id = String(record.id || attrs.id || '')
+              const label = attrs[displayFieldName] ? String(attrs[displayFieldName]) : id
+              idToLabel[id] = label
+            }
+
+            for (const field of fields) {
+              displayMap[field.name] = idToLabel
+            }
+          } catch {
+            for (const field of fields) {
+              displayMap[field.name] = {}
+            }
+          }
+        })
+      )
+      return { displayMap, targetNameMap }
+    },
+    enabled: lookupFields.length > 0,
+  })
+
+  const lookupDisplayMap = lookupData?.displayMap
+  const lookupTargetNameMap = lookupData?.targetNameMap
+
   // Sort fields by order
   const sortedFields = useMemo(() => {
     if (!schema?.fields) return []
@@ -529,22 +619,31 @@ export function ResourceDetailPage({
           }
           return String(value)
 
-        case 'reference':
-          // For reference fields, display the ID with a link if possible
+        case 'master_detail': {
+          // Display the resolved display name with a deep link to the related record
+          const recordId = String(value)
+          const fieldDisplayMap = lookupDisplayMap?.[field.name]
+          const displayLabel = fieldDisplayMap?.[recordId] ?? recordId
+          // Get target collection from relationship data or lookup map
+          const relData = resource?.[`_rel_${field.name}`] as
+            | { type: string; id: string }
+            | undefined
+          const targetCollection = relData?.type ?? lookupTargetNameMap?.[field.name]
           return (
             <span className={styles.referenceValue}>
-              {field.referenceTarget ? (
+              {targetCollection ? (
                 <Link
-                  to={`/${getTenantSlug()}/resources/${field.referenceTarget}/${value}`}
+                  to={`/${getTenantSlug()}/resources/${targetCollection}/${recordId}`}
                   className={styles.referenceLink}
                 >
-                  {String(value)}
+                  {displayLabel}
                 </Link>
               ) : (
-                String(value)
+                displayLabel
               )}
             </span>
           )
+        }
 
         case 'string':
         default: {

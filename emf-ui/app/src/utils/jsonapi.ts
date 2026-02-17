@@ -61,11 +61,16 @@ export function flattenResource<T extends Record<string, unknown> = Record<strin
     Object.assign(result, resource.attributes)
   }
 
-  // Extract relationship IDs as flat fields (e.g., owner -> ownerId or owner)
+  // Extract relationship IDs as flat fields.
+  // The raw ID goes into result[key] for form binding.
+  // The full { type, id } goes into result[`_rel_${key}`] for display/linking.
   if (resource.relationships) {
     for (const [key, rel] of Object.entries(resource.relationships)) {
       if (rel.data) {
         result[key] = rel.data.id
+        result[`_rel_${key}`] = rel.data // { type, id } — target collection + record id
+      } else {
+        result[key] = null
       }
     }
   }
@@ -108,13 +113,36 @@ export function unwrapResource<T extends Record<string, unknown> = Record<string
  *
  * Input:  "products", { name: "Test", price: 10 }, "123"
  * Output: { data: { type: "products", id: "123", attributes: { name: "Test", price: 10 } } }
+ *
+ * When relationshipFields is provided, those fields are emitted in the
+ * `relationships` section instead of `attributes`.  Each entry maps a field
+ * name to the target collection type (from the JSON:API relationship `type`).
+ *
+ * Input:  "products", { name: "Test", category: "uuid-1" }, undefined,
+ *         { category: "categories" }
+ * Output: { data: { type: "products",
+ *                    attributes: { name: "Test" },
+ *                    relationships: { category: { data: { type: "categories", id: "uuid-1" } } } } }
  */
 export function wrapResource(
   type: string,
   attributes: Record<string, unknown>,
-  id?: string
-): { data: { type: string; id?: string; attributes: Record<string, unknown> } } {
-  const data: { type: string; id?: string; attributes: Record<string, unknown> } = {
+  id?: string,
+  relationshipFields?: Record<string, string>
+): {
+  data: {
+    type: string
+    id?: string
+    attributes: Record<string, unknown>
+    relationships?: Record<string, { data: { type: string; id: string } | null }>
+  }
+} {
+  const data: {
+    type: string
+    id?: string
+    attributes: Record<string, unknown>
+    relationships?: Record<string, { data: { type: string; id: string } | null }>
+  } = {
     type,
     attributes: { ...attributes },
   }
@@ -133,6 +161,30 @@ export function wrapResource(
   delete data.attributes.updatedBy
   delete data.attributes.created_by
   delete data.attributes.updated_by
+
+  // Remove internal relationship metadata fields (prefixed with _rel_)
+  for (const key of Object.keys(data.attributes)) {
+    if (key.startsWith('_rel_')) {
+      delete data.attributes[key]
+    }
+  }
+
+  // Move relationship fields from attributes to relationships section
+  if (relationshipFields) {
+    const relationships: Record<string, { data: { type: string; id: string } | null }> = {}
+    for (const [fieldName, relType] of Object.entries(relationshipFields)) {
+      const value = data.attributes[fieldName]
+      delete data.attributes[fieldName]
+      if (value != null && value !== '') {
+        relationships[fieldName] = { data: { type: relType, id: String(value) } }
+      } else {
+        relationships[fieldName] = { data: null }
+      }
+    }
+    if (Object.keys(relationships).length > 0) {
+      data.relationships = relationships
+    }
+  }
 
   return { data }
 }

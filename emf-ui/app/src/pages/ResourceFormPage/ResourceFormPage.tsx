@@ -353,13 +353,14 @@ export function ResourceFormPage({
     enabled: picklistFields.length > 0,
   })
 
-  // Identify lookup/master_detail/reference fields that need dropdown options
+  // Identify lookup/master_detail/reference fields that need dropdown options.
+  // referenceCollectionId (UUID) is the canonical FK — always set by the backend.
   const lookupFields = useMemo(() => {
     if (!schema?.fields) return []
     return schema.fields.filter(
       (f) =>
         (f.type === 'lookup' || f.type === 'master_detail' || f.type === 'reference') &&
-        (f.referenceTarget || f.referenceCollectionId)
+        f.referenceCollectionId
     )
   }, [schema])
 
@@ -370,14 +371,10 @@ export function ResourceFormPage({
     queryKey: ['lookup-options-for-form', collectionName, lookupFields.map((f) => f.id)],
     queryFn: async () => {
       const map: Record<string, LookupOption[]> = {}
-      // Group fields by target collection to avoid duplicate requests.
-      // Use referenceTarget (collection name) when available, otherwise
-      // fall back to referenceCollectionId (UUID). The /control/collections/
-      // endpoint accepts both names and UUIDs.
+      // Group fields by referenceCollectionId (UUID) to avoid duplicate requests.
       const targetMap = new Map<string, FieldDefinition[]>()
       for (const field of lookupFields) {
-        const target = field.referenceTarget || field.referenceCollectionId
-        if (!target) continue
+        const target = field.referenceCollectionId!
         if (!targetMap.has(target)) {
           targetMap.set(target, [])
         }
@@ -385,12 +382,12 @@ export function ResourceFormPage({
       }
 
       await Promise.all(
-        Array.from(targetMap.entries()).map(async ([target, fields]) => {
+        Array.from(targetMap.entries()).map(async ([targetCollectionId, fields]) => {
           try {
-            // Fetch the target collection schema to find display field.
-            // The endpoint accepts both collection name and UUID.
+            // Fetch the target collection schema by its UUID to find display field
+            // and resolve the collection name for the /api/ endpoint.
             const targetSchema = await apiClient.get<CollectionSchema>(
-              `/control/collections/${target}`
+              `/control/collections/${targetCollectionId}`
             )
             const targetName = targetSchema.name
 

@@ -502,13 +502,14 @@ export function ResourceListPage({
     },
   })
 
-  // Identify lookup/master_detail/reference fields so we can resolve their display values
+  // Identify lookup/master_detail/reference fields so we can resolve their display values.
+  // referenceCollectionId (UUID) is the canonical FK — always set by the backend.
   const lookupFields = useMemo(() => {
     if (!schema?.fields) return []
     return schema.fields.filter(
       (f) =>
         (f.type === 'lookup' || f.type === 'master_detail' || f.type === 'reference') &&
-        (f.referenceTarget || f.referenceCollectionId)
+        f.referenceCollectionId
     )
   }, [schema])
 
@@ -519,11 +520,10 @@ export function ResourceListPage({
     queryFn: async () => {
       const map: Record<string, Record<string, string>> = {}
 
-      // Group by target collection
+      // Group by referenceCollectionId (UUID) to avoid duplicate requests
       const targetMap = new Map<string, FieldDefinition[]>()
       for (const field of lookupFields) {
-        const target = field.referenceTarget || field.referenceCollectionId
-        if (!target) continue
+        const target = field.referenceCollectionId!
         if (!targetMap.has(target)) {
           targetMap.set(target, [])
         }
@@ -531,14 +531,15 @@ export function ResourceListPage({
       }
 
       await Promise.all(
-        Array.from(targetMap.entries()).map(async ([target, fields]) => {
+        Array.from(targetMap.entries()).map(async ([targetCollectionId, fields]) => {
           try {
-            // Fetch target collection schema to find display field
+            // Fetch target collection schema by UUID to find display field
+            // and resolve the collection name for the /api/ endpoint.
             const targetSchema = await apiClient.get<{
               name: string
               displayFieldName?: string
               fields?: Array<{ name: string; type: string }>
-            }>(`/control/collections/${target}`)
+            }>(`/control/collections/${targetCollectionId}`)
             const targetName = targetSchema.name
 
             // Determine display field

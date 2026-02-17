@@ -16,7 +16,7 @@
 
 import React, { useState, useCallback, useEffect } from 'react'
 import { useI18n } from '../../context/I18nContext'
-import styles from './BulkActionsBar.module.css'
+import { cn } from '@/lib/utils'
 
 /** Editable field types that can be bulk-updated */
 const EDITABLE_FIELD_TYPES = new Set(['string', 'number', 'boolean', 'date', 'datetime'])
@@ -142,6 +142,10 @@ export function BulkActionsBar({
       ? Math.round((processingProgress.current / processingProgress.total) * 100)
       : 0
 
+  // Shared input classes for form controls
+  const inputClasses =
+    'w-full p-2 border border-border rounded-md text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-primary'
+
   // Render the type-appropriate value input
   const renderValueInput = (): React.ReactElement | null => {
     if (!selectedFieldDescriptor) return null
@@ -149,14 +153,17 @@ export function BulkActionsBar({
     switch (selectedFieldDescriptor.type) {
       case 'boolean':
         return (
-          <div className={styles.checkboxWrapper}>
+          <div className="flex items-center gap-2 py-2">
             <input
               type="checkbox"
               id="bulk-field-value"
+              className="w-4 h-4 cursor-pointer accent-primary"
               checked={!!fieldValue}
               onChange={(e) => setFieldValue(e.target.checked)}
             />
-            <span>{selectedFieldDescriptor.displayName || selectedFieldDescriptor.name}</span>
+            <span className="text-sm text-foreground">
+              {selectedFieldDescriptor.displayName || selectedFieldDescriptor.name}
+            </span>
           </div>
         )
       case 'number':
@@ -164,6 +171,7 @@ export function BulkActionsBar({
           <input
             type="number"
             id="bulk-field-value"
+            className={inputClasses}
             value={fieldValue as string}
             onChange={(e) => setFieldValue(e.target.value === '' ? '' : Number(e.target.value))}
             placeholder={t('bulkActions.enterValue')}
@@ -174,6 +182,7 @@ export function BulkActionsBar({
           <input
             type="date"
             id="bulk-field-value"
+            className={inputClasses}
             value={fieldValue as string}
             onChange={(e) => setFieldValue(e.target.value)}
           />
@@ -183,6 +192,7 @@ export function BulkActionsBar({
           <input
             type="datetime-local"
             id="bulk-field-value"
+            className={inputClasses}
             value={fieldValue as string}
             onChange={(e) => setFieldValue(e.target.value)}
           />
@@ -193,6 +203,7 @@ export function BulkActionsBar({
           <input
             type="text"
             id="bulk-field-value"
+            className={inputClasses}
             value={fieldValue as string}
             onChange={(e) => setFieldValue(e.target.value)}
             placeholder={t('bulkActions.enterValue')}
@@ -205,34 +216,41 @@ export function BulkActionsBar({
     <>
       {/* Floating bulk actions bar */}
       <div
-        className={selectedCount > 0 ? styles.bar : styles.barHidden}
+        className={
+          selectedCount > 0
+            ? 'fixed bottom-6 left-1/2 -translate-x-1/2 bg-card border border-border rounded-lg px-4 py-3 flex items-center gap-4 shadow-[0_4px_20px_rgba(0,0,0,0.15)] z-[1000] min-w-[500px] animate-in slide-in-from-bottom-2'
+            : 'hidden'
+        }
         data-testid="bulk-actions-bar"
       >
         {/* Selected count */}
-        <span className={styles.count}>
+        <span className="font-semibold text-sm whitespace-nowrap text-foreground">
           {t('bulkActions.selectedCount', { count: selectedCount })}
         </span>
 
         {/* Progress indicator (shown during processing) */}
         {isProcessing && processingProgress && (
-          <div className={styles.progressSection}>
-            <span className={styles.progressText}>
+          <div className="flex flex-col gap-1 flex-1 min-w-[120px]">
+            <span className="text-xs text-muted-foreground whitespace-nowrap">
               {t('bulkActions.processing', {
                 current: processingProgress.current,
                 total: processingProgress.total,
               })}
             </span>
-            <div className={styles.progressBar}>
-              <div className={styles.progressFill} style={{ width: `${progressPercent}%` }} />
+            <div className="h-1 bg-muted rounded-sm overflow-hidden">
+              <div
+                className="h-full bg-primary transition-[width] duration-300"
+                style={{ width: `${progressPercent}%` }}
+              />
             </div>
           </div>
         )}
 
         {/* Action buttons */}
-        <div className={styles.actions}>
+        <div className="flex gap-2">
           <button
             type="button"
-            className={styles.actionButton}
+            className="px-3 py-1 rounded-md text-sm cursor-pointer border border-border bg-card text-foreground transition-colors hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={onExport}
             disabled={isProcessing}
           >
@@ -241,7 +259,7 @@ export function BulkActionsBar({
 
           <button
             type="button"
-            className={styles.actionButton}
+            className="px-3 py-1 rounded-md text-sm cursor-pointer border border-border bg-card text-foreground transition-colors hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={openModal}
             disabled={isProcessing}
           >
@@ -250,7 +268,10 @@ export function BulkActionsBar({
 
           <button
             type="button"
-            className={`${styles.actionButton} ${styles.dangerButton}`}
+            className={cn(
+              'px-3 py-1 rounded-md text-sm cursor-pointer border border-border bg-card text-foreground transition-colors hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed',
+              'text-destructive border-destructive hover:bg-destructive hover:text-white'
+            )}
             onClick={onDelete}
             disabled={isProcessing}
           >
@@ -260,7 +281,7 @@ export function BulkActionsBar({
           {onSubmitForApproval && (
             <button
               type="button"
-              className={styles.actionButton}
+              className="px-3 py-1 rounded-md text-sm cursor-pointer border border-border bg-card text-foreground transition-colors hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
               onClick={onSubmitForApproval}
               disabled={isProcessing}
             >
@@ -270,7 +291,11 @@ export function BulkActionsBar({
         </div>
 
         {/* Deselect All link */}
-        <button type="button" className={styles.deselectLink} onClick={onDeselectAll}>
+        <button
+          type="button"
+          className="text-primary cursor-pointer text-sm bg-transparent border-0 p-0 no-underline whitespace-nowrap transition-colors hover:underline"
+          onClick={onDeselectAll}
+        >
           {t('common.deselectAll')}
         </button>
       </div>
@@ -278,18 +303,34 @@ export function BulkActionsBar({
       {/* Change Field Value Modal */}
       {modalOpen && (
         <div
-          className={styles.modalOverlay}
+          className="fixed inset-0 bg-black/50 z-[1001] flex items-center justify-center"
           role="presentation"
           onClick={handleOverlayClick}
           data-testid="bulk-change-value-modal"
         >
-          <div className={styles.modal} role="dialog" aria-modal="true">
-            <h3 className={styles.modalTitle}>{t('bulkActions.changeFieldValue')}</h3>
+          <div
+            className="bg-card rounded-lg p-6 min-w-[400px] max-w-[500px] shadow-[0_8px_30px_rgba(0,0,0,0.2)]"
+            role="dialog"
+            aria-modal="true"
+          >
+            <h3 className="text-lg font-semibold m-0 mb-4 text-foreground">
+              {t('bulkActions.changeFieldValue')}
+            </h3>
 
             {/* Field selector */}
-            <div className={styles.formGroup}>
-              <label htmlFor="bulk-field-select">{t('bulkActions.selectField')}</label>
-              <select id="bulk-field-select" value={selectedField} onChange={handleFieldChange}>
+            <div className="mb-4">
+              <label
+                htmlFor="bulk-field-select"
+                className="block text-sm font-medium mb-1 text-muted-foreground"
+              >
+                {t('bulkActions.selectField')}
+              </label>
+              <select
+                id="bulk-field-select"
+                className={inputClasses}
+                value={selectedField}
+                onChange={handleFieldChange}
+              >
                 <option value="">{t('bulkActions.selectField')}</option>
                 {editableFields.map((field) => (
                   <option key={field.name} value={field.name}>
@@ -301,20 +342,29 @@ export function BulkActionsBar({
 
             {/* Value input (type-appropriate) */}
             {selectedFieldDescriptor && (
-              <div className={styles.formGroup}>
-                <label htmlFor="bulk-field-value">{t('bulkActions.enterValue')}</label>
+              <div className="mb-4">
+                <label
+                  htmlFor="bulk-field-value"
+                  className="block text-sm font-medium mb-1 text-muted-foreground"
+                >
+                  {t('bulkActions.enterValue')}
+                </label>
                 {renderValueInput()}
               </div>
             )}
 
             {/* Modal actions */}
-            <div className={styles.modalActions}>
-              <button type="button" className={styles.cancelButton} onClick={closeModal}>
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                type="button"
+                className="bg-card border border-border text-foreground px-4 py-2 rounded-md text-sm cursor-pointer transition-colors hover:bg-accent"
+                onClick={closeModal}
+              >
                 {t('common.cancel')}
               </button>
               <button
                 type="button"
-                className={styles.applyButton}
+                className="bg-primary border border-primary text-primary-foreground px-4 py-2 rounded-md text-sm cursor-pointer transition-colors hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={handleApply}
                 disabled={!selectedField}
               >

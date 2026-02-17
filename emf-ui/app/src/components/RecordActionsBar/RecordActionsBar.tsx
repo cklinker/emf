@@ -20,7 +20,7 @@ import { getTenantSlug } from '../../context/TenantContext'
 
 import { useToast } from '../../components'
 import type { ApiClient } from '../../services/apiClient'
-import styles from './RecordActionsBar.module.css'
+import { cn } from '@/lib/utils'
 
 /**
  * Approval instance interface for tracking approval status
@@ -217,9 +217,7 @@ export function RecordActionsBar({
   const { data: approvalInstances } = useQuery({
     queryKey: ['approval-instances', collectionName, recordId],
     queryFn: async () => {
-      const result = await apiClient.get<ApprovalInstance[]>(
-        `/control/approvals/instances`
-      )
+      const result = await apiClient.get<ApprovalInstance[]>(`/control/approvals/instances`)
       return result
     },
     enabled: !!collectionName && !!recordId,
@@ -234,13 +232,13 @@ export function RecordActionsBar({
   const getApprovalPillClass = (status: string): string => {
     switch (status) {
       case 'PENDING':
-        return styles.approvalPillPending
+        return 'inline-flex items-center px-2.5 py-0.5 text-xs font-semibold rounded-full whitespace-nowrap text-amber-800 bg-amber-100 dark:text-amber-200 dark:bg-amber-900'
       case 'APPROVED':
-        return styles.approvalPillApproved
+        return 'inline-flex items-center px-2.5 py-0.5 text-xs font-semibold rounded-full whitespace-nowrap text-green-800 bg-green-100 dark:text-green-200 dark:bg-green-900'
       case 'REJECTED':
-        return styles.approvalPillRejected
+        return 'inline-flex items-center px-2.5 py-0.5 text-xs font-semibold rounded-full whitespace-nowrap text-red-800 bg-red-100 dark:text-red-200 dark:bg-red-900'
       default:
-        return styles.approvalPillPending
+        return 'inline-flex items-center px-2.5 py-0.5 text-xs font-semibold rounded-full whitespace-nowrap text-amber-800 bg-amber-100 dark:text-amber-200 dark:bg-amber-900'
     }
   }
 
@@ -259,12 +257,19 @@ export function RecordActionsBar({
   }
 
   return (
-    <div className={styles.actionsBar} data-testid="record-actions-bar">
+    <div
+      className={cn('flex justify-between items-center gap-4 flex-wrap')}
+      data-testid="record-actions-bar"
+    >
       {/* Left section - Back button */}
-      <div className={styles.leftActions}>
+      <div className={cn('flex items-center gap-2')}>
         <button
           type="button"
-          className={styles.backButton}
+          className={cn(
+            'inline-flex items-center justify-center px-4 py-2 text-sm font-medium',
+            'text-muted-foreground bg-transparent border border-border rounded-md',
+            'cursor-pointer transition-colors hover:bg-accent hover:text-foreground'
+          )}
           onClick={onBack}
           aria-label={t('common.back')}
           data-testid="actions-back-button"
@@ -284,10 +289,14 @@ export function RecordActionsBar({
       </div>
 
       {/* Right section - Edit, Favorite, Dropdown */}
-      <div className={styles.rightActions}>
+      <div className={cn('flex items-center gap-2')}>
         <button
           type="button"
-          className={styles.primaryButton}
+          className={cn(
+            'inline-flex items-center justify-center px-4 py-2 text-sm font-medium',
+            'text-primary-foreground bg-primary border border-primary rounded-md',
+            'cursor-pointer transition-colors hover:bg-primary/90'
+          )}
           onClick={onEdit}
           aria-label={t('recordActions.edit')}
           data-testid="actions-edit-button"
@@ -297,7 +306,11 @@ export function RecordActionsBar({
 
         <button
           type="button"
-          className={styles.favoriteButton}
+          className={cn(
+            'inline-flex items-center justify-center w-9 h-9 bg-transparent',
+            'border border-border rounded-md cursor-pointer text-xl text-muted-foreground',
+            'transition-colors hover:text-amber-500 hover:border-amber-500'
+          )}
           onClick={onToggleFavorite}
           aria-label={isFavorite ? t('favorites.remove') : t('favorites.add')}
           aria-pressed={isFavorite}
@@ -308,11 +321,15 @@ export function RecordActionsBar({
         </button>
 
         {/* Dropdown menu */}
-        <div className={styles.dropdownContainer} ref={dropdownRef}>
+        <div className={cn('relative inline-flex')} ref={dropdownRef}>
           <button
             ref={toggleRef}
             type="button"
-            className={styles.dropdownToggle}
+            className={cn(
+              'inline-flex items-center justify-center w-9 h-9 bg-transparent',
+              'border border-border rounded-md cursor-pointer text-xs text-muted-foreground',
+              'transition-colors hover:bg-accent hover:border-muted-foreground'
+            )}
             onClick={handleToggleDropdown}
             onKeyDown={handleToggleKeyDown}
             aria-haspopup="true"
@@ -325,7 +342,11 @@ export function RecordActionsBar({
 
           {dropdownOpen && (
             <div
-              className={styles.dropdownMenu}
+              className={cn(
+                'absolute top-[calc(100%+4px)] right-0 min-w-[200px]',
+                'bg-card border border-border rounded-md shadow-lg z-[1000]',
+                'overflow-hidden py-1'
+              )}
               role="menu"
               tabIndex={-1}
               aria-label={t('recordActions.moreActions')}
@@ -338,7 +359,11 @@ export function RecordActionsBar({
                   menuItemsRef.current[0] = el
                 }}
                 type="button"
-                className={styles.dropdownItem}
+                className={cn(
+                  'flex items-center w-full py-2 px-4 bg-transparent border-0',
+                  'cursor-pointer text-foreground text-sm text-left transition-colors',
+                  'hover:bg-accent'
+                )}
                 role="menuitem"
                 tabIndex={focusedIndex === 0 ? 0 : -1}
                 onClick={handleClone}
@@ -347,7 +372,7 @@ export function RecordActionsBar({
                 {t('recordActions.clone')}
               </button>
 
-              <div className={styles.dropdownDivider} role="separator" />
+              <div className={cn('h-px bg-border my-1')} role="separator" />
 
               {/* Submit for Approval */}
               <button
@@ -355,7 +380,11 @@ export function RecordActionsBar({
                   menuItemsRef.current[1] = el
                 }}
                 type="button"
-                className={styles.dropdownItem}
+                className={cn(
+                  'flex items-center w-full py-2 px-4 bg-transparent border-0',
+                  'cursor-pointer text-foreground text-sm text-left transition-colors',
+                  'hover:bg-accent'
+                )}
                 role="menuitem"
                 tabIndex={focusedIndex === 1 ? 0 : -1}
                 onClick={handleSubmitForApproval}
@@ -364,7 +393,7 @@ export function RecordActionsBar({
                 {t('recordActions.submitForApproval')}
               </button>
 
-              <div className={styles.dropdownDivider} role="separator" />
+              <div className={cn('h-px bg-border my-1')} role="separator" />
 
               {/* Delete */}
               <button
@@ -372,7 +401,11 @@ export function RecordActionsBar({
                   menuItemsRef.current[2] = el
                 }}
                 type="button"
-                className={styles.dropdownItemDanger}
+                className={cn(
+                  'flex items-center w-full py-2 px-4 bg-transparent border-0',
+                  'cursor-pointer text-sm text-left transition-colors',
+                  'text-destructive hover:bg-destructive/10'
+                )}
                 role="menuitem"
                 tabIndex={focusedIndex === 2 ? 0 : -1}
                 onClick={handleDelete}

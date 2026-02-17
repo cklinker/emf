@@ -18,7 +18,7 @@
 
 import React from 'react'
 import { LoadingSpinner } from '../LoadingSpinner'
-import styles from './PageLoader.module.css'
+import { cn } from '@/lib/utils'
 
 /**
  * Skeleton variant types
@@ -100,23 +100,21 @@ export function PageLoader({
   className,
   'data-testid': testId = 'page-loader',
 }: PageLoaderProps): React.ReactElement {
-  const containerClasses = [
-    styles.pageLoader,
-    fullPage ? styles.fullPage : styles.inline,
-    className,
-  ]
-    .filter(Boolean)
-    .join(' ')
-
   return (
     <div
-      className={containerClasses}
+      className={cn(
+        'flex items-center justify-center',
+        fullPage
+          ? 'fullPage fixed inset-0 z-[1000] bg-background/95 dark:bg-background/95'
+          : 'inline min-h-[200px] w-full',
+        className
+      )}
       role="status"
       aria-live="polite"
       aria-busy="true"
       data-testid={testId}
     >
-      <div className={styles.loaderContent}>
+      <div className="flex flex-col items-center justify-center gap-4">
         <LoadingSpinner size={size} label={message} data-testid={`${testId}-spinner`} />
       </div>
     </div>
@@ -161,7 +159,7 @@ export function Skeleton({
         return (
           <div
             key={index}
-            className={`${styles.skeleton} ${styles.skeletonText}`}
+            className="skeletonText h-4 w-full mb-2 rounded bg-muted animate-pulse last:w-[70%]"
             style={style}
             data-testid={itemTestId}
             aria-hidden="true"
@@ -172,16 +170,25 @@ export function Skeleton({
         return (
           <div
             key={index}
-            className={`${styles.skeleton} ${styles.skeletonCard}`}
+            className="skeletonCard p-4 rounded-lg mb-4 min-h-[150px] bg-muted animate-pulse"
             style={style}
             data-testid={itemTestId}
             aria-hidden="true"
           >
-            <div className={styles.skeletonCardHeader} />
-            <div className={styles.skeletonCardBody}>
-              <div className={styles.skeletonLine} style={{ width: '80%' }} />
-              <div className={styles.skeletonLine} style={{ width: '60%' }} />
-              <div className={styles.skeletonLine} style={{ width: '70%' }} />
+            <div className="h-5 w-[60%] mb-4 rounded bg-muted animate-pulse" />
+            <div className="flex flex-col gap-2">
+              <div
+                className="h-3.5 mb-2 last:mb-0 rounded bg-muted animate-pulse"
+                style={{ width: '80%' }}
+              />
+              <div
+                className="h-3.5 mb-2 last:mb-0 rounded bg-muted animate-pulse"
+                style={{ width: '60%' }}
+              />
+              <div
+                className="h-3.5 mb-2 last:mb-0 rounded bg-muted animate-pulse"
+                style={{ width: '70%' }}
+              />
             </div>
           </div>
         )
@@ -190,15 +197,15 @@ export function Skeleton({
         return (
           <div
             key={index}
-            className={`${styles.skeleton} ${styles.skeletonTableRow}`}
+            className="skeletonTableRow flex gap-4 py-3 border-b border-border last:border-b-0 bg-muted animate-pulse"
             style={style}
             data-testid={itemTestId}
             aria-hidden="true"
           >
-            <div className={styles.skeletonCell} style={{ width: '20%' }} />
-            <div className={styles.skeletonCell} style={{ width: '30%' }} />
-            <div className={styles.skeletonCell} style={{ width: '25%' }} />
-            <div className={styles.skeletonCell} style={{ width: '15%' }} />
+            <div className="h-4 rounded bg-muted animate-pulse" style={{ width: '20%' }} />
+            <div className="h-4 rounded bg-muted animate-pulse" style={{ width: '30%' }} />
+            <div className="h-4 rounded bg-muted animate-pulse" style={{ width: '25%' }} />
+            <div className="h-4 rounded bg-muted animate-pulse" style={{ width: '15%' }} />
           </div>
         )
 
@@ -206,14 +213,14 @@ export function Skeleton({
         return (
           <div
             key={index}
-            className={`${styles.skeleton} ${styles.skeletonForm}`}
+            className="skeletonForm"
             style={style}
             data-testid={itemTestId}
             aria-hidden="true"
           >
-            <div className={styles.skeletonFormField}>
-              <div className={styles.skeletonLabel} />
-              <div className={styles.skeletonInput} />
+            <div className="mb-6">
+              <div className="h-3.5 w-[30%] mb-2 rounded bg-muted animate-pulse" />
+              <div className="h-10 w-full rounded bg-muted animate-pulse" />
             </div>
           </div>
         )
@@ -222,13 +229,13 @@ export function Skeleton({
         return (
           <div
             key={index}
-            className={`${styles.skeleton} ${styles.skeletonHeader}`}
+            className="skeletonHeader mb-6"
             style={style}
             data-testid={itemTestId}
             aria-hidden="true"
           >
-            <div className={styles.skeletonTitle} />
-            <div className={styles.skeletonSubtitle} />
+            <div className="h-8 w-1/2 mb-3 rounded bg-muted animate-pulse" />
+            <div className="h-4 w-[35%] rounded bg-muted animate-pulse" />
           </div>
         )
 
@@ -236,15 +243,21 @@ export function Skeleton({
         return (
           <div
             key={index}
-            className={`${styles.skeleton} ${styles.skeletonListItem}`}
+            className="skeletonListItem flex items-center gap-4 py-3 border-b border-border last:border-b-0"
             style={style}
             data-testid={itemTestId}
             aria-hidden="true"
           >
-            <div className={styles.skeletonAvatar} />
-            <div className={styles.skeletonListContent}>
-              <div className={styles.skeletonLine} style={{ width: '70%' }} />
-              <div className={styles.skeletonLine} style={{ width: '50%' }} />
+            <div className="w-10 h-10 rounded-full shrink-0 bg-muted animate-pulse" />
+            <div className="flex-1 flex flex-col gap-2">
+              <div
+                className="h-3.5 mb-2 last:mb-0 rounded bg-muted animate-pulse"
+                style={{ width: '70%' }}
+              />
+              <div
+                className="h-3.5 mb-2 last:mb-0 rounded bg-muted animate-pulse"
+                style={{ width: '50%' }}
+              />
             </div>
           </div>
         )
@@ -253,7 +266,7 @@ export function Skeleton({
         return (
           <div
             key={index}
-            className={`${styles.skeleton} ${styles.skeletonText}`}
+            className="skeletonText h-4 w-full mb-2 rounded bg-muted animate-pulse last:w-[70%]"
             style={style}
             data-testid={itemTestId}
             aria-hidden="true"
@@ -262,16 +275,14 @@ export function Skeleton({
     }
   }
 
-  const containerClasses = [styles.skeletonContainer, className].filter(Boolean).join(' ')
-
   return (
     <div
-      className={containerClasses}
+      className={cn('w-full', className)}
       role="status"
       aria-label="Loading content"
       data-testid={`${testId}-container`}
     >
-      <span className={styles.srOnly}>Loading...</span>
+      <span className="sr-only">Loading...</span>
       {Array.from({ length: count }, (_, index) => renderSkeletonItem(index))}
     </div>
   )
@@ -302,7 +313,7 @@ export function ContentLoader({
   if (isLoading) {
     return (
       <div className={className} data-testid={testId} aria-busy="true">
-        <span className={styles.srOnly}>{loadingMessage}</span>
+        <span className="sr-only">{loadingMessage}</span>
         <Skeleton variant={skeleton} count={skeletonCount} data-testid={`${testId}-skeleton`} />
       </div>
     )

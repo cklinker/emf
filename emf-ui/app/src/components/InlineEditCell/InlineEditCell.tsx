@@ -16,7 +16,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import type { ApiClient } from '../../services/apiClient'
-import styles from './InlineEditCell.module.css'
+import { cn } from '@/lib/utils'
 
 /**
  * Supported field types for inline editing
@@ -305,35 +305,29 @@ export function InlineEditCell({
     setEditValue(e.target.value)
   }, [])
 
-  // Build cell class names
-  const cellClassNames = [styles.cell]
+  const isEditableType = enabled && !NON_EDITABLE_TYPES.has(fieldType)
 
-  if (enabled && !NON_EDITABLE_TYPES.has(fieldType) && !isEditing) {
-    cellClassNames.push(styles.cellEditable)
-  }
-  if (isEditing) {
-    cellClassNames.push(styles.cellEditing)
-  }
-  if (mutation.isPending) {
-    cellClassNames.push(styles.cellSaving)
-  }
-  if (showSuccess) {
-    cellClassNames.push(styles.cellSuccess)
-  }
-  if (mutation.isError && !isEditing) {
-    cellClassNames.push(styles.cellError)
-  }
-  if (NON_EDITABLE_TYPES.has(fieldType) && enabled) {
-    cellClassNames.push(styles.nonEditable)
-  }
+  // Build cell class name
+  const cellClassName = cn(
+    'relative flex items-center min-h-[32px] px-2 py-1 border border-transparent rounded transition-all',
+    isEditableType &&
+      !isEditing &&
+      'cursor-pointer hover:bg-primary/[0.04] dark:hover:bg-primary/[0.08]',
+    isEditing && 'border-primary bg-background dark:bg-muted cursor-default',
+    mutation.isPending && 'opacity-60 pointer-events-none',
+    showSuccess && 'border-green-500',
+    mutation.isError && !isEditing && 'border-destructive',
+    NON_EDITABLE_TYPES.has(fieldType) && enabled && 'text-muted-foreground cursor-default',
+    isEditableType && !isEditing && 'group'
+  )
 
   // Render boolean field as checkbox (always visible, toggles on click)
   if (fieldType === 'boolean' && enabled) {
     return (
-      <div className={cellClassNames.join(' ')} data-testid={`inline-edit-cell-${fieldName}`}>
+      <div className={cellClassName} data-testid={`inline-edit-cell-${fieldName}`}>
         <input
           type="checkbox"
-          className={styles.checkbox}
+          className="w-[1.125rem] h-[1.125rem] accent-primary cursor-pointer m-0 disabled:cursor-not-allowed disabled:opacity-50"
           checked={!!value}
           onChange={handleCellClick}
           disabled={mutation.isPending}
@@ -341,7 +335,10 @@ export function InlineEditCell({
           data-testid={`inline-edit-checkbox-${fieldName}`}
         />
         {mutation.isError && (
-          <span className={styles.errorTooltip} role="alert">
+          <span
+            className="absolute bottom-[calc(100%+4px)] left-0 z-10 max-w-[250px] px-2 py-1 text-xs leading-[1.4] text-white bg-destructive rounded whitespace-nowrap overflow-hidden text-ellipsis pointer-events-none shadow-md"
+            role="alert"
+          >
             {mutation.error?.message || 'Save failed'}
           </span>
         )}
@@ -352,11 +349,11 @@ export function InlineEditCell({
   // Render edit mode
   if (isEditing) {
     return (
-      <div className={cellClassNames.join(' ')} data-testid={`inline-edit-cell-${fieldName}`}>
+      <div className={cellClassName} data-testid={`inline-edit-cell-${fieldName}`}>
         <input
           ref={inputRef}
           type={getInputType(fieldType)}
-          className={styles.input}
+          className="w-full px-2 py-1 text-sm leading-relaxed text-foreground bg-background dark:bg-muted border-0 rounded outline-none"
           value={editValue}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
@@ -365,7 +362,10 @@ export function InlineEditCell({
           data-testid={`inline-edit-input-${fieldName}`}
         />
         {mutation.isError && (
-          <span className={styles.errorTooltip} role="alert">
+          <span
+            className="absolute bottom-[calc(100%+4px)] left-0 z-10 max-w-[250px] px-2 py-1 text-xs leading-[1.4] text-white bg-destructive rounded whitespace-nowrap overflow-hidden text-ellipsis pointer-events-none shadow-md"
+            role="alert"
+          >
             {mutation.error?.message || 'Save failed'}
           </span>
         )}
@@ -376,12 +376,12 @@ export function InlineEditCell({
   // Render display mode
   return (
     <div
-      className={cellClassNames.join(' ')}
+      className={cellClassName}
       onClick={handleCellClick}
-      role={enabled && !NON_EDITABLE_TYPES.has(fieldType) ? 'button' : undefined}
-      tabIndex={enabled && !NON_EDITABLE_TYPES.has(fieldType) ? 0 : undefined}
+      role={isEditableType ? 'button' : undefined}
+      tabIndex={isEditableType ? 0 : undefined}
       onKeyDown={
-        enabled && !NON_EDITABLE_TYPES.has(fieldType)
+        isEditableType
           ? (e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault()
@@ -390,25 +390,33 @@ export function InlineEditCell({
             }
           : undefined
       }
-      aria-label={
-        enabled && !NON_EDITABLE_TYPES.has(fieldType)
-          ? `Edit ${fieldName}: ${displayValue}`
-          : undefined
-      }
+      aria-label={isEditableType ? `Edit ${fieldName}: ${displayValue}` : undefined}
       data-testid={`inline-edit-cell-${fieldName}`}
     >
-      <span className={styles.displayValue}>{displayValue}</span>
-      {enabled && !NON_EDITABLE_TYPES.has(fieldType) && (
-        <span className={styles.pencilIcon} aria-hidden="true">
+      <span className="overflow-hidden text-ellipsis whitespace-nowrap flex-1 text-sm text-foreground leading-relaxed">
+        {displayValue}
+      </span>
+      {isEditableType && (
+        <span
+          className="hidden items-center justify-center w-4 h-4 ml-1 shrink-0 text-muted-foreground text-xs leading-none group-hover:flex"
+          aria-hidden="true"
+        >
           &#9998;
         </span>
       )}
       {mutation.isError && (
-        <span className={styles.errorTooltip} role="alert">
+        <span
+          className="absolute bottom-[calc(100%+4px)] left-0 z-10 max-w-[250px] px-2 py-1 text-xs leading-[1.4] text-white bg-destructive rounded whitespace-nowrap overflow-hidden text-ellipsis pointer-events-none shadow-md"
+          role="alert"
+        >
           {mutation.error?.message || 'Save failed'}
         </span>
       )}
-      {showJsonHint && <span className={styles.nonEditableHint}>Edit in detail view</span>}
+      {showJsonHint && (
+        <span className="absolute bottom-[calc(100%+4px)] left-0 z-10 px-2 py-1 text-xs leading-[1.4] text-foreground bg-muted border border-border rounded whitespace-nowrap pointer-events-none shadow-sm">
+          Edit in detail view
+        </span>
+      )}
     </div>
   )
 }

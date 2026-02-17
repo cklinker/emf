@@ -16,7 +16,7 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react'
 import type { SavedView } from '../../hooks/useSavedViews'
-import styles from './ViewSelector.module.css'
+import { cn } from '@/lib/utils'
 
 export interface ViewSelectorProps {
   views: SavedView[]
@@ -159,11 +159,15 @@ export function ViewSelector({
   const displayLabel = activeView?.name ?? 'All Records'
 
   return (
-    <div className={styles.viewSelector} ref={containerRef} data-testid="view-selector">
+    <div
+      className="relative inline-flex items-center"
+      ref={containerRef}
+      data-testid="view-selector"
+    >
       <button
         ref={buttonRef}
         type="button"
-        className={styles.viewButton}
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[0.8125rem] font-medium leading-[1.4] text-foreground bg-background border border-border rounded cursor-pointer whitespace-nowrap transition-colors hover:bg-muted hover:border-muted-foreground/40"
         onClick={toggleOpen}
         aria-expanded={open}
         aria-haspopup="listbox"
@@ -171,14 +175,14 @@ export function ViewSelector({
         data-testid="view-selector-trigger"
       >
         <span>{displayLabel}</span>
-        <span className={styles.viewButtonIcon} aria-hidden="true">
+        <span className="text-[0.625rem] leading-none opacity-60" aria-hidden="true">
           {open ? '\u25B2' : '\u25BC'}
         </span>
       </button>
 
       {open && (
         <div
-          className={styles.viewDropdown}
+          className="absolute top-[calc(100%+4px)] left-0 min-w-[240px] max-h-[360px] bg-card border border-border rounded shadow-lg z-[1000] overflow-y-auto flex flex-col"
           role="listbox"
           aria-label="Saved views"
           data-testid="view-selector-dropdown"
@@ -186,23 +190,32 @@ export function ViewSelector({
           {/* All Records option */}
           <button
             type="button"
-            className={`${styles.viewOption} ${activeView === null ? styles.viewOptionActive : ''}`}
+            className={cn(
+              'group flex items-center w-full py-2 px-4 bg-transparent border-0 cursor-pointer text-left text-[0.8125rem] text-foreground gap-2 transition-colors hover:bg-accent',
+              activeView === null && 'bg-primary/[0.08] font-semibold hover:bg-primary/[0.12]'
+            )}
             role="option"
             aria-selected={activeView === null}
             onClick={handleSelectAllRecords}
             data-testid="view-option-all"
           >
-            <span className={styles.viewOptionName}>All Records</span>
+            <span className="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+              All Records
+            </span>
           </button>
 
-          {views.length > 0 && <hr className={styles.divider} />}
+          {views.length > 0 && <hr className="h-px my-1 bg-border border-none" />}
 
           {/* Saved views list */}
           {views.map((view) => (
             <button
               type="button"
               key={view.id}
-              className={`${styles.viewOption} ${activeView?.id === view.id ? styles.viewOptionActive : ''}`}
+              className={cn(
+                'group flex items-center w-full py-2 px-4 bg-transparent border-0 cursor-pointer text-left text-[0.8125rem] text-foreground gap-2 transition-colors hover:bg-accent',
+                activeView?.id === view.id &&
+                  'bg-primary/[0.08] font-semibold hover:bg-primary/[0.12]'
+              )}
               role="option"
               aria-selected={activeView?.id === view.id}
               onClick={() => handleSelectView(view.id)}
@@ -210,7 +223,7 @@ export function ViewSelector({
             >
               {view.isDefault && (
                 <span
-                  className={styles.viewOptionDefault}
+                  className="shrink-0 text-xs text-amber-500 leading-none"
                   title="Default view"
                   role="button"
                   tabIndex={0}
@@ -228,7 +241,7 @@ export function ViewSelector({
               )}
               {!view.isDefault && (
                 <span
-                  className={styles.viewOptionDefault}
+                  className="shrink-0 text-xs text-amber-500 leading-none"
                   title="Set as default"
                   role="button"
                   tabIndex={0}
@@ -245,10 +258,12 @@ export function ViewSelector({
                   &#9734;
                 </span>
               )}
-              <span className={styles.viewOptionName}>{view.name}</span>
+              <span className="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+                {view.name}
+              </span>
               <button
                 type="button"
-                className={styles.viewDeleteButton}
+                className="shrink-0 inline-flex items-center justify-center w-5 h-5 p-0 bg-transparent border-0 rounded cursor-pointer text-xs leading-none text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-destructive hover:bg-destructive/10"
                 onClick={(e) => handleDeleteView(e, view.id)}
                 aria-label={`Delete view ${view.name}`}
                 title={`Delete ${view.name}`}
@@ -259,13 +274,13 @@ export function ViewSelector({
             </button>
           ))}
 
-          <hr className={styles.divider} />
+          <hr className="h-px my-1 bg-border border-none" />
 
           {/* Save current view */}
           {!saving && (
             <button
               type="button"
-              className={styles.saveViewButton}
+              className="flex items-center w-full py-2 px-4 bg-transparent border-0 cursor-pointer text-left text-[0.8125rem] font-medium text-primary gap-1.5 transition-colors hover:bg-accent"
               onClick={handleStartSave}
               data-testid="view-save-button"
             >
@@ -275,11 +290,11 @@ export function ViewSelector({
           )}
 
           {saving && (
-            <div className={styles.saveViewRow}>
+            <div className="flex items-center py-2 px-4 gap-2">
               <input
                 ref={saveInputRef}
                 type="text"
-                className={styles.saveViewInput}
+                className="flex-1 min-w-0 px-2 py-1 text-[0.8125rem] text-foreground bg-background border border-border rounded focus:outline-none focus:border-primary focus:ring-2 focus:ring-ring"
                 value={saveName}
                 onChange={(e) => setSaveName(e.target.value)}
                 onKeyDown={handleSaveKeyDown}
@@ -289,7 +304,7 @@ export function ViewSelector({
               />
               <button
                 type="button"
-                className={styles.saveViewConfirm}
+                className="shrink-0 inline-flex items-center justify-center px-2 py-1 text-xs font-medium text-primary-foreground bg-primary border-0 rounded cursor-pointer transition-colors hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={handleConfirmSave}
                 disabled={!saveName.trim()}
                 aria-label="Confirm save view"

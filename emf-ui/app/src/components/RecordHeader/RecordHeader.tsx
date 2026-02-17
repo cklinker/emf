@@ -10,7 +10,6 @@
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react'
 import { useI18n } from '../../context/I18nContext'
-import styles from './RecordHeader.module.css'
 
 /**
  * Props for the RecordHeader component
@@ -236,36 +235,49 @@ export function RecordHeader({
   )
 
   return (
-    <div className={styles.header} data-testid="record-header">
+    <div className="bg-muted/50 px-8 py-6 border-b border-border" data-testid="record-header">
       {/* Top row: name + collection badge */}
-      <div className={styles.headerTop}>
-        <h1 className={styles.recordName} data-testid="record-header-name">
+      <div className="flex items-center gap-4 flex-wrap">
+        <h1
+          className="m-0 text-2xl font-bold text-foreground leading-[1.3]"
+          data-testid="record-header-name"
+        >
           {recordName}
         </h1>
-        <span className={styles.collectionBadge} data-testid="record-header-collection">
+        <span
+          className="inline-flex items-center px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide rounded-full bg-primary/10 text-primary whitespace-nowrap"
+          data-testid="record-header-collection"
+        >
           {schema.displayName || collectionName}
         </span>
       </div>
 
       {/* Key fields */}
       {keyFields.length > 0 && (
-        <div className={styles.keyFields} data-testid="record-header-key-fields">
+        <div className="flex flex-wrap gap-2 mt-4" data-testid="record-header-key-fields">
           {keyFields.map((field) => (
             <span
               key={field.name}
-              className={styles.keyField}
+              className="inline-flex items-center gap-1 px-2 py-1 bg-background border border-border rounded text-sm leading-[1.4]"
               data-testid={`record-header-field-${field.name}`}
             >
-              <span className={styles.keyFieldLabel}>{field.displayName || field.name}:</span>
-              <span className={styles.keyFieldValue}>{formatFieldValue(field)}</span>
+              <span className="text-muted-foreground text-xs font-medium whitespace-nowrap">
+                {field.displayName || field.name}:
+              </span>
+              <span className="text-foreground font-medium whitespace-nowrap max-w-[200px] overflow-hidden text-ellipsis">
+                {formatFieldValue(field)}
+              </span>
             </span>
           ))}
         </div>
       )}
 
       {/* Bottom row: timestamps + record ID */}
-      <div className={styles.headerBottom}>
-        <span className={styles.timestamps} data-testid="record-header-timestamps">
+      <div className="flex items-center justify-between flex-wrap gap-2 mt-4">
+        <span
+          className="text-xs text-muted-foreground leading-[1.4]"
+          data-testid="record-header-timestamps"
+        >
           {(record.created_at || record.createdAt) && (
             <>
               {t('recordHeader.created')}{' '}
@@ -285,7 +297,7 @@ export function RecordHeader({
 
         <button
           type="button"
-          className={styles.recordId}
+          className="relative inline-flex items-center gap-1 font-mono text-xs text-muted-foreground cursor-pointer px-1 py-0.5 rounded border border-transparent bg-transparent transition-colors hover:bg-background hover:border-border hover:text-muted-foreground/80"
           onClick={handleCopyId}
           title={t('recordHeader.copyId')}
           aria-label={t('recordHeader.copyId')}
@@ -293,7 +305,11 @@ export function RecordHeader({
         >
           {record.id}
           {copied && (
-            <span className={styles.copiedTooltip} role="status" aria-live="polite">
+            <span
+              className="absolute bottom-[calc(100%+4px)] left-1/2 -translate-x-1/2 px-2 py-0.5 text-xs font-medium text-primary-foreground bg-foreground rounded whitespace-nowrap pointer-events-none animate-in fade-in slide-in-from-bottom-1"
+              role="status"
+              aria-live="polite"
+            >
               {t('recordHeader.copied')}
             </span>
           )}

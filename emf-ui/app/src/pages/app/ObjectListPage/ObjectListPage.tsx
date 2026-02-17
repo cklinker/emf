@@ -44,10 +44,11 @@ import { useCollectionRecords } from '@/hooks/useCollectionRecords'
 import { useRecordMutation } from '@/hooks/useRecordMutation'
 import { useObjectPermissions } from '@/hooks/useObjectPermissions'
 import { useFieldPermissions } from '@/hooks/useFieldPermissions'
-import type { SortState, CollectionRecord } from '@/hooks/useCollectionRecords'
+import type { SortState, FilterCondition, CollectionRecord } from '@/hooks/useCollectionRecords'
 import { ObjectDataTable } from '@/components/ObjectDataTable/ObjectDataTable'
 import { DataTablePagination } from '@/components/ObjectDataTable/DataTablePagination'
 import { ListViewToolbar } from '@/components/ListViewToolbar'
+import { FilterBar } from '@/components/FilterBar'
 import { InsufficientPrivileges } from '@/components/InsufficientPrivileges'
 import { QuickActionsMenu } from '@/components/QuickActions'
 import type { QuickActionExecutionContext } from '@/types/quickActions'
@@ -80,17 +81,48 @@ function downloadFile(content: string, filename: string, mimeType: string): void
 }
 
 /**
+ * Parse filter conditions from a URL search param.
+ * Filters are stored as a JSON-encoded array of FilterCondition objects.
+ * Returns an empty array if the param is missing or invalid.
+ */
+function parseFilters(filterParam: string | null): FilterCondition[] {
+  if (!filterParam) return []
+  try {
+    const parsed = JSON.parse(filterParam)
+    if (Array.isArray(parsed)) {
+      return parsed.filter(
+        (f: unknown) =>
+          f &&
+          typeof f === 'object' &&
+          'field' in (f as Record<string, unknown>) &&
+          'operator' in (f as Record<string, unknown>) &&
+          'value' in (f as Record<string, unknown>)
+      ) as FilterCondition[]
+    }
+    return []
+  } catch {
+    return []
+  }
+}
+
+/**
  * Parse list view state from URL search params.
- * Returns page, pageSize, and sort state with sensible defaults.
+ * Returns page, pageSize, sort, and filters with sensible defaults.
+ *
+ * URL format:
+ * - page=2&pageSize=50&sort=-createdAt
+ * - filter=[{"id":"f1","field":"status","operator":"equals","value":"active"}]
  */
 function parseListViewParams(searchParams: URLSearchParams): {
   page: number
   pageSize: number
   sort: SortState | undefined
+  filters: FilterCondition[]
 } {
   const pageParam = parseInt(searchParams.get('page') || '1', 10)
   const pageSizeParam = parseInt(searchParams.get('pageSize') || '25', 10)
   const sortParam = searchParams.get('sort')
+  const filterParam = searchParams.get('filter')
 
   let sort: SortState | undefined
   if (sortParam) {
@@ -105,6 +137,7 @@ function parseListViewParams(searchParams: URLSearchParams): {
     page: isNaN(pageParam) || pageParam < 1 ? 1 : pageParam,
     pageSize: [10, 25, 50, 100].includes(pageSizeParam) ? pageSizeParam : 25,
     sort,
+    filters: parseFilters(filterParam),
   }
 }
 
@@ -118,7 +151,10 @@ export function ObjectListPage(): React.ReactElement {
   const basePath = `/${tenantSlug}/app`
 
   // Parse list state from URL params (deep linking support)
-  const { page, pageSize, sort } = useMemo(() => parseListViewParams(searchParams), [searchParams])
+  const { page, pageSize, sort, filters } = useMemo(
+    () => parseListViewParams(searchParams),
+    [searchParams]
+  )
 
   // Selection state (local only — not persisted in URL)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -162,6 +198,7 @@ export function ObjectListPage(): React.ReactElement {
     page,
     pageSize,
     sort,
+    filters: filters.length > 0 ? filters : undefined,
     enabled: !!schema,
   })
 
@@ -305,6 +342,22 @@ export function ObjectListPage(): React.ReactElement {
     setSelectedIds(new Set())
   }, [])
 
+  // Filter handlers
+  const handleRemoveFilter = useCallback(
+    (filterId: string) => {
+      const remaining = filters.filter((f) => f.id !== filterId)
+      updateParams({
+        filter: remaining.length > 0 ? JSON.stringify(remaining) : undefined,
+        page: undefined,
+      })
+    },
+    [filters, updateParams]
+  )
+
+  const handleClearAllFilters = useCallback(() => {
+    updateParams({ filter: undefined, page: undefined })
+  }, [updateParams])
+
   // Quick action execution context for list-scoped actions
   const quickActionContext = useMemo<QuickActionExecutionContext>(
     () => ({
@@ -354,7 +407,7 @@ export function ObjectListPage(): React.ReactElement {
   }
 
   return (
-    <div className="space-y-4 p-6">
+    <div className="space-y-4 p-4 sm:p-6">
       {/* Breadcrumb */}
       <Breadcrumb>
         <BreadcrumbList>
@@ -389,6 +442,13 @@ export function ObjectListPage(): React.ReactElement {
             executionContext={quickActionContext}
           />
         }
+      />
+
+      {/* Active filters bar */}
+      <FilterBar
+        filters={filters}
+        onRemoveFilter={handleRemoveFilter}
+        onClearAll={handleClearAllFilters}
       />
 
       {/* Error state for records */}

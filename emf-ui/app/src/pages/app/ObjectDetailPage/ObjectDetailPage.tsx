@@ -7,6 +7,7 @@
  * - Quick actions menu for server-side scripts and custom operations
  * - Highlights panel showing key fields
  * - Detail sections organized in a 2-column field grid
+ * - Related lists for master-detail child records
  * - Delete confirmation dialog
  */
 
@@ -50,11 +51,23 @@ import { useObjectPermissions } from '@/hooks/useObjectPermissions'
 import { useFieldPermissions } from '@/hooks/useFieldPermissions'
 import { FieldRenderer } from '@/components/FieldRenderer'
 import { DetailSection } from '@/components/DetailSection'
+import { RelatedList } from '@/components/RelatedList'
 import { InsufficientPrivileges } from '@/components/InsufficientPrivileges'
 import { QuickActionsMenu } from '@/components/QuickActions'
 import { useAppContext } from '@/context/AppContext'
 import type { FieldDefinition } from '@/hooks/useCollectionSchema'
 import type { QuickActionExecutionContext } from '@/types/quickActions'
+
+/**
+ * Represents a relationship where another collection has a field
+ * that references this collection (reverse relationship).
+ */
+interface RelatedCollection {
+  /** Related collection name */
+  collectionName: string
+  /** Field on the related collection that points to this record */
+  foreignKeyField: string
+}
 
 /** System fields to exclude from detail sections */
 const SYSTEM_FIELDS = new Set([
@@ -187,6 +200,45 @@ export function ObjectDetailPage(): React.ReactElement {
     return fields.filter((f) => SYSTEM_FIELDS.has(f.name))
   }, [fields])
 
+  // Discover related collections: fields on THIS collection that reference other collections
+  // These represent forward relationships. For reverse relationships (child records),
+  // we look for fields with referenceCollectionId matching the current collection's ID.
+  // Since we don't have a full schema graph, we derive related lists from fields
+  // on the current collection that are lookup/reference types with referenceTarget.
+  const relatedCollections = useMemo<RelatedCollection[]>(() => {
+    if (!schema || !fields.length || !collectionName) return []
+
+    // Find fields that have a referenceTarget (they point to another collection).
+    // These are forward lookups — we can show related records from the target
+    // collection that reference back to this record.
+    // For a true reverse lookup, we'd need a backend endpoint that tells us
+    // which collections have fields referencing this collection. For now,
+    // we expose the forward reference info and let the component gracefully
+    // handle empty results.
+    const related: RelatedCollection[] = []
+    const seen = new Set<string>()
+
+    for (const field of fields) {
+      if (
+        (field.type === 'reference' || field.type === 'lookup' || field.type === 'master_detail') &&
+        field.referenceTarget &&
+        field.referenceTarget !== collectionName &&
+        !seen.has(field.referenceTarget)
+      ) {
+        seen.add(field.referenceTarget)
+        // The reverse: the referenced collection should have records
+        // that point back to this collection via a lookup field.
+        // We store the field name on the referenced collection that links back.
+        related.push({
+          collectionName: field.referenceTarget,
+          foreignKeyField: collectionName,
+        })
+      }
+    }
+
+    return related
+  }, [schema, fields, collectionName])
+
   // Handlers
   const handleEdit = useCallback(() => {
     navigate(`${basePath}/o/${collectionName}/${recordId}/edit`)
@@ -296,10 +348,12 @@ export function ObjectDetailPage(): React.ReactElement {
       </Breadcrumb>
 
       {/* Record Header */}
-      <div className="flex items-start justify-between">
-        <div className="space-y-1">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 space-y-1">
           <div className="flex items-center gap-2">
-            <h1 className="text-xl font-semibold tracking-tight text-foreground">{recordTitle}</h1>
+            <h1 className="truncate text-xl font-semibold tracking-tight text-foreground">
+              {recordTitle}
+            </h1>
             {mutations.remove.isPending && (
               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
             )}
@@ -310,7 +364,7 @@ export function ObjectDetailPage(): React.ReactElement {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-shrink-0 items-center gap-2">
           {/* Quick Actions menu (only shown when actions are configured) */}
           <QuickActionsMenu
             collectionName={collectionName || ''}
@@ -400,6 +454,22 @@ export function ObjectDetailPage(): React.ReactElement {
           tenantSlug={tenantSlug}
           defaultCollapsed
         />
+      )}
+
+      {/* Related Lists */}
+      {relatedCollections.length > 0 && recordId && (
+        <div className="space-y-4">
+          <Separator />
+          {relatedCollections.map((rel) => (
+            <RelatedList
+              key={`${rel.collectionName}-${rel.foreignKeyField}`}
+              collectionName={rel.collectionName}
+              foreignKeyField={rel.foreignKeyField}
+              parentRecordId={recordId}
+              tenantSlug={tenantSlug || ''}
+            />
+          ))}
+        </div>
       )}
 
       {/* Delete confirmation */}

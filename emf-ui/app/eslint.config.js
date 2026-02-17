@@ -56,4 +56,12 @@ export default defineConfig([
       'jsx-a11y/tabindex-no-positive': 'error',
     },
   },
+  // shadcn/ui components export both components and variant helpers from the same file,
+  // which triggers react-refresh warnings. These are safe to ignore.
+  {
+    files: ['src/components/ui/**/*.{ts,tsx}'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
+  },
 ])

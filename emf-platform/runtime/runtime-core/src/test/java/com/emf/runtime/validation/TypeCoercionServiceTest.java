@@ -6,6 +6,8 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -448,6 +450,181 @@ class TypeCoercionServiceTest {
             assertEquals(5, data.get("quantity"));
             assertInstanceOf(Integer.class, data.get("quantity"));
             assertEquals(Boolean.TRUE, data.get("active"));
+        }
+    }
+
+    @Nested
+    @DisplayName("Datetime Coercion")
+    class DatetimeCoercionTests {
+
+        @Test
+        @DisplayName("Should coerce ISO-8601 string with Z to Instant")
+        void shouldCoerceIsoStringWithZ() {
+            CollectionDefinition def = createTestCollection(FieldDefinition.datetime("startDate"));
+            Map<String, Object> data = new HashMap<>();
+            data.put("startDate", "2025-06-01T00:00:00Z");
+
+            TypeCoercionService.coerce(def, data);
+
+            assertEquals(Instant.parse("2025-06-01T00:00:00Z"), data.get("startDate"));
+            assertInstanceOf(Instant.class, data.get("startDate"));
+        }
+
+        @Test
+        @DisplayName("Should coerce ISO-8601 string without Z to Instant (assumed UTC)")
+        void shouldCoerceIsoStringWithoutZ() {
+            CollectionDefinition def = createTestCollection(FieldDefinition.datetime("startDate"));
+            Map<String, Object> data = new HashMap<>();
+            data.put("startDate", "2025-06-01T00:00:00");
+
+            TypeCoercionService.coerce(def, data);
+
+            assertEquals(Instant.parse("2025-06-01T00:00:00Z"), data.get("startDate"));
+            assertInstanceOf(Instant.class, data.get("startDate"));
+        }
+
+        @Test
+        @DisplayName("Should coerce ISO-8601 string without seconds to Instant")
+        void shouldCoerceIsoStringWithoutSeconds() {
+            CollectionDefinition def = createTestCollection(FieldDefinition.datetime("startDate"));
+            Map<String, Object> data = new HashMap<>();
+            data.put("startDate", "2025-06-01T00:00");
+
+            TypeCoercionService.coerce(def, data);
+
+            assertEquals(Instant.parse("2025-06-01T00:00:00Z"), data.get("startDate"));
+            assertInstanceOf(Instant.class, data.get("startDate"));
+        }
+
+        @Test
+        @DisplayName("Should coerce date-only string to Instant (start of day UTC)")
+        void shouldCoerceDateOnlyStringToInstant() {
+            CollectionDefinition def = createTestCollection(FieldDefinition.datetime("startDate"));
+            Map<String, Object> data = new HashMap<>();
+            data.put("startDate", "2025-06-01");
+
+            TypeCoercionService.coerce(def, data);
+
+            assertEquals(Instant.parse("2025-06-01T00:00:00Z"), data.get("startDate"));
+            assertInstanceOf(Instant.class, data.get("startDate"));
+        }
+
+        @Test
+        @DisplayName("Should leave Instant value unchanged")
+        void shouldLeaveInstantUnchanged() {
+            CollectionDefinition def = createTestCollection(FieldDefinition.datetime("startDate"));
+            Map<String, Object> data = new HashMap<>();
+            Instant now = Instant.now();
+            data.put("startDate", now);
+
+            TypeCoercionService.coerce(def, data);
+
+            assertSame(now, data.get("startDate"));
+        }
+
+        @Test
+        @DisplayName("Should leave non-date string unchanged for datetime field")
+        void shouldLeaveNonDateStringUnchanged() {
+            CollectionDefinition def = createTestCollection(FieldDefinition.datetime("startDate"));
+            Map<String, Object> data = new HashMap<>();
+            data.put("startDate", "not-a-date");
+
+            TypeCoercionService.coerce(def, data);
+
+            assertEquals("not-a-date", data.get("startDate"));
+        }
+
+        @Test
+        @DisplayName("Should leave empty string unchanged for datetime field")
+        void shouldLeaveEmptyStringUnchanged() {
+            CollectionDefinition def = createTestCollection(FieldDefinition.datetime("startDate"));
+            Map<String, Object> data = new HashMap<>();
+            data.put("startDate", "");
+
+            TypeCoercionService.coerce(def, data);
+
+            assertEquals("", data.get("startDate"));
+        }
+
+        @Test
+        @DisplayName("Should coerce string with whitespace for datetime field")
+        void shouldCoerceStringWithWhitespace() {
+            CollectionDefinition def = createTestCollection(FieldDefinition.datetime("startDate"));
+            Map<String, Object> data = new HashMap<>();
+            data.put("startDate", " 2025-06-01T12:30:00Z ");
+
+            TypeCoercionService.coerce(def, data);
+
+            assertEquals(Instant.parse("2025-06-01T12:30:00Z"), data.get("startDate"));
+            assertInstanceOf(Instant.class, data.get("startDate"));
+        }
+    }
+
+    @Nested
+    @DisplayName("Date Coercion")
+    class DateCoercionTests {
+
+        @Test
+        @DisplayName("Should coerce date string to LocalDate")
+        void shouldCoerceDateStringToLocalDate() {
+            CollectionDefinition def = createTestCollection(FieldDefinition.date("birthDate"));
+            Map<String, Object> data = new HashMap<>();
+            data.put("birthDate", "2025-06-01");
+
+            TypeCoercionService.coerce(def, data);
+
+            assertEquals(LocalDate.of(2025, 6, 1), data.get("birthDate"));
+            assertInstanceOf(LocalDate.class, data.get("birthDate"));
+        }
+
+        @Test
+        @DisplayName("Should leave LocalDate value unchanged")
+        void shouldLeaveLocalDateUnchanged() {
+            CollectionDefinition def = createTestCollection(FieldDefinition.date("birthDate"));
+            Map<String, Object> data = new HashMap<>();
+            LocalDate date = LocalDate.of(2025, 6, 1);
+            data.put("birthDate", date);
+
+            TypeCoercionService.coerce(def, data);
+
+            assertSame(date, data.get("birthDate"));
+        }
+
+        @Test
+        @DisplayName("Should leave non-date string unchanged for date field")
+        void shouldLeaveNonDateStringUnchanged() {
+            CollectionDefinition def = createTestCollection(FieldDefinition.date("birthDate"));
+            Map<String, Object> data = new HashMap<>();
+            data.put("birthDate", "not-a-date");
+
+            TypeCoercionService.coerce(def, data);
+
+            assertEquals("not-a-date", data.get("birthDate"));
+        }
+
+        @Test
+        @DisplayName("Should leave empty string unchanged for date field")
+        void shouldLeaveEmptyStringUnchanged() {
+            CollectionDefinition def = createTestCollection(FieldDefinition.date("birthDate"));
+            Map<String, Object> data = new HashMap<>();
+            data.put("birthDate", "");
+
+            TypeCoercionService.coerce(def, data);
+
+            assertEquals("", data.get("birthDate"));
+        }
+
+        @Test
+        @DisplayName("Should coerce string with whitespace for date field")
+        void shouldCoerceStringWithWhitespace() {
+            CollectionDefinition def = createTestCollection(FieldDefinition.date("birthDate"));
+            Map<String, Object> data = new HashMap<>();
+            data.put("birthDate", " 2025-06-01 ");
+
+            TypeCoercionService.coerce(def, data);
+
+            assertEquals(LocalDate.of(2025, 6, 1), data.get("birthDate"));
+            assertInstanceOf(LocalDate.class, data.get("birthDate"));
         }
     }
 

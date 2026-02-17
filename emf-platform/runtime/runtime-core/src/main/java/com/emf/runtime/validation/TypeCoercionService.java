@@ -6,6 +6,11 @@ import com.emf.runtime.model.FieldType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeParseException;
 import java.util.Map;
 import java.util.Objects;
 
@@ -15,13 +20,16 @@ import java.util.Objects;
  * <p>When JSON is deserialized by Jackson (e.g., from an HTTP request body),
  * numeric values that arrive as strings (e.g., {@code "10"} instead of {@code 10})
  * will be rejected by the validation engine's type checks. This service converts
- * such string values to the appropriate Java type (Integer, Long, Double, Boolean)
- * based on the field definition, allowing validation to proceed correctly.
+ * such string values to the appropriate Java type (Integer, Long, Double, Boolean,
+ * Instant, LocalDate) based on the field definition, allowing validation to proceed
+ * correctly.
  *
  * <p>Coercion rules:
  * <ul>
  *   <li>STRING values for numeric fields → parsed to Integer/Long/Double</li>
  *   <li>STRING values for boolean fields → parsed to Boolean ("true"/"false")</li>
+ *   <li>STRING values for DATETIME fields → parsed to Instant (ISO-8601 formats)</li>
+ *   <li>STRING values for DATE fields → parsed to LocalDate (ISO-8601 "yyyy-MM-dd")</li>
  *   <li>Integer values for Long/Double fields → widened to Long/Double</li>
  *   <li>Values that cannot be coerced are left unchanged (validation will catch them)</li>
  * </ul>
@@ -86,6 +94,8 @@ public final class TypeCoercionService {
             case LONG -> coerceToLong(value);
             case DOUBLE, CURRENCY, PERCENT -> coerceToDouble(value);
             case BOOLEAN -> coerceToBoolean(value);
+            case DATE -> coerceToLocalDate(value);
+            case DATETIME -> coerceToInstant(value);
             default -> value;
         };
     }
@@ -192,6 +202,73 @@ public final class TypeCoercionService {
             }
             if ("false".equals(lower)) {
                 return Boolean.FALSE;
+            }
+        }
+        return value;
+    }
+
+    /**
+     * Attempts to coerce a value to {@link Instant} for DATETIME fields.
+     *
+     * <p>Supports multiple ISO-8601 formats:
+     * <ul>
+     *   <li>{@code "2025-06-01T00:00:00Z"} — full instant with UTC offset</li>
+     *   <li>{@code "2025-06-01T00:00:00"} — local datetime, assumed UTC</li>
+     *   <li>{@code "2025-06-01T00:00"} — local datetime without seconds, assumed UTC</li>
+     *   <li>{@code "2025-06-01"} — date only, interpreted as start of day UTC</li>
+     * </ul>
+     */
+    private static Object coerceToInstant(Object value) {
+        if (value instanceof Instant) {
+            return value;
+        }
+        if (value instanceof String str) {
+            String trimmed = str.trim();
+            if (trimmed.isEmpty()) {
+                return value;
+            }
+            // Try full Instant format first (with Z or offset)
+            try {
+                return Instant.parse(trimmed);
+            } catch (DateTimeParseException e) {
+                // Fall through to LocalDateTime parsing
+            }
+            // Try LocalDateTime format (no offset — assume UTC)
+            try {
+                LocalDateTime ldt = LocalDateTime.parse(trimmed);
+                return ldt.toInstant(ZoneOffset.UTC);
+            } catch (DateTimeParseException e) {
+                // Fall through to date-only parsing
+            }
+            // Try date-only format (start of day UTC)
+            try {
+                LocalDate ld = LocalDate.parse(trimmed);
+                return ld.atStartOfDay().toInstant(ZoneOffset.UTC);
+            } catch (DateTimeParseException e) {
+                // Cannot coerce — return original for validation to catch
+            }
+        }
+        return value;
+    }
+
+    /**
+     * Attempts to coerce a value to {@link LocalDate} for DATE fields.
+     *
+     * <p>Supports ISO-8601 date format: {@code "2025-06-01"}.
+     */
+    private static Object coerceToLocalDate(Object value) {
+        if (value instanceof LocalDate) {
+            return value;
+        }
+        if (value instanceof String str) {
+            String trimmed = str.trim();
+            if (trimmed.isEmpty()) {
+                return value;
+            }
+            try {
+                return LocalDate.parse(trimmed);
+            } catch (DateTimeParseException e) {
+                // Cannot coerce — return original for validation to catch
             }
         }
         return value;

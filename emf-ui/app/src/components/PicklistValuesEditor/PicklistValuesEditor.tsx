@@ -1,12 +1,12 @@
 import React, { useState, useCallback, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { cn } from '@/lib/utils'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
 import { useToast } from '../Toast'
 import { LoadingSpinner } from '../LoadingSpinner'
 import { ErrorMessage } from '../ErrorMessage'
 import type { PicklistValue } from '../../types/collections'
-import styles from './PicklistValuesEditor.module.css'
 
 export interface PicklistValuesEditorProps {
   picklistId: string
@@ -210,7 +210,7 @@ export function PicklistValuesEditor({
 
   return (
     <div
-      className={styles.modalOverlay}
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-[1000] p-4"
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
       onKeyDown={handleKeyDown}
       role="presentation"
@@ -218,20 +218,20 @@ export function PicklistValuesEditor({
     >
       {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
       <div
-        className={styles.modal}
+        className="bg-card rounded-lg shadow-xl max-w-[800px] w-full max-h-[90vh] flex flex-col"
         role="dialog"
         aria-modal="true"
         aria-labelledby="values-editor-title"
         onMouseDown={(e) => e.stopPropagation()}
         data-testid="picklist-values-modal"
       >
-        <div className={styles.modalHeader}>
-          <h2 id="values-editor-title" className={styles.modalTitle}>
+        <div className="flex justify-between items-center p-6 border-b border-border shrink-0">
+          <h2 id="values-editor-title" className="text-xl font-semibold m-0 text-foreground">
             {t('picklists.valuesTitle')} — {picklistName}
           </h2>
           <button
             type="button"
-            className={styles.modalCloseButton}
+            className="p-2 text-2xl leading-none text-muted-foreground bg-transparent border-none cursor-pointer rounded hover:text-foreground hover:bg-muted"
             onClick={onClose}
             aria-label={t('common.close')}
             data-testid="values-editor-close"
@@ -240,25 +240,32 @@ export function PicklistValuesEditor({
           </button>
         </div>
 
-        <div className={styles.modalBody}>
+        <div className="p-6 overflow-y-auto flex-1">
           {isLoading ? (
-            <div className={styles.loadingContainer}>
+            <div className="flex justify-center items-center p-12">
               <LoadingSpinner size="medium" label={t('common.loading')} />
             </div>
           ) : error ? (
             <ErrorMessage error={error instanceof Error ? error : new Error(t('errors.generic'))} />
           ) : localValues.length === 0 ? (
-            <div className={styles.emptyState} data-testid="values-empty-state">
+            <div
+              className="p-8 text-center text-muted-foreground text-sm"
+              data-testid="values-empty-state"
+            >
               <p>{t('picklists.noValues')}</p>
             </div>
           ) : (
-            <div className={styles.valuesList} data-testid="values-list">
+            <div className="flex flex-col gap-3" data-testid="values-list">
               {localValues.map((v, index) => (
-                <div key={v.key} className={styles.valueRow} data-testid={`value-row-${index}`}>
-                  <div className={styles.orderButtons}>
+                <div
+                  key={v.key}
+                  className="grid grid-cols-[auto_1fr_1fr_120px_60px_60px_auto] gap-2 items-start p-3 bg-muted border border-border rounded-md"
+                  data-testid={`value-row-${index}`}
+                >
+                  <div className="flex flex-col gap-0.5">
                     <button
                       type="button"
-                      className={styles.orderButton}
+                      className="px-1.5 py-0.5 text-xs leading-none text-muted-foreground bg-background border border-border rounded cursor-pointer hover:bg-muted hover:border-primary hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed"
                       onClick={() => handleMoveUp(index)}
                       disabled={index === 0 || isSaving}
                       aria-label={t('picklists.moveUp')}
@@ -268,7 +275,7 @@ export function PicklistValuesEditor({
                     </button>
                     <button
                       type="button"
-                      className={styles.orderButton}
+                      className="px-1.5 py-0.5 text-xs leading-none text-muted-foreground bg-background border border-border rounded cursor-pointer hover:bg-muted hover:border-primary hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed"
                       onClick={() => handleMoveDown(index)}
                       disabled={index === localValues.length - 1 || isSaving}
                       aria-label={t('picklists.moveDown')}
@@ -278,14 +285,20 @@ export function PicklistValuesEditor({
                     </button>
                   </div>
 
-                  <div className={styles.fieldGroup}>
-                    <label className={styles.fieldLabel} htmlFor={`value-${v.key}`}>
+                  <div className="flex flex-col gap-1">
+                    <label
+                      className="text-[0.6875rem] font-semibold text-muted-foreground uppercase tracking-wider"
+                      htmlFor={`value-${v.key}`}
+                    >
                       Value *
                     </label>
                     <input
                       id={`value-${v.key}`}
                       type="text"
-                      className={`${styles.input} ${errors[v.key]?.value ? styles.inputError : ''}`}
+                      className={cn(
+                        'w-full px-2.5 py-2 text-[0.8125rem] text-foreground bg-background border border-border rounded box-border focus:outline-none focus:border-primary focus:ring-2 focus:ring-ring/20',
+                        errors[v.key]?.value && 'border-destructive'
+                      )}
                       value={v.value}
                       onChange={(e) => handleChange(v.key, 'value', e.target.value)}
                       placeholder={t('picklists.valuePlaceholder')}
@@ -293,18 +306,26 @@ export function PicklistValuesEditor({
                       data-testid={`value-input-${index}`}
                     />
                     {errors[v.key]?.value && (
-                      <span className={styles.errorText}>{errors[v.key].value}</span>
+                      <span className="text-[0.6875rem] text-destructive">
+                        {errors[v.key].value}
+                      </span>
                     )}
                   </div>
 
-                  <div className={styles.fieldGroup}>
-                    <label className={styles.fieldLabel} htmlFor={`label-${v.key}`}>
+                  <div className="flex flex-col gap-1">
+                    <label
+                      className="text-[0.6875rem] font-semibold text-muted-foreground uppercase tracking-wider"
+                      htmlFor={`label-${v.key}`}
+                    >
                       Label *
                     </label>
                     <input
                       id={`label-${v.key}`}
                       type="text"
-                      className={`${styles.input} ${errors[v.key]?.label ? styles.inputError : ''}`}
+                      className={cn(
+                        'w-full px-2.5 py-2 text-[0.8125rem] text-foreground bg-background border border-border rounded box-border focus:outline-none focus:border-primary focus:ring-2 focus:ring-ring/20',
+                        errors[v.key]?.label && 'border-destructive'
+                      )}
                       value={v.label}
                       onChange={(e) => handleChange(v.key, 'label', e.target.value)}
                       placeholder={t('picklists.labelPlaceholder')}
@@ -312,18 +333,23 @@ export function PicklistValuesEditor({
                       data-testid={`label-input-${index}`}
                     />
                     {errors[v.key]?.label && (
-                      <span className={styles.errorText}>{errors[v.key].label}</span>
+                      <span className="text-[0.6875rem] text-destructive">
+                        {errors[v.key].label}
+                      </span>
                     )}
                   </div>
 
-                  <div className={styles.fieldGroup}>
-                    <label className={styles.fieldLabel} htmlFor={`color-${v.key}`}>
+                  <div className="flex flex-col gap-1">
+                    <label
+                      className="text-[0.6875rem] font-semibold text-muted-foreground uppercase tracking-wider"
+                      htmlFor={`color-${v.key}`}
+                    >
                       Color
                     </label>
                     <input
                       id={`color-${v.key}`}
                       type="text"
-                      className={styles.input}
+                      className="w-full px-2.5 py-2 text-[0.8125rem] text-foreground bg-background border border-border rounded box-border focus:outline-none focus:border-primary focus:ring-2 focus:ring-ring/20"
                       value={v.color}
                       onChange={(e) => handleChange(v.key, 'color', e.target.value)}
                       placeholder={t('picklists.colorPlaceholder')}
@@ -332,7 +358,7 @@ export function PicklistValuesEditor({
                     />
                   </div>
 
-                  <div className={styles.checkboxGroup}>
+                  <div className="flex items-center gap-1.5 pt-1">
                     <input
                       id={`default-${v.key}`}
                       type="checkbox"
@@ -341,12 +367,12 @@ export function PicklistValuesEditor({
                       disabled={isSaving}
                       data-testid={`default-checkbox-${index}`}
                     />
-                    <label className={styles.checkboxLabel} htmlFor={`default-${v.key}`}>
+                    <label className="text-xs text-foreground" htmlFor={`default-${v.key}`}>
                       Default
                     </label>
                   </div>
 
-                  <div className={styles.checkboxGroup}>
+                  <div className="flex items-center gap-1.5 pt-1">
                     <input
                       id={`active-${v.key}`}
                       type="checkbox"
@@ -355,14 +381,14 @@ export function PicklistValuesEditor({
                       disabled={isSaving}
                       data-testid={`active-checkbox-${index}`}
                     />
-                    <label className={styles.checkboxLabel} htmlFor={`active-${v.key}`}>
+                    <label className="text-xs text-foreground" htmlFor={`active-${v.key}`}>
                       Active
                     </label>
                   </div>
 
                   <button
                     type="button"
-                    className={styles.removeButton}
+                    className="p-1.5 text-base leading-none text-destructive bg-transparent border border-transparent rounded cursor-pointer self-center hover:bg-destructive/10 hover:border-destructive/10 disabled:opacity-50 disabled:cursor-not-allowed"
                     onClick={() => handleRemove(v.key)}
                     disabled={isSaving}
                     aria-label={t('picklists.removeValue')}
@@ -378,7 +404,7 @@ export function PicklistValuesEditor({
           {!isLoading && !error && (
             <button
               type="button"
-              className={styles.addButton}
+              className="w-full mt-2 px-4 py-2 text-sm font-medium text-primary bg-transparent border border-dashed border-primary rounded-md cursor-pointer hover:bg-primary/5 disabled:opacity-50 disabled:cursor-not-allowed"
               onClick={handleAdd}
               disabled={isSaving}
               data-testid="add-value-button"
@@ -388,10 +414,10 @@ export function PicklistValuesEditor({
           )}
         </div>
 
-        <div className={styles.modalFooter}>
+        <div className="flex gap-3 justify-end px-6 py-4 border-t border-border shrink-0">
           <button
             type="button"
-            className={styles.cancelButton}
+            className="px-5 py-2.5 text-sm font-medium text-foreground bg-background border border-border rounded-md cursor-pointer hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={onClose}
             disabled={isSaving}
             data-testid="values-editor-cancel"
@@ -400,7 +426,7 @@ export function PicklistValuesEditor({
           </button>
           <button
             type="button"
-            className={styles.saveButton}
+            className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-primary-foreground bg-primary border-none rounded-md cursor-pointer hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={handleSave}
             disabled={isSaving || isLoading}
             data-testid="values-editor-save"

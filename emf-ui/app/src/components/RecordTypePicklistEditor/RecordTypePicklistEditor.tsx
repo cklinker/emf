@@ -10,7 +10,6 @@ import type {
   PicklistValue,
   RecordTypePicklistOverride,
 } from '../../types/collections'
-import styles from './RecordTypePicklistEditor.module.css'
 
 export interface RecordTypePicklistEditorProps {
   collectionId: string
@@ -258,7 +257,7 @@ export function RecordTypePicklistEditor({
 
   return (
     <div
-      className={styles.modalOverlay}
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-[1000] p-4"
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
       onKeyDown={handleKeyDown}
       role="presentation"
@@ -266,20 +265,20 @@ export function RecordTypePicklistEditor({
     >
       {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
       <div
-        className={styles.modal}
+        className="bg-card rounded-lg shadow-xl max-w-[700px] w-full max-h-[90vh] flex flex-col"
         role="dialog"
         aria-modal="true"
         aria-labelledby="picklist-override-title"
         onMouseDown={(e) => e.stopPropagation()}
         data-testid="picklist-override-modal"
       >
-        <div className={styles.modalHeader}>
-          <h2 id="picklist-override-title" className={styles.modalTitle}>
+        <div className="flex justify-between items-center p-6 border-b border-border shrink-0">
+          <h2 id="picklist-override-title" className="text-xl font-semibold m-0 text-foreground">
             {t('recordTypes.picklistOverrides')} &mdash; {recordType.name}
           </h2>
           <button
             type="button"
-            className={styles.modalCloseButton}
+            className="p-2 text-2xl leading-none text-muted-foreground bg-transparent border-none cursor-pointer rounded hover:text-foreground hover:bg-muted"
             onClick={onClose}
             aria-label={t('common.close')}
             data-testid="picklist-override-close"
@@ -288,17 +287,20 @@ export function RecordTypePicklistEditor({
           </button>
         </div>
 
-        <div className={styles.modalBody}>
+        <div className="p-6 overflow-y-auto flex-1">
           {isLoading ? (
-            <div className={styles.loadingContainer}>
+            <div className="flex justify-center items-center p-12">
               <LoadingSpinner size="medium" label={t('common.loading')} />
             </div>
           ) : picklistFields.length === 0 ? (
-            <div className={styles.emptyState} data-testid="no-picklist-fields">
+            <div
+              className="p-8 text-center text-muted-foreground text-sm"
+              data-testid="no-picklist-fields"
+            >
               <p>{t('recordTypes.noPicklistFields')}</p>
             </div>
           ) : (
-            <div className={styles.fieldSections}>
+            <div className="flex flex-col gap-3">
               {picklistFields.map((field) => {
                 const state = fieldStates[field.id]
                 if (!state) return null
@@ -310,21 +312,23 @@ export function RecordTypePicklistEditor({
                 return (
                   <div
                     key={field.id}
-                    className={styles.fieldSection}
+                    className="border border-border rounded-md overflow-hidden"
                     data-testid={`field-section-${field.id}`}
                   >
                     <button
                       type="button"
-                      className={styles.fieldSectionHeader}
+                      className="flex items-center gap-3 w-full px-4 py-3 bg-muted border-none cursor-pointer text-left text-sm hover:bg-accent"
                       onClick={() => handleToggleCollapse(field.id)}
                       aria-expanded={!isCollapsed}
                       data-testid={`field-header-${field.id}`}
                     >
-                      <span className={styles.collapseIcon}>
+                      <span className="text-[0.625rem] text-muted-foreground w-3 shrink-0">
                         {isCollapsed ? '\u25B6' : '\u25BC'}
                       </span>
-                      <span className={styles.fieldSectionName}>{state.fieldName}</span>
-                      <span className={styles.fieldSectionBadge}>
+                      <span className="font-semibold text-foreground flex-1">
+                        {state.fieldName}
+                      </span>
+                      <span className="text-xs text-muted-foreground font-normal">
                         {allSelected
                           ? t('recordTypes.allValuesAvailable')
                           : t('recordTypes.restrictedValues', {
@@ -335,17 +339,17 @@ export function RecordTypePicklistEditor({
                     </button>
 
                     {!isCollapsed && (
-                      <div className={styles.fieldSectionBody}>
+                      <div className="p-4 border-t border-border">
                         {state.allValues.length === 0 ? (
-                          <p className={styles.noValues}>
+                          <p className="text-sm text-muted-foreground text-center p-4">
                             {t('picklistDependencies.noValuesForField')}
                           </p>
                         ) : (
                           <>
-                            <div className={styles.bulkActions}>
+                            <div className="flex gap-2 mb-3">
                               <button
                                 type="button"
-                                className={styles.bulkButton}
+                                className="px-2.5 py-1 text-xs font-medium text-primary bg-transparent border border-primary rounded cursor-pointer hover:bg-primary hover:text-primary-foreground disabled:opacity-40 disabled:cursor-not-allowed"
                                 onClick={() => handleSelectAll(field.id)}
                                 disabled={isSaving || allSelected}
                                 data-testid={`select-all-${field.id}`}
@@ -354,7 +358,7 @@ export function RecordTypePicklistEditor({
                               </button>
                               <button
                                 type="button"
-                                className={styles.bulkButton}
+                                className="px-2.5 py-1 text-xs font-medium text-primary bg-transparent border border-primary rounded cursor-pointer hover:bg-primary hover:text-primary-foreground disabled:opacity-40 disabled:cursor-not-allowed"
                                 onClick={() => handleDeselectAll(field.id)}
                                 disabled={isSaving || checkedCount === 0}
                                 data-testid={`deselect-all-${field.id}`}
@@ -362,26 +366,27 @@ export function RecordTypePicklistEditor({
                                 {t('common.deselectAll')}
                               </button>
                             </div>
-                            <div className={styles.valuesList}>
+                            <div className="flex flex-col gap-1.5 mb-4 max-h-[240px] overflow-y-auto py-1">
                               {state.allValues.map((val) => (
                                 <label
                                   key={val.value}
-                                  className={styles.valueItem}
+                                  className="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer text-sm hover:bg-muted"
                                   data-testid={`value-item-${field.id}-${val.value}`}
                                 >
                                   <input
                                     type="checkbox"
+                                    className="w-4 h-4 accent-primary cursor-pointer shrink-0"
                                     checked={state.checkedValues.has(val.value)}
                                     onChange={() => handleToggleValue(field.id, val.value)}
                                     disabled={isSaving}
                                     data-testid={`value-checkbox-${field.id}-${val.value}`}
                                   />
-                                  <span className={styles.valueLabel}>
+                                  <span className="text-foreground flex-1">
                                     {val.label || val.value}
                                   </span>
                                   {val.color && (
                                     <span
-                                      className={styles.valueColor}
+                                      className="w-4 h-4 rounded-full border border-border shrink-0"
                                       style={{ backgroundColor: val.color }}
                                       aria-label={val.color}
                                     />
@@ -390,16 +395,16 @@ export function RecordTypePicklistEditor({
                               ))}
                             </div>
 
-                            <div className={styles.defaultValueGroup}>
+                            <div className="flex items-center gap-3 pt-3 border-t border-border">
                               <label
                                 htmlFor={`default-value-${field.id}`}
-                                className={styles.defaultValueLabel}
+                                className="text-[0.8125rem] font-medium text-foreground whitespace-nowrap"
                               >
                                 {t('recordTypes.defaultValue')}
                               </label>
                               <select
                                 id={`default-value-${field.id}`}
-                                className={styles.select}
+                                className="flex-1 px-3 py-2 text-[0.8125rem] text-foreground bg-background border border-border rounded-md focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-ring/20 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed"
                                 value={state.defaultValue}
                                 onChange={(e) => handleDefaultChange(field.id, e.target.value)}
                                 disabled={isSaving}
@@ -426,10 +431,10 @@ export function RecordTypePicklistEditor({
           )}
         </div>
 
-        <div className={styles.modalFooter}>
+        <div className="flex gap-3 justify-end px-6 py-4 border-t border-border shrink-0">
           <button
             type="button"
-            className={styles.cancelButton}
+            className="px-5 py-2.5 text-sm font-medium text-foreground bg-background border border-border rounded-md cursor-pointer hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={onClose}
             disabled={isSaving}
             data-testid="picklist-override-cancel"
@@ -438,7 +443,7 @@ export function RecordTypePicklistEditor({
           </button>
           <button
             type="button"
-            className={styles.saveButton}
+            className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-primary-foreground bg-primary border-none rounded-md cursor-pointer hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={handleSave}
             disabled={isSaving || isLoading || picklistFields.length === 0}
             data-testid="picklist-override-save"

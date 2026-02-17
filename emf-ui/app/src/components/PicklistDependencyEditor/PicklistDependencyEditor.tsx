@@ -1,10 +1,10 @@
 import React, { useState, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { cn } from '@/lib/utils'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
 import { LoadingSpinner } from '../LoadingSpinner'
 import type { FieldDefinition, PicklistValue, PicklistDependency } from '../../types/collections'
-import styles from './PicklistDependencyEditor.module.css'
 
 export interface PicklistDependencyEditorProps {
   collectionId: string
@@ -115,7 +115,7 @@ export function PicklistDependencyEditor({
 
   return (
     <div
-      className={styles.modalOverlay}
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-[1000] p-4"
       onMouseDown={(e) => e.target === e.currentTarget && onCancel()}
       onKeyDown={handleKeyDown}
       role="presentation"
@@ -123,22 +123,22 @@ export function PicklistDependencyEditor({
     >
       {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
       <div
-        className={styles.modal}
+        className="bg-card rounded-lg shadow-xl max-w-[900px] w-full max-h-[90vh] flex flex-col"
         role="dialog"
         aria-modal="true"
         aria-labelledby="dependency-editor-title"
         onMouseDown={(e) => e.stopPropagation()}
         data-testid="dependency-editor-modal"
       >
-        <div className={styles.modalHeader}>
-          <h2 id="dependency-editor-title" className={styles.modalTitle}>
+        <div className="flex justify-between items-center p-6 border-b border-border shrink-0">
+          <h2 id="dependency-editor-title" className="text-xl font-semibold m-0 text-foreground">
             {isEditMode
               ? t('picklistDependencies.editDependency')
               : t('picklistDependencies.addDependency')}
           </h2>
           <button
             type="button"
-            className={styles.modalCloseButton}
+            className="p-2 text-2xl leading-none text-muted-foreground bg-transparent border-none cursor-pointer rounded hover:text-foreground hover:bg-muted"
             onClick={onCancel}
             aria-label={t('common.close')}
             data-testid="dependency-editor-close"
@@ -147,9 +147,9 @@ export function PicklistDependencyEditor({
           </button>
         </div>
 
-        <div className={styles.modalBody}>
+        <div className="p-6 overflow-y-auto flex-1">
           {picklistFields.length < 2 ? (
-            <div className={styles.emptyState}>
+            <div className="p-8 text-center text-muted-foreground text-sm">
               <p>
                 {picklistFields.length === 0
                   ? t('picklistDependencies.noPicklistFields')
@@ -158,17 +158,20 @@ export function PicklistDependencyEditor({
             </div>
           ) : (
             <>
-              <div className={styles.fieldSelectors}>
-                <div className={styles.fieldGroup}>
-                  <label htmlFor="controlling-field" className={styles.fieldLabel}>
+              <div className="grid grid-cols-2 gap-6 mb-6">
+                <div className="flex flex-col gap-2">
+                  <label
+                    htmlFor="controlling-field"
+                    className="text-sm font-medium text-foreground"
+                  >
                     {t('picklistDependencies.controllingField')}
-                    <span className={styles.required} aria-hidden="true">
+                    <span className="text-destructive ml-1" aria-hidden="true">
                       *
                     </span>
                   </label>
                   <select
                     id="controlling-field"
-                    className={styles.select}
+                    className="px-3.5 py-2.5 text-sm text-foreground bg-background border border-border rounded-md focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-ring/20 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed"
                     value={controllingFieldId}
                     onChange={(e) => handleControllingFieldChange(e.target.value)}
                     disabled={isEditMode || isSubmitting}
@@ -183,16 +186,16 @@ export function PicklistDependencyEditor({
                   </select>
                 </div>
 
-                <div className={styles.fieldGroup}>
-                  <label htmlFor="dependent-field" className={styles.fieldLabel}>
+                <div className="flex flex-col gap-2">
+                  <label htmlFor="dependent-field" className="text-sm font-medium text-foreground">
                     {t('picklistDependencies.dependentField')}
-                    <span className={styles.required} aria-hidden="true">
+                    <span className="text-destructive ml-1" aria-hidden="true">
                       *
                     </span>
                   </label>
                   <select
                     id="dependent-field"
-                    className={styles.select}
+                    className="px-3.5 py-2.5 text-sm text-foreground bg-background border border-border rounded-md focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-ring/20 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed"
                     value={dependentFieldId}
                     onChange={(e) => handleDependentFieldChange(e.target.value)}
                     disabled={isEditMode || isSubmitting || !controllingFieldId}
@@ -209,7 +212,7 @@ export function PicklistDependencyEditor({
               </div>
 
               {(loadingControlling || loadingDependent) && (
-                <div className={styles.loadingContainer}>
+                <div className="flex justify-center items-center p-12">
                   <LoadingSpinner size="medium" label={t('common.loading')} />
                 </div>
               )}
@@ -219,7 +222,7 @@ export function PicklistDependencyEditor({
                 !loadingControlling &&
                 !loadingDependent &&
                 (!controllingValues || controllingValues.length === 0) && (
-                  <div className={styles.emptyState}>
+                  <div className="p-8 text-center text-muted-foreground text-sm">
                     <p>
                       {t('picklistDependencies.noValuesForField')} ({controllingFieldName})
                     </p>
@@ -233,7 +236,7 @@ export function PicklistDependencyEditor({
                 controllingValues &&
                 controllingValues.length > 0 &&
                 (!dependentValues || dependentValues.length === 0) && (
-                  <div className={styles.emptyState}>
+                  <div className="p-8 text-center text-muted-foreground text-sm">
                     <p>
                       {t('picklistDependencies.noValuesForField')} ({dependentFieldName})
                     </p>
@@ -241,28 +244,58 @@ export function PicklistDependencyEditor({
                 )}
 
               {showMappingMatrix && (
-                <div className={styles.mappingSection}>
-                  <h3 className={styles.mappingSectionTitle}>
+                <div className="mt-4">
+                  <h3 className="text-base font-semibold m-0 mb-2 text-foreground">
                     {t('picklistDependencies.mapping')}
                   </h3>
-                  <p className={styles.mappingHint}>{t('picklistDependencies.mappingHint')}</p>
-                  <table className={styles.mappingTable} data-testid="mapping-matrix">
-                    <thead>
+                  <p className="text-xs text-muted-foreground mb-4">
+                    {t('picklistDependencies.mappingHint')}
+                  </p>
+                  <table
+                    className="w-full border-collapse border border-border rounded-md overflow-hidden"
+                    data-testid="mapping-matrix"
+                  >
+                    <thead className="bg-muted">
                       <tr>
-                        <th>{controllingFieldName}</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider border-b border-border">
+                          {controllingFieldName}
+                        </th>
                         {dependentValues!.map((dv) => (
-                          <th key={dv.value}>{dv.label || dv.value}</th>
+                          <th
+                            key={dv.value}
+                            className="px-3 py-2.5 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider border-b border-border"
+                          >
+                            {dv.label || dv.value}
+                          </th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {controllingValues!.map((cv) => (
+                      {controllingValues!.map((cv, cvIdx) => (
                         <tr key={cv.value}>
-                          <td>{cv.label || cv.value}</td>
+                          <td
+                            className={cn(
+                              'px-3 py-2 text-left text-[0.8125rem] font-medium text-foreground bg-muted',
+                              cvIdx === controllingValues!.length - 1
+                                ? 'border-b-0'
+                                : 'border-b border-border'
+                            )}
+                          >
+                            {cv.label || cv.value}
+                          </td>
                           {dependentValues!.map((dv) => (
-                            <td key={dv.value}>
+                            <td
+                              key={dv.value}
+                              className={cn(
+                                'px-3 py-2 text-center text-[0.8125rem]',
+                                cvIdx === controllingValues!.length - 1
+                                  ? 'border-b-0'
+                                  : 'border-b border-border'
+                              )}
+                            >
                               <input
                                 type="checkbox"
+                                className="w-4 h-4 accent-primary cursor-pointer"
                                 checked={mapping[cv.value]?.includes(dv.value) ?? false}
                                 onChange={() => handleMappingToggle(cv.value, dv.value)}
                                 disabled={isSubmitting}
@@ -281,10 +314,10 @@ export function PicklistDependencyEditor({
           )}
         </div>
 
-        <div className={styles.modalFooter}>
+        <div className="flex gap-3 justify-end px-6 py-4 border-t border-border shrink-0">
           <button
             type="button"
-            className={styles.cancelButton}
+            className="px-5 py-2.5 text-sm font-medium text-foreground bg-background border border-border rounded-md cursor-pointer hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={onCancel}
             disabled={isSubmitting}
             data-testid="dependency-editor-cancel"
@@ -293,7 +326,7 @@ export function PicklistDependencyEditor({
           </button>
           <button
             type="button"
-            className={styles.saveButton}
+            className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-primary-foreground bg-primary border-none rounded-md cursor-pointer hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={handleSave}
             disabled={!canSave}
             data-testid="dependency-editor-save"

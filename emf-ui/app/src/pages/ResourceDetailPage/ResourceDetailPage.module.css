@@ -360,6 +360,16 @@
   color: var(--color-text-primary, #1a1a1a);
 }
 
+.metadataLink {
+  color: var(--color-link, #0066cc);
+  text-decoration: none;
+}
+
+.metadataLink:hover {
+  text-decoration: underline;
+  color: var(--color-link-hover, #0052a3);
+}
+
 /* Empty State */
 .emptyState {
   display: flex;

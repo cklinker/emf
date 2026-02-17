@@ -38,6 +38,17 @@ export interface CollectionFormData {
   storageMode: StorageMode
   /** Whether the collection is active */
   active: boolean
+  /** ID of the field used as display field in lookup dropdowns */
+  displayFieldId?: string
+}
+
+/**
+ * Available field for display field dropdown
+ */
+export interface AvailableField {
+  id: string
+  name: string
+  displayName: string
 }
 
 /**
@@ -50,6 +61,7 @@ export interface Collection {
   description?: string
   storageMode: StorageMode
   active: boolean
+  displayFieldId?: string
   currentVersion: number
   createdAt: string
   updatedAt: string
@@ -61,6 +73,8 @@ export interface Collection {
 export interface CollectionFormProps {
   /** Existing collection data for edit mode */
   collection?: Collection
+  /** Available fields for display field dropdown (edit mode only) */
+  availableFields?: AvailableField[]
   /** Callback when form is submitted successfully */
   onSubmit: (data: CollectionFormData) => Promise<void>
   /** Callback when form is cancelled */
@@ -96,6 +110,7 @@ export const collectionFormSchema = z.object({
     errorMap: () => ({ message: 'validation.storageModeRequired' }),
   }),
   active: z.boolean(),
+  displayFieldId: z.string().optional().or(z.literal('')),
 })
 
 /**
@@ -117,6 +132,7 @@ export type CollectionFormSchema = z.infer<typeof collectionFormSchema>
  */
 export function CollectionForm({
   collection,
+  availableFields = [],
   onSubmit,
   onCancel,
   isSubmitting = false,
@@ -139,6 +155,7 @@ export function CollectionForm({
       description: collection?.description ?? '',
       storageMode: collection?.storageMode ?? 'JSONB',
       active: collection?.active ?? true,
+      displayFieldId: collection?.displayFieldId ?? '',
     },
     mode: 'onBlur',
   })
@@ -152,6 +169,7 @@ export function CollectionForm({
         description: collection.description ?? '',
         storageMode: collection.storageMode,
         active: collection.active,
+        displayFieldId: collection.displayFieldId ?? '',
       })
     }
   }, [collection, reset])
@@ -165,6 +183,7 @@ export function CollectionForm({
         description: data.description || undefined,
         storageMode: data.storageMode,
         active: data.active,
+        displayFieldId: data.displayFieldId || undefined,
       }
       await onSubmit(formData)
     },
@@ -332,6 +351,37 @@ export function CollectionForm({
           </span>
         )}
       </div>
+
+      {/* Display Field (edit mode only, when fields exist) */}
+      {isEditMode && availableFields.length > 0 && (
+        <div className={styles.fieldGroup}>
+          <label htmlFor="collection-display-field" className={styles.label}>
+            {t('collections.displayField', 'Display Field')}
+            <span className={styles.optional}>({t('common.optional')})</span>
+          </label>
+          <select
+            id="collection-display-field"
+            className={styles.select}
+            disabled={isSubmitting}
+            aria-describedby="display-field-hint"
+            data-testid="collection-display-field-select"
+            {...register('displayFieldId')}
+          >
+            <option value="">{t('collectionForm.displayFieldNone', 'Auto-detect')}</option>
+            {availableFields.map((field) => (
+              <option key={field.id} value={field.id}>
+                {field.displayName || field.name}
+              </option>
+            ))}
+          </select>
+          <span id="display-field-hint" className={styles.hint} data-testid="display-field-hint">
+            {t(
+              'collectionForm.displayFieldHint',
+              'The field shown when records appear in lookup dropdowns. If not set, defaults to a field named "name" or the first text field.'
+            )}
+          </span>
+        </div>
+      )}
 
       {/* Active Status Field */}
       <div className={styles.fieldGroup}>

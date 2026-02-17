@@ -60,6 +60,7 @@ export type {
   CollectionFormSchema,
   Collection as CollectionFormCollection,
   StorageMode,
+  AvailableField,
 } from './CollectionForm'
 
 // FieldsPanel component

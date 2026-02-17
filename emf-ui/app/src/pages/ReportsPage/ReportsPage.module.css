@@ -3,6 +3,39 @@
  */
 
 .container {
+  /* Theme tokens — light defaults */
+  --color-text-primary: #1a1a1a;
+  --color-text-secondary: #666666;
+  --color-text-tertiary: #6b7280;
+  --color-text-placeholder: #9ca3af;
+  --color-surface-primary: #ffffff;
+  --color-surface-secondary: #f5f5f5;
+  --color-surface-tertiary: #f3f4f6;
+  --color-surface-hover: #f9fafb;
+  --color-border: #d1d5db;
+  --color-border-light: #e5e7eb;
+  --color-border-hover: #9ca3af;
+  --color-link: #2563eb;
+  --color-link-hover: #1d4ed8;
+  --color-button-primary: #2563eb;
+  --color-button-primary-hover: #1d4ed8;
+  --color-danger: #ef4444;
+  --color-danger-hover: #dc2626;
+  --color-success: #10b981;
+  --color-success-hover: #059669;
+  --color-success-text: #065f46;
+  --color-success-bg: #d1fae5;
+  --color-error-text: #991b1b;
+  --color-error-bg: #fee2e2;
+  --color-warning: #f59e0b;
+  --color-warning-hover: #d97706;
+  --color-warning-text: #92400e;
+  --color-warning-bg: #fef3c7;
+  --color-focus-ring: #2563eb;
+  --color-input-bg: #ffffff;
+  --color-input-disabled-bg: #f9fafb;
+  --color-input-disabled-text: #6b7280;
+
   padding: 2rem;
   max-width: 1400px;
   margin: 0 auto;
@@ -69,7 +102,7 @@
   font-size: 0.875rem;
   font-weight: 500;
   color: var(--color-text-primary, #1a1a1a);
-  background-color: #fff;
+  background-color: var(--color-surface-primary);
   border: 1px solid var(--color-border, #d1d5db);
   border-radius: 0.375rem;
   cursor: pointer;
@@ -155,13 +188,13 @@
 }
 
 .badgeScope {
-  color: #065f46;
-  background-color: #d1fae5;
+  color: var(--color-success-text);
+  background-color: var(--color-success-bg);
 }
 
 .badgeAccess {
-  color: #92400e;
-  background-color: #fef3c7;
+  color: var(--color-warning-text);
+  background-color: var(--color-warning-bg);
 }
 
 .cardMetaText {
@@ -214,13 +247,13 @@
 }
 
 .deleteCardButton {
-  color: #dc2626;
+  color: var(--color-error-text);
   margin-left: auto;
 }
 
 .deleteCardButton:hover {
-  border-color: #dc2626;
-  background-color: #fef2f2;
+  border-color: var(--color-error-text);
+  background-color: var(--color-error-bg);
 }
 
 /* ───────────────────────── Empty State ───────────────────────── */
@@ -292,7 +325,7 @@
 
 .stepCircleComplete {
   border-color: #059669;
-  background-color: #059669;
+  background-color: var(--color-success-hover);
   color: #fff;
 }
 
@@ -322,7 +355,7 @@
 }
 
 .stepConnectorComplete {
-  background-color: #059669;
+  background-color: var(--color-success-hover);
 }
 
 /* Step Content */
@@ -393,7 +426,7 @@
 
 .navButtonSecondary {
   color: var(--color-text-primary, #1a1a1a);
-  background-color: #fff;
+  background-color: var(--color-surface-primary);
   border: 1px solid var(--color-border, #d1d5db);
 }
 
@@ -403,7 +436,7 @@
 
 .navButtonSuccess {
   color: #fff;
-  background-color: #059669;
+  background-color: var(--color-success-hover);
   border: none;
 }
 
@@ -439,7 +472,7 @@
 
 .collectionItem:hover {
   border-color: var(--color-primary, #0066cc);
-  background-color: #f0f7ff;
+  background-color: var(--color-surface-hover);
 }
 
 .collectionItemSelected {
@@ -658,15 +691,15 @@
   border: 1px solid var(--color-border, #d1d5db);
   border-radius: 0.375rem;
   background: #fff;
-  color: #dc2626;
+  color: var(--color-error-text);
   cursor: pointer;
   flex-shrink: 0;
   transition: all 0.15s;
 }
 
 .filterRemoveButton:hover {
-  background-color: #fef2f2;
-  border-color: #dc2626;
+  background-color: var(--color-error-bg);
+  border-color: var(--color-error-text);
 }
 
 .addFilterButton {
@@ -756,7 +789,7 @@
 }
 
 .required {
-  color: #dc2626;
+  color: var(--color-error-text);
   margin-left: 0.25rem;
 }
 
@@ -764,7 +797,7 @@
   padding: 0.625rem 0.875rem;
   font-size: 0.875rem;
   color: var(--color-text-primary, #1a1a1a);
-  background-color: #fff;
+  background-color: var(--color-surface-primary);
   border: 1px solid var(--color-border, #d1d5db);
   border-radius: 0.375rem;
   transition: border-color 0.2s;
@@ -794,7 +827,7 @@
   padding: 0.625rem 0.875rem;
   font-size: 0.875rem;
   color: var(--color-text-primary, #1a1a1a);
-  background-color: #fff;
+  background-color: var(--color-surface-primary);
   border: 1px solid var(--color-border, #d1d5db);
   border-radius: 0.375rem;
   transition: border-color 0.2s;
@@ -809,12 +842,12 @@
 }
 
 .hasError {
-  border-color: #dc2626;
+  border-color: var(--color-error-text);
 }
 
 .formError {
   font-size: 0.75rem;
-  color: #dc2626;
+  color: var(--color-error-text);
 }
 
 /* ───────────────────────── Report Viewer ───────────────────────── */
@@ -1082,4 +1115,39 @@
     width: 100%;
     flex-wrap: wrap;
   }
+}
+
+/* Dark Theme Support */
+[data-theme='dark'] .container {
+  --color-text-primary: #f9fafb;
+  --color-text-secondary: #d1d5db;
+  --color-text-tertiary: #9ca3af;
+  --color-text-placeholder: #6b7280;
+  --color-surface-primary: #1f2937;
+  --color-surface-secondary: #111827;
+  --color-surface-tertiary: #374151;
+  --color-surface-hover: #374151;
+  --color-border: #374151;
+  --color-border-light: #4b5563;
+  --color-border-hover: #6b7280;
+  --color-link: #60a5fa;
+  --color-link-hover: #93bbfd;
+  --color-button-primary: #2563eb;
+  --color-button-primary-hover: #3b82f6;
+  --color-danger: #ef4444;
+  --color-danger-hover: #f87171;
+  --color-success: #34d399;
+  --color-success-hover: #6ee7b7;
+  --color-success-text: #86efac;
+  --color-success-bg: #14532d;
+  --color-error-text: #fca5a5;
+  --color-error-bg: #450a0a;
+  --color-warning: #fbbf24;
+  --color-warning-hover: #fcd34d;
+  --color-warning-text: #fde047;
+  --color-warning-bg: #713f12;
+  --color-focus-ring: #60a5fa;
+  --color-input-bg: #111827;
+  --color-input-disabled-bg: #1f2937;
+  --color-input-disabled-text: #9ca3af;
 }

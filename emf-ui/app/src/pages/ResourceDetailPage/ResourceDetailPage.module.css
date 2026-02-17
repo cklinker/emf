@@ -462,8 +462,8 @@
   font-size: 0.75rem;
   font-weight: 600;
   border-radius: 9999px;
-  color: #1e40af;
-  background-color: #dbeafe;
+  color: var(--color-link);
+  background-color: var(--color-surface-tertiary);
 }
 
 .removeButton {

@@ -55,7 +55,7 @@
 }
 
 .card {
-  background: var(--color-bg-primary, #fff);
+  background: var(--color-surface-primary);
   border: 1px solid var(--color-border, #e5e7eb);
   border-radius: 0.5rem;
   padding: 1.5rem;
@@ -119,7 +119,7 @@
 .progressBar {
   width: 100%;
   height: 0.5rem;
-  background: var(--color-bg-secondary, #e5e7eb);
+  background: var(--color-surface-secondary);
   border-radius: 9999px;
   overflow: hidden;
 }
@@ -173,7 +173,7 @@
 .table th {
   font-weight: 600;
   color: var(--color-text-secondary, #6b7280);
-  background: var(--color-bg-secondary, #f9fafb);
+  background: var(--color-surface-secondary);
 }
 
 .empty {

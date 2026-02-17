@@ -7,6 +7,8 @@
  * - Field type-aware rendering via FieldRenderer
  * - Row click navigation to record detail
  * - Row action menu (Edit, Delete)
+ * - Keyboard navigation (Arrow keys, Enter, Space, Home, End, Escape)
+ * - Prefetch on hover for instant detail page loading
  */
 
 import React, { useCallback, useMemo } from 'react'
@@ -30,6 +32,9 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Skeleton } from '@/components/ui/skeleton'
 import { FieldRenderer } from '@/components/FieldRenderer'
+import { useTableKeyboardNav } from '@/hooks/useTableKeyboardNav'
+import { usePrefetch } from '@/hooks/usePrefetch'
+import { cn } from '@/lib/utils'
 import type { FieldDefinition } from '@/hooks/useCollectionSchema'
 import type { CollectionRecord, SortState } from '@/hooks/useCollectionRecords'
 
@@ -113,6 +118,25 @@ export function ObjectDataTable({
   const navigate = useNavigate()
   const basePath = `/${tenantSlug}/app`
 
+  // Keyboard navigation
+  const { handleKeyDown, tableRef, getRowProps } = useTableKeyboardNav({
+    rowCount: records.length,
+    onRowActivate: (index) => {
+      if (records[index]) {
+        navigate(`${basePath}/o/${collectionName}/${records[index].id}`)
+      }
+    },
+    onRowToggle: (index) => {
+      if (records[index]) {
+        handleSelectRow(records[index].id)
+      }
+    },
+    enabled: !isLoading && records.length > 0,
+  })
+
+  // Prefetch on hover
+  const { prefetchRecord, cancelPrefetch } = usePrefetch({ collectionName })
+
   // Check if all visible records are selected
   const allSelected = useMemo(() => {
     if (records.length === 0) return false
@@ -177,7 +201,14 @@ export function ObjectDataTable({
   )
 
   return (
-    <div className="rounded-md border">
+    <div
+      className="rounded-md border"
+      ref={tableRef}
+      onKeyDown={handleKeyDown}
+      role="grid"
+      tabIndex={0}
+      aria-label={`${collectionName} records`}
+    >
       <Table>
         <TableHeader>
           <TableRow>
@@ -233,14 +264,23 @@ export function ObjectDataTable({
               </TableCell>
             </TableRow>
           ) : (
-            records.map((record) => {
+            records.map((record, index) => {
               const isSelected = selectedIds.has(record.id)
+              const rowProps = getRowProps(index)
               return (
                 <TableRow
                   key={record.id}
-                  className="cursor-pointer"
+                  className={cn(
+                    'cursor-pointer',
+                    rowProps['data-focused'] && 'ring-2 ring-inset ring-ring'
+                  )}
                   data-state={isSelected ? 'selected' : undefined}
+                  tabIndex={rowProps.tabIndex}
+                  aria-selected={rowProps['aria-selected']}
+                  onFocus={rowProps.onFocus}
                   onClick={() => handleRowClick(record)}
+                  onMouseEnter={() => prefetchRecord(record.id)}
+                  onMouseLeave={cancelPrefetch}
                 >
                   {/* Checkbox */}
                   <TableCell className="w-[40px]" onClick={(e) => e.stopPropagation()}>

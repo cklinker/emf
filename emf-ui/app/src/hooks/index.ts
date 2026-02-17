@@ -90,3 +90,20 @@ export {
   type ExecuteScriptParams,
   type UseScriptExecutionReturn,
 } from './useScriptExecution'
+
+// Related records hook for fetching child records in master-detail relationships
+export {
+  useRelatedRecords,
+  type RelatedRecordsOptions,
+  type UseRelatedRecordsReturn,
+} from './useRelatedRecords'
+
+// Table keyboard navigation hook for accessible data table interaction
+export {
+  useTableKeyboardNav,
+  type UseTableKeyboardNavOptions,
+  type UseTableKeyboardNavReturn,
+} from './useTableKeyboardNav'
+
+// Prefetch hook for hovering rows in data tables
+export { usePrefetch, type UsePrefetchOptions, type UsePrefetchReturn } from './usePrefetch'

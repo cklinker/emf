@@ -359,7 +359,7 @@ export function ResourceFormPage({
     return schema.fields.filter(
       (f) =>
         (f.type === 'lookup' || f.type === 'master_detail' || f.type === 'reference') &&
-        f.referenceTarget
+        (f.referenceTarget || f.referenceCollectionId)
     )
   }, [schema])
 
@@ -370,10 +370,14 @@ export function ResourceFormPage({
     queryKey: ['lookup-options-for-form', collectionName, lookupFields.map((f) => f.id)],
     queryFn: async () => {
       const map: Record<string, LookupOption[]> = {}
-      // Group fields by target collection to avoid duplicate requests
+      // Group fields by target collection to avoid duplicate requests.
+      // Use referenceTarget (collection name) when available, otherwise
+      // fall back to referenceCollectionId (UUID). The /control/collections/
+      // endpoint accepts both names and UUIDs.
       const targetMap = new Map<string, FieldDefinition[]>()
       for (const field of lookupFields) {
-        const target = field.referenceTarget!
+        const target = field.referenceTarget || field.referenceCollectionId
+        if (!target) continue
         if (!targetMap.has(target)) {
           targetMap.set(target, [])
         }
@@ -381,12 +385,14 @@ export function ResourceFormPage({
       }
 
       await Promise.all(
-        Array.from(targetMap.entries()).map(async ([targetName, fields]) => {
+        Array.from(targetMap.entries()).map(async ([target, fields]) => {
           try {
-            // Fetch the target collection schema to find display field
+            // Fetch the target collection schema to find display field.
+            // The endpoint accepts both collection name and UUID.
             const targetSchema = await apiClient.get<CollectionSchema>(
-              `/control/collections/${targetName}`
+              `/control/collections/${target}`
             )
+            const targetName = targetSchema.name
 
             // Determine display field: displayFieldName → 'name' → first string field → 'id'
             let displayFieldName = 'id'

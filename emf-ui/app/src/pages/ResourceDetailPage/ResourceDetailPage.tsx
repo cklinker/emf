@@ -402,6 +402,56 @@ export function ResourceDetailPage({
     },
   })
 
+  // Resolve user display names for created_by / updated_by metadata fields
+  const createdById = resource?.created_by ? String(resource.created_by) : undefined
+  const updatedById = resource?.updated_by ? String(resource.updated_by) : undefined
+
+  const { data: createdByUser } = useQuery({
+    queryKey: ['user', createdById],
+    queryFn: async () => {
+      try {
+        return await apiClient.get<{ id: string; firstName: string; lastName: string }>(
+          `/control/users/${createdById}`
+        )
+      } catch {
+        return null
+      }
+    },
+    enabled: !!createdById,
+    staleTime: 5 * 60 * 1000, // cache user lookups for 5 minutes
+  })
+
+  const { data: updatedByUser } = useQuery({
+    queryKey: ['user', updatedById],
+    queryFn: async () => {
+      try {
+        return await apiClient.get<{ id: string; firstName: string; lastName: string }>(
+          `/control/users/${updatedById}`
+        )
+      } catch {
+        return null
+      }
+    },
+    enabled: !!updatedById && updatedById !== createdById,
+    staleTime: 5 * 60 * 1000,
+  })
+
+  // Build user display name helper
+  const getUserDisplay = useCallback(
+    (userId: string): { name: string; linkTo: string } | null => {
+      const userObj =
+        createdByUser && createdByUser.id === userId
+          ? createdByUser
+          : updatedByUser && updatedByUser.id === userId
+            ? updatedByUser
+            : null
+      if (!userObj) return null
+      const name = [userObj.firstName, userObj.lastName].filter(Boolean).join(' ') || userId
+      return { name, linkTo: `/${getTenantSlug()}/users/${userId}` }
+    },
+    [createdByUser, updatedByUser]
+  )
+
   // Identify master_detail fields for display name resolution
   const lookupFields = useMemo(() => {
     if (!schema?.fields) return []
@@ -828,7 +878,16 @@ export function ResourceDetailPage({
             <div className={styles.metadataItem}>
               <span className={styles.metadataLabel}>Created by</span>
               <span className={styles.metadataValue} data-testid="created-by">
-                {String(resource.created_by)}
+                {(() => {
+                  const display = getUserDisplay(String(resource.created_by))
+                  return display ? (
+                    <Link to={display.linkTo} className={styles.metadataLink}>
+                      {display.name}
+                    </Link>
+                  ) : (
+                    String(resource.created_by)
+                  )
+                })()}
               </span>
             </div>
           )}
@@ -836,7 +895,16 @@ export function ResourceDetailPage({
             <div className={styles.metadataItem}>
               <span className={styles.metadataLabel}>Last modified by</span>
               <span className={styles.metadataValue} data-testid="updated-by">
-                {String(resource.updated_by)}
+                {(() => {
+                  const display = getUserDisplay(String(resource.updated_by))
+                  return display ? (
+                    <Link to={display.linkTo} className={styles.metadataLink}>
+                      {display.name}
+                    </Link>
+                  ) : (
+                    String(resource.updated_by)
+                  )
+                })()}
               </span>
             </div>
           )}

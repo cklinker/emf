@@ -36,6 +36,10 @@ export interface ListViewToolbarProps {
   onExportJson?: () => void
   /** Callback to clear selection */
   onClearSelection?: () => void
+  /** Whether the user can create records (controls New button visibility) */
+  canCreate?: boolean
+  /** Whether the user can delete records (controls Delete action visibility) */
+  canDelete?: boolean
 }
 
 export function ListViewToolbar({
@@ -47,6 +51,8 @@ export function ListViewToolbar({
   onExportCsv,
   onExportJson,
   onClearSelection,
+  canCreate = true,
+  canDelete = true,
 }: ListViewToolbarProps): React.ReactElement {
   return (
     <div className="space-y-2">
@@ -82,7 +88,7 @@ export function ListViewToolbar({
                 </DropdownMenuItem>
               )}
               {(onExportCsv || onExportJson) && onBulkDelete && <DropdownMenuSeparator />}
-              {onBulkDelete && selectedCount > 0 && (
+              {canDelete && onBulkDelete && selectedCount > 0 && (
                 <DropdownMenuItem
                   className="text-destructive focus:text-destructive"
                   onClick={onBulkDelete}
@@ -94,11 +100,13 @@ export function ListViewToolbar({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* New record button */}
-          <Button size="sm" onClick={onNew} aria-label={`New ${collectionLabel}`}>
-            <Plus className="mr-1.5 h-3.5 w-3.5" />
-            New
-          </Button>
+          {/* New record button (hidden if user lacks create permission) */}
+          {canCreate && (
+            <Button size="sm" onClick={onNew} aria-label={`New ${collectionLabel}`}>
+              <Plus className="mr-1.5 h-3.5 w-3.5" />
+              New
+            </Button>
+          )}
         </div>
       </div>
 
@@ -108,7 +116,7 @@ export function ListViewToolbar({
           <span className="font-medium">
             {selectedCount} record{selectedCount !== 1 ? 's' : ''} selected
           </span>
-          {onBulkDelete && (
+          {canDelete && onBulkDelete && (
             <Button
               variant="ghost"
               size="sm"

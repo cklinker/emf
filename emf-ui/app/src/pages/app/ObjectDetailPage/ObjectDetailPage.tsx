@@ -45,8 +45,11 @@ import {
 import { useCollectionSchema } from '@/hooks/useCollectionSchema'
 import { useRecord } from '@/hooks/useRecord'
 import { useRecordMutation } from '@/hooks/useRecordMutation'
+import { useObjectPermissions } from '@/hooks/useObjectPermissions'
+import { useFieldPermissions } from '@/hooks/useFieldPermissions'
 import { FieldRenderer } from '@/components/FieldRenderer'
 import { DetailSection } from '@/components/DetailSection'
+import { InsufficientPrivileges } from '@/components/InsufficientPrivileges'
 import { useAppContext } from '@/context/AppContext'
 import type { FieldDefinition } from '@/hooks/useCollectionSchema'
 
@@ -126,6 +129,10 @@ export function ObjectDetailPage(): React.ReactElement {
     recordId,
   })
 
+  // Fetch permissions
+  const { permissions, isLoading: permissionsLoading } = useObjectPermissions(collectionName)
+  const { isFieldVisible } = useFieldPermissions(collectionName)
+
   // Mutations
   const mutations = useRecordMutation({
     collectionName: collectionName || '',
@@ -157,10 +164,12 @@ export function ObjectDetailPage(): React.ReactElement {
     }
   }, [record, recordId, collectionName, recordTitle, addRecentItem])
 
-  // Split fields into highlights and detail sections
+  // Split fields into highlights and detail sections (filtered by field permissions)
   const userFields = useMemo(() => {
-    return fields.filter((f) => !SYSTEM_FIELDS.has(f.name) && f.name !== 'id')
-  }, [fields])
+    return fields
+      .filter((f) => !SYSTEM_FIELDS.has(f.name) && f.name !== 'id')
+      .filter((f) => isFieldVisible(f.name))
+  }, [fields, isFieldVisible])
 
   const highlightFields = useMemo(() => {
     return userFields.slice(0, MAX_HIGHLIGHT_FIELDS)
@@ -195,7 +204,7 @@ export function ObjectDetailPage(): React.ReactElement {
     navigate(`${basePath}/o/${collectionName}/new`)
   }, [navigate, basePath, collectionName])
 
-  const isLoading = schemaLoading || recordLoading
+  const isLoading = schemaLoading || recordLoading || permissionsLoading
 
   // Loading state
   if (isLoading) {
@@ -203,6 +212,17 @@ export function ObjectDetailPage(): React.ReactElement {
       <div className="flex items-center justify-center p-12">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
+    )
+  }
+
+  // Permission check: user must have canRead
+  if (!permissions.canRead) {
+    return (
+      <InsufficientPrivileges
+        action="view"
+        resource={`this ${collectionLabel} record`}
+        backPath={`${basePath}/o/${collectionName}`}
+      />
     )
   }
 
@@ -277,10 +297,12 @@ export function ObjectDetailPage(): React.ReactElement {
         </div>
 
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" onClick={handleEdit}>
-            <Pencil className="mr-1.5 h-3.5 w-3.5" />
-            Edit
-          </Button>
+          {permissions.canEdit && (
+            <Button size="sm" variant="outline" onClick={handleEdit}>
+              <Pencil className="mr-1.5 h-3.5 w-3.5" />
+              Edit
+            </Button>
+          )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button size="sm" variant="outline" aria-label="More actions">
@@ -288,18 +310,22 @@ export function ObjectDetailPage(): React.ReactElement {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={handleClone}>
-                <Copy className="mr-2 h-4 w-4" />
-                Clone
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="text-destructive focus:text-destructive"
-                onClick={handleDelete}
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
-              </DropdownMenuItem>
+              {permissions.canCreate && (
+                <DropdownMenuItem onClick={handleClone}>
+                  <Copy className="mr-2 h-4 w-4" />
+                  Clone
+                </DropdownMenuItem>
+              )}
+              {permissions.canCreate && permissions.canDelete && <DropdownMenuSeparator />}
+              {permissions.canDelete && (
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onClick={handleDelete}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

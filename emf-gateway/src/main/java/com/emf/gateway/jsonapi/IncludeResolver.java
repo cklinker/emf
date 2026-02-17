@@ -84,9 +84,15 @@ public class IncludeResolver {
     /**
      * Extracts resource identifiers from relationships in primary data.
      * Only extracts identifiers for relationships specified in includeParams.
-     * Supports matching by both relationship key name and relationship display name
-     * (case-insensitive) to allow named relationships like "Account" to resolve
-     * to the underlying relationship key "account_id".
+     *
+     * <p>Matching is attempted in three stages:
+     * <ol>
+     *   <li>Exact match on relationship key (e.g. include=category matches relationships.category)</li>
+     *   <li>Case-insensitive match on relationship key (e.g. include=Category matches relationships.category)</li>
+     *   <li>Match by target collection type: if the include name matches the {@code data.type} of any
+     *       relationship, that relationship is included. This allows {@code ?include=categories} to resolve
+     *       a relationship keyed as {@code category_id} whose target type is {@code categories}.</li>
+     * </ol>
      *
      * @param includeParams List of relationship names to include
      * @param primaryData List of primary data resources
@@ -106,34 +112,59 @@ public class IncludeResolver {
 
             // For each requested include parameter
             for (String includeName : includeParams) {
-                Relationship relationship = relationships.get(includeName);
+                List<Relationship> matched = new ArrayList<>();
 
-                // Fallback: try case-insensitive match on relationship keys
-                if (relationship == null) {
+                // 1. Exact match on relationship key
+                Relationship exactMatch = relationships.get(includeName);
+                if (exactMatch != null) {
+                    matched.add(exactMatch);
+                }
+
+                // 2. Fallback: case-insensitive match on relationship keys
+                if (matched.isEmpty()) {
                     for (Map.Entry<String, Relationship> entry : relationships.entrySet()) {
                         if (entry.getKey().equalsIgnoreCase(includeName)) {
-                            relationship = entry.getValue();
+                            matched.add(entry.getValue());
                             break;
                         }
                     }
                 }
 
-                if (relationship == null) {
-                    continue;
+                // 3. Fallback: match by target collection type (data.type)
+                //    e.g. include=categories matches a relationship whose data.type is "categories"
+                if (matched.isEmpty()) {
+                    for (Relationship rel : relationships.values()) {
+                        if (rel.isSingleResource()) {
+                            ResourceIdentifier rid = rel.getDataAsSingle();
+                            if (rid != null && includeName.equalsIgnoreCase(rid.getType())) {
+                                matched.add(rel);
+                            }
+                        } else if (rel.isResourceCollection()) {
+                            List<ResourceIdentifier> collection = rel.getDataAsCollection();
+                            if (collection != null && !collection.isEmpty()) {
+                                ResourceIdentifier first = collection.get(0);
+                                if (first != null && includeName.equalsIgnoreCase(first.getType())) {
+                                    matched.add(rel);
+                                }
+                            }
+                        }
+                    }
                 }
 
-                // Extract identifiers from relationship data
-                if (relationship.isSingleResource()) {
-                    ResourceIdentifier identifier = relationship.getDataAsSingle();
-                    if (identifier != null && identifier.getType() != null && identifier.getId() != null) {
-                        identifiers.add(identifier);
-                    }
-                } else if (relationship.isResourceCollection()) {
-                    List<ResourceIdentifier> collection = relationship.getDataAsCollection();
-                    if (collection != null) {
-                        for (ResourceIdentifier identifier : collection) {
-                            if (identifier != null && identifier.getType() != null && identifier.getId() != null) {
-                                identifiers.add(identifier);
+                // Extract identifiers from all matched relationships
+                for (Relationship relationship : matched) {
+                    if (relationship.isSingleResource()) {
+                        ResourceIdentifier identifier = relationship.getDataAsSingle();
+                        if (identifier != null && identifier.getType() != null && identifier.getId() != null) {
+                            identifiers.add(identifier);
+                        }
+                    } else if (relationship.isResourceCollection()) {
+                        List<ResourceIdentifier> collection = relationship.getDataAsCollection();
+                        if (collection != null) {
+                            for (ResourceIdentifier identifier : collection) {
+                                if (identifier != null && identifier.getType() != null && identifier.getId() != null) {
+                                    identifiers.add(identifier);
+                                }
                             }
                         }
                     }

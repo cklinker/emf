@@ -35,6 +35,9 @@ import { Separator } from '@/components/ui/separator'
 import { useCollectionSchema } from '@/hooks/useCollectionSchema'
 import { useRecord } from '@/hooks/useRecord'
 import { useRecordMutation } from '@/hooks/useRecordMutation'
+import { useObjectPermissions } from '@/hooks/useObjectPermissions'
+import { useFieldPermissions } from '@/hooks/useFieldPermissions'
+import { InsufficientPrivileges } from '@/components/InsufficientPrivileges'
 import type { FieldDefinition, FieldType } from '@/hooks/useCollectionSchema'
 
 /** System fields excluded from forms */
@@ -88,13 +91,20 @@ interface FormFieldProps {
   field: FieldDefinition
   value: unknown
   onChange: (name: string, value: unknown) => void
+  /** Whether the field is read-only due to field-level permissions */
+  readOnly?: boolean
 }
 
 /**
  * Renders the appropriate form control for a field type.
  */
-function FormField({ field, value, onChange }: FormFieldProps): React.ReactElement {
-  const isReadOnly = READ_ONLY_TYPES.has(field.type)
+function FormField({
+  field,
+  value,
+  onChange,
+  readOnly = false,
+}: FormFieldProps): React.ReactElement {
+  const isReadOnly = READ_ONLY_TYPES.has(field.type) || readOnly
   const fieldId = `field-${field.name}`
 
   // Boolean fields use a checkbox
@@ -215,6 +225,8 @@ interface ObjectFormBodyProps {
   collectionLabel: string
   recordId?: string
   basePath: string
+  /** Check if a field is editable (VISIBLE vs READ_ONLY from field permissions) */
+  isFieldEditable?: (fieldName: string) => boolean
 }
 
 /**
@@ -230,12 +242,23 @@ function ObjectFormBody({
   collectionLabel,
   recordId,
   basePath,
+  isFieldEditable,
 }: ObjectFormBodyProps): React.ReactElement {
   const navigate = useNavigate()
   const [formData, setFormData] = useState<Record<string, unknown>>(initialData)
 
-  // Editable fields (exclude system and read-only)
+  // Editable fields (exclude system, read-only types, and permission-read-only fields)
   const editableFields = useMemo(() => {
+    return fields.filter(
+      (f) =>
+        !SYSTEM_FIELDS.has(f.name) &&
+        !READ_ONLY_TYPES.has(f.type) &&
+        (!isFieldEditable || isFieldEditable(f.name))
+    )
+  }, [fields, isFieldEditable])
+
+  // All visible non-system fields (including read-only for display)
+  const displayFields = useMemo(() => {
     return fields.filter((f) => !SYSTEM_FIELDS.has(f.name) && !READ_ONLY_TYPES.has(f.type))
   }, [fields])
 
@@ -336,18 +359,22 @@ function ObjectFormBody({
           <CardTitle className="text-sm font-medium">{collectionLabel} Information</CardTitle>
         </CardHeader>
         <CardContent>
-          {editableFields.length === 0 ? (
+          {displayFields.length === 0 ? (
             <p className="text-sm text-muted-foreground">No editable fields in this collection.</p>
           ) : (
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-              {editableFields.map((field) => (
-                <FormField
-                  key={field.name}
-                  field={field}
-                  value={formData[field.name]}
-                  onChange={handleFieldChange}
-                />
-              ))}
+              {displayFields.map((field) => {
+                const fieldIsEditable = !isFieldEditable || isFieldEditable(field.name)
+                return (
+                  <FormField
+                    key={field.name}
+                    field={field}
+                    value={formData[field.name]}
+                    onChange={fieldIsEditable ? handleFieldChange : () => {}}
+                    readOnly={!fieldIsEditable}
+                  />
+                )
+              })}
             </div>
           )}
         </CardContent>
@@ -385,7 +412,16 @@ export function ObjectFormPage(): React.ReactElement {
     enabled: !isNew,
   })
 
-  const isLoading = schemaLoading || (!isNew && recordLoading)
+  // Fetch permissions
+  const { permissions, isLoading: permissionsLoading } = useObjectPermissions(collectionName)
+  const { isFieldVisible, isFieldEditable } = useFieldPermissions(collectionName)
+
+  // Filter fields by field-level permissions (hidden fields excluded, read-only shown as disabled)
+  const permissionFilteredFields = useMemo(() => {
+    return fields.filter((f) => isFieldVisible(f.name))
+  }, [fields, isFieldVisible])
+
+  const isLoading = schemaLoading || (!isNew && recordLoading) || permissionsLoading
 
   // Collection label
   const collectionLabel =
@@ -395,10 +431,12 @@ export function ObjectFormPage(): React.ReactElement {
   // Compute initial data and a key that changes when the data source changes.
   // The key forces ObjectFormBody to remount, running useState with fresh initialData.
   const initialData = useMemo(
-    () => computeInitialFormData(isNew, record, fields),
-    [isNew, record, fields]
+    () => computeInitialFormData(isNew, record, permissionFilteredFields),
+    [isNew, record, permissionFilteredFields]
   )
-  const formKey = isNew ? `new:${fields.length}` : `edit:${recordId}:${record?.id ?? 'loading'}`
+  const formKey = isNew
+    ? `new:${permissionFilteredFields.length}`
+    : `edit:${recordId}:${record?.id ?? 'loading'}`
 
   // Handle cancel (needed for error state)
   const handleCancel = useCallback(() => {
@@ -415,6 +453,22 @@ export function ObjectFormPage(): React.ReactElement {
       <div className="flex items-center justify-center p-12">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
+    )
+  }
+
+  // Permission check: canCreate for new, canEdit for edit
+  const requiredPermission = isNew ? permissions.canCreate : permissions.canEdit
+  if (!requiredPermission) {
+    return (
+      <InsufficientPrivileges
+        action={isNew ? 'create' : 'edit'}
+        resource={collectionLabel}
+        backPath={
+          recordId
+            ? `${basePath}/o/${collectionName}/${recordId}`
+            : `${basePath}/o/${collectionName}`
+        }
+      />
     )
   }
 
@@ -441,11 +495,12 @@ export function ObjectFormPage(): React.ReactElement {
       key={formKey}
       isNew={isNew}
       initialData={initialData}
-      fields={fields}
+      fields={permissionFilteredFields}
       collectionName={collectionName || ''}
       collectionLabel={collectionLabel}
       recordId={recordId}
       basePath={basePath}
+      isFieldEditable={isFieldEditable}
     />
   )
 }

@@ -61,3 +61,18 @@ export {
 
 // Single record hook for fetching a record by ID
 export { useRecord, type UseRecordOptions, type UseRecordReturn } from './useRecord'
+
+// Object-level permission hook (CRUD permissions per collection)
+export {
+  useObjectPermissions,
+  type ObjectPermissions,
+  type UseObjectPermissionsReturn,
+} from './useObjectPermissions'
+
+// Field-level permission hook (visibility per field)
+export {
+  useFieldPermissions,
+  type FieldVisibility,
+  type FieldPermissionMap,
+  type UseFieldPermissionsReturn,
+} from './useFieldPermissions'

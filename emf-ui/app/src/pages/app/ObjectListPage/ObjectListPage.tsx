@@ -41,10 +41,13 @@ import { Button } from '@/components/ui/button'
 import { useCollectionSchema } from '@/hooks/useCollectionSchema'
 import { useCollectionRecords } from '@/hooks/useCollectionRecords'
 import { useRecordMutation } from '@/hooks/useRecordMutation'
+import { useObjectPermissions } from '@/hooks/useObjectPermissions'
+import { useFieldPermissions } from '@/hooks/useFieldPermissions'
 import type { SortState, CollectionRecord } from '@/hooks/useCollectionRecords'
 import { ObjectDataTable } from '@/components/ObjectDataTable/ObjectDataTable'
 import { DataTablePagination } from '@/components/ObjectDataTable/DataTablePagination'
 import { ListViewToolbar } from '@/components/ListViewToolbar'
+import { InsufficientPrivileges } from '@/components/InsufficientPrivileges'
 
 /**
  * Escape a value for CSV format.
@@ -129,13 +132,20 @@ export function ObjectListPage(): React.ReactElement {
     error: schemaError,
   } = useCollectionSchema(collectionName)
 
-  // Determine visible fields (first 6 fields by default, excluding system fields)
+  // Fetch object-level permissions (CRUD flags)
+  const { permissions, isLoading: permissionsLoading } = useObjectPermissions(collectionName)
+
+  // Fetch field-level permissions (visibility per field)
+  const { isFieldVisible } = useFieldPermissions(collectionName)
+
+  // Determine visible fields (first 6 fields by default, excluding system and hidden fields)
   const visibleFields = useMemo(() => {
     if (!fields.length) return []
     return fields
       .filter((f) => !['createdAt', 'updatedAt', 'createdBy', 'updatedBy'].includes(f.name))
+      .filter((f) => isFieldVisible(f.name))
       .slice(0, 6)
-  }, [fields])
+  }, [fields, isFieldVisible])
 
   // Fetch records
   const {
@@ -292,12 +302,23 @@ export function ObjectListPage(): React.ReactElement {
     setSelectedIds(new Set())
   }, [])
 
-  // Loading state for schema
-  if (schemaLoading) {
+  // Loading state for schema and permissions
+  if (schemaLoading || permissionsLoading) {
     return (
       <div className="flex items-center justify-center p-12">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
+    )
+  }
+
+  // Permission check: user must have canRead
+  if (!permissions.canRead) {
+    return (
+      <InsufficientPrivileges
+        action="view"
+        resource={collectionLabel}
+        backPath={`${basePath}/home`}
+      />
     )
   }
 
@@ -346,6 +367,8 @@ export function ObjectListPage(): React.ReactElement {
         onExportCsv={handleExportCsv}
         onExportJson={handleExportJson}
         onClearSelection={handleClearSelection}
+        canCreate={permissions.canCreate}
+        canDelete={permissions.canDelete}
       />
 
       {/* Error state for records */}
@@ -367,8 +390,8 @@ export function ObjectListPage(): React.ReactElement {
         onSelectionChange={setSelectedIds}
         isLoading={recordsLoading}
         collectionName={collectionName || ''}
-        onEdit={handleEdit}
-        onDelete={handleDeleteClick}
+        onEdit={permissions.canEdit ? handleEdit : undefined}
+        onDelete={permissions.canDelete ? handleDeleteClick : undefined}
       />
 
       {/* Pagination */}

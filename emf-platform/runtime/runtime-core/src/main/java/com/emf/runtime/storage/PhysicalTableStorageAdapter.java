@@ -656,6 +656,38 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
                 if (value instanceof java.time.Instant instant) {
                     yield java.sql.Timestamp.from(instant);
                 }
+                // Handle LocalDate conversion (for DATE fields)
+                if (value instanceof java.time.LocalDate localDate) {
+                    yield java.sql.Date.valueOf(localDate);
+                }
+                // Handle LocalDateTime conversion
+                if (value instanceof java.time.LocalDateTime localDateTime) {
+                    yield java.sql.Timestamp.valueOf(localDateTime);
+                }
+                // Safety net: parse String if coercion was bypassed
+                if (value instanceof String str) {
+                    String trimmed = str.trim();
+                    try {
+                        yield java.sql.Timestamp.from(java.time.Instant.parse(trimmed));
+                    } catch (java.time.format.DateTimeParseException e) {
+                        // Try LocalDateTime
+                    }
+                    try {
+                        java.time.LocalDateTime ldt = java.time.LocalDateTime.parse(trimmed);
+                        yield java.sql.Timestamp.from(ldt.toInstant(java.time.ZoneOffset.UTC));
+                    } catch (java.time.format.DateTimeParseException e) {
+                        // Try LocalDate
+                    }
+                    try {
+                        java.time.LocalDate ld = java.time.LocalDate.parse(trimmed);
+                        if (type == FieldType.DATE) {
+                            yield java.sql.Date.valueOf(ld);
+                        }
+                        yield java.sql.Timestamp.from(ld.atStartOfDay().toInstant(java.time.ZoneOffset.UTC));
+                    } catch (java.time.format.DateTimeParseException e) {
+                        // Cannot parse — fall through and let JDBC handle it
+                    }
+                }
                 yield value;
             }
             case MULTI_PICKLIST -> {

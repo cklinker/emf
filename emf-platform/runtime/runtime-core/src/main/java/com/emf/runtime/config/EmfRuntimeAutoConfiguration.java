@@ -18,11 +18,14 @@ import com.emf.runtime.validation.DefaultValidationEngine;
 import com.emf.runtime.validation.ValidationEngine;
 import com.emf.runtime.validation.ValidationRuleEvaluator;
 import com.emf.runtime.validation.ValidationRuleRegistry;
+import org.apache.coyote.http11.AbstractHttp11Protocol;
 import org.springframework.beans.factory.annotation.Autowired;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.web.embedded.tomcat.TomcatServletWebServerFactory;
+import org.springframework.boot.web.server.WebServerFactoryCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
@@ -172,5 +175,23 @@ public class EmfRuntimeAutoConfiguration {
     @ConditionalOnMissingBean(name = "globalExceptionHandler")
     public GlobalExceptionHandler globalExceptionHandler() {
         return new GlobalExceptionHandler();
+    }
+
+    /**
+     * Configures embedded Tomcat to allow square brackets in query strings.
+     *
+     * <p>JSON:API uses bracket notation for pagination and filtering parameters
+     * (e.g. {@code page[size]=20}, {@code filter[name]=value}). By default Tomcat
+     * rejects {@code [} and {@code ]} as invalid characters per RFC 7230/3986.
+     * This customizer adds them to the relaxed query character set.
+     */
+    @Bean
+    @ConditionalOnMissingBean(name = "emfTomcatCustomizer")
+    public WebServerFactoryCustomizer<TomcatServletWebServerFactory> emfTomcatCustomizer() {
+        return factory -> factory.addConnectorCustomizers(connector -> {
+            if (connector.getProtocolHandler() instanceof AbstractHttp11Protocol<?> protocol) {
+                protocol.setRelaxedQueryChars("[]");
+            }
+        });
     }
 }

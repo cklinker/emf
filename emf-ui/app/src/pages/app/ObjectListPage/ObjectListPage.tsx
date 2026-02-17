@@ -16,7 +16,7 @@
  * - Breadcrumb navigation
  */
 
-import React, { useState, useCallback, useMemo } from 'react'
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { useNavigate, useParams, useSearchParams, Link } from 'react-router-dom'
 import { Loader2, AlertCircle } from 'lucide-react'
 import {
@@ -51,6 +51,7 @@ import { ListViewToolbar } from '@/components/ListViewToolbar'
 import { FilterBar } from '@/components/FilterBar'
 import { InsufficientPrivileges } from '@/components/InsufficientPrivileges'
 import { QuickActionsMenu } from '@/components/QuickActions'
+import { useAnnounce } from '@/components/LiveRegion'
 import type { QuickActionExecutionContext } from '@/types/quickActions'
 
 /**
@@ -202,6 +203,22 @@ export function ObjectListPage(): React.ReactElement {
     enabled: !!schema,
   })
 
+  // Screen reader announcements for dynamic state changes
+  const { announce } = useAnnounce()
+  const prevRecordsLoadingRef = useRef(recordsLoading)
+
+  useEffect(() => {
+    // Announce when records finish loading
+    if (prevRecordsLoadingRef.current && !recordsLoading) {
+      if (recordsError) {
+        announce('Error loading records', 'assertive')
+      } else {
+        announce(`Loaded ${records.length} of ${total} records`)
+      }
+    }
+    prevRecordsLoadingRef.current = recordsLoading
+  }, [recordsLoading, records.length, total, recordsError, announce])
+
   // Mutations
   const mutations = useRecordMutation({
     collectionName: collectionName || '',
@@ -209,6 +226,7 @@ export function ObjectListPage(): React.ReactElement {
       setDeleteTarget(null)
       setShowBulkDeleteDialog(false)
       setSelectedIds(new Set())
+      announce('Record deleted successfully')
     },
   })
 

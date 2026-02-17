@@ -91,21 +91,21 @@ describe('ConfirmDialog Component', () => {
       renderWithI18n(<ConfirmDialog {...defaultProps} />)
 
       const dialog = screen.getByTestId('confirm-dialog')
-      expect(dialog.className).toMatch(/default/)
+      expect(dialog).toHaveAttribute('data-variant', 'default')
     })
 
     it('should render with danger variant styling', () => {
       renderWithI18n(<ConfirmDialog {...defaultProps} variant="danger" />)
 
       const dialog = screen.getByTestId('confirm-dialog')
-      expect(dialog.className).toMatch(/danger/)
+      expect(dialog).toHaveAttribute('data-variant', 'danger')
     })
 
     it('should render danger button with danger variant', () => {
       renderWithI18n(<ConfirmDialog {...defaultProps} variant="danger" />)
 
       const confirmButton = screen.getByTestId('confirm-dialog-confirm')
-      expect(confirmButton.className).toMatch(/dangerButton/)
+      expect(confirmButton).toHaveAttribute('data-variant', 'destructive')
     })
   })
 
@@ -411,8 +411,11 @@ describe('ConfirmDialog Integration', () => {
     render(<TestComponent />)
 
     // Verify danger styling
-    expect(screen.getByTestId('confirm-dialog').className).toMatch(/danger/)
-    expect(screen.getByTestId('confirm-dialog-confirm').className).toMatch(/dangerButton/)
+    expect(screen.getByTestId('confirm-dialog')).toHaveAttribute('data-variant', 'danger')
+    expect(screen.getByTestId('confirm-dialog-confirm')).toHaveAttribute(
+      'data-variant',
+      'destructive'
+    )
 
     // Verify custom labels
     expect(screen.getByTestId('confirm-dialog-confirm')).toHaveTextContent('Delete')

@@ -24,7 +24,8 @@
 
 import React, { useEffect, useRef, useCallback } from 'react'
 import { useI18n } from '../../context/I18nContext'
-import styles from './ConfirmDialog.module.css'
+import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
 
 /**
  * ConfirmDialog variant type
@@ -242,44 +243,64 @@ export function ConfirmDialog({
 
   return (
     <div
-      className={styles.overlay}
+      className={cn(
+        'fixed inset-0 z-[10000] flex items-center justify-center p-4',
+        'bg-black/50 animate-in fade-in duration-200'
+      )}
       onClick={handleOverlayClick}
       data-testid="confirm-dialog-overlay"
       aria-hidden="true"
     >
       <div
         ref={dialogRef}
-        className={`${styles.dialog} ${styles[variant]}`}
+        className={cn(
+          'relative flex flex-col w-full max-w-md max-h-[calc(100vh-2rem)]',
+          'p-6 bg-background rounded-lg shadow-xl',
+          'animate-in fade-in zoom-in-95 duration-200 overflow-auto'
+        )}
         role="alertdialog"
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
         data-testid="confirm-dialog"
+        data-variant={variant}
         tabIndex={-1}
       >
-        <h2 id={titleId} className={styles.title} data-testid="confirm-dialog-title">
+        <h2
+          id={titleId}
+          className={cn(
+            'm-0 mb-3 text-xl font-semibold leading-[1.4] text-foreground',
+            variant === 'danger' && 'text-red-700 dark:text-red-400'
+          )}
+          data-testid="confirm-dialog-title"
+        >
           {title}
         </h2>
-        <p id={descriptionId} className={styles.message} data-testid="confirm-dialog-message">
+        <p
+          id={descriptionId}
+          className="m-0 mb-6 text-[15px] leading-relaxed text-muted-foreground"
+          data-testid="confirm-dialog-message"
+        >
           {message}
         </p>
-        <div className={styles.actions}>
-          <button
+        <div className="flex gap-3 justify-end mt-auto">
+          <Button
             type="button"
-            className={styles.cancelButton}
+            variant="outline"
             onClick={handleCancel}
             data-testid="confirm-dialog-cancel"
           >
             {resolvedCancelLabel}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
-            className={`${styles.confirmButton} ${variant === 'danger' ? styles.dangerButton : ''}`}
+            variant={variant === 'danger' ? 'destructive' : 'default'}
             onClick={handleConfirm}
             data-testid="confirm-dialog-confirm"
+            data-variant={variant === 'danger' ? 'destructive' : 'default'}
           >
             {resolvedConfirmLabel}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

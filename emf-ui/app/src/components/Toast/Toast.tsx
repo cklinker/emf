@@ -27,7 +27,7 @@ import React, {
   useRef,
 } from 'react'
 import { CheckCircle, XCircle, AlertTriangle, Info } from 'lucide-react'
-import styles from './Toast.module.css'
+import { cn } from '@/lib/utils'
 
 /**
  * Toast type variants
@@ -149,6 +149,26 @@ function getAriaLive(type: ToastType): 'assertive' | 'polite' {
   return type === 'error' || type === 'warning' ? 'assertive' : 'polite'
 }
 
+/** Tailwind classes for each toast type variant */
+const toastTypeClasses: Record<ToastType, string> = {
+  success:
+    'bg-emerald-500 text-white border-l-4 border-l-emerald-600 dark:bg-emerald-900 dark:border-l-emerald-500',
+  error: 'bg-red-500 text-white border-l-4 border-l-red-600 dark:bg-red-900 dark:border-l-red-500',
+  warning:
+    'bg-amber-500 text-gray-800 border-l-4 border-l-amber-600 dark:bg-amber-900 dark:text-amber-100 dark:border-l-amber-500',
+  info: 'bg-blue-500 text-white border-l-4 border-l-blue-600 dark:bg-blue-900 dark:border-l-blue-500',
+}
+
+/** Tailwind classes for container position variants (includes position key for test matching) */
+const positionClasses: Record<string, string> = {
+  'top-right': 'topright top-0 right-0 items-end',
+  'top-left': 'topleft top-0 left-0 items-start',
+  'bottom-right': 'bottomright bottom-0 right-0 items-end flex-col-reverse',
+  'bottom-left': 'bottomleft bottom-0 left-0 items-start flex-col-reverse',
+  'top-center': 'topcenter top-0 left-1/2 -translate-x-1/2 items-center',
+  'bottom-center': 'bottomcenter bottom-0 left-1/2 -translate-x-1/2 items-center flex-col-reverse',
+}
+
 /**
  * Individual Toast Component
  *
@@ -162,7 +182,17 @@ export function Toast({
   onClose,
 }: ToastProps): React.ReactElement {
   const [isExiting, setIsExiting] = useState(false)
+  const [isVisible, setIsVisible] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Trigger enter animation on mount
+  useEffect(() => {
+    // Use a rAF to ensure the initial styles are painted before transitioning
+    const frame = requestAnimationFrame(() => {
+      setIsVisible(true)
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [])
 
   // Handle close with exit animation
   const handleClose = useCallback(() => {
@@ -170,7 +200,7 @@ export function Toast({
     // Wait for exit animation to complete before calling onClose
     setTimeout(() => {
       onClose()
-    }, 200) // Match CSS animation duration
+    }, 200) // Match transition duration
   }, [onClose])
 
   // Set up auto-dismiss timer
@@ -204,27 +234,50 @@ export function Toast({
 
   return (
     <div
-      className={`${styles.toast} ${styles[type]} ${isExiting ? styles.exiting : ''}`}
+      className={cn(
+        'flex items-center gap-3 py-3.5 px-4 rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.15),0_2px_4px_rgba(0,0,0,0.1)] min-w-[280px] max-w-[420px] pointer-events-auto',
+        'transition-all duration-200 ease-out',
+        'forced-colors:border-2 forced-colors:border-current',
+        toastTypeClasses[type]
+      )}
+      style={{
+        opacity: isExiting ? 0 : isVisible ? 1 : 0,
+        transform: isExiting
+          ? 'translateX(100%)'
+          : isVisible
+            ? 'translateX(0)'
+            : 'translateX(100%)',
+      }}
       role={role}
       aria-live={ariaLive}
       aria-atomic="true"
       data-testid={`toast-${type}`}
       onKeyDown={handleKeyDown}
     >
-      <span className={styles.icon} aria-hidden="true" data-testid="toast-icon">
+      <span
+        className="flex items-center justify-center w-6 h-6 text-base font-bold shrink-0 rounded-full bg-white/20"
+        aria-hidden="true"
+        data-testid="toast-icon"
+      >
         {icon}
       </span>
-      <span className={styles.message} data-testid="toast-message">
+      <span className="flex-1 text-[15px] leading-[1.4] break-words" data-testid="toast-message">
         {message}
       </span>
       <button
         type="button"
-        className={styles.closeButton}
+        className={cn(
+          'flex items-center justify-center w-7 h-7 p-0 border-none rounded bg-transparent text-current text-xl leading-none cursor-pointer opacity-70 shrink-0',
+          'transition-[opacity,background-color] duration-150',
+          'hover:opacity-100 hover:bg-black/10',
+          'focus-visible:outline-2 focus-visible:outline-current focus-visible:outline-offset-2 focus-visible:opacity-100',
+          'forced-colors:focus:outline-[3px] forced-colors:focus:outline-current'
+        )}
         onClick={handleClose}
         aria-label="Close notification"
         data-testid="toast-close-button"
       >
-        <span aria-hidden="true">×</span>
+        <span aria-hidden="true">&times;</span>
       </button>
     </div>
   )
@@ -251,7 +304,11 @@ function ToastContainer({
 
   return (
     <div
-      className={`${styles.container} ${styles[position.replace('-', '')]}`}
+      className={cn(
+        'fixed z-[9999] flex flex-col gap-3 p-4 pointer-events-none max-h-screen overflow-hidden',
+        'max-[480px]:p-2 max-[480px]:left-0 max-[480px]:right-0',
+        positionClasses[position ?? DEFAULT_POSITION]
+      )}
       data-testid="toast-container"
       aria-label="Notifications"
     >

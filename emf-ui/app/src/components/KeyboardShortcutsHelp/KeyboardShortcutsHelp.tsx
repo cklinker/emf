@@ -3,17 +3,24 @@
  *
  * Modal overlay that displays all available keyboard shortcuts grouped
  * by category. Opened by pressing the `?` key.
+ * Built on shadcn Dialog (Radix UI) with Tailwind CSS styling.
  *
  * Features:
  * - Grouped shortcuts table (Navigation, Search, Record Actions, General)
  * - Styled kbd elements for key display
- * - Accessible modal with role="dialog" and role="presentation" backdrop
+ * - Accessible modal with role="dialog" and Radix overlay
  * - Escape to close, close button in header
  */
 
-import { useEffect, useRef } from 'react'
 import { useI18n } from '../../context/I18nContext'
-import styles from './KeyboardShortcutsHelp.module.css'
+import { cn } from '@/lib/utils'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog'
 
 export interface KeyboardShortcutsHelpProps {
   isOpen: boolean
@@ -70,88 +77,61 @@ const shortcutGroups: ShortcutGroup[] = [
 
 export function KeyboardShortcutsHelp({ isOpen, onClose }: KeyboardShortcutsHelpProps) {
   const { t } = useI18n()
-  const modalRef = useRef<HTMLDivElement>(null)
-
-  // Focus trap and escape handling
-  useEffect(() => {
-    if (!isOpen) return
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation()
-        onClose()
-      }
-    }
-
-    document.addEventListener('keydown', handleKeyDown, true)
-
-    // Focus the modal when opened
-    if (modalRef.current) {
-      modalRef.current.focus()
-    }
-
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown, true)
-    }
-  }, [isOpen, onClose])
-
-  if (!isOpen) return null
 
   // Fix: the `/` key should display as `/`
   const displayKey = (key: string) => (key === '\u2044' ? '/' : key)
 
   return (
-    <div
-      className={styles.overlay}
-      role="presentation"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose()
-      }}
-      data-testid="keyboard-shortcuts-help"
-    >
-      <div
-        className={styles.modal}
-        role="dialog"
-        aria-modal="true"
-        aria-label={t('shortcuts.title')}
-        ref={modalRef}
-        tabIndex={-1}
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent
+        className="sm:max-w-[560px] max-h-[80vh] overflow-y-auto p-6"
+        data-testid="keyboard-shortcuts-help"
       >
-        <div className={styles.header}>
-          <h2 className={styles.title}>{t('shortcuts.title')}</h2>
-          <button
-            type="button"
-            className={styles.closeButton}
-            onClick={onClose}
-            aria-label={t('common.close')}
-          >
-            &times;
-          </button>
-        </div>
+        <DialogHeader>
+          <DialogTitle className="text-lg font-semibold text-foreground">
+            {t('shortcuts.title')}
+          </DialogTitle>
+          <DialogDescription className="sr-only">{t('shortcuts.title')}</DialogDescription>
+        </DialogHeader>
 
-        {shortcutGroups.map((group) => (
-          <div key={group.titleKey} className={styles.group}>
-            <h3 className={styles.groupTitle}>{t(group.titleKey)}</h3>
-            {group.shortcuts.map((shortcut) => (
-              <div key={shortcut.descriptionKey} className={styles.shortcutRow}>
-                <div className={styles.keys}>
-                  {shortcut.keys.map((keyCombo, comboIdx) => (
-                    <span key={comboIdx} className={styles.keys}>
-                      {keyCombo.map((key, keyIdx) => (
-                        <kbd key={keyIdx} className={styles.kbd}>
-                          {displayKey(key)}
-                        </kbd>
-                      ))}
-                    </span>
-                  ))}
+        <div className="space-y-4 mt-2">
+          {shortcutGroups.map((group) => (
+            <div key={group.titleKey}>
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                {t(group.titleKey)}
+              </h3>
+              {group.shortcuts.map((shortcut) => (
+                <div
+                  key={shortcut.descriptionKey}
+                  className={cn(
+                    'flex justify-between items-center py-2',
+                    'border-b border-border/40 last:border-b-0'
+                  )}
+                >
+                  <div className="flex gap-1">
+                    {shortcut.keys.map((keyCombo, comboIdx) => (
+                      <span key={comboIdx} className="flex gap-1">
+                        {keyCombo.map((key, keyIdx) => (
+                          <kbd
+                            key={keyIdx}
+                            className="inline-flex items-center justify-center min-w-[24px] rounded border bg-muted px-2 py-0.5 font-mono text-[0.6875rem] text-foreground shadow-[0_1px_0] shadow-border text-center"
+                          >
+                            {displayKey(key)}
+                          </kbd>
+                        ))}
+                      </span>
+                    ))}
+                  </div>
+                  <span className="text-sm text-muted-foreground">
+                    {t(shortcut.descriptionKey)}
+                  </span>
                 </div>
-                <span className={styles.description}>{t(shortcut.descriptionKey)}</span>
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
-    </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 

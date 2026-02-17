@@ -3,8 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
-
-import styles from './ListViewsPage.module.css'
+import { cn } from '@/lib/utils'
 
 interface CollectionSummary {
   id: string
@@ -154,26 +153,26 @@ function ListViewForm({
 
   return (
     <div
-      className={styles.modalOverlay}
+      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 p-4"
       onClick={(e) => e.target === e.currentTarget && onCancel()}
       onKeyDown={handleKeyDown}
       data-testid="listview-form-overlay"
       role="presentation"
     >
       <div
-        className={styles.modal}
+        className="w-full max-w-[700px] max-h-[90vh] overflow-y-auto rounded-lg bg-card shadow-xl"
         role="dialog"
         aria-modal="true"
         aria-labelledby="listview-form-title"
         data-testid="listview-form-modal"
       >
-        <div className={styles.modalHeader}>
-          <h2 id="listview-form-title" className={styles.modalTitle}>
+        <div className="flex items-center justify-between border-b border-border p-6">
+          <h2 id="listview-form-title" className="m-0 text-xl font-semibold text-foreground">
             {title}
           </h2>
           <button
             type="button"
-            className={styles.modalCloseButton}
+            className="rounded p-2 text-2xl leading-none text-muted-foreground hover:bg-muted hover:text-foreground"
             onClick={onCancel}
             aria-label="Close"
             data-testid="listview-form-close"
@@ -181,12 +180,15 @@ function ListViewForm({
             &times;
           </button>
         </div>
-        <div className={styles.modalBody}>
-          <form className={styles.form} onSubmit={handleSubmit} noValidate>
-            <div className={styles.formGroup}>
-              <label htmlFor="listview-name" className={styles.formLabel}>
+        <div className="p-6">
+          <form className="space-y-4" onSubmit={handleSubmit} noValidate>
+            <div>
+              <label
+                htmlFor="listview-name"
+                className="mb-1 block text-sm font-medium text-foreground"
+              >
                 Name
-                <span className={styles.required} aria-hidden="true">
+                <span className="ml-0.5 text-destructive" aria-hidden="true">
                   *
                 </span>
               </label>
@@ -194,7 +196,10 @@ function ListViewForm({
                 ref={nameInputRef}
                 id="listview-name"
                 type="text"
-                className={`${styles.formInput} ${touched.name && errors.name ? styles.hasError : ''}`}
+                className={cn(
+                  'w-full rounded-md border px-3 py-2 text-sm text-foreground bg-background focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary',
+                  touched.name && errors.name ? 'border-destructive' : 'border-border'
+                )}
                 value={formData.name}
                 onChange={(e) => handleChange('name', e.target.value)}
                 onBlur={() => handleBlur('name')}
@@ -205,22 +210,30 @@ function ListViewForm({
                 data-testid="listview-name-input"
               />
               {touched.name && errors.name && (
-                <span className={styles.formError} role="alert">
+                <span className="mt-1 block text-xs text-destructive" role="alert">
                   {errors.name}
                 </span>
               )}
             </div>
 
-            <div className={styles.formGroup}>
-              <label htmlFor="listview-collectionId" className={styles.formLabel}>
+            <div>
+              <label
+                htmlFor="listview-collectionId"
+                className="mb-1 block text-sm font-medium text-foreground"
+              >
                 Collection
-                <span className={styles.required} aria-hidden="true">
+                <span className="ml-0.5 text-destructive" aria-hidden="true">
                   *
                 </span>
               </label>
               <select
                 id="listview-collectionId"
-                className={`${styles.formInput} ${touched.collectionId && errors.collectionId ? styles.hasError : ''}`}
+                className={cn(
+                  'w-full rounded-md border px-3 py-2 text-sm text-foreground bg-background focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary',
+                  touched.collectionId && errors.collectionId
+                    ? 'border-destructive'
+                    : 'border-border'
+                )}
                 value={formData.collectionId}
                 onChange={(e) => handleChange('collectionId', e.target.value)}
                 onBlur={() => handleBlur('collectionId')}
@@ -237,19 +250,22 @@ function ListViewForm({
                 ))}
               </select>
               {touched.collectionId && errors.collectionId && (
-                <span className={styles.formError} role="alert">
+                <span className="mt-1 block text-xs text-destructive" role="alert">
                   {errors.collectionId}
                 </span>
               )}
             </div>
 
-            <div className={styles.formGroup}>
-              <label htmlFor="listview-visibility" className={styles.formLabel}>
+            <div>
+              <label
+                htmlFor="listview-visibility"
+                className="mb-1 block text-sm font-medium text-foreground"
+              >
                 Visibility
               </label>
               <select
                 id="listview-visibility"
-                className={`${styles.formInput} ${styles.formSelect}`}
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 value={formData.visibility}
                 onChange={(e) => handleChange('visibility', e.target.value)}
                 disabled={isSubmitting}
@@ -261,13 +277,19 @@ function ListViewForm({
               </select>
             </div>
 
-            <div className={styles.formGroup}>
-              <label htmlFor="listview-columns" className={styles.formLabel}>
+            <div>
+              <label
+                htmlFor="listview-columns"
+                className="mb-1 block text-sm font-medium text-foreground"
+              >
                 Columns
               </label>
               <textarea
                 id="listview-columns"
-                className={`${styles.formInput} ${styles.formTextarea} ${touched.columns && errors.columns ? styles.hasError : ''}`}
+                className={cn(
+                  'w-full rounded-md border px-3 py-2 text-sm text-foreground bg-background font-mono focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary',
+                  touched.columns && errors.columns ? 'border-destructive' : 'border-border'
+                )}
                 value={formData.columns}
                 onChange={(e) => handleChange('columns', e.target.value)}
                 onBlur={() => handleBlur('columns')}
@@ -276,21 +298,29 @@ function ListViewForm({
                 rows={3}
                 data-testid="listview-columns-input"
               />
-              <span className={styles.formHint}>JSON array of column field names</span>
+              <span className="mt-1 block text-xs text-muted-foreground">
+                JSON array of column field names
+              </span>
               {touched.columns && errors.columns && (
-                <span className={styles.formError} role="alert">
+                <span className="mt-1 block text-xs text-destructive" role="alert">
                   {errors.columns}
                 </span>
               )}
             </div>
 
-            <div className={styles.formGroup}>
-              <label htmlFor="listview-filters" className={styles.formLabel}>
+            <div>
+              <label
+                htmlFor="listview-filters"
+                className="mb-1 block text-sm font-medium text-foreground"
+              >
                 Filters
               </label>
               <textarea
                 id="listview-filters"
-                className={`${styles.formInput} ${styles.formTextarea} ${touched.filters && errors.filters ? styles.hasError : ''}`}
+                className={cn(
+                  'w-full rounded-md border px-3 py-2 text-sm text-foreground bg-background font-mono focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary',
+                  touched.filters && errors.filters ? 'border-destructive' : 'border-border'
+                )}
                 value={formData.filters}
                 onChange={(e) => handleChange('filters', e.target.value)}
                 onBlur={() => handleBlur('filters')}
@@ -299,22 +329,27 @@ function ListViewForm({
                 rows={3}
                 data-testid="listview-filters-input"
               />
-              <span className={styles.formHint}>JSON array of filter objects</span>
+              <span className="mt-1 block text-xs text-muted-foreground">
+                JSON array of filter objects
+              </span>
               {touched.filters && errors.filters && (
-                <span className={styles.formError} role="alert">
+                <span className="mt-1 block text-xs text-destructive" role="alert">
                   {errors.filters}
                 </span>
               )}
             </div>
 
-            <div className={styles.formGroup}>
-              <label htmlFor="listview-sortField" className={styles.formLabel}>
+            <div>
+              <label
+                htmlFor="listview-sortField"
+                className="mb-1 block text-sm font-medium text-foreground"
+              >
                 Sort Field
               </label>
               <input
                 id="listview-sortField"
                 type="text"
-                className={styles.formInput}
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 value={formData.sortField}
                 onChange={(e) => handleChange('sortField', e.target.value)}
                 placeholder="Enter sort field name"
@@ -323,13 +358,16 @@ function ListViewForm({
               />
             </div>
 
-            <div className={styles.formGroup}>
-              <label htmlFor="listview-sortDirection" className={styles.formLabel}>
+            <div>
+              <label
+                htmlFor="listview-sortDirection"
+                className="mb-1 block text-sm font-medium text-foreground"
+              >
                 Sort Direction
               </label>
               <select
                 id="listview-sortDirection"
-                className={`${styles.formInput} ${styles.formSelect}`}
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 value={formData.sortDirection}
                 onChange={(e) => handleChange('sortDirection', e.target.value)}
                 disabled={isSubmitting}
@@ -340,10 +378,10 @@ function ListViewForm({
               </select>
             </div>
 
-            <div className={styles.formActions}>
+            <div className="flex justify-end gap-2 pt-2">
               <button
                 type="button"
-                className={styles.cancelButton}
+                className="rounded-md border border-border bg-secondary px-4 py-2 text-sm text-foreground hover:bg-muted disabled:opacity-50"
                 onClick={onCancel}
                 disabled={isSubmitting}
                 data-testid="listview-form-cancel"
@@ -352,7 +390,7 @@ function ListViewForm({
               </button>
               <button
                 type="submit"
-                className={styles.submitButton}
+                className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                 disabled={isSubmitting}
                 data-testid="listview-form-submit"
               >
@@ -523,18 +561,18 @@ export function ListViewsPage({
   const getVisibilityBadgeClass = (visibility: string): string => {
     switch (visibility) {
       case 'PUBLIC':
-        return styles.badgePublic
+        return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
       case 'GROUP':
-        return styles.badgeGroup
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300'
       default:
-        return styles.badgePrivate
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'
     }
   }
 
   if (isLoading) {
     return (
-      <div className={styles.container} data-testid={testId}>
-        <div className={styles.loadingContainer}>
+      <div className="mx-auto max-w-[1400px] space-y-6 p-6 lg:p-8" data-testid={testId}>
+        <div className="flex min-h-[400px] items-center justify-center">
           <LoadingSpinner size="large" label="Loading..." />
         </div>
       </div>
@@ -543,7 +581,7 @@ export function ListViewsPage({
 
   if (error) {
     return (
-      <div className={styles.container} data-testid={testId}>
+      <div className="mx-auto max-w-[1400px] space-y-6 p-6 lg:p-8" data-testid={testId}>
         <ErrorMessage
           error={error instanceof Error ? error : new Error('An error occurred')}
           onRetry={() => refetch()}
@@ -555,12 +593,12 @@ export function ListViewsPage({
   const isSubmitting = createMutation.isPending || updateMutation.isPending
 
   return (
-    <div className={styles.container} data-testid={testId}>
-      <header className={styles.header}>
-        <h1 className={styles.title}>List Views</h1>
+    <div className="mx-auto max-w-[1400px] space-y-6 p-6 lg:p-8" data-testid={testId}>
+      <header className="flex items-center justify-between">
+        <h1 className="m-0 text-2xl font-semibold text-foreground">List Views</h1>
         <button
           type="button"
-          className={styles.createButton}
+          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
           onClick={handleCreate}
           aria-label="Create List View"
           data-testid="add-listview-button"
@@ -570,35 +608,62 @@ export function ListViewsPage({
       </header>
 
       {listViewList.length === 0 ? (
-        <div className={styles.emptyState} data-testid="empty-state">
+        <div
+          className="rounded-lg border border-border bg-card p-16 text-center text-muted-foreground"
+          data-testid="empty-state"
+        >
           <p>No list views found.</p>
         </div>
       ) : (
-        <div className={styles.tableContainer}>
+        <div className="overflow-x-auto rounded-lg border border-border bg-card">
           <table
-            className={styles.table}
+            className="w-full border-collapse text-sm"
             role="grid"
             aria-label="List Views"
             data-testid="listviews-table"
           >
             <thead>
-              <tr role="row">
-                <th role="columnheader" scope="col">
+              <tr role="row" className="bg-muted">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   Name
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   Collection
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   Visibility
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   Created By
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   Created
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   Actions
                 </th>
               </tr>
@@ -608,29 +673,40 @@ export function ListViewsPage({
                 <tr
                   key={lv.id}
                   role="row"
-                  className={styles.tableRow}
+                  className="border-b border-border transition-colors last:border-b-0 hover:bg-muted/50"
                   data-testid={`listview-row-${index}`}
                 >
-                  <td role="gridcell">{lv.name}</td>
-                  <td role="gridcell">{getCollectionName(lv.collectionId)}</td>
-                  <td role="gridcell">
-                    <span className={`${styles.badge} ${getVisibilityBadgeClass(lv.visibility)}`}>
+                  <td role="gridcell" className="px-4 py-3 text-foreground">
+                    {lv.name}
+                  </td>
+                  <td role="gridcell" className="px-4 py-3 text-foreground">
+                    {getCollectionName(lv.collectionId)}
+                  </td>
+                  <td role="gridcell" className="px-4 py-3">
+                    <span
+                      className={cn(
+                        'inline-block rounded px-2 py-0.5 text-xs font-medium',
+                        getVisibilityBadgeClass(lv.visibility)
+                      )}
+                    >
                       {lv.visibility}
                     </span>
                   </td>
-                  <td role="gridcell">{lv.createdBy}</td>
-                  <td role="gridcell">
+                  <td role="gridcell" className="px-4 py-3 text-foreground">
+                    {lv.createdBy}
+                  </td>
+                  <td role="gridcell" className="px-4 py-3 text-foreground">
                     {formatDate(new Date(lv.createdAt), {
                       year: 'numeric',
                       month: 'short',
                       day: 'numeric',
                     })}
                   </td>
-                  <td role="gridcell" className={styles.actionsCell}>
-                    <div className={styles.actions}>
+                  <td role="gridcell" className="px-4 py-3 text-right">
+                    <div className="flex justify-end gap-2">
                       <button
                         type="button"
-                        className={styles.actionButton}
+                        className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-primary hover:border-primary hover:bg-muted"
                         onClick={() => handleEdit(lv)}
                         aria-label={`Edit ${lv.name}`}
                         data-testid={`edit-button-${index}`}
@@ -639,7 +715,7 @@ export function ListViewsPage({
                       </button>
                       <button
                         type="button"
-                        className={`${styles.actionButton} ${styles.deleteButton}`}
+                        className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-destructive hover:border-destructive hover:bg-destructive/10"
                         onClick={() => handleDeleteClick(lv)}
                         aria-label={`Delete ${lv.name}`}
                         data-testid={`delete-button-${index}`}

@@ -10,7 +10,8 @@
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react'
 import { useI18n } from '../../context/I18nContext'
-import styles from './RecordHeader.module.css'
+import { cn } from '@/lib/utils'
+import { Badge } from '@/components/ui/badge'
 
 /**
  * Props for the RecordHeader component
@@ -236,36 +237,46 @@ export function RecordHeader({
   )
 
   return (
-    <div className={styles.header} data-testid="record-header">
+    <div className="bg-muted/50 border-b px-8 py-6 max-md:px-4" data-testid="record-header">
       {/* Top row: name + collection badge */}
-      <div className={styles.headerTop}>
-        <h1 className={styles.recordName} data-testid="record-header-name">
+      <div className="flex items-center gap-4 flex-wrap max-md:flex-col max-md:items-start max-md:gap-2">
+        <h1
+          className="m-0 text-2xl font-bold text-foreground leading-tight max-md:text-xl"
+          data-testid="record-header-name"
+        >
           {recordName}
         </h1>
-        <span className={styles.collectionBadge} data-testid="record-header-collection">
+        <Badge variant="secondary" data-testid="record-header-collection">
           {schema.displayName || collectionName}
-        </span>
+        </Badge>
       </div>
 
       {/* Key fields */}
       {keyFields.length > 0 && (
-        <div className={styles.keyFields} data-testid="record-header-key-fields">
+        <div className="flex flex-wrap gap-2 mt-4" data-testid="record-header-key-fields">
           {keyFields.map((field) => (
             <span
               key={field.name}
-              className={styles.keyField}
+              className="inline-flex items-center gap-1 px-2 py-1 bg-background border border-border rounded text-sm leading-snug"
               data-testid={`record-header-field-${field.name}`}
             >
-              <span className={styles.keyFieldLabel}>{field.displayName || field.name}:</span>
-              <span className={styles.keyFieldValue}>{formatFieldValue(field)}</span>
+              <span className="text-muted-foreground text-xs font-medium whitespace-nowrap">
+                {field.displayName || field.name}:
+              </span>
+              <span className="text-foreground font-medium whitespace-nowrap max-w-[200px] max-md:max-w-[150px] overflow-hidden text-ellipsis">
+                {formatFieldValue(field)}
+              </span>
             </span>
           ))}
         </div>
       )}
 
       {/* Bottom row: timestamps + record ID */}
-      <div className={styles.headerBottom}>
-        <span className={styles.timestamps} data-testid="record-header-timestamps">
+      <div className="flex items-center justify-between flex-wrap gap-2 mt-4 max-md:flex-col max-md:items-start">
+        <span
+          className="text-xs text-muted-foreground leading-snug"
+          data-testid="record-header-timestamps"
+        >
           {(record.created_at || record.createdAt) && (
             <>
               {t('recordHeader.created')}{' '}
@@ -285,7 +296,13 @@ export function RecordHeader({
 
         <button
           type="button"
-          className={styles.recordId}
+          className={cn(
+            'relative inline-flex items-center gap-1 font-mono text-xs text-muted-foreground',
+            'cursor-pointer px-1 py-0.5 rounded border border-transparent bg-transparent',
+            'transition-all motion-reduce:transition-none',
+            'hover:bg-background hover:border-border hover:text-muted-foreground/80',
+            'focus:outline-2 focus:outline-primary focus:outline-offset-2'
+          )}
           onClick={handleCopyId}
           title={t('recordHeader.copyId')}
           aria-label={t('recordHeader.copyId')}
@@ -293,7 +310,16 @@ export function RecordHeader({
         >
           {record.id}
           {copied && (
-            <span className={styles.copiedTooltip} role="status" aria-live="polite">
+            <span
+              className={cn(
+                'absolute bottom-[calc(100%+4px)] left-1/2 -translate-x-1/2',
+                'px-2 py-0.5 text-xs font-medium text-primary-foreground bg-foreground',
+                'rounded whitespace-nowrap pointer-events-none',
+                'animate-in fade-in slide-in-from-bottom-1 motion-reduce:animate-none'
+              )}
+              role="status"
+              aria-live="polite"
+            >
               {t('recordHeader.copied')}
             </span>
           )}

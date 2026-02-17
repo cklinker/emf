@@ -17,7 +17,7 @@
  */
 
 import React, { useEffect, useState, useRef } from 'react'
-import styles from './PageTransition.module.css'
+import { cn } from '@/lib/utils'
 
 /**
  * Animation type options
@@ -126,16 +126,6 @@ export function PageTransition({
   // Determine effective transition type based on reduced motion preference
   const effectiveType = prefersReducedMotion ? 'none' : type
 
-  // Build class names
-  const containerClasses = [
-    styles.container,
-    styles[effectiveType.replace('-', '')], // 'fade-slide' -> 'fadeslide'
-    isVisible ? styles.visible : styles.hidden,
-    className,
-  ]
-    .filter(Boolean)
-    .join(' ')
-
   // Set CSS custom property for duration
   const style: React.CSSProperties = {
     '--transition-duration': `${duration}ms`,
@@ -144,8 +134,32 @@ export function PageTransition({
   return (
     <div
       ref={containerRef}
-      className={containerClasses}
-      style={style}
+      className={cn(
+        'w-full min-h-full',
+        // Fade transition
+        effectiveType === 'fade' && [
+          'transition-opacity ease-out',
+          isVisible ? 'opacity-100' : 'opacity-0',
+        ],
+        // Fade-slide transition
+        effectiveType === 'fade-slide' && [
+          'transition-[opacity,transform] ease-out',
+          isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2',
+        ],
+        // None transition
+        effectiveType === 'none' && 'opacity-100 transform-none transition-none',
+        // Reduced motion override
+        'motion-reduce:!opacity-100 motion-reduce:!transform-none motion-reduce:!transition-none',
+        // Print override
+        'print:!opacity-100 print:!transform-none print:!transition-none',
+        // Marker classes for test assertions (not Tailwind utilities)
+        isVisible ? 'is-visible' : 'is-hidden',
+        className
+      )}
+      style={{
+        ...style,
+        transitionDuration: effectiveType !== 'none' ? `${duration}ms` : undefined,
+      }}
       data-testid={testId}
       data-transition-type={effectiveType}
       data-reduced-motion={prefersReducedMotion ? 'true' : 'false'}

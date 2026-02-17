@@ -10,7 +10,7 @@ import React, { useState, useMemo, useCallback } from 'react'
 import { GripVertical, ChevronDown, ChevronRight, X, Columns2, Columns3 } from 'lucide-react'
 import { useLayoutEditor, type EditorFieldPlacement } from './LayoutEditorContext'
 import { LayoutFieldSlot } from './LayoutFieldSlot'
-import styles from './LayoutSectionCard.module.css'
+import { cn } from '@/lib/utils'
 
 export interface LayoutSectionCardProps {
   sectionId: string
@@ -157,18 +157,17 @@ export function LayoutSectionCard({
 
   if (!section) return null
 
-  const sectionClasses = [
-    styles.section,
-    isSelected ? styles.sectionSelected : '',
-    isHighlightsPanel ? styles.sectionHighlight : '',
-  ]
-    .filter(Boolean)
-    .join(' ')
-
   return (
-    <div className={sectionClasses} data-testid={`layout-section-${sectionId}`}>
+    <div
+      className={cn(
+        'overflow-hidden rounded-lg border border-border bg-background transition-shadow duration-150 motion-reduce:transition-none',
+        isSelected && 'border-primary shadow-[0_0_0_2px_rgba(37,99,235,0.2)]',
+        isHighlightsPanel && 'border-yellow-500 bg-yellow-50'
+      )}
+      data-testid={`layout-section-${sectionId}`}
+    >
       <div
-        className={styles.sectionHeader}
+        className="flex cursor-pointer items-center gap-2 border-b border-border bg-muted px-4 py-2.5 focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-[-2px] max-md:px-3 max-md:py-2"
         onClick={handleHeaderClick}
         role="button"
         tabIndex={0}
@@ -181,7 +180,7 @@ export function LayoutSectionCard({
         data-testid={`layout-section-header-${sectionId}`}
       >
         <div
-          className={styles.dragHandle}
+          className="flex shrink-0 items-center text-muted-foreground cursor-grab active:cursor-grabbing"
           draggable
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
@@ -193,7 +192,7 @@ export function LayoutSectionCard({
 
         <button
           type="button"
-          className={styles.sectionActionButton}
+          className="flex h-6 w-6 items-center justify-center rounded border-none bg-transparent p-0 text-muted-foreground cursor-pointer transition-colors duration-150 hover:bg-muted-foreground/10 hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 motion-reduce:transition-none"
           onClick={handleToggleCollapse}
           aria-label={collapsedLocal ? 'Expand section' : 'Collapse section'}
           data-testid={`layout-section-collapse-${sectionId}`}
@@ -201,17 +200,29 @@ export function LayoutSectionCard({
           {collapsedLocal ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
         </button>
 
-        <h4 className={styles.sectionHeading}>{section.heading || 'Untitled Section'}</h4>
+        <h4 className="m-0 flex-1 text-sm font-medium text-foreground">
+          {section.heading || 'Untitled Section'}
+        </h4>
 
-        {isHighlightsPanel && <span className={styles.sectionBadge}>Highlights</span>}
+        {isHighlightsPanel && (
+          <span className="rounded bg-muted-foreground/10 px-1.5 py-0.5 text-[11px] text-muted-foreground">
+            Highlights
+          </span>
+        )}
         {section.sectionType !== 'HIGHLIGHTS_PANEL' && section.sectionType !== 'fields' && (
-          <span className={styles.sectionBadge}>{section.sectionType}</span>
+          <span className="rounded bg-muted-foreground/10 px-1.5 py-0.5 text-[11px] text-muted-foreground">
+            {section.sectionType}
+          </span>
         )}
 
-        <div className={styles.columnSelector}>
+        <div className="flex gap-0.5">
           <button
             type="button"
-            className={`${styles.columnButton} ${columns === 1 ? styles.columnButtonActive : ''}`}
+            className={cn(
+              'rounded-sm border border-input bg-background px-1.5 py-0.5 text-[11px] text-muted-foreground cursor-pointer transition-colors duration-150 motion-reduce:transition-none',
+              'focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-1',
+              columns === 1 ? 'bg-primary text-primary-foreground border-primary' : 'hover:bg-muted'
+            )}
             onClick={(e) => {
               e.stopPropagation()
               handleColumnChange(1)
@@ -224,7 +235,11 @@ export function LayoutSectionCard({
           </button>
           <button
             type="button"
-            className={`${styles.columnButton} ${columns === 2 ? styles.columnButtonActive : ''}`}
+            className={cn(
+              'rounded-sm border border-input bg-background px-1.5 py-0.5 text-[11px] text-muted-foreground cursor-pointer transition-colors duration-150 motion-reduce:transition-none',
+              'focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-1',
+              columns === 2 ? 'bg-primary text-primary-foreground border-primary' : 'hover:bg-muted'
+            )}
             onClick={(e) => {
               e.stopPropagation()
               handleColumnChange(2)
@@ -237,7 +252,11 @@ export function LayoutSectionCard({
           </button>
           <button
             type="button"
-            className={`${styles.columnButton} ${columns === 3 ? styles.columnButtonActive : ''}`}
+            className={cn(
+              'rounded-sm border border-input bg-background px-1.5 py-0.5 text-[11px] text-muted-foreground cursor-pointer transition-colors duration-150 motion-reduce:transition-none',
+              'focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-1',
+              columns === 3 ? 'bg-primary text-primary-foreground border-primary' : 'hover:bg-muted'
+            )}
             onClick={(e) => {
               e.stopPropagation()
               handleColumnChange(3)
@@ -250,10 +269,10 @@ export function LayoutSectionCard({
           </button>
         </div>
 
-        <div className={styles.sectionActions}>
+        <div className="flex gap-1">
           <button
             type="button"
-            className={styles.sectionActionButton}
+            className="flex h-6 w-6 items-center justify-center rounded border-none bg-transparent p-0 text-muted-foreground cursor-pointer transition-colors duration-150 hover:bg-muted-foreground/10 hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 motion-reduce:transition-none"
             onClick={handleDelete}
             aria-label="Delete section"
             title="Delete section"
@@ -265,9 +284,9 @@ export function LayoutSectionCard({
       </div>
 
       {!collapsedLocal && (
-        <div className={styles.sectionBody}>
+        <div className="min-h-[60px] p-4 max-md:p-3">
           <div
-            className={styles.columnGrid}
+            className="grid gap-3 max-md:!grid-cols-1"
             style={{ gridTemplateColumns: `repeat(${columns}, 1fr)` }}
           >
             {Array.from({ length: columns }, (_, colIndex) => {
@@ -277,14 +296,20 @@ export function LayoutSectionCard({
               return (
                 <div
                   key={colIndex}
-                  className={`${styles.column} ${isDragOver ? styles.columnDragOver : ''}`}
+                  className={cn(
+                    'min-h-[40px] rounded-md p-1 transition-colors duration-150 motion-reduce:transition-none',
+                    isDragOver &&
+                      'bg-primary/5 outline-2 outline-dashed outline-primary outline-offset-[-2px]'
+                  )}
                   onDragOver={(e) => handleColumnDragOver(e, colIndex)}
                   onDragLeave={handleColumnDragLeave}
                   onDrop={(e) => handleColumnDrop(e, colIndex)}
                   data-testid={`layout-section-col-${sectionId}-${colIndex}`}
                 >
                   {fieldsInCol.length === 0 ? (
-                    <div className={styles.columnEmpty}>Drop fields here</div>
+                    <div className="flex min-h-[40px] items-center justify-center rounded-md border border-dashed border-border text-xs text-input">
+                      Drop fields here
+                    </div>
                   ) : (
                     fieldsInCol.map((fp) => {
                       const span = fp.columnSpan ?? 1
@@ -292,11 +317,15 @@ export function LayoutSectionCard({
                       return (
                         <div
                           key={fp.id}
-                          className={showSpanBadge ? styles.spanningFieldWrapper : undefined}
+                          className={showSpanBadge ? 'relative' : undefined}
                           data-span={span > 1 ? span : undefined}
                         >
                           <LayoutFieldSlot fieldPlacement={fp} sectionId={sectionId} />
-                          {showSpanBadge && <span className={styles.spanBadge}>Span {span}</span>}
+                          {showSpanBadge && (
+                            <span className="pointer-events-none absolute -right-1 -top-1.5 z-[1] rounded bg-primary px-[5px] py-px text-[10px] font-semibold leading-[1.4] text-primary-foreground">
+                              Span {span}
+                            </span>
+                          )}
                         </div>
                       )
                     })

@@ -10,8 +10,8 @@ import {
   ExecutionLogModal,
 } from '../../components'
 import type { LogColumn } from '../../components'
-
-import styles from './ScheduledJobsPage.module.css'
+import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
 
 interface ScheduledJob {
   id: string
@@ -154,26 +154,26 @@ function ScheduledJobForm({
 
   return (
     <div
-      className={styles.modalOverlay}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
       onClick={(e) => e.target === e.currentTarget && onCancel()}
       onKeyDown={handleKeyDown}
       data-testid="scheduled-job-form-overlay"
       role="presentation"
     >
       <div
-        className={styles.modal}
+        className="w-full max-w-[600px] max-h-[90vh] overflow-y-auto rounded-lg bg-background shadow-xl"
         role="dialog"
         aria-modal="true"
         aria-labelledby="scheduled-job-form-title"
         data-testid="scheduled-job-form-modal"
       >
-        <div className={styles.modalHeader}>
-          <h2 id="scheduled-job-form-title" className={styles.modalTitle}>
+        <div className="flex items-center justify-between border-b border-border p-6">
+          <h2 id="scheduled-job-form-title" className="text-lg font-semibold text-foreground">
             {title}
           </h2>
           <button
             type="button"
-            className={styles.modalCloseButton}
+            className="rounded p-2 text-2xl leading-none text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             onClick={onCancel}
             aria-label="Close"
             data-testid="scheduled-job-form-close"
@@ -181,12 +181,12 @@ function ScheduledJobForm({
             &times;
           </button>
         </div>
-        <div className={styles.modalBody}>
-          <form className={styles.form} onSubmit={handleSubmit} noValidate>
-            <div className={styles.formGroup}>
-              <label htmlFor="scheduled-job-name" className={styles.formLabel}>
+        <div className="p-6">
+          <form className="flex flex-col gap-5" onSubmit={handleSubmit} noValidate>
+            <div className="flex flex-col gap-2">
+              <label htmlFor="scheduled-job-name" className="text-sm font-medium text-foreground">
                 Name
-                <span className={styles.required} aria-hidden="true">
+                <span className="ml-1 text-destructive" aria-hidden="true">
                   *
                 </span>
               </label>
@@ -194,7 +194,12 @@ function ScheduledJobForm({
                 ref={nameInputRef}
                 id="scheduled-job-name"
                 type="text"
-                className={`${styles.formInput} ${touched.name && errors.name ? styles.hasError : ''}`}
+                className={cn(
+                  'rounded-md border border-border bg-background px-3 py-2.5 text-sm text-foreground transition-colors',
+                  'focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20',
+                  'disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground',
+                  touched.name && errors.name && 'border-destructive'
+                )}
                 value={formData.name}
                 onChange={(e) => handleChange('name', e.target.value)}
                 onBlur={() => handleBlur('name')}
@@ -205,19 +210,27 @@ function ScheduledJobForm({
                 data-testid="scheduled-job-name-input"
               />
               {touched.name && errors.name && (
-                <span className={styles.formError} role="alert">
+                <span className="text-xs text-destructive" role="alert">
                   {errors.name}
                 </span>
               )}
             </div>
 
-            <div className={styles.formGroup}>
-              <label htmlFor="scheduled-job-description" className={styles.formLabel}>
+            <div className="flex flex-col gap-2">
+              <label
+                htmlFor="scheduled-job-description"
+                className="text-sm font-medium text-foreground"
+              >
                 Description
               </label>
               <textarea
                 id="scheduled-job-description"
-                className={`${styles.formInput} ${styles.formTextarea} ${touched.description && errors.description ? styles.hasError : ''}`}
+                className={cn(
+                  'min-h-[80px] resize-y rounded-md border border-border bg-background px-3 py-2.5 font-[inherit] text-sm text-foreground transition-colors',
+                  'focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20',
+                  'disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground',
+                  touched.description && errors.description && 'border-destructive'
+                )}
                 value={formData.description}
                 onChange={(e) => handleChange('description', e.target.value)}
                 onBlur={() => handleBlur('description')}
@@ -227,22 +240,22 @@ function ScheduledJobForm({
                 data-testid="scheduled-job-description-input"
               />
               {touched.description && errors.description && (
-                <span className={styles.formError} role="alert">
+                <span className="text-xs text-destructive" role="alert">
                   {errors.description}
                 </span>
               )}
             </div>
 
-            <div className={styles.formGroup}>
-              <label htmlFor="scheduled-job-type" className={styles.formLabel}>
+            <div className="flex flex-col gap-2">
+              <label htmlFor="scheduled-job-type" className="text-sm font-medium text-foreground">
                 Job Type
-                <span className={styles.required} aria-hidden="true">
+                <span className="ml-1 text-destructive" aria-hidden="true">
                   *
                 </span>
               </label>
               <select
                 id="scheduled-job-type"
-                className={styles.formInput}
+                className="rounded-md border border-border bg-background px-3 py-2.5 text-sm text-foreground transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
                 value={formData.jobType}
                 onChange={(e) => handleChange('jobType', e.target.value)}
                 disabled={isSubmitting}
@@ -254,14 +267,17 @@ function ScheduledJobForm({
               </select>
             </div>
 
-            <div className={styles.formGroup}>
-              <label htmlFor="scheduled-job-reference-id" className={styles.formLabel}>
+            <div className="flex flex-col gap-2">
+              <label
+                htmlFor="scheduled-job-reference-id"
+                className="text-sm font-medium text-foreground"
+              >
                 Job Reference ID
               </label>
               <input
                 id="scheduled-job-reference-id"
                 type="text"
-                className={styles.formInput}
+                className="rounded-md border border-border bg-background px-3 py-2.5 text-sm text-foreground transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
                 value={formData.jobReferenceId}
                 onChange={(e) => handleChange('jobReferenceId', e.target.value)}
                 placeholder="Enter job reference ID"
@@ -270,17 +286,25 @@ function ScheduledJobForm({
               />
             </div>
 
-            <div className={styles.formGroup}>
-              <label htmlFor="scheduled-job-cron-expression" className={styles.formLabel}>
+            <div className="flex flex-col gap-2">
+              <label
+                htmlFor="scheduled-job-cron-expression"
+                className="text-sm font-medium text-foreground"
+              >
                 Cron Expression
-                <span className={styles.required} aria-hidden="true">
+                <span className="ml-1 text-destructive" aria-hidden="true">
                   *
                 </span>
               </label>
               <input
                 id="scheduled-job-cron-expression"
                 type="text"
-                className={`${styles.formInput} ${touched.cronExpression && errors.cronExpression ? styles.hasError : ''}`}
+                className={cn(
+                  'rounded-md border border-border bg-background px-3 py-2.5 text-sm text-foreground transition-colors',
+                  'focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20',
+                  'disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground',
+                  touched.cronExpression && errors.cronExpression && 'border-destructive'
+                )}
                 value={formData.cronExpression}
                 onChange={(e) => handleChange('cronExpression', e.target.value)}
                 onBlur={() => handleBlur('cronExpression')}
@@ -291,20 +315,23 @@ function ScheduledJobForm({
                 data-testid="scheduled-job-cron-expression-input"
               />
               {touched.cronExpression && errors.cronExpression && (
-                <span className={styles.formError} role="alert">
+                <span className="text-xs text-destructive" role="alert">
                   {errors.cronExpression}
                 </span>
               )}
             </div>
 
-            <div className={styles.formGroup}>
-              <label htmlFor="scheduled-job-timezone" className={styles.formLabel}>
+            <div className="flex flex-col gap-2">
+              <label
+                htmlFor="scheduled-job-timezone"
+                className="text-sm font-medium text-foreground"
+              >
                 Timezone
               </label>
               <input
                 id="scheduled-job-timezone"
                 type="text"
-                className={styles.formInput}
+                className="rounded-md border border-border bg-background px-3 py-2.5 text-sm text-foreground transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
                 value={formData.timezone}
                 onChange={(e) => handleChange('timezone', e.target.value)}
                 placeholder="UTC"
@@ -313,38 +340,34 @@ function ScheduledJobForm({
               />
             </div>
 
-            <div className={styles.checkboxGroup}>
+            <div className="flex items-center gap-2">
               <input
                 id="scheduled-job-active"
                 type="checkbox"
+                className="h-4 w-4 accent-primary"
                 checked={formData.active}
                 onChange={(e) => handleChange('active', e.target.checked)}
                 disabled={isSubmitting}
                 data-testid="scheduled-job-active-input"
               />
-              <label htmlFor="scheduled-job-active" className={styles.formLabel}>
+              <label htmlFor="scheduled-job-active" className="text-sm font-medium text-foreground">
                 Active
               </label>
             </div>
 
-            <div className={styles.formActions}>
-              <button
+            <div className="mt-2 flex justify-end gap-3 border-t border-border pt-4">
+              <Button
                 type="button"
-                className={styles.cancelButton}
+                variant="outline"
                 onClick={onCancel}
                 disabled={isSubmitting}
                 data-testid="scheduled-job-form-cancel"
               >
                 Cancel
-              </button>
-              <button
-                type="submit"
-                className={styles.submitButton}
-                disabled={isSubmitting}
-                data-testid="scheduled-job-form-submit"
-              >
+              </Button>
+              <Button type="submit" disabled={isSubmitting} data-testid="scheduled-job-form-submit">
                 {isSubmitting ? 'Saving...' : 'Save'}
-              </button>
+              </Button>
             </div>
           </form>
         </div>
@@ -426,18 +449,14 @@ export function ScheduledJobsPage({
     refetch,
   } = useQuery({
     queryKey: ['scheduled-jobs'],
-    queryFn: () =>
-      apiClient.get<ScheduledJob[]>(`/control/scheduled-jobs`),
+    queryFn: () => apiClient.get<ScheduledJob[]>(`/control/scheduled-jobs`),
   })
 
   const scheduledJobList: ScheduledJob[] = scheduledJobs ?? []
 
   const createMutation = useMutation({
     mutationFn: (data: ScheduledJobFormData) =>
-      apiClient.post<ScheduledJob>(
-        `/control/scheduled-jobs?userId=system`,
-        data
-      ),
+      apiClient.post<ScheduledJob>(`/control/scheduled-jobs?userId=system`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['scheduled-jobs'] })
       showToast('Scheduled job created successfully', 'success')
@@ -518,8 +537,8 @@ export function ScheduledJobsPage({
 
   if (isLoading) {
     return (
-      <div className={styles.container} data-testid={testId}>
-        <div className={styles.loadingContainer}>
+      <div className="mx-auto max-w-[1400px] space-y-6 p-6 lg:p-8" data-testid={testId}>
+        <div className="flex min-h-[400px] items-center justify-center">
           <LoadingSpinner size="large" label="Loading scheduled jobs..." />
         </div>
       </div>
@@ -528,7 +547,7 @@ export function ScheduledJobsPage({
 
   if (error) {
     return (
-      <div className={styles.container} data-testid={testId}>
+      <div className="mx-auto max-w-[1400px] space-y-6 p-6 lg:p-8" data-testid={testId}>
         <ErrorMessage
           error={error instanceof Error ? error : new Error('An error occurred')}
           onRetry={() => refetch()}
@@ -540,53 +559,83 @@ export function ScheduledJobsPage({
   const isSubmitting = createMutation.isPending || updateMutation.isPending
 
   return (
-    <div className={styles.container} data-testid={testId}>
-      <header className={styles.header}>
-        <h1 className={styles.title}>Scheduled Jobs</h1>
-        <button
+    <div className="mx-auto max-w-[1400px] space-y-6 p-6 lg:p-8" data-testid={testId}>
+      <header className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold text-foreground">Scheduled Jobs</h1>
+        <Button
           type="button"
-          className={styles.createButton}
           onClick={handleCreate}
           aria-label="Create Scheduled Job"
           data-testid="add-scheduled-job-button"
         >
           Create Scheduled Job
-        </button>
+        </Button>
       </header>
 
       {scheduledJobList.length === 0 ? (
-        <div className={styles.emptyState} data-testid="empty-state">
+        <div
+          className="rounded-lg border border-border bg-card py-16 text-center text-muted-foreground"
+          data-testid="empty-state"
+        >
           <p>No scheduled jobs found.</p>
         </div>
       ) : (
-        <div className={styles.tableContainer}>
+        <div className="overflow-x-auto rounded-lg border border-border bg-card">
           <table
-            className={styles.table}
+            className="w-full border-collapse"
             role="grid"
             aria-label="Scheduled Jobs"
             data-testid="scheduled-jobs-table"
           >
             <thead>
-              <tr role="row">
-                <th role="columnheader" scope="col">
+              <tr role="row" className="bg-muted">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   Name
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   Job Type
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   Cron Expression
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   Active
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   Last Run
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   Last Status
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   Actions
                 </th>
               </tr>
@@ -596,22 +645,33 @@ export function ScheduledJobsPage({
                 <tr
                   key={scheduledJob.id}
                   role="row"
-                  className={styles.tableRow}
+                  className="border-b border-border transition-colors last:border-b-0 hover:bg-muted/50"
                   data-testid={`scheduled-job-row-${index}`}
                 >
-                  <td role="gridcell">{scheduledJob.name}</td>
-                  <td role="gridcell">
-                    <span className={styles.badge}>{scheduledJob.jobType}</span>
+                  <td role="gridcell" className="px-4 py-3 text-sm text-foreground">
+                    {scheduledJob.name}
                   </td>
-                  <td role="gridcell">{scheduledJob.cronExpression}</td>
-                  <td role="gridcell">
+                  <td role="gridcell" className="px-4 py-3 text-sm text-foreground">
+                    <span className="inline-block rounded-full bg-muted px-3 py-1 text-xs font-semibold uppercase tracking-wider text-primary">
+                      {scheduledJob.jobType}
+                    </span>
+                  </td>
+                  <td role="gridcell" className="px-4 py-3 text-sm text-foreground">
+                    {scheduledJob.cronExpression}
+                  </td>
+                  <td role="gridcell" className="px-4 py-3 text-sm text-foreground">
                     <span
-                      className={`${styles.boolBadge} ${scheduledJob.active ? styles.boolTrue : styles.boolFalse}`}
+                      className={cn(
+                        'inline-block rounded-full px-3 py-1 text-xs font-semibold',
+                        scheduledJob.active
+                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                          : 'bg-muted text-muted-foreground'
+                      )}
                     >
                       {scheduledJob.active ? 'Yes' : 'No'}
                     </span>
                   </td>
-                  <td role="gridcell">
+                  <td role="gridcell" className="px-4 py-3 text-sm text-foreground">
                     {scheduledJob.lastRun
                       ? formatDate(new Date(scheduledJob.lastRun), {
                           year: 'numeric',
@@ -622,18 +682,21 @@ export function ScheduledJobsPage({
                         })
                       : '-'}
                   </td>
-                  <td role="gridcell">
+                  <td role="gridcell" className="px-4 py-3 text-sm text-foreground">
                     {scheduledJob.lastStatus ? (
-                      <span className={styles.badge}>{scheduledJob.lastStatus}</span>
+                      <span className="inline-block rounded-full bg-muted px-3 py-1 text-xs font-semibold uppercase tracking-wider text-primary">
+                        {scheduledJob.lastStatus}
+                      </span>
                     ) : (
                       '-'
                     )}
                   </td>
-                  <td role="gridcell" className={styles.actionsCell}>
-                    <div className={styles.actions}>
-                      <button
+                  <td role="gridcell" className="px-4 py-3 text-right text-sm">
+                    <div className="flex justify-end gap-2">
+                      <Button
                         type="button"
-                        className={styles.actionButton}
+                        variant="outline"
+                        size="sm"
                         onClick={() => {
                           setLogsItemId(scheduledJob.id)
                           setLogsItemName(scheduledJob.name)
@@ -642,25 +705,28 @@ export function ScheduledJobsPage({
                         data-testid={`logs-button-${index}`}
                       >
                         Logs
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
-                        className={styles.actionButton}
+                        variant="outline"
+                        size="sm"
                         onClick={() => handleEdit(scheduledJob)}
                         aria-label={`Edit ${scheduledJob.name}`}
                         data-testid={`edit-button-${index}`}
                       >
                         Edit
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
-                        className={`${styles.actionButton} ${styles.deleteButton}`}
+                        variant="outline"
+                        size="sm"
+                        className="border-destructive/30 text-destructive hover:bg-destructive/10"
                         onClick={() => handleDeleteClick(scheduledJob)}
                         aria-label={`Delete ${scheduledJob.name}`}
                         data-testid={`delete-button-${index}`}
                       >
                         Delete
-                      </button>
+                      </Button>
                     </div>
                   </td>
                 </tr>

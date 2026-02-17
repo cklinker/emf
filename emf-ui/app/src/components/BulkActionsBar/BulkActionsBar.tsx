@@ -16,7 +16,15 @@
 
 import React, { useState, useCallback, useEffect } from 'react'
 import { useI18n } from '../../context/I18nContext'
-import styles from './BulkActionsBar.module.css'
+import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
 
 /** Editable field types that can be bulk-updated */
 const EDITABLE_FIELD_TYPES = new Set(['string', 'number', 'boolean', 'date', 'datetime'])
@@ -96,7 +104,7 @@ export function BulkActionsBar({
     setFieldValue('')
   }, [])
 
-  // Handle Escape key to close modal
+  // Handle Escape key to close modal (backup for Dialog built-in)
   useEffect(() => {
     if (!modalOpen) return
 
@@ -126,16 +134,6 @@ export function BulkActionsBar({
     closeModal()
   }, [selectedField, fieldValue, onChangeFieldValue, closeModal])
 
-  // Handle overlay click (close on backdrop click)
-  const handleOverlayClick = useCallback(
-    (e: React.MouseEvent) => {
-      if (e.target === e.currentTarget) {
-        closeModal()
-      }
-    },
-    [closeModal]
-  )
-
   // Calculate progress percentage
   const progressPercent =
     processingProgress && processingProgress.total > 0
@@ -146,17 +144,23 @@ export function BulkActionsBar({
   const renderValueInput = (): React.ReactElement | null => {
     if (!selectedFieldDescriptor) return null
 
+    const inputBaseClass =
+      'w-full p-2 border border-border rounded-md text-sm bg-background text-foreground box-border focus:outline-2 focus:-outline-offset-1 focus:outline-primary focus:border-primary'
+
     switch (selectedFieldDescriptor.type) {
       case 'boolean':
         return (
-          <div className={styles.checkboxWrapper}>
+          <div className="flex items-center gap-2 py-2">
             <input
               type="checkbox"
               id="bulk-field-value"
               checked={!!fieldValue}
               onChange={(e) => setFieldValue(e.target.checked)}
+              className="w-4 h-4 cursor-pointer"
             />
-            <span>{selectedFieldDescriptor.displayName || selectedFieldDescriptor.name}</span>
+            <span className="text-sm text-foreground">
+              {selectedFieldDescriptor.displayName || selectedFieldDescriptor.name}
+            </span>
           </div>
         )
       case 'number':
@@ -167,6 +171,7 @@ export function BulkActionsBar({
             value={fieldValue as string}
             onChange={(e) => setFieldValue(e.target.value === '' ? '' : Number(e.target.value))}
             placeholder={t('bulkActions.enterValue')}
+            className={inputBaseClass}
           />
         )
       case 'date':
@@ -176,6 +181,7 @@ export function BulkActionsBar({
             id="bulk-field-value"
             value={fieldValue as string}
             onChange={(e) => setFieldValue(e.target.value)}
+            className={inputBaseClass}
           />
         )
       case 'datetime':
@@ -185,6 +191,7 @@ export function BulkActionsBar({
             id="bulk-field-value"
             value={fieldValue as string}
             onChange={(e) => setFieldValue(e.target.value)}
+            className={inputBaseClass}
           />
         )
       default:
@@ -196,6 +203,7 @@ export function BulkActionsBar({
             value={fieldValue as string}
             onChange={(e) => setFieldValue(e.target.value)}
             placeholder={t('bulkActions.enterValue')}
+            className={inputBaseClass}
           />
         )
     }
@@ -205,125 +213,138 @@ export function BulkActionsBar({
     <>
       {/* Floating bulk actions bar */}
       <div
-        className={selectedCount > 0 ? styles.bar : styles.barHidden}
+        className={cn(
+          selectedCount > 0
+            ? cn(
+                'fixed bottom-6 left-1/2 -translate-x-1/2',
+                'bg-background border border-border rounded-lg',
+                'px-4 py-3 flex items-center gap-4',
+                'shadow-[0_4px_20px_rgba(0,0,0,0.15)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)]',
+                'z-[1000] min-w-[500px]',
+                'animate-in slide-in-from-bottom-2 fade-in motion-reduce:animate-none'
+              )
+            : 'hidden'
+        )}
         data-testid="bulk-actions-bar"
       >
         {/* Selected count */}
-        <span className={styles.count}>
+        <span className="font-semibold text-sm whitespace-nowrap text-foreground">
           {t('bulkActions.selectedCount', { count: selectedCount })}
         </span>
 
         {/* Progress indicator (shown during processing) */}
         {isProcessing && processingProgress && (
-          <div className={styles.progressSection}>
-            <span className={styles.progressText}>
+          <div className="flex flex-col gap-1 flex-1 min-w-[120px]">
+            <span className="text-xs text-muted-foreground whitespace-nowrap">
               {t('bulkActions.processing', {
                 current: processingProgress.current,
                 total: processingProgress.total,
               })}
             </span>
-            <div className={styles.progressBar}>
-              <div className={styles.progressFill} style={{ width: `${progressPercent}%` }} />
+            <div className="h-1 bg-muted rounded-sm overflow-hidden">
+              <div
+                className="h-full bg-primary transition-[width] duration-300 motion-reduce:transition-none"
+                style={{ width: `${progressPercent}%` }}
+              />
             </div>
           </div>
         )}
 
         {/* Action buttons */}
-        <div className={styles.actions}>
-          <button
-            type="button"
-            className={styles.actionButton}
-            onClick={onExport}
-            disabled={isProcessing}
-          >
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={onExport} disabled={isProcessing}>
             {t('bulkActions.export')}
-          </button>
+          </Button>
 
-          <button
-            type="button"
-            className={styles.actionButton}
-            onClick={openModal}
-            disabled={isProcessing}
-          >
+          <Button variant="outline" size="sm" onClick={openModal} disabled={isProcessing}>
             {t('bulkActions.changeFieldValue')}
-          </button>
+          </Button>
 
-          <button
-            type="button"
-            className={`${styles.actionButton} ${styles.dangerButton}`}
-            onClick={onDelete}
-            disabled={isProcessing}
-          >
+          <Button variant="destructive" size="sm" onClick={onDelete} disabled={isProcessing}>
             {t('bulkActions.delete')}
-          </button>
+          </Button>
 
           {onSubmitForApproval && (
-            <button
-              type="button"
-              className={styles.actionButton}
+            <Button
+              variant="outline"
+              size="sm"
               onClick={onSubmitForApproval}
               disabled={isProcessing}
             >
               {t('bulkActions.submitForApproval')}
-            </button>
+            </Button>
           )}
         </div>
 
         {/* Deselect All link */}
-        <button type="button" className={styles.deselectLink} onClick={onDeselectAll}>
+        <button
+          type="button"
+          className={cn(
+            'text-primary cursor-pointer text-sm bg-transparent border-0 p-0',
+            'no-underline whitespace-nowrap',
+            'transition-colors motion-reduce:transition-none',
+            'hover:underline',
+            'focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2'
+          )}
+          onClick={onDeselectAll}
+        >
           {t('common.deselectAll')}
         </button>
       </div>
 
       {/* Change Field Value Modal */}
-      {modalOpen && (
-        <div
-          className={styles.modalOverlay}
-          role="presentation"
-          onClick={handleOverlayClick}
-          data-testid="bulk-change-value-modal"
-        >
-          <div className={styles.modal} role="dialog" aria-modal="true">
-            <h3 className={styles.modalTitle}>{t('bulkActions.changeFieldValue')}</h3>
+      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
+        <DialogContent data-testid="bulk-change-value-modal">
+          <DialogHeader>
+            <DialogTitle>{t('bulkActions.changeFieldValue')}</DialogTitle>
+          </DialogHeader>
 
-            {/* Field selector */}
-            <div className={styles.formGroup}>
-              <label htmlFor="bulk-field-select">{t('bulkActions.selectField')}</label>
-              <select id="bulk-field-select" value={selectedField} onChange={handleFieldChange}>
-                <option value="">{t('bulkActions.selectField')}</option>
-                {editableFields.map((field) => (
-                  <option key={field.name} value={field.name}>
-                    {field.displayName || field.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Value input (type-appropriate) */}
-            {selectedFieldDescriptor && (
-              <div className={styles.formGroup}>
-                <label htmlFor="bulk-field-value">{t('bulkActions.enterValue')}</label>
-                {renderValueInput()}
-              </div>
-            )}
-
-            {/* Modal actions */}
-            <div className={styles.modalActions}>
-              <button type="button" className={styles.cancelButton} onClick={closeModal}>
-                {t('common.cancel')}
-              </button>
-              <button
-                type="button"
-                className={styles.applyButton}
-                onClick={handleApply}
-                disabled={!selectedField}
-              >
-                {t('bulkActions.apply')}
-              </button>
-            </div>
+          {/* Field selector */}
+          <div className="mb-4">
+            <label
+              htmlFor="bulk-field-select"
+              className="block text-sm font-medium mb-1 text-muted-foreground"
+            >
+              {t('bulkActions.selectField')}
+            </label>
+            <select
+              id="bulk-field-select"
+              value={selectedField}
+              onChange={handleFieldChange}
+              className="w-full p-2 border border-border rounded-md text-sm bg-background text-foreground box-border focus:outline-2 focus:-outline-offset-1 focus:outline-primary focus:border-primary"
+            >
+              <option value="">{t('bulkActions.selectField')}</option>
+              {editableFields.map((field) => (
+                <option key={field.name} value={field.name}>
+                  {field.displayName || field.name}
+                </option>
+              ))}
+            </select>
           </div>
-        </div>
-      )}
+
+          {/* Value input (type-appropriate) */}
+          {selectedFieldDescriptor && (
+            <div className="mb-4">
+              <label
+                htmlFor="bulk-field-value"
+                className="block text-sm font-medium mb-1 text-muted-foreground"
+              >
+                {t('bulkActions.enterValue')}
+              </label>
+              {renderValueInput()}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={closeModal}>
+              {t('common.cancel')}
+            </Button>
+            <Button onClick={handleApply} disabled={!selectedField}>
+              {t('bulkActions.apply')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

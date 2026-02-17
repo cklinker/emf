@@ -14,6 +14,7 @@
 import React, { useState, useCallback, useMemo } from 'react'
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { cn } from '@/lib/utils'
 import { useI18n } from '../../context/I18nContext'
 import { getTenantSlug } from '../../context/TenantContext'
 import { usePlugins } from '../../context/PluginContext'
@@ -23,7 +24,6 @@ import type { LookupOption } from '../../components'
 import { unwrapResource, wrapResource } from '../../utils/jsonapi'
 import { ApiError } from '../../services/apiClient'
 import type { ApiClient } from '../../services/apiClient'
-import styles from './ResourceFormPage.module.css'
 
 /**
  * Field definition interface for collection schema
@@ -367,7 +367,7 @@ export function ResourceFormPage({
   // Fetch lookup options for all master_detail fields.
   // For each target collection, fetch its schema (to find display field),
   // then fetch records to build the options list.
-  // Also builds a mapping from field name → target collection name for JSON:API relationships.
+  // Also builds a mapping from field name -> target collection name for JSON:API relationships.
   const { data: lookupData } = useQuery({
     queryKey: ['lookup-options-for-form', collectionName, lookupFields.map((f) => f.id)],
     queryFn: async () => {
@@ -393,12 +393,12 @@ export function ResourceFormPage({
             )
             const targetName = targetSchema.name
 
-            // Record the field name → target collection name mapping
+            // Record the field name -> target collection name mapping
             for (const field of fields) {
               relFieldsMap[field.name] = targetName
             }
 
-            // Determine display field: displayFieldName → 'name' → first string field → 'id'
+            // Determine display field: displayFieldName -> 'name' -> first string field -> 'id'
             let displayFieldName = 'id'
             if (targetSchema.displayFieldName) {
               displayFieldName = targetSchema.displayFieldName
@@ -451,7 +451,7 @@ export function ResourceFormPage({
   })
 
   const lookupOptionsMap = lookupData?.optionsMap
-  // Map from field name → target collection name for JSON:API relationship serialization
+  // Map from field name -> target collection name for JSON:API relationship serialization
   const relationshipFieldsMap = lookupData?.relFieldsMap
 
   // Merge picklist values and lookup options into the schema fields
@@ -918,6 +918,15 @@ export function ResourceFormPage({
     }
   }, [navigate, collectionName, resourceId, isEditMode])
 
+  // Common input class
+  const inputBaseClass =
+    'w-full rounded-md border border-border bg-card px-4 py-2 font-inherit text-base text-foreground placeholder:text-muted-foreground/60 transition-[border-color,box-shadow] duration-200 hover:border-muted-foreground/40 focus:border-ring focus:outline-none focus:ring-[3px] focus:ring-ring/20 motion-reduce:transition-none'
+  const inputErrorClass = 'border-destructive focus:border-destructive focus:ring-destructive/20'
+
+  // Common textarea class
+  const textareaBaseClass =
+    'w-full resize-y rounded-md border border-border bg-card px-4 py-2 font-inherit text-base text-foreground transition-[border-color,box-shadow] duration-200 hover:border-muted-foreground/40 focus:border-ring focus:outline-none focus:ring-[3px] focus:ring-ring/20 motion-reduce:transition-none'
+
   /**
    * Render form field based on field type
    * Requirement 11.6: Generate form from collection schema
@@ -937,12 +946,12 @@ export function ResourceFormPage({
       if (CustomRenderer) {
         // Use custom renderer from plugin
         return (
-          <div key={field.id} className={styles.fieldGroup} data-testid={`field-group-${index}`}>
-            <label htmlFor={fieldId} className={styles.label}>
+          <div key={field.id} className="flex flex-col gap-1" data-testid={`field-group-${index}`}>
+            <label htmlFor={fieldId} className="text-sm font-medium text-foreground">
               {field.displayName || field.name}
-              {field.required && <span className={styles.required}>*</span>}
+              {field.required && <span className="ml-1 text-destructive">*</span>}
             </label>
-            <div className={styles.fieldTypeHint}>
+            <div className="mb-1 text-xs text-muted-foreground/60">
               {t(`fields.types.${field.type.toLowerCase()}`)}
             </div>
             <div data-testid={`custom-renderer-${field.name}`}>
@@ -964,7 +973,7 @@ export function ResourceFormPage({
             {error && (
               <div
                 id={errorId}
-                className={styles.errorMessage}
+                className="mt-1 text-sm text-destructive"
                 role="alert"
                 data-testid={`error-${field.name}`}
               >
@@ -992,7 +1001,7 @@ export function ResourceFormPage({
             <input
               {...commonProps}
               type="text"
-              className={`${styles.input} ${error ? styles.inputError : ''}`}
+              className={cn(inputBaseClass, error && inputErrorClass)}
               value={String(value ?? '')}
               onChange={(e) => handleFieldChange(field.name, e.target.value)}
               placeholder={field.displayName || field.name}
@@ -1005,7 +1014,7 @@ export function ResourceFormPage({
             <input
               {...commonProps}
               type="number"
-              className={`${styles.input} ${error ? styles.inputError : ''}`}
+              className={cn(inputBaseClass, error && inputErrorClass)}
               value={value === '' || value === null || value === undefined ? '' : String(value)}
               onChange={(e) => handleFieldChange(field.name, e.target.value)}
               placeholder={field.displayName || field.name}
@@ -1016,15 +1025,15 @@ export function ResourceFormPage({
 
         case 'boolean':
           input = (
-            <div className={styles.checkboxWrapper}>
+            <div className="flex items-center gap-2 py-2">
               <input
                 {...commonProps}
                 type="checkbox"
-                className={styles.checkbox}
+                className="h-5 w-5 cursor-pointer accent-primary focus:outline-2 focus:outline-offset-2 focus:outline-ring"
                 checked={Boolean(value)}
                 onChange={(e) => handleFieldChange(field.name, e.target.checked)}
               />
-              <span className={styles.checkboxLabel}>
+              <span className="text-base text-foreground">
                 {value ? t('common.yes') : t('common.no')}
               </span>
             </div>
@@ -1036,7 +1045,7 @@ export function ResourceFormPage({
             <input
               {...commonProps}
               type="date"
-              className={`${styles.input} ${error ? styles.inputError : ''}`}
+              className={cn(inputBaseClass, error && inputErrorClass)}
               value={String(value ?? '')}
               onChange={(e) => handleFieldChange(field.name, e.target.value)}
             />
@@ -1048,7 +1057,7 @@ export function ResourceFormPage({
             <input
               {...commonProps}
               type="datetime-local"
-              className={`${styles.input} ${error ? styles.inputError : ''}`}
+              className={cn(inputBaseClass, error && inputErrorClass)}
               value={String(value ?? '')}
               onChange={(e) => handleFieldChange(field.name, e.target.value)}
             />
@@ -1059,7 +1068,11 @@ export function ResourceFormPage({
           input = (
             <textarea
               {...commonProps}
-              className={`${styles.textarea} ${styles.jsonTextarea} ${error ? styles.inputError : ''}`}
+              className={cn(
+                textareaBaseClass,
+                'min-h-[100px] font-mono text-sm',
+                error && inputErrorClass
+              )}
               value={String(value ?? '')}
               onChange={(e) => handleFieldChange(field.name, e.target.value)}
               placeholder='{"key": "value"}'
@@ -1074,7 +1087,7 @@ export function ResourceFormPage({
               id={fieldId}
               value={String(value || '')}
               onChange={(e) => handleFieldChange(field.name, e.target.value)}
-              className={styles.input}
+              className={inputBaseClass}
             >
               <option value="">{t('common.select')}</option>
               {(field.enumValues || []).map((val: string) => (
@@ -1088,9 +1101,9 @@ export function ResourceFormPage({
 
         case 'multi_picklist':
           input = (
-            <div className={styles.checkboxGroup}>
+            <div className="flex flex-col gap-1">
               {(field.enumValues || []).map((val: string) => (
-                <label key={val} className={styles.checkboxLabel}>
+                <label key={val} className="flex items-center gap-2 text-base text-foreground">
                   <input
                     type="checkbox"
                     checked={Array.isArray(value) && value.includes(val)}
@@ -1114,7 +1127,7 @@ export function ResourceFormPage({
                   id={fieldId}
                   value={String(value || '')}
                   onChange={(e) => handleFieldChange(field.name, e.target.value)}
-                  className={styles.input}
+                  className={inputBaseClass}
                   placeholder={t('fields.types.multi_picklist')}
                 />
               )}
@@ -1130,7 +1143,7 @@ export function ResourceFormPage({
               step="0.01"
               value={value !== null && value !== undefined ? String(value) : ''}
               onChange={(e) => handleFieldChange(field.name, e.target.value)}
-              className={`${styles.input} ${error ? styles.inputError : ''}`}
+              className={cn(inputBaseClass, error && inputErrorClass)}
               placeholder="0.00"
             />
           )
@@ -1138,17 +1151,17 @@ export function ResourceFormPage({
 
         case 'percent':
           input = (
-            <div className={styles.inputGroup}>
+            <div className="flex items-center gap-2">
               <input
                 {...commonProps}
                 type="number"
                 step="0.01"
                 value={value !== null && value !== undefined ? String(value) : ''}
                 onChange={(e) => handleFieldChange(field.name, e.target.value)}
-                className={`${styles.input} ${error ? styles.inputError : ''}`}
+                className={cn(inputBaseClass, error && inputErrorClass)}
                 placeholder="0.00"
               />
-              <span className={styles.inputSuffix}>%</span>
+              <span className="text-sm text-muted-foreground">%</span>
             </div>
           )
           break
@@ -1159,7 +1172,7 @@ export function ResourceFormPage({
               {...commonProps}
               type="text"
               value={String(value || '')}
-              className={styles.input}
+              className={cn(inputBaseClass, 'opacity-50')}
               disabled
               placeholder={t('fields.autoGenerated', 'Auto-generated')}
             />
@@ -1173,7 +1186,7 @@ export function ResourceFormPage({
               type="tel"
               value={String(value || '')}
               onChange={(e) => handleFieldChange(field.name, e.target.value)}
-              className={`${styles.input} ${error ? styles.inputError : ''}`}
+              className={cn(inputBaseClass, error && inputErrorClass)}
               placeholder="+1 (555) 123-4567"
             />
           )
@@ -1186,7 +1199,7 @@ export function ResourceFormPage({
               type="email"
               value={String(value || '')}
               onChange={(e) => handleFieldChange(field.name, e.target.value)}
-              className={`${styles.input} ${error ? styles.inputError : ''}`}
+              className={cn(inputBaseClass, error && inputErrorClass)}
               placeholder="user@example.com"
             />
           )
@@ -1199,7 +1212,7 @@ export function ResourceFormPage({
               type="url"
               value={String(value || '')}
               onChange={(e) => handleFieldChange(field.name, e.target.value)}
-              className={`${styles.input} ${error ? styles.inputError : ''}`}
+              className={cn(inputBaseClass, error && inputErrorClass)}
               placeholder="https://example.com"
             />
           )
@@ -1211,7 +1224,7 @@ export function ResourceFormPage({
               {...commonProps}
               value={String(value || '')}
               onChange={(e) => handleFieldChange(field.name, e.target.value)}
-              className={`${styles.textarea} ${error ? styles.inputError : ''}`}
+              className={cn(textareaBaseClass, 'min-h-[100px]', error && inputErrorClass)}
               rows={8}
               placeholder={t('fields.types.rich_text')}
             />
@@ -1225,7 +1238,7 @@ export function ResourceFormPage({
               type="password"
               value={String(value || '')}
               onChange={(e) => handleFieldChange(field.name, e.target.value)}
-              className={`${styles.input} ${error ? styles.inputError : ''}`}
+              className={cn(inputBaseClass, error && inputErrorClass)}
               placeholder="••••••••"
             />
           )
@@ -1238,7 +1251,7 @@ export function ResourceFormPage({
               type="text"
               value={String(value || '')}
               onChange={(e) => handleFieldChange(field.name, e.target.value)}
-              className={`${styles.input} ${error ? styles.inputError : ''}`}
+              className={cn(inputBaseClass, error && inputErrorClass)}
               placeholder={t('fields.types.external_id')}
             />
           )
@@ -1248,7 +1261,7 @@ export function ResourceFormPage({
           const geoValue =
             typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {}
           input = (
-            <div className={styles.inputGroup}>
+            <div className="flex items-center gap-2">
               <input
                 type="number"
                 step="0.000001"
@@ -1261,7 +1274,7 @@ export function ResourceFormPage({
                     latitude: e.target.value ? Number(e.target.value) : null,
                   })
                 }
-                className={`${styles.input} ${error ? styles.inputError : ''}`}
+                className={cn(inputBaseClass, error && inputErrorClass)}
                 placeholder={t('fields.config.latitude', 'Latitude')}
               />
               <input
@@ -1276,7 +1289,7 @@ export function ResourceFormPage({
                     longitude: e.target.value ? Number(e.target.value) : null,
                   })
                 }
-                className={`${styles.input} ${error ? styles.inputError : ''}`}
+                className={cn(inputBaseClass, error && inputErrorClass)}
                 placeholder={t('fields.config.longitude', 'Longitude')}
               />
             </div>
@@ -1307,7 +1320,7 @@ export function ResourceFormPage({
                 type="text"
                 value={String(value || '')}
                 onChange={(e) => handleFieldChange(field.name, e.target.value)}
-                className={`${styles.input} ${error ? styles.inputError : ''}`}
+                className={cn(inputBaseClass, error && inputErrorClass)}
                 placeholder={t('fields.types.master_detail')}
               />
             )
@@ -1319,7 +1332,7 @@ export function ResourceFormPage({
             <input
               {...commonProps}
               type="text"
-              className={`${styles.input} ${error ? styles.inputError : ''}`}
+              className={cn(inputBaseClass, error && inputErrorClass)}
               value={String(value ?? '')}
               onChange={(e) => handleFieldChange(field.name, e.target.value)}
             />
@@ -1327,19 +1340,19 @@ export function ResourceFormPage({
       }
 
       return (
-        <div key={field.id} className={styles.fieldGroup} data-testid={`field-group-${index}`}>
-          <label htmlFor={fieldId} className={styles.label}>
+        <div key={field.id} className="flex flex-col gap-1" data-testid={`field-group-${index}`}>
+          <label htmlFor={fieldId} className="text-sm font-medium text-foreground">
             {field.displayName || field.name}
-            {field.required && <span className={styles.required}>*</span>}
+            {field.required && <span className="ml-1 text-destructive">*</span>}
           </label>
-          <div className={styles.fieldTypeHint}>
+          <div className="mb-1 text-xs text-muted-foreground/60">
             {t(`fields.types.${field.type.toLowerCase()}`)}
           </div>
           {input}
           {error && (
             <div
               id={errorId}
-              className={styles.errorMessage}
+              className="mt-1 text-sm text-destructive"
               role="alert"
               data-testid={`error-${field.name}`}
             >
@@ -1358,8 +1371,11 @@ export function ResourceFormPage({
 
   if (isLoading) {
     return (
-      <div className={styles.container} data-testid={testId}>
-        <div className={styles.loadingContainer}>
+      <div
+        className="flex w-full flex-col gap-6 p-6 max-lg:p-4 max-md:gap-4 max-md:p-2"
+        data-testid={testId}
+      >
+        <div className="flex min-h-[300px] items-center justify-center">
           <LoadingSpinner size="large" label={t('common.loading')} />
         </div>
       </div>
@@ -1369,7 +1385,10 @@ export function ResourceFormPage({
   // Error state - schema error
   if (schemaError) {
     return (
-      <div className={styles.container} data-testid={testId}>
+      <div
+        className="flex w-full flex-col gap-6 p-6 max-lg:p-4 max-md:gap-4 max-md:p-2"
+        data-testid={testId}
+      >
         <ErrorMessage
           error={schemaError instanceof Error ? schemaError : new Error(t('errors.generic'))}
           onRetry={() =>
@@ -1383,7 +1402,10 @@ export function ResourceFormPage({
   // Error state - resource error (edit mode)
   if (isEditMode && resourceError) {
     return (
-      <div className={styles.container} data-testid={testId}>
+      <div
+        className="flex w-full flex-col gap-6 p-6 max-lg:p-4 max-md:gap-4 max-md:p-2"
+        data-testid={testId}
+      >
         <ErrorMessage
           error={resourceError instanceof Error ? resourceError : new Error(t('errors.generic'))}
           onRetry={() =>
@@ -1397,34 +1419,46 @@ export function ResourceFormPage({
   // Not found state
   if (!effectiveSchema) {
     return (
-      <div className={styles.container} data-testid={testId}>
+      <div
+        className="flex w-full flex-col gap-6 p-6 max-lg:p-4 max-md:gap-4 max-md:p-2"
+        data-testid={testId}
+      >
         <ErrorMessage error={new Error(t('errors.notFound'))} />
       </div>
     )
   }
 
   return (
-    <div className={styles.container} data-testid={testId}>
+    <div
+      className="flex w-full flex-col gap-6 p-6 max-lg:p-4 max-md:gap-4 max-md:p-2"
+      data-testid={testId}
+    >
       {/* Page Header */}
-      <header className={styles.header}>
-        <div className={styles.headerLeft}>
-          <nav className={styles.breadcrumb} aria-label="Breadcrumb">
-            <Link to={`/${getTenantSlug()}/resources`} className={styles.breadcrumbLink}>
+      <header className="flex flex-col gap-2">
+        <div className="flex flex-col gap-1">
+          <nav
+            className="flex items-center gap-1 text-sm text-muted-foreground max-md:flex-wrap"
+            aria-label="Breadcrumb"
+          >
+            <Link
+              to={`/${getTenantSlug()}/resources`}
+              className="text-primary no-underline transition-colors duration-200 hover:text-primary/80 hover:underline focus:rounded focus:outline-2 focus:outline-offset-2 focus:outline-ring motion-reduce:transition-none"
+            >
               {t('resources.title')}
             </Link>
-            <span className={styles.breadcrumbSeparator} aria-hidden="true">
+            <span className="mx-1 text-muted-foreground/60" aria-hidden="true">
               /
             </span>
             <Link
               to={`/${getTenantSlug()}/resources/${collectionName}`}
-              className={styles.breadcrumbLink}
+              className="text-primary no-underline transition-colors duration-200 hover:text-primary/80 hover:underline focus:rounded focus:outline-2 focus:outline-offset-2 focus:outline-ring motion-reduce:transition-none"
             >
               {effectiveSchema.displayName}
             </Link>
-            <span className={styles.breadcrumbSeparator} aria-hidden="true">
+            <span className="mx-1 text-muted-foreground/60" aria-hidden="true">
               /
             </span>
-            <span className={styles.breadcrumbCurrent}>
+            <span className="font-medium text-foreground">
               {isEditMode
                 ? t('resources.editRecord')
                 : isCloneMode
@@ -1432,7 +1466,10 @@ export function ResourceFormPage({
                   : t('resources.createRecord')}
             </span>
           </nav>
-          <h1 className={styles.title} data-testid="page-title">
+          <h1
+            className="m-0 text-2xl font-semibold text-foreground max-md:text-xl"
+            data-testid="page-title"
+          >
             {isEditMode
               ? t('resources.editRecord')
               : isCloneMode
@@ -1440,18 +1477,21 @@ export function ResourceFormPage({
                 : t('resources.createRecord')}
           </h1>
           {isEditMode && resourceId && (
-            <p className={styles.subtitle} data-testid="resource-id">
+            <p className="m-0 font-mono text-sm text-muted-foreground" data-testid="resource-id">
               ID: {resourceId}
             </p>
           )}
           {isCloneMode && cloneSourceId && (
-            <div className={styles.cloneBanner} data-testid="clone-banner">
+            <div
+              className="mt-1 flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-4 py-2 text-sm text-blue-800 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
+              data-testid="clone-banner"
+            >
               <span>
                 {t('resources.cloningFrom')} {cloneSourceId}
               </span>
               <Link
                 to={`/${getTenantSlug()}/resources/${collectionName}/${cloneSourceId}`}
-                className={styles.cloneSourceLink}
+                className="font-medium text-primary no-underline hover:underline"
               >
                 {t('resources.viewSource')}
               </Link>
@@ -1461,12 +1501,20 @@ export function ResourceFormPage({
       </header>
 
       {/* Form */}
-      <form className={styles.form} onSubmit={handleSubmit} noValidate data-testid="resource-form">
+      <form
+        className="flex flex-col gap-6"
+        onSubmit={handleSubmit}
+        noValidate
+        data-testid="resource-form"
+      >
         {/* Form Fields */}
-        <div className={styles.fieldsContainer}>
+        <div className="flex flex-col gap-6 rounded-md border border-border bg-card p-6 max-md:p-4">
           {sortedFields.length === 0 ? (
-            <div className={styles.emptyState} data-testid="no-fields">
-              <p>{t('resourceForm.noFields')}</p>
+            <div
+              className="flex flex-col items-center justify-center rounded-md bg-muted p-8 text-center text-muted-foreground"
+              data-testid="no-fields"
+            >
+              <p className="m-0 text-base">{t('resourceForm.noFields')}</p>
             </div>
           ) : (
             sortedFields.map((field, index) => renderField(field, index))
@@ -1474,10 +1522,10 @@ export function ResourceFormPage({
         </div>
 
         {/* Form Actions */}
-        <div className={styles.formActions}>
+        <div className="flex justify-end gap-4 border-t border-border pt-4 max-md:flex-col-reverse">
           <button
             type="button"
-            className={styles.cancelButton}
+            className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-md border border-border bg-transparent px-6 py-2 text-base font-medium text-muted-foreground transition-[background-color,border-color] duration-200 hover:bg-muted hover:text-foreground focus:outline-2 focus:outline-offset-2 focus:outline-ring disabled:cursor-not-allowed disabled:opacity-50 max-md:w-full motion-reduce:transition-none"
             onClick={handleCancel}
             disabled={isSubmitting}
             data-testid="cancel-button"
@@ -1486,7 +1534,7 @@ export function ResourceFormPage({
           </button>
           <button
             type="submit"
-            className={styles.submitButton}
+            className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-md border border-primary bg-primary px-6 py-2 text-base font-medium text-primary-foreground transition-[background-color,border-color] duration-200 hover:bg-primary/90 focus:outline-2 focus:outline-offset-2 focus:outline-ring disabled:cursor-not-allowed disabled:opacity-50 max-md:w-full motion-reduce:transition-none"
             disabled={isSubmitting || sortedFields.length === 0}
             data-testid="submit-button"
           >

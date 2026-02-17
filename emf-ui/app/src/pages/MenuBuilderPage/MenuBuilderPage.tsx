@@ -40,7 +40,7 @@ import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
 import type { ApiClient } from '../../services/apiClient'
-import styles from './MenuBuilderPage.module.css'
+import { cn } from '@/lib/utils'
 
 /**
  * UI Menu interface matching the API response
@@ -277,26 +277,26 @@ function MenuForm({ menu, onSubmit, onCancel, isSubmitting }: MenuFormProps): Re
 
   return (
     <div
-      className={styles.modalOverlay}
+      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 p-4"
       onClick={(e) => e.target === e.currentTarget && onCancel()}
       onKeyDown={handleKeyDown}
       data-testid="menu-form-overlay"
       role="presentation"
     >
       <div
-        className={styles.modal}
+        className="w-full max-w-[500px] max-h-[90vh] overflow-y-auto rounded-lg bg-card shadow-xl animate-in fade-in zoom-in-95"
         role="dialog"
         aria-modal="true"
         aria-labelledby="menu-form-title"
         data-testid="menu-form-modal"
       >
-        <div className={styles.modalHeader}>
-          <h2 id="menu-form-title" className={styles.modalTitle}>
+        <div className="flex items-center justify-between border-b border-border p-6">
+          <h2 id="menu-form-title" className="m-0 text-lg font-semibold text-foreground">
             {title}
           </h2>
           <button
             type="button"
-            className={styles.modalCloseButton}
+            className="flex h-8 w-8 items-center justify-center rounded bg-transparent border-none text-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:outline-2 focus:outline-primary focus:outline-offset-2"
             onClick={onCancel}
             aria-label={t('common.close')}
             data-testid="menu-form-close"
@@ -304,12 +304,12 @@ function MenuForm({ menu, onSubmit, onCancel, isSubmitting }: MenuFormProps): Re
             ×
           </button>
         </div>
-        <div className={styles.modalBody}>
-          <form className={styles.form} onSubmit={handleSubmit} noValidate>
-            <div className={styles.formGroup}>
-              <label htmlFor="menu-name" className={styles.formLabel}>
+        <div className="p-6">
+          <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="menu-name" className="text-sm font-medium text-foreground">
                 {t('builder.menus.menuName')}
-                <span className={styles.required} aria-hidden="true">
+                <span className="ml-0.5 text-destructive" aria-hidden="true">
                   *
                 </span>
               </label>
@@ -317,7 +317,10 @@ function MenuForm({ menu, onSubmit, onCancel, isSubmitting }: MenuFormProps): Re
                 ref={nameInputRef}
                 id="menu-name"
                 type="text"
-                className={`${styles.formInput} ${touched.name && errors.name ? styles.hasError : ''}`}
+                className={cn(
+                  'rounded-md border border-border bg-card px-4 py-2 text-sm text-foreground transition-colors placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20',
+                  touched.name && errors.name && 'border-destructive focus:ring-destructive/20'
+                )}
                 value={formData.name}
                 onChange={(e) => handleChange('name', e.target.value)}
                 onBlur={() => handleBlur('name')}
@@ -328,20 +331,20 @@ function MenuForm({ menu, onSubmit, onCancel, isSubmitting }: MenuFormProps): Re
                 disabled={isSubmitting}
                 data-testid="menu-name-input"
               />
-              <span id="menu-name-hint" className={styles.formHint}>
+              <span id="menu-name-hint" className="mt-1 text-xs text-muted-foreground">
                 {t('builder.menus.nameHint')}
               </span>
               {touched.name && errors.name && (
-                <span id="menu-name-error" className={styles.formError} role="alert">
+                <span id="menu-name-error" className="mt-1 text-xs text-destructive" role="alert">
                   {errors.name}
                 </span>
               )}
             </div>
 
-            <div className={styles.formActions}>
+            <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-border max-md:flex-col">
               <button
                 type="button"
-                className={styles.cancelButton}
+                className="rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted hover:border-muted-foreground/40 focus:outline-2 focus:outline-primary focus:outline-offset-2 max-md:w-full"
                 onClick={onCancel}
                 disabled={isSubmitting}
                 data-testid="menu-form-cancel"
@@ -350,7 +353,7 @@ function MenuForm({ menu, onSubmit, onCancel, isSubmitting }: MenuFormProps): Re
               </button>
               <button
                 type="submit"
-                className={styles.submitButton}
+                className="rounded-md border-none bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus:outline-2 focus:outline-primary focus:outline-offset-2 disabled:opacity-60 disabled:cursor-not-allowed max-md:w-full"
                 disabled={isSubmitting}
                 data-testid="menu-form-submit"
               >
@@ -456,26 +459,26 @@ function MenuItemForm({
 
   return (
     <div
-      className={styles.modalOverlay}
+      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 p-4"
       onClick={(e) => e.target === e.currentTarget && onCancel()}
       onKeyDown={handleKeyDown}
       data-testid="menu-item-form-overlay"
       role="presentation"
     >
       <div
-        className={styles.modal}
+        className="w-full max-w-[500px] max-h-[90vh] overflow-y-auto rounded-lg bg-card shadow-xl animate-in fade-in zoom-in-95"
         role="dialog"
         aria-modal="true"
         aria-labelledby="menu-item-form-title"
         data-testid="menu-item-form-modal"
       >
-        <div className={styles.modalHeader}>
-          <h2 id="menu-item-form-title" className={styles.modalTitle}>
+        <div className="flex items-center justify-between border-b border-border p-6">
+          <h2 id="menu-item-form-title" className="m-0 text-lg font-semibold text-foreground">
             {title}
           </h2>
           <button
             type="button"
-            className={styles.modalCloseButton}
+            className="flex h-8 w-8 items-center justify-center rounded bg-transparent border-none text-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:outline-2 focus:outline-primary focus:outline-offset-2"
             onClick={onCancel}
             aria-label={t('common.close')}
             data-testid="menu-item-form-close"
@@ -483,12 +486,12 @@ function MenuItemForm({
             ×
           </button>
         </div>
-        <div className={styles.modalBody}>
-          <form className={styles.form} onSubmit={handleSubmit} noValidate>
-            <div className={styles.formGroup}>
-              <label htmlFor="item-label" className={styles.formLabel}>
+        <div className="p-6">
+          <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="item-label" className="text-sm font-medium text-foreground">
                 {t('builder.menus.itemLabel')}
-                <span className={styles.required} aria-hidden="true">
+                <span className="ml-0.5 text-destructive" aria-hidden="true">
                   *
                 </span>
               </label>
@@ -496,7 +499,10 @@ function MenuItemForm({
                 ref={labelInputRef}
                 id="item-label"
                 type="text"
-                className={`${styles.formInput} ${touched.label && errors.label ? styles.hasError : ''}`}
+                className={cn(
+                  'rounded-md border border-border bg-card px-4 py-2 text-sm text-foreground transition-colors placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20',
+                  touched.label && errors.label && 'border-destructive focus:ring-destructive/20'
+                )}
                 value={formData.label}
                 onChange={(e) => handleChange('label', e.target.value)}
                 onBlur={() => handleBlur('label')}
@@ -508,20 +514,23 @@ function MenuItemForm({
                 data-testid="item-label-input"
               />
               {touched.label && errors.label && (
-                <span id="item-label-error" className={styles.formError} role="alert">
+                <span id="item-label-error" className="mt-1 text-xs text-destructive" role="alert">
                   {errors.label}
                 </span>
               )}
             </div>
 
-            <div className={styles.formGroup}>
-              <label htmlFor="item-path" className={styles.formLabel}>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="item-path" className="text-sm font-medium text-foreground">
                 {t('builder.menus.itemPath')}
               </label>
               <input
                 id="item-path"
                 type="text"
-                className={`${styles.formInput} ${touched.path && errors.path ? styles.hasError : ''}`}
+                className={cn(
+                  'rounded-md border border-border bg-card px-4 py-2 text-sm text-foreground transition-colors placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20',
+                  touched.path && errors.path && 'border-destructive focus:ring-destructive/20'
+                )}
                 value={formData.path}
                 onChange={(e) => handleChange('path', e.target.value)}
                 onBlur={() => handleBlur('path')}
@@ -531,23 +540,23 @@ function MenuItemForm({
                 disabled={isSubmitting}
                 data-testid="item-path-input"
               />
-              <span id="item-path-hint" className={styles.formHint}>
+              <span id="item-path-hint" className="mt-1 text-xs text-muted-foreground">
                 {t('builder.menus.pathHint')}
               </span>
               {touched.path && errors.path && (
-                <span id="item-path-error" className={styles.formError} role="alert">
+                <span id="item-path-error" className="mt-1 text-xs text-destructive" role="alert">
                   {errors.path}
                 </span>
               )}
             </div>
 
-            <div className={styles.formGroup}>
-              <label htmlFor="item-icon" className={styles.formLabel}>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="item-icon" className="text-sm font-medium text-foreground">
                 {t('builder.menus.itemIcon')}
               </label>
               <select
                 id="item-icon"
-                className={styles.formSelect}
+                className="rounded-md border border-border bg-card px-4 py-2 text-sm text-foreground transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                 value={formData.icon}
                 onChange={(e) => handleChange('icon', e.target.value)}
                 disabled={isSubmitting}
@@ -561,48 +570,61 @@ function MenuItemForm({
               </select>
             </div>
 
-            <div className={styles.formGroup}>
-              <label className={styles.formLabel}>{t('builder.menus.accessPolicies')}</label>
-              <div className={styles.policiesContainer} data-testid="policies-container">
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-foreground">
+                {t('builder.menus.accessPolicies')}
+              </label>
+              <div
+                className="rounded-md border border-border bg-muted max-h-[200px] overflow-y-auto"
+                data-testid="policies-container"
+              >
                 {availablePolicies.length === 0 ? (
-                  <p className={styles.noPolicies} data-testid="no-policies-message">
+                  <p
+                    className="m-0 p-4 text-center text-sm text-muted-foreground"
+                    data-testid="no-policies-message"
+                  >
                     {t('builder.menus.noPolicies')}
                   </p>
                 ) : (
                   <div
-                    className={styles.policiesList}
+                    className="flex flex-col gap-1 p-2"
                     role="group"
                     aria-label={t('builder.menus.accessPolicies')}
                   >
                     {availablePolicies.map((policy) => (
                       <label
                         key={policy.id}
-                        className={styles.policyCheckbox}
+                        className="flex items-start gap-2 rounded p-2 cursor-pointer transition-colors hover:bg-muted-foreground/10"
                         data-testid={`policy-checkbox-${policy.id}`}
                       >
                         <input
                           type="checkbox"
+                          className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer"
                           checked={formData.policies.includes(policy.id)}
                           onChange={() => handlePolicyToggle(policy.id)}
                           disabled={isSubmitting}
                           data-testid={`policy-input-${policy.id}`}
                         />
-                        <span className={styles.policyName}>{policy.name}</span>
+                        <span className="text-sm font-medium text-foreground">{policy.name}</span>
                         {policy.description && (
-                          <span className={styles.policyDescription}>{policy.description}</span>
+                          <span className="block text-xs text-muted-foreground mt-0.5">
+                            {policy.description}
+                          </span>
                         )}
                       </label>
                     ))}
                   </div>
                 )}
               </div>
-              <span className={styles.formHint}>{t('builder.menus.accessPoliciesHint')}</span>
+              <span className="mt-1 text-xs text-muted-foreground">
+                {t('builder.menus.accessPoliciesHint')}
+              </span>
             </div>
 
-            <div className={styles.formActions}>
+            <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-border max-md:flex-col">
               <button
                 type="button"
-                className={styles.cancelButton}
+                className="rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted hover:border-muted-foreground/40 focus:outline-2 focus:outline-primary focus:outline-offset-2 max-md:w-full"
                 onClick={onCancel}
                 disabled={isSubmitting}
                 data-testid="menu-item-form-cancel"
@@ -611,7 +633,7 @@ function MenuItemForm({
               </button>
               <button
                 type="submit"
-                className={styles.submitButton}
+                className="rounded-md border-none bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus:outline-2 focus:outline-primary focus:outline-offset-2 disabled:opacity-60 disabled:cursor-not-allowed max-md:w-full"
                 disabled={isSubmitting}
                 data-testid="menu-item-form-submit"
               >
@@ -683,9 +705,13 @@ function MenuTreeItem({
   }
 
   return (
-    <div className={styles.treeItemContainer}>
+    <div className="mb-1">
       <div
-        className={`${styles.treeItem} ${isDragOver ? styles.treeItemDragOver : ''} ${isDragging ? styles.treeItemDragging : ''}`}
+        className={cn(
+          'flex items-center justify-between rounded border border-border bg-muted p-2 cursor-grab transition-all hover:bg-muted-foreground/10 hover:border-muted-foreground/40',
+          isDragOver && 'border-primary ring-2 ring-primary/20',
+          isDragging && 'opacity-50'
+        )}
         style={{ paddingLeft: `${depth * 24 + 8}px` }}
         draggable
         onDragStart={(e) => onDragStart(e, item.id)}
@@ -694,11 +720,11 @@ function MenuTreeItem({
         onDragEnd={onDragEnd}
         data-testid={`tree-item-${item.id}`}
       >
-        <div className={styles.treeItemContent}>
+        <div className="flex items-center gap-2 flex-1 min-w-0">
           {hasChildren && (
             <button
               type="button"
-              className={styles.expandButton}
+              className="flex h-5 w-5 items-center justify-center rounded bg-transparent border-none text-xs text-muted-foreground cursor-pointer transition-colors hover:text-foreground hover:bg-muted-foreground/10 focus:outline-2 focus:outline-primary focus:outline-offset-2"
               onClick={() => setIsExpanded(!isExpanded)}
               aria-expanded={isExpanded}
               aria-label={isExpanded ? 'Collapse' : 'Expand'}
@@ -707,19 +733,21 @@ function MenuTreeItem({
               {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
             </button>
           )}
-          {!hasChildren && <span className={styles.expandPlaceholder} />}
-          <span className={styles.itemIcon}>{getMenuIcon(item.icon)}</span>
-          <span className={styles.itemLabel}>{item.label}</span>
+          {!hasChildren && <span className="h-5 w-5" />}
+          <span className="text-base">{getMenuIcon(item.icon)}</span>
+          <span className="font-medium text-foreground truncate">{item.label}</span>
           {item.path && (
-            <span className={styles.itemPath}>
-              <code>{item.path}</code>
+            <span className="shrink-0">
+              <code className="font-mono text-xs rounded bg-card px-2 py-1 text-muted-foreground">
+                {item.path}
+              </code>
             </span>
           )}
         </div>
-        <div className={styles.treeItemActions}>
+        <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 [.flex:hover>&]:opacity-100">
           <button
             type="button"
-            className={styles.treeActionButton}
+            className="flex h-7 w-7 items-center justify-center rounded border border-transparent bg-transparent text-sm text-muted-foreground cursor-pointer transition-colors hover:text-foreground hover:bg-card hover:border-border focus:outline-2 focus:outline-primary focus:outline-offset-2"
             onClick={() => onAddChild(item.id)}
             aria-label={`Add child to ${item.label}`}
             title={t('builder.menus.addChild')}
@@ -729,7 +757,7 @@ function MenuTreeItem({
           </button>
           <button
             type="button"
-            className={styles.treeActionButton}
+            className="flex h-7 w-7 items-center justify-center rounded border border-transparent bg-transparent text-sm text-muted-foreground cursor-pointer transition-colors hover:text-foreground hover:bg-card hover:border-border focus:outline-2 focus:outline-primary focus:outline-offset-2"
             onClick={() => onEdit(item)}
             aria-label={`Edit ${item.label}`}
             title={t('common.edit')}
@@ -739,7 +767,7 @@ function MenuTreeItem({
           </button>
           <button
             type="button"
-            className={`${styles.treeActionButton} ${styles.deleteActionButton}`}
+            className="flex h-7 w-7 items-center justify-center rounded border border-transparent bg-transparent text-sm text-muted-foreground cursor-pointer transition-colors hover:text-destructive hover:bg-destructive/10 hover:border-destructive/30 focus:outline-2 focus:outline-primary focus:outline-offset-2"
             onClick={() => onDelete(item.id)}
             aria-label={`Delete ${item.label}`}
             title={t('common.delete')}
@@ -750,7 +778,7 @@ function MenuTreeItem({
         </div>
       </div>
       {hasChildren && isExpanded && (
-        <div className={styles.treeChildren} data-testid={`children-${item.id}`}>
+        <div className="ml-4 mt-1" data-testid={`children-${item.id}`}>
           {item.children!.map((child) => (
             <MenuTreeItem
               key={child.id}
@@ -840,16 +868,19 @@ function MenuTreeView({
 
   if (items.length === 0) {
     return (
-      <div className={styles.treeEmpty} data-testid="tree-empty">
-        <p>{t('builder.menus.noItems')}</p>
-        <p className={styles.treeEmptyHint}>{t('builder.menus.addItemHint')}</p>
+      <div
+        className="flex flex-col items-center justify-center p-12 text-center text-muted-foreground"
+        data-testid="tree-empty"
+      >
+        <p className="m-0">{t('builder.menus.noItems')}</p>
+        <p className="m-0 mt-2 text-sm">{t('builder.menus.addItemHint')}</p>
       </div>
     )
   }
 
   return (
     <div
-      className={styles.treeView}
+      className="flex-1 overflow-y-auto p-4"
       role="tree"
       aria-label={t('builder.menus.menuItems')}
       data-testid="menu-tree-view"
@@ -920,29 +951,34 @@ function MenuPreview({ menu, items, availablePolicies }: MenuPreviewProps): Reac
     return (
       <div
         key={item.id}
-        className={styles.previewItem}
+        className="flex flex-wrap items-center gap-2 rounded p-2 transition-colors hover:bg-muted"
         style={{ paddingLeft: `${depth * 16}px` }}
         data-testid={`preview-item-${item.id}`}
       >
-        <div className={styles.previewItemMain}>
-          <span className={styles.previewIcon}>{getPreviewIcon(item.icon)}</span>
-          <span className={styles.previewLabel}>{item.label}</span>
+        <div className="flex items-center gap-2 flex-1">
+          <span className="text-base">{getPreviewIcon(item.icon)}</span>
+          <span className="text-sm text-foreground">{item.label}</span>
           {item.path && (
-            <span className={styles.previewPath}>
-              <code>{item.path}</code>
+            <span className="shrink-0 ml-auto">
+              <code className="font-mono text-xs rounded bg-muted px-1 py-0.5 text-muted-foreground">
+                {item.path}
+              </code>
             </span>
           )}
         </div>
         {policyNames.length > 0 && (
-          <div className={styles.previewPolicies} data-testid={`preview-policies-${item.id}`}>
-            <span className={styles.previewPoliciesIcon}>
+          <div
+            className="flex items-center gap-1 mt-1 pl-[calc(1rem+0.5rem)]"
+            data-testid={`preview-policies-${item.id}`}
+          >
+            <span className="text-xs opacity-70">
               <Lock size={12} />
             </span>
-            <span className={styles.previewPoliciesText}>{policyNames.join(', ')}</span>
+            <span className="text-xs text-muted-foreground italic">{policyNames.join(', ')}</span>
           </div>
         )}
         {item.children && item.children.length > 0 && (
-          <div className={styles.previewChildren}>
+          <div className="w-full mt-1 pl-4 border-l-2 border-border">
             {item.children.map((child) => renderPreviewItem(child, depth + 1))}
           </div>
         )}
@@ -951,13 +987,18 @@ function MenuPreview({ menu, items, availablePolicies }: MenuPreviewProps): Reac
   }
 
   return (
-    <div className={styles.preview} data-testid="menu-preview">
-      <h3 className={styles.previewTitle}>{t('builder.menus.preview')}</h3>
-      <div className={styles.previewContent}>
+    <div
+      className="flex flex-col overflow-hidden rounded-md border border-border bg-card"
+      data-testid="menu-preview"
+    >
+      <h3 className="m-0 p-4 text-sm font-semibold text-foreground bg-muted border-b border-border">
+        {t('builder.menus.preview')}
+      </h3>
+      <div className="flex-1 overflow-y-auto p-4">
         {items.length === 0 ? (
-          <p className={styles.previewEmpty}>{t('builder.menus.noItems')}</p>
+          <p className="m-0 p-6 text-center text-muted-foreground">{t('builder.menus.noItems')}</p>
         ) : (
-          <nav className={styles.previewNav} aria-label={menu?.name || 'Menu preview'}>
+          <nav className="flex flex-col gap-1" aria-label={menu?.name || 'Menu preview'}>
             {items.map((item) => renderPreviewItem(item))}
           </nav>
         )}
@@ -1379,8 +1420,8 @@ export function MenuBuilderPage({
   // Render loading state
   if (viewMode === 'list' && isLoadingMenus) {
     return (
-      <div className={styles.container} data-testid={testId}>
-        <div className={styles.loadingContainer}>
+      <div className="flex h-full min-h-0 w-full flex-col p-6" data-testid={testId}>
+        <div className="flex min-h-[400px] items-center justify-center">
           <LoadingSpinner size="large" label={t('common.loading')} />
         </div>
       </div>
@@ -1390,7 +1431,7 @@ export function MenuBuilderPage({
   // Render error state
   if (viewMode === 'list' && menusError) {
     return (
-      <div className={styles.container} data-testid={testId}>
+      <div className="flex h-full min-h-0 w-full flex-col p-6" data-testid={testId}>
         <ErrorMessage
           error={menusError instanceof Error ? menusError : new Error(t('errors.generic'))}
           onRetry={() => refetchMenus()}
@@ -1402,28 +1443,30 @@ export function MenuBuilderPage({
   // Render editor view
   if (viewMode === 'editor') {
     return (
-      <div className={styles.container} data-testid={testId}>
-        <header className={styles.editorHeader}>
-          <div className={styles.editorHeaderLeft}>
+      <div className="flex h-full min-h-0 w-full flex-col p-6 max-md:p-2" data-testid={testId}>
+        <header className="flex items-center justify-between border-b border-border pb-4 mb-4 max-md:flex-col max-md:gap-2">
+          <div className="flex items-center gap-4 max-md:w-full max-md:justify-between">
             <button
               type="button"
-              className={styles.backButton}
+              className="bg-transparent border-none px-2 py-1 text-sm text-muted-foreground cursor-pointer transition-colors hover:text-foreground focus:outline-2 focus:outline-primary focus:outline-offset-2"
               onClick={handleBackToList}
               aria-label={t('common.back')}
               data-testid="back-to-list-button"
             >
               ← {t('common.back')}
             </button>
-            <h1 className={styles.editorTitle}>
+            <h1 className="m-0 text-xl font-semibold text-foreground">
               {currentMenu?.name || t('builder.menus.newMenu')}
-              {hasUnsavedChanges && <span className={styles.unsavedIndicator}>*</span>}
+              {hasUnsavedChanges && (
+                <span className="ml-1 text-amber-600 dark:text-amber-400">*</span>
+              )}
             </h1>
           </div>
-          <div className={styles.editorHeaderRight}>
+          <div className="flex items-center gap-2 max-md:w-full max-md:justify-between">
             {currentMenu && (
               <button
                 type="button"
-                className={styles.configButton}
+                className="rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted focus:outline-2 focus:outline-primary focus:outline-offset-2"
                 onClick={() => handleEditMenuConfig(currentMenu)}
                 data-testid="edit-config-button"
               >
@@ -1432,7 +1475,7 @@ export function MenuBuilderPage({
             )}
             <button
               type="button"
-              className={styles.saveButton}
+              className="rounded-md border-none bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus:outline-2 focus:outline-primary focus:outline-offset-2 disabled:opacity-60 disabled:cursor-not-allowed"
               onClick={handleSaveMenu}
               disabled={!hasUnsavedChanges || updateMenuMutation.isPending}
               data-testid="save-menu-button"
@@ -1442,12 +1485,12 @@ export function MenuBuilderPage({
           </div>
         </header>
 
-        <div className={styles.editorLayout}>
-          <div className={styles.editorMain}>
-            <div className={styles.editorToolbar}>
+        <div className="grid grid-cols-[1fr_300px] gap-4 flex-1 min-h-0 overflow-hidden max-lg:grid-cols-[1fr_250px] max-md:grid-cols-1 max-md:grid-rows-[1fr_auto]">
+          <div className="flex flex-col overflow-hidden rounded-md border border-border bg-card">
+            <div className="flex items-center border-b border-border bg-muted px-4 py-2">
               <button
                 type="button"
-                className={styles.addItemButton}
+                className="inline-flex items-center rounded border-none bg-primary px-2 py-1 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus:outline-2 focus:outline-primary focus:outline-offset-2"
                 onClick={() => handleAddItem(null)}
                 data-testid="add-item-button"
               >
@@ -1508,12 +1551,14 @@ export function MenuBuilderPage({
 
   // Render list view
   return (
-    <div className={styles.container} data-testid={testId}>
-      <header className={styles.header}>
-        <h1 className={styles.title}>{t('builder.menus.title')}</h1>
+    <div className="flex h-full min-h-0 w-full flex-col p-6 max-md:p-2" data-testid={testId}>
+      <header className="flex flex-wrap items-center justify-between gap-4 mb-6 max-md:flex-col max-md:items-stretch">
+        <h1 className="m-0 text-2xl font-semibold text-foreground max-md:text-xl">
+          {t('builder.menus.title')}
+        </h1>
         <button
           type="button"
-          className={styles.createButton}
+          className="inline-flex items-center justify-center rounded-md border-none bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus:outline-2 focus:outline-primary focus:outline-offset-2 max-md:w-full"
           onClick={handleCreateMenu}
           aria-label={t('builder.menus.createMenu')}
           data-testid="create-menu-button"
@@ -1523,29 +1568,48 @@ export function MenuBuilderPage({
       </header>
 
       {menus.length === 0 ? (
-        <div className={styles.emptyState} data-testid="empty-state">
-          <p>{t('common.noResults')}</p>
+        <div
+          className="flex flex-col items-center justify-center rounded-md bg-muted p-12 text-center text-muted-foreground"
+          data-testid="empty-state"
+        >
+          <p className="m-0">{t('common.noResults')}</p>
         </div>
       ) : (
-        <div className={styles.tableContainer}>
+        <div className="overflow-x-auto rounded-md border border-border bg-card">
           <table
-            className={styles.table}
+            className="w-full border-collapse text-sm"
             role="grid"
             aria-label={t('builder.menus.title')}
             data-testid="menus-table"
           >
-            <thead>
+            <thead className="bg-muted">
               <tr role="row">
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b-2 border-border p-4 text-left font-semibold text-foreground whitespace-nowrap"
+                >
                   {t('builder.menus.menuName')}
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b-2 border-border p-4 text-left font-semibold text-foreground whitespace-nowrap"
+                >
                   {t('builder.menus.itemCount')}
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b-2 border-border p-4 text-left font-semibold text-foreground whitespace-nowrap"
+                >
                   {t('collections.updated')}
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b-2 border-border p-4 text-left font-semibold text-foreground whitespace-nowrap"
+                >
                   {t('common.actions')}
                 </th>
               </tr>
@@ -1555,34 +1619,43 @@ export function MenuBuilderPage({
                 <tr
                   key={menu.id}
                   role="row"
-                  className={styles.tableRow}
+                  className="transition-colors hover:bg-muted/50"
                   data-testid={`menu-row-${index}`}
                 >
-                  <td role="gridcell" className={styles.nameCell}>
+                  <td
+                    role="gridcell"
+                    className="border-b border-border p-4 font-medium text-foreground"
+                  >
                     <button
                       type="button"
-                      className={styles.nameLink}
+                      className="bg-transparent border-none p-0 font-inherit text-primary cursor-pointer hover:underline focus:outline-2 focus:outline-primary focus:outline-offset-2"
                       onClick={() => handleOpenEditor(menu)}
                       data-testid={`menu-name-${index}`}
                     >
                       {menu.name}
                     </button>
                   </td>
-                  <td role="gridcell" className={styles.countCell}>
+                  <td role="gridcell" className="border-b border-border p-4 text-muted-foreground">
                     {menu.items?.length || 0} {t('builder.menus.items')}
                   </td>
-                  <td role="gridcell" className={styles.dateCell}>
+                  <td
+                    role="gridcell"
+                    className="border-b border-border p-4 text-muted-foreground whitespace-nowrap"
+                  >
                     {formatDate(new Date(menu.updatedAt), {
                       year: 'numeric',
                       month: 'short',
                       day: 'numeric',
                     })}
                   </td>
-                  <td role="gridcell" className={styles.actionsCell}>
-                    <div className={styles.actions}>
+                  <td
+                    role="gridcell"
+                    className="border-b border-border p-4 w-[1%] whitespace-nowrap"
+                  >
+                    <div className="flex gap-2">
                       <button
                         type="button"
-                        className={styles.actionButton}
+                        className="rounded border border-border bg-card px-2 py-1 text-xs font-medium text-foreground cursor-pointer transition-colors hover:bg-muted hover:border-muted-foreground/40 focus:outline-2 focus:outline-primary focus:outline-offset-2"
                         onClick={() => handleOpenEditor(menu)}
                         aria-label={`${t('common.edit')} ${menu.name}`}
                         data-testid={`edit-button-${index}`}
@@ -1591,7 +1664,7 @@ export function MenuBuilderPage({
                       </button>
                       <button
                         type="button"
-                        className={`${styles.actionButton} ${styles.deleteButton}`}
+                        className="rounded border border-destructive/30 bg-card px-2 py-1 text-xs font-medium text-destructive cursor-pointer transition-colors hover:bg-destructive/10 hover:border-destructive focus:outline-2 focus:outline-primary focus:outline-offset-2"
                         onClick={() => handleDeleteMenuClick(menu)}
                         aria-label={`${t('common.delete')} ${menu.name}`}
                         data-testid={`delete-button-${index}`}

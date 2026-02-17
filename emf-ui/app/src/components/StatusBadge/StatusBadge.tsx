@@ -1,4 +1,4 @@
-import styles from './StatusBadge.module.css'
+import { cn } from '@/lib/utils'
 
 interface ColorConfig {
   color: string
@@ -60,15 +60,22 @@ export default function StatusBadge({ value, colorMap, size = 'md', className }:
   const normalizedValue = value.toLowerCase()
   const mergedMap = colorMap ? { ...DEFAULT_COLOR_MAP, ...colorMap } : DEFAULT_COLOR_MAP
   const colors = mergedMap[normalizedValue] ?? DEFAULT_FALLBACK
-  const sizeClass = size === 'sm' ? styles.badgeSm : styles.badgeMd
 
   return (
     <span
-      className={`${styles.badge} ${sizeClass}${className ? ` ${className}` : ''}`}
+      className={cn(
+        'inline-flex items-center gap-1.5 rounded-full font-medium whitespace-nowrap leading-none',
+        size === 'sm' ? 'text-[11px] px-2 py-0.5' : 'text-xs px-2.5 py-[3px]',
+        className
+      )}
       style={{ color: colors.color, backgroundColor: colors.bg }}
       data-testid="status-badge"
     >
-      <span className={styles.dot} style={{ backgroundColor: colors.color }} aria-hidden="true" />
+      <span
+        className={cn('rounded-full shrink-0', size === 'sm' ? 'size-1.5' : 'size-[7px]')}
+        style={{ backgroundColor: colors.color }}
+        aria-hidden="true"
+      />
       {formatLabel(value)}
     </span>
   )

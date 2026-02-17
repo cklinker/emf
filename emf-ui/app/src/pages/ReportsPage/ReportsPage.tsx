@@ -22,8 +22,7 @@ import {
   ChevronDown,
   ChevronRight,
 } from 'lucide-react'
-
-import styles from './ReportsPage.module.css'
+import { cn } from '@/lib/utils'
 
 /* ─────────────────────────── Types ─────────────────────────── */
 
@@ -305,10 +304,7 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
 
   const { data: gatewayData, isLoading: isLoadingGateway } = useQuery({
     queryKey: ['report-data', selectedReportId, collectionNameForViewer],
-    queryFn: () =>
-      apiClient.get<GatewayResponse>(
-        `/gateway/${collectionNameForViewer}?size=1000`
-      ),
+    queryFn: () => apiClient.get<GatewayResponse>(`/gateway/${collectionNameForViewer}?size=1000`),
     enabled: viewMode === 'viewer' && !!selectedReportId && !!collectionNameForViewer,
   })
 
@@ -690,8 +686,8 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
 
   if (isLoading) {
     return (
-      <div className={styles.container} data-testid={testId}>
-        <div className={styles.loadingContainer}>
+      <div className="mx-auto max-w-[1400px] p-8 max-md:p-4" data-testid={testId}>
+        <div className="flex items-center justify-center min-h-[400px]">
           <LoadingSpinner size="large" label="Loading reports..." />
         </div>
       </div>
@@ -700,7 +696,7 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
 
   if (error) {
     return (
-      <div className={styles.container} data-testid={testId}>
+      <div className="mx-auto max-w-[1400px] p-8 max-md:p-4" data-testid={testId}>
         <ErrorMessage
           error={error instanceof Error ? error : new Error('An error occurred')}
           onRetry={() => refetch()}
@@ -715,13 +711,13 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
 
   if (viewMode === 'list') {
     return (
-      <div className={styles.container} data-testid={testId}>
-        <header className={styles.header}>
-          <h1 className={styles.title}>Reports</h1>
-          <div className={styles.headerActions}>
+      <div className="mx-auto max-w-[1400px] p-8 max-md:p-4" data-testid={testId}>
+        <header className="flex items-center justify-between mb-8 max-md:flex-col max-md:items-start max-md:gap-4">
+          <h1 className="text-3xl font-semibold text-foreground m-0">Reports</h1>
+          <div className="flex items-center gap-3">
             <button
               type="button"
-              className={styles.createButton}
+              className="inline-flex items-center gap-2 px-6 py-3 text-base font-medium text-white bg-primary border-none rounded-md cursor-pointer transition-colors duration-200 hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 max-md:w-full max-md:justify-center"
               onClick={handleCreateNew}
               aria-label="Create Report"
               data-testid="add-report-button"
@@ -733,39 +729,51 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
         </header>
 
         {reportList.length === 0 ? (
-          <div className={styles.emptyState} data-testid="empty-state">
-            <div className={styles.emptyIcon}>
+          <div
+            className="py-16 px-8 text-center text-muted-foreground bg-card border border-border rounded-lg"
+            data-testid="empty-state"
+          >
+            <div className="text-muted-foreground mb-4 opacity-50">
               <FileSpreadsheet size={48} />
             </div>
             <p>No reports found. Create your first report to get started.</p>
           </div>
         ) : (
-          <div className={styles.cardsGrid} data-testid="reports-grid">
+          <div
+            className="grid grid-cols-[repeat(auto-fill,minmax(380px,1fr))] gap-4 max-md:grid-cols-1"
+            data-testid="reports-grid"
+          >
             {reportList.map((report, index) => {
               const collectionMatch = collections.find((c) => c.id === report.primaryCollectionId)
               const collectionLabel = collectionMatch?.displayName ?? report.primaryCollectionId
               return (
                 <div
                   key={report.id}
-                  className={styles.reportCard}
+                  className="flex flex-col gap-3 bg-card border border-border rounded-lg p-5 transition-all duration-200 hover:border-primary hover:shadow-[0_2px_8px_rgba(0,0,0,0.06)]"
                   data-testid={`report-card-${index}`}
                 >
-                  <div className={styles.cardHeader}>
-                    <h3 className={styles.cardTitle}>{report.name}</h3>
+                  <div className="flex items-start justify-between gap-3">
+                    <h3 className="text-base font-semibold text-foreground m-0 leading-[1.4]">
+                      {report.name}
+                    </h3>
                   </div>
                   {report.description && (
-                    <p className={styles.cardDescription}>{report.description}</p>
+                    <p className="text-[0.8125rem] text-muted-foreground m-0 leading-relaxed line-clamp-2">
+                      {report.description}
+                    </p>
                   )}
-                  <div className={styles.cardMeta}>
-                    <span className={`${styles.badge} ${styles.badgeType}`}>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-block px-2.5 py-0.5 text-[0.6875rem] font-semibold rounded-full uppercase tracking-wide text-primary bg-muted">
                       {report.reportType}
                     </span>
-                    <span className={`${styles.badge} ${styles.badgeScope}`}>{report.scope}</span>
-                    <span className={`${styles.badge} ${styles.badgeAccess}`}>
+                    <span className="inline-block px-2.5 py-0.5 text-[0.6875rem] font-semibold rounded-full uppercase tracking-wide text-emerald-800 bg-emerald-100 dark:text-emerald-300 dark:bg-emerald-900">
+                      {report.scope}
+                    </span>
+                    <span className="inline-block px-2.5 py-0.5 text-[0.6875rem] font-semibold rounded-full uppercase tracking-wide text-amber-800 bg-amber-100 dark:text-amber-200 dark:bg-amber-900">
                       {report.accessLevel}
                     </span>
-                    <span className={styles.cardMetaText}>{collectionLabel}</span>
-                    <span className={styles.cardMetaText}>
+                    <span className="text-xs text-muted-foreground">{collectionLabel}</span>
+                    <span className="text-xs text-muted-foreground">
                       Modified{' '}
                       {formatDate(new Date(report.updatedAt), {
                         year: 'numeric',
@@ -774,10 +782,10 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
                       })}
                     </span>
                   </div>
-                  <div className={styles.cardActions}>
+                  <div className="flex gap-2 border-t border-border pt-3 mt-auto">
                     <button
                       type="button"
-                      className={`${styles.cardActionButton} ${styles.runButton}`}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[0.8125rem] font-medium rounded-md cursor-pointer transition-all duration-200 text-white bg-primary border border-primary hover:bg-primary/90 hover:border-primary/90 focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
                       onClick={() => handleRunReport(report)}
                       aria-label={`Run ${report.name}`}
                       data-testid={`run-button-${index}`}
@@ -787,7 +795,7 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
                     </button>
                     <button
                       type="button"
-                      className={styles.cardActionButton}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[0.8125rem] font-medium rounded-md cursor-pointer transition-all duration-200 border border-border bg-transparent text-foreground hover:bg-muted hover:border-primary focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
                       onClick={() => handleEditReport(report)}
                       aria-label={`Edit ${report.name}`}
                       data-testid={`edit-button-${index}`}
@@ -797,7 +805,7 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
                     </button>
                     <button
                       type="button"
-                      className={`${styles.cardActionButton} ${styles.deleteCardButton}`}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[0.8125rem] font-medium rounded-md cursor-pointer transition-all duration-200 border border-border bg-transparent text-destructive ml-auto hover:border-destructive hover:bg-destructive/10 focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
                       onClick={() => handleDeleteClick(report)}
                       aria-label={`Delete ${report.name}`}
                       data-testid={`delete-button-${index}`}
@@ -830,7 +838,10 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
 
   if (viewMode === 'builder') {
     const renderStepIndicator = () => (
-      <div className={styles.stepIndicator} data-testid="step-indicator">
+      <div
+        className="flex items-center justify-center gap-0 px-8 py-6 bg-muted border-b border-border overflow-x-auto max-md:px-4 max-md:py-4"
+        data-testid="step-indicator"
+      >
         {WIZARD_STEPS.map((step, i) => {
           const stepNum = i + 1
           const isActive = stepNum === builderStep
@@ -839,24 +850,35 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
             <React.Fragment key={step.key}>
               {i > 0 && (
                 <div
-                  className={`${styles.stepConnector} ${
-                    isComplete ? styles.stepConnectorComplete : ''
-                  }`}
+                  className={cn(
+                    'w-8 h-0.5 mx-2 shrink-0 max-md:w-6',
+                    isComplete ? 'bg-emerald-600' : 'bg-border'
+                  )}
                 />
               )}
-              <div className={styles.stepItem}>
+              <div className="flex items-center gap-0 shrink-0">
                 <div
-                  className={`${styles.stepCircle} ${
-                    isActive ? styles.stepCircleActive : isComplete ? styles.stepCircleComplete : ''
-                  }`}
+                  className={cn(
+                    'w-8 h-8 rounded-full flex items-center justify-center text-[0.8125rem] font-semibold border-2 shrink-0 transition-all duration-200',
+                    isActive
+                      ? 'border-primary bg-primary text-white'
+                      : isComplete
+                        ? 'border-emerald-600 bg-emerald-600 text-white'
+                        : 'border-border text-muted-foreground bg-card'
+                  )}
                   data-testid={`step-circle-${stepNum}`}
                 >
                   {isComplete ? <Check size={14} /> : stepNum}
                 </div>
                 <span
-                  className={`${styles.stepLabel} ${
-                    isActive ? styles.stepLabelActive : isComplete ? styles.stepLabelComplete : ''
-                  }`}
+                  className={cn(
+                    'text-xs font-medium ml-2 whitespace-nowrap max-md:hidden',
+                    isActive
+                      ? 'text-primary font-semibold'
+                      : isComplete
+                        ? 'text-emerald-600'
+                        : 'text-muted-foreground'
+                  )}
                 >
                   {step.label}
                 </span>
@@ -869,28 +891,36 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
 
     const renderStep1Source = () => (
       <div>
-        <h2 className={styles.stepTitle}>Select a Collection</h2>
-        <p className={styles.stepDescription}>Choose the collection to build your report on.</p>
+        <h2 className="text-xl font-semibold text-foreground mb-2">Select a Collection</h2>
+        <p className="text-sm text-muted-foreground mb-6">
+          Choose the collection to build your report on.
+        </p>
         <input
           type="text"
-          className={styles.collectionSearchInput}
+          className="w-full px-3.5 py-2.5 text-sm border border-border rounded-md mb-4 text-foreground bg-card transition-colors duration-200 focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/10"
           placeholder="Search collections..."
           value={collectionSearch}
           onChange={(e) => setCollectionSearch(e.target.value)}
           data-testid="collection-search-input"
         />
-        <div className={styles.collectionsList} data-testid="collections-list">
+        <div
+          className="flex flex-col gap-2 max-h-[400px] overflow-y-auto"
+          data-testid="collections-list"
+        >
           {filteredCollections.length === 0 && (
-            <p className={styles.cardMetaText}>No collections found.</p>
+            <p className="text-xs text-muted-foreground">No collections found.</p>
           )}
           {filteredCollections.map((col) => {
             const isSelected = col.id === builder.collectionId
             return (
               <div
                 key={col.id}
-                className={`${styles.collectionItem} ${
-                  isSelected ? styles.collectionItemSelected : ''
-                }`}
+                className={cn(
+                  'flex items-center px-4 py-3.5 bg-card border-2 rounded-lg cursor-pointer transition-all duration-150',
+                  isSelected
+                    ? 'border-primary bg-muted'
+                    : 'border-border hover:border-primary hover:bg-accent'
+                )}
                 onClick={() => handleSelectCollection(col)}
                 role="button"
                 tabIndex={0}
@@ -903,16 +933,21 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
                 data-testid={`collection-item-${col.name}`}
               >
                 <div
-                  className={`${styles.collectionItemRadio} ${
-                    isSelected ? styles.collectionItemRadioSelected : ''
-                  }`}
+                  className={cn(
+                    'w-[1.125rem] h-[1.125rem] rounded-full border-2 mr-3.5 shrink-0 flex items-center justify-center transition-all duration-150',
+                    isSelected ? 'border-primary bg-primary' : 'border-border'
+                  )}
                 >
-                  {isSelected && <div className={styles.collectionItemRadioDot} />}
+                  {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-card" />}
                 </div>
-                <div className={styles.collectionItemInfo}>
-                  <div className={styles.collectionItemName}>{col.displayName || col.name}</div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[0.9375rem] font-semibold text-foreground">
+                    {col.displayName || col.name}
+                  </div>
                   {col.description && (
-                    <div className={styles.collectionItemDesc}>{col.description}</div>
+                    <div className="text-[0.8125rem] text-muted-foreground mt-0.5">
+                      {col.description}
+                    </div>
                   )}
                 </div>
               </div>
@@ -924,27 +959,30 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
 
     const renderStep2Columns = () => (
       <div>
-        <h2 className={styles.stepTitle}>Select Columns</h2>
-        <p className={styles.stepDescription}>
+        <h2 className="text-xl font-semibold text-foreground mb-2">Select Columns</h2>
+        <p className="text-sm text-muted-foreground mb-6">
           Choose which fields to display in the report. At least one column is required.
         </p>
         {fields.length === 0 ? (
-          <p className={styles.cardMetaText}>No fields found for this collection.</p>
+          <p className="text-xs text-muted-foreground">No fields found for this collection.</p>
         ) : (
           <>
-            <div className={styles.selectAllRow}>
+            <div className="flex items-center gap-2 py-2 mb-2 border-b border-border">
               <input
                 type="checkbox"
-                className={styles.columnCheckbox}
+                className="w-4 h-4 cursor-pointer accent-primary shrink-0"
                 checked={builder.selectedColumns.length === fields.length && fields.length > 0}
                 onChange={handleSelectAllColumns}
                 data-testid="select-all-columns"
               />
-              <span className={styles.selectAllLabel}>
+              <span className="text-[0.8125rem] font-medium text-muted-foreground">
                 Select All ({builder.selectedColumns.length} / {fields.length})
               </span>
             </div>
-            <div className={styles.columnsContainer} data-testid="columns-list">
+            <div
+              className="flex flex-col gap-1.5 max-h-[400px] overflow-y-auto"
+              data-testid="columns-list"
+            >
               {/* Show selected columns first (in order), then unselected */}
               {[
                 ...(builder.selectedColumns
@@ -978,23 +1016,27 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
                 return (
                   <div
                     key={field.id}
-                    className={styles.columnItem}
+                    className="flex items-center gap-3 px-3.5 py-2.5 bg-card border border-border rounded-md transition-colors duration-150 hover:bg-muted"
                     data-testid={`column-item-${field.name}`}
                   >
                     <input
                       type="checkbox"
-                      className={styles.columnCheckbox}
+                      className="w-4 h-4 cursor-pointer accent-primary shrink-0"
                       checked={selected}
                       onChange={() => handleToggleColumn(field)}
                       data-testid={`column-checkbox-${field.name}`}
                     />
-                    <span className={styles.columnLabel}>{field.displayName || field.name}</span>
-                    <span className={styles.columnType}>{field.type}</span>
+                    <span className="flex-1 text-sm text-foreground">
+                      {field.displayName || field.name}
+                    </span>
+                    <span className="text-xs text-muted-foreground px-2 py-0.5 bg-muted rounded">
+                      {field.type}
+                    </span>
                     {selected && (
-                      <div className={styles.columnMoveButtons}>
+                      <div className="flex gap-1">
                         <button
                           type="button"
-                          className={styles.moveButton}
+                          className="inline-flex items-center justify-center w-6 h-6 p-0 border border-border rounded bg-card text-muted-foreground cursor-pointer transition-all duration-150 hover:bg-muted hover:border-primary hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed"
                           onClick={() => handleMoveColumn(selectedIndex, 'up')}
                           disabled={selectedIndex <= 0}
                           aria-label={`Move ${field.name} up`}
@@ -1004,7 +1046,7 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
                         </button>
                         <button
                           type="button"
-                          className={styles.moveButton}
+                          className="inline-flex items-center justify-center w-6 h-6 p-0 border border-border rounded bg-card text-muted-foreground cursor-pointer transition-all duration-150 hover:bg-muted hover:border-primary hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed"
                           onClick={() => handleMoveColumn(selectedIndex, 'down')}
                           disabled={selectedIndex >= builder.selectedColumns.length - 1}
                           aria-label={`Move ${field.name} down`}
@@ -1025,20 +1067,24 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
 
     const renderStep3Filters = () => (
       <div>
-        <h2 className={styles.stepTitle}>Add Filters</h2>
-        <p className={styles.stepDescription}>
+        <h2 className="text-xl font-semibold text-foreground mb-2">Add Filters</h2>
+        <p className="text-sm text-muted-foreground mb-6">
           Optionally filter the data. Multiple filters use AND logic.
         </p>
-        <div className={styles.filtersContainer} data-testid="filters-container">
+        <div className="flex flex-col gap-3" data-testid="filters-container">
           {builder.filters.length === 0 && (
-            <p className={styles.noFiltersHint}>
+            <p className="text-sm text-muted-foreground py-4">
               No filters added. Click the button below to add a filter condition.
             </p>
           )}
           {builder.filters.map((filter, index) => (
-            <div key={index} className={styles.filterRow} data-testid={`filter-row-${index}`}>
+            <div
+              key={index}
+              className="flex items-start gap-2 flex-wrap max-md:flex-col"
+              data-testid={`filter-row-${index}`}
+            >
               <select
-                className={styles.filterSelect}
+                className="px-3 py-2 text-sm border border-border rounded-md bg-card text-foreground min-w-[150px] focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/10 max-md:min-w-full"
                 value={filter.field}
                 onChange={(e) => handleUpdateFilter(index, 'field', e.target.value)}
                 data-testid={`filter-field-${index}`}
@@ -1050,7 +1096,7 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
                 ))}
               </select>
               <select
-                className={styles.filterSelect}
+                className="px-3 py-2 text-sm border border-border rounded-md bg-card text-foreground min-w-[150px] focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/10 max-md:min-w-full"
                 value={filter.operator}
                 onChange={(e) => handleUpdateFilter(index, 'operator', e.target.value)}
                 data-testid={`filter-operator-${index}`}
@@ -1063,7 +1109,7 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
               </select>
               <input
                 type="text"
-                className={styles.filterInput}
+                className="flex-1 min-w-[120px] px-3 py-2 text-sm border border-border rounded-md bg-card text-foreground focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/10 max-md:min-w-full"
                 value={filter.value}
                 onChange={(e) => handleUpdateFilter(index, 'value', e.target.value)}
                 placeholder="Value"
@@ -1071,7 +1117,7 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
               />
               <button
                 type="button"
-                className={styles.filterRemoveButton}
+                className="inline-flex items-center justify-center w-8 h-8 p-0 border border-border rounded-md bg-card text-destructive cursor-pointer shrink-0 transition-all duration-150 hover:bg-destructive/10 hover:border-destructive"
                 onClick={() => handleRemoveFilter(index)}
                 aria-label={`Remove filter ${index + 1}`}
                 data-testid={`filter-remove-${index}`}
@@ -1082,7 +1128,7 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
           ))}
           <button
             type="button"
-            className={styles.addFilterButton}
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-[0.8125rem] font-medium text-primary bg-transparent border border-dashed border-primary rounded-md cursor-pointer transition-colors duration-150 self-start mt-1 hover:bg-muted"
             onClick={handleAddFilter}
             data-testid="add-filter-button"
           >
@@ -1099,15 +1145,21 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
       )
       return (
         <div>
-          <h2 className={styles.stepTitle}>Group By</h2>
-          <p className={styles.stepDescription}>
+          <h2 className="text-xl font-semibold text-foreground mb-2">Group By</h2>
+          <p className="text-sm text-muted-foreground mb-6">
             Optionally group records by a field. Numeric columns will show subtotals.
           </p>
-          <div className={styles.groupByContainer} data-testid="groupby-container">
+          <div
+            className="flex flex-col gap-2 max-h-[400px] overflow-y-auto"
+            data-testid="groupby-container"
+          >
             <div
-              className={`${styles.groupByItem} ${
-                builder.groupByField === '' ? styles.groupByItemSelected : ''
-              }`}
+              className={cn(
+                'flex items-center px-4 py-3 bg-card border-2 rounded-md cursor-pointer transition-all duration-150',
+                builder.groupByField === ''
+                  ? 'border-primary bg-muted'
+                  : 'border-border hover:border-primary'
+              )}
               onClick={() => handleSetGroupBy('')}
               role="button"
               tabIndex={0}
@@ -1120,22 +1172,26 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
               data-testid="groupby-none"
             >
               <div
-                className={`${styles.collectionItemRadio} ${
-                  builder.groupByField === '' ? styles.collectionItemRadioSelected : ''
-                }`}
+                className={cn(
+                  'w-[1.125rem] h-[1.125rem] rounded-full border-2 mr-3.5 shrink-0 flex items-center justify-center transition-all duration-150',
+                  builder.groupByField === '' ? 'border-primary bg-primary' : 'border-border'
+                )}
               >
-                {builder.groupByField === '' && <div className={styles.collectionItemRadioDot} />}
+                {builder.groupByField === '' && (
+                  <div className="w-1.5 h-1.5 rounded-full bg-card" />
+                )}
               </div>
-              <span className={styles.columnLabel}>None (no grouping)</span>
+              <span className="flex-1 text-sm text-foreground">None (no grouping)</span>
             </div>
             {groupableFields.map((field) => {
               const isSelected = builder.groupByField === field.name
               return (
                 <div
                   key={field.id}
-                  className={`${styles.groupByItem} ${
-                    isSelected ? styles.groupByItemSelected : ''
-                  }`}
+                  className={cn(
+                    'flex items-center px-4 py-3 bg-card border-2 rounded-md cursor-pointer transition-all duration-150',
+                    isSelected ? 'border-primary bg-muted' : 'border-border hover:border-primary'
+                  )}
                   onClick={() => handleSetGroupBy(field.name)}
                   role="button"
                   tabIndex={0}
@@ -1148,14 +1204,19 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
                   data-testid={`groupby-field-${field.name}`}
                 >
                   <div
-                    className={`${styles.collectionItemRadio} ${
-                      isSelected ? styles.collectionItemRadioSelected : ''
-                    }`}
+                    className={cn(
+                      'w-[1.125rem] h-[1.125rem] rounded-full border-2 mr-3.5 shrink-0 flex items-center justify-center transition-all duration-150',
+                      isSelected ? 'border-primary bg-primary' : 'border-border'
+                    )}
                   >
-                    {isSelected && <div className={styles.collectionItemRadioDot} />}
+                    {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-card" />}
                   </div>
-                  <span className={styles.columnLabel}>{field.displayName || field.name}</span>
-                  <span className={styles.columnType}>{field.type}</span>
+                  <span className="flex-1 text-sm text-foreground">
+                    {field.displayName || field.name}
+                  </span>
+                  <span className="text-xs text-muted-foreground px-2 py-0.5 bg-muted rounded">
+                    {field.type}
+                  </span>
                 </div>
               )
             })}
@@ -1170,19 +1231,21 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
       )
       return (
         <div>
-          <h2 className={styles.stepTitle}>Sort & Save</h2>
-          <p className={styles.stepDescription}>Configure sorting and save your report.</p>
-          <div className={styles.saveForm}>
+          <h2 className="text-xl font-semibold text-foreground mb-2">Sort & Save</h2>
+          <p className="text-sm text-muted-foreground mb-6">
+            Configure sorting and save your report.
+          </p>
+          <div className="flex flex-col gap-5">
             {/* Sort */}
-            <div className={styles.formRow}>
-              <div className={styles.formRowHalf}>
-                <div className={styles.formGroup}>
-                  <label htmlFor="sort-by-field" className={styles.formLabel}>
+            <div className="flex gap-4 max-md:flex-col max-md:gap-5">
+              <div className="flex-1">
+                <div className="flex flex-col gap-2">
+                  <label htmlFor="sort-by-field" className="text-sm font-medium text-foreground">
                     Sort By
                   </label>
                   <select
                     id="sort-by-field"
-                    className={styles.formSelect}
+                    className="w-full px-3.5 py-2.5 text-sm text-foreground bg-card border border-border rounded-md transition-colors duration-200 focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/10"
                     value={builder.sortByField}
                     onChange={(e) =>
                       setBuilder((prev) => ({
@@ -1201,14 +1264,14 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
                   </select>
                 </div>
               </div>
-              <div className={styles.formRowHalf}>
-                <div className={styles.formGroup}>
-                  <label htmlFor="sort-direction" className={styles.formLabel}>
+              <div className="flex-1">
+                <div className="flex flex-col gap-2">
+                  <label htmlFor="sort-direction" className="text-sm font-medium text-foreground">
                     Direction
                   </label>
                   <select
                     id="sort-direction"
-                    className={styles.formSelect}
+                    className="w-full px-3.5 py-2.5 text-sm text-foreground bg-card border border-border rounded-md transition-colors duration-200 focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/10"
                     value={builder.sortDirection}
                     onChange={(e) =>
                       setBuilder((prev) => ({
@@ -1227,19 +1290,20 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
             </div>
 
             {/* Report Name */}
-            <div className={styles.formGroup}>
-              <label htmlFor="report-name" className={styles.formLabel}>
+            <div className="flex flex-col gap-2">
+              <label htmlFor="report-name" className="text-sm font-medium text-foreground">
                 Report Name
-                <span className={styles.required} aria-hidden="true">
+                <span className="text-destructive ml-1" aria-hidden="true">
                   *
                 </span>
               </label>
               <input
                 id="report-name"
                 type="text"
-                className={`${styles.formInput} ${
-                  builder.reportName.trim() === '' ? styles.hasError : ''
-                }`}
+                className={cn(
+                  'w-full px-3.5 py-2.5 text-sm text-foreground bg-card border border-border rounded-md transition-colors duration-200 focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/10 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed',
+                  builder.reportName.trim() === '' && 'border-destructive'
+                )}
                 value={builder.reportName}
                 onChange={(e) =>
                   setBuilder((prev) => ({
@@ -1252,20 +1316,20 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
                 data-testid="report-name-input"
               />
               {builder.reportName.trim() === '' && (
-                <span className={styles.formError} role="alert">
+                <span className="text-xs text-destructive" role="alert">
                   Name is required
                 </span>
               )}
             </div>
 
             {/* Description */}
-            <div className={styles.formGroup}>
-              <label htmlFor="report-description" className={styles.formLabel}>
+            <div className="flex flex-col gap-2">
+              <label htmlFor="report-description" className="text-sm font-medium text-foreground">
                 Description
               </label>
               <textarea
                 id="report-description"
-                className={`${styles.formInput} ${styles.formTextarea}`}
+                className="w-full px-3.5 py-2.5 text-sm text-foreground bg-card border border-border rounded-md transition-colors duration-200 resize-y min-h-[70px] font-[inherit] focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/10"
                 value={builder.reportDescription}
                 onChange={(e) =>
                   setBuilder((prev) => ({
@@ -1280,15 +1344,15 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
             </div>
 
             {/* Type & Access */}
-            <div className={styles.formRow}>
-              <div className={styles.formRowHalf}>
-                <div className={styles.formGroup}>
-                  <label htmlFor="report-type" className={styles.formLabel}>
+            <div className="flex gap-4 max-md:flex-col max-md:gap-5">
+              <div className="flex-1">
+                <div className="flex flex-col gap-2">
+                  <label htmlFor="report-type" className="text-sm font-medium text-foreground">
                     Report Type
                   </label>
                   <select
                     id="report-type"
-                    className={styles.formSelect}
+                    className="w-full px-3.5 py-2.5 text-sm text-foreground bg-card border border-border rounded-md transition-colors duration-200 focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/10"
                     value={builder.reportType}
                     onChange={(e) =>
                       setBuilder((prev) => ({
@@ -1304,14 +1368,14 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
                   </select>
                 </div>
               </div>
-              <div className={styles.formRowHalf}>
-                <div className={styles.formGroup}>
-                  <label htmlFor="report-access" className={styles.formLabel}>
+              <div className="flex-1">
+                <div className="flex flex-col gap-2">
+                  <label htmlFor="report-access" className="text-sm font-medium text-foreground">
                     Access Level
                   </label>
                   <select
                     id="report-access"
-                    className={styles.formSelect}
+                    className="w-full px-3.5 py-2.5 text-sm text-foreground bg-card border border-border rounded-md transition-colors duration-200 focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/10"
                     value={builder.accessLevel}
                     onChange={(e) =>
                       setBuilder((prev) => ({
@@ -1333,12 +1397,14 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
     }
 
     return (
-      <div className={styles.container} data-testid={testId}>
-        <header className={styles.header}>
-          <h1 className={styles.title}>{editingReportId ? 'Edit Report' : 'Create Report'}</h1>
+      <div className="mx-auto max-w-[1400px] p-8 max-md:p-4" data-testid={testId}>
+        <header className="flex items-center justify-between mb-8 max-md:flex-col max-md:items-start max-md:gap-4">
+          <h1 className="text-3xl font-semibold text-foreground m-0">
+            {editingReportId ? 'Edit Report' : 'Create Report'}
+          </h1>
           <button
             type="button"
-            className={styles.backButton}
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-foreground bg-card border border-border rounded-md cursor-pointer transition-all duration-200 hover:bg-muted"
             onClick={handleBackToList}
             data-testid="back-to-list-button"
           >
@@ -1347,10 +1413,13 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
           </button>
         </header>
 
-        <div className={styles.builderContainer} data-testid="report-builder">
+        <div
+          className="bg-card border border-border rounded-lg overflow-hidden"
+          data-testid="report-builder"
+        >
           {renderStepIndicator()}
 
-          <div className={styles.stepContent} data-testid="step-content">
+          <div className="p-8 min-h-[360px]" data-testid="step-content">
             {builderStep === 1 && renderStep1Source()}
             {builderStep === 2 && renderStep2Columns()}
             {builderStep === 3 && renderStep3Filters()}
@@ -1358,12 +1427,12 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
             {builderStep === 5 && renderStep5Save()}
           </div>
 
-          <div className={styles.stepFooter}>
-            <div className={styles.stepNavLeft}>
+          <div className="flex items-center justify-between px-8 py-4 border-t border-border bg-muted">
+            <div className="flex gap-3">
               {builderStep > 1 && (
                 <button
                   type="button"
-                  className={`${styles.navButton} ${styles.navButtonSecondary}`}
+                  className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-medium rounded-md cursor-pointer transition-all duration-200 text-foreground bg-card border border-border hover:bg-muted"
                   onClick={handlePrevStep}
                   data-testid="step-back-button"
                 >
@@ -1372,11 +1441,11 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
                 </button>
               )}
             </div>
-            <div className={styles.stepNavRight}>
+            <div className="flex gap-3">
               {builderStep < 5 && (
                 <button
                   type="button"
-                  className={`${styles.navButton} ${styles.navButtonPrimary}`}
+                  className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-medium rounded-md cursor-pointer transition-all duration-200 text-white bg-primary border-none hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
                   onClick={handleNextStep}
                   disabled={!canProceedStep(builderStep)}
                   data-testid="step-next-button"
@@ -1388,7 +1457,7 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
                 <>
                   <button
                     type="button"
-                    className={`${styles.navButton} ${styles.navButtonSecondary}`}
+                    className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-medium rounded-md cursor-pointer transition-all duration-200 text-foreground bg-card border border-border hover:bg-muted"
                     onClick={() => handleSave(false)}
                     disabled={isSaving || !canProceedStep(5)}
                     data-testid="save-report-button"
@@ -1397,7 +1466,7 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
                   </button>
                   <button
                     type="button"
-                    className={`${styles.navButton} ${styles.navButtonSuccess}`}
+                    className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-medium rounded-md cursor-pointer transition-all duration-200 text-white bg-emerald-600 border-none hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
                     onClick={() => handleSave(true)}
                     disabled={isSaving || !canProceedStep(5)}
                     data-testid="save-and-run-button"
@@ -1437,12 +1506,15 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
             return (
               <React.Fragment key={groupKey}>
                 <tr
-                  className={styles.groupHeaderRow}
+                  className="bg-muted hover:bg-accent"
                   onClick={() => handleToggleGroup(groupKey)}
                   data-testid={`group-header-${groupKey}`}
                 >
-                  <td className={styles.groupHeaderCell} colSpan={viewerColumns.length}>
-                    <span className={styles.groupToggle}>
+                  <td
+                    className="!px-4 !py-3 font-semibold text-sm text-foreground cursor-pointer select-none"
+                    colSpan={viewerColumns.length}
+                  >
+                    <span className="inline-flex items-center gap-2">
                       {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                       {viewerGroupBy}: {groupKey} ({groupRows.length} records)
                     </span>
@@ -1457,7 +1529,10 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
                     </tr>
                   ))}
                 {isExpanded && (
-                  <tr className={styles.subtotalRow} data-testid={`group-subtotal-${groupKey}`}>
+                  <tr
+                    className="!bg-muted [&_td]:font-semibold [&_td]:text-[0.8125rem] [&_td]:text-muted-foreground [&_td]:italic [&_td]:!border-b-2 [&_td]:!border-border"
+                    data-testid={`group-subtotal-${groupKey}`}
+                  >
                     {viewerColumns.map((col, cIdx) => (
                       <td key={col.fieldName}>
                         {cIdx === 0 && !isNumericType(col.type)
@@ -1491,19 +1566,21 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
     const hasNumericColumns = viewerColumns.some((c) => isNumericType(c.type))
 
     return (
-      <div className={styles.container} data-testid={testId}>
-        <div className={styles.viewerContainer}>
-          <div className={styles.viewerHeader}>
-            <div className={styles.viewerTitleSection}>
-              <h1 className={styles.viewerTitle}>{selectedReport.name}</h1>
+      <div className="mx-auto max-w-[1400px] p-8 max-md:p-4" data-testid={testId}>
+        <div className="flex flex-col gap-4">
+          <div className="flex items-start justify-between flex-wrap gap-4 max-md:flex-col">
+            <div className="flex-1 min-w-0">
+              <h1 className="text-2xl font-semibold text-foreground m-0">{selectedReport.name}</h1>
               {selectedReport.description && (
-                <p className={styles.viewerDescription}>{selectedReport.description}</p>
+                <p className="text-sm text-muted-foreground mt-1 mb-0">
+                  {selectedReport.description}
+                </p>
               )}
             </div>
-            <div className={styles.viewerActions}>
+            <div className="flex items-center gap-3 shrink-0 max-md:w-full max-md:flex-wrap">
               <button
                 type="button"
-                className={styles.viewerActionButton}
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-md cursor-pointer transition-all duration-200 border border-border bg-card text-foreground hover:bg-muted hover:border-primary focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
                 onClick={handleBackToList}
                 data-testid="viewer-back-button"
               >
@@ -1512,7 +1589,7 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
               </button>
               <button
                 type="button"
-                className={styles.viewerActionButton}
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-md cursor-pointer transition-all duration-200 border border-border bg-card text-foreground hover:bg-muted hover:border-primary focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
                 onClick={() => handleEditReport(selectedReport)}
                 data-testid="viewer-edit-button"
               >
@@ -1521,7 +1598,7 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
               </button>
               <button
                 type="button"
-                className={styles.viewerActionButton}
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-md cursor-pointer transition-all duration-200 border border-border bg-card text-foreground hover:bg-muted hover:border-primary focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
                 onClick={handleExportCsv}
                 disabled={processedRecords.length === 0}
                 data-testid="viewer-export-button"
@@ -1532,37 +1609,46 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
             </div>
           </div>
 
-          <div className={styles.viewerMeta}>
-            <span className={styles.rowCount} data-testid="row-count">
+          <div className="flex items-center flex-wrap gap-4">
+            <span
+              className="text-[0.8125rem] text-muted-foreground font-medium"
+              data-testid="row-count"
+            >
               {processedRecords.length} records
             </span>
-            <span className={`${styles.badge} ${styles.badgeType}`}>
+            <span className="inline-block px-2.5 py-0.5 text-[0.6875rem] font-semibold rounded-full uppercase tracking-wide text-primary bg-muted">
               {selectedReport.reportType}
             </span>
             {viewerGroupBy && (
-              <span className={`${styles.badge} ${styles.badgeScope}`}>
+              <span className="inline-block px-2.5 py-0.5 text-[0.6875rem] font-semibold rounded-full uppercase tracking-wide text-emerald-800 bg-emerald-100 dark:text-emerald-300 dark:bg-emerald-900">
                 Grouped by: {viewerGroupBy}
               </span>
             )}
           </div>
 
           {isLoadingGateway ? (
-            <div className={styles.loadingContainer}>
+            <div className="flex items-center justify-center min-h-[400px]">
               <LoadingSpinner size="large" label="Loading report data..." />
             </div>
           ) : viewerColumns.length === 0 ? (
-            <div className={styles.viewerEmpty} data-testid="viewer-empty">
+            <div
+              className="py-12 px-8 text-center text-muted-foreground text-sm"
+              data-testid="viewer-empty"
+            >
               This report has no columns configured. Edit the report to select columns.
             </div>
           ) : processedRecords.length === 0 ? (
-            <div className={styles.viewerEmpty} data-testid="viewer-no-data">
+            <div
+              className="py-12 px-8 text-center text-muted-foreground text-sm"
+              data-testid="viewer-no-data"
+            >
               No data found matching the report criteria.
             </div>
           ) : (
-            <div className={styles.tableContainer}>
-              <div className={styles.tableScrollable}>
+            <div className="bg-card border border-border rounded-lg overflow-hidden">
+              <div className="overflow-x-auto">
                 <table
-                  className={styles.dataTable}
+                  className="w-full border-collapse [&_thead]:bg-muted [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:text-[0.8125rem] [&_th]:font-semibold [&_th]:text-muted-foreground [&_th]:uppercase [&_th]:tracking-wide [&_th]:border-b [&_th]:border-border [&_th]:whitespace-nowrap [&_td]:px-4 [&_td]:py-2.5 [&_td]:text-sm [&_td]:text-foreground [&_td]:border-b [&_td]:border-border [&_td]:max-w-[300px] [&_td]:overflow-hidden [&_td]:text-ellipsis [&_td]:whitespace-nowrap [&_tbody_tr:last-child_td]:border-b-0 [&_tbody_tr:hover]:bg-accent"
                   role="grid"
                   aria-label={selectedReport.name}
                   data-testid="report-data-table"
@@ -1579,7 +1665,10 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
                   {groupedRecords ? renderGroupedTable() : renderFlatTable()}
                   {hasNumericColumns && (
                     <tfoot>
-                      <tr className={styles.summaryRow} data-testid="summary-row">
+                      <tr
+                        className="!bg-muted hover:!bg-muted [&_td]:font-semibold [&_td]:text-[0.8125rem] [&_td]:text-primary [&_td]:border-t-2 [&_td]:border-border [&_td]:border-b-0"
+                        data-testid="summary-row"
+                      >
                         {viewerColumns.map((col, cIdx) => (
                           <td key={col.fieldName}>
                             {cIdx === 0 && !isNumericType(col.type)
@@ -1603,7 +1692,7 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
 
   /* Fallback — should not happen */
   return (
-    <div className={styles.container} data-testid={testId}>
+    <div className="mx-auto max-w-[1400px] p-8 max-md:p-4" data-testid={testId}>
       <p>Unknown view mode.</p>
     </div>
   )

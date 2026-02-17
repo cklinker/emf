@@ -9,7 +9,7 @@
 import React, { useMemo, useCallback } from 'react'
 import { useLayoutEditor, type EditorSection } from './LayoutEditorContext'
 import { VisibilityRuleEditor } from './VisibilityRuleEditor'
-import styles from './PropertyPanel.module.css'
+import { cn } from '@/lib/utils'
 
 export interface SectionPropertyFormProps {
   sectionId: string
@@ -100,14 +100,17 @@ export function SectionPropertyForm({
   return (
     <div data-testid={`section-property-form-${sectionId}`}>
       {/* Heading */}
-      <div className={styles.formGroup}>
-        <label className={styles.formLabel} htmlFor={`section-heading-${sectionId}`}>
+      <div className="flex flex-col gap-1">
+        <label
+          className="text-xs font-medium uppercase tracking-wider text-muted-foreground"
+          htmlFor={`section-heading-${sectionId}`}
+        >
           Heading
         </label>
         <input
           id={`section-heading-${sectionId}`}
           type="text"
-          className={styles.formInput}
+          className="rounded-md border border-input bg-background px-2.5 py-1.5 text-[13px] text-foreground placeholder:text-muted-foreground transition-colors duration-150 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground motion-reduce:transition-none"
           value={section.heading}
           onChange={handleHeadingChange}
           placeholder="Section heading"
@@ -116,14 +119,20 @@ export function SectionPropertyForm({
       </div>
 
       {/* Columns */}
-      <div className={styles.formGroup}>
-        <span className={styles.formLabel}>Columns</span>
-        <div className={styles.segmentedControl}>
+      <div className="flex flex-col gap-1">
+        <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          Columns
+        </span>
+        <div className="flex overflow-hidden rounded-md border border-input">
           {[1, 2, 3].map((n) => (
             <button
               key={n}
               type="button"
-              className={`${styles.segmentButton} ${section.columns === n ? styles.segmentButtonActive : ''}`}
+              className={cn(
+                'flex-1 border-none border-r border-input bg-background py-1.5 text-center text-xs text-muted-foreground cursor-pointer transition-colors duration-150 last:border-r-0 motion-reduce:transition-none',
+                'focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-[-2px]',
+                section.columns === n ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'
+              )}
               onClick={() => handleColumnsChange(n)}
               data-testid={`section-prop-col-${n}`}
             >
@@ -134,13 +143,16 @@ export function SectionPropertyForm({
       </div>
 
       {/* Style */}
-      <div className={styles.formGroup}>
-        <label className={styles.formLabel} htmlFor={`section-style-${sectionId}`}>
+      <div className="flex flex-col gap-1">
+        <label
+          className="text-xs font-medium uppercase tracking-wider text-muted-foreground"
+          htmlFor={`section-style-${sectionId}`}
+        >
           Style
         </label>
         <select
           id={`section-style-${sectionId}`}
-          className={styles.formSelect}
+          className="cursor-pointer appearance-none rounded-md border border-input bg-background bg-[url('data:image/svg+xml,%3csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20fill=%27none%27%20viewBox=%270%200%2020%2020%27%3e%3cpath%20stroke=%27%236b7280%27%20stroke-linecap=%27round%27%20stroke-linejoin=%27round%27%20stroke-width=%271.5%27%20d=%27M6%208l4%204%204-4%27/%3e%3c/svg%3e')] bg-[length:1.25em_1.25em] bg-[right_6px_center] bg-no-repeat px-2.5 py-1.5 pr-7 text-[13px] text-foreground transition-colors duration-150 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground motion-reduce:transition-none"
           value={section.style}
           onChange={handleStyleChange}
           data-testid="section-prop-style"
@@ -154,13 +166,16 @@ export function SectionPropertyForm({
       </div>
 
       {/* Section Type */}
-      <div className={styles.formGroup}>
-        <label className={styles.formLabel} htmlFor={`section-type-${sectionId}`}>
+      <div className="flex flex-col gap-1">
+        <label
+          className="text-xs font-medium uppercase tracking-wider text-muted-foreground"
+          htmlFor={`section-type-${sectionId}`}
+        >
           Section Type
         </label>
         <select
           id={`section-type-${sectionId}`}
-          className={styles.formSelect}
+          className="cursor-pointer appearance-none rounded-md border border-input bg-background bg-[url('data:image/svg+xml,%3csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20fill=%27none%27%20viewBox=%270%200%2020%2020%27%3e%3cpath%20stroke=%27%236b7280%27%20stroke-linecap=%27round%27%20stroke-linejoin=%27round%27%20stroke-width=%271.5%27%20d=%27M6%208l4%204%204-4%27/%3e%3c/svg%3e')] bg-[length:1.25em_1.25em] bg-[right_6px_center] bg-no-repeat px-2.5 py-1.5 pr-7 text-[13px] text-foreground transition-colors duration-150 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground motion-reduce:transition-none"
           value={section.sectionType}
           onChange={handleSectionTypeChange}
           data-testid="section-prop-type"
@@ -177,17 +192,20 @@ export function SectionPropertyForm({
         </select>
       </div>
 
-      <hr className={styles.sectionDivider} />
+      <hr className="my-1 border-t border-border" />
 
       {/* Tab Group */}
-      <div className={styles.formGroup}>
-        <label className={styles.formLabel} htmlFor={`section-tab-group-${sectionId}`}>
+      <div className="flex flex-col gap-1">
+        <label
+          className="text-xs font-medium uppercase tracking-wider text-muted-foreground"
+          htmlFor={`section-tab-group-${sectionId}`}
+        >
           Tab Group
         </label>
         <input
           id={`section-tab-group-${sectionId}`}
           type="text"
-          className={styles.formInput}
+          className="rounded-md border border-input bg-background px-2.5 py-1.5 text-[13px] text-foreground placeholder:text-muted-foreground transition-colors duration-150 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground motion-reduce:transition-none"
           value={section.tabGroup ?? ''}
           onChange={handleTabGroupChange}
           placeholder="Tab group name"
@@ -197,14 +215,17 @@ export function SectionPropertyForm({
 
       {/* Tab Label (shown only when tabGroup is set) */}
       {section.tabGroup && (
-        <div className={styles.formGroup}>
-          <label className={styles.formLabel} htmlFor={`section-tab-label-${sectionId}`}>
+        <div className="flex flex-col gap-1">
+          <label
+            className="text-xs font-medium uppercase tracking-wider text-muted-foreground"
+            htmlFor={`section-tab-label-${sectionId}`}
+          >
             Tab Label
           </label>
           <input
             id={`section-tab-label-${sectionId}`}
             type="text"
-            className={styles.formInput}
+            className="rounded-md border border-input bg-background px-2.5 py-1.5 text-[13px] text-foreground placeholder:text-muted-foreground transition-colors duration-150 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground motion-reduce:transition-none"
             value={section.tabLabel ?? ''}
             onChange={handleTabLabelChange}
             placeholder="Tab label"
@@ -213,28 +234,39 @@ export function SectionPropertyForm({
         </div>
       )}
 
-      <hr className={styles.sectionDivider} />
+      <hr className="my-1 border-t border-border" />
 
       {/* Collapsed by Default */}
-      <div className={styles.toggleGroup}>
-        <span className={styles.toggleLabel}>Collapsed by Default</span>
+      <div className="flex items-center justify-between py-2">
+        <span className="text-[13px] text-foreground">Collapsed by Default</span>
         <button
           type="button"
-          className={`${styles.toggle} ${section.collapsed ? styles.toggleActive : ''}`}
+          className={cn(
+            'relative h-5 w-9 cursor-pointer rounded-full border-none p-0 transition-colors duration-200 motion-reduce:transition-none',
+            'focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2',
+            section.collapsed ? 'bg-primary' : 'bg-input'
+          )}
           onClick={handleCollapsedToggle}
           role="switch"
           aria-checked={section.collapsed}
           data-testid="section-prop-collapsed"
         >
-          <span className={styles.toggleDot} />
+          <span
+            className={cn(
+              'absolute top-0.5 h-4 w-4 rounded-full bg-background transition-[left] duration-200 motion-reduce:transition-none',
+              section.collapsed ? 'left-[18px]' : 'left-0.5'
+            )}
+          />
         </button>
       </div>
 
-      <hr className={styles.sectionDivider} />
+      <hr className="my-1 border-t border-border" />
 
       {/* Visibility Rule */}
-      <div className={styles.formGroup}>
-        <span className={styles.formLabel}>Visibility Rule</span>
+      <div className="flex flex-col gap-1">
+        <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          Visibility Rule
+        </span>
         <VisibilityRuleEditor
           value={section.visibilityRule}
           onChange={handleVisibilityRuleChange}

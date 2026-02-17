@@ -45,14 +45,19 @@ describe('LoadingSpinner', () => {
   describe('Size Variants', () => {
     const sizes: SpinnerSize[] = ['small', 'medium', 'large']
 
+    const sizeToTailwind: Record<SpinnerSize, string> = {
+      small: 'size-4',
+      medium: 'size-6',
+      large: 'size-12',
+    }
+
     sizes.forEach((size) => {
       it(`renders with size="${size}"`, () => {
         render(<LoadingSpinner size={size} />)
 
         const spinnerIcon = screen.getByTestId('loading-spinner-icon')
         expect(spinnerIcon).toBeInTheDocument()
-        // CSS Modules transform class names, so we check for partial match
-        expect(spinnerIcon.className).toMatch(new RegExp(size))
+        expect(spinnerIcon).toHaveClass(sizeToTailwind[size])
       })
     })
 
@@ -60,8 +65,7 @@ describe('LoadingSpinner', () => {
       render(<LoadingSpinner />)
 
       const spinnerIcon = screen.getByTestId('loading-spinner-icon')
-      // CSS Modules transform class names, so we check for partial match
-      expect(spinnerIcon.className).toMatch(/medium/)
+      expect(spinnerIcon).toHaveClass('size-6')
     })
   })
 
@@ -187,8 +191,7 @@ describe('LoadingSpinner', () => {
       expect(spinner).toHaveAttribute('role', 'status')
 
       const spinnerIcon = screen.getByTestId('full-spinner-icon')
-      // CSS Modules transform class names, so we check for partial match
-      expect(spinnerIcon.className).toMatch(/large/)
+      expect(spinnerIcon).toHaveClass('size-12')
 
       const label = screen.getByTestId('full-spinner-label')
       expect(label).toHaveTextContent('Please wait...')

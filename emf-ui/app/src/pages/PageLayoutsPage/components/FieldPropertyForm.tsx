@@ -9,7 +9,7 @@
 import React, { useMemo, useCallback } from 'react'
 import { useLayoutEditor, type EditorFieldPlacement } from './LayoutEditorContext'
 import { VisibilityRuleEditor } from './VisibilityRuleEditor'
-import styles from './PropertyPanel.module.css'
+import { cn } from '@/lib/utils'
 
 export interface FieldPropertyFormProps {
   fieldPlacementId: string
@@ -90,32 +90,39 @@ export function FieldPropertyForm({
   return (
     <div data-testid={`field-property-form-${fieldPlacementId}`}>
       {/* Field Name (read-only) */}
-      <div className={styles.formGroup}>
-        <span className={styles.formLabel}>Field Name</span>
-        <div className={styles.fieldInfoReadOnly} data-testid="field-prop-name">
+      <div className="flex flex-col gap-1">
+        <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          Field Name
+        </span>
+        <div className="py-1.5 text-[13px] text-foreground" data-testid="field-prop-name">
           {fieldPlacement.fieldName || fieldPlacement.fieldId}
         </div>
       </div>
 
       {/* Field Type (read-only) */}
-      <div className={styles.formGroup}>
-        <span className={styles.formLabel}>Field Type</span>
-        <div className={styles.fieldInfoReadOnly} data-testid="field-prop-type">
+      <div className="flex flex-col gap-1">
+        <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          Field Type
+        </span>
+        <div className="py-1.5 text-[13px] text-foreground" data-testid="field-prop-type">
           {fieldPlacement.fieldType || 'Unknown'}
         </div>
       </div>
 
-      <hr className={styles.sectionDivider} />
+      <hr className="my-1 border-t border-border" />
 
       {/* Label Override */}
-      <div className={styles.formGroup}>
-        <label className={styles.formLabel} htmlFor={`field-label-${fieldPlacementId}`}>
+      <div className="flex flex-col gap-1">
+        <label
+          className="text-xs font-medium uppercase tracking-wider text-muted-foreground"
+          htmlFor={`field-label-${fieldPlacementId}`}
+        >
           Label Override
         </label>
         <input
           id={`field-label-${fieldPlacementId}`}
           type="text"
-          className={styles.formInput}
+          className="rounded-md border border-input bg-background px-2.5 py-1.5 text-[13px] text-foreground placeholder:text-muted-foreground transition-colors duration-150 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground motion-reduce:transition-none"
           value={fieldPlacement.labelOverride ?? ''}
           onChange={handleLabelOverrideChange}
           placeholder={fieldPlacement.fieldDisplayName || 'Custom label'}
@@ -124,13 +131,16 @@ export function FieldPropertyForm({
       </div>
 
       {/* Help Text Override */}
-      <div className={styles.formGroup}>
-        <label className={styles.formLabel} htmlFor={`field-help-${fieldPlacementId}`}>
+      <div className="flex flex-col gap-1">
+        <label
+          className="text-xs font-medium uppercase tracking-wider text-muted-foreground"
+          htmlFor={`field-help-${fieldPlacementId}`}
+        >
           Help Text Override
         </label>
         <textarea
           id={`field-help-${fieldPlacementId}`}
-          className={`${styles.formInput} ${styles.formTextarea}`}
+          className="min-h-[60px] resize-y rounded-md border border-input bg-background px-2.5 py-1.5 font-[inherit] text-[13px] text-foreground placeholder:text-muted-foreground transition-colors duration-150 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground motion-reduce:transition-none"
           value={fieldPlacement.helpTextOverride ?? ''}
           onChange={handleHelpTextChange}
           placeholder="Help text for this field"
@@ -142,15 +152,26 @@ export function FieldPropertyForm({
       {/* Column Span (only show for multi-column sections) */}
       {sectionColumns > 1 && (
         <>
-          <hr className={styles.sectionDivider} />
-          <div className={styles.formGroup}>
-            <span className={styles.formLabel}>Column Span</span>
-            <div className={styles.segmentedControl} data-testid="field-prop-column-span">
+          <hr className="my-1 border-t border-border" />
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Column Span
+            </span>
+            <div
+              className="flex overflow-hidden rounded-md border border-input"
+              data-testid="field-prop-column-span"
+            >
               {Array.from({ length: sectionColumns }, (_, i) => i + 1).map((span) => (
                 <button
                   key={span}
                   type="button"
-                  className={`${styles.segmentButton} ${(fieldPlacement.columnSpan ?? 1) === span ? styles.segmentButtonActive : ''}`}
+                  className={cn(
+                    'flex-1 border-none border-r border-input bg-background py-1.5 text-center text-xs text-muted-foreground cursor-pointer transition-colors duration-150 last:border-r-0 motion-reduce:transition-none',
+                    'focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-[-2px]',
+                    (fieldPlacement.columnSpan ?? 1) === span
+                      ? 'bg-primary text-primary-foreground'
+                      : 'hover:bg-muted'
+                  )}
                   onClick={() => handleColumnSpanChange(span)}
                   aria-pressed={(fieldPlacement.columnSpan ?? 1) === span}
                   data-testid={`field-prop-span-${span}`}
@@ -163,43 +184,63 @@ export function FieldPropertyForm({
         </>
       )}
 
-      <hr className={styles.sectionDivider} />
+      <hr className="my-1 border-t border-border" />
 
       {/* Required on Layout */}
-      <div className={styles.toggleGroup}>
-        <span className={styles.toggleLabel}>Required on Layout</span>
+      <div className="flex items-center justify-between py-2">
+        <span className="text-[13px] text-foreground">Required on Layout</span>
         <button
           type="button"
-          className={`${styles.toggle} ${fieldPlacement.requiredOnLayout ? styles.toggleActive : ''}`}
+          className={cn(
+            'relative h-5 w-9 cursor-pointer rounded-full border-none p-0 transition-colors duration-200 motion-reduce:transition-none',
+            'focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2',
+            fieldPlacement.requiredOnLayout ? 'bg-primary' : 'bg-input'
+          )}
           onClick={handleRequiredToggle}
           role="switch"
           aria-checked={fieldPlacement.requiredOnLayout}
           data-testid="field-prop-required"
         >
-          <span className={styles.toggleDot} />
+          <span
+            className={cn(
+              'absolute top-0.5 h-4 w-4 rounded-full bg-background transition-[left] duration-200 motion-reduce:transition-none',
+              fieldPlacement.requiredOnLayout ? 'left-[18px]' : 'left-0.5'
+            )}
+          />
         </button>
       </div>
 
       {/* Read-only on Layout */}
-      <div className={styles.toggleGroup}>
-        <span className={styles.toggleLabel}>Read-only on Layout</span>
+      <div className="flex items-center justify-between py-2">
+        <span className="text-[13px] text-foreground">Read-only on Layout</span>
         <button
           type="button"
-          className={`${styles.toggle} ${fieldPlacement.readOnlyOnLayout ? styles.toggleActive : ''}`}
+          className={cn(
+            'relative h-5 w-9 cursor-pointer rounded-full border-none p-0 transition-colors duration-200 motion-reduce:transition-none',
+            'focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2',
+            fieldPlacement.readOnlyOnLayout ? 'bg-primary' : 'bg-input'
+          )}
           onClick={handleReadOnlyToggle}
           role="switch"
           aria-checked={fieldPlacement.readOnlyOnLayout}
           data-testid="field-prop-readonly"
         >
-          <span className={styles.toggleDot} />
+          <span
+            className={cn(
+              'absolute top-0.5 h-4 w-4 rounded-full bg-background transition-[left] duration-200 motion-reduce:transition-none',
+              fieldPlacement.readOnlyOnLayout ? 'left-[18px]' : 'left-0.5'
+            )}
+          />
         </button>
       </div>
 
-      <hr className={styles.sectionDivider} />
+      <hr className="my-1 border-t border-border" />
 
       {/* Visibility Rule */}
-      <div className={styles.formGroup}>
-        <span className={styles.formLabel}>Visibility Rule</span>
+      <div className="flex flex-col gap-1">
+        <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          Visibility Rule
+        </span>
         <VisibilityRuleEditor
           value={fieldPlacement.visibilityRule}
           onChange={handleVisibilityRuleChange}

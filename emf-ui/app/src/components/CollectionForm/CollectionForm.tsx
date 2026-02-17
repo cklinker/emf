@@ -15,9 +15,9 @@ import React, { useEffect, useCallback } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
+import { cn } from '@/lib/utils'
 import { useI18n } from '../../context/I18nContext'
 import { LoadingSpinner } from '../LoadingSpinner'
-import styles from './CollectionForm.module.css'
 
 /**
  * Storage mode options for collections
@@ -205,23 +205,33 @@ export function CollectionForm({
 
   return (
     <form
-      className={styles.form}
+      className="flex flex-col gap-6 max-w-[600px] w-full md:gap-4"
       onSubmit={handleSubmit(handleFormSubmit)}
       data-testid={testId}
       noValidate
     >
       {/* Name Field */}
-      <div className={styles.fieldGroup}>
-        <label htmlFor="collection-name" className={styles.label}>
+      <div className="flex flex-col gap-1">
+        <label
+          htmlFor="collection-name"
+          className="flex items-center gap-1 text-sm font-medium text-foreground"
+        >
           {t('collections.collectionName')}
-          <span className={styles.required} aria-hidden="true">
+          <span className="text-destructive font-semibold" aria-hidden="true">
             *
           </span>
         </label>
         <input
           id="collection-name"
           type="text"
-          className={`${styles.input} ${errors.name ? styles.inputError : ''}`}
+          className={cn(
+            'px-3 py-2 text-base leading-6 text-foreground bg-background border border-input rounded-md',
+            'transition-colors duration-150 motion-reduce:transition-none',
+            'focus:outline-none focus:border-primary focus:ring-2 focus:ring-ring',
+            'disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed',
+            'placeholder:text-muted-foreground',
+            errors.name && 'border-destructive focus:border-destructive focus:ring-destructive/25'
+          )}
           placeholder={t('collectionForm.namePlaceholder')}
           disabled={isEditMode || isSubmitting}
           aria-required="true"
@@ -233,7 +243,7 @@ export function CollectionForm({
         {errors.name && (
           <span
             id="name-error"
-            className={styles.errorMessage}
+            className="flex items-center gap-1 text-sm text-destructive mt-1 before:content-['\u26A0'] before:text-xs"
             role="alert"
             data-testid="name-error"
           >
@@ -241,24 +251,39 @@ export function CollectionForm({
           </span>
         )}
         {!isEditMode && (
-          <span id="name-hint" className={styles.hint} data-testid="name-hint">
+          <span
+            id="name-hint"
+            className="text-xs text-muted-foreground mt-1"
+            data-testid="name-hint"
+          >
             {t('collectionForm.nameHint')}
           </span>
         )}
       </div>
 
       {/* Display Name Field */}
-      <div className={styles.fieldGroup}>
-        <label htmlFor="collection-display-name" className={styles.label}>
+      <div className="flex flex-col gap-1">
+        <label
+          htmlFor="collection-display-name"
+          className="flex items-center gap-1 text-sm font-medium text-foreground"
+        >
           {t('collections.displayName')}
-          <span className={styles.required} aria-hidden="true">
+          <span className="text-destructive font-semibold" aria-hidden="true">
             *
           </span>
         </label>
         <input
           id="collection-display-name"
           type="text"
-          className={`${styles.input} ${errors.displayName ? styles.inputError : ''}`}
+          className={cn(
+            'px-3 py-2 text-base leading-6 text-foreground bg-background border border-input rounded-md',
+            'transition-colors duration-150 motion-reduce:transition-none',
+            'focus:outline-none focus:border-primary focus:ring-2 focus:ring-ring',
+            'disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed',
+            'placeholder:text-muted-foreground',
+            errors.displayName &&
+              'border-destructive focus:border-destructive focus:ring-destructive/25'
+          )}
           placeholder={t('collectionForm.displayNamePlaceholder')}
           disabled={isSubmitting}
           aria-required="true"
@@ -270,7 +295,7 @@ export function CollectionForm({
         {errors.displayName && (
           <span
             id="display-name-error"
-            className={styles.errorMessage}
+            className="flex items-center gap-1 text-sm text-destructive mt-1 before:content-['\u26A0'] before:text-xs"
             role="alert"
             data-testid="display-name-error"
           >
@@ -280,14 +305,28 @@ export function CollectionForm({
       </div>
 
       {/* Description Field */}
-      <div className={styles.fieldGroup}>
-        <label htmlFor="collection-description" className={styles.label}>
+      <div className="flex flex-col gap-1">
+        <label
+          htmlFor="collection-description"
+          className="flex items-center gap-1 text-sm font-medium text-foreground"
+        >
           {t('collections.description')}
-          <span className={styles.optional}>({t('common.optional')})</span>
+          <span className="text-xs font-normal text-muted-foreground ml-1">
+            ({t('common.optional')})
+          </span>
         </label>
         <textarea
           id="collection-description"
-          className={`${styles.textarea} ${errors.description ? styles.inputError : ''}`}
+          className={cn(
+            'px-3 py-2 text-base leading-6 text-foreground bg-background border border-input rounded-md',
+            'resize-y min-h-[80px]',
+            'transition-colors duration-150 motion-reduce:transition-none',
+            'focus:outline-none focus:border-primary focus:ring-2 focus:ring-ring',
+            'disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed',
+            'placeholder:text-muted-foreground',
+            errors.description &&
+              'border-destructive focus:border-destructive focus:ring-destructive/25'
+          )}
           placeholder={t('collectionForm.descriptionPlaceholder')}
           disabled={isSubmitting}
           rows={3}
@@ -299,7 +338,7 @@ export function CollectionForm({
         {errors.description && (
           <span
             id="description-error"
-            className={styles.errorMessage}
+            className="flex items-center gap-1 text-sm text-destructive mt-1 before:content-['\u26A0'] before:text-xs"
             role="alert"
             data-testid="description-error"
           >
@@ -309,16 +348,28 @@ export function CollectionForm({
       </div>
 
       {/* Storage Mode Field */}
-      <div className={styles.fieldGroup}>
-        <label htmlFor="collection-storage-mode" className={styles.label}>
+      <div className="flex flex-col gap-1">
+        <label
+          htmlFor="collection-storage-mode"
+          className="flex items-center gap-1 text-sm font-medium text-foreground"
+        >
           {t('collections.storageMode')}
-          <span className={styles.required} aria-hidden="true">
+          <span className="text-destructive font-semibold" aria-hidden="true">
             *
           </span>
         </label>
         <select
           id="collection-storage-mode"
-          className={`${styles.select} ${errors.storageMode ? styles.inputError : ''}`}
+          className={cn(
+            'px-3 py-2 pr-10 text-base leading-6 text-foreground bg-background border border-input rounded-md',
+            'appearance-none bg-[length:1.5em_1.5em] bg-[right_0.5rem_center] bg-no-repeat cursor-pointer',
+            "bg-[url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e\")]",
+            'transition-colors duration-150 motion-reduce:transition-none',
+            'focus:outline-none focus:border-primary focus:ring-2 focus:ring-ring',
+            'disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed',
+            errors.storageMode &&
+              'border-destructive focus:border-destructive focus:ring-destructive/25'
+          )}
           disabled={isEditMode || isSubmitting}
           aria-required="true"
           aria-invalid={!!errors.storageMode}
@@ -338,7 +389,7 @@ export function CollectionForm({
         {errors.storageMode && (
           <span
             id="storage-mode-error"
-            className={styles.errorMessage}
+            className="flex items-center gap-1 text-sm text-destructive mt-1 before:content-['\u26A0'] before:text-xs"
             role="alert"
             data-testid="storage-mode-error"
           >
@@ -346,7 +397,11 @@ export function CollectionForm({
           </span>
         )}
         {!isEditMode && (
-          <span id="storage-mode-hint" className={styles.hint} data-testid="storage-mode-hint">
+          <span
+            id="storage-mode-hint"
+            className="text-xs text-muted-foreground mt-1"
+            data-testid="storage-mode-hint"
+          >
             {t('collectionForm.storageModeHint')}
           </span>
         )}
@@ -354,14 +409,26 @@ export function CollectionForm({
 
       {/* Display Field (edit mode only, when fields exist) */}
       {isEditMode && availableFields.length > 0 && (
-        <div className={styles.fieldGroup}>
-          <label htmlFor="collection-display-field" className={styles.label}>
+        <div className="flex flex-col gap-1">
+          <label
+            htmlFor="collection-display-field"
+            className="flex items-center gap-1 text-sm font-medium text-foreground"
+          >
             {t('collections.displayField', 'Display Field')}
-            <span className={styles.optional}>({t('common.optional')})</span>
+            <span className="text-xs font-normal text-muted-foreground ml-1">
+              ({t('common.optional')})
+            </span>
           </label>
           <select
             id="collection-display-field"
-            className={styles.select}
+            className={cn(
+              'px-3 py-2 pr-10 text-base leading-6 text-foreground bg-background border border-input rounded-md',
+              'appearance-none bg-[length:1.5em_1.5em] bg-[right_0.5rem_center] bg-no-repeat cursor-pointer',
+              "bg-[url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e\")]",
+              'transition-colors duration-150 motion-reduce:transition-none',
+              'focus:outline-none focus:border-primary focus:ring-2 focus:ring-ring',
+              'disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed'
+            )}
             disabled={isSubmitting}
             aria-describedby="display-field-hint"
             data-testid="collection-display-field-select"
@@ -374,7 +441,11 @@ export function CollectionForm({
               </option>
             ))}
           </select>
-          <span id="display-field-hint" className={styles.hint} data-testid="display-field-hint">
+          <span
+            id="display-field-hint"
+            className="text-xs text-muted-foreground mt-1"
+            data-testid="display-field-hint"
+          >
             {t(
               'collectionForm.displayFieldHint',
               'The field shown when records appear in lookup dropdowns. If not set, defaults to a field named "name" or the first text field.'
@@ -384,31 +455,42 @@ export function CollectionForm({
       )}
 
       {/* Active Status Field */}
-      <div className={styles.fieldGroup}>
-        <div className={styles.checkboxGroup}>
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-2">
           <input
             id="collection-active"
             type="checkbox"
-            className={styles.checkbox}
+            className="w-[1.125rem] h-[1.125rem] accent-primary cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
             disabled={isSubmitting}
             aria-describedby="active-hint"
             data-testid="collection-active-checkbox"
             {...register('active')}
           />
-          <label htmlFor="collection-active" className={styles.checkboxLabel}>
+          <label htmlFor="collection-active" className="text-base text-foreground cursor-pointer">
             {t('collections.active')}
           </label>
         </div>
-        <span id="active-hint" className={styles.hint} data-testid="active-hint">
+        <span
+          id="active-hint"
+          className="text-xs text-muted-foreground mt-1"
+          data-testid="active-hint"
+        >
           {t('collectionForm.activeHint')}
         </span>
       </div>
 
       {/* Form Actions */}
-      <div className={styles.actions}>
+      <div className="flex justify-end gap-3 mt-6 pt-6 border-t border-border max-md:flex-col-reverse max-md:gap-2">
         <button
           type="button"
-          className={styles.cancelButton}
+          className={cn(
+            'inline-flex items-center justify-center gap-2 px-6 py-2 text-base font-medium leading-6 rounded-md cursor-pointer',
+            'text-foreground bg-secondary border border-input',
+            'transition-colors duration-150 motion-reduce:transition-none',
+            'hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring',
+            'disabled:opacity-50 disabled:cursor-not-allowed',
+            'max-md:w-full'
+          )}
           onClick={onCancel}
           disabled={isSubmitting}
           data-testid="collection-form-cancel"
@@ -417,16 +499,21 @@ export function CollectionForm({
         </button>
         <button
           type="submit"
-          className={styles.submitButton}
+          className={cn(
+            'inline-flex items-center justify-center gap-2 px-6 py-2 text-base font-medium leading-6 rounded-md cursor-pointer',
+            'text-primary-foreground bg-primary border border-transparent',
+            'transition-colors duration-150 motion-reduce:transition-none',
+            'hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring',
+            'disabled:opacity-50 disabled:cursor-not-allowed',
+            'max-md:w-full'
+          )}
           disabled={isSubmitting || (!isDirty && isEditMode)}
           data-testid="collection-form-submit"
         >
           {isSubmitting ? (
             <>
               <LoadingSpinner size="small" />
-              <span className={styles.submitText}>
-                {isEditMode ? t('common.save') : t('common.create')}
-              </span>
+              <span className="ml-1">{isEditMode ? t('common.save') : t('common.create')}</span>
             </>
           ) : isEditMode ? (
             t('common.save')

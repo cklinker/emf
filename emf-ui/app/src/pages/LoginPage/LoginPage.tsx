@@ -18,7 +18,7 @@ import { useConfig } from '../../context/ConfigContext'
 import { useI18n } from '../../context/I18nContext'
 import { LoadingSpinner } from '../../components/LoadingSpinner'
 import { ErrorMessage } from '../../components/ErrorMessage'
-import styles from './LoginPage.module.css'
+import { cn } from '@/lib/utils'
 
 /**
  * Props for the LoginPage component
@@ -117,8 +117,11 @@ export function LoginPage({ title }: LoginPageProps): React.ReactElement {
   // Show loading while checking auth or config
   if (authLoading || configLoading) {
     return (
-      <div className={styles.loginPage} data-testid="login-page">
-        <div className={styles.container}>
+      <div
+        className="flex min-h-screen items-center justify-center bg-background p-6"
+        data-testid="login-page"
+      >
+        <div className="w-full max-w-[400px] rounded-lg bg-card p-8 shadow-md">
           <LoadingSpinner size="large" label={t('login.checking')} />
         </div>
       </div>
@@ -129,25 +132,28 @@ export function LoginPage({ title }: LoginPageProps): React.ReactElement {
   const error = loginError || authError
 
   return (
-    <div className={styles.loginPage} data-testid="login-page">
-      <div className={styles.container}>
+    <div
+      className="flex min-h-screen items-center justify-center bg-background p-6"
+      data-testid="login-page"
+    >
+      <div className="w-full max-w-[400px] rounded-lg bg-card p-8 shadow-md max-[480px]:p-6">
         {/* Logo and branding */}
-        <div className={styles.branding}>
+        <div className="mb-8 text-center">
           {config?.branding?.logoUrl && (
             <img
               src={config.branding.logoUrl}
               alt={config.branding.applicationName || 'Application logo'}
-              className={styles.logo}
+              className="mb-4 inline-block max-h-[60px] max-w-[120px]"
             />
           )}
-          <h1 className={styles.title}>
+          <h1 className="m-0 text-2xl font-semibold text-foreground">
             {title || config?.branding?.applicationName || t('login.title')}
           </h1>
         </div>
 
         {/* Error message */}
         {error && (
-          <div className={styles.error}>
+          <div className="mb-6">
             <ErrorMessage
               error={error}
               onRetry={() => {
@@ -161,18 +167,26 @@ export function LoginPage({ title }: LoginPageProps): React.ReactElement {
         )}
 
         {/* Provider selection */}
-        <div className={styles.providers}>
-          <h2 className={styles.subtitle}>{t('login.selectProvider')}</h2>
+        <div className="mb-6">
+          <h2 className="mb-4 text-center text-base font-medium text-muted-foreground">
+            {t('login.selectProvider')}
+          </h2>
 
           {providers.length === 0 ? (
-            <p className={styles.noProviders}>{t('login.noProviders')}</p>
+            <p className="p-6 text-center text-muted-foreground">{t('login.noProviders')}</p>
           ) : (
-            <div className={styles.providerList}>
+            <div className="flex flex-col gap-2">
               {providers.map((provider) => (
                 <button
                   key={provider.id}
                   type="button"
-                  className={styles.providerButton}
+                  className={cn(
+                    'flex w-full items-center gap-2 rounded-lg border border-border bg-muted p-4 text-left',
+                    'transition-colors duration-200',
+                    'hover:bg-accent hover:border-primary',
+                    'focus:outline-2 focus:outline-offset-2 focus:outline-ring',
+                    'disabled:cursor-not-allowed disabled:opacity-70'
+                  )}
                   onClick={() => handleLogin(provider.id)}
                   disabled={isLoggingIn}
                   aria-busy={isLoggingIn && selectedProvider === provider.id}
@@ -180,12 +194,14 @@ export function LoginPage({ title }: LoginPageProps): React.ReactElement {
                   {isLoggingIn && selectedProvider === provider.id ? (
                     <LoadingSpinner size="small" />
                   ) : (
-                    <span className={styles.providerIcon} aria-hidden="true">
+                    <span className="text-2xl" aria-hidden="true">
                       <KeyRound size={20} />
                     </span>
                   )}
-                  <span className={styles.providerName}>{provider.name}</span>
-                  <span className={styles.providerIssuer}>{provider.issuer}</span>
+                  <span className="flex-1 font-medium text-foreground">{provider.name}</span>
+                  <span className="max-w-[150px] truncate text-sm text-muted-foreground max-[480px]:hidden">
+                    {provider.issuer}
+                  </span>
                 </button>
               ))}
             </div>
@@ -193,8 +209,8 @@ export function LoginPage({ title }: LoginPageProps): React.ReactElement {
         </div>
 
         {/* Footer */}
-        <footer className={styles.footer}>
-          <p className={styles.footerText}>{t('login.footer')}</p>
+        <footer className="border-t border-border pt-4 text-center">
+          <p className="m-0 text-sm text-muted-foreground">{t('login.footer')}</p>
         </footer>
       </div>
     </div>

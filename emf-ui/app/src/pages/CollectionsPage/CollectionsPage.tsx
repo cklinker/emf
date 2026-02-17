@@ -20,7 +20,7 @@ import { useI18n } from '../../context/I18nContext'
 import { getTenantSlug } from '../../context/TenantContext'
 import { useApi } from '../../context/ApiContext'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
-import styles from './CollectionsPage.module.css'
+import { cn } from '@/lib/utils'
 
 /**
  * Collection interface matching the API response
@@ -199,18 +199,18 @@ export function CollectionsPage({
   // Handle filter change
   const handleNameFilterChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     setFilters((prev) => ({ ...prev, name: event.target.value }))
-    setPage(1) // Reset to first page when filtering
+    setPage(1)
   }, [])
 
   const handleStatusFilterChange = useCallback((event: React.ChangeEvent<HTMLSelectElement>) => {
     setFilters((prev) => ({ ...prev, status: event.target.value as CollectionFilters['status'] }))
-    setPage(1) // Reset to first page when filtering
+    setPage(1)
   }, [])
 
   // Handle show system collections toggle
   const handleShowSystemChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     setShowSystem(event.target.checked)
-    setPage(1) // Reset to first page when toggling
+    setPage(1)
   }, [])
 
   // Handle sort change
@@ -270,7 +270,7 @@ export function CollectionsPage({
   const getSortIndicator = useCallback(
     (field: CollectionSort['field']) => {
       if (sort.field !== field) return null
-      return sort.direction === 'asc' ? ' ↑' : ' ↓'
+      return sort.direction === 'asc' ? ' \u2191' : ' \u2193'
     },
     [sort]
   )
@@ -287,8 +287,8 @@ export function CollectionsPage({
   // Render loading state
   if (isLoading) {
     return (
-      <div className={styles.container} data-testid={testId}>
-        <div className={styles.loadingContainer}>
+      <div className="mx-auto max-w-[1400px] space-y-6 p-6 lg:p-8" data-testid={testId}>
+        <div className="flex min-h-[400px] items-center justify-center">
           <LoadingSpinner size="large" label={t('common.loading')} />
         </div>
       </div>
@@ -298,7 +298,7 @@ export function CollectionsPage({
   // Render error state
   if (error) {
     return (
-      <div className={styles.container} data-testid={testId}>
+      <div className="mx-auto max-w-[1400px] space-y-6 p-6 lg:p-8" data-testid={testId}>
         <ErrorMessage
           error={error instanceof Error ? error : new Error(t('errors.generic'))}
           onRetry={() => refetch()}
@@ -308,13 +308,13 @@ export function CollectionsPage({
   }
 
   return (
-    <div className={styles.container} data-testid={testId}>
+    <div className="mx-auto max-w-[1400px] space-y-6 p-6 lg:p-8" data-testid={testId}>
       {/* Page Header */}
-      <header className={styles.header}>
-        <h1 className={styles.title}>{t('collections.title')}</h1>
+      <header className="flex items-center justify-between">
+        <h1 className="m-0 text-2xl font-semibold text-foreground">{t('collections.title')}</h1>
         <button
           type="button"
-          className={styles.createButton}
+          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
           onClick={handleCreate}
           aria-label={t('collections.createCollection')}
           data-testid="create-collection-button"
@@ -324,15 +324,19 @@ export function CollectionsPage({
       </header>
 
       {/* Filters */}
-      <div className={styles.filters} role="search" aria-label={t('common.filter')}>
-        <div className={styles.filterGroup}>
-          <label htmlFor="name-filter" className={styles.filterLabel}>
+      <div
+        className="flex flex-wrap items-end gap-4 rounded-lg border border-border bg-card p-4"
+        role="search"
+        aria-label={t('common.filter')}
+      >
+        <div className="flex flex-col gap-1">
+          <label htmlFor="name-filter" className="text-sm font-medium text-muted-foreground">
             {t('collections.collectionName')}
           </label>
           <input
             id="name-filter"
             type="text"
-            className={styles.filterInput}
+            className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             placeholder={t('common.search')}
             value={filters.name}
             onChange={handleNameFilterChange}
@@ -340,13 +344,13 @@ export function CollectionsPage({
             data-testid="name-filter"
           />
         </div>
-        <div className={styles.filterGroup}>
-          <label htmlFor="status-filter" className={styles.filterLabel}>
+        <div className="flex flex-col gap-1">
+          <label htmlFor="status-filter" className="text-sm font-medium text-muted-foreground">
             {t('collections.status')}
           </label>
           <select
             id="status-filter"
-            className={styles.filterSelect}
+            className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             value={filters.status}
             onChange={handleStatusFilterChange}
             aria-label={t('collections.status')}
@@ -357,12 +361,13 @@ export function CollectionsPage({
             <option value="inactive">{t('collections.inactive')}</option>
           </select>
         </div>
-        <div className={styles.filterGroup}>
-          <label className={styles.checkboxLabel}>
+        <div className="flex items-center">
+          <label className="flex cursor-pointer items-center gap-2 text-sm">
             <input
               type="checkbox"
               checked={showSystem}
               onChange={handleShowSystemChange}
+              className="h-4 w-4 accent-primary"
               data-testid="show-system-toggle"
             />
             <span>{t('collections.showSystem')}</span>
@@ -372,24 +377,27 @@ export function CollectionsPage({
 
       {/* Collections Table */}
       {paginatedCollections.length === 0 ? (
-        <div className={styles.emptyState} data-testid="empty-state">
+        <div
+          className="rounded-lg border border-border bg-card p-16 text-center text-muted-foreground"
+          data-testid="empty-state"
+        >
           <p>{t('common.noResults')}</p>
         </div>
       ) : (
         <>
-          <div className={styles.tableContainer}>
+          <div className="overflow-x-auto rounded-lg border border-border bg-card">
             <table
-              className={styles.table}
+              className="w-full border-collapse text-sm"
               role="grid"
               aria-label={t('collections.title')}
               data-testid="collections-table"
             >
               <thead>
-                <tr role="row">
+                <tr role="row" className="bg-muted">
                   <th
                     role="columnheader"
                     scope="col"
-                    className={styles.sortableHeader}
+                    className="cursor-pointer select-none border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground"
                     onClick={() => handleSortChange('name')}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
@@ -402,20 +410,28 @@ export function CollectionsPage({
                     data-testid="header-name"
                   >
                     {t('collections.collectionName')}
-                    <span className={styles.sortIndicator} aria-hidden="true">
+                    <span className="text-xs opacity-40" aria-hidden="true">
                       {getSortIndicator('name')}
                     </span>
                   </th>
-                  <th role="columnheader" scope="col">
+                  <th
+                    role="columnheader"
+                    scope="col"
+                    className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                  >
                     {t('collections.displayName')}
                   </th>
-                  <th role="columnheader" scope="col">
+                  <th
+                    role="columnheader"
+                    scope="col"
+                    className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                  >
                     {t('collections.status')}
                   </th>
                   <th
                     role="columnheader"
                     scope="col"
-                    className={styles.sortableHeader}
+                    className="cursor-pointer select-none border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground"
                     onClick={() => handleSortChange('createdAt')}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
@@ -428,14 +444,14 @@ export function CollectionsPage({
                     data-testid="header-created"
                   >
                     {t('common.create')}d
-                    <span className={styles.sortIndicator} aria-hidden="true">
+                    <span className="text-xs opacity-40" aria-hidden="true">
                       {getSortIndicator('createdAt')}
                     </span>
                   </th>
                   <th
                     role="columnheader"
                     scope="col"
-                    className={styles.sortableHeader}
+                    className="cursor-pointer select-none border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground"
                     onClick={() => handleSortChange('updatedAt')}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
@@ -448,11 +464,15 @@ export function CollectionsPage({
                     data-testid="header-updated"
                   >
                     {t('common.edit')}ed
-                    <span className={styles.sortIndicator} aria-hidden="true">
+                    <span className="text-xs opacity-40" aria-hidden="true">
                       {getSortIndicator('updatedAt')}
                     </span>
                   </th>
-                  <th role="columnheader" scope="col">
+                  <th
+                    role="columnheader"
+                    scope="col"
+                    className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                  >
                     {t('common.actions')}
                   </th>
                 </tr>
@@ -462,48 +482,53 @@ export function CollectionsPage({
                   <tr
                     key={collection.id}
                     role="row"
-                    className={styles.tableRow}
+                    className="cursor-pointer border-b border-border transition-colors last:border-b-0 hover:bg-muted/50"
                     onClick={() => handleView(collection)}
                     data-testid={`collection-row-${index}`}
                   >
-                    <td role="gridcell" className={styles.nameCell}>
+                    <td role="gridcell" className="px-4 py-3 font-medium text-foreground">
                       {collection.name}
                     </td>
-                    <td role="gridcell">{collection.displayName}</td>
-                    <td role="gridcell">
+                    <td role="gridcell" className="px-4 py-3 text-foreground">
+                      {collection.displayName}
+                    </td>
+                    <td role="gridcell" className="px-4 py-3">
                       <span
-                        className={`${styles.statusBadge} ${
-                          collection.active ? styles.statusActive : styles.statusInactive
-                        }`}
+                        className={cn(
+                          'inline-block rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wider',
+                          collection.active
+                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                            : 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300'
+                        )}
                         data-testid={`status-badge-${index}`}
                       >
                         {collection.active ? t('collections.active') : t('collections.inactive')}
                       </span>
                     </td>
-                    <td role="gridcell">
+                    <td role="gridcell" className="px-4 py-3 text-foreground">
                       {formatDate(new Date(collection.createdAt), {
                         year: 'numeric',
                         month: 'short',
                         day: 'numeric',
                       })}
                     </td>
-                    <td role="gridcell">
+                    <td role="gridcell" className="px-4 py-3 text-foreground">
                       {formatDate(new Date(collection.updatedAt), {
                         year: 'numeric',
                         month: 'short',
                         day: 'numeric',
                       })}
                     </td>
-                    <td role="gridcell" className={styles.actionsCell}>
+                    <td role="gridcell" className="px-4 py-3 text-right">
                       <div
-                        className={styles.actions}
+                        className="flex justify-end gap-2"
                         onClick={(e) => e.stopPropagation()}
                         onKeyDown={(e) => e.stopPropagation()}
                         role="toolbar"
                       >
                         <button
                           type="button"
-                          className={styles.actionButton}
+                          className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-primary hover:border-primary hover:bg-muted"
                           onClick={() => handleEdit(collection)}
                           aria-label={`${t('common.edit')} ${collection.name}`}
                           data-testid={`edit-button-${index}`}
@@ -512,7 +537,7 @@ export function CollectionsPage({
                         </button>
                         <button
                           type="button"
-                          className={`${styles.actionButton} ${styles.deleteButton}`}
+                          className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-destructive hover:border-destructive hover:bg-destructive/10"
                           onClick={() => handleDeleteClick(collection)}
                           aria-label={`${t('common.delete')} ${collection.name}`}
                           data-testid={`delete-button-${index}`}
@@ -530,27 +555,29 @@ export function CollectionsPage({
           {/* Pagination */}
           {totalPages > 1 && (
             <nav
-              className={styles.pagination}
+              className="flex items-center justify-center gap-4"
               role="navigation"
               aria-label="Table pagination"
               data-testid="pagination"
             >
               <button
                 type="button"
-                className={styles.paginationButton}
+                className="rounded-md border border-border bg-card px-3 py-1.5 text-sm text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={page <= 1}
                 onClick={() => handlePageChange(page - 1)}
                 aria-label={t('common.previous')}
               >
                 {t('common.previous')}
               </button>
-              <span className={styles.paginationInfo} aria-live="polite">
+              <span className="text-sm text-muted-foreground" aria-live="polite">
                 Page {page} of {totalPages}
-                <span className={styles.paginationTotal}> ({sortedCollections.length} total)</span>
+                <span className="ml-1 text-muted-foreground">
+                  ({sortedCollections.length} total)
+                </span>
               </span>
               <button
                 type="button"
-                className={styles.paginationButton}
+                className="rounded-md border border-border bg-card px-3 py-1.5 text-sm text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={page >= totalPages}
                 onClick={() => handlePageChange(page + 1)}
                 aria-label={t('common.next')}

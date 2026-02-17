@@ -17,7 +17,6 @@ import type {
   CollectionFormData,
   AvailableField,
 } from '../../components/CollectionForm/CollectionForm'
-import styles from './CollectionFormPage.module.css'
 
 /**
  * Props for CollectionFormPage component
@@ -118,8 +117,8 @@ export function CollectionFormPage({
   // Show loading state while fetching collection in edit mode
   if (isEditMode && isLoading) {
     return (
-      <div className={styles.container} data-testid={testId}>
-        <div className={styles.loadingContainer}>
+      <div className="flex h-full flex-col overflow-y-auto p-8" data-testid={testId}>
+        <div className="flex min-h-[400px] items-center justify-center">
           <LoadingSpinner size="large" label={t('common.loading')} />
         </div>
       </div>
@@ -129,7 +128,7 @@ export function CollectionFormPage({
   // Show error state if fetch failed
   if (isEditMode && error) {
     return (
-      <div className={styles.container} data-testid={testId}>
+      <div className="flex h-full flex-col overflow-y-auto p-8" data-testid={testId}>
         <ErrorMessage
           error={error instanceof Error ? error : new Error(t('errors.generic'))}
           onRetry={() => navigate(`/${getTenantSlug()}/collections`)}
@@ -139,14 +138,14 @@ export function CollectionFormPage({
   }
 
   return (
-    <div className={styles.container} data-testid={testId}>
-      <header className={styles.header}>
-        <h1 className={styles.title}>
+    <div className="flex h-full flex-col overflow-y-auto p-8" data-testid={testId}>
+      <header className="mb-8">
+        <h1 className="m-0 text-[1.75rem] font-semibold text-foreground">
           {isEditMode ? t('collections.editCollection') : t('collections.createCollection')}
         </h1>
       </header>
 
-      <div className={styles.content}>
+      <div className="w-full flex-1">
         <CollectionForm
           collection={collection}
           availableFields={availableFields}

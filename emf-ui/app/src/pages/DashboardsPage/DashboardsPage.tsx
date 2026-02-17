@@ -18,8 +18,7 @@ import {
   AlertCircle,
   Loader2,
 } from 'lucide-react'
-
-import styles from './DashboardsPage.module.css'
+import { cn } from '@/lib/utils'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -154,6 +153,12 @@ function getWidgetLabel(type: WidgetType): string {
 
 const WIDGET_TYPES: WidgetType[] = ['METRIC_CARD', 'BAR_CHART', 'DATA_TABLE', 'RECENT_RECORDS']
 
+const accessBadgeVariants: Record<string, string> = {
+  PRIVATE: 'text-warning-foreground bg-warning/20',
+  PUBLIC: 'text-emerald-700 bg-emerald-100 dark:text-emerald-300 dark:bg-emerald-900/40',
+  HIDDEN: 'text-muted-foreground bg-muted',
+}
+
 // ─── DashboardForm (Create/Edit metadata modal) ─────────────────────────────
 
 interface DashboardFormProps {
@@ -232,26 +237,26 @@ function DashboardForm({
 
   return (
     <div
-      className={styles.modalOverlay}
+      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 p-4"
       onClick={(e) => e.target === e.currentTarget && onCancel()}
       onKeyDown={handleKeyDown}
       data-testid="dashboard-form-overlay"
       role="presentation"
     >
       <div
-        className={styles.modal}
+        className="w-full max-w-[600px] max-h-[90vh] overflow-y-auto rounded-lg bg-card shadow-xl"
         role="dialog"
         aria-modal="true"
         aria-labelledby="dashboard-form-title"
         data-testid="dashboard-form-modal"
       >
-        <div className={styles.modalHeader}>
-          <h2 id="dashboard-form-title" className={styles.modalTitle}>
+        <div className="flex items-center justify-between border-b border-border p-6">
+          <h2 id="dashboard-form-title" className="m-0 text-xl font-semibold text-foreground">
             {title}
           </h2>
           <button
             type="button"
-            className={styles.modalCloseButton}
+            className="flex items-center justify-center rounded p-1.5 text-muted-foreground transition-all duration-200 hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             onClick={onCancel}
             aria-label="Close"
             data-testid="dashboard-form-close"
@@ -259,12 +264,12 @@ function DashboardForm({
             <X size={20} />
           </button>
         </div>
-        <div className={styles.modalBody}>
-          <form className={styles.form} onSubmit={handleSubmit} noValidate>
-            <div className={styles.formGroup}>
-              <label htmlFor="dashboard-name" className={styles.formLabel}>
+        <div className="p-6">
+          <form className="flex flex-col gap-5" onSubmit={handleSubmit} noValidate>
+            <div className="flex flex-col gap-2">
+              <label htmlFor="dashboard-name" className="text-sm font-medium text-foreground">
                 Name
-                <span className={styles.required} aria-hidden="true">
+                <span className="ml-1 text-destructive" aria-hidden="true">
                   *
                 </span>
               </label>
@@ -272,7 +277,10 @@ function DashboardForm({
                 ref={nameInputRef}
                 id="dashboard-name"
                 type="text"
-                className={`${styles.formInput} ${touched.name && errors.name ? styles.hasError : ''}`}
+                className={cn(
+                  'rounded-md border border-border bg-background px-3.5 py-2.5 text-sm text-foreground transition-all duration-200 focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/10 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground',
+                  touched.name && errors.name && 'border-destructive'
+                )}
                 value={formData.name}
                 onChange={(e) => handleChange('name', e.target.value)}
                 onBlur={() => handleBlur('name')}
@@ -283,19 +291,25 @@ function DashboardForm({
                 data-testid="dashboard-name-input"
               />
               {touched.name && errors.name && (
-                <span className={styles.formError} role="alert">
+                <span className="text-xs text-destructive" role="alert">
                   {errors.name}
                 </span>
               )}
             </div>
 
-            <div className={styles.formGroup}>
-              <label htmlFor="dashboard-description" className={styles.formLabel}>
+            <div className="flex flex-col gap-2">
+              <label
+                htmlFor="dashboard-description"
+                className="text-sm font-medium text-foreground"
+              >
                 Description
               </label>
               <textarea
                 id="dashboard-description"
-                className={`${styles.formInput} ${styles.formTextarea} ${touched.description && errors.description ? styles.hasError : ''}`}
+                className={cn(
+                  'min-h-[80px] resize-y rounded-md border border-border bg-background px-3.5 py-2.5 font-inherit text-sm text-foreground transition-all duration-200 focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/10 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground',
+                  touched.description && errors.description && 'border-destructive'
+                )}
                 value={formData.description}
                 onChange={(e) => handleChange('description', e.target.value)}
                 onBlur={() => handleBlur('description')}
@@ -305,22 +319,25 @@ function DashboardForm({
                 data-testid="dashboard-description-input"
               />
               {touched.description && errors.description && (
-                <span className={styles.formError} role="alert">
+                <span className="text-xs text-destructive" role="alert">
                   {errors.description}
                 </span>
               )}
             </div>
 
-            <div className={styles.formGroup}>
-              <label htmlFor="dashboard-access-level" className={styles.formLabel}>
+            <div className="flex flex-col gap-2">
+              <label
+                htmlFor="dashboard-access-level"
+                className="text-sm font-medium text-foreground"
+              >
                 Access Level
-                <span className={styles.required} aria-hidden="true">
+                <span className="ml-1 text-destructive" aria-hidden="true">
                   *
                 </span>
               </label>
               <select
                 id="dashboard-access-level"
-                className={styles.formInput}
+                className="rounded-md border border-border bg-background px-3.5 py-2.5 text-sm text-foreground transition-all duration-200 focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/10 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
                 value={formData.accessLevel}
                 onChange={(e) => handleChange('accessLevel', e.target.value)}
                 disabled={isSubmitting}
@@ -332,17 +349,23 @@ function DashboardForm({
               </select>
             </div>
 
-            <div className={styles.formGroup}>
-              <label htmlFor="dashboard-column-count" className={styles.formLabel}>
+            <div className="flex flex-col gap-2">
+              <label
+                htmlFor="dashboard-column-count"
+                className="text-sm font-medium text-foreground"
+              >
                 Column Count
-                <span className={styles.required} aria-hidden="true">
+                <span className="ml-1 text-destructive" aria-hidden="true">
                   *
                 </span>
               </label>
               <input
                 id="dashboard-column-count"
                 type="number"
-                className={`${styles.formInput} ${touched.columnCount && errors.columnCount ? styles.hasError : ''}`}
+                className={cn(
+                  'rounded-md border border-border bg-background px-3.5 py-2.5 text-sm text-foreground transition-all duration-200 focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/10 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground',
+                  touched.columnCount && errors.columnCount && 'border-destructive'
+                )}
                 value={formData.columnCount}
                 onChange={(e) => handleChange('columnCount', parseInt(e.target.value, 10) || 1)}
                 onBlur={() => handleBlur('columnCount')}
@@ -352,30 +375,31 @@ function DashboardForm({
                 data-testid="dashboard-column-count-input"
               />
               {touched.columnCount && errors.columnCount && (
-                <span className={styles.formError} role="alert">
+                <span className="text-xs text-destructive" role="alert">
                   {errors.columnCount}
                 </span>
               )}
             </div>
 
-            <div className={styles.checkboxGroup}>
+            <div className="flex items-center gap-2">
               <input
                 id="dashboard-dynamic"
                 type="checkbox"
+                className="h-4 w-4 accent-primary"
                 checked={formData.dynamic}
                 onChange={(e) => handleChange('dynamic', e.target.checked)}
                 disabled={isSubmitting}
                 data-testid="dashboard-dynamic-input"
               />
-              <label htmlFor="dashboard-dynamic" className={styles.formLabel}>
+              <label htmlFor="dashboard-dynamic" className="text-sm font-medium text-foreground">
                 Dynamic
               </label>
             </div>
 
-            <div className={styles.formActions}>
+            <div className="mt-2 flex justify-end gap-3 border-t border-border pt-4">
               <button
                 type="button"
-                className={styles.cancelButton}
+                className="rounded-md border border-border bg-background px-5 py-2.5 text-sm font-medium text-foreground transition-all duration-200 hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
                 onClick={onCancel}
                 disabled={isSubmitting}
                 data-testid="dashboard-form-cancel"
@@ -384,7 +408,7 @@ function DashboardForm({
               </button>
               <button
                 type="submit"
-                className={styles.submitButton}
+                className="inline-flex items-center gap-1.5 rounded-md border-none bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors duration-200 hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                 disabled={isSubmitting}
                 data-testid="dashboard-form-submit"
               >
@@ -453,26 +477,26 @@ function WidgetConfigModal({
 
   return (
     <div
-      className={styles.modalOverlay}
+      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 p-4"
       onClick={(e) => e.target === e.currentTarget && onCancel()}
       onKeyDown={handleKeyDown}
       data-testid="widget-config-overlay"
       role="presentation"
     >
       <div
-        className={styles.modal}
+        className="w-full max-w-[600px] max-h-[90vh] overflow-y-auto rounded-lg bg-card shadow-xl"
         role="dialog"
         aria-modal="true"
         aria-labelledby="widget-config-title"
         data-testid="widget-config-modal"
       >
-        <div className={styles.modalHeader}>
-          <h2 id="widget-config-title" className={styles.modalTitle}>
+        <div className="flex items-center justify-between border-b border-border p-6">
+          <h2 id="widget-config-title" className="m-0 text-xl font-semibold text-foreground">
             Configure {getWidgetLabel(type)}
           </h2>
           <button
             type="button"
-            className={styles.modalCloseButton}
+            className="flex items-center justify-center rounded p-1.5 text-muted-foreground transition-all duration-200 hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             onClick={onCancel}
             aria-label="Close"
             data-testid="widget-config-close"
@@ -480,19 +504,19 @@ function WidgetConfigModal({
             <X size={20} />
           </button>
         </div>
-        <div className={styles.modalBody}>
-          <form className={styles.form} onSubmit={handleSubmit} noValidate>
-            <div className={styles.formGroup}>
-              <label htmlFor="widget-title" className={styles.formLabel}>
+        <div className="p-6">
+          <form className="flex flex-col gap-5" onSubmit={handleSubmit} noValidate>
+            <div className="flex flex-col gap-2">
+              <label htmlFor="widget-title" className="text-sm font-medium text-foreground">
                 Title
-                <span className={styles.required} aria-hidden="true">
+                <span className="ml-1 text-destructive" aria-hidden="true">
                   *
                 </span>
               </label>
               <input
                 id="widget-title"
                 type="text"
-                className={styles.formInput}
+                className="rounded-md border border-border bg-background px-3.5 py-2.5 text-sm text-foreground transition-all duration-200 focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/10 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
                 value={formData.title}
                 onChange={(e) => handleChange('title', e.target.value)}
                 placeholder="Enter widget title"
@@ -500,16 +524,16 @@ function WidgetConfigModal({
               />
             </div>
 
-            <div className={styles.formGroup}>
-              <label htmlFor="widget-collection" className={styles.formLabel}>
+            <div className="flex flex-col gap-2">
+              <label htmlFor="widget-collection" className="text-sm font-medium text-foreground">
                 Collection
-                <span className={styles.required} aria-hidden="true">
+                <span className="ml-1 text-destructive" aria-hidden="true">
                   *
                 </span>
               </label>
               <select
                 id="widget-collection"
-                className={styles.formInput}
+                className="rounded-md border border-border bg-background px-3.5 py-2.5 text-sm text-foreground transition-all duration-200 focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/10 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
                 value={formData.collection}
                 onChange={(e) => handleChange('collection', e.target.value)}
                 data-testid="widget-collection-input"
@@ -525,27 +549,30 @@ function WidgetConfigModal({
 
             {type === 'METRIC_CARD' && (
               <>
-                <div className={styles.formGroup}>
-                  <label htmlFor="widget-agg-field" className={styles.formLabel}>
+                <div className="flex flex-col gap-2">
+                  <label htmlFor="widget-agg-field" className="text-sm font-medium text-foreground">
                     Aggregation Field
                   </label>
                   <input
                     id="widget-agg-field"
                     type="text"
-                    className={styles.formInput}
+                    className="rounded-md border border-border bg-background px-3.5 py-2.5 text-sm text-foreground transition-all duration-200 focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/10 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
                     value={formData.aggregationField}
                     onChange={(e) => handleChange('aggregationField', e.target.value)}
                     placeholder="Leave empty for COUNT of all records"
                     data-testid="widget-agg-field-input"
                   />
                 </div>
-                <div className={styles.formGroup}>
-                  <label htmlFor="widget-agg-function" className={styles.formLabel}>
+                <div className="flex flex-col gap-2">
+                  <label
+                    htmlFor="widget-agg-function"
+                    className="text-sm font-medium text-foreground"
+                  >
                     Aggregation Function
                   </label>
                   <select
                     id="widget-agg-function"
-                    className={styles.formInput}
+                    className="rounded-md border border-border bg-background px-3.5 py-2.5 text-sm text-foreground transition-all duration-200 focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/10 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
                     value={formData.aggregationFunction}
                     onChange={(e) => handleChange('aggregationFunction', e.target.value)}
                     data-testid="widget-agg-function-input"
@@ -562,41 +589,50 @@ function WidgetConfigModal({
 
             {type === 'BAR_CHART' && (
               <>
-                <div className={styles.formGroup}>
-                  <label htmlFor="widget-category-field" className={styles.formLabel}>
+                <div className="flex flex-col gap-2">
+                  <label
+                    htmlFor="widget-category-field"
+                    className="text-sm font-medium text-foreground"
+                  >
                     Category Field
                   </label>
                   <input
                     id="widget-category-field"
                     type="text"
-                    className={styles.formInput}
+                    className="rounded-md border border-border bg-background px-3.5 py-2.5 text-sm text-foreground transition-all duration-200 focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/10 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
                     value={formData.categoryField}
                     onChange={(e) => handleChange('categoryField', e.target.value)}
                     placeholder="Field to group by"
                     data-testid="widget-category-field-input"
                   />
                 </div>
-                <div className={styles.formGroup}>
-                  <label htmlFor="widget-value-field" className={styles.formLabel}>
+                <div className="flex flex-col gap-2">
+                  <label
+                    htmlFor="widget-value-field"
+                    className="text-sm font-medium text-foreground"
+                  >
                     Value Field
                   </label>
                   <input
                     id="widget-value-field"
                     type="text"
-                    className={styles.formInput}
+                    className="rounded-md border border-border bg-background px-3.5 py-2.5 text-sm text-foreground transition-all duration-200 focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/10 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
                     value={formData.valueField}
                     onChange={(e) => handleChange('valueField', e.target.value)}
                     placeholder="Field to aggregate (optional for COUNT)"
                     data-testid="widget-value-field-input"
                   />
                 </div>
-                <div className={styles.formGroup}>
-                  <label htmlFor="widget-bar-agg-function" className={styles.formLabel}>
+                <div className="flex flex-col gap-2">
+                  <label
+                    htmlFor="widget-bar-agg-function"
+                    className="text-sm font-medium text-foreground"
+                  >
                     Aggregation Function
                   </label>
                   <select
                     id="widget-bar-agg-function"
-                    className={styles.formInput}
+                    className="rounded-md border border-border bg-background px-3.5 py-2.5 text-sm text-foreground transition-all duration-200 focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/10 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
                     value={formData.barAggregationFunction}
                     onChange={(e) => handleChange('barAggregationFunction', e.target.value)}
                     data-testid="widget-bar-agg-function-input"
@@ -613,28 +649,28 @@ function WidgetConfigModal({
 
             {type === 'DATA_TABLE' && (
               <>
-                <div className={styles.formGroup}>
-                  <label htmlFor="widget-columns" className={styles.formLabel}>
+                <div className="flex flex-col gap-2">
+                  <label htmlFor="widget-columns" className="text-sm font-medium text-foreground">
                     Columns (comma-separated field names)
                   </label>
                   <input
                     id="widget-columns"
                     type="text"
-                    className={styles.formInput}
+                    className="rounded-md border border-border bg-background px-3.5 py-2.5 text-sm text-foreground transition-all duration-200 focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/10 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
                     value={formData.columns}
                     onChange={(e) => handleChange('columns', e.target.value)}
                     placeholder="e.g., name, email, status"
                     data-testid="widget-columns-input"
                   />
                 </div>
-                <div className={styles.formGroup}>
-                  <label htmlFor="widget-row-limit" className={styles.formLabel}>
+                <div className="flex flex-col gap-2">
+                  <label htmlFor="widget-row-limit" className="text-sm font-medium text-foreground">
                     Row Limit
                   </label>
                   <input
                     id="widget-row-limit"
                     type="number"
-                    className={styles.formInput}
+                    className="rounded-md border border-border bg-background px-3.5 py-2.5 text-sm text-foreground transition-all duration-200 focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/10 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
                     value={formData.rowLimit}
                     onChange={(e) => handleChange('rowLimit', parseInt(e.target.value, 10) || 5)}
                     min={1}
@@ -647,28 +683,34 @@ function WidgetConfigModal({
 
             {type === 'RECENT_RECORDS' && (
               <>
-                <div className={styles.formGroup}>
-                  <label htmlFor="widget-display-fields" className={styles.formLabel}>
+                <div className="flex flex-col gap-2">
+                  <label
+                    htmlFor="widget-display-fields"
+                    className="text-sm font-medium text-foreground"
+                  >
                     Display Fields (comma-separated)
                   </label>
                   <input
                     id="widget-display-fields"
                     type="text"
-                    className={styles.formInput}
+                    className="rounded-md border border-border bg-background px-3.5 py-2.5 text-sm text-foreground transition-all duration-200 focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/10 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
                     value={formData.displayFields}
                     onChange={(e) => handleChange('displayFields', e.target.value)}
                     placeholder="e.g., name, createdAt"
                     data-testid="widget-display-fields-input"
                   />
                 </div>
-                <div className={styles.formGroup}>
-                  <label htmlFor="widget-recent-row-limit" className={styles.formLabel}>
+                <div className="flex flex-col gap-2">
+                  <label
+                    htmlFor="widget-recent-row-limit"
+                    className="text-sm font-medium text-foreground"
+                  >
                     Row Limit
                   </label>
                   <input
                     id="widget-recent-row-limit"
                     type="number"
-                    className={styles.formInput}
+                    className="rounded-md border border-border bg-background px-3.5 py-2.5 text-sm text-foreground transition-all duration-200 focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/10 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
                     value={formData.rowLimit}
                     onChange={(e) => handleChange('rowLimit', parseInt(e.target.value, 10) || 5)}
                     min={1}
@@ -679,10 +721,10 @@ function WidgetConfigModal({
               </>
             )}
 
-            <div className={styles.formActions}>
+            <div className="mt-2 flex justify-end gap-3 border-t border-border pt-4">
               <button
                 type="button"
-                className={styles.cancelButton}
+                className="rounded-md border border-border bg-background px-5 py-2.5 text-sm font-medium text-foreground transition-all duration-200 hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
                 onClick={onCancel}
                 data-testid="widget-config-cancel"
               >
@@ -690,7 +732,7 @@ function WidgetConfigModal({
               </button>
               <button
                 type="submit"
-                className={styles.submitButton}
+                className="inline-flex items-center gap-1.5 rounded-md border-none bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors duration-200 hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                 disabled={!isValid}
                 data-testid="widget-config-save"
               >
@@ -763,8 +805,11 @@ function MetricCardWidget({ component, apiClient }: WidgetRendererProps): React.
 
   if (isLoading) {
     return (
-      <div className={styles.widgetLoading} data-testid={`widget-loading-${component.id}`}>
-        <Loader2 size={24} className={styles.spinner} />
+      <div
+        className="flex h-full min-h-[120px] flex-col items-center justify-center gap-3 p-8 text-muted-foreground"
+        data-testid={`widget-loading-${component.id}`}
+      >
+        <Loader2 size={24} className="animate-spin" />
         <span>Loading...</span>
       </div>
     )
@@ -772,7 +817,10 @@ function MetricCardWidget({ component, apiClient }: WidgetRendererProps): React.
 
   if (error) {
     return (
-      <div className={styles.widgetError} data-testid={`widget-error-${component.id}`}>
+      <div
+        className="flex h-full min-h-[120px] flex-col items-center justify-center gap-2 p-8 text-sm text-destructive"
+        data-testid={`widget-error-${component.id}`}
+      >
         <AlertCircle size={20} />
         <span>Failed to load data</span>
       </div>
@@ -783,10 +831,13 @@ function MetricCardWidget({ component, apiClient }: WidgetRendererProps): React.
   const value = computeAggregation(records, aggField, aggFn)
 
   return (
-    <div className={styles.metricCard} data-testid={`widget-metric-${component.id}`}>
-      <div className={styles.metricValue}>{formatNumber(value)}</div>
-      <div className={styles.metricLabel}>{component.title}</div>
-      <div className={styles.metricMeta}>
+    <div
+      className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center"
+      data-testid={`widget-metric-${component.id}`}
+    >
+      <div className="text-4xl font-bold leading-none text-primary">{formatNumber(value)}</div>
+      <div className="text-[15px] font-semibold text-foreground">{component.title}</div>
+      <div className="text-xs text-muted-foreground">
         {aggFn}
         {aggField ? ` of ${aggField}` : ''} from {collection}
       </div>
@@ -809,8 +860,11 @@ function BarChartWidget({ component, apiClient }: WidgetRendererProps): React.Re
 
   if (isLoading) {
     return (
-      <div className={styles.widgetLoading} data-testid={`widget-loading-${component.id}`}>
-        <Loader2 size={24} className={styles.spinner} />
+      <div
+        className="flex h-full min-h-[120px] flex-col items-center justify-center gap-3 p-8 text-muted-foreground"
+        data-testid={`widget-loading-${component.id}`}
+      >
+        <Loader2 size={24} className="animate-spin" />
         <span>Loading...</span>
       </div>
     )
@@ -818,7 +872,10 @@ function BarChartWidget({ component, apiClient }: WidgetRendererProps): React.Re
 
   if (error) {
     return (
-      <div className={styles.widgetError} data-testid={`widget-error-${component.id}`}>
+      <div
+        className="flex h-full min-h-[120px] flex-col items-center justify-center gap-2 p-8 text-sm text-destructive"
+        data-testid={`widget-error-${component.id}`}
+      >
         <AlertCircle size={20} />
         <span>Failed to load data</span>
       </div>
@@ -846,24 +903,31 @@ function BarChartWidget({ component, apiClient }: WidgetRendererProps): React.Re
   const maxValue = bars.length > 0 ? Math.max(...bars.map((b) => b.value)) : 1
 
   return (
-    <div className={styles.barChart} data-testid={`widget-bar-${component.id}`}>
-      <div className={styles.barChartTitle}>{component.title}</div>
-      <div className={styles.barChartBody}>
+    <div className="flex h-full flex-col p-5" data-testid={`widget-bar-${component.id}`}>
+      <div className="mb-4 text-[15px] font-semibold text-foreground">{component.title}</div>
+      <div className="flex flex-1 flex-col gap-2.5">
         {bars.length === 0 ? (
-          <div className={styles.widgetEmpty}>No data</div>
+          <div className="flex items-center justify-center p-6 text-sm text-muted-foreground">
+            No data
+          </div>
         ) : (
           bars.map((bar) => (
-            <div key={bar.label} className={styles.barRow}>
-              <div className={styles.barLabel} title={bar.label}>
+            <div key={bar.label} className="flex items-center gap-3">
+              <div
+                className="min-w-[80px] max-w-[120px] overflow-hidden text-ellipsis whitespace-nowrap text-right text-[13px] text-muted-foreground max-md:min-w-[60px] max-md:max-w-[80px]"
+                title={bar.label}
+              >
                 {truncate(bar.label, 20)}
               </div>
-              <div className={styles.barTrack}>
+              <div className="h-5 flex-1 overflow-hidden rounded bg-muted">
                 <div
-                  className={styles.barFill}
+                  className="h-full min-w-[2px] rounded bg-gradient-to-r from-primary to-blue-500 transition-[width] duration-400 ease-out"
                   style={{ width: `${maxValue > 0 ? (bar.value / maxValue) * 100 : 0}%` }}
                 />
               </div>
-              <div className={styles.barValue}>{formatNumber(bar.value)}</div>
+              <div className="min-w-[50px] text-right text-[13px] font-semibold text-foreground">
+                {formatNumber(bar.value)}
+              </div>
             </div>
           ))
         )}
@@ -890,8 +954,11 @@ function DataTableWidget({ component, apiClient }: WidgetRendererProps): React.R
 
   if (isLoading) {
     return (
-      <div className={styles.widgetLoading} data-testid={`widget-loading-${component.id}`}>
-        <Loader2 size={24} className={styles.spinner} />
+      <div
+        className="flex h-full min-h-[120px] flex-col items-center justify-center gap-3 p-8 text-muted-foreground"
+        data-testid={`widget-loading-${component.id}`}
+      >
+        <Loader2 size={24} className="animate-spin" />
         <span>Loading...</span>
       </div>
     )
@@ -899,7 +966,10 @@ function DataTableWidget({ component, apiClient }: WidgetRendererProps): React.R
 
   if (error) {
     return (
-      <div className={styles.widgetError} data-testid={`widget-error-${component.id}`}>
+      <div
+        className="flex h-full min-h-[120px] flex-col items-center justify-center gap-2 p-8 text-sm text-destructive"
+        data-testid={`widget-error-${component.id}`}
+      >
         <AlertCircle size={20} />
         <span>Failed to load data</span>
       </div>
@@ -917,25 +987,42 @@ function DataTableWidget({ component, apiClient }: WidgetRendererProps): React.R
         : []
 
   return (
-    <div className={styles.dataTableWidget} data-testid={`widget-table-${component.id}`}>
-      <div className={styles.dataTableTitle}>{component.title}</div>
+    <div className="flex h-full flex-col" data-testid={`widget-table-${component.id}`}>
+      <div className="px-5 pb-3 pt-4 text-[15px] font-semibold text-foreground">
+        {component.title}
+      </div>
       {records.length === 0 ? (
-        <div className={styles.widgetEmpty}>No records</div>
+        <div className="flex items-center justify-center p-6 text-sm text-muted-foreground">
+          No records
+        </div>
       ) : (
-        <div className={styles.dataTableContainer}>
-          <table className={styles.dataTable}>
-            <thead>
+        <div className="flex-1 overflow-x-auto">
+          <table className="w-full border-collapse text-[13px]">
+            <thead className="bg-muted">
               <tr>
                 {displayColumns.map((col) => (
-                  <th key={col}>{col}</th>
+                  <th
+                    key={col}
+                    className="border-b border-border px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
+                  >
+                    {col}
+                  </th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {records.map((record, idx) => (
-                <tr key={(record.id as string) || idx}>
+                <tr
+                  key={(record.id as string) || idx}
+                  className="hover:bg-accent/50 [&:last-child>td]:border-b-0"
+                >
                   {displayColumns.map((col) => (
-                    <td key={col}>{record[col] != null ? String(record[col]) : ''}</td>
+                    <td
+                      key={col}
+                      className="max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap border-b border-border/50 px-3 py-2 text-foreground"
+                    >
+                      {record[col] != null ? String(record[col]) : ''}
+                    </td>
                   ))}
                 </tr>
               ))}
@@ -966,8 +1053,11 @@ function RecentRecordsWidget({ component, apiClient }: WidgetRendererProps): Rea
 
   if (isLoading) {
     return (
-      <div className={styles.widgetLoading} data-testid={`widget-loading-${component.id}`}>
-        <Loader2 size={24} className={styles.spinner} />
+      <div
+        className="flex h-full min-h-[120px] flex-col items-center justify-center gap-3 p-8 text-muted-foreground"
+        data-testid={`widget-loading-${component.id}`}
+      >
+        <Loader2 size={24} className="animate-spin" />
         <span>Loading...</span>
       </div>
     )
@@ -975,7 +1065,10 @@ function RecentRecordsWidget({ component, apiClient }: WidgetRendererProps): Rea
 
   if (error) {
     return (
-      <div className={styles.widgetError} data-testid={`widget-error-${component.id}`}>
+      <div
+        className="flex h-full min-h-[120px] flex-col items-center justify-center gap-2 p-8 text-sm text-destructive"
+        data-testid={`widget-error-${component.id}`}
+      >
         <AlertCircle size={20} />
         <span>Failed to load data</span>
       </div>
@@ -993,20 +1086,25 @@ function RecentRecordsWidget({ component, apiClient }: WidgetRendererProps): Rea
         : []
 
   return (
-    <div className={styles.recentRecordsWidget} data-testid={`widget-recent-${component.id}`}>
-      <div className={styles.recentRecordsTitle}>
+    <div className="flex h-full flex-col" data-testid={`widget-recent-${component.id}`}>
+      <div className="flex items-center gap-2 px-5 pb-3 pt-4 text-[15px] font-semibold text-foreground">
         <Clock size={16} />
         {component.title}
       </div>
       {records.length === 0 ? (
-        <div className={styles.widgetEmpty}>No recent records</div>
+        <div className="flex items-center justify-center p-6 text-sm text-muted-foreground">
+          No recent records
+        </div>
       ) : (
-        <ul className={styles.recentRecordsList}>
+        <ul className="m-0 flex-1 list-none p-0">
           {records.map((record, idx) => (
-            <li key={(record.id as string) || idx} className={styles.recentRecordItem}>
+            <li
+              key={(record.id as string) || idx}
+              className="flex flex-wrap gap-3 border-b border-border/50 px-5 py-2.5 text-[13px] transition-colors duration-150 last:border-b-0 hover:bg-accent/50"
+            >
               {fields.map((field) => (
-                <span key={field} className={styles.recentRecordField}>
-                  <span className={styles.recentRecordFieldLabel}>{field}:</span>{' '}
+                <span key={field} className="inline-flex gap-1 text-foreground">
+                  <span className="font-medium text-muted-foreground">{field}:</span>{' '}
                   {record[field] != null ? String(record[field]) : '-'}
                 </span>
               ))}
@@ -1029,7 +1127,11 @@ function WidgetRenderer(props: WidgetRendererProps): React.ReactElement {
     case 'RECENT_RECORDS':
       return <RecentRecordsWidget {...props} />
     default:
-      return <div className={styles.widgetError}>Unknown widget type</div>
+      return (
+        <div className="flex h-full min-h-[120px] flex-col items-center justify-center gap-2 p-8 text-sm text-destructive">
+          Unknown widget type
+        </div>
+      )
   }
 }
 
@@ -1053,9 +1155,12 @@ function DashboardCard({
   index,
 }: DashboardCardProps): React.ReactElement {
   return (
-    <div className={styles.card} data-testid={`dashboard-card-${index}`}>
+    <div
+      className="flex flex-col overflow-hidden rounded-lg border border-border bg-card transition-all duration-200 hover:border-primary hover:shadow-md"
+      data-testid={`dashboard-card-${index}`}
+    >
       <div
-        className={styles.cardClickable}
+        className="flex flex-1 cursor-pointer flex-col gap-3 p-5 focus-visible:rounded-t-lg focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-primary"
         onClick={() => onView(dashboard)}
         role="button"
         tabIndex={0}
@@ -1067,29 +1172,38 @@ function DashboardCard({
         }}
         data-testid={`dashboard-card-view-${index}`}
       >
-        <div className={styles.cardHeader}>
-          <div className={styles.cardTitleRow}>
-            <LayoutGrid size={18} className={styles.cardIcon} />
-            <h3 className={styles.cardName}>{dashboard.name}</h3>
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2">
+            <LayoutGrid size={18} className="shrink-0 text-primary" />
+            <h3 className="m-0 overflow-hidden text-ellipsis whitespace-nowrap text-base font-semibold text-foreground">
+              {dashboard.name}
+            </h3>
           </div>
           <span
-            className={`${styles.accessBadge} ${styles[`access${dashboard.accessLevel}`] || ''}`}
+            className={cn(
+              'inline-block shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider',
+              accessBadgeVariants[dashboard.accessLevel] || 'text-primary bg-muted'
+            )}
           >
             {formatAccessLevel(dashboard.accessLevel)}
           </span>
         </div>
         {dashboard.description && (
-          <p className={styles.cardDescription}>{truncate(dashboard.description, 120)}</p>
+          <p className="m-0 text-[13px] leading-relaxed text-muted-foreground">
+            {truncate(dashboard.description, 120)}
+          </p>
         )}
-        <div className={styles.cardMeta}>
-          <span className={styles.cardMetaItem}>
+        <div className="flex gap-4 text-xs text-muted-foreground">
+          <span className="inline-flex items-center gap-1">
             <LayoutGrid size={14} />
             {dashboard.columnCount} columns
           </span>
-          <span className={styles.cardMetaItem}>{dashboard.components?.length || 0} widgets</span>
+          <span className="inline-flex items-center gap-1">
+            {dashboard.components?.length || 0} widgets
+          </span>
         </div>
-        <div className={styles.cardFooter}>
-          <span className={styles.cardDate}>
+        <div className="mt-auto flex items-center justify-between border-t border-border/50 pt-2 text-xs text-muted-foreground">
+          <span>
             Updated{' '}
             {formatDate(new Date(dashboard.updatedAt), {
               year: 'numeric',
@@ -1097,13 +1211,13 @@ function DashboardCard({
               day: 'numeric',
             })}
           </span>
-          <span className={styles.cardCreator}>by {dashboard.createdBy || 'system'}</span>
+          <span>by {dashboard.createdBy || 'system'}</span>
         </div>
       </div>
-      <div className={styles.cardActions}>
+      <div className="flex border-t border-border">
         <button
           type="button"
-          className={styles.cardActionButton}
+          className="flex flex-1 items-center justify-center gap-1.5 border-r border-border bg-transparent px-2 py-2.5 text-[13px] font-medium text-muted-foreground transition-all duration-150 hover:bg-muted hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-primary"
           onClick={(e) => {
             e.stopPropagation()
             onView(dashboard)
@@ -1116,7 +1230,7 @@ function DashboardCard({
         </button>
         <button
           type="button"
-          className={styles.cardActionButton}
+          className="flex flex-1 items-center justify-center gap-1.5 border-r border-border bg-transparent px-2 py-2.5 text-[13px] font-medium text-muted-foreground transition-all duration-150 hover:bg-muted hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-primary"
           onClick={(e) => {
             e.stopPropagation()
             onEdit(dashboard)
@@ -1129,7 +1243,7 @@ function DashboardCard({
         </button>
         <button
           type="button"
-          className={`${styles.cardActionButton} ${styles.cardActionDelete}`}
+          className="flex flex-1 items-center justify-center gap-1.5 bg-transparent px-2 py-2.5 text-[13px] font-medium text-muted-foreground transition-all duration-150 hover:bg-destructive/10 hover:text-destructive focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-primary"
           onClick={(e) => {
             e.stopPropagation()
             onDelete(dashboard)
@@ -1172,7 +1286,7 @@ function DashboardViewer({
 
   if (isLoading) {
     return (
-      <div className={styles.viewerContainer} data-testid="dashboard-viewer-loading">
+      <div className="flex flex-col gap-6" data-testid="dashboard-viewer-loading">
         <LoadingSpinner size="large" label="Loading dashboard..." />
       </div>
     )
@@ -1180,14 +1294,14 @@ function DashboardViewer({
 
   if (error || !dashboard) {
     return (
-      <div className={styles.viewerContainer} data-testid="dashboard-viewer-error">
+      <div className="flex flex-col gap-6" data-testid="dashboard-viewer-error">
         <ErrorMessage
           error={error instanceof Error ? error : new Error('Failed to load dashboard')}
           onRetry={() => {}}
         />
         <button
           type="button"
-          className={styles.backButton}
+          className="inline-flex w-fit items-center gap-1.5 rounded-md border border-border bg-transparent px-4 py-2 text-sm font-medium text-muted-foreground transition-all duration-150 hover:border-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           onClick={onBack}
           data-testid="viewer-back-button"
         >
@@ -1203,26 +1317,26 @@ function DashboardViewer({
   )
 
   return (
-    <div className={styles.viewerContainer} data-testid="dashboard-viewer">
-      <div className={styles.viewerHeader}>
-        <div className={styles.viewerHeaderLeft}>
+    <div className="flex flex-col gap-6" data-testid="dashboard-viewer">
+      <div className="flex items-start justify-between gap-4 max-md:flex-col">
+        <div className="flex flex-col gap-2">
           <button
             type="button"
-            className={styles.backButton}
+            className="inline-flex w-fit items-center gap-1.5 rounded-md border border-border bg-transparent px-4 py-2 text-sm font-medium text-muted-foreground transition-all duration-150 hover:border-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             onClick={onBack}
             data-testid="viewer-back-button"
           >
             <ArrowLeft size={16} />
             Back to List
           </button>
-          <h2 className={styles.viewerTitle}>{dashboard.name}</h2>
+          <h2 className="m-0 text-2xl font-semibold text-foreground">{dashboard.name}</h2>
           {dashboard.description && (
-            <p className={styles.viewerDescription}>{dashboard.description}</p>
+            <p className="m-0 text-sm text-muted-foreground">{dashboard.description}</p>
           )}
         </div>
         <button
           type="button"
-          className={styles.editDashboardButton}
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-primary bg-transparent px-5 py-2.5 text-sm font-medium text-primary transition-all duration-150 hover:bg-primary/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           onClick={onEdit}
           data-testid="viewer-edit-button"
         >
@@ -1232,12 +1346,15 @@ function DashboardViewer({
       </div>
 
       {components.length === 0 ? (
-        <div className={styles.viewerEmpty} data-testid="viewer-empty">
+        <div
+          className="flex flex-col items-center justify-center gap-4 rounded-lg border-2 border-dashed border-border bg-card p-16 text-center text-muted-foreground"
+          data-testid="viewer-empty"
+        >
           <LayoutGrid size={48} />
-          <p>This dashboard has no widgets yet.</p>
+          <p className="m-0 text-base text-muted-foreground">This dashboard has no widgets yet.</p>
           <button
             type="button"
-            className={styles.submitButton}
+            className="inline-flex items-center gap-1.5 rounded-md border-none bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors duration-200 hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             onClick={onEdit}
             data-testid="viewer-add-widgets-button"
           >
@@ -1247,7 +1364,7 @@ function DashboardViewer({
         </div>
       ) : (
         <div
-          className={styles.widgetGrid}
+          className="grid gap-5"
           style={{
             gridTemplateColumns: `repeat(${dashboard.columnCount}, 1fr)`,
           }}
@@ -1256,7 +1373,7 @@ function DashboardViewer({
           {components.map((comp) => (
             <div
               key={comp.id}
-              className={styles.widgetCell}
+              className="min-h-[160px] overflow-hidden rounded-lg border border-border bg-card"
               style={{
                 gridColumn: `span ${Math.min(comp.width || 1, dashboard.columnCount)}`,
               }}
@@ -1382,23 +1499,23 @@ function DashboardEditorInner({
   }, [localComponents, saveMutation])
 
   return (
-    <div className={styles.editorContainer} data-testid="dashboard-editor">
-      <div className={styles.editorHeader}>
-        <div className={styles.editorHeaderLeft}>
+    <div className="flex min-h-[calc(100vh-200px)] flex-col gap-4" data-testid="dashboard-editor">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4 max-md:flex-col max-md:items-start">
           <button
             type="button"
-            className={styles.backButton}
+            className="inline-flex w-fit items-center gap-1.5 rounded-md border border-border bg-transparent px-4 py-2 text-sm font-medium text-muted-foreground transition-all duration-150 hover:border-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             onClick={onBack}
             data-testid="editor-back-button"
           >
             <ArrowLeft size={16} />
             Back to Viewer
           </button>
-          <h2 className={styles.editorTitle}>Editing: {dashboard.name}</h2>
+          <h2 className="m-0 text-xl font-semibold text-foreground">Editing: {dashboard.name}</h2>
         </div>
         <button
           type="button"
-          className={styles.submitButton}
+          className="inline-flex items-center gap-1.5 rounded-md border-none bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors duration-200 hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           onClick={handleSave}
           disabled={!hasChanges || saveMutation.isPending}
           data-testid="editor-save-button"
@@ -1407,40 +1524,51 @@ function DashboardEditorInner({
         </button>
       </div>
 
-      <div className={styles.editorBody}>
+      <div className="flex flex-1 gap-6 max-md:flex-col">
         {/* Palette */}
-        <div className={styles.editorPalette} data-testid="widget-palette">
-          <h3 className={styles.paletteTitle}>Widget Palette</h3>
-          <div className={styles.paletteList}>
+        <div
+          className="sticky top-4 w-60 shrink-0 self-start rounded-lg border border-border bg-card p-4 max-md:static max-md:w-full"
+          data-testid="widget-palette"
+        >
+          <h3 className="m-0 mb-3 text-sm font-semibold uppercase tracking-wider text-foreground">
+            Widget Palette
+          </h3>
+          <div className="flex flex-col gap-2 max-md:flex-row max-md:flex-wrap">
             {WIDGET_TYPES.map((type) => (
               <button
                 key={type}
                 type="button"
-                className={styles.paletteItem}
+                className="flex w-full items-center gap-2.5 rounded-md border border-border bg-muted p-3 text-left text-sm font-medium text-foreground transition-all duration-150 hover:border-primary hover:bg-primary/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary max-md:min-w-[140px] max-md:flex-1"
                 onClick={() => handleAddWidget(type)}
                 data-testid={`palette-item-${type}`}
               >
-                <span className={styles.paletteItemIcon}>{getWidgetIcon(type)}</span>
-                <span className={styles.paletteItemLabel}>{getWidgetLabel(type)}</span>
-                <Plus size={14} className={styles.paletteItemAdd} />
+                <span className="flex items-center text-primary">{getWidgetIcon(type)}</span>
+                <span className="flex-1">{getWidgetLabel(type)}</span>
+                <Plus size={14} className="text-muted-foreground" />
               </button>
             ))}
           </div>
         </div>
 
         {/* Canvas */}
-        <div className={styles.editorCanvas} data-testid="editor-canvas">
+        <div
+          className="min-h-[400px] flex-1 rounded-lg border border-border bg-card p-5"
+          data-testid="editor-canvas"
+        >
           {localComponents.length === 0 ? (
-            <div className={styles.canvasEmpty} data-testid="canvas-empty">
+            <div
+              className="flex h-full min-h-[300px] flex-col items-center justify-center gap-2 text-center text-muted-foreground"
+              data-testid="canvas-empty"
+            >
               <LayoutGrid size={48} />
-              <p>No widgets added yet</p>
-              <p className={styles.canvasEmptyHint}>
+              <p className="m-0 text-base text-muted-foreground">No widgets added yet</p>
+              <p className="m-0 text-sm text-muted-foreground">
                 Click a widget type from the palette to add it
               </p>
             </div>
           ) : (
             <div
-              className={styles.canvasGrid}
+              className="grid gap-4"
               style={{
                 gridTemplateColumns: `repeat(${dashboard.columnCount}, 1fr)`,
               }}
@@ -1448,20 +1576,20 @@ function DashboardEditorInner({
               {localComponents.map((comp) => (
                 <div
                   key={comp.id}
-                  className={styles.canvasWidget}
+                  className="overflow-hidden rounded-lg border border-border bg-muted transition-colors duration-150 hover:border-primary"
                   style={{
                     gridColumn: `span ${Math.min(comp.width || 1, dashboard.columnCount)}`,
                   }}
                   data-testid={`canvas-widget-${comp.id}`}
                 >
-                  <div className={styles.canvasWidgetHeader}>
-                    <span className={styles.canvasWidgetType}>
+                  <div className="flex items-center justify-between border-b border-border bg-card px-3 py-2">
+                    <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-primary">
                       {getWidgetIcon(comp.type)}
                       {getWidgetLabel(comp.type)}
                     </span>
                     <button
                       type="button"
-                      className={styles.canvasWidgetRemove}
+                      className="flex items-center justify-center rounded p-1 text-muted-foreground transition-all duration-150 hover:bg-destructive/10 hover:text-destructive focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                       onClick={() => handleRemoveWidget(comp.id)}
                       aria-label={`Remove ${comp.title}`}
                       data-testid={`remove-widget-${comp.id}`}
@@ -1469,9 +1597,9 @@ function DashboardEditorInner({
                       <X size={16} />
                     </button>
                   </div>
-                  <div className={styles.canvasWidgetBody}>
-                    <div className={styles.canvasWidgetTitle}>{comp.title}</div>
-                    <div className={styles.canvasWidgetInfo}>
+                  <div className="p-3.5">
+                    <div className="mb-1 text-sm font-semibold text-foreground">{comp.title}</div>
+                    <div className="text-xs text-muted-foreground">
                       Collection: {(comp.config.collection as string) || 'N/A'}
                     </div>
                   </div>
@@ -1518,7 +1646,10 @@ function DashboardEditor({ dashboardId, onBack }: DashboardEditorProps): React.R
 
   if (dashboardLoading) {
     return (
-      <div className={styles.editorContainer} data-testid="dashboard-editor-loading">
+      <div
+        className="flex min-h-[calc(100vh-200px)] flex-col gap-4"
+        data-testid="dashboard-editor-loading"
+      >
         <LoadingSpinner size="large" label="Loading dashboard..." />
       </div>
     )
@@ -1526,7 +1657,10 @@ function DashboardEditor({ dashboardId, onBack }: DashboardEditorProps): React.R
 
   if (dashboardError || !dashboard) {
     return (
-      <div className={styles.editorContainer} data-testid="dashboard-editor-error">
+      <div
+        className="flex min-h-[calc(100vh-200px)] flex-col gap-4"
+        data-testid="dashboard-editor-error"
+      >
         <ErrorMessage
           error={
             dashboardError instanceof Error ? dashboardError : new Error('Failed to load dashboard')
@@ -1535,7 +1669,7 @@ function DashboardEditor({ dashboardId, onBack }: DashboardEditorProps): React.R
         />
         <button
           type="button"
-          className={styles.backButton}
+          className="inline-flex w-fit items-center gap-1.5 rounded-md border border-border bg-transparent px-4 py-2 text-sm font-medium text-muted-foreground transition-all duration-150 hover:border-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           onClick={onBack}
           data-testid="editor-back-button"
         >
@@ -1588,10 +1722,7 @@ export function DashboardsPage({
 
   const createMutation = useMutation({
     mutationFn: (data: DashboardFormData) =>
-      apiClient.post<Dashboard>(
-        `/control/dashboards?userId=system`,
-        data
-      ),
+      apiClient.post<Dashboard>(`/control/dashboards?userId=system`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['dashboards'] })
       showToast('Dashboard created successfully', 'success')
@@ -1692,7 +1823,7 @@ export function DashboardsPage({
 
   if (viewMode === 'viewer' && selectedDashboardId) {
     return (
-      <div className={styles.container} data-testid={testId}>
+      <div className="mx-auto max-w-[1400px] p-8 max-md:p-4" data-testid={testId}>
         <DashboardViewer
           dashboardId={selectedDashboardId}
           onBack={handleBackToList}
@@ -1706,7 +1837,7 @@ export function DashboardsPage({
 
   if (viewMode === 'editor' && selectedDashboardId) {
     return (
-      <div className={styles.container} data-testid={testId}>
+      <div className="mx-auto max-w-[1400px] p-8 max-md:p-4" data-testid={testId}>
         <DashboardEditor dashboardId={selectedDashboardId} onBack={handleBackToViewer} />
       </div>
     )
@@ -1716,8 +1847,8 @@ export function DashboardsPage({
 
   if (isLoading) {
     return (
-      <div className={styles.container} data-testid={testId}>
-        <div className={styles.loadingContainer}>
+      <div className="mx-auto max-w-[1400px] p-8 max-md:p-4" data-testid={testId}>
+        <div className="flex min-h-[400px] items-center justify-center">
           <LoadingSpinner size="large" label="Loading dashboards..." />
         </div>
       </div>
@@ -1726,7 +1857,7 @@ export function DashboardsPage({
 
   if (error) {
     return (
-      <div className={styles.container} data-testid={testId}>
+      <div className="mx-auto max-w-[1400px] p-8 max-md:p-4" data-testid={testId}>
         <ErrorMessage
           error={error instanceof Error ? error : new Error('An error occurred')}
           onRetry={() => refetch()}
@@ -1738,12 +1869,12 @@ export function DashboardsPage({
   const isSubmitting = createMutation.isPending || updateMutation.isPending
 
   return (
-    <div className={styles.container} data-testid={testId}>
-      <header className={styles.header}>
-        <h1 className={styles.title}>Dashboards</h1>
+    <div className="mx-auto max-w-[1400px] p-8 max-md:p-4" data-testid={testId}>
+      <header className="mb-8 flex items-center justify-between max-md:flex-col max-md:items-start max-md:gap-4">
+        <h1 className="m-0 text-3xl font-semibold text-foreground">Dashboards</h1>
         <button
           type="button"
-          className={styles.createButton}
+          className="inline-flex items-center gap-2 rounded-md border-none bg-primary px-6 py-3 text-base font-medium text-primary-foreground transition-colors duration-200 hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary max-md:w-full max-md:justify-center"
           onClick={handleCreate}
           aria-label="Create Dashboard"
           data-testid="add-dashboard-button"
@@ -1754,15 +1885,21 @@ export function DashboardsPage({
       </header>
 
       {dashboardList.length === 0 ? (
-        <div className={styles.emptyState} data-testid="empty-state">
-          <LayoutGrid size={48} className={styles.emptyIcon} />
-          <p className={styles.emptyTitle}>No dashboards found</p>
-          <p className={styles.emptyHint}>
+        <div
+          className="flex flex-col items-center gap-2 rounded-lg border border-border bg-card px-8 py-16 text-center text-muted-foreground"
+          data-testid="empty-state"
+        >
+          <LayoutGrid size={48} className="mb-2 text-muted-foreground" />
+          <p className="m-0 text-lg font-semibold text-foreground">No dashboards found</p>
+          <p className="m-0 text-sm text-muted-foreground">
             Create your first dashboard to start visualizing your data.
           </p>
         </div>
       ) : (
-        <div className={styles.cardGrid} data-testid="dashboards-grid">
+        <div
+          className="grid grid-cols-[repeat(auto-fill,minmax(340px,1fr))] gap-6 max-md:grid-cols-1"
+          data-testid="dashboards-grid"
+        >
           {dashboardList.map((dashboard, index) => (
             <DashboardCard
               key={dashboard.id}

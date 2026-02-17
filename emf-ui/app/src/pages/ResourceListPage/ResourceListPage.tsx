@@ -155,6 +155,8 @@ export interface FieldDefinition {
     | 'formula'
     | 'rollup_summary'
   required: boolean
+  referenceTarget?: string
+  referenceCollectionId?: string
 }
 
 /**
@@ -498,6 +500,95 @@ export function ResourceListPage({
     onError: (error: Error) => {
       showToast(error.message || t('errors.generic'), 'error')
     },
+  })
+
+  // Identify lookup/master_detail/reference fields so we can resolve their display values
+  const lookupFields = useMemo(() => {
+    if (!schema?.fields) return []
+    return schema.fields.filter(
+      (f) =>
+        (f.type === 'lookup' || f.type === 'master_detail' || f.type === 'reference') &&
+        (f.referenceTarget || f.referenceCollectionId)
+    )
+  }, [schema])
+
+  // Fetch display labels for all lookup field values.
+  // Builds a map: { [fieldName]: { [recordId]: displayLabel } }
+  const { data: lookupDisplayMap } = useQuery({
+    queryKey: ['lookup-display-map', collectionName, lookupFields.map((f) => f.id)],
+    queryFn: async () => {
+      const map: Record<string, Record<string, string>> = {}
+
+      // Group by target collection
+      const targetMap = new Map<string, FieldDefinition[]>()
+      for (const field of lookupFields) {
+        const target = field.referenceTarget || field.referenceCollectionId
+        if (!target) continue
+        if (!targetMap.has(target)) {
+          targetMap.set(target, [])
+        }
+        targetMap.get(target)!.push(field)
+      }
+
+      await Promise.all(
+        Array.from(targetMap.entries()).map(async ([target, fields]) => {
+          try {
+            // Fetch target collection schema to find display field
+            const targetSchema = await apiClient.get<{
+              name: string
+              displayFieldName?: string
+              fields?: Array<{ name: string; type: string }>
+            }>(`/control/collections/${target}`)
+            const targetName = targetSchema.name
+
+            // Determine display field
+            let displayFieldName = 'id'
+            if (targetSchema.displayFieldName) {
+              displayFieldName = targetSchema.displayFieldName
+            } else if (targetSchema.fields) {
+              const nameField = targetSchema.fields.find((f) => f.name.toLowerCase() === 'name')
+              if (nameField) {
+                displayFieldName = nameField.name
+              } else {
+                const firstStringField = targetSchema.fields.find(
+                  (f) => f.type.toUpperCase() === 'STRING'
+                )
+                if (firstStringField) {
+                  displayFieldName = firstStringField.name
+                }
+              }
+            }
+
+            // Fetch records from target collection
+            const recordsResponse = await apiClient.get<Record<string, unknown>>(
+              `/api/${targetName}?page[size]=200`
+            )
+            const data = recordsResponse?.data
+            const records: Array<Record<string, unknown>> = Array.isArray(data) ? data : []
+
+            // Build id → label map
+            const idToLabel: Record<string, string> = {}
+            for (const record of records) {
+              const attrs = (record.attributes || record) as Record<string, unknown>
+              const id = String(record.id || attrs.id || '')
+              const label = attrs[displayFieldName] ? String(attrs[displayFieldName]) : id
+              idToLabel[id] = label
+            }
+
+            // Assign to all fields targeting this collection
+            for (const field of fields) {
+              map[field.name] = idToLabel
+            }
+          } catch {
+            for (const field of fields) {
+              map[field.name] = {}
+            }
+          }
+        })
+      )
+      return map
+    },
+    enabled: lookupFields.length > 0,
   })
 
   // Get visible fields for table columns
@@ -898,11 +989,21 @@ export function ResourceListPage({
           return String(value)
             .replace(/<[^>]*>/g, '')
             .substring(0, 100)
+        case 'lookup':
+        case 'master_detail':
+        case 'reference': {
+          const strValue = String(value)
+          const fieldMap = lookupDisplayMap?.[field.name]
+          if (fieldMap && fieldMap[strValue]) {
+            return fieldMap[strValue]
+          }
+          return strValue
+        }
         default:
           return String(value)
       }
     },
-    [t, formatDate]
+    [t, formatDate, lookupDisplayMap]
   )
 
   // Loading state

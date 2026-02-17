@@ -1,0 +1,5 @@
+export { AppHomePage } from './AppHomePage'
+export { ObjectListPage } from './ObjectListPage'
+export { ObjectDetailPage } from './ObjectDetailPage'
+export { ObjectFormPage } from './ObjectFormPage'
+export { GlobalSearchPage } from './GlobalSearchPage'

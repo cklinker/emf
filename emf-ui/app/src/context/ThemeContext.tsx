@@ -365,7 +365,10 @@ function applyCSSCustomProperties(colors: ThemeColors, themeConfig?: ThemeConfig
 }
 
 /**
- * Apply theme class to document for CSS selectors
+ * Apply theme class to document for CSS selectors.
+ *
+ * Sets both legacy selectors (theme-light/theme-dark, data-theme) for existing
+ * CSS Module pages and the .dark class for shadcn/Tailwind components.
  */
 function applyThemeClass(resolvedMode: ResolvedTheme): void {
   if (typeof document === 'undefined') {
@@ -376,8 +379,15 @@ function applyThemeClass(resolvedMode: ResolvedTheme): void {
   root.classList.remove('theme-light', 'theme-dark')
   root.classList.add(`theme-${resolvedMode}`)
 
-  // Also set data attribute for CSS selectors
+  // Also set data attribute for CSS selectors (legacy admin pages)
   root.setAttribute('data-theme', resolvedMode)
+
+  // Toggle .dark class for shadcn/ui + Tailwind dark mode
+  if (resolvedMode === 'dark') {
+    root.classList.add('dark')
+  } else {
+    root.classList.remove('dark')
+  }
 }
 
 // Create the context with undefined default

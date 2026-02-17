@@ -12,7 +12,7 @@
  */
 
 import React, { useCallback } from 'react'
-import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AlertTriangle } from 'lucide-react'
 
@@ -24,6 +24,7 @@ import { ThemeProvider } from './context/ThemeContext'
 import { I18nProvider } from './context/I18nContext'
 import { PluginProvider } from './context/PluginContext'
 import { TenantProvider, useTenant } from './context/TenantContext'
+import { AppContextProvider } from './context/AppContext'
 import { useAuth } from './context/AuthContext'
 
 // Hooks
@@ -86,6 +87,16 @@ import {
   NotFoundPage,
 } from './pages'
 import { NoTenantPage } from './pages/NoTenantPage/NoTenantPage'
+
+// End-User Shell & Pages
+import { EndUserShell } from './shells/EndUserShell'
+import {
+  AppHomePage,
+  ObjectListPage as EndUserObjectListPage,
+  ObjectDetailPage as EndUserObjectDetailPage,
+  ObjectFormPage as EndUserObjectFormPage,
+  GlobalSearchPage,
+} from './pages/app'
 
 // Types
 import type { Plugin } from './types/plugin'
@@ -345,11 +356,13 @@ function TenantScopedApp({ plugins = [] }: { plugins?: Plugin[] }): React.ReactE
           <ThemeProvider>
             <I18nProvider>
               <PluginProvider plugins={plugins}>
-                <ToastProvider>
-                  <LiveRegionProvider>
-                    <TenantRoutes />
-                  </LiveRegionProvider>
-                </ToastProvider>
+                <AppContextProvider>
+                  <ToastProvider>
+                    <LiveRegionProvider>
+                      <TenantRoutes />
+                    </LiveRegionProvider>
+                  </ToastProvider>
+                </AppContextProvider>
               </PluginProvider>
             </I18nProvider>
           </ThemeProvider>
@@ -363,6 +376,7 @@ function TenantScopedApp({ plugins = [] }: { plugins?: Plugin[] }): React.ReactE
  * All tenant-scoped routes. Paths are relative to /:tenantSlug/.
  */
 function TenantRoutes(): React.ReactElement {
+  const { tenantSlug } = useTenant()
   return (
     <Routes>
       {/* Public routes */}
@@ -741,6 +755,31 @@ function TenantRoutes(): React.ReactElement {
           </ProtectedPageRoute>
         }
       />
+
+      {/* ============================================
+       * END-USER RUNTIME (shadcn/Tailwind)
+       * All routes under /app use the EndUserShell
+       * with horizontal top nav bar.
+       * ============================================ */}
+      <Route
+        path="app"
+        element={
+          <ProtectedRoute
+            loginPath={`/${tenantSlug}/login`}
+            unauthorizedPath={`/${tenantSlug}/unauthorized`}
+          >
+            <EndUserShell />
+          </ProtectedRoute>
+        }
+      >
+        <Route index element={<Navigate to="home" replace />} />
+        <Route path="home" element={<AppHomePage />} />
+        <Route path="o/:collection" element={<EndUserObjectListPage />} />
+        <Route path="o/:collection/new" element={<EndUserObjectFormPage />} />
+        <Route path="o/:collection/:id" element={<EndUserObjectDetailPage />} />
+        <Route path="o/:collection/:id/edit" element={<EndUserObjectFormPage />} />
+        <Route path="search" element={<GlobalSearchPage />} />
+      </Route>
 
       {/* 404 Not Found - catch all within tenant scope */}
       <Route path="*" element={<NotFoundPage />} />

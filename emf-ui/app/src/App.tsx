@@ -88,15 +88,28 @@ import {
 } from './pages'
 import { NoTenantPage } from './pages/NoTenantPage/NoTenantPage'
 
-// End-User Shell & Pages
+// End-User Shell & Pages (lazy-loaded for code splitting)
 import { EndUserShell } from './shells/EndUserShell'
-import {
-  AppHomePage,
-  ObjectListPage as EndUserObjectListPage,
-  ObjectDetailPage as EndUserObjectDetailPage,
-  ObjectFormPage as EndUserObjectFormPage,
-  GlobalSearchPage,
-} from './pages/app'
+
+const AppHomePage = React.lazy(() =>
+  import('./pages/app/AppHomePage/AppHomePage').then((m) => ({ default: m.AppHomePage }))
+)
+const EndUserObjectListPage = React.lazy(() =>
+  import('./pages/app/ObjectListPage/ObjectListPage').then((m) => ({ default: m.ObjectListPage }))
+)
+const EndUserObjectDetailPage = React.lazy(() =>
+  import('./pages/app/ObjectDetailPage/ObjectDetailPage').then((m) => ({
+    default: m.ObjectDetailPage,
+  }))
+)
+const EndUserObjectFormPage = React.lazy(() =>
+  import('./pages/app/ObjectFormPage/ObjectFormPage').then((m) => ({ default: m.ObjectFormPage }))
+)
+const GlobalSearchPage = React.lazy(() =>
+  import('./pages/app/GlobalSearchPage/GlobalSearchPage').then((m) => ({
+    default: m.GlobalSearchPage,
+  }))
+)
 
 // Types
 import type { Plugin } from './types/plugin'
@@ -773,12 +786,54 @@ function TenantRoutes(): React.ReactElement {
         }
       >
         <Route index element={<Navigate to="home" replace />} />
-        <Route path="home" element={<AppHomePage />} />
-        <Route path="o/:collection" element={<EndUserObjectListPage />} />
-        <Route path="o/:collection/new" element={<EndUserObjectFormPage />} />
-        <Route path="o/:collection/:id" element={<EndUserObjectDetailPage />} />
-        <Route path="o/:collection/:id/edit" element={<EndUserObjectFormPage />} />
-        <Route path="search" element={<GlobalSearchPage />} />
+        <Route
+          path="home"
+          element={
+            <React.Suspense fallback={<PageLoader message="Loading..." />}>
+              <AppHomePage />
+            </React.Suspense>
+          }
+        />
+        <Route
+          path="o/:collection"
+          element={
+            <React.Suspense fallback={<PageLoader message="Loading..." />}>
+              <EndUserObjectListPage />
+            </React.Suspense>
+          }
+        />
+        <Route
+          path="o/:collection/new"
+          element={
+            <React.Suspense fallback={<PageLoader message="Loading..." />}>
+              <EndUserObjectFormPage />
+            </React.Suspense>
+          }
+        />
+        <Route
+          path="o/:collection/:id"
+          element={
+            <React.Suspense fallback={<PageLoader message="Loading..." />}>
+              <EndUserObjectDetailPage />
+            </React.Suspense>
+          }
+        />
+        <Route
+          path="o/:collection/:id/edit"
+          element={
+            <React.Suspense fallback={<PageLoader message="Loading..." />}>
+              <EndUserObjectFormPage />
+            </React.Suspense>
+          }
+        />
+        <Route
+          path="search"
+          element={
+            <React.Suspense fallback={<PageLoader message="Loading..." />}>
+              <GlobalSearchPage />
+            </React.Suspense>
+          }
+        />
       </Route>
 
       {/* 404 Not Found - catch all within tenant scope */}

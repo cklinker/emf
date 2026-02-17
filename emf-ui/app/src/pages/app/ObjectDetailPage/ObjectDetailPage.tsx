@@ -9,7 +9,7 @@
  * - Delete confirmation dialog
  */
 
-import React, { useState, useCallback, useMemo } from 'react'
+import React, { useState, useCallback, useMemo, useEffect } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { Loader2, AlertCircle, Pencil, Copy, Trash2, MoreHorizontal } from 'lucide-react'
 import {
@@ -47,6 +47,7 @@ import { useRecord } from '@/hooks/useRecord'
 import { useRecordMutation } from '@/hooks/useRecordMutation'
 import { FieldRenderer } from '@/components/FieldRenderer'
 import { DetailSection } from '@/components/DetailSection'
+import { useAppContext } from '@/context/AppContext'
 import type { FieldDefinition } from '@/hooks/useCollectionSchema'
 
 /** System fields to exclude from detail sections */
@@ -101,6 +102,7 @@ export function ObjectDetailPage(): React.ReactElement {
     id: string
   }>()
   const navigate = useNavigate()
+  const { addRecentItem } = useAppContext()
   const basePath = `/${tenantSlug}/app`
 
   // Delete confirmation state
@@ -143,6 +145,17 @@ export function ObjectDetailPage(): React.ReactElement {
     if (!record || !fields.length) return recordId || 'Loading...'
     return getRecordDisplayName(record, fields, schema?.displayFieldName)
   }, [record, fields, recordId, schema?.displayFieldName])
+
+  // Track recently viewed record
+  useEffect(() => {
+    if (record && recordId && collectionName && recordTitle !== 'Loading...') {
+      addRecentItem({
+        id: recordId,
+        collectionName,
+        label: recordTitle,
+      })
+    }
+  }, [record, recordId, collectionName, recordTitle, addRecentItem])
 
   // Split fields into highlights and detail sections
   const userFields = useMemo(() => {

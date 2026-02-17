@@ -16,7 +16,7 @@
  */
 
 import React, { useState, useCallback, useMemo } from 'react'
-import { useNavigate, useParams, Link } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams, Link } from 'react-router-dom'
 import { Loader2, AlertCircle } from 'lucide-react'
 import {
   Breadcrumb,
@@ -73,22 +73,48 @@ function downloadFile(content: string, filename: string, mimeType: string): void
   URL.revokeObjectURL(url)
 }
 
+/**
+ * Parse list view state from URL search params.
+ * Returns page, pageSize, and sort state with sensible defaults.
+ */
+function parseListViewParams(searchParams: URLSearchParams): {
+  page: number
+  pageSize: number
+  sort: SortState | undefined
+} {
+  const pageParam = parseInt(searchParams.get('page') || '1', 10)
+  const pageSizeParam = parseInt(searchParams.get('pageSize') || '25', 10)
+  const sortParam = searchParams.get('sort')
+
+  let sort: SortState | undefined
+  if (sortParam) {
+    if (sortParam.startsWith('-')) {
+      sort = { field: sortParam.slice(1), direction: 'desc' }
+    } else {
+      sort = { field: sortParam, direction: 'asc' }
+    }
+  }
+
+  return {
+    page: isNaN(pageParam) || pageParam < 1 ? 1 : pageParam,
+    pageSize: [10, 25, 50, 100].includes(pageSizeParam) ? pageSizeParam : 25,
+    sort,
+  }
+}
+
 export function ObjectListPage(): React.ReactElement {
   const { tenantSlug, collection: collectionName } = useParams<{
     tenantSlug: string
     collection: string
   }>()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const basePath = `/${tenantSlug}/app`
 
-  // Pagination state
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(25)
+  // Parse list state from URL params (deep linking support)
+  const { page, pageSize, sort } = useMemo(() => parseListViewParams(searchParams), [searchParams])
 
-  // Sort state
-  const [sort, setSort] = useState<SortState | undefined>(undefined)
-
-  // Selection state
+  // Selection state (local only — not persisted in URL)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
   // Delete confirmation state
@@ -141,29 +167,66 @@ export function ObjectListPage(): React.ReactElement {
     schema?.displayName ||
     (collectionName ? collectionName.charAt(0).toUpperCase() + collectionName.slice(1) : 'Objects')
 
+  /**
+   * Update URL search params, preserving existing params and removing defaults.
+   */
+  const updateParams = useCallback(
+    (updates: Record<string, string | undefined>) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          for (const [key, value] of Object.entries(updates)) {
+            if (value === undefined) {
+              next.delete(key)
+            } else {
+              next.set(key, value)
+            }
+          }
+          // Remove defaults to keep URLs clean
+          if (next.get('page') === '1') next.delete('page')
+          if (next.get('pageSize') === '25') next.delete('pageSize')
+          return next
+        },
+        { replace: true }
+      )
+    },
+    [setSearchParams]
+  )
+
   // Sort handler: cycle through asc → desc → none
-  const handleSortChange = useCallback((field: string) => {
-    setSort((prev) => {
-      if (prev?.field === field) {
-        return prev.direction === 'asc' ? { field, direction: 'desc' } : undefined
+  const handleSortChange = useCallback(
+    (field: string) => {
+      let newSort: string | undefined
+      if (sort?.field === field) {
+        newSort = sort.direction === 'asc' ? `-${field}` : undefined
+      } else {
+        newSort = field
       }
-      return { field, direction: 'asc' }
-    })
-    setPage(1)
-  }, [])
+      updateParams({ sort: newSort, page: undefined })
+    },
+    [sort, updateParams]
+  )
 
   // Page change handler
-  const handlePageChange = useCallback((newPage: number) => {
-    setPage(newPage)
-    setSelectedIds(new Set())
-  }, [])
+  const handlePageChange = useCallback(
+    (newPage: number) => {
+      updateParams({ page: newPage > 1 ? String(newPage) : undefined })
+      setSelectedIds(new Set())
+    },
+    [updateParams]
+  )
 
   // Page size change handler
-  const handlePageSizeChange = useCallback((newPageSize: number) => {
-    setPageSize(newPageSize)
-    setPage(1)
-    setSelectedIds(new Set())
-  }, [])
+  const handlePageSizeChange = useCallback(
+    (newPageSize: number) => {
+      updateParams({
+        pageSize: newPageSize !== 25 ? String(newPageSize) : undefined,
+        page: undefined,
+      })
+      setSelectedIds(new Set())
+    },
+    [updateParams]
+  )
 
   // Navigation handlers
   const handleNew = useCallback(() => {

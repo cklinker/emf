@@ -20,8 +20,8 @@ import { useQuery } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { getTenantSlug } from '../../context/TenantContext'
 import { LoadingSpinner } from '../LoadingSpinner'
+import { cn } from '../../lib/utils'
 import type { ApiClient } from '../../services/apiClient'
-import styles from './RelatedRecordsSection.module.css'
 
 /**
  * Field definition from a collection schema
@@ -220,16 +220,19 @@ export function RelatedRecordsSection({
   if (collectionsLoading) {
     return (
       <section
-        className={styles.section}
+        className="p-6 bg-card border border-border rounded-md"
         aria-labelledby="related-records-heading"
         data-testid="related-records-section"
       >
-        <div className={styles.sectionHeader}>
-          <h2 id="related-records-heading" className={styles.sectionTitle}>
+        <div className="flex justify-between items-center mb-4">
+          <h2 id="related-records-heading" className="m-0 text-lg font-semibold text-foreground">
             {t('relatedRecords.title')}
           </h2>
         </div>
-        <div className={styles.loadingState} data-testid="related-records-loading">
+        <div
+          className="flex justify-center items-center p-8 min-h-[120px]"
+          data-testid="related-records-loading"
+        >
           <LoadingSpinner size="medium" label={t('common.loading')} />
         </div>
       </section>
@@ -240,16 +243,19 @@ export function RelatedRecordsSection({
   if (collectionsError) {
     return (
       <section
-        className={styles.section}
+        className="p-6 bg-card border border-border rounded-md"
         aria-labelledby="related-records-heading"
         data-testid="related-records-section"
       >
-        <div className={styles.sectionHeader}>
-          <h2 id="related-records-heading" className={styles.sectionTitle}>
+        <div className="flex justify-between items-center mb-4">
+          <h2 id="related-records-heading" className="m-0 text-lg font-semibold text-foreground">
             {t('relatedRecords.title')}
           </h2>
         </div>
-        <div className={styles.emptyState} data-testid="related-records-error">
+        <div
+          className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground bg-muted rounded-sm text-sm"
+          data-testid="related-records-error"
+        >
           <p>{t('relatedRecords.errorLoading')}</p>
         </div>
       </section>
@@ -260,16 +266,19 @@ export function RelatedRecordsSection({
   if (relatedCollections.length === 0) {
     return (
       <section
-        className={styles.section}
+        className="p-6 bg-card border border-border rounded-md"
         aria-labelledby="related-records-heading"
         data-testid="related-records-section"
       >
-        <div className={styles.sectionHeader}>
-          <h2 id="related-records-heading" className={styles.sectionTitle}>
+        <div className="flex justify-between items-center mb-4">
+          <h2 id="related-records-heading" className="m-0 text-lg font-semibold text-foreground">
             {t('relatedRecords.title')}
           </h2>
         </div>
-        <div className={styles.emptyState} data-testid="related-records-empty">
+        <div
+          className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground bg-muted rounded-sm text-sm"
+          data-testid="related-records-empty"
+        >
           <p>{t('relatedRecords.noRelatedRecords')}</p>
         </div>
       </section>
@@ -281,42 +290,52 @@ export function RelatedRecordsSection({
 
   return (
     <section
-      className={styles.section}
+      className="p-6 bg-card border border-border rounded-md"
       aria-labelledby="related-records-heading"
       data-testid="related-records-section"
     >
       {/* Section Header */}
-      <div className={styles.sectionHeader}>
-        <h2 id="related-records-heading" className={styles.sectionTitle}>
+      <div className="flex justify-between items-center mb-4">
+        <h2 id="related-records-heading" className="m-0 text-lg font-semibold text-foreground">
           {t('relatedRecords.title')}
         </h2>
       </div>
 
       {/* Tab Bar */}
-      <div className={styles.tabs} role="tablist" aria-label={t('relatedRecords.tabsLabel')}>
-        {relatedCollections.map((related, index) => (
-          <button
-            key={`${related.collection.name}-${related.referenceField.name}`}
-            type="button"
-            role="tab"
-            id={`related-tab-${index}`}
-            aria-selected={index === safeActiveTab}
-            aria-controls={`related-tabpanel-${index}`}
-            className={`${styles.tab} ${index === safeActiveTab ? styles.tabActive : ''}`}
-            onClick={() => setActiveTab(index)}
-            data-testid={`related-tab-${related.collection.name}`}
-          >
-            {related.collection.displayName || related.collection.name}
-            {index === safeActiveTab && !recordsLoading && (
-              <span
-                className={styles.tabBadge}
-                data-testid={`related-tab-badge-${related.collection.name}`}
-              >
-                {totalCount}
-              </span>
-            )}
-          </button>
-        ))}
+      <div
+        className="flex gap-1 overflow-x-auto border-b border-border mb-4"
+        role="tablist"
+        aria-label={t('relatedRecords.tabsLabel')}
+      >
+        {relatedCollections.map((related, index) => {
+          const isActive = index === safeActiveTab
+          return (
+            <button
+              key={`${related.collection.name}-${related.referenceField.name}`}
+              type="button"
+              role="tab"
+              id={`related-tab-${index}`}
+              aria-selected={isActive}
+              aria-controls={`related-tabpanel-${index}`}
+              className={cn(
+                'inline-flex items-center gap-1 px-4 py-2 text-sm font-medium text-muted-foreground bg-transparent border-none border-b-2 border-transparent cursor-pointer whitespace-nowrap transition-colors hover:text-foreground hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring',
+                isActive && 'text-primary border-b-primary'
+              )}
+              onClick={() => setActiveTab(index)}
+              data-testid={`related-tab-${related.collection.name}`}
+            >
+              {related.collection.displayName || related.collection.name}
+              {isActive && !recordsLoading && (
+                <span
+                  className="inline-flex items-center justify-center min-w-[20px] h-5 px-1 text-xs font-semibold text-primary-foreground bg-primary rounded-full leading-none"
+                  data-testid={`related-tab-badge-${related.collection.name}`}
+                >
+                  {totalCount}
+                </span>
+              )}
+            </button>
+          )
+        })}
       </div>
 
       {/* Tab Panel */}
@@ -327,20 +346,26 @@ export function RelatedRecordsSection({
         data-testid="related-records-tabpanel"
       >
         {recordsLoading ? (
-          <div className={styles.tabLoadingState} data-testid="related-records-tab-loading">
+          <div
+            className="flex justify-center items-center p-6"
+            data-testid="related-records-tab-loading"
+          >
             <LoadingSpinner size="small" label={t('common.loading')} />
           </div>
         ) : records.length === 0 ? (
-          <div className={styles.tabEmptyState} data-testid="related-records-tab-empty">
+          <div
+            className="flex items-center justify-center p-6 text-center text-muted-foreground text-sm"
+            data-testid="related-records-tab-empty"
+          >
             {t('relatedRecords.noRecordsInCollection', {
               collection: activeRelated?.collection.displayName || '',
             })}
           </div>
         ) : (
           <>
-            <div className={styles.tableContainer}>
+            <div className="overflow-x-auto">
               <table
-                className={styles.compactTable}
+                className="w-full border-collapse text-sm"
                 role="grid"
                 aria-label={t('relatedRecords.tableLabel', {
                   collection: activeRelated?.collection.displayName || '',
@@ -350,17 +375,27 @@ export function RelatedRecordsSection({
                 <thead>
                   <tr>
                     {displayFields.map((field) => (
-                      <th key={field.name} scope="col">
+                      <th
+                        key={field.name}
+                        scope="col"
+                        className="px-4 py-2 text-left font-semibold text-muted-foreground bg-muted border-b border-border whitespace-nowrap"
+                      >
                         {field.displayName || field.name}
                       </th>
                     ))}
-                    <th scope="col">{t('relatedRecords.created')}</th>
+                    <th
+                      scope="col"
+                      className="px-4 py-2 text-left font-semibold text-muted-foreground bg-muted border-b border-border whitespace-nowrap"
+                    >
+                      {t('relatedRecords.created')}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {records.map((record) => (
                     <tr
                       key={record.id}
+                      className="cursor-pointer transition-colors hover:bg-accent focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-[-2px]"
                       onClick={() =>
                         navigate(
                           `/${getTenantSlug()}/resources/${activeRelated!.collection.name}/${record.id}`
@@ -378,9 +413,16 @@ export function RelatedRecordsSection({
                       data-testid={`related-record-row-${record.id}`}
                     >
                       {displayFields.map((field) => (
-                        <td key={field.name}>{formatCellValue(record[field.name])}</td>
+                        <td
+                          key={field.name}
+                          className="px-4 py-2 border-b border-border text-foreground max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap"
+                        >
+                          {formatCellValue(record[field.name])}
+                        </td>
                       ))}
-                      <td>{formatCreatedDate(record.createdAt)}</td>
+                      <td className="px-4 py-2 border-b border-border text-foreground max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap">
+                        {formatCreatedDate(record.createdAt)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -390,7 +432,7 @@ export function RelatedRecordsSection({
             {/* View All Link */}
             <Link
               to={`/${getTenantSlug()}/resources/${activeRelated!.collection.name}`}
-              className={styles.viewAllLink}
+              className="inline-flex items-center gap-1 mt-4 text-sm font-medium text-primary no-underline hover:underline"
               data-testid="related-records-view-all"
             >
               {t('relatedRecords.viewAll', {

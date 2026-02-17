@@ -18,7 +18,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { MessageSquarePlus, Pencil, Trash2 } from 'lucide-react'
 import { useI18n } from '../../context/I18nContext'
 import type { ApiClient } from '../../services/apiClient'
-import styles from './NotesSection.module.css'
 
 /**
  * A note associated with a record
@@ -201,16 +200,19 @@ export function NotesSection({
   if (!apiAvailable && !isLoading) {
     return (
       <section
-        className={styles.section}
+        className="bg-card border border-border rounded-lg overflow-hidden"
         aria-labelledby="notes-heading"
         data-testid="notes-section"
       >
-        <div className={styles.sectionHeader}>
-          <h3 id="notes-heading" className={styles.sectionTitle}>
+        <div className="flex justify-between items-center p-4 border-b border-border bg-muted">
+          <h3 id="notes-heading" className="m-0 text-base font-semibold text-foreground">
             {t('notes.title')}
           </h3>
         </div>
-        <div className={styles.comingSoon} data-testid="notes-coming-soon">
+        <div
+          className="text-center p-8 text-sm text-muted-foreground"
+          data-testid="notes-coming-soon"
+        >
           <p>{t('notes.comingSoon')}</p>
         </div>
       </section>
@@ -218,16 +220,20 @@ export function NotesSection({
   }
 
   return (
-    <section className={styles.section} aria-labelledby="notes-heading" data-testid="notes-section">
+    <section
+      className="bg-card border border-border rounded-lg overflow-hidden"
+      aria-labelledby="notes-heading"
+      data-testid="notes-section"
+    >
       {/* Header */}
-      <div className={styles.sectionHeader}>
-        <h3 id="notes-heading" className={styles.sectionTitle}>
+      <div className="flex justify-between items-center p-4 border-b border-border bg-muted">
+        <h3 id="notes-heading" className="m-0 text-base font-semibold text-foreground">
           {t('notes.title')}
         </h3>
         {!isAdding && (
           <button
             type="button"
-            className={styles.addButton}
+            className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-primary bg-transparent border border-primary rounded cursor-pointer transition-colors hover:bg-primary hover:text-primary-foreground"
             onClick={handleAddClick}
             data-testid="notes-add-button"
           >
@@ -239,19 +245,19 @@ export function NotesSection({
 
       {/* Add Note Editor */}
       {isAdding && (
-        <div className={styles.editorContainer} data-testid="notes-editor">
+        <div className="p-4 border-b border-border" data-testid="notes-editor">
           <textarea
-            className={styles.editor}
+            className="w-full min-h-[80px] p-2 border border-border rounded text-sm font-[inherit] text-foreground bg-background resize-y box-border focus:outline-none focus:border-primary focus:ring-2 focus:ring-ring"
             value={newContent}
             onChange={(e) => setNewContent(e.target.value)}
             placeholder={t('notes.placeholder')}
             autoFocus
             data-testid="notes-editor-textarea"
           />
-          <div className={styles.editorActions}>
+          <div className="flex gap-2 mt-2 justify-end">
             <button
               type="button"
-              className={styles.cancelButton}
+              className="px-4 py-1 text-sm font-medium text-muted-foreground bg-transparent border border-border rounded cursor-pointer transition-colors hover:bg-accent"
               onClick={handleCancelAdd}
               data-testid="notes-cancel-button"
             >
@@ -259,7 +265,7 @@ export function NotesSection({
             </button>
             <button
               type="button"
-              className={styles.saveButton}
+              className="px-4 py-1 text-sm font-medium text-primary-foreground bg-primary border border-primary rounded cursor-pointer transition-colors hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
               onClick={handleSaveNew}
               disabled={!newContent.trim() || createMutation.isPending}
               data-testid="notes-save-button"
@@ -272,15 +278,18 @@ export function NotesSection({
 
       {/* Notes List */}
       {sortedNotes.length === 0 && !isAdding ? (
-        <div className={styles.emptyState} data-testid="notes-empty">
+        <div
+          className="flex flex-col items-center justify-center px-6 py-8 text-center text-sm text-muted-foreground"
+          data-testid="notes-empty"
+        >
           <p>{t('notes.empty')}</p>
         </div>
       ) : (
-        <div className={styles.notesList} role="list" aria-label={t('notes.title')}>
+        <div className="flex flex-col" role="list" aria-label={t('notes.title')}>
           {sortedNotes.map((note) => (
             <div
               key={note.id}
-              className={styles.noteCard}
+              className="p-4 border-b border-border last:border-b-0"
               role="listitem"
               data-testid={`note-${note.id}`}
             >
@@ -288,23 +297,23 @@ export function NotesSection({
                 /* Edit mode */
                 <div data-testid={`note-edit-${note.id}`}>
                   <textarea
-                    className={styles.editor}
+                    className="w-full min-h-[80px] p-2 border border-border rounded text-sm font-[inherit] text-foreground bg-background resize-y box-border focus:outline-none focus:border-primary focus:ring-2 focus:ring-ring"
                     value={editContent}
                     onChange={(e) => setEditContent(e.target.value)}
                     autoFocus
                     data-testid={`note-edit-textarea-${note.id}`}
                   />
-                  <div className={styles.editorActions}>
+                  <div className="flex gap-2 mt-2 justify-end">
                     <button
                       type="button"
-                      className={styles.cancelButton}
+                      className="px-4 py-1 text-sm font-medium text-muted-foreground bg-transparent border border-border rounded cursor-pointer transition-colors hover:bg-accent"
                       onClick={handleCancelEdit}
                     >
                       {t('notes.cancel')}
                     </button>
                     <button
                       type="button"
-                      className={styles.saveButton}
+                      className="px-4 py-1 text-sm font-medium text-primary-foreground bg-primary border border-primary rounded cursor-pointer transition-colors hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
                       onClick={handleSaveEdit}
                       disabled={!editContent.trim() || updateMutation.isPending}
                     >
@@ -315,16 +324,18 @@ export function NotesSection({
               ) : (
                 /* View mode */
                 <>
-                  <p className={styles.noteContent}>{note.content}</p>
-                  <div className={styles.noteMeta}>
+                  <p className="m-0 text-sm text-foreground whitespace-pre-wrap leading-relaxed">
+                    {note.content}
+                  </p>
+                  <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
                     <span>{note.createdBy}</span>
                     <span>&middot;</span>
                     <time dateTime={note.createdAt}>{formatRelativeTime(note.createdAt)}</time>
                   </div>
-                  <div className={styles.noteActions}>
+                  <div className="flex gap-2 mt-2">
                     <button
                       type="button"
-                      className={styles.actionButton}
+                      className="inline-flex items-center gap-1 px-1 py-0.5 text-xs font-medium text-muted-foreground bg-transparent border-none rounded cursor-pointer transition-colors hover:text-primary"
                       onClick={() => handleEditClick(note)}
                       aria-label={t('notes.edit')}
                       data-testid={`note-edit-button-${note.id}`}
@@ -334,7 +345,7 @@ export function NotesSection({
                     </button>
                     <button
                       type="button"
-                      className={`${styles.actionButton} ${styles.deleteAction}`}
+                      className="inline-flex items-center gap-1 px-1 py-0.5 text-xs font-medium text-muted-foreground bg-transparent border-none rounded cursor-pointer transition-colors hover:text-destructive"
                       onClick={() => handleDelete(note.id)}
                       aria-label={t('notes.delete')}
                       data-testid={`note-delete-button-${note.id}`}

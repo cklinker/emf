@@ -40,6 +40,8 @@ export interface ListViewToolbarProps {
   canCreate?: boolean
   /** Whether the user can delete records (controls Delete action visibility) */
   canDelete?: boolean
+  /** Optional slot for rendering quick actions (e.g., QuickActionsMenu) */
+  quickActionsSlot?: React.ReactNode
 }
 
 export function ListViewToolbar({
@@ -53,6 +55,7 @@ export function ListViewToolbar({
   onClearSelection,
   canCreate = true,
   canDelete = true,
+  quickActionsSlot,
 }: ListViewToolbarProps): React.ReactElement {
   return (
     <div className="space-y-2">
@@ -66,6 +69,9 @@ export function ListViewToolbar({
         </h1>
 
         <div className="flex items-center gap-2">
+          {/* Quick Actions slot (rendered when configured) */}
+          {quickActionsSlot}
+
           {/* Actions dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

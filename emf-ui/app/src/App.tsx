@@ -110,6 +110,9 @@ const GlobalSearchPage = React.lazy(() =>
     default: m.GlobalSearchPage,
   }))
 )
+const EndUserCustomPage = React.lazy(() =>
+  import('./pages/app/CustomPage/CustomPage').then((m) => ({ default: m.CustomPage }))
+)
 
 // Types
 import type { Plugin } from './types/plugin'
@@ -831,6 +834,14 @@ function TenantRoutes(): React.ReactElement {
           element={
             <React.Suspense fallback={<PageLoader message="Loading..." />}>
               <GlobalSearchPage />
+            </React.Suspense>
+          }
+        />
+        <Route
+          path="p/:pageSlug"
+          element={
+            <React.Suspense fallback={<PageLoader message="Loading..." />}>
+              <EndUserCustomPage />
             </React.Suspense>
           }
         />

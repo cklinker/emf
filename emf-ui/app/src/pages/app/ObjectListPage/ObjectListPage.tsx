@@ -12,6 +12,7 @@
  * - Row click navigation to record detail
  * - Row action menu (View, Edit, Delete)
  * - CSV/JSON export
+ * - Quick actions menu for list-scoped operations
  * - Breadcrumb navigation
  */
 
@@ -48,6 +49,8 @@ import { ObjectDataTable } from '@/components/ObjectDataTable/ObjectDataTable'
 import { DataTablePagination } from '@/components/ObjectDataTable/DataTablePagination'
 import { ListViewToolbar } from '@/components/ListViewToolbar'
 import { InsufficientPrivileges } from '@/components/InsufficientPrivileges'
+import { QuickActionsMenu } from '@/components/QuickActions'
+import type { QuickActionExecutionContext } from '@/types/quickActions'
 
 /**
  * Escape a value for CSV format.
@@ -302,6 +305,16 @@ export function ObjectListPage(): React.ReactElement {
     setSelectedIds(new Set())
   }, [])
 
+  // Quick action execution context for list-scoped actions
+  const quickActionContext = useMemo<QuickActionExecutionContext>(
+    () => ({
+      collectionName: collectionName || '',
+      selectedIds: Array.from(selectedIds),
+      tenantSlug: tenantSlug || '',
+    }),
+    [collectionName, selectedIds, tenantSlug]
+  )
+
   // Loading state for schema and permissions
   if (schemaLoading || permissionsLoading) {
     return (
@@ -369,6 +382,13 @@ export function ObjectListPage(): React.ReactElement {
         onClearSelection={handleClearSelection}
         canCreate={permissions.canCreate}
         canDelete={permissions.canDelete}
+        quickActionsSlot={
+          <QuickActionsMenu
+            collectionName={collectionName || ''}
+            context="list"
+            executionContext={quickActionContext}
+          />
+        }
       />
 
       {/* Error state for records */}

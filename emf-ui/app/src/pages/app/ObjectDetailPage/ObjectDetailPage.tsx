@@ -4,6 +4,7 @@
  * Displays the detail view of a single record with:
  * - Breadcrumb navigation
  * - Record header with name, collection badge, and action buttons
+ * - Quick actions menu for server-side scripts and custom operations
  * - Highlights panel showing key fields
  * - Detail sections organized in a 2-column field grid
  * - Delete confirmation dialog
@@ -50,8 +51,10 @@ import { useFieldPermissions } from '@/hooks/useFieldPermissions'
 import { FieldRenderer } from '@/components/FieldRenderer'
 import { DetailSection } from '@/components/DetailSection'
 import { InsufficientPrivileges } from '@/components/InsufficientPrivileges'
+import { QuickActionsMenu } from '@/components/QuickActions'
 import { useAppContext } from '@/context/AppContext'
 import type { FieldDefinition } from '@/hooks/useCollectionSchema'
+import type { QuickActionExecutionContext } from '@/types/quickActions'
 
 /** System fields to exclude from detail sections */
 const SYSTEM_FIELDS = new Set([
@@ -204,6 +207,17 @@ export function ObjectDetailPage(): React.ReactElement {
     navigate(`${basePath}/o/${collectionName}/new`)
   }, [navigate, basePath, collectionName])
 
+  // Quick action execution context
+  const quickActionContext = useMemo<QuickActionExecutionContext>(
+    () => ({
+      collectionName: collectionName || '',
+      recordId,
+      record: record || undefined,
+      tenantSlug: tenantSlug || '',
+    }),
+    [collectionName, recordId, record, tenantSlug]
+  )
+
   const isLoading = schemaLoading || recordLoading || permissionsLoading
 
   // Loading state
@@ -297,6 +311,12 @@ export function ObjectDetailPage(): React.ReactElement {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Quick Actions menu (only shown when actions are configured) */}
+          <QuickActionsMenu
+            collectionName={collectionName || ''}
+            context="record"
+            executionContext={quickActionContext}
+          />
           {permissions.canEdit && (
             <Button size="sm" variant="outline" onClick={handleEdit}>
               <Pencil className="mr-1.5 h-3.5 w-3.5" />

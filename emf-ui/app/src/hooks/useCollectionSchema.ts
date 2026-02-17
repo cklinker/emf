@@ -1,0 +1,151 @@
+/**
+ * useCollectionSchema Hook
+ *
+ * Fetches and caches a collection's schema (name, displayName, fields)
+ * from the control plane. Field types are normalized from backend
+ * canonical form (uppercase) to UI form (lowercase).
+ */
+
+import { useQuery } from '@tanstack/react-query'
+import { useApi } from '../context/ApiContext'
+import type { ApiClient } from '../services/apiClient'
+
+/**
+ * Field type union covering all supported field types.
+ */
+export type FieldType =
+  | 'string'
+  | 'number'
+  | 'boolean'
+  | 'date'
+  | 'datetime'
+  | 'json'
+  | 'reference'
+  | 'picklist'
+  | 'multi_picklist'
+  | 'currency'
+  | 'percent'
+  | 'auto_number'
+  | 'phone'
+  | 'email'
+  | 'url'
+  | 'rich_text'
+  | 'encrypted'
+  | 'external_id'
+  | 'geolocation'
+  | 'lookup'
+  | 'master_detail'
+  | 'formula'
+  | 'rollup_summary'
+
+/**
+ * Field definition from the collection schema.
+ */
+export interface FieldDefinition {
+  id: string
+  name: string
+  displayName?: string
+  type: FieldType
+  required: boolean
+  referenceTarget?: string
+  referenceCollectionId?: string
+}
+
+/**
+ * Collection schema with fields.
+ */
+export interface CollectionSchema {
+  id: string
+  name: string
+  displayName: string
+  displayFieldName?: string
+  fields: FieldDefinition[]
+}
+
+/**
+ * Reverse mapping from backend canonical types (uppercase) to UI types (lowercase).
+ */
+const BACKEND_TYPE_TO_UI: Record<string, FieldType> = {
+  DOUBLE: 'number',
+  INTEGER: 'number',
+  LONG: 'number',
+  JSON: 'json',
+  ARRAY: 'json',
+  REFERENCE: 'master_detail',
+  LOOKUP: 'master_detail',
+}
+
+function normalizeFieldType(backendType: string): FieldType {
+  const upper = backendType.toUpperCase()
+  if (upper in BACKEND_TYPE_TO_UI) {
+    return BACKEND_TYPE_TO_UI[upper]
+  }
+  return backendType.toLowerCase() as FieldType
+}
+
+/**
+ * Fetch a collection schema by name from the control plane.
+ * First fetches all collections to find by name, then loads full schema by ID.
+ */
+async function fetchCollectionSchema(
+  apiClient: ApiClient,
+  collectionName: string
+): Promise<CollectionSchema> {
+  // Fetch all collections to find the one matching the name
+  const response = await apiClient.get<{ content: CollectionSchema[] }>('/control/collections')
+  const collections = response?.content || []
+
+  const collection = collections.find((c: CollectionSchema) => c.name === collectionName)
+
+  if (!collection) {
+    throw new Error(`Collection '${collectionName}' not found`)
+  }
+
+  // Fetch full collection schema by ID
+  const schema = await apiClient.get<CollectionSchema>(`/control/collections/${collection.id}`)
+
+  // Normalize field types from backend canonical form to UI form
+  if (schema.fields) {
+    schema.fields = schema.fields.map((f) => ({
+      ...f,
+      type: normalizeFieldType(f.type),
+    }))
+  }
+
+  return schema
+}
+
+export interface UseCollectionSchemaReturn {
+  schema: CollectionSchema | undefined
+  fields: FieldDefinition[]
+  isLoading: boolean
+  error: Error | null
+}
+
+/**
+ * Hook to fetch and cache a collection schema.
+ *
+ * @param collectionName - The collection name to fetch the schema for
+ * @returns Collection schema, fields array, loading/error states
+ */
+export function useCollectionSchema(collectionName: string | undefined): UseCollectionSchemaReturn {
+  const { apiClient } = useApi()
+
+  const {
+    data: schema,
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ['collection-schema', collectionName],
+    queryFn: () => fetchCollectionSchema(apiClient, collectionName!),
+    enabled: !!collectionName,
+    staleTime: 5 * 60 * 1000, // 5 minutes — metadata changes rarely
+  })
+
+  return {
+    schema,
+    fields: schema?.fields ?? [],
+    isLoading,
+    error: error as Error | null,
+  }
+}

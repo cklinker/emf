@@ -208,6 +208,7 @@ export function TopNavBar({
 
       {/* Center section: Object tabs (hidden on mobile) */}
       <nav
+        id="main-navigation"
         className="ml-2 hidden flex-1 items-center gap-1 overflow-x-auto md:flex"
         role="navigation"
         aria-label="Object navigation"

@@ -15,6 +15,7 @@ import { GlobalSearch } from './GlobalSearch'
 import { useAuth } from '@/context/AuthContext'
 import { useConfig } from '@/context/ConfigContext'
 import { PageLoader } from '@/components/PageLoader'
+import { SkipLinks } from '@/components/SkipLinks'
 import type { NavTab } from './TopNavBar'
 import type { MenuConfig } from '@/types/config'
 
@@ -79,6 +80,13 @@ export function EndUserShell(): React.ReactElement {
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-background">
+      {/* Skip links for keyboard navigation — must be first focusable elements */}
+      <SkipLinks
+        targets={[
+          { id: 'main-content', label: 'Skip to main content' },
+          { id: 'main-navigation', label: 'Skip to navigation' },
+        ]}
+      />
       <TopNavBar
         appName={appName}
         tabs={tabs}
@@ -88,7 +96,7 @@ export function EndUserShell(): React.ReactElement {
         onSearchOpen={() => setSearchOpen(true)}
         notificationCount={0}
       />
-      <main className="flex-1 overflow-auto" role="main">
+      <main id="main-content" className="flex-1 overflow-auto" role="main" tabIndex={-1}>
         <Outlet />
       </main>
       <GlobalSearch open={searchOpen} onOpenChange={setSearchOpen} />

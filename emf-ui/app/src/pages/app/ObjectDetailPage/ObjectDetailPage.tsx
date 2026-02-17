@@ -54,6 +54,7 @@ import { DetailSection } from '@/components/DetailSection'
 import { RelatedList } from '@/components/RelatedList'
 import { InsufficientPrivileges } from '@/components/InsufficientPrivileges'
 import { QuickActionsMenu } from '@/components/QuickActions'
+import { useAnnounce } from '@/components/LiveRegion'
 import { useAppContext } from '@/context/AppContext'
 import type { FieldDefinition } from '@/hooks/useCollectionSchema'
 import type { QuickActionExecutionContext } from '@/types/quickActions'
@@ -149,11 +150,15 @@ export function ObjectDetailPage(): React.ReactElement {
   const { permissions, isLoading: permissionsLoading } = useObjectPermissions(collectionName)
   const { isFieldVisible } = useFieldPermissions(collectionName)
 
+  // Screen reader announcements
+  const { announce } = useAnnounce()
+
   // Mutations
   const mutations = useRecordMutation({
     collectionName: collectionName || '',
     onSuccess: () => {
       setShowDeleteDialog(false)
+      announce('Record deleted successfully')
       navigate(`${basePath}/o/${collectionName}`)
     },
   })
@@ -179,6 +184,15 @@ export function ObjectDetailPage(): React.ReactElement {
       })
     }
   }, [record, recordId, collectionName, recordTitle, addRecentItem])
+
+  // Announce when record finishes loading for screen readers
+  useEffect(() => {
+    if (record && recordTitle && recordTitle !== 'Loading...') {
+      announce(`Viewing ${collectionLabel} record: ${recordTitle}`)
+    }
+    // Only announce on initial load, not re-renders
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [record?.id])
 
   // Split fields into highlights and detail sections (filtered by field permissions)
   const userFields = useMemo(() => {

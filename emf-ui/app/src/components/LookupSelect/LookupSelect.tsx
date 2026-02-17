@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react'
-import styles from './LookupSelect.module.css'
+import { cn } from '@/lib/utils'
 
 export interface LookupOption {
   id: string
@@ -174,7 +174,7 @@ export function LookupSelect({
     // eslint-disable-next-line jsx-a11y/no-static-element-interactions
     <div
       ref={containerRef}
-      className={`${styles.container} ${className || ''}`}
+      className={cn('relative w-full', className)}
       onKeyDown={handleKeyDown}
       data-testid={testId}
     >
@@ -182,7 +182,11 @@ export function LookupSelect({
         type="button"
         id={id}
         data-trigger="true"
-        className={`${styles.trigger} ${error ? styles.triggerError : ''} ${disabled ? styles.triggerDisabled : ''}`}
+        className={cn(
+          'flex items-center justify-between w-full min-h-[38px] px-4 py-2 text-sm text-foreground bg-background border border-border rounded-md cursor-pointer text-left transition-[border-color,box-shadow] hover:border-muted-foreground/40 focus:outline-none focus:border-ring focus:ring-[3px] focus:ring-ring/20',
+          error && 'border-destructive',
+          disabled && 'opacity-60 cursor-not-allowed bg-muted'
+        )}
         onClick={handleTriggerClick}
         disabled={disabled}
         role="combobox"
@@ -192,16 +196,20 @@ export function LookupSelect({
         data-testid={testId ? `${testId}-trigger` : undefined}
       >
         <span
-          className={`${styles.triggerText} ${!displayText ? styles.placeholder : ''} ${value && !selectedOption ? styles.unknownValue : ''}`}
+          className={cn(
+            'flex-1 overflow-hidden text-ellipsis whitespace-nowrap',
+            !displayText && 'text-muted-foreground',
+            value && !selectedOption && 'italic text-muted-foreground'
+          )}
         >
           {displayText || placeholder}
         </span>
-        <span className={styles.triggerIcons}>
+        <span className="flex items-center gap-1 ml-2 shrink-0">
           {showClear && (
             <span
               role="button"
               tabIndex={-1}
-              className={styles.clearButton}
+              className="flex items-center justify-center w-[18px] h-[18px] text-sm text-muted-foreground cursor-pointer rounded-full hover:bg-accent hover:text-foreground"
               onClick={handleClear}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
@@ -215,7 +223,10 @@ export function LookupSelect({
             </span>
           )}
           <span
-            className={`${styles.chevron} ${isOpen ? styles.chevronOpen : ''}`}
+            className={cn(
+              'text-[10px] text-muted-foreground transition-transform',
+              isOpen && 'rotate-180'
+            )}
             aria-hidden="true"
           >
             &#9662;
@@ -225,14 +236,14 @@ export function LookupSelect({
 
       {isOpen && (
         <div
-          className={styles.dropdown}
+          className="absolute top-[calc(100%+4px)] left-0 right-0 z-50 bg-background border border-border rounded-md shadow-md"
           role="presentation"
           data-testid={testId ? `${testId}-dropdown` : undefined}
         >
           <input
             ref={searchInputRef}
             type="text"
-            className={styles.searchInput}
+            className="w-full px-4 py-2 text-sm text-foreground bg-background border-0 border-b border-border rounded-t-md outline-none box-border focus:border-b-ring"
             value={search}
             onChange={(e) => {
               setSearch(e.target.value)
@@ -245,12 +256,16 @@ export function LookupSelect({
           <ul
             ref={listRef}
             id={listboxId}
-            className={styles.optionsList}
+            className="list-none m-0 py-1 max-h-[250px] overflow-y-auto"
             role="listbox"
             aria-label={name || 'Options'}
           >
             {filteredOptions.length === 0 ? (
-              <li className={styles.noResults} role="option" aria-selected={false}>
+              <li
+                className="p-4 text-sm text-muted-foreground text-center cursor-default"
+                role="option"
+                aria-selected={false}
+              >
                 No records found
               </li>
             ) : (
@@ -259,7 +274,11 @@ export function LookupSelect({
                   key={option.id}
                   role="option"
                   aria-selected={option.id === value}
-                  className={`${styles.option} ${option.id === value ? styles.optionSelected : ''} ${index === highlightedIndex ? styles.optionHighlighted : ''}`}
+                  className={cn(
+                    'px-4 py-2 text-sm text-foreground cursor-pointer hover:bg-accent',
+                    option.id === value && 'font-medium text-primary',
+                    index === highlightedIndex && 'bg-accent'
+                  )}
                   onClick={() => handleSelect(option.id)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {

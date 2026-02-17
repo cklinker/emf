@@ -24,10 +24,10 @@
 
 import React, { useState, useCallback, useMemo } from 'react'
 import { Calendar, Clock, Link2, Pencil, Trash2 } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { useI18n } from '../../context/I18nContext'
 import { ConfirmDialog } from '../ConfirmDialog'
 import { LoadingSpinner } from '../LoadingSpinner'
-import styles from './FieldsPanel.module.css'
 
 /**
  * Field type enumeration
@@ -113,6 +113,10 @@ function getFieldTypeIcon(type: FieldType): React.ReactNode {
   }
 }
 
+/** Shared action button classes */
+const actionBtnClasses =
+  'inline-flex items-center justify-center w-9 h-9 p-0 bg-transparent border border-transparent rounded cursor-pointer hover:bg-muted hover:border-border focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2'
+
 /**
  * FieldsPanel Component
  *
@@ -194,7 +198,7 @@ export function FieldsPanel({
       // Add a slight delay to allow the drag image to be captured
       const target = e.currentTarget
       setTimeout(() => {
-        target.classList.add(styles.dragging)
+        target.classList.add('opacity-50', 'bg-muted')
       }, 0)
     },
     []
@@ -204,7 +208,7 @@ export function FieldsPanel({
    * Handle drag end
    */
   const handleDragEnd = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.currentTarget.classList.remove(styles.dragging)
+    e.currentTarget.classList.remove('opacity-50', 'bg-muted')
     setDraggedFieldId(null)
     setDragOverFieldId(null)
   }, [])
@@ -293,11 +297,14 @@ export function FieldsPanel({
   // Render loading state
   if (isLoading) {
     return (
-      <div className={styles.container} data-testid={testId}>
-        <div className={styles.header}>
-          <h3 className={styles.title}>{t('collections.fields')}</h3>
+      <div className="bg-card border border-border rounded-lg overflow-hidden" data-testid={testId}>
+        <div className="flex justify-between items-center p-4 border-b border-border bg-muted">
+          <h3 className="m-0 text-lg font-semibold text-foreground">{t('collections.fields')}</h3>
         </div>
-        <div className={styles.loadingContainer} data-testid={`${testId}-loading`}>
+        <div
+          className="flex justify-center items-center p-8 min-h-[200px]"
+          data-testid={`${testId}-loading`}
+        >
           <LoadingSpinner size="medium" label={t('common.loading')} />
         </div>
       </div>
@@ -307,42 +314,45 @@ export function FieldsPanel({
   // Render empty state
   if (sortedFields.length === 0) {
     return (
-      <div className={styles.container} data-testid={testId}>
-        <div className={styles.header}>
-          <h3 className={styles.title}>{t('collections.fields')}</h3>
+      <div className="bg-card border border-border rounded-lg overflow-hidden" data-testid={testId}>
+        <div className="flex justify-between items-center p-4 border-b border-border bg-muted">
+          <h3 className="m-0 text-lg font-semibold text-foreground">{t('collections.fields')}</h3>
           <button
             type="button"
-            className={styles.addButton}
+            className="inline-flex items-center gap-1 px-4 py-2 bg-primary text-primary-foreground border-none rounded text-sm font-medium cursor-pointer hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
             onClick={onAdd}
             data-testid={`${testId}-add-button`}
             aria-label={t('collections.addField')}
           >
-            <span className={styles.addIcon} aria-hidden="true">
+            <span className="text-base font-bold" aria-hidden="true">
               +
             </span>
             {t('collections.addField')}
           </button>
         </div>
-        <div className={styles.emptyState} data-testid={`${testId}-empty`}>
-          <p className={styles.emptyMessage}>{t('fieldsPanel.noFields')}</p>
-          <p className={styles.emptyHint}>{t('fieldsPanel.addFieldHint')}</p>
+        <div
+          className="flex flex-col items-center justify-center p-8 text-center min-h-[200px]"
+          data-testid={`${testId}-empty`}
+        >
+          <p className="mb-2 text-base text-muted-foreground">{t('fieldsPanel.noFields')}</p>
+          <p className="text-sm text-muted-foreground/70">{t('fieldsPanel.addFieldHint')}</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className={styles.container} data-testid={testId}>
-      <div className={styles.header}>
-        <h3 className={styles.title}>{t('collections.fields')}</h3>
+    <div className="bg-card border border-border rounded-lg overflow-hidden" data-testid={testId}>
+      <div className="flex justify-between items-center p-4 border-b border-border bg-muted">
+        <h3 className="m-0 text-lg font-semibold text-foreground">{t('collections.fields')}</h3>
         <button
           type="button"
-          className={styles.addButton}
+          className="inline-flex items-center gap-1 px-4 py-2 bg-primary text-primary-foreground border-none rounded text-sm font-medium cursor-pointer hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
           onClick={onAdd}
           data-testid={`${testId}-add-button`}
           aria-label={t('collections.addField')}
         >
-          <span className={styles.addIcon} aria-hidden="true">
+          <span className="text-base font-bold" aria-hidden="true">
             +
           </span>
           {t('collections.addField')}
@@ -350,7 +360,7 @@ export function FieldsPanel({
       </div>
 
       <div
-        className={styles.fieldList}
+        className="m-0 p-0 list-none"
         role="list"
         aria-label={t('fieldsPanel.fieldListLabel')}
         data-testid={`${testId}-list`}
@@ -359,7 +369,11 @@ export function FieldsPanel({
         {sortedFields.map((field, index) => (
           <div
             key={field.id}
-            className={`${styles.fieldItem} ${dragOverFieldId === field.id ? styles.dragOver : ''}`}
+            className={cn(
+              'flex items-center gap-2 p-4 border-b border-border bg-card cursor-grab hover:bg-accent/50 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-inset focus:z-[1] last:border-b-0',
+              dragOverFieldId === field.id &&
+                'bg-primary/10 shadow-[inset_0_-2px_0_hsl(var(--primary))]'
+            )}
             role="listitem"
             draggable
             onDragStart={(e) => handleDragStart(e, field)}
@@ -373,28 +387,31 @@ export function FieldsPanel({
             aria-label={t('fieldsPanel.fieldItemLabel', { name: field.displayName || field.name })}
           >
             <div
-              className={styles.dragHandle}
+              className="flex items-center justify-center w-6 h-6 text-muted-foreground/60 cursor-grab shrink-0 active:cursor-grabbing"
               aria-hidden="true"
               data-testid={`${testId}-drag-handle-${field.id}`}
             >
-              <span className={styles.dragIcon}>⋮⋮</span>
+              <span className="text-base leading-none tracking-[-2px]">&#x22EE;&#x22EE;</span>
             </div>
 
-            <div className={styles.fieldInfo}>
-              <div className={styles.fieldMain}>
+            <div className="flex-1 min-w-0 flex flex-col gap-1">
+              <div className="flex items-center gap-2">
                 <span
-                  className={styles.fieldTypeIcon}
+                  className="inline-flex items-center justify-center w-7 h-7 bg-muted rounded text-sm text-muted-foreground shrink-0"
                   title={t(`fields.types.${field.type.toLowerCase()}`)}
                   aria-label={t(`fields.types.${field.type.toLowerCase()}`)}
                 >
                   {getFieldTypeIcon(field.type)}
                 </span>
-                <span className={styles.fieldName} data-testid={`${testId}-field-name-${field.id}`}>
+                <span
+                  className="font-semibold text-base text-foreground font-mono"
+                  data-testid={`${testId}-field-name-${field.id}`}
+                >
                   {field.name}
                 </span>
                 {field.displayName && field.displayName !== field.name && (
                   <span
-                    className={styles.fieldDisplayName}
+                    className="text-sm text-muted-foreground"
                     data-testid={`${testId}-field-display-name-${field.id}`}
                   >
                     ({field.displayName})
@@ -402,14 +419,17 @@ export function FieldsPanel({
                 )}
               </div>
 
-              <div className={styles.fieldMeta}>
-                <span className={styles.fieldType} data-testid={`${testId}-field-type-${field.id}`}>
+              <div className="flex items-center flex-wrap gap-2">
+                <span
+                  className="text-sm text-muted-foreground"
+                  data-testid={`${testId}-field-type-${field.id}`}
+                >
                   {t(`fields.types.${field.type.toLowerCase()}`)}
                 </span>
 
                 {field.required && (
                   <span
-                    className={`${styles.badge} ${styles.requiredBadge}`}
+                    className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded uppercase tracking-wider bg-destructive/10 text-destructive"
                     title={t('fields.validation.required')}
                     data-testid={`${testId}-field-required-${field.id}`}
                   >
@@ -419,7 +439,7 @@ export function FieldsPanel({
 
                 {field.unique && (
                   <span
-                    className={`${styles.badge} ${styles.uniqueBadge}`}
+                    className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded uppercase tracking-wider bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
                     title={t('fields.validation.unique')}
                     data-testid={`${testId}-field-unique-${field.id}`}
                   >
@@ -429,7 +449,7 @@ export function FieldsPanel({
 
                 {field.indexed && (
                   <span
-                    className={`${styles.badge} ${styles.indexedBadge}`}
+                    className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded uppercase tracking-wider bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
                     title={t('fields.validation.indexed')}
                     data-testid={`${testId}-field-indexed-${field.id}`}
                   >
@@ -440,19 +460,19 @@ export function FieldsPanel({
                 {(field.type === 'reference' || field.type === 'master_detail') &&
                   field.referenceTarget && (
                     <span
-                      className={styles.referenceTarget}
+                      className="text-sm text-primary font-mono"
                       data-testid={`${testId}-field-reference-${field.id}`}
                     >
-                      → {field.referenceTarget}
+                      &rarr; {field.referenceTarget}
                     </span>
                   )}
               </div>
             </div>
 
-            <div className={styles.fieldActions}>
+            <div className="flex items-center gap-1 shrink-0">
               <button
                 type="button"
-                className={styles.actionButton}
+                className={actionBtnClasses}
                 onClick={() => onEdit(field)}
                 title={t('collections.editField')}
                 aria-label={t('fieldsPanel.editFieldLabel', { name: field.name })}
@@ -464,7 +484,7 @@ export function FieldsPanel({
               </button>
               <button
                 type="button"
-                className={`${styles.actionButton} ${styles.deleteButton}`}
+                className={cn(actionBtnClasses, 'hover:bg-destructive/10 hover:border-destructive')}
                 onClick={() => handleDeleteClick(field)}
                 title={t('collections.deleteField')}
                 aria-label={t('fieldsPanel.deleteFieldLabel', { name: field.name })}

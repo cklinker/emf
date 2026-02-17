@@ -30,3 +30,31 @@ export { useGlobalShortcuts } from './useGlobalShortcuts'
 
 // Tenant ID hook for centralized tenant resolution
 export { useTenantId, getTenantId } from './useTenantId'
+
+// Collection schema hook for fetching collection metadata
+export {
+  useCollectionSchema,
+  type FieldType,
+  type FieldDefinition,
+  type CollectionSchema,
+  type UseCollectionSchemaReturn,
+} from './useCollectionSchema'
+
+// Collection records hook for fetching paginated record data
+export {
+  useCollectionRecords,
+  type CollectionRecord,
+  type SortState,
+  type FilterOperator,
+  type FilterCondition,
+  type PaginatedResponse,
+  type UseCollectionRecordsOptions,
+  type UseCollectionRecordsReturn,
+} from './useCollectionRecords'
+
+// Record mutation hook for CRUD operations
+export {
+  useRecordMutation,
+  type UseRecordMutationOptions,
+  type UseRecordMutationReturn,
+} from './useRecordMutation'

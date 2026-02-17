@@ -21,7 +21,7 @@
 import React, { useMemo } from 'react'
 import { Zap, AlertTriangle, Search, Lock, Monitor, X, RotateCw } from 'lucide-react'
 import { useI18n } from '../../context/I18nContext'
-import styles from './ErrorMessage.module.css'
+import { cn } from '@/lib/utils'
 
 /**
  * Error type variants
@@ -53,6 +53,51 @@ export interface ErrorMessageProps {
   title?: string
   /** Whether to show the error icon */
   showIcon?: boolean
+}
+
+/**
+ * Tailwind classes for each error type: container colors and icon background
+ */
+const ERROR_TYPE_CLASSES: Record<ErrorType, { container: string; iconBg: string }> = {
+  network: {
+    container:
+      'bg-amber-50 border-amber-300 text-amber-900 dark:bg-amber-950 dark:border-amber-800 dark:text-amber-200',
+    iconBg: 'bg-amber-400',
+  },
+  validation: {
+    container:
+      'bg-red-50 border-red-200 text-red-900 dark:bg-red-950 dark:border-red-800 dark:text-red-200',
+    iconBg: 'bg-red-500',
+  },
+  notFound: {
+    container:
+      'bg-gray-100 border-gray-300 text-gray-700 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300',
+    iconBg: 'bg-gray-500',
+  },
+  forbidden: {
+    container:
+      'bg-red-50 border-red-200 text-red-900 dark:bg-red-950 dark:border-red-800 dark:text-red-200',
+    iconBg: 'bg-red-600',
+  },
+  server: {
+    container:
+      'bg-red-50 border-red-200 text-red-900 dark:bg-red-950 dark:border-red-800 dark:text-red-200',
+    iconBg: 'bg-red-700',
+  },
+  generic: {
+    container:
+      'bg-red-50 border-red-200 text-red-900 dark:bg-red-950 dark:border-red-800 dark:text-red-200',
+    iconBg: 'bg-red-500',
+  },
+}
+
+/**
+ * Tailwind classes for each display variant
+ */
+const VARIANT_CLASSES: Record<ErrorVariant, string> = {
+  default: 'flex items-start gap-3 p-4 rounded-lg border animate-in fade-in',
+  compact: 'flex items-center gap-2 p-2.5 rounded-lg border',
+  inline: 'inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded bg-transparent border-0',
 }
 
 /**
@@ -213,38 +258,62 @@ export function ErrorMessage({
     return errorType === 'network' || errorType === 'server' || errorType === 'generic'
   }, [onRetry, errorType])
 
-  // Combine class names
-  const containerClasses = [styles.container, styles[variant], styles[errorType], className]
-    .filter(Boolean)
-    .join(' ')
+  const typeClasses = ERROR_TYPE_CLASSES[errorType]
 
   return (
     <div
-      className={containerClasses}
+      className={cn(VARIANT_CLASSES[variant], typeClasses.container, className)}
       role="alert"
       aria-live="assertive"
       aria-atomic="true"
       data-testid={testId}
       data-error-type={errorType}
+      data-variant={variant}
     >
       {/* Error icon */}
       {showIcon && (
-        <span className={styles.icon} aria-hidden="true" data-testid={`${testId}-icon`}>
+        <span
+          className={cn(
+            'flex items-center justify-center rounded-full text-white shrink-0',
+            variant === 'inline'
+              ? 'w-4 h-4 bg-transparent text-current'
+              : variant === 'compact'
+                ? 'w-5 h-5'
+                : 'w-8 h-8',
+            variant !== 'inline' && typeClasses.iconBg
+          )}
+          aria-hidden="true"
+          data-testid={`${testId}-icon`}
+        >
           {icon}
         </span>
       )}
 
       {/* Error content */}
-      <div className={styles.content}>
+      <div
+        className={cn(
+          'flex flex-1 min-w-0',
+          variant === 'default' ? 'flex-col' : 'flex-row items-center gap-2'
+        )}
+      >
         {/* Title (only shown in default variant) */}
         {variant === 'default' && (
-          <h3 className={styles.title} data-testid={`${testId}-title`}>
+          <h3
+            className="m-0 text-[15px] font-semibold leading-snug"
+            data-testid={`${testId}-title`}
+          >
             {displayTitle}
           </h3>
         )}
 
         {/* Error message */}
-        <p className={styles.message} data-testid={`${testId}-message`}>
+        <p
+          className={cn(
+            'm-0 leading-relaxed opacity-90 break-words',
+            variant === 'inline' ? 'text-[13px]' : 'text-sm'
+          )}
+          data-testid={`${testId}-message`}
+        >
           {message}
         </p>
       </div>
@@ -253,15 +322,22 @@ export function ErrorMessage({
       {showRetry && onRetry && (
         <button
           type="button"
-          className={styles.retryButton}
+          className={cn(
+            'inline-flex items-center gap-1.5 border border-current rounded-md',
+            'bg-transparent text-inherit text-sm font-medium cursor-pointer',
+            'shrink-0 self-start transition-colors',
+            'hover:bg-black/5 dark:hover:bg-white/10',
+            'focus-visible:outline-2 focus-visible:outline-current focus-visible:outline-offset-2',
+            variant === 'inline' ? 'px-2 py-1 text-xs' : 'px-3.5 py-2'
+          )}
           onClick={onRetry}
           aria-label={t('common.retry')}
           data-testid={`${testId}-retry`}
         >
-          <span className={styles.retryIcon} aria-hidden="true">
+          <span className="inline-flex leading-none" aria-hidden="true">
             <RotateCw size={14} />
           </span>
-          <span className={styles.retryText}>{t('common.retry')}</span>
+          <span className="leading-none">{t('common.retry')}</span>
         </button>
       )}
     </div>

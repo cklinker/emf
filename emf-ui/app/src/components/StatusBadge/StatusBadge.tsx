@@ -1,4 +1,4 @@
-import styles from './StatusBadge.module.css'
+import { cn } from '@/lib/utils'
 
 interface ColorConfig {
   color: string
@@ -13,7 +13,6 @@ interface StatusBadgeProps {
 }
 
 const DEFAULT_COLOR_MAP: Record<string, ColorConfig> = {
-  // Green
   active: { color: '#15803d', bg: '#dcfce7' },
   approved: { color: '#15803d', bg: '#dcfce7' },
   success: { color: '#15803d', bg: '#dcfce7' },
@@ -23,16 +22,12 @@ const DEFAULT_COLOR_MAP: Record<string, ColorConfig> = {
   yes: { color: '#15803d', bg: '#dcfce7' },
   healthy: { color: '#15803d', bg: '#dcfce7' },
   loaded: { color: '#15803d', bg: '#dcfce7' },
-
-  // Yellow
   pending: { color: '#854d0e', bg: '#fef9c3' },
   in_progress: { color: '#854d0e', bg: '#fef9c3' },
   running: { color: '#854d0e', bg: '#fef9c3' },
   warning: { color: '#854d0e', bg: '#fef9c3' },
   draft: { color: '#854d0e', bg: '#fef9c3' },
   submitted: { color: '#854d0e', bg: '#fef9c3' },
-
-  // Red
   rejected: { color: '#991b1b', bg: '#fee2e2' },
   failed: { color: '#991b1b', bg: '#fee2e2' },
   error: { color: '#991b1b', bg: '#fee2e2' },
@@ -41,8 +36,6 @@ const DEFAULT_COLOR_MAP: Record<string, ColorConfig> = {
   false: { color: '#991b1b', bg: '#fee2e2' },
   no: { color: '#991b1b', bg: '#fee2e2' },
   unhealthy: { color: '#991b1b', bg: '#fee2e2' },
-
-  // Blue
   new: { color: '#1e40af', bg: '#dbeafe' },
   open: { color: '#1e40af', bg: '#dbeafe' },
   info: { color: '#1e40af', bg: '#dbeafe' },
@@ -60,15 +53,22 @@ export default function StatusBadge({ value, colorMap, size = 'md', className }:
   const normalizedValue = value.toLowerCase()
   const mergedMap = colorMap ? { ...DEFAULT_COLOR_MAP, ...colorMap } : DEFAULT_COLOR_MAP
   const colors = mergedMap[normalizedValue] ?? DEFAULT_FALLBACK
-  const sizeClass = size === 'sm' ? styles.badgeSm : styles.badgeMd
 
   return (
     <span
-      className={`${styles.badge} ${sizeClass}${className ? ` ${className}` : ''}`}
+      className={cn(
+        'inline-flex items-center gap-1.5 rounded-full font-medium whitespace-nowrap leading-none',
+        size === 'sm' ? 'text-[11px] px-2 py-0.5' : 'text-xs px-2.5 py-[3px]',
+        className
+      )}
       style={{ color: colors.color, backgroundColor: colors.bg }}
       data-testid="status-badge"
     >
-      <span className={styles.dot} style={{ backgroundColor: colors.color }} aria-hidden="true" />
+      <span
+        className={cn('rounded-full shrink-0', size === 'sm' ? 'size-1.5' : 'size-[7px]')}
+        style={{ backgroundColor: colors.color }}
+        aria-hidden="true"
+      />
       {formatLabel(value)}
     </span>
   )

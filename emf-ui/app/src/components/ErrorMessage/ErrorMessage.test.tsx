@@ -189,10 +189,10 @@ describe('ErrorMessage', () => {
       expect(screen.getByTestId('error-message-message')).toBeInTheDocument()
     })
 
-    it('applies variant class to container', () => {
+    it('applies variant data attribute to container', () => {
       const { rerender } = renderErrorMessage({ error: 'Test', variant: 'compact' })
 
-      expect(screen.getByTestId('error-message').className).toContain('compact')
+      expect(screen.getByTestId('error-message')).toHaveAttribute('data-variant', 'compact')
 
       rerender(
         <I18nProvider>
@@ -200,7 +200,7 @@ describe('ErrorMessage', () => {
         </I18nProvider>
       )
 
-      expect(screen.getByTestId('error-message').className).toContain('inline')
+      expect(screen.getByTestId('error-message')).toHaveAttribute('data-variant', 'inline')
     })
   })
 
@@ -237,10 +237,10 @@ describe('ErrorMessage', () => {
       expect(screen.getByTestId('error-message').className).toContain('custom-class')
     })
 
-    it('applies error type class to container', () => {
+    it('applies error type data attribute to container', () => {
       renderErrorMessage({ error: 'Test', type: 'network' })
 
-      expect(screen.getByTestId('error-message').className).toContain('network')
+      expect(screen.getByTestId('error-message')).toHaveAttribute('data-error-type', 'network')
     })
   })
 

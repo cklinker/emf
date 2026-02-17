@@ -15,7 +15,7 @@
  */
 
 import React from 'react'
-import styles from './SkipLinks.module.css'
+import { cn } from '@/lib/utils'
 
 /**
  * Skip link target definition
@@ -89,12 +89,20 @@ export function SkipLinks({ targets = DEFAULT_TARGETS }: SkipLinksProps): React.
   }
 
   return (
-    <nav className={styles.skipLinks} aria-label="Skip links" data-testid="skip-links">
+    <nav
+      className={cn('absolute top-0 left-0 z-[10000] flex flex-col gap-1 p-1')}
+      aria-label="Skip links"
+      data-testid="skip-links"
+    >
       {targets.map((target) => (
         <a
           key={target.id}
           href={`#${target.id}`}
-          className={styles.skipLink}
+          className={cn(
+            'sr-only focus:not-sr-only focus:static focus:w-auto focus:h-auto focus:p-3 focus:px-4 focus:m-0 focus:overflow-visible focus:clip-auto focus:whitespace-normal',
+            'bg-primary text-primary-foreground no-underline text-sm font-medium rounded',
+            'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:shadow-lg'
+          )}
           onClick={(e) => handleClick(e, target.id)}
           data-testid={`skip-link-${target.id}`}
         >

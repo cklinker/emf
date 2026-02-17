@@ -124,11 +124,11 @@ describe('PageTransition', () => {
 
       // Wait for the animation frame to trigger visibility
       await waitFor(() => {
-        expect(container.className).toMatch(/visible/)
+        expect(container).toHaveAttribute('data-visible', 'true')
       })
     })
 
-    it('applies custom duration via CSS variable', () => {
+    it('applies custom duration via inline transitionDuration style', () => {
       render(
         <PageTransition duration={500}>
           <div>Content</div>
@@ -136,7 +136,7 @@ describe('PageTransition', () => {
       )
 
       const container = screen.getByTestId('page-transition')
-      expect(container).toHaveStyle({ '--transition-duration': '500ms' })
+      expect(container).toHaveStyle({ transitionDuration: '500ms' })
     })
 
     it('uses default duration of 200ms', () => {
@@ -147,7 +147,7 @@ describe('PageTransition', () => {
       )
 
       const container = screen.getByTestId('page-transition')
-      expect(container).toHaveStyle({ '--transition-duration': '200ms' })
+      expect(container).toHaveStyle({ transitionDuration: '200ms' })
     })
   })
 
@@ -236,7 +236,7 @@ describe('PageTransition', () => {
       const container = screen.getByTestId('full-transition')
       expect(container).toBeInTheDocument()
       expect(container).toHaveClass('custom-class')
-      expect(container).toHaveStyle({ '--transition-duration': '300ms' })
+      expect(container).toHaveStyle({ transitionDuration: '300ms' })
       expect(container).toHaveAttribute('data-transition-type', 'fade-slide')
 
       const child = screen.getByTestId('child')
@@ -245,7 +245,7 @@ describe('PageTransition', () => {
 
       // Wait for visible state
       await waitFor(() => {
-        expect(container.className).toMatch(/visible/)
+        expect(container).toHaveAttribute('data-visible', 'true')
       })
     })
   })

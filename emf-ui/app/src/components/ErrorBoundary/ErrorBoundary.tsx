@@ -11,7 +11,8 @@
  */
 
 import { Component, type ErrorInfo, type ReactNode, type ReactElement } from 'react'
-import styles from './ErrorBoundary.module.css'
+import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
 
 /**
  * Props for the ErrorBoundary component
@@ -85,15 +86,29 @@ export function ErrorFallback({ error, onReset }: ErrorFallbackProps): ReactElem
 
   return (
     <div
-      className={styles.errorContainer}
+      className={cn(
+        'flex flex-col items-center justify-center min-h-screen p-4 bg-background text-foreground',
+        'md:p-8'
+      )}
       role="alert"
       aria-live="assertive"
       aria-atomic="true"
       data-testid="error-boundary-fallback"
     >
-      <div className={styles.errorContent}>
+      <div
+        className={cn(
+          'flex flex-col items-center max-w-[600px] w-full p-6 px-4 bg-card rounded-lg shadow-lg text-center',
+          'md:p-8'
+        )}
+      >
         {/* Error Icon */}
-        <div className={styles.errorIcon} aria-hidden="true">
+        <div
+          className={cn(
+            'flex items-center justify-center w-16 h-16 mb-4 rounded-full bg-red-50 text-red-600 dark:bg-red-950 dark:text-red-400',
+            'md:w-20 md:h-20 md:mb-6'
+          )}
+          aria-hidden="true"
+        >
           <svg
             viewBox="0 0 24 24"
             fill="none"
@@ -101,7 +116,7 @@ export function ErrorFallback({ error, onReset }: ErrorFallbackProps): ReactElem
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
-            className={styles.errorIconSvg}
+            className={cn('w-9 h-9', 'md:w-12 md:h-12')}
           >
             <circle cx="12" cy="12" r="10" />
             <line x1="12" y1="8" x2="12" y2="12" />
@@ -110,55 +125,79 @@ export function ErrorFallback({ error, onReset }: ErrorFallbackProps): ReactElem
         </div>
 
         {/* Error Title */}
-        <h1 className={styles.errorTitle} data-testid="error-title">
+        <h1
+          className={cn(
+            'm-0 mb-4 text-xl font-semibold text-foreground leading-tight',
+            'md:text-2xl'
+          )}
+          data-testid="error-title"
+        >
           Something went wrong
         </h1>
 
         {/* Error Message */}
-        <p className={styles.errorMessage} data-testid="error-message">
+        <p
+          className={cn('m-0 mb-6 text-sm text-muted-foreground leading-relaxed', 'md:text-base')}
+          data-testid="error-message"
+        >
           {error?.message || 'An unexpected error occurred. Please try again.'}
         </p>
 
         {/* Stack Trace (Development Only) */}
         {showStackTrace && (
-          <details className={styles.stackTraceContainer} data-testid="error-stack-trace">
-            <summary className={styles.stackTraceSummary}>View technical details</summary>
-            <pre className={styles.stackTrace}>{error.stack}</pre>
+          <details className="w-full mb-6 text-left" data-testid="error-stack-trace">
+            <summary className="p-2 px-4 text-sm font-medium text-muted-foreground bg-muted rounded cursor-pointer hover:bg-muted/80">
+              View technical details
+            </summary>
+            <pre className="mt-2 p-4 font-mono text-xs leading-relaxed text-foreground bg-muted border border-border rounded overflow-x-auto whitespace-pre-wrap break-words max-h-[300px] overflow-y-auto">
+              {error.stack}
+            </pre>
           </details>
         )}
 
         {/* Recovery Actions */}
-        <div className={styles.errorActions} data-testid="error-actions">
+        <div
+          className={cn(
+            'flex flex-col gap-2 justify-center mb-6 w-full',
+            'md:flex-row md:flex-wrap md:w-auto'
+          )}
+          data-testid="error-actions"
+        >
           {onReset && (
-            <button
+            <Button
               type="button"
-              className={styles.primaryButton}
+              variant="default"
               onClick={handleTryAgain}
+              className={cn('w-full', 'md:w-auto')}
               data-testid="try-again-button"
             >
               Try Again
-            </button>
+            </Button>
           )}
-          <button
+          <Button
             type="button"
-            className={styles.primaryButton}
+            variant="default"
             onClick={handleReload}
+            className={cn('w-full', 'md:w-auto')}
             data-testid="reload-button"
           >
             Reload Page
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
-            className={styles.secondaryButton}
+            variant="outline"
             onClick={handleGoHome}
+            className={cn('w-full', 'md:w-auto')}
             data-testid="go-home-button"
           >
             Go Home
-          </button>
+          </Button>
         </div>
 
         {/* Help Text */}
-        <p className={styles.helpText}>If this problem persists, please contact support.</p>
+        <p className="m-0 text-sm text-muted-foreground">
+          If this problem persists, please contact support.
+        </p>
       </div>
     </div>
   )

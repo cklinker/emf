@@ -14,7 +14,7 @@
 
 import React, { useState } from 'react'
 import { User } from 'lucide-react'
-import styles from './Avatar.module.css'
+import { cn } from '@/lib/utils'
 
 /**
  * Color palette for avatar backgrounds (12 colors with good white text contrast)
@@ -108,13 +108,22 @@ function getInitials(name?: string, email?: string): string | null {
 }
 
 /**
- * Size variant CSS class mapping
+ * Tailwind size variant classes for the avatar
  */
 const SIZE_CLASSES: Record<AvatarSize, string> = {
-  sm: styles.avatarSm,
-  md: styles.avatarMd,
-  lg: styles.avatarLg,
-  xl: styles.avatarXl,
+  sm: 'w-6 h-6 text-[10px]',
+  md: 'w-8 h-8 text-xs',
+  lg: 'w-10 h-10 text-sm',
+  xl: 'w-12 h-12 text-base',
+}
+
+/**
+ * Tailwind negative margin classes for avatar group item overlap, per size
+ */
+const GROUP_MARGIN_CLASSES: Record<'sm' | 'md' | 'lg', string> = {
+  sm: '-ml-1.5',
+  md: '-ml-2',
+  lg: '-ml-2.5',
 }
 
 /**
@@ -144,7 +153,11 @@ export function Avatar({
   const bgColor = identifier ? getAvatarColor(identifier) : '#9E9E9E'
   const showImage = imageUrl && !imageError
 
-  const containerClasses = [styles.avatar, SIZE_CLASSES[size], className].filter(Boolean).join(' ')
+  const containerClasses = cn(
+    'inline-flex items-center justify-center rounded-full font-semibold text-white select-none shrink-0 overflow-hidden leading-none',
+    SIZE_CLASSES[size],
+    className
+  )
 
   if (showImage) {
     return (
@@ -157,7 +170,7 @@ export function Avatar({
         <img
           src={imageUrl}
           alt={name || email || 'User avatar'}
-          className={styles.avatarImage}
+          className="h-full w-full rounded-full object-cover"
           onError={() => setImageError(true)}
         />
       </div>
@@ -232,24 +245,31 @@ export function AvatarGroup({ users, max = 5, size = 'md' }: AvatarGroupProps): 
   const visible = users.slice(0, max)
   const overflowCount = users.length - max
 
-  const itemClass = [
-    styles.avatarGroupItem,
-    styles[`groupItem${size.charAt(0).toUpperCase() + size.slice(1)}`],
-  ].join(' ')
-
   return (
-    <div className={styles.avatarGroup} data-testid="avatar-group">
+    <div className="flex items-center" data-testid="avatar-group">
       {visible.map((user, index) => (
-        <div key={user.userId || user.email || user.name || index} className={itemClass}>
-          <Avatar name={user.name} email={user.email} userId={user.userId} size={size} />
+        <div
+          key={user.userId || user.email || user.name || index}
+          className={cn('relative', index > 0 && GROUP_MARGIN_CLASSES[size])}
+        >
+          <Avatar
+            name={user.name}
+            email={user.email}
+            userId={user.userId}
+            size={size}
+            className="border-2 border-background box-content"
+          />
         </div>
       ))}
       {overflowCount > 0 && (
-        <div className={itemClass}>
+        <div className={cn('relative', GROUP_MARGIN_CLASSES[size])}>
           <div
-            className={[styles.avatar, SIZE_CLASSES[size], styles.overflow]
-              .filter(Boolean)
-              .join(' ')}
+            className={cn(
+              'inline-flex items-center justify-center rounded-full font-semibold select-none shrink-0 overflow-hidden leading-none',
+              'bg-muted text-muted-foreground',
+              'border-2 border-background box-content',
+              SIZE_CLASSES[size]
+            )}
             data-testid="avatar-group-overflow"
             title={`${overflowCount} more`}
           >

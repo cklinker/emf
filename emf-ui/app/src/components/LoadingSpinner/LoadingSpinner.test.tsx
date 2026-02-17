@@ -51,8 +51,7 @@ describe('LoadingSpinner', () => {
 
         const spinnerIcon = screen.getByTestId('loading-spinner-icon')
         expect(spinnerIcon).toBeInTheDocument()
-        // CSS Modules transform class names, so we check for partial match
-        expect(spinnerIcon.className).toMatch(new RegExp(size))
+        expect(spinnerIcon).toHaveAttribute('data-size', size)
       })
     })
 
@@ -60,8 +59,7 @@ describe('LoadingSpinner', () => {
       render(<LoadingSpinner />)
 
       const spinnerIcon = screen.getByTestId('loading-spinner-icon')
-      // CSS Modules transform class names, so we check for partial match
-      expect(spinnerIcon.className).toMatch(/medium/)
+      expect(spinnerIcon).toHaveAttribute('data-size', 'medium')
     })
   })
 
@@ -187,8 +185,7 @@ describe('LoadingSpinner', () => {
       expect(spinner).toHaveAttribute('role', 'status')
 
       const spinnerIcon = screen.getByTestId('full-spinner-icon')
-      // CSS Modules transform class names, so we check for partial match
-      expect(spinnerIcon.className).toMatch(/large/)
+      expect(spinnerIcon).toHaveAttribute('data-size', 'large')
 
       const label = screen.getByTestId('full-spinner-label')
       expect(label).toHaveTextContent('Please wait...')

@@ -12,7 +12,11 @@ import { useI18n } from '../../context/I18nContext'
 import { getTenantSlug } from '../../context/TenantContext'
 import { useApi } from '../../context/ApiContext'
 import { CollectionForm, LoadingSpinner, ErrorMessage } from '../../components'
-import type { Collection, CollectionFormData } from '../../components/CollectionForm/CollectionForm'
+import type {
+  Collection,
+  CollectionFormData,
+  AvailableField,
+} from '../../components/CollectionForm/CollectionForm'
 import styles from './CollectionFormPage.module.css'
 
 /**
@@ -38,25 +42,43 @@ export function CollectionFormPage({
 
   const isEditMode = Boolean(id)
 
+  /** API response includes fields for the collection */
+  interface CollectionWithFields extends Collection {
+    fields?: Array<{ id: string; name: string; displayName: string; active: boolean }>
+  }
+
   // Fetch existing collection if in edit mode
   const {
-    data: collection,
+    data: collectionData,
     isLoading,
     error,
   } = useQuery({
     queryKey: ['collection', id],
-    queryFn: () => apiClient.get<Collection>(`/control/collections/${id}`),
+    queryFn: () => apiClient.get<CollectionWithFields>(`/control/collections/${id}`),
     enabled: isEditMode,
   })
+
+  // Extract collection (without fields) for the form and available fields for dropdown
+  const collection = collectionData
+  const availableFields: AvailableField[] = React.useMemo(() => {
+    if (!collectionData?.fields) return []
+    return collectionData.fields
+      .filter((f) => f.active)
+      .map((f) => ({ id: f.id, name: f.name, displayName: f.displayName }))
+  }, [collectionData])
 
   // Handle form submission
   const handleSubmit = useCallback(
     async (data: CollectionFormData) => {
       if (isEditMode && id) {
-        // Update existing collection - only name and description can be updated
-        const requestData = {
+        // Update existing collection
+        const requestData: Record<string, unknown> = {
           name: data.name,
           description: data.description || '',
+        }
+        // Include displayFieldId — empty string clears it, undefined means no change
+        if (data.displayFieldId !== undefined) {
+          requestData.displayFieldId = data.displayFieldId || ''
         }
         await apiClient.put(`/control/collections/${id}`, requestData)
         navigate(`/${getTenantSlug()}/collections/${id}`)
@@ -125,7 +147,12 @@ export function CollectionFormPage({
       </header>
 
       <div className={styles.content}>
-        <CollectionForm collection={collection} onSubmit={handleSubmit} onCancel={handleCancel} />
+        <CollectionForm
+          collection={collection}
+          availableFields={availableFields}
+          onSubmit={handleSubmit}
+          onCancel={handleCancel}
+        />
       </div>
     </div>
   )

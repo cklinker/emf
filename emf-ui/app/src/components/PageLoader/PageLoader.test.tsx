@@ -53,14 +53,18 @@ describe('PageLoader', () => {
       render(<PageLoader />)
 
       const loader = screen.getByTestId('page-loader')
-      expect(loader.className).toMatch(/inline/)
+      // Non-fullPage variant uses min-h and w-full instead of fixed positioning
+      expect(loader).toHaveClass('w-full')
+      expect(loader.className).not.toContain('fixed')
     })
 
     it('renders as full page when fullPage is true', () => {
       render(<PageLoader fullPage />)
 
       const loader = screen.getByTestId('page-loader')
-      expect(loader.className).toMatch(/fullPage/)
+      // Full page variant uses fixed positioning with inset-0
+      expect(loader).toHaveClass('fixed')
+      expect(loader).toHaveClass('inset-0')
     })
   })
 
@@ -160,7 +164,9 @@ describe('Skeleton', () => {
       render(<Skeleton />)
 
       const skeleton = screen.getByTestId('skeleton')
-      expect(skeleton.className).toMatch(/skeletonText/)
+      // Text variant uses h-4 height and full width
+      expect(skeleton).toHaveClass('h-4')
+      expect(skeleton).toHaveClass('w-full')
     })
   })
 
@@ -301,7 +307,9 @@ describe('ContentLoader', () => {
 
       // With default count of 3, the first item has testid content-loader-skeleton-item-0
       const skeleton = screen.getByTestId('content-loader-skeleton-item-0')
-      expect(skeleton.className).toMatch(/skeletonText/)
+      // Text variant uses h-4 height and full width
+      expect(skeleton).toHaveClass('h-4')
+      expect(skeleton).toHaveClass('w-full')
     })
 
     it('uses specified skeleton variant', () => {
@@ -312,7 +320,9 @@ describe('ContentLoader', () => {
       )
 
       const skeleton = screen.getByTestId('content-loader-skeleton-item-0')
-      expect(skeleton.className).toMatch(/skeletonCard/)
+      // Card variant uses padding and rounded-lg with min height
+      expect(skeleton).toHaveClass('rounded-lg')
+      expect(skeleton).toHaveClass('p-4')
     })
 
     it('renders specified number of skeleton items', () => {

@@ -16,8 +16,9 @@ import React, { useState, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Paperclip, Download, Trash2, Upload } from 'lucide-react'
 import { useI18n } from '../../context/I18nContext'
+import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
 import type { ApiClient } from '../../services/apiClient'
-import styles from './AttachmentsSection.module.css'
 
 /**
  * An attachment associated with a record
@@ -151,17 +152,17 @@ export function AttachmentsSection({
   if (!apiAvailable && !isLoading) {
     return (
       <section
-        className={styles.section}
+        className="bg-background border border-border rounded-lg overflow-hidden"
         aria-labelledby="attachments-heading"
         data-testid="attachments-section"
       >
-        <div className={styles.sectionHeader}>
-          <h3 id="attachments-heading" className={styles.sectionTitle}>
+        <div className="flex justify-between items-center p-4 border-b border-border bg-muted/50">
+          <h3 id="attachments-heading" className="m-0 text-base font-semibold text-foreground">
             {t('attachments.title')}
           </h3>
         </div>
-        <div className={styles.comingSoon} data-testid="attachments-coming-soon">
-          <p>{t('attachments.comingSoon')}</p>
+        <div className="text-center py-8" data-testid="attachments-coming-soon">
+          <p className="m-0 text-sm text-muted-foreground">{t('attachments.comingSoon')}</p>
         </div>
       </section>
     )
@@ -169,49 +170,61 @@ export function AttachmentsSection({
 
   return (
     <section
-      className={styles.section}
+      className="bg-background border border-border rounded-lg overflow-hidden"
       aria-labelledby="attachments-heading"
       data-testid="attachments-section"
     >
       {/* Header */}
-      <div className={styles.sectionHeader}>
-        <h3 id="attachments-heading" className={styles.sectionTitle}>
+      <div className="flex justify-between items-center p-4 border-b border-border bg-muted/50 max-md:flex-col max-md:items-start max-md:gap-2">
+        <h3 id="attachments-heading" className="m-0 text-base font-semibold text-foreground">
           {t('attachments.title')}
         </h3>
-        <button
-          type="button"
-          className={styles.uploadButton}
+        <Button
+          variant="outline"
+          size="xs"
           data-testid="attachments-upload-button"
           title={t('attachments.upload')}
         >
           <Upload size={14} aria-hidden="true" />
           {t('attachments.upload')}
-        </button>
+        </Button>
       </div>
 
       {/* Attachments List */}
       {sortedAttachments.length === 0 ? (
-        <div className={styles.emptyState} data-testid="attachments-empty">
-          <p>{t('attachments.empty')}</p>
+        <div
+          className="flex flex-col items-center justify-center px-6 py-8 text-center"
+          data-testid="attachments-empty"
+        >
+          <p className="m-0 text-sm text-muted-foreground">{t('attachments.empty')}</p>
         </div>
       ) : (
-        <div className={styles.attachmentsList} role="list" aria-label={t('attachments.title')}>
-          {sortedAttachments.map((attachment) => (
+        <div className="flex flex-col" role="list" aria-label={t('attachments.title')}>
+          {sortedAttachments.map((attachment, index) => (
             <div
               key={attachment.id}
-              className={styles.attachmentRow}
+              className={cn(
+                'flex items-center gap-2 px-4 py-2 max-md:px-2',
+                'transition-colors motion-reduce:transition-none hover:bg-muted/50',
+                index < sortedAttachments.length - 1 && 'border-b border-border'
+              )}
               role="listitem"
               data-testid={`attachment-${attachment.id}`}
             >
               {/* File Icon */}
-              <div className={styles.fileIcon} aria-hidden="true">
+              <div
+                className="flex items-center justify-center w-8 h-8 shrink-0 rounded bg-muted text-muted-foreground"
+                aria-hidden="true"
+              >
                 <Paperclip size={16} />
               </div>
 
               {/* File Info */}
-              <div className={styles.fileInfo}>
-                <span className={styles.fileName}>{attachment.fileName}</span>
-                <span className={styles.fileMeta}>
+              <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+                <span className="text-sm font-medium text-foreground whitespace-nowrap overflow-hidden text-ellipsis">
+                  {attachment.fileName}
+                </span>
+                <span className="flex items-center gap-1 text-xs text-muted-foreground max-md:flex-wrap">
                   {formatFileSize(attachment.fileSize)}
                   <span>&middot;</span>
                   <time dateTime={attachment.uploadedAt}>
@@ -223,26 +236,27 @@ export function AttachmentsSection({
               </div>
 
               {/* Actions */}
-              <div className={styles.attachmentActions}>
-                <button
-                  type="button"
-                  className={styles.actionButton}
+              <div className="flex gap-1 shrink-0">
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
                   aria-label={`${t('attachments.download')} ${attachment.fileName}`}
                   data-testid={`attachment-download-${attachment.id}`}
                   title={t('attachments.download')}
                 >
                   <Download size={14} />
-                </button>
-                <button
-                  type="button"
-                  className={`${styles.actionButton} ${styles.deleteAction}`}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  className="hover:text-destructive hover:bg-destructive/10"
                   onClick={() => handleDelete(attachment.id)}
                   aria-label={`${t('attachments.delete')} ${attachment.fileName}`}
                   data-testid={`attachment-delete-${attachment.id}`}
                   title={t('attachments.delete')}
                 >
                   <Trash2 size={14} />
-                </button>
+                </Button>
               </div>
             </div>
           ))}

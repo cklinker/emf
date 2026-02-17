@@ -399,7 +399,7 @@ describe('FieldsPanel Component', () => {
 
       fireEvent.click(screen.getByTestId('fields-panel-delete-field-1'))
 
-      expect(screen.getByTestId('confirm-dialog').className).toMatch(/danger/)
+      expect(screen.getByTestId('confirm-dialog')).toHaveAttribute('data-variant', 'danger')
     })
   })
 

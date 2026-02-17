@@ -13,7 +13,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
 import { LoadingSpinner, ErrorMessage } from '../../components'
-import styles from './TenantDashboardPage.module.css'
+import { cn } from '@/lib/utils'
 
 /**
  * Governor limits for the current tenant
@@ -73,29 +73,37 @@ function UsageCard({
 }: UsageCardProps): React.ReactElement {
   const percentage = limit > 0 ? Math.min((current / limit) * 100, 100) : 0
 
-  const barClass = useMemo(() => {
-    if (percentage >= 90) return styles.barCritical
-    if (percentage >= 75) return styles.barWarning
-    return styles.barNormal
+  const barColor = useMemo(() => {
+    if (percentage >= 90) return 'bg-red-500'
+    if (percentage >= 75) return 'bg-amber-500'
+    return 'bg-emerald-500'
   }, [percentage])
 
   return (
-    <div className={styles.usageCard} data-testid={testId} role="article" aria-label={title}>
-      <h3 className={styles.usageCardTitle}>{title}</h3>
-      <div className={styles.usageValues}>
-        <span className={styles.usageCurrent}>
+    <div
+      className="flex flex-col gap-2 rounded-md border border-border bg-card p-6"
+      data-testid={testId}
+      role="article"
+      aria-label={title}
+    >
+      <h3 className="m-0 text-sm font-medium text-muted-foreground">{title}</h3>
+      <div className="flex items-baseline gap-1">
+        <span className="text-2xl font-semibold text-foreground">
           {current.toLocaleString()}
           {unit}
         </span>
-        <span className={styles.usageLimit}>
+        <span className="text-sm text-muted-foreground">
           / {limit.toLocaleString()}
           {unit}
         </span>
       </div>
-      <div className={styles.usageBarContainer} aria-hidden="true">
-        <div className={`${styles.usageBar} ${barClass}`} style={{ width: `${percentage}%` }} />
+      <div className="h-2 w-full overflow-hidden rounded bg-muted" aria-hidden="true">
+        <div
+          className={cn('h-full rounded transition-[width] duration-300', barColor)}
+          style={{ width: `${percentage}%` }}
+        />
       </div>
-      <span className={styles.usagePercentage}>{percentage.toFixed(1)}% used</span>
+      <span className="text-xs text-muted-foreground">{percentage.toFixed(1)}% used</span>
     </div>
   )
 }
@@ -142,8 +150,8 @@ export function TenantDashboardPage({
 
   if (isLoading) {
     return (
-      <div className={styles.container} data-testid={testId}>
-        <div className={styles.loadingContainer}>
+      <div className="flex w-full flex-col gap-6 p-6" data-testid={testId}>
+        <div className="flex min-h-[400px] items-center justify-center">
           <LoadingSpinner size="large" label={t('common.loading')} />
         </div>
       </div>
@@ -152,7 +160,7 @@ export function TenantDashboardPage({
 
   if (error) {
     return (
-      <div className={styles.container} data-testid={testId}>
+      <div className="flex w-full flex-col gap-6 p-6" data-testid={testId}>
         <ErrorMessage
           error={error instanceof Error ? error : new Error(t('errors.generic'))}
           onRetry={() => refetch()}
@@ -162,16 +170,19 @@ export function TenantDashboardPage({
   }
 
   return (
-    <div className={styles.container} data-testid={testId}>
-      <header className={styles.header}>
-        <h1 className={styles.title}>Tenant Dashboard</h1>
+    <div className="flex w-full flex-col gap-6 p-6 max-[767px]:p-2" data-testid={testId}>
+      <header className="flex items-center justify-between">
+        <h1 className="m-0 text-2xl font-semibold text-foreground">Tenant Dashboard</h1>
       </header>
 
-      <section className={styles.section} aria-labelledby="usage-heading">
-        <h2 id="usage-heading" className={styles.sectionTitle}>
+      <section className="flex flex-col gap-4" aria-labelledby="usage-heading">
+        <h2 id="usage-heading" className="m-0 text-lg font-semibold text-foreground">
           Usage & Limits
         </h2>
-        <div className={styles.usageGrid} data-testid="usage-cards">
+        <div
+          className="grid grid-cols-[repeat(auto-fill,minmax(250px,1fr))] gap-4 max-[767px]:grid-cols-1"
+          data-testid="usage-cards"
+        >
           <UsageCard
             title="API Calls Today"
             current={usage.apiCallsToday}
@@ -200,46 +211,68 @@ export function TenantDashboardPage({
         </div>
       </section>
 
-      <section className={styles.section} aria-labelledby="limits-heading">
-        <h2 id="limits-heading" className={styles.sectionTitle}>
+      <section className="flex flex-col gap-4" aria-labelledby="limits-heading">
+        <h2 id="limits-heading" className="m-0 text-lg font-semibold text-foreground">
           Governor Limits
         </h2>
-        <div className={styles.limitsTable}>
-          <table className={styles.table} role="grid" aria-label="Governor Limits">
+        <div className="overflow-x-auto rounded-md border border-border bg-card">
+          <table
+            className="w-full border-collapse text-sm"
+            role="grid"
+            aria-label="Governor Limits"
+          >
             <thead>
-              <tr>
-                <th>Limit</th>
-                <th>Value</th>
+              <tr className="bg-muted">
+                <th className="border-b-2 border-border p-4 text-left font-semibold text-foreground">
+                  Limit
+                </th>
+                <th className="border-b-2 border-border p-4 text-left font-semibold text-foreground">
+                  Value
+                </th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td>API Calls / Day</td>
-                <td>{limits.apiCallsPerDay.toLocaleString()}</td>
+                <td className="border-b border-border p-4 text-foreground">API Calls / Day</td>
+                <td className="border-b border-border p-4 text-foreground">
+                  {limits.apiCallsPerDay.toLocaleString()}
+                </td>
               </tr>
               <tr>
-                <td>Storage</td>
-                <td>{limits.storageGb} GB</td>
+                <td className="border-b border-border p-4 text-foreground">Storage</td>
+                <td className="border-b border-border p-4 text-foreground">
+                  {limits.storageGb} GB
+                </td>
               </tr>
               <tr>
-                <td>Max Users</td>
-                <td>{limits.maxUsers.toLocaleString()}</td>
+                <td className="border-b border-border p-4 text-foreground">Max Users</td>
+                <td className="border-b border-border p-4 text-foreground">
+                  {limits.maxUsers.toLocaleString()}
+                </td>
               </tr>
               <tr>
-                <td>Max Collections</td>
-                <td>{limits.maxCollections.toLocaleString()}</td>
+                <td className="border-b border-border p-4 text-foreground">Max Collections</td>
+                <td className="border-b border-border p-4 text-foreground">
+                  {limits.maxCollections.toLocaleString()}
+                </td>
               </tr>
               <tr>
-                <td>Max Fields / Collection</td>
-                <td>{limits.maxFieldsPerCollection.toLocaleString()}</td>
+                <td className="border-b border-border p-4 text-foreground">
+                  Max Fields / Collection
+                </td>
+                <td className="border-b border-border p-4 text-foreground">
+                  {limits.maxFieldsPerCollection.toLocaleString()}
+                </td>
               </tr>
               <tr>
-                <td>Max Workflows</td>
-                <td>{limits.maxWorkflows.toLocaleString()}</td>
+                <td className="border-b border-border p-4 text-foreground">Max Workflows</td>
+                <td className="border-b border-border p-4 text-foreground">
+                  {limits.maxWorkflows.toLocaleString()}
+                </td>
               </tr>
               <tr>
-                <td>Max Reports</td>
-                <td>{limits.maxReports.toLocaleString()}</td>
+                <td className="p-4 text-foreground">Max Reports</td>
+                <td className="p-4 text-foreground">{limits.maxReports.toLocaleString()}</td>
               </tr>
             </tbody>
           </table>

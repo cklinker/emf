@@ -21,7 +21,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
 import { useToast, LoadingSpinner, ErrorMessage } from '../../components'
-import styles from './WorkersPage.module.css'
+import { cn } from '@/lib/utils'
 
 /**
  * Worker interface matching the API response
@@ -168,25 +168,22 @@ interface WorkerStatusBadgeProps {
 }
 
 function WorkerStatusBadge({ status }: WorkerStatusBadgeProps): React.ReactElement {
-  const statusClass = (() => {
-    switch (status) {
-      case 'READY':
-        return styles.statusReady
-      case 'STARTING':
-        return styles.statusStarting
-      case 'DRAINING':
-        return styles.statusDraining
-      case 'OFFLINE':
-        return styles.statusOffline
-      case 'FAILED':
-        return styles.statusFailed
-      default:
-        return styles.statusOffline
-    }
-  })()
+  const colorMap: Record<Worker['status'], string> = {
+    READY: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300',
+    STARTING: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300',
+    DRAINING: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300',
+    OFFLINE: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
+    FAILED: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
+  }
 
   return (
-    <span className={`${styles.statusBadge} ${statusClass}`} data-testid="worker-status-badge">
+    <span
+      className={cn(
+        'inline-block rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wider',
+        colorMap[status] ?? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
+      )}
+      data-testid="worker-status-badge"
+    >
       {status}
     </span>
   )
@@ -202,19 +199,18 @@ interface CapacityBarProps {
 
 function CapacityBar({ current, capacity }: CapacityBarProps): React.ReactElement {
   const percentage = capacity > 0 ? Math.min((current / capacity) * 100, 100) : 0
-  const barClass =
-    percentage >= 90
-      ? styles.capacityBarCritical
-      : percentage >= 70
-        ? styles.capacityBarWarning
-        : styles.capacityBarNormal
+  const barColor =
+    percentage >= 90 ? 'bg-red-500' : percentage >= 70 ? 'bg-amber-500' : 'bg-emerald-500'
 
   return (
-    <div className={styles.capacityContainer} data-testid="capacity-bar">
-      <div className={styles.capacityBar}>
-        <div className={`${styles.capacityFill} ${barClass}`} style={{ width: `${percentage}%` }} />
+    <div className="flex min-w-[120px] items-center gap-2" data-testid="capacity-bar">
+      <div className="flex-1 overflow-hidden rounded-full bg-muted" style={{ height: '6px' }}>
+        <div
+          className={cn('h-full rounded-full transition-all duration-300', barColor)}
+          style={{ width: `${percentage}%` }}
+        />
       </div>
-      <span className={styles.capacityText}>
+      <span className="min-w-[3rem] text-right text-xs font-medium text-muted-foreground whitespace-nowrap">
         {current}/{capacity}
       </span>
     </div>
@@ -247,13 +243,19 @@ function SortableHeader({
       role="columnheader"
       scope="col"
       aria-sort={ariaSort}
-      className={`${styles.sortableHeader} ${isActive ? styles.sortableHeaderActive : ''}`}
+      className={cn(
+        'cursor-pointer select-none border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground',
+        isActive && 'text-primary'
+      )}
       onClick={() => onSort(column)}
       data-testid={`sort-header-${column}`}
     >
-      <span className={styles.sortableHeaderContent}>
+      <span className="inline-flex items-center gap-1">
         {label}
-        <span className={styles.sortIndicator} aria-hidden="true">
+        <span
+          className={cn('text-[0.625rem]', isActive ? 'opacity-100' : 'opacity-40')}
+          aria-hidden="true"
+        >
           {isActive ? (currentDirection === 'asc' ? ' \u25B2' : ' \u25BC') : ' \u25B4'}
         </span>
       </span>
@@ -290,26 +292,26 @@ function AssignmentsModal({
 
   return (
     <div
-      className={styles.modalOverlay}
+      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 p-4"
       onClick={(e) => e.target === e.currentTarget && onClose()}
       onKeyDown={handleKeyDown}
       data-testid="assignments-modal-overlay"
       role="presentation"
     >
       <div
-        className={styles.modal}
+        className="w-full max-w-[700px] max-h-[90vh] overflow-y-auto rounded-lg bg-card shadow-xl"
         role="dialog"
         aria-modal="true"
         aria-labelledby="assignments-modal-title"
         data-testid="assignments-modal"
       >
-        <div className={styles.modalHeader}>
-          <h2 id="assignments-modal-title" className={styles.modalTitle}>
+        <div className="flex items-center justify-between border-b border-border p-6">
+          <h2 id="assignments-modal-title" className="m-0 text-lg font-semibold text-foreground">
             {t('workers.assignmentsFor', { name: worker.podName || worker.host || worker.id })}
           </h2>
           <button
             type="button"
-            className={styles.modalCloseButton}
+            className="rounded p-2 text-xl leading-none text-muted-foreground hover:bg-muted hover:text-foreground"
             onClick={onClose}
             aria-label={t('common.close')}
             data-testid="assignments-modal-close"
@@ -317,32 +319,47 @@ function AssignmentsModal({
             &times;
           </button>
         </div>
-        <div className={styles.modalBody}>
+        <div className="p-6">
           {isLoading ? (
-            <div className={styles.loadingContainer}>
+            <div className="flex min-h-[200px] items-center justify-center">
               <LoadingSpinner size="medium" label={t('common.loading')} />
             </div>
           ) : assignments.length === 0 ? (
-            <div className={styles.emptyState} data-testid="no-assignments">
+            <div
+              className="rounded-lg border border-border bg-card p-16 text-center text-muted-foreground"
+              data-testid="no-assignments"
+            >
               <p>{t('workers.noAssignments')}</p>
             </div>
           ) : (
-            <div className={styles.tableContainer}>
+            <div className="overflow-x-auto rounded-lg border border-border bg-card">
               <table
-                className={styles.table}
+                className="w-full border-collapse text-sm"
                 role="grid"
                 aria-label={t('workers.assignments')}
                 data-testid="assignments-table"
               >
                 <thead>
-                  <tr role="row">
-                    <th role="columnheader" scope="col">
+                  <tr role="row" className="bg-muted">
+                    <th
+                      role="columnheader"
+                      scope="col"
+                      className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                    >
                       {t('workers.collection')}
                     </th>
-                    <th role="columnheader" scope="col">
+                    <th
+                      role="columnheader"
+                      scope="col"
+                      className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                    >
                       {t('workers.assignmentStatus')}
                     </th>
-                    <th role="columnheader" scope="col">
+                    <th
+                      role="columnheader"
+                      scope="col"
+                      className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                    >
                       {t('workers.assignedAt')}
                     </th>
                   </tr>
@@ -352,16 +369,21 @@ function AssignmentsModal({
                     <tr
                       key={assignment.id}
                       role="row"
-                      className={styles.tableRow}
+                      className="border-b border-border transition-colors last:border-b-0 hover:bg-muted/50"
                       data-testid={`assignment-row-${index}`}
                     >
-                      <td role="gridcell" className={styles.nameCell}>
+                      <td role="gridcell" className="px-4 py-3 font-medium text-foreground">
                         {assignment.collectionDisplayName || assignment.collectionName}
                       </td>
-                      <td role="gridcell">
-                        <span className={styles.assignmentStatusBadge}>{assignment.status}</span>
+                      <td role="gridcell" className="px-4 py-3">
+                        <span className="inline-block rounded bg-emerald-100 px-2 py-0.5 text-xs font-medium uppercase text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300">
+                          {assignment.status}
+                        </span>
                       </td>
-                      <td role="gridcell" className={styles.dateCell}>
+                      <td
+                        role="gridcell"
+                        className="whitespace-nowrap px-4 py-3 text-muted-foreground"
+                      >
                         {formatRelativeTime(assignment.assignedAt)}
                       </td>
                     </tr>
@@ -371,10 +393,10 @@ function AssignmentsModal({
             </div>
           )}
         </div>
-        <div className={styles.modalFooter}>
+        <div className="flex justify-end border-t border-border px-6 py-4">
           <button
             type="button"
-            className={styles.cancelButton}
+            className="rounded-md border border-border bg-card px-5 py-2.5 text-sm font-medium text-foreground hover:bg-muted"
             onClick={onClose}
             data-testid="assignments-modal-done"
           >
@@ -506,8 +528,8 @@ export function WorkersPage({ testId = 'workers-page' }: WorkersPageProps): Reac
   // Render loading state
   if (isLoading) {
     return (
-      <div className={styles.container} data-testid={testId}>
-        <div className={styles.loadingContainer}>
+      <div className="mx-auto max-w-[1400px] space-y-6 p-6 lg:p-8" data-testid={testId}>
+        <div className="flex min-h-[400px] items-center justify-center">
           <LoadingSpinner size="large" label={t('common.loading')} />
         </div>
       </div>
@@ -517,7 +539,7 @@ export function WorkersPage({ testId = 'workers-page' }: WorkersPageProps): Reac
   // Render error state
   if (error) {
     return (
-      <div className={styles.container} data-testid={testId}>
+      <div className="mx-auto max-w-[1400px] space-y-6 p-6 lg:p-8" data-testid={testId}>
         <ErrorMessage
           error={error instanceof Error ? error : new Error(t('errors.generic'))}
           onRetry={() => refetch()}
@@ -527,29 +549,35 @@ export function WorkersPage({ testId = 'workers-page' }: WorkersPageProps): Reac
   }
 
   return (
-    <div className={styles.container} data-testid={testId}>
+    <div className="mx-auto max-w-[1400px] space-y-6 p-6 lg:p-8" data-testid={testId}>
       {/* Page Header */}
-      <header className={styles.header}>
-        <div className={styles.headerLeft}>
-          <h1 className={styles.title}>{t('workers.title')}</h1>
-          <span className={styles.workerCount}>
+      <header className="flex items-center justify-between">
+        <div className="flex items-baseline gap-4">
+          <h1 className="m-0 text-2xl font-semibold text-foreground">{t('workers.title')}</h1>
+          <span className="text-sm text-muted-foreground">
             {t('workers.count', { count: String(workers.length) })}
           </span>
         </div>
-        <div className={styles.headerActions}>
-          <label className={styles.filterToggle} data-testid="show-offline-toggle">
+        <div className="flex items-center gap-4">
+          <label
+            className="flex cursor-pointer items-center gap-2 rounded-md px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted"
+            data-testid="show-offline-toggle"
+          >
             <input
               type="checkbox"
               checked={showOffline}
               onChange={(e) => setShowOffline(e.target.checked)}
-              className={styles.filterCheckbox}
+              className="h-4 w-4 cursor-pointer accent-primary"
             />
-            <span className={styles.filterLabel}>Show offline ({offlineCount})</span>
+            <span className="whitespace-nowrap text-sm">Show offline ({offlineCount})</span>
           </label>
-          <span className={styles.autoRefreshLabel}>{t('workers.autoRefresh')}</span>
+          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
+            {t('workers.autoRefresh')}
+          </span>
           <button
             type="button"
-            className={styles.rebalanceButton}
+            className="rounded-md bg-primary px-6 py-3 text-base font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
             onClick={handleRebalance}
             disabled={rebalanceMutation.isPending}
             aria-label={t('workers.rebalance')}
@@ -562,7 +590,10 @@ export function WorkersPage({ testId = 'workers-page' }: WorkersPageProps): Reac
 
       {/* Workers Table */}
       {workers.length === 0 ? (
-        <div className={styles.emptyState} data-testid="empty-state">
+        <div
+          className="rounded-lg border border-border bg-card p-16 text-center text-muted-foreground"
+          data-testid="empty-state"
+        >
           <p>
             {showOffline
               ? t('workers.noWorkers')
@@ -570,15 +601,15 @@ export function WorkersPage({ testId = 'workers-page' }: WorkersPageProps): Reac
           </p>
         </div>
       ) : (
-        <div className={styles.tableContainer}>
+        <div className="overflow-x-auto rounded-lg border border-border bg-card">
           <table
-            className={styles.table}
+            className="w-full border-collapse text-sm"
             role="grid"
             aria-label={t('workers.title')}
             data-testid="workers-table"
           >
             <thead>
-              <tr role="row">
+              <tr role="row" className="bg-muted">
                 <SortableHeader
                   column="podName"
                   label={t('workers.podName')}
@@ -628,7 +659,11 @@ export function WorkersPage({ testId = 'workers-page' }: WorkersPageProps): Reac
                   currentDirection={sortDirection}
                   onSort={handleSort}
                 />
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   {t('common.actions')}
                 </th>
               </tr>
@@ -638,36 +673,43 @@ export function WorkersPage({ testId = 'workers-page' }: WorkersPageProps): Reac
                 <tr
                   key={worker.id}
                   role="row"
-                  className={`${styles.tableRow} ${styles.clickableRow}`}
+                  className="cursor-pointer border-b border-border transition-colors last:border-b-0 hover:bg-muted/50"
                   onClick={() => handleWorkerClick(worker)}
                   data-testid={`worker-row-${index}`}
                 >
-                  <td role="gridcell" className={styles.nameCell}>
-                    <code>{worker.podName || worker.host || worker.id}</code>
+                  <td role="gridcell" className="px-4 py-3">
+                    <code className="rounded bg-muted px-2 py-1 font-mono text-[0.8125rem]">
+                      {worker.podName || worker.host || worker.id}
+                    </code>
                   </td>
-                  <td role="gridcell" className={styles.hostCell}>
+                  <td role="gridcell" className="px-4 py-3 text-muted-foreground">
                     {worker.host}
                   </td>
-                  <td role="gridcell" className={styles.portCell}>
+                  <td
+                    role="gridcell"
+                    className="px-4 py-3 font-mono text-[0.8125rem] text-muted-foreground"
+                  >
                     {worker.port}
                   </td>
-                  <td role="gridcell" className={styles.poolCell}>
-                    <span className={styles.poolBadge}>{worker.pool}</span>
+                  <td role="gridcell" className="px-4 py-3">
+                    <span className="inline-block rounded bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                      {worker.pool}
+                    </span>
                   </td>
-                  <td role="gridcell" className={styles.statusCell}>
+                  <td role="gridcell" className="px-4 py-3">
                     <WorkerStatusBadge status={worker.status} />
                   </td>
-                  <td role="gridcell" className={styles.capacityCell}>
+                  <td role="gridcell" className="px-4 py-3">
                     <CapacityBar current={worker.currentLoad} capacity={worker.capacity} />
                   </td>
-                  <td role="gridcell" className={styles.heartbeatCell}>
+                  <td role="gridcell" className="whitespace-nowrap px-4 py-3 text-muted-foreground">
                     {formatRelativeTime(worker.lastHeartbeat)}
                   </td>
-                  <td role="gridcell" className={styles.actionsCell}>
-                    <div className={styles.actions}>
+                  <td role="gridcell" className="px-4 py-3 text-right">
+                    <div className="flex justify-end gap-2">
                       <button
                         type="button"
-                        className={styles.actionButton}
+                        className="rounded-md border border-border px-4 py-2 text-sm font-medium text-primary hover:border-primary hover:bg-muted"
                         onClick={(e) => {
                           e.stopPropagation()
                           handleWorkerClick(worker)

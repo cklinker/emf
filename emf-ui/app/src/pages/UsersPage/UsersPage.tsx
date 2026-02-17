@@ -5,7 +5,7 @@ import { useApi } from '../../context/ApiContext'
 import { useI18n } from '../../context/I18nContext'
 import { getTenantSlug } from '../../context/TenantContext'
 import { useToast } from '../../components/Toast'
-import styles from './UsersPage.module.css'
+import { cn } from '@/lib/utils'
 
 interface PlatformUser {
   id: string
@@ -51,14 +51,21 @@ export interface UsersPageProps {
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const colorMap: Record<string, string> = {
-    ACTIVE: styles.statusActive,
-    INACTIVE: styles.statusInactive,
-    LOCKED: styles.statusLocked,
-    PENDING_ACTIVATION: styles.statusPending,
-  }
-
-  return <span className={`${styles.statusBadge} ${colorMap[status] || ''}`}>{status}</span>
+  return (
+    <span
+      className={cn(
+        'inline-block rounded-full px-2 py-0.5 text-xs font-medium',
+        status === 'ACTIVE' &&
+          'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300',
+        status === 'INACTIVE' && 'bg-muted text-foreground',
+        status === 'LOCKED' && 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300',
+        status === 'PENDING_ACTIVATION' &&
+          'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+      )}
+    >
+      {status}
+    </span>
+  )
 }
 
 function UserForm({
@@ -102,63 +109,99 @@ function UserForm({
 
   return (
     <div
-      className={styles.modalOverlay}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
       onClick={(e) => e.target === e.currentTarget && onCancel()}
       onKeyDown={(e) => {
         if (e.key === 'Escape') onCancel()
       }}
       role="presentation"
     >
-      <div className={styles.modal} role="dialog" aria-modal="true">
-        <h2>{t('users.createUser')}</h2>
+      <div
+        className="w-full max-w-[480px] rounded-lg bg-card p-6 shadow-xl"
+        role="dialog"
+        aria-modal="true"
+      >
+        <h2 className="mb-4 text-xl font-semibold">{t('users.createUser')}</h2>
         <form onSubmit={handleSubmit}>
-          <div className={styles.formGroup}>
-            <label htmlFor="email">{t('users.email')} *</label>
+          <div className="mb-4">
+            <label htmlFor="email" className="mb-1 block text-sm font-medium text-foreground">
+              {t('users.email')} *
+            </label>
             <input
               id="email"
               type="email"
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              className={errors.email ? styles.inputError : ''}
+              className={cn(
+                'w-full rounded-md border border-border bg-background px-3 py-2 text-sm',
+                errors.email && 'border-destructive'
+              )}
             />
-            {errors.email && <span className={styles.errorText}>{errors.email}</span>}
+            {errors.email && (
+              <span className="mt-1 block text-xs text-destructive">{errors.email}</span>
+            )}
           </div>
-          <div className={styles.formGroup}>
-            <label htmlFor="firstName">{t('users.firstName')} *</label>
+          <div className="mb-4">
+            <label htmlFor="firstName" className="mb-1 block text-sm font-medium text-foreground">
+              {t('users.firstName')} *
+            </label>
             <input
               id="firstName"
               type="text"
               value={formData.firstName}
               onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-              className={errors.firstName ? styles.inputError : ''}
+              className={cn(
+                'w-full rounded-md border border-border bg-background px-3 py-2 text-sm',
+                errors.firstName && 'border-destructive'
+              )}
             />
-            {errors.firstName && <span className={styles.errorText}>{errors.firstName}</span>}
+            {errors.firstName && (
+              <span className="mt-1 block text-xs text-destructive">{errors.firstName}</span>
+            )}
           </div>
-          <div className={styles.formGroup}>
-            <label htmlFor="lastName">{t('users.lastName')} *</label>
+          <div className="mb-4">
+            <label htmlFor="lastName" className="mb-1 block text-sm font-medium text-foreground">
+              {t('users.lastName')} *
+            </label>
             <input
               id="lastName"
               type="text"
               value={formData.lastName}
               onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-              className={errors.lastName ? styles.inputError : ''}
+              className={cn(
+                'w-full rounded-md border border-border bg-background px-3 py-2 text-sm',
+                errors.lastName && 'border-destructive'
+              )}
             />
-            {errors.lastName && <span className={styles.errorText}>{errors.lastName}</span>}
+            {errors.lastName && (
+              <span className="mt-1 block text-xs text-destructive">{errors.lastName}</span>
+            )}
           </div>
-          <div className={styles.formGroup}>
-            <label htmlFor="username">{t('users.username')}</label>
+          <div className="mb-4">
+            <label htmlFor="username" className="mb-1 block text-sm font-medium text-foreground">
+              {t('users.username')}
+            </label>
             <input
               id="username"
               type="text"
               value={formData.username}
               onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
             />
           </div>
-          <div className={styles.formActions}>
-            <button type="button" className={styles.btnSecondary} onClick={onCancel}>
+          <div className="mt-6 flex justify-end gap-2">
+            <button
+              type="button"
+              className="cursor-pointer rounded-md border border-border bg-muted px-4 py-2 text-sm text-foreground"
+              onClick={onCancel}
+            >
               {t('common.cancel')}
             </button>
-            <button type="submit" className={styles.btnPrimary} disabled={isSubmitting}>
+            <button
+              type="submit"
+              className="cursor-pointer rounded-md border-none bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={isSubmitting}
+            >
               {isSubmitting ? t('common.saving') : t('common.create')}
             </button>
           </div>
@@ -254,10 +297,13 @@ export function UsersPage({ testId = 'users-page' }: UsersPageProps) {
 
   if (error) {
     return (
-      <div className={styles.container} data-testid={testId}>
-        <div className={styles.errorState}>
+      <div className="mx-auto max-w-[1200px] p-6" data-testid={testId}>
+        <div className="flex flex-col items-center justify-center p-12 text-muted-foreground">
           <p>{t('errors.generic')}</p>
-          <button onClick={() => refetch()} className={styles.btnPrimary}>
+          <button
+            onClick={() => refetch()}
+            className="cursor-pointer rounded-md border-none bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+          >
             {t('common.retry')}
           </button>
         </div>
@@ -266,15 +312,18 @@ export function UsersPage({ testId = 'users-page' }: UsersPageProps) {
   }
 
   return (
-    <div className={styles.container} data-testid={testId}>
-      <header className={styles.header}>
-        <h1>{t('users.title')}</h1>
-        <button className={styles.btnPrimary} onClick={() => setIsFormOpen(true)}>
+    <div className="mx-auto max-w-[1200px] p-6" data-testid={testId}>
+      <header className="mb-6 flex items-center justify-between">
+        <h1 className="m-0 text-2xl font-semibold">{t('users.title')}</h1>
+        <button
+          className="cursor-pointer rounded-md border-none bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+          onClick={() => setIsFormOpen(true)}
+        >
           {t('users.createUser')}
         </button>
       </header>
 
-      <div className={styles.toolbar}>
+      <div className="mb-4 flex gap-4">
         <input
           type="text"
           placeholder={t('users.searchPlaceholder')}
@@ -283,7 +332,7 @@ export function UsersPage({ testId = 'users-page' }: UsersPageProps) {
             setFilter(e.target.value)
             setPage(0)
           }}
-          className={styles.searchInput}
+          className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm"
         />
         <select
           value={statusFilter}
@@ -291,7 +340,7 @@ export function UsersPage({ testId = 'users-page' }: UsersPageProps) {
             setStatusFilter(e.target.value)
             setPage(0)
           }}
-          className={styles.statusSelect}
+          className="min-w-[140px] rounded-md border border-border bg-background px-3 py-2 text-sm"
         >
           <option value="">{t('users.allStatuses')}</option>
           <option value="ACTIVE">{t('users.statusActive')}</option>
@@ -301,85 +350,105 @@ export function UsersPage({ testId = 'users-page' }: UsersPageProps) {
       </div>
 
       {isLoading ? (
-        <div className={styles.loadingState}>{t('common.loading')}</div>
+        <div className="flex flex-col items-center justify-center p-12 text-muted-foreground">
+          {t('common.loading')}
+        </div>
       ) : users.length === 0 ? (
-        <div className={styles.emptyState}>
+        <div className="flex flex-col items-center justify-center p-12 text-muted-foreground">
           <p>{t('common.noResults')}</p>
         </div>
       ) : (
         <>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>{t('users.name')}</th>
-                <th>{t('users.email')}</th>
-                <th>{t('users.username')}</th>
-                <th>{t('users.status')}</th>
-                <th>{t('users.lastLogin')}</th>
-                <th>{t('common.actions')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map((user) => (
-                <tr key={user.id}>
-                  <td>
-                    <button
-                      className={styles.linkButton}
-                      onClick={() => navigate(`/${getTenantSlug()}/users/${user.id}`)}
-                    >
-                      {user.firstName} {user.lastName}
-                    </button>
-                  </td>
-                  <td>{user.email}</td>
-                  <td>{user.username || '\u2014'}</td>
-                  <td>
-                    <StatusBadge status={user.status} />
-                  </td>
-                  <td>{user.lastLoginAt ? formatDate(user.lastLoginAt) : t('users.never')}</td>
-                  <td>
-                    <div className={styles.actionButtons}>
+          <div className="overflow-x-auto rounded-lg border border-border bg-card">
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr>
+                  <th className="border-b-2 border-border p-3 text-left font-semibold text-foreground">
+                    {t('users.name')}
+                  </th>
+                  <th className="border-b-2 border-border p-3 text-left font-semibold text-foreground">
+                    {t('users.email')}
+                  </th>
+                  <th className="border-b-2 border-border p-3 text-left font-semibold text-foreground">
+                    {t('users.username')}
+                  </th>
+                  <th className="border-b-2 border-border p-3 text-left font-semibold text-foreground">
+                    {t('users.status')}
+                  </th>
+                  <th className="border-b-2 border-border p-3 text-left font-semibold text-foreground">
+                    {t('users.lastLogin')}
+                  </th>
+                  <th className="border-b-2 border-border p-3 text-left font-semibold text-foreground">
+                    {t('common.actions')}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.map((user) => (
+                  <tr key={user.id} className="hover:bg-muted">
+                    <td className="border-b border-border p-3">
                       <button
-                        className={styles.btnSmall}
+                        className="cursor-pointer border-none bg-transparent p-0 text-left font-medium text-primary hover:underline"
                         onClick={() => navigate(`/${getTenantSlug()}/users/${user.id}`)}
                       >
-                        {t('common.edit')}
+                        {user.firstName} {user.lastName}
                       </button>
-                      {user.status === 'ACTIVE' ? (
+                    </td>
+                    <td className="border-b border-border p-3">{user.email}</td>
+                    <td className="border-b border-border p-3">{user.username || '\u2014'}</td>
+                    <td className="border-b border-border p-3">
+                      <StatusBadge status={user.status} />
+                    </td>
+                    <td className="border-b border-border p-3">
+                      {user.lastLoginAt ? formatDate(user.lastLoginAt) : t('users.never')}
+                    </td>
+                    <td className="border-b border-border p-3">
+                      <div className="flex gap-2">
                         <button
-                          className={`${styles.btnSmall} ${styles.btnDanger}`}
-                          onClick={() => handleStatusAction(user, 'deactivate')}
+                          className="cursor-pointer rounded border border-border bg-card px-2 py-1 text-xs hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+                          onClick={() => navigate(`/${getTenantSlug()}/users/${user.id}`)}
                         >
-                          {t('users.deactivate')}
+                          {t('common.edit')}
                         </button>
-                      ) : user.status !== 'ACTIVE' ? (
-                        <button
-                          className={`${styles.btnSmall} ${styles.btnSuccess}`}
-                          onClick={() => handleStatusAction(user, 'activate')}
-                        >
-                          {t('users.activate')}
-                        </button>
-                      ) : null}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                        {user.status === 'ACTIVE' ? (
+                          <button
+                            className="cursor-pointer rounded border-none bg-destructive px-2 py-1 text-xs text-destructive-foreground hover:bg-destructive/90"
+                            onClick={() => handleStatusAction(user, 'deactivate')}
+                          >
+                            {t('users.deactivate')}
+                          </button>
+                        ) : user.status !== 'ACTIVE' ? (
+                          <button
+                            className="cursor-pointer rounded border-none bg-emerald-500 px-2 py-1 text-xs text-white hover:bg-emerald-600"
+                            onClick={() => handleStatusAction(user, 'activate')}
+                          >
+                            {t('users.activate')}
+                          </button>
+                        ) : null}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
           {totalPages > 1 && (
-            <div className={styles.pagination}>
+            <div className="mt-4 flex items-center justify-center gap-4 border-t border-border pt-4">
               <button
                 disabled={page === 0}
                 onClick={() => setPage((p) => Math.max(0, p - 1))}
-                className={styles.btnSmall}
+                className="cursor-pointer rounded border border-border bg-card px-2 py-1 text-xs hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {t('common.previous')}
               </button>
-              <span>{t('common.pageOf', { current: page + 1, total: totalPages })}</span>
+              <span className="text-sm">
+                {t('common.pageOf', { current: page + 1, total: totalPages })}
+              </span>
               <button
                 disabled={page >= totalPages - 1}
                 onClick={() => setPage((p) => p + 1)}
-                className={styles.btnSmall}
+                className="cursor-pointer rounded border border-border bg-card px-2 py-1 text-xs hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {t('common.next')}
               </button>
@@ -398,7 +467,7 @@ export function UsersPage({ testId = 'users-page' }: UsersPageProps) {
 
       {confirmDialog.open && (
         <div
-          className={styles.modalOverlay}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
           onClick={(e) => {
             if (e.target === e.currentTarget) setConfirmDialog({ ...confirmDialog, open: false })
           }}
@@ -407,24 +476,31 @@ export function UsersPage({ testId = 'users-page' }: UsersPageProps) {
           }}
           role="presentation"
         >
-          <div className={styles.modal} role="dialog" aria-modal="true">
-            <h2>{t('common.confirm')}</h2>
+          <div
+            className="w-full max-w-[480px] rounded-lg bg-card p-6 shadow-xl"
+            role="dialog"
+            aria-modal="true"
+          >
+            <h2 className="mb-4 text-xl font-semibold">{t('common.confirm')}</h2>
             <p>
               {confirmDialog.action === 'deactivate'
                 ? t('users.deactivateConfirm', { name: confirmDialog.userName })
                 : t('users.activateConfirm', { name: confirmDialog.userName })}
             </p>
-            <div className={styles.formActions}>
+            <div className="mt-6 flex justify-end gap-2">
               <button
-                className={styles.btnSecondary}
+                className="cursor-pointer rounded-md border border-border bg-muted px-4 py-2 text-sm text-foreground"
                 onClick={() => setConfirmDialog({ ...confirmDialog, open: false })}
               >
                 {t('common.cancel')}
               </button>
               <button
-                className={
-                  confirmDialog.action === 'deactivate' ? styles.btnDanger : styles.btnPrimary
-                }
+                className={cn(
+                  'cursor-pointer rounded-md border-none px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50',
+                  confirmDialog.action === 'deactivate'
+                    ? 'bg-destructive hover:bg-destructive/90'
+                    : 'bg-primary hover:bg-primary/90'
+                )}
                 onClick={confirmAction}
                 disabled={statusMutation.isPending}
               >

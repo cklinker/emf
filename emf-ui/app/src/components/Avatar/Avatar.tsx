@@ -14,7 +14,7 @@
 
 import React, { useState } from 'react'
 import { User } from 'lucide-react'
-import styles from './Avatar.module.css'
+import { cn } from '@/lib/utils'
 
 /**
  * Color palette for avatar backgrounds (12 colors with good white text contrast)
@@ -107,14 +107,11 @@ function getInitials(name?: string, email?: string): string | null {
   return null
 }
 
-/**
- * Size variant CSS class mapping
- */
 const SIZE_CLASSES: Record<AvatarSize, string> = {
-  sm: styles.avatarSm,
-  md: styles.avatarMd,
-  lg: styles.avatarLg,
-  xl: styles.avatarXl,
+  sm: 'size-6 text-[10px]',
+  md: 'size-8 text-xs',
+  lg: 'size-10 text-sm',
+  xl: 'size-12 text-base',
 }
 
 /**
@@ -144,12 +141,16 @@ export function Avatar({
   const bgColor = identifier ? getAvatarColor(identifier) : '#9E9E9E'
   const showImage = imageUrl && !imageError
 
-  const containerClasses = [styles.avatar, SIZE_CLASSES[size], className].filter(Boolean).join(' ')
+  const baseClasses = cn(
+    'inline-flex items-center justify-center rounded-full font-semibold text-white select-none shrink-0 overflow-hidden leading-none',
+    SIZE_CLASSES[size],
+    className
+  )
 
   if (showImage) {
     return (
       <div
-        className={containerClasses}
+        className={baseClasses}
         style={{ backgroundColor: bgColor }}
         data-testid="avatar"
         title={name || email}
@@ -157,7 +158,7 @@ export function Avatar({
         <img
           src={imageUrl}
           alt={name || email || 'User avatar'}
-          className={styles.avatarImage}
+          className="size-full object-cover rounded-full"
           onError={() => setImageError(true)}
         />
       </div>
@@ -167,7 +168,7 @@ export function Avatar({
   if (initials) {
     return (
       <div
-        className={containerClasses}
+        className={baseClasses}
         style={{ backgroundColor: bgColor }}
         data-testid="avatar"
         title={name || email}
@@ -180,7 +181,7 @@ export function Avatar({
   // Fallback: generic user icon
   return (
     <div
-      className={containerClasses}
+      className={baseClasses}
       style={{ backgroundColor: '#9E9E9E' }}
       data-testid="avatar"
       title="User"
@@ -211,6 +212,12 @@ export interface AvatarGroupProps {
   size?: 'sm' | 'md' | 'lg'
 }
 
+const GROUP_MARGIN_CLASSES: Record<'sm' | 'md' | 'lg', string> = {
+  sm: '-ml-1.5',
+  md: '-ml-2',
+  lg: '-ml-2.5',
+}
+
 /**
  * AvatarGroup Component
  *
@@ -232,24 +239,30 @@ export function AvatarGroup({ users, max = 5, size = 'md' }: AvatarGroupProps): 
   const visible = users.slice(0, max)
   const overflowCount = users.length - max
 
-  const itemClass = [
-    styles.avatarGroupItem,
-    styles[`groupItem${size.charAt(0).toUpperCase() + size.slice(1)}`],
-  ].join(' ')
-
   return (
-    <div className={styles.avatarGroup} data-testid="avatar-group">
+    <div className="flex items-center" data-testid="avatar-group">
       {visible.map((user, index) => (
-        <div key={user.userId || user.email || user.name || index} className={itemClass}>
-          <Avatar name={user.name} email={user.email} userId={user.userId} size={size} />
+        <div
+          key={user.userId || user.email || user.name || index}
+          className={cn('relative', index > 0 && GROUP_MARGIN_CLASSES[size])}
+        >
+          <Avatar
+            name={user.name}
+            email={user.email}
+            userId={user.userId}
+            size={size}
+            className="border-2 border-background dark:border-background box-content"
+          />
         </div>
       ))}
       {overflowCount > 0 && (
-        <div className={itemClass}>
+        <div className={cn('relative', GROUP_MARGIN_CLASSES[size])}>
           <div
-            className={[styles.avatar, SIZE_CLASSES[size], styles.overflow]
-              .filter(Boolean)
-              .join(' ')}
+            className={cn(
+              'inline-flex items-center justify-center rounded-full font-semibold select-none shrink-0 overflow-hidden leading-none border-2 border-background dark:border-background box-content',
+              'bg-muted text-muted-foreground',
+              SIZE_CLASSES[size]
+            )}
             data-testid="avatar-group-overflow"
             title={`${overflowCount} more`}
           >

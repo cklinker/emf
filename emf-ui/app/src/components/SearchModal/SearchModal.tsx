@@ -3,6 +3,7 @@
  *
  * Command-palette style global search overlay (Cmd+K / Ctrl+K).
  * Searches across records, pages, and recent items.
+ * Built on shadcn Dialog + Command (cmdk) with Tailwind CSS styling.
  */
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
@@ -13,7 +14,14 @@ import { useApi } from '../../context/ApiContext'
 import { useAuth } from '../../context/AuthContext'
 import { useRecentRecords } from '../../hooks/useRecentRecords'
 import { formatRelativeTime } from '../../utils/formatRelativeTime'
-import styles from './SearchModal.module.css'
+import { cn } from '@/lib/utils'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog'
 
 export interface SearchModalProps {
   open: boolean
@@ -314,22 +322,27 @@ export function SearchModal({ open, onClose }: SearchModalProps): JSX.Element | 
   if (!open) return null
 
   return (
-    <div
-      className={styles.overlay}
-      role="presentation"
-      onClick={onClose}
-      data-testid="search-modal-overlay"
-    >
-      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
-      <div className={styles.modal} onClick={(e) => e.stopPropagation()} data-testid="search-modal">
-        <div className={styles.inputContainer}>
-          <span className={styles.searchIcon} aria-hidden="true">
+    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
+      <DialogContent
+        className="overflow-hidden p-0 sm:max-w-xl top-[15vh] translate-y-0"
+        showCloseButton={false}
+        onInteractOutside={() => onClose()}
+        data-testid="search-modal"
+      >
+        <DialogHeader className="sr-only">
+          <DialogTitle>{t('search.label')}</DialogTitle>
+          <DialogDescription>{t('search.placeholder')}</DialogDescription>
+        </DialogHeader>
+
+        {/* Search input */}
+        <div className="flex items-center gap-2 border-b px-4 py-3">
+          <span className="text-muted-foreground shrink-0" aria-hidden="true">
             <Search size={18} />
           </span>
           <input
             ref={inputRef}
             type="text"
-            className={styles.input}
+            className="flex-1 border-none bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
             placeholder={t('search.placeholder')}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -342,27 +355,41 @@ export function SearchModal({ open, onClose }: SearchModalProps): JSX.Element | 
             }
             data-testid="search-input"
           />
-          <kbd className={styles.kbd}>ESC</kbd>
+          <kbd className="inline-flex items-center rounded border bg-muted px-1.5 text-[0.6875rem] font-sans text-muted-foreground shrink-0">
+            ESC
+          </kbd>
         </div>
 
-        <ul id="search-results" className={styles.results} role="listbox">
+        {/* Results list */}
+        <ul
+          id="search-results"
+          className="list-none m-0 p-1 max-h-[400px] overflow-y-auto"
+          role="listbox"
+        >
           {/* Search history when no query */}
           {!query.trim() && searchHistory.length > 0 && (
             <>
-              <li className={styles.sectionLabel} role="presentation">
+              <li
+                className="flex items-center justify-between px-4 pt-2 pb-1 text-[0.6875rem] font-semibold uppercase tracking-wider text-muted-foreground"
+                role="presentation"
+              >
                 <span>{t('search.recentSearches')}</span>
-                <button className={styles.clearHistory} onClick={clearHistory} type="button">
+                <button
+                  className="bg-transparent border-none p-0 text-[0.6875rem] text-primary cursor-pointer normal-case tracking-normal font-medium hover:underline"
+                  onClick={clearHistory}
+                  type="button"
+                >
                   {t('common.clear')}
                 </button>
               </li>
               {searchHistory.map((term) => (
                 <li key={`history-${term}`}>
                   <button
-                    className={styles.historyItem}
+                    className="flex items-center gap-2 w-full px-4 py-2 bg-transparent border-none cursor-pointer text-sm text-foreground text-left hover:bg-accent"
                     onClick={() => setQuery(term)}
                     type="button"
                   >
-                    <span className={styles.historyIcon} aria-hidden="true">
+                    <span className="text-sm opacity-50" aria-hidden="true">
                       <Clock size={14} />
                     </span>
                     {term}
@@ -374,15 +401,23 @@ export function SearchModal({ open, onClose }: SearchModalProps): JSX.Element | 
 
           {/* Results */}
           {!query.trim() && results.length > 0 && (
-            <li className={styles.sectionLabel} role="presentation">
+            <li
+              className="flex items-center justify-between px-4 pt-2 pb-1 text-[0.6875rem] font-semibold uppercase tracking-wider text-muted-foreground"
+              role="presentation"
+            >
               {t('search.recentlyViewed')}
             </li>
           )}
           {query.trim() && results.length > 0 && (
-            <li className={styles.sectionLabel} role="presentation">
+            <li
+              className="flex items-center justify-between px-4 pt-2 pb-1 text-[0.6875rem] font-semibold uppercase tracking-wider text-muted-foreground"
+              role="presentation"
+            >
               {t('search.results')}
               {searching && (
-                <span className={styles.searchingIndicator}>{t('common.loading')}</span>
+                <span className="font-normal normal-case tracking-normal">
+                  {t('common.loading')}
+                </span>
               )}
             </li>
           )}
@@ -392,14 +427,20 @@ export function SearchModal({ open, onClose }: SearchModalProps): JSX.Element | 
               id={`search-result-${idx}`}
               role="option"
               aria-selected={idx === activeIndex}
-              className={`${styles.resultItem} ${idx === activeIndex ? styles.resultItemActive : ''}`}
+              className={cn(
+                'flex items-center gap-2 px-4 py-2 cursor-pointer transition-colors duration-100',
+                idx === activeIndex ? 'bg-accent' : 'hover:bg-accent'
+              )}
               onClick={() => handleSelect(result)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleSelect(result)
               }}
               onMouseEnter={() => setActiveIndex(idx)}
             >
-              <span className={styles.resultIcon} aria-hidden="true">
+              <span
+                className="text-base shrink-0 w-6 text-center text-muted-foreground"
+                aria-hidden="true"
+              >
                 {result.type === 'page' ? (
                   <FileText size={16} />
                 ) : result.type === 'recent' ? (
@@ -408,11 +449,11 @@ export function SearchModal({ open, onClose }: SearchModalProps): JSX.Element | 
                   <ClipboardList size={16} />
                 )}
               </span>
-              <div className={styles.resultInfo}>
-                <span className={styles.resultTitle}>{result.title}</span>
-                <span className={styles.resultSubtitle}>{result.subtitle}</span>
+              <div className="flex flex-col gap-px flex-1 min-w-0">
+                <span className="text-sm font-medium text-foreground truncate">{result.title}</span>
+                <span className="text-xs text-muted-foreground truncate">{result.subtitle}</span>
               </div>
-              <span className={styles.resultType}>
+              <span className="text-[0.6875rem] text-muted-foreground whitespace-nowrap shrink-0">
                 {result.type === 'page'
                   ? t('search.typePage')
                   : result.type === 'recent'
@@ -423,14 +464,16 @@ export function SearchModal({ open, onClose }: SearchModalProps): JSX.Element | 
           ))}
 
           {query.trim() && results.length === 0 && !searching && (
-            <li className={styles.noResults}>{t('search.noResults')}</li>
+            <li className="p-6 text-center text-sm text-muted-foreground">
+              {t('search.noResults')}
+            </li>
           )}
           {query.trim() && searching && results.length === 0 && (
-            <li className={styles.noResults}>{t('common.loading')}</li>
+            <li className="p-6 text-center text-sm text-muted-foreground">{t('common.loading')}</li>
           )}
         </ul>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 

@@ -5,7 +5,7 @@ import { useApi } from '../../context/ApiContext'
 import { useI18n } from '../../context/I18nContext'
 import { getTenantSlug } from '../../context/TenantContext'
 import { useToast } from '../../components/Toast'
-import styles from './UserDetailPage.module.css'
+import { cn } from '@/lib/utils'
 
 interface PlatformUser {
   id: string
@@ -57,20 +57,29 @@ export interface UserDetailPageProps {
 
 function StatusBadge({ status }: { status: string }) {
   const colorMap: Record<string, string> = {
-    ACTIVE: styles.statusActive,
-    INACTIVE: styles.statusInactive,
-    LOCKED: styles.statusLocked,
-    PENDING_ACTIVATION: styles.statusPending,
+    ACTIVE: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300',
+    INACTIVE: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300',
+    LOCKED: 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300',
+    PENDING_ACTIVATION: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300',
   }
 
-  return <span className={`${styles.statusBadge} ${colorMap[status] || ''}`}>{status}</span>
+  return (
+    <span
+      className={cn(
+        'inline-block rounded-full px-2 py-0.5 text-xs font-medium',
+        colorMap[status] || ''
+      )}
+    >
+      {status}
+    </span>
+  )
 }
 
 function LoginStatusLabel({ status }: { status: string }) {
   const colorMap: Record<string, string> = {
-    SUCCESS: styles.loginStatusSuccess,
-    FAILED: styles.loginStatusFailed,
-    LOCKED_OUT: styles.loginStatusLocked,
+    SUCCESS: 'font-medium text-emerald-700 dark:text-emerald-300',
+    FAILED: 'font-medium text-red-700 dark:text-red-300',
+    LOCKED_OUT: 'font-medium text-amber-700 dark:text-amber-300',
   }
 
   return <span className={colorMap[status] || ''}>{status}</span>
@@ -174,10 +183,13 @@ export function UserDetailPage({ testId = 'user-detail-page' }: UserDetailPagePr
 
   if (error) {
     return (
-      <div className={styles.container} data-testid={testId}>
-        <div className={styles.errorState}>
+      <div className="mx-auto max-w-[1200px] space-y-6 p-6" data-testid={testId}>
+        <div className="flex flex-col items-center justify-center p-12 text-muted-foreground">
           <p>{t('errors.generic')}</p>
-          <button onClick={() => refetch()} className={styles.btnPrimary}>
+          <button
+            onClick={() => refetch()}
+            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+          >
             {t('common.retry')}
           </button>
         </div>
@@ -187,8 +199,10 @@ export function UserDetailPage({ testId = 'user-detail-page' }: UserDetailPagePr
 
   if (isLoading || !user) {
     return (
-      <div className={styles.container} data-testid={testId}>
-        <div className={styles.loadingState}>{t('common.loading')}</div>
+      <div className="mx-auto max-w-[1200px] space-y-6 p-6" data-testid={testId}>
+        <div className="flex flex-col items-center justify-center p-12 text-muted-foreground">
+          {t('common.loading')}
+        </div>
       </div>
     )
   }
@@ -197,24 +211,24 @@ export function UserDetailPage({ testId = 'user-detail-page' }: UserDetailPagePr
   const historyTotalPages = loginHistory?.totalPages ?? 0
 
   return (
-    <div className={styles.container} data-testid={testId}>
-      <header className={styles.header}>
-        <div className={styles.headerLeft}>
+    <div className="mx-auto max-w-[1200px] space-y-6 p-6" data-testid={testId}>
+      <header className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
           <button
-            className={styles.backButton}
+            className="rounded-md border border-border bg-transparent px-3 py-2 text-sm text-muted-foreground hover:bg-muted"
             onClick={() => navigate(`/${getTenantSlug()}/users`)}
           >
             {t('common.back')}
           </button>
-          <h1>
+          <h1 className="m-0 text-2xl font-semibold text-foreground">
             {user.firstName} {user.lastName}
           </h1>
           <StatusBadge status={user.status} />
         </div>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
+        <div className="flex gap-2">
           {user.status === 'ACTIVE' ? (
             <button
-              className={styles.btnDanger}
+              className="rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90"
               onClick={() => statusMutation.mutate('deactivate')}
               disabled={statusMutation.isPending}
             >
@@ -222,7 +236,7 @@ export function UserDetailPage({ testId = 'user-detail-page' }: UserDetailPagePr
             </button>
           ) : (
             <button
-              className={styles.btnPrimary}
+              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
               onClick={() => statusMutation.mutate('activate')}
               disabled={statusMutation.isPending}
             >
@@ -232,15 +246,21 @@ export function UserDetailPage({ testId = 'user-detail-page' }: UserDetailPagePr
         </div>
       </header>
 
-      <div className={styles.tabs}>
+      <div className="-mb-[2px] flex border-b-2 border-border">
         <button
-          className={`${styles.tab} ${activeTab === 'details' ? styles.tabActive : ''}`}
+          className={cn(
+            '-mb-[2px] border-b-2 border-transparent bg-transparent px-6 py-3 text-sm font-medium text-muted-foreground hover:text-foreground',
+            activeTab === 'details' && 'border-primary text-primary'
+          )}
           onClick={() => setActiveTab('details')}
         >
           {t('users.details')}
         </button>
         <button
-          className={`${styles.tab} ${activeTab === 'loginHistory' ? styles.tabActive : ''}`}
+          className={cn(
+            '-mb-[2px] border-b-2 border-transparent bg-transparent px-6 py-3 text-sm font-medium text-muted-foreground hover:text-foreground',
+            activeTab === 'loginHistory' && 'border-primary text-primary'
+          )}
           onClick={() => setActiveTab('loginHistory')}
         >
           {t('users.loginHistory')}
@@ -248,88 +268,128 @@ export function UserDetailPage({ testId = 'user-detail-page' }: UserDetailPagePr
       </div>
 
       {activeTab === 'details' && (
-        <div className={styles.card}>
-          <div className={styles.formGrid}>
-            <div className={styles.formGroup}>
-              <label>{t('users.email')}</label>
-              <input type="email" value={user.email} disabled />
+        <div className="rounded-lg border border-border bg-card p-6">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">
+                {t('users.email')}
+              </label>
+              <input
+                type="email"
+                value={user.email}
+                disabled
+                className="w-full rounded-md border border-border bg-muted px-3 py-2 text-sm text-muted-foreground"
+              />
             </div>
-            <div className={styles.formGroup}>
-              <label>{t('users.username')}</label>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">
+                {t('users.username')}
+              </label>
               <input
                 type="text"
                 value={formData.username}
                 onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                 disabled={!isEditing}
+                className={cn(
+                  'w-full rounded-md border border-border px-3 py-2 text-sm text-foreground',
+                  !isEditing && 'bg-muted text-muted-foreground'
+                )}
               />
             </div>
-            <div className={styles.formGroup}>
-              <label>{t('users.firstName')}</label>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">
+                {t('users.firstName')}
+              </label>
               <input
                 type="text"
                 value={formData.firstName}
                 onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
                 disabled={!isEditing}
+                className={cn(
+                  'w-full rounded-md border border-border px-3 py-2 text-sm text-foreground',
+                  !isEditing && 'bg-muted text-muted-foreground'
+                )}
               />
             </div>
-            <div className={styles.formGroup}>
-              <label>{t('users.lastName')}</label>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">
+                {t('users.lastName')}
+              </label>
               <input
                 type="text"
                 value={formData.lastName}
                 onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
                 disabled={!isEditing}
+                className={cn(
+                  'w-full rounded-md border border-border px-3 py-2 text-sm text-foreground',
+                  !isEditing && 'bg-muted text-muted-foreground'
+                )}
               />
             </div>
-            <div className={styles.formGroup}>
-              <label>{t('users.locale')}</label>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">
+                {t('users.locale')}
+              </label>
               <input
                 type="text"
                 value={formData.locale}
                 onChange={(e) => setFormData({ ...formData, locale: e.target.value })}
                 disabled={!isEditing}
+                className={cn(
+                  'w-full rounded-md border border-border px-3 py-2 text-sm text-foreground',
+                  !isEditing && 'bg-muted text-muted-foreground'
+                )}
               />
             </div>
-            <div className={styles.formGroup}>
-              <label>{t('users.timezone')}</label>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">
+                {t('users.timezone')}
+              </label>
               <input
                 type="text"
                 value={formData.timezone}
                 onChange={(e) => setFormData({ ...formData, timezone: e.target.value })}
                 disabled={!isEditing}
+                className={cn(
+                  'w-full rounded-md border border-border px-3 py-2 text-sm text-foreground',
+                  !isEditing && 'bg-muted text-muted-foreground'
+                )}
               />
             </div>
           </div>
 
-          <div className={styles.infoRow}>
-            <div className={styles.infoItem}>
-              <span className={styles.infoLabel}>{t('users.lastLogin')}</span>
+          <div className="mt-4 flex gap-8 border-t border-border pt-4 text-sm text-muted-foreground">
+            <div className="flex flex-col gap-0.5">
+              <span className="font-medium text-muted-foreground">{t('users.lastLogin')}</span>
               <span>
                 {user.lastLoginAt ? formatDate(new Date(user.lastLoginAt)) : t('users.never')}
               </span>
             </div>
-            <div className={styles.infoItem}>
-              <span className={styles.infoLabel}>{t('users.loginCount')}</span>
+            <div className="flex flex-col gap-0.5">
+              <span className="font-medium text-muted-foreground">{t('users.loginCount')}</span>
               <span>{user.loginCount}</span>
             </div>
-            <div className={styles.infoItem}>
-              <span className={styles.infoLabel}>{t('users.mfaEnabled')}</span>
+            <div className="flex flex-col gap-0.5">
+              <span className="font-medium text-muted-foreground">{t('users.mfaEnabled')}</span>
               <span>{user.mfaEnabled ? t('common.yes') : t('common.no')}</span>
             </div>
-            <div className={styles.infoItem}>
-              <span className={styles.infoLabel}>{t('users.created')}</span>
+            <div className="flex flex-col gap-0.5">
+              <span className="font-medium text-muted-foreground">{t('users.created')}</span>
               <span>{formatDate(new Date(user.createdAt))}</span>
             </div>
           </div>
 
-          <div className={styles.formActions}>
+          <div className="mt-6 flex justify-end gap-2">
             {isEditing ? (
               <>
-                <button className={styles.btnSecondary} onClick={handleCancel}>
+                <button
+                  className="rounded-md border border-border bg-secondary px-4 py-2 text-sm text-foreground hover:bg-muted"
+                  onClick={handleCancel}
+                >
                   {t('common.cancel')}
                 </button>
                 <button
-                  className={styles.btnPrimary}
+                  className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                   onClick={handleSave}
                   disabled={updateMutation.isPending}
                 >
@@ -337,7 +397,10 @@ export function UserDetailPage({ testId = 'user-detail-page' }: UserDetailPagePr
                 </button>
               </>
             ) : (
-              <button className={styles.btnPrimary} onClick={() => setIsEditing(true)}>
+              <button
+                className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                onClick={() => setIsEditing(true)}
+              >
                 {t('common.edit')}
               </button>
             )}
@@ -346,42 +409,49 @@ export function UserDetailPage({ testId = 'user-detail-page' }: UserDetailPagePr
       )}
 
       {activeTab === 'loginHistory' && (
-        <div className={styles.card}>
+        <div className="rounded-lg border border-border bg-card p-6">
           {historyLoading ? (
-            <div className={styles.loadingState}>{t('common.loading')}</div>
+            <div className="flex flex-col items-center justify-center p-12 text-muted-foreground">
+              {t('common.loading')}
+            </div>
           ) : historyEntries.length === 0 ? (
-            <div className={styles.emptyState}>
+            <div className="flex flex-col items-center justify-center p-12 text-muted-foreground">
               <p>{t('users.noLoginHistory')}</p>
             </div>
           ) : (
             <>
-              <table className={styles.table}>
+              <table className="w-full border-collapse text-sm">
                 <thead>
                   <tr>
-                    <th>{t('users.loginTime')}</th>
-                    <th>{t('users.loginType')}</th>
-                    <th>{t('users.loginStatus')}</th>
-                    <th>{t('users.sourceIp')}</th>
-                    <th>{t('users.userAgent')}</th>
+                    <th className="border-b-2 border-border px-4 py-3 text-left font-semibold text-foreground">
+                      {t('users.loginTime')}
+                    </th>
+                    <th className="border-b-2 border-border px-4 py-3 text-left font-semibold text-foreground">
+                      {t('users.loginType')}
+                    </th>
+                    <th className="border-b-2 border-border px-4 py-3 text-left font-semibold text-foreground">
+                      {t('users.loginStatus')}
+                    </th>
+                    <th className="border-b-2 border-border px-4 py-3 text-left font-semibold text-foreground">
+                      {t('users.sourceIp')}
+                    </th>
+                    <th className="border-b-2 border-border px-4 py-3 text-left font-semibold text-foreground">
+                      {t('users.userAgent')}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {historyEntries.map((entry) => (
-                    <tr key={entry.id}>
-                      <td>{formatDate(new Date(entry.loginTime))}</td>
-                      <td>{entry.loginType}</td>
-                      <td>
+                    <tr key={entry.id} className="border-b border-border hover:bg-muted/50">
+                      <td className="px-4 py-3 text-foreground">
+                        {formatDate(new Date(entry.loginTime))}
+                      </td>
+                      <td className="px-4 py-3 text-foreground">{entry.loginType}</td>
+                      <td className="px-4 py-3">
                         <LoginStatusLabel status={entry.status} />
                       </td>
-                      <td>{entry.sourceIp}</td>
-                      <td
-                        style={{
-                          maxWidth: '200px',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
+                      <td className="px-4 py-3 text-foreground">{entry.sourceIp}</td>
+                      <td className="max-w-[200px] truncate px-4 py-3 text-foreground">
                         {entry.userAgent}
                       </td>
                     </tr>
@@ -390,11 +460,11 @@ export function UserDetailPage({ testId = 'user-detail-page' }: UserDetailPagePr
               </table>
 
               {historyTotalPages > 1 && (
-                <div className={styles.pagination}>
+                <div className="mt-4 flex items-center justify-center gap-4 border-t border-border pt-4 text-muted-foreground">
                   <button
                     disabled={historyPage === 0}
                     onClick={() => setHistoryPage((p) => Math.max(0, p - 1))}
-                    className={styles.btnSmall}
+                    className="rounded-md border border-border bg-card px-2 py-1 text-xs text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {t('common.previous')}
                   </button>
@@ -404,7 +474,7 @@ export function UserDetailPage({ testId = 'user-detail-page' }: UserDetailPagePr
                   <button
                     disabled={historyPage >= historyTotalPages - 1}
                     onClick={() => setHistoryPage((p) => p + 1)}
-                    className={styles.btnSmall}
+                    className="rounded-md border border-border bg-card px-2 py-1 text-xs text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {t('common.next')}
                   </button>

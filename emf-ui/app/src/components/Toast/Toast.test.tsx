@@ -586,8 +586,9 @@ describe('ToastProvider', () => {
       fireEvent.click(screen.getByTestId('show-success'))
 
       const container = screen.getByTestId('toast-container')
-      // CSS Modules transform class names, so we check for partial match
-      expect(container.className).toMatch(/topright/)
+      // Tailwind classes for top-right position
+      expect(container.className).toMatch(/top-0/)
+      expect(container.className).toMatch(/right-0/)
     })
 
     it('should render container with custom position', () => {
@@ -600,8 +601,9 @@ describe('ToastProvider', () => {
       fireEvent.click(screen.getByTestId('show-success'))
 
       const container = screen.getByTestId('toast-container')
-      // CSS Modules transform class names, so we check for partial match
-      expect(container.className).toMatch(/bottomleft/)
+      // Tailwind classes for bottom-left position
+      expect(container.className).toMatch(/bottom-0/)
+      expect(container.className).toMatch(/left-0/)
     })
   })
 })

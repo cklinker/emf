@@ -13,43 +13,27 @@ import { usePlugins } from '../../context/PluginContext'
 import { useI18n } from '../../context/I18nContext'
 import { LoadingSpinner } from '../../components'
 import type { LoadedPlugin, PluginStatus } from '../../types/plugin'
-import styles from './PluginsPage.module.css'
+import { cn } from '@/lib/utils'
 
 /**
  * Plugin settings interface for plugins that provide configuration
  */
 export interface PluginSettings {
-  /** Plugin ID */
   pluginId: string
-  /** Settings component provided by the plugin */
   SettingsComponent?: React.ComponentType<PluginSettingsProps>
-  /** Current settings values */
   values?: Record<string, unknown>
 }
 
-/**
- * Props passed to plugin settings components
- */
 export interface PluginSettingsProps {
-  /** Current settings values */
   values: Record<string, unknown>
-  /** Callback to update settings */
   onChange: (values: Record<string, unknown>) => void
-  /** Whether settings are being saved */
   isSaving?: boolean
 }
 
-/**
- * Props for PluginsPage component
- */
 export interface PluginsPageProps {
-  /** Optional test ID for testing */
   testId?: string
 }
 
-/**
- * Get status display text
- */
 function getStatusText(status: PluginStatus, t: (key: string) => string): string {
   switch (status) {
     case 'loaded':
@@ -65,11 +49,21 @@ function getStatusText(status: PluginStatus, t: (key: string) => string): string
   }
 }
 
-/**
- * PluginCard Component
- *
- * Displays a single plugin with its details and actions.
- */
+function getStatusDotColor(status: PluginStatus): string {
+  switch (status) {
+    case 'loaded':
+      return 'bg-emerald-500'
+    case 'loading':
+      return 'bg-blue-500'
+    case 'error':
+      return 'bg-red-500'
+    case 'pending':
+      return 'bg-amber-500'
+    default:
+      return 'bg-gray-500'
+  }
+}
+
 interface PluginCardProps {
   loadedPlugin: LoadedPlugin
   isSelected: boolean
@@ -118,15 +112,12 @@ function PluginCard({
     [onViewSettings]
   )
 
-  const statusClassName = `${styles.statusBadge} ${styles[status]}`
-  const cardClassName = `${styles.pluginCard} ${isSelected ? styles.selected : ''}`
-  const toggleClassName = `${styles.toggle} ${isEnabled ? styles.enabled : ''} ${
-    status === 'loading' ? styles.disabled : ''
-  }`
-
   return (
     <div
-      className={cardClassName}
+      className={cn(
+        'cursor-pointer rounded-lg border bg-card p-4 transition-all hover:shadow-md',
+        isSelected ? 'border-primary ring-1 ring-primary' : 'border-border'
+      )}
       onClick={onSelect}
       onKeyDown={handleKeyDown}
       tabIndex={0}
@@ -135,52 +126,67 @@ function PluginCard({
       aria-label={`${plugin.name} plugin`}
       data-testid={`plugin-card-${plugin.id}`}
     >
-      <div className={styles.pluginCardHeader}>
-        <div className={styles.pluginInfo}>
-          <h3 className={styles.pluginName}>{plugin.name}</h3>
-          <span className={styles.pluginVersion}>v{plugin.version}</span>
+      <div className="mb-2 flex items-start justify-between">
+        <div className="flex items-center gap-2">
+          <h3 className="m-0 text-base font-semibold text-foreground">{plugin.name}</h3>
+          <span className="text-xs text-muted-foreground">v{plugin.version}</span>
         </div>
-        <span className={statusClassName} data-testid={`plugin-status-${plugin.id}`}>
-          <span className={styles.statusDot} aria-hidden="true" />
+        <span
+          className="flex items-center gap-1.5 text-xs text-muted-foreground"
+          data-testid={`plugin-status-${plugin.id}`}
+        >
+          <span
+            className={cn('inline-block h-2 w-2 rounded-full', getStatusDotColor(status))}
+            aria-hidden="true"
+          />
           {getStatusText(status, t)}
         </span>
       </div>
 
-      <div className={styles.pluginCardBody}>
+      <div className="mb-3">
         {error ? (
-          <p className={styles.pluginDescription} style={{ color: 'var(--color-error-text)' }}>
+          <p className="text-sm text-destructive">
             {t('plugins.errorMessage')}: {error}
           </p>
         ) : (
-          <p className={styles.pluginDescription}>
+          <p className="text-sm text-muted-foreground">
             {t('plugins.pluginId')}: {plugin.id}
           </p>
         )}
       </div>
 
-      <div className={styles.pluginCardFooter}>
-        <div className={styles.toggleContainer}>
-          <span className={styles.toggleLabel}>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">
             {isEnabled ? t('plugins.enabled') : t('plugins.disabled')}
           </span>
           <button
             type="button"
-            className={toggleClassName}
+            className={cn(
+              'relative inline-flex h-5 w-9 items-center rounded-full transition-colors',
+              isEnabled ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-600',
+              status === 'loading' && 'cursor-not-allowed opacity-50'
+            )}
             onClick={handleToggleClick}
             disabled={status === 'loading'}
             aria-label={isEnabled ? t('plugins.disable') : t('plugins.enable')}
             aria-pressed={isEnabled}
             data-testid={`plugin-toggle-${plugin.id}`}
           >
-            <span className={styles.toggleKnob} />
+            <span
+              className={cn(
+                'inline-block h-4 w-4 rounded-full bg-white shadow transition-transform',
+                isEnabled ? 'translate-x-[18px]' : 'translate-x-0.5'
+              )}
+            />
           </button>
         </div>
 
-        <div className={styles.pluginActions}>
+        <div>
           {hasSettings && (
             <button
               type="button"
-              className={styles.actionButton}
+              className="rounded-md border border-border px-3 py-1 text-xs font-medium text-primary hover:bg-muted disabled:opacity-50"
               onClick={handleSettingsClick}
               disabled={status !== 'loaded'}
               aria-label={`${t('plugins.settings')} ${plugin.name}`}
@@ -195,11 +201,6 @@ function PluginCard({
   )
 }
 
-/**
- * PluginDetailsPanel Component
- *
- * Displays detailed information about a selected plugin.
- */
 interface PluginDetailsPanelProps {
   loadedPlugin: LoadedPlugin
   registeredFieldRenderers: string[]
@@ -218,124 +219,117 @@ function PluginDetailsPanel({
 
   return (
     <aside
-      className={styles.detailsPanel}
+      className="w-80 shrink-0 rounded-lg border border-border bg-card p-4"
       aria-label={`${plugin.name} details`}
       data-testid="plugin-details-panel"
     >
-      <div className={styles.detailsHeader}>
-        <h2 className={styles.detailsTitle}>{plugin.name}</h2>
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="m-0 text-lg font-semibold text-foreground">{plugin.name}</h2>
         <button
           type="button"
-          className={styles.closeButton}
+          className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
           onClick={onClose}
           aria-label={t('common.close')}
           data-testid="plugin-details-close"
         >
-          ×
+          x
         </button>
       </div>
 
-      <div className={styles.detailsSection}>
-        <h3 className={styles.detailsSectionTitle}>{t('plugins.information')}</h3>
-        <div className={styles.detailsRow}>
-          <span className={styles.detailsLabel}>{t('plugins.pluginId')}:</span>
-          <span className={styles.detailsValue}>{plugin.id}</span>
+      <div className="mb-4 space-y-2">
+        <h3 className="text-sm font-semibold text-foreground">{t('plugins.information')}</h3>
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">{t('plugins.pluginId')}:</span>
+          <span className="text-foreground">{plugin.id}</span>
         </div>
-        <div className={styles.detailsRow}>
-          <span className={styles.detailsLabel}>{t('plugins.version')}:</span>
-          <span className={styles.detailsValue}>{plugin.version}</span>
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">{t('plugins.version')}:</span>
+          <span className="text-foreground">{plugin.version}</span>
         </div>
-        <div className={styles.detailsRow}>
-          <span className={styles.detailsLabel}>{t('plugins.status.label')}:</span>
-          <span className={styles.detailsValue}>{getStatusText(status, t)}</span>
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">{t('plugins.status.label')}:</span>
+          <span className="text-foreground">{getStatusText(status, t)}</span>
         </div>
         {error && (
-          <div className={styles.detailsRow}>
-            <span className={styles.detailsLabel}>{t('plugins.errorMessage')}:</span>
-            <span className={styles.detailsValue} style={{ color: 'var(--color-error-text)' }}>
-              {error}
-            </span>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">{t('plugins.errorMessage')}:</span>
+            <span className="text-destructive">{error}</span>
           </div>
         )}
       </div>
 
-      <div className={styles.detailsSection}>
-        <h3 className={styles.detailsSectionTitle}>{t('plugins.registeredComponents')}</h3>
+      <div className="mb-4 space-y-2">
+        <h3 className="text-sm font-semibold text-foreground">
+          {t('plugins.registeredComponents')}
+        </h3>
 
-        <div className={styles.detailsRow}>
-          <span className={styles.detailsLabel}>{t('plugins.fieldRenderers')}:</span>
-          <div className={styles.detailsValue}>
+        <div className="text-sm">
+          <span className="text-muted-foreground">{t('plugins.fieldRenderers')}:</span>
+          <div className="mt-1">
             {registeredFieldRenderers.length > 0 ? (
-              <div className={styles.componentsList}>
+              <div className="flex flex-wrap gap-1">
                 {registeredFieldRenderers.map((type) => (
-                  <span key={type} className={styles.componentTag}>
+                  <span
+                    key={type}
+                    className="rounded bg-muted px-2 py-0.5 text-xs font-medium text-foreground"
+                  >
                     {type}
                   </span>
                 ))}
               </div>
             ) : (
-              <span className={styles.noSettings}>{t('common.none')}</span>
+              <span className="text-xs text-muted-foreground italic">{t('common.none')}</span>
             )}
           </div>
         </div>
 
-        <div className={styles.detailsRow}>
-          <span className={styles.detailsLabel}>{t('plugins.pageComponents')}:</span>
-          <div className={styles.detailsValue}>
+        <div className="text-sm">
+          <span className="text-muted-foreground">{t('plugins.pageComponents')}:</span>
+          <div className="mt-1">
             {registeredPageComponents.length > 0 ? (
-              <div className={styles.componentsList}>
+              <div className="flex flex-wrap gap-1">
                 {registeredPageComponents.map((name) => (
-                  <span key={name} className={styles.componentTag}>
+                  <span
+                    key={name}
+                    className="rounded bg-muted px-2 py-0.5 text-xs font-medium text-foreground"
+                  >
                     {name}
                   </span>
                 ))}
               </div>
             ) : (
-              <span className={styles.noSettings}>{t('common.none')}</span>
+              <span className="text-xs text-muted-foreground italic">{t('common.none')}</span>
             )}
           </div>
         </div>
       </div>
 
-      <div className={styles.settingsPanel}>
-        <h3 className={styles.settingsTitle}>{t('plugins.settings')}</h3>
-        <div className={styles.settingsContent}>
-          <p className={styles.noSettings}>{t('plugins.noSettingsAvailable')}</p>
-        </div>
+      <div>
+        <h3 className="mb-2 text-sm font-semibold text-foreground">{t('plugins.settings')}</h3>
+        <p className="text-xs text-muted-foreground italic">{t('plugins.noSettingsAvailable')}</p>
       </div>
     </aside>
   )
 }
 
-/**
- * PluginsPage Component
- *
- * Main page for managing plugins in the EMF Admin UI.
- * Displays installed plugins, their status, and provides configuration options.
- */
 export function PluginsPage({ testId = 'plugins-page' }: PluginsPageProps): React.ReactElement {
   const { t } = useI18n()
   const { plugins, isLoading, errors, fieldRenderers, pageComponents } = usePlugins()
 
-  // Track enabled state for each plugin (in a real app, this would be persisted)
   const [enabledPlugins, setEnabledPlugins] = useState<Set<string>>(new Set())
 
-  // Update enabled plugins when plugins load
   React.useEffect(() => {
     const loadedPluginIds = plugins.filter((p) => p.status === 'loaded').map((p) => p.plugin.id)
     setEnabledPlugins(new Set(loadedPluginIds))
   }, [plugins])
 
-  // Track selected plugin for details panel
   const [selectedPluginId, setSelectedPluginId] = useState<string | null>(null)
 
-  // Get the selected plugin
   const selectedPlugin = useMemo(() => {
     if (!selectedPluginId) return null
     return plugins.find((p) => p.plugin.id === selectedPluginId) ?? null
   }, [plugins, selectedPluginId])
 
-  // Get registered components for the selected plugin
   const registeredFieldRenderers = useMemo(() => {
     if (!selectedPlugin) return []
     const pluginFieldRenderers = selectedPlugin.plugin.fieldRenderers
@@ -350,12 +344,10 @@ export function PluginsPage({ testId = 'plugins-page' }: PluginsPageProps): Reac
     return Object.keys(pluginPageComponents)
   }, [selectedPlugin])
 
-  // Handle plugin selection
   const handleSelectPlugin = useCallback((pluginId: string) => {
     setSelectedPluginId((prev) => (prev === pluginId ? null : pluginId))
   }, [])
 
-  // Handle toggle enabled
   const handleToggleEnabled = useCallback((pluginId: string) => {
     setEnabledPlugins((prev) => {
       const next = new Set(prev)
@@ -368,26 +360,22 @@ export function PluginsPage({ testId = 'plugins-page' }: PluginsPageProps): Reac
     })
   }, [])
 
-  // Handle view settings
   const handleViewSettings = useCallback((pluginId: string) => {
     setSelectedPluginId(pluginId)
   }, [])
 
-  // Handle close details panel
   const handleCloseDetails = useCallback(() => {
     setSelectedPluginId(null)
   }, [])
 
-  // Count statistics
   const loadedCount = plugins.filter((p) => p.status === 'loaded').length
   const totalFieldRenderers = fieldRenderers.size
   const totalPageComponents = pageComponents.size
 
-  // Render loading state
   if (isLoading) {
     return (
-      <div className={styles.container} data-testid={testId}>
-        <div className={styles.loadingContainer}>
+      <div className="mx-auto max-w-[1400px] space-y-6 p-6 lg:p-8" data-testid={testId}>
+        <div className="flex min-h-[400px] items-center justify-center">
           <LoadingSpinner size="large" label={t('common.loading')} />
         </div>
       </div>
@@ -395,11 +383,10 @@ export function PluginsPage({ testId = 'plugins-page' }: PluginsPageProps): Reac
   }
 
   return (
-    <div className={styles.container} data-testid={testId}>
-      {/* Page Header */}
-      <header className={styles.header}>
-        <h1 className={styles.title}>{t('navigation.plugins')}</h1>
-        <div className={styles.headerInfo}>
+    <div className="mx-auto max-w-[1400px] space-y-6 p-6 lg:p-8" data-testid={testId}>
+      <header className="flex items-center justify-between">
+        <h1 className="m-0 text-2xl font-semibold text-foreground">{t('navigation.plugins')}</h1>
+        <div className="flex items-center gap-4 text-sm text-muted-foreground">
           <span data-testid="plugins-count">
             {t('plugins.loadedCount', {
               count: String(loadedCount),
@@ -419,28 +406,32 @@ export function PluginsPage({ testId = 'plugins-page' }: PluginsPageProps): Reac
         </div>
       </header>
 
-      {/* Error Summary */}
       {errors.length > 0 && (
-        <div className={styles.errorList} role="alert" data-testid="plugin-errors">
-          <h2 className={styles.detailsSectionTitle}>{t('plugins.loadErrors')}</h2>
+        <div
+          className="rounded-lg border border-destructive bg-destructive/10 p-4"
+          role="alert"
+          data-testid="plugin-errors"
+        >
+          <h2 className="mb-2 text-sm font-semibold text-foreground">{t('plugins.loadErrors')}</h2>
           {errors.map((err) => (
-            <div key={err.pluginId} className={styles.errorItem}>
-              <span className={styles.errorPluginId}>{err.pluginId}</span>
-              <span className={styles.errorMessage}>{err.error}</span>
+            <div key={err.pluginId} className="flex items-center gap-2 text-sm">
+              <span className="font-medium text-foreground">{err.pluginId}</span>
+              <span className="text-destructive">{err.error}</span>
             </div>
           ))}
         </div>
       )}
 
-      {/* Main Content */}
       {plugins.length === 0 ? (
-        <div className={styles.emptyState} data-testid="empty-state">
+        <div
+          className="rounded-lg border border-border bg-card p-16 text-center text-muted-foreground"
+          data-testid="empty-state"
+        >
           <p>{t('plugins.noPlugins')}</p>
         </div>
       ) : (
-        <div style={{ display: 'flex', gap: 'var(--spacing-lg, 1.5rem)' }}>
-          {/* Plugin Grid */}
-          <div className={styles.pluginGrid} style={{ flex: 1 }}>
+        <div className="flex gap-6">
+          <div className="flex-1 grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-4">
             {plugins.map((loadedPlugin) => (
               <PluginCard
                 key={loadedPlugin.plugin.id}
@@ -450,12 +441,11 @@ export function PluginsPage({ testId = 'plugins-page' }: PluginsPageProps): Reac
                 onSelect={() => handleSelectPlugin(loadedPlugin.plugin.id)}
                 onToggleEnabled={() => handleToggleEnabled(loadedPlugin.plugin.id)}
                 onViewSettings={() => handleViewSettings(loadedPlugin.plugin.id)}
-                hasSettings={false} // In a real implementation, check if plugin provides settings
+                hasSettings={false}
               />
             ))}
           </div>
 
-          {/* Details Panel */}
           {selectedPlugin && (
             <PluginDetailsPanel
               loadedPlugin={selectedPlugin}

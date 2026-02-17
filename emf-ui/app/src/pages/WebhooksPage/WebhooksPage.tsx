@@ -11,7 +11,8 @@ import {
 } from '../../components'
 import type { LogColumn } from '../../components'
 
-import styles from './WebhooksPage.module.css'
+import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
 
 interface Webhook {
   id: string
@@ -167,26 +168,26 @@ function WebhookForm({
 
   return (
     <div
-      className={styles.modalOverlay}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
       onClick={(e) => e.target === e.currentTarget && onCancel()}
       onKeyDown={handleKeyDown}
       data-testid="webhook-form-overlay"
       role="presentation"
     >
       <div
-        className={styles.modal}
+        className="w-full max-w-[600px] max-h-[90vh] overflow-y-auto rounded-lg bg-background shadow-xl"
         role="dialog"
         aria-modal="true"
         aria-labelledby="webhook-form-title"
         data-testid="webhook-form-modal"
       >
-        <div className={styles.modalHeader}>
-          <h2 id="webhook-form-title" className={styles.modalTitle}>
+        <div className="flex items-center justify-between border-b border-border p-6">
+          <h2 id="webhook-form-title" className="text-lg font-semibold text-foreground">
             {title}
           </h2>
           <button
             type="button"
-            className={styles.modalCloseButton}
+            className="rounded p-2 text-2xl leading-none text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             onClick={onCancel}
             aria-label="Close"
             data-testid="webhook-form-close"
@@ -194,12 +195,12 @@ function WebhookForm({
             &times;
           </button>
         </div>
-        <div className={styles.modalBody}>
-          <form className={styles.form} onSubmit={handleSubmit} noValidate>
-            <div className={styles.formGroup}>
-              <label htmlFor="webhook-name" className={styles.formLabel}>
+        <div className="p-6">
+          <form className="flex flex-col gap-5" onSubmit={handleSubmit} noValidate>
+            <div className="flex flex-col gap-2">
+              <label htmlFor="webhook-name" className="text-sm font-medium text-foreground">
                 Name
-                <span className={styles.required} aria-hidden="true">
+                <span className="ml-1 text-destructive" aria-hidden="true">
                   *
                 </span>
               </label>
@@ -207,7 +208,12 @@ function WebhookForm({
                 ref={nameInputRef}
                 id="webhook-name"
                 type="text"
-                className={`${styles.formInput} ${touched.name && errors.name ? styles.hasError : ''}`}
+                className={cn(
+                  'rounded-md border border-border bg-background px-3 py-2.5 text-sm text-foreground transition-colors',
+                  'focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20',
+                  'disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground',
+                  touched.name && errors.name && 'border-destructive'
+                )}
                 value={formData.name}
                 onChange={(e) => handleChange('name', e.target.value)}
                 onBlur={() => handleBlur('name')}
@@ -218,23 +224,28 @@ function WebhookForm({
                 data-testid="webhook-name-input"
               />
               {touched.name && errors.name && (
-                <span className={styles.formError} role="alert">
+                <span className="text-xs text-destructive" role="alert">
                   {errors.name}
                 </span>
               )}
             </div>
 
-            <div className={styles.formGroup}>
-              <label htmlFor="webhook-url" className={styles.formLabel}>
+            <div className="flex flex-col gap-2">
+              <label htmlFor="webhook-url" className="text-sm font-medium text-foreground">
                 URL
-                <span className={styles.required} aria-hidden="true">
+                <span className="ml-1 text-destructive" aria-hidden="true">
                   *
                 </span>
               </label>
               <input
                 id="webhook-url"
                 type="text"
-                className={`${styles.formInput} ${touched.url && errors.url ? styles.hasError : ''}`}
+                className={cn(
+                  'rounded-md border border-border bg-background px-3 py-2.5 text-sm text-foreground transition-colors',
+                  'focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20',
+                  'disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground',
+                  touched.url && errors.url && 'border-destructive'
+                )}
                 value={formData.url}
                 onChange={(e) => handleChange('url', e.target.value)}
                 onBlur={() => handleBlur('url')}
@@ -245,19 +256,24 @@ function WebhookForm({
                 data-testid="webhook-url-input"
               />
               {touched.url && errors.url && (
-                <span className={styles.formError} role="alert">
+                <span className="text-xs text-destructive" role="alert">
                   {errors.url}
                 </span>
               )}
             </div>
 
-            <div className={styles.formGroup}>
-              <label htmlFor="webhook-events" className={styles.formLabel}>
+            <div className="flex flex-col gap-2">
+              <label htmlFor="webhook-events" className="text-sm font-medium text-foreground">
                 Events
               </label>
               <textarea
                 id="webhook-events"
-                className={`${styles.formInput} ${styles.formTextarea} ${touched.events && errors.events ? styles.hasError : ''}`}
+                className={cn(
+                  'min-h-[80px] resize-y rounded-md border border-border bg-background px-3 py-2.5 font-[inherit] text-sm text-foreground transition-colors',
+                  'focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20',
+                  'disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground',
+                  touched.events && errors.events && 'border-destructive'
+                )}
                 value={formData.events}
                 onChange={(e) => handleChange('events', e.target.value)}
                 onBlur={() => handleBlur('events')}
@@ -266,22 +282,29 @@ function WebhookForm({
                 rows={3}
                 data-testid="webhook-events-input"
               />
-              <span className={styles.formHint}>JSON array of event types</span>
+              <span className="text-xs text-muted-foreground">JSON array of event types</span>
               {touched.events && errors.events && (
-                <span className={styles.formError} role="alert">
+                <span className="text-xs text-destructive" role="alert">
                   {errors.events}
                 </span>
               )}
             </div>
 
-            <div className={styles.formGroup}>
-              <label htmlFor="webhook-collection-id" className={styles.formLabel}>
+            <div className="flex flex-col gap-2">
+              <label
+                htmlFor="webhook-collection-id"
+                className="text-sm font-medium text-foreground"
+              >
                 Collection ID
               </label>
               <input
                 id="webhook-collection-id"
                 type="text"
-                className={styles.formInput}
+                className={cn(
+                  'rounded-md border border-border bg-background px-3 py-2.5 text-sm text-foreground transition-colors',
+                  'focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20',
+                  'disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground'
+                )}
                 value={formData.collectionId}
                 onChange={(e) => handleChange('collectionId', e.target.value)}
                 placeholder="Optional collection ID"
@@ -290,13 +313,20 @@ function WebhookForm({
               />
             </div>
 
-            <div className={styles.formGroup}>
-              <label htmlFor="webhook-filter-formula" className={styles.formLabel}>
+            <div className="flex flex-col gap-2">
+              <label
+                htmlFor="webhook-filter-formula"
+                className="text-sm font-medium text-foreground"
+              >
                 Filter Formula
               </label>
               <textarea
                 id="webhook-filter-formula"
-                className={`${styles.formInput} ${styles.formTextarea}`}
+                className={cn(
+                  'min-h-[80px] resize-y rounded-md border border-border bg-background px-3 py-2.5 font-[inherit] text-sm text-foreground transition-colors',
+                  'focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20',
+                  'disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground'
+                )}
                 value={formData.filterFormula}
                 onChange={(e) => handleChange('filterFormula', e.target.value)}
                 placeholder="Optional filter formula"
@@ -306,55 +336,57 @@ function WebhookForm({
               />
             </div>
 
-            <div className={styles.formGroup}>
-              <label htmlFor="webhook-secret" className={styles.formLabel}>
+            <div className="flex flex-col gap-2">
+              <label htmlFor="webhook-secret" className="text-sm font-medium text-foreground">
                 Secret
               </label>
               <input
                 id="webhook-secret"
                 type="text"
-                className={styles.formInput}
+                className={cn(
+                  'rounded-md border border-border bg-background px-3 py-2.5 text-sm text-foreground transition-colors',
+                  'focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20',
+                  'disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground'
+                )}
                 value={formData.secret}
                 onChange={(e) => handleChange('secret', e.target.value)}
                 placeholder="Optional HMAC signing secret"
                 disabled={isSubmitting}
                 data-testid="webhook-secret-input"
               />
-              <span className={styles.formHint}>Used for HMAC signature verification</span>
+              <span className="text-xs text-muted-foreground">
+                Used for HMAC signature verification
+              </span>
             </div>
 
-            <div className={styles.checkboxGroup}>
+            <div className="flex items-center gap-2">
               <input
                 id="webhook-active"
                 type="checkbox"
+                className="h-4 w-4 accent-primary"
                 checked={formData.active}
                 onChange={(e) => handleChange('active', e.target.checked)}
                 disabled={isSubmitting}
                 data-testid="webhook-active-input"
               />
-              <label htmlFor="webhook-active" className={styles.formLabel}>
+              <label htmlFor="webhook-active" className="text-sm font-medium text-foreground">
                 Active
               </label>
             </div>
 
-            <div className={styles.formActions}>
-              <button
+            <div className="mt-2 flex justify-end gap-3 border-t border-border pt-4">
+              <Button
                 type="button"
-                className={styles.cancelButton}
+                variant="outline"
                 onClick={onCancel}
                 disabled={isSubmitting}
                 data-testid="webhook-form-cancel"
               >
                 Cancel
-              </button>
-              <button
-                type="submit"
-                className={styles.submitButton}
-                disabled={isSubmitting}
-                data-testid="webhook-form-submit"
-              >
+              </Button>
+              <Button type="submit" disabled={isSubmitting} data-testid="webhook-form-submit">
                 {isSubmitting ? 'Saving...' : 'Save'}
-              </button>
+              </Button>
             </div>
           </form>
         </div>
@@ -448,10 +480,7 @@ export function WebhooksPage({ testId = 'webhooks-page' }: WebhooksPageProps): R
         secret: data.secret || null,
         active: data.active,
       }
-      return apiClient.post<Webhook>(
-        `/control/webhooks?userId=system`,
-        payload
-      )
+      return apiClient.post<Webhook>(`/control/webhooks?userId=system`, payload)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['webhooks'] })
@@ -548,8 +577,8 @@ export function WebhooksPage({ testId = 'webhooks-page' }: WebhooksPageProps): R
 
   if (isLoading) {
     return (
-      <div className={styles.container} data-testid={testId}>
-        <div className={styles.loadingContainer}>
+      <div className="mx-auto max-w-[1400px] space-y-6 p-6 lg:p-8" data-testid={testId}>
+        <div className="flex min-h-[400px] items-center justify-center">
           <LoadingSpinner size="large" label="Loading webhooks..." />
         </div>
       </div>
@@ -558,7 +587,7 @@ export function WebhooksPage({ testId = 'webhooks-page' }: WebhooksPageProps): R
 
   if (error) {
     return (
-      <div className={styles.container} data-testid={testId}>
+      <div className="mx-auto max-w-[1400px] space-y-6 p-6 lg:p-8" data-testid={testId}>
         <ErrorMessage
           error={error instanceof Error ? error : new Error('An error occurred')}
           onRetry={() => refetch()}
@@ -570,50 +599,76 @@ export function WebhooksPage({ testId = 'webhooks-page' }: WebhooksPageProps): R
   const isSubmitting = createMutation.isPending || updateMutation.isPending
 
   return (
-    <div className={styles.container} data-testid={testId}>
-      <header className={styles.header}>
-        <h1 className={styles.title}>Webhooks</h1>
-        <button
+    <div className="mx-auto max-w-[1400px] space-y-6 p-6 lg:p-8" data-testid={testId}>
+      <header className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold text-foreground">Webhooks</h1>
+        <Button
           type="button"
-          className={styles.createButton}
           onClick={handleCreate}
           aria-label="Create Webhook"
           data-testid="add-webhook-button"
         >
           Create Webhook
-        </button>
+        </Button>
       </header>
 
       {webhookList.length === 0 ? (
-        <div className={styles.emptyState} data-testid="empty-state">
+        <div
+          className="rounded-lg border border-border bg-card py-16 text-center text-muted-foreground"
+          data-testid="empty-state"
+        >
           <p>No webhooks found.</p>
         </div>
       ) : (
-        <div className={styles.tableContainer}>
+        <div className="overflow-x-auto rounded-lg border border-border bg-card">
           <table
-            className={styles.table}
+            className="w-full border-collapse"
             role="grid"
             aria-label="Webhooks"
             data-testid="webhooks-table"
           >
             <thead>
-              <tr role="row">
-                <th role="columnheader" scope="col">
+              <tr role="row" className="bg-muted">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   Name
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   URL
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   Events
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   Active
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   Created
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   Actions
                 </th>
               </tr>
@@ -623,38 +678,50 @@ export function WebhooksPage({ testId = 'webhooks-page' }: WebhooksPageProps): R
                 <tr
                   key={webhook.id}
                   role="row"
-                  className={styles.tableRow}
+                  className="border-b border-border transition-colors last:border-b-0 hover:bg-muted/50"
                   data-testid={`webhook-row-${index}`}
                 >
-                  <td role="gridcell">{webhook.name}</td>
-                  <td role="gridcell" className={styles.descriptionCell} title={webhook.url}>
+                  <td role="gridcell" className="px-4 py-3 text-sm text-foreground">
+                    {webhook.name}
+                  </td>
+                  <td
+                    role="gridcell"
+                    className="max-w-[300px] truncate px-4 py-3 text-sm text-foreground"
+                    title={webhook.url}
+                  >
                     {truncateUrl(webhook.url)}
                   </td>
-                  <td role="gridcell">
-                    <span className={styles.badge}>
+                  <td role="gridcell" className="px-4 py-3 text-sm text-foreground">
+                    <span className="inline-block rounded-full bg-muted px-3 py-1 text-xs font-semibold uppercase tracking-wider text-primary">
                       {webhook.events?.length ?? 0} event
                       {(webhook.events?.length ?? 0) !== 1 ? 's' : ''}
                     </span>
                   </td>
-                  <td role="gridcell">
+                  <td role="gridcell" className="px-4 py-3 text-sm text-foreground">
                     <span
-                      className={`${styles.boolBadge} ${webhook.active ? styles.boolTrue : styles.boolFalse}`}
+                      className={cn(
+                        'inline-block rounded-full px-3 py-1 text-xs font-semibold',
+                        webhook.active
+                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                          : 'bg-muted text-muted-foreground'
+                      )}
                     >
                       {webhook.active ? 'Yes' : 'No'}
                     </span>
                   </td>
-                  <td role="gridcell">
+                  <td role="gridcell" className="px-4 py-3 text-sm text-foreground">
                     {formatDate(new Date(webhook.createdAt), {
                       year: 'numeric',
                       month: 'short',
                       day: 'numeric',
                     })}
                   </td>
-                  <td role="gridcell" className={styles.actionsCell}>
-                    <div className={styles.actions}>
-                      <button
+                  <td role="gridcell" className="px-4 py-3 text-right text-sm">
+                    <div className="flex justify-end gap-2">
+                      <Button
                         type="button"
-                        className={styles.actionButton}
+                        variant="outline"
+                        size="sm"
                         onClick={() => {
                           setLogsItemId(webhook.id)
                           setLogsItemName(webhook.name)
@@ -663,25 +730,28 @@ export function WebhooksPage({ testId = 'webhooks-page' }: WebhooksPageProps): R
                         data-testid={`deliveries-button-${index}`}
                       >
                         Deliveries
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
-                        className={styles.actionButton}
+                        variant="outline"
+                        size="sm"
                         onClick={() => handleEdit(webhook)}
                         aria-label={`Edit ${webhook.name}`}
                         data-testid={`edit-button-${index}`}
                       >
                         Edit
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
-                        className={`${styles.actionButton} ${styles.deleteButton}`}
+                        variant="outline"
+                        size="sm"
+                        className="border-destructive/30 text-destructive hover:bg-destructive/10"
                         onClick={() => handleDeleteClick(webhook)}
                         aria-label={`Delete ${webhook.name}`}
                         data-testid={`delete-button-${index}`}
                       >
                         Delete
-                      </button>
+                      </Button>
                     </div>
                   </td>
                 </tr>

@@ -17,7 +17,7 @@
  */
 
 import React from 'react'
-import styles from './LoadingSpinner.module.css'
+import { cn } from '@/lib/utils'
 
 /**
  * Size variants for the spinner
@@ -43,6 +43,18 @@ export interface LoadingSpinnerProps {
  */
 const DEFAULT_SR_TEXT = 'Loading...'
 
+const SIZE_CLASSES: Record<SpinnerSize, string> = {
+  small: 'size-4',
+  medium: 'size-6',
+  large: 'size-12',
+}
+
+const LABEL_SIZE_CLASSES: Record<SpinnerSize, string> = {
+  small: 'text-xs',
+  medium: 'text-sm',
+  large: 'text-base',
+}
+
 /**
  * LoadingSpinner Component
  *
@@ -67,50 +79,61 @@ export function LoadingSpinner({
   className,
   'data-testid': testId = 'loading-spinner',
 }: LoadingSpinnerProps): React.ReactElement {
-  // Combine class names
-  const containerClasses = [styles.container, className].filter(Boolean).join(' ')
-
-  const spinnerClasses = [styles.spinner, styles[size]].join(' ')
-
   return (
     <div
-      className={containerClasses}
+      className={cn('inline-flex flex-col items-center justify-center gap-2', className)}
       role="status"
       aria-live="polite"
       aria-busy="true"
       data-testid={testId}
     >
       {/* Spinner element */}
-      <div className={spinnerClasses} aria-hidden="true" data-testid={`${testId}-icon`}>
+      <div
+        className={cn('flex items-center justify-center shrink-0', SIZE_CLASSES[size])}
+        aria-hidden="true"
+        data-testid={`${testId}-icon`}
+      >
         <svg
-          className={styles.svg}
+          className="size-full animate-spin motion-reduce:animate-none"
           viewBox="0 0 24 24"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
         >
           {/* Background circle (track) */}
-          <circle className={styles.track} cx="12" cy="12" r="10" strokeWidth="3" />
+          <circle
+            className="stroke-current opacity-10 dark:opacity-10"
+            cx="12"
+            cy="12"
+            r="10"
+            strokeWidth="3"
+          />
           {/* Animated arc */}
           <circle
-            className={styles.arc}
+            className="stroke-primary motion-reduce:animate-pulse"
             cx="12"
             cy="12"
             r="10"
             strokeWidth="3"
             strokeLinecap="round"
+            strokeDasharray="45 200"
+            strokeDashoffset="0"
+            style={{ transformOrigin: 'center' }}
           />
         </svg>
       </div>
 
       {/* Visible label (if provided) */}
       {label && (
-        <span className={styles.label} data-testid={`${testId}-label`}>
+        <span
+          className={cn('text-muted-foreground text-center leading-snug', LABEL_SIZE_CLASSES[size])}
+          data-testid={`${testId}-label`}
+        >
           {label}
         </span>
       )}
 
       {/* Screen reader text (always present for accessibility) */}
-      <span className={styles.srOnly} data-testid={`${testId}-sr-text`}>
+      <span className="sr-only" data-testid={`${testId}-sr-text`}>
         {label || DEFAULT_SR_TEXT}
       </span>
     </div>

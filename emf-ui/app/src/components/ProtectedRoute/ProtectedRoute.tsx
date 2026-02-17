@@ -53,8 +53,6 @@ export function hasRequiredRoles(
 
 /**
  * Check if user has any of the required policies
- * Note: In a real implementation, this would check against the user's
- * permissions/policies from the auth context or a separate authorization service
  */
 // eslint-disable-next-line react-refresh/only-export-components
 export function hasRequiredPolicies(
@@ -76,24 +74,6 @@ export function hasRequiredPolicies(
  * Wraps routes that require authentication and optionally authorization.
  * Shows loading state while checking auth, redirects to login if not authenticated,
  * and redirects to unauthorized page if user lacks required permissions.
- *
- * @example
- * ```tsx
- * // Basic protected route
- * <ProtectedRoute>
- *   <DashboardPage />
- * </ProtectedRoute>
- *
- * // Protected route with role requirements
- * <ProtectedRoute requiredRoles={['admin']}>
- *   <AdminPage />
- * </ProtectedRoute>
- *
- * // Protected route with policy requirements
- * <ProtectedRoute requiredPolicies={['collections:read']}>
- *   <CollectionsPage />
- * </ProtectedRoute>
- * ```
  */
 export function ProtectedRoute({
   children,
@@ -115,12 +95,7 @@ export function ProtectedRoute({
         aria-live="polite"
         aria-label="Checking authentication"
         data-testid="protected-route-loading"
-        style={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          minHeight: '200px',
-        }}
+        className="flex justify-center items-center min-h-[200px]"
       >
         {loadingComponent || <LoadingSpinner size="large" label="Checking authentication..." />}
       </div>
@@ -128,11 +103,8 @@ export function ProtectedRoute({
   }
 
   // Redirect to login if not authenticated
-  // Requirement 2.1: Redirect unauthenticated users to OIDC provider login page
   if (!isAuthenticated) {
-    // Preserve query params (e.g. ?logged_out=true) when redirecting to login
     const loginTarget = location.search ? `${loginPath}${location.search}` : loginPath
-    // Store the current location to redirect back after login
     return (
       <Navigate
         to={loginTarget}
@@ -147,7 +119,6 @@ export function ProtectedRoute({
   const hasRoles = hasRequiredRoles(user?.roles, requiredRoles)
 
   // Check policy-based authorization
-  // Note: User policies would typically come from claims or a separate authorization check
   const userPolicies = (user?.claims?.policies as string[]) || []
   const hasPolicies = hasRequiredPolicies(userPolicies, requiredPolicies)
 

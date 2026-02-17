@@ -9,7 +9,6 @@
 import React from 'react'
 import { useLayoutEditor } from './LayoutEditorContext'
 import { LayoutCanvas } from './LayoutCanvas'
-import styles from './MobilePreview.module.css'
 
 export function MobilePreview(): React.ReactElement {
   const { state } = useLayoutEditor()
@@ -18,7 +17,7 @@ export function MobilePreview(): React.ReactElement {
   if (previewDevice === 'desktop') {
     return (
       <div
-        className={`${styles.previewContainer} ${styles.previewDesktop}`}
+        className="flex flex-1 justify-center overflow-y-auto bg-muted p-6 min-h-0 w-full max-w-full max-md:p-3"
         data-testid="mobile-preview-desktop"
       >
         <LayoutCanvas />
@@ -29,10 +28,10 @@ export function MobilePreview(): React.ReactElement {
   if (previewDevice === 'tablet') {
     return (
       <div
-        className={`${styles.previewContainer} ${styles.previewTablet}`}
+        className="flex flex-1 justify-center overflow-y-auto bg-muted p-6 min-h-0 w-full max-w-[768px] max-md:p-3"
         data-testid="mobile-preview-tablet"
       >
-        <div className={styles.tabletFrame}>
+        <div className="rounded-xl border-2 border-border bg-background p-3 shadow-md">
           <LayoutCanvas />
         </div>
       </div>
@@ -42,12 +41,12 @@ export function MobilePreview(): React.ReactElement {
   // Mobile
   return (
     <div
-      className={`${styles.previewContainer} ${styles.previewMobile}`}
+      className="flex flex-1 justify-center overflow-y-auto bg-muted p-6 min-h-0 w-full max-w-[375px] max-md:p-3"
       data-testid="mobile-preview-mobile"
     >
-      <div className={styles.phoneFrame}>
-        <div className={styles.phoneNotch} />
-        <div className={styles.phoneContent}>
+      <div className="relative rounded-3xl border-[3px] border-gray-800 bg-background p-2 shadow-lg">
+        <div className="relative flex justify-center pb-2 pt-1 before:h-1.5 before:w-20 before:rounded-full before:bg-gray-800 before:content-['']" />
+        <div className="min-h-[500px] overflow-hidden rounded-2xl">
           <LayoutCanvas />
         </div>
       </div>

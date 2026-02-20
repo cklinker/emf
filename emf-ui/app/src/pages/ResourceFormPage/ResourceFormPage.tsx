@@ -21,6 +21,9 @@ import { usePlugins } from '../../context/PluginContext'
 import { useApi } from '../../context/ApiContext'
 import { useToast, LoadingSpinner, ErrorMessage, LookupSelect } from '../../components'
 import type { LookupOption } from '../../components'
+import { useAuth } from '../../context/AuthContext'
+import { usePageLayout } from '../../hooks/usePageLayout'
+import { LayoutFormSections } from '../../components/LayoutFormSections/LayoutFormSections'
 import { unwrapResource, wrapResource } from '../../utils/jsonapi'
 import { ApiError } from '../../services/apiClient'
 import type { ApiClient } from '../../services/apiClient'
@@ -291,6 +294,7 @@ export function ResourceFormPage({
   // Get plugin system for custom field renderers
   // Requirement 12.4: Use registered field renderers when rendering fields
   const { getFieldRenderer } = usePlugins()
+  const { user } = useAuth()
 
   // Get collection name and resource ID from props or route params
   const collectionName = propCollectionName || routeCollection || ''
@@ -322,6 +326,9 @@ export function ResourceFormPage({
     queryFn: () => fetchCollectionSchema(apiClient, collectionName),
     enabled: !!collectionName,
   })
+
+  // Resolve page layout for this collection (returns null if none configured)
+  const { layout, isLoading: layoutLoading } = usePageLayout(schema?.id, user?.id)
 
   // Identify picklist fields so we can fetch their values
   const picklistFields = useMemo(() => {
@@ -1367,7 +1374,10 @@ export function ResourceFormPage({
 
   // Loading state
   const isLoading =
-    schemaLoading || (isEditMode && resourceLoading) || (isCloneMode && !cloneSource)
+    schemaLoading ||
+    layoutLoading ||
+    (isEditMode && resourceLoading) ||
+    (isCloneMode && !cloneSource)
 
   if (isLoading) {
     return (
@@ -1507,19 +1517,27 @@ export function ResourceFormPage({
         noValidate
         data-testid="resource-form"
       >
-        {/* Form Fields */}
-        <div className="flex flex-col gap-6 rounded-md border border-border bg-card p-6 max-md:p-4">
-          {sortedFields.length === 0 ? (
-            <div
-              className="flex flex-col items-center justify-center rounded-md bg-muted p-8 text-center text-muted-foreground"
-              data-testid="no-fields"
-            >
-              <p className="m-0 text-base">{t('resourceForm.noFields')}</p>
-            </div>
-          ) : (
-            sortedFields.map((field, index) => renderField(field, index))
-          )}
-        </div>
+        {/* Form Fields — use page layout sections when available */}
+        {layout && layout.sections.length > 0 ? (
+          <LayoutFormSections
+            sections={layout.sections}
+            schemaFields={sortedFields}
+            renderField={renderField}
+          />
+        ) : (
+          <div className="flex flex-col gap-6 rounded-md border border-border bg-card p-6 max-md:p-4">
+            {sortedFields.length === 0 ? (
+              <div
+                className="flex flex-col items-center justify-center rounded-md bg-muted p-8 text-center text-muted-foreground"
+                data-testid="no-fields"
+              >
+                <p className="m-0 text-base">{t('resourceForm.noFields')}</p>
+              </div>
+            ) : (
+              sortedFields.map((field, index) => renderField(field, index))
+            )}
+          </div>
+        )}
 
         {/* Form Actions */}
         <div className="flex justify-end gap-4 border-t border-border pt-4 max-md:flex-col-reverse">

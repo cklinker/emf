@@ -24,6 +24,7 @@ import {
   FieldPalette,
   PropertyPanel,
   MobilePreview,
+  RelatedListPanel,
 } from './components'
 import type {
   EditorSection,
@@ -669,7 +670,12 @@ function LayoutEditorViewInner({ layoutId, onBack }: LayoutEditorViewProps): Rea
       <div className="flex flex-1 min-h-0 overflow-hidden">
         <FieldPalette />
         <MobilePreview />
-        <PropertyPanel />
+        <div className="flex w-[300px] flex-col overflow-y-auto border-l border-border bg-background max-md:w-full max-md:max-h-[300px] max-md:border-l-0 max-md:border-t">
+          <PropertyPanel />
+          <div className="border-t border-border">
+            <RelatedListPanel />
+          </div>
+        </div>
       </div>
     </div>
   )

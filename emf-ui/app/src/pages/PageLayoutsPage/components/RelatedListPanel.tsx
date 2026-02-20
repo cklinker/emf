@@ -236,15 +236,36 @@ export function RelatedListPanel(): React.ReactElement {
 
   const handleEdit = useCallback((rl: EditorRelatedList) => {
     setEditingId(rl.id)
-    setFormData({
-      relatedCollectionId: rl.relatedCollectionId,
-      relationshipFieldId: rl.relationshipFieldId,
-      selectedDisplayColumns: rl.displayColumns
-        ? rl.displayColumns
+
+    // Parse displayColumns: may be a JSON array string '["col1","col2"]' or CSV 'col1,col2'
+    let parsedColumns: string[] = []
+    if (rl.displayColumns) {
+      const trimmed = rl.displayColumns.trim()
+      if (trimmed.startsWith('[')) {
+        try {
+          const parsed = JSON.parse(trimmed) as unknown
+          if (Array.isArray(parsed)) {
+            parsedColumns = parsed.map(String).filter(Boolean)
+          }
+        } catch {
+          // Fall back to CSV parsing if JSON parse fails
+          parsedColumns = trimmed
             .split(',')
             .map((s) => s.trim())
             .filter(Boolean)
-        : [],
+        }
+      } else {
+        parsedColumns = trimmed
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      }
+    }
+
+    setFormData({
+      relatedCollectionId: rl.relatedCollectionId,
+      relationshipFieldId: rl.relationshipFieldId,
+      selectedDisplayColumns: parsedColumns,
       sortField: rl.sortField ?? '',
       sortDirection: rl.sortDirection,
       rowLimit: rl.rowLimit,
@@ -283,7 +304,8 @@ export function RelatedListPanel(): React.ReactElement {
       e.preventDefault()
       if (!formData.relatedCollectionId || !formData.relationshipFieldId) return
 
-      const displayColumns = formData.selectedDisplayColumns.join(',')
+      // Store as JSON array string since the backend column is JSONB
+      const displayColumns = JSON.stringify(formData.selectedDisplayColumns)
 
       if (editingId) {
         updateRelatedList(editingId, {

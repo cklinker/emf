@@ -23,6 +23,7 @@ import { ApiClient } from '../../services/apiClient'
 import { unwrapCollection } from '../../utils/jsonapi'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
 import { useSavedViews } from '../../hooks/useSavedViews'
+import { useLookupDisplayMap } from '../../hooks/useLookupDisplayMap'
 import { ViewSelector } from '../../components/ViewSelector/ViewSelector'
 import { InlineEditCell } from '../../components/InlineEditCell/InlineEditCell'
 import { SummaryStatsBar } from '../../components/SummaryStatsBar/SummaryStatsBar'
@@ -504,91 +505,8 @@ export function ResourceListPage({
     },
   })
 
-  // Identify master_detail fields so we can resolve their display values.
-  // referenceCollectionId (UUID) is the canonical FK — always set by the backend.
-  const lookupFields = useMemo(() => {
-    if (!schema?.fields) return []
-    return schema.fields.filter((f) => f.type === 'master_detail' && f.referenceCollectionId)
-  }, [schema])
-
-  // Fetch display labels for all lookup field values.
-  // Builds a map: { [fieldName]: { [recordId]: displayLabel } }
-  const { data: lookupDisplayMap } = useQuery({
-    queryKey: ['lookup-display-map', collectionName, lookupFields.map((f) => f.id)],
-    queryFn: async () => {
-      const map: Record<string, Record<string, string>> = {}
-
-      // Group by referenceCollectionId (UUID) to avoid duplicate requests
-      const targetMap = new Map<string, FieldDefinition[]>()
-      for (const field of lookupFields) {
-        const target = field.referenceCollectionId!
-        if (!targetMap.has(target)) {
-          targetMap.set(target, [])
-        }
-        targetMap.get(target)!.push(field)
-      }
-
-      await Promise.all(
-        Array.from(targetMap.entries()).map(async ([targetCollectionId, fields]) => {
-          try {
-            // Fetch target collection schema by UUID to find display field
-            // and resolve the collection name for the /api/ endpoint.
-            const targetSchema = await apiClient.get<{
-              name: string
-              displayFieldName?: string
-              fields?: Array<{ name: string; type: string }>
-            }>(`/control/collections/${targetCollectionId}`)
-            const targetName = targetSchema.name
-
-            // Determine display field
-            let displayFieldName = 'id'
-            if (targetSchema.displayFieldName) {
-              displayFieldName = targetSchema.displayFieldName
-            } else if (targetSchema.fields) {
-              const nameField = targetSchema.fields.find((f) => f.name.toLowerCase() === 'name')
-              if (nameField) {
-                displayFieldName = nameField.name
-              } else {
-                const firstStringField = targetSchema.fields.find(
-                  (f) => f.type.toUpperCase() === 'STRING'
-                )
-                if (firstStringField) {
-                  displayFieldName = firstStringField.name
-                }
-              }
-            }
-
-            // Fetch records from target collection
-            const recordsResponse = await apiClient.get<Record<string, unknown>>(
-              `/api/${targetName}?page[size]=200`
-            )
-            const data = recordsResponse?.data
-            const records: Array<Record<string, unknown>> = Array.isArray(data) ? data : []
-
-            // Build id → label map
-            const idToLabel: Record<string, string> = {}
-            for (const record of records) {
-              const attrs = (record.attributes || record) as Record<string, unknown>
-              const id = String(record.id || attrs.id || '')
-              const label = attrs[displayFieldName] ? String(attrs[displayFieldName]) : id
-              idToLabel[id] = label
-            }
-
-            // Assign to all fields targeting this collection
-            for (const field of fields) {
-              map[field.name] = idToLabel
-            }
-          } catch {
-            for (const field of fields) {
-              map[field.name] = {}
-            }
-          }
-        })
-      )
-      return map
-    },
-    enabled: lookupFields.length > 0,
-  })
+  // Resolve display labels for reference/lookup/master_detail fields
+  const { lookupDisplayMap } = useLookupDisplayMap(schema?.fields, 'lookup-display-list')
 
   // Get visible fields for table columns
   const visibleFields = useMemo(() => {

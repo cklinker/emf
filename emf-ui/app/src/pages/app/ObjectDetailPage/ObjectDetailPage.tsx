@@ -61,6 +61,7 @@ import { useAppContext } from '@/context/AppContext'
 import { useAuth } from '@/context/AuthContext'
 import { useApi } from '@/context/ApiContext'
 import { usePageLayout } from '@/hooks/usePageLayout'
+import { useLookupDisplayMap } from '@/hooks/useLookupDisplayMap'
 import type { FieldDefinition } from '@/hooks/useCollectionSchema'
 import type { QuickActionExecutionContext } from '@/types/quickActions'
 
@@ -159,6 +160,9 @@ export function ObjectDetailPage(): React.ReactElement {
 
   // Resolve page layout for this collection (returns null if none configured)
   const { layout, isLoading: layoutLoading } = usePageLayout(schema?.id, user?.id)
+
+  // Resolve display labels for reference/lookup/master_detail fields
+  const { lookupDisplayMap } = useLookupDisplayMap(fields)
 
   // Fetch record
   const {
@@ -446,24 +450,37 @@ export function ObjectDetailPage(): React.ReactElement {
         <Card>
           <CardContent className="py-4">
             <div className="grid grid-cols-2 gap-x-8 gap-y-3 md:grid-cols-4">
-              {highlightFields.map((field) => (
-                <div key={field.name} className="space-y-1">
-                  <dt className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    {field.displayName || field.name}
-                  </dt>
-                  <dd className="text-sm font-medium">
-                    <FieldRenderer
-                      type={field.type}
-                      value={record[field.name]}
-                      fieldName={field.name}
-                      displayName={field.displayName || field.name}
-                      tenantSlug={tenantSlug}
-                      targetCollection={field.referenceTarget}
-                      truncate
-                    />
-                  </dd>
-                </div>
-              ))}
+              {highlightFields.map((field) => {
+                const value = record[field.name]
+                const isRef =
+                  field.type === 'master_detail' ||
+                  field.type === 'lookup' ||
+                  field.type === 'reference'
+                const displayLabel =
+                  isRef && lookupDisplayMap?.[field.name]
+                    ? lookupDisplayMap[field.name][String(value)] || undefined
+                    : undefined
+
+                return (
+                  <div key={field.name} className="space-y-1">
+                    <dt className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      {field.displayName || field.name}
+                    </dt>
+                    <dd className="text-sm font-medium">
+                      <FieldRenderer
+                        type={field.type}
+                        value={value}
+                        fieldName={field.name}
+                        displayName={field.displayName || field.name}
+                        tenantSlug={tenantSlug}
+                        targetCollection={field.referenceTarget}
+                        displayLabel={displayLabel}
+                        truncate
+                      />
+                    </dd>
+                  </div>
+                )
+              })}
             </div>
           </CardContent>
         </Card>
@@ -478,6 +495,7 @@ export function ObjectDetailPage(): React.ReactElement {
           fields={detailFields}
           record={record}
           tenantSlug={tenantSlug}
+          lookupDisplayMap={lookupDisplayMap}
         />
       )}
 

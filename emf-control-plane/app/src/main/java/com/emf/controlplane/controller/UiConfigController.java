@@ -181,6 +181,36 @@ public class UiConfigController {
     }
 
     /**
+     * Creates a new UI menu.
+     * Requires ADMIN role authorization.
+     *
+     * @param request The menu creation request with name and optional items
+     * @return The created UI menu with generated ID
+     */
+    @PostMapping("/menus")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(
+            summary = "Create UI menu",
+            description = "Creates a new UI menu with the provided configuration. Requires ADMIN role."
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "201", description = "UI menu created successfully"),
+            @ApiResponse(responseCode = "400", description = "Invalid request - validation errors"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized - invalid or missing JWT token"),
+            @ApiResponse(responseCode = "403", description = "Forbidden - requires ADMIN role"),
+            @ApiResponse(responseCode = "409", description = "Conflict - menu with same name already exists")
+    })
+    public ResponseEntity<UiMenuDto> createMenu(
+            @Valid @RequestBody CreateUiMenuRequest request) {
+        log.info("REST request to create UI menu: {}", request.getName());
+
+        UiMenu created = uiConfigService.createMenu(request);
+        UiMenuDto dto = UiMenuDto.fromEntity(created);
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(dto);
+    }
+
+    /**
      * Updates an existing UI menu.
      * Only provided fields will be updated.
      * If items are provided, they will replace the existing items.
@@ -217,5 +247,35 @@ public class UiConfigController {
         UiMenuDto dto = UiMenuDto.fromEntity(updated);
 
         return ResponseEntity.ok(dto);
+    }
+
+    /**
+     * Deletes a UI menu.
+     * Cascade deletes all associated menu items.
+     * Requires ADMIN role authorization.
+     *
+     * @param id The menu ID to delete
+     * @return 204 No Content on success
+     */
+    @DeleteMapping("/menus/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(
+            summary = "Delete UI menu",
+            description = "Deletes a UI menu and all its items. Requires ADMIN role."
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "204", description = "UI menu deleted successfully"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized - invalid or missing JWT token"),
+            @ApiResponse(responseCode = "403", description = "Forbidden - requires ADMIN role"),
+            @ApiResponse(responseCode = "404", description = "UI menu not found")
+    })
+    public ResponseEntity<Void> deleteMenu(
+            @Parameter(description = "UI menu ID", required = true)
+            @PathVariable String id) {
+        log.info("REST request to delete UI menu: {}", id);
+
+        uiConfigService.deleteMenu(id);
+
+        return ResponseEntity.noContent().build();
     }
 }

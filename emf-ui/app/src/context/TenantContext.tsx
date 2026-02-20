@@ -28,6 +28,16 @@ export function getTenantSlug(): string {
 }
 
 /**
+ * Eagerly sets the tenant slug during render so child providers
+ * (AuthProvider, ConfigProvider) read the correct value on mount.
+ * Extracted to a function so the React Compiler does not flag it
+ * as a direct variable reassignment inside a component body.
+ */
+function syncTenantSlug(slug: string): void {
+  _currentTenantSlug = slug
+}
+
+/**
  * Sets the resolved tenant ID from bootstrap config.
  * Called by AuthContext/ConfigContext after fetching bootstrap.
  */
@@ -57,9 +67,14 @@ export function TenantProvider({ children }: { children: React.ReactNode }): Rea
   const { tenantSlug } = useParams<{ tenantSlug: string }>()
   const slug = tenantSlug || 'default'
 
-  // Keep module-level variable in sync
+  // Set module-level variable synchronously during render so that
+  // child providers (AuthProvider, ConfigProvider) can read the correct
+  // tenant slug when their own effects fire on mount.
+  syncTenantSlug(slug)
+
+  // Also keep it in sync via useEffect for route changes
   useEffect(() => {
-    _currentTenantSlug = slug
+    syncTenantSlug(slug)
   }, [slug])
 
   const value: TenantContextValue = {

@@ -60,6 +60,10 @@ const INITIAL_FORM_DATA: RelatedListFormData = {
 
 const REFERENCE_FIELD_TYPES = new Set(['reference', 'master_detail', 'lookup'])
 
+function isReferenceField(type: string): boolean {
+  return REFERENCE_FIELD_TYPES.has(type.toLowerCase())
+}
+
 // ---------------------------------------------------------------------------
 // Shared input class
 // ---------------------------------------------------------------------------
@@ -159,7 +163,7 @@ export function RelatedListPanel(): React.ReactElement {
     // Fields on the related collection pointing to the current collection
     for (const f of relatedCollectionFields) {
       if (
-        REFERENCE_FIELD_TYPES.has(f.type) &&
+        isReferenceField(f.type) &&
         (f.referenceTarget === currentCollectionName || f.referenceCollectionId === collectionId)
       ) {
         const relatedDisplayName =
@@ -175,7 +179,7 @@ export function RelatedListPanel(): React.ReactElement {
     // Fields on the current collection pointing to the related collection
     for (const f of currentCollectionFields) {
       if (
-        REFERENCE_FIELD_TYPES.has(f.type) &&
+        isReferenceField(f.type) &&
         (f.referenceTarget === selectedCollectionName ||
           f.referenceCollectionId === selectedCollectionId)
       ) {
@@ -202,7 +206,7 @@ export function RelatedListPanel(): React.ReactElement {
 
   // Non-reference fields for display columns and sort
   const displayableFields = useMemo(
-    () => relatedCollectionFields.filter((f) => !REFERENCE_FIELD_TYPES.has(f.type)),
+    () => relatedCollectionFields.filter((f) => !isReferenceField(f.type)),
     [relatedCollectionFields]
   )
 

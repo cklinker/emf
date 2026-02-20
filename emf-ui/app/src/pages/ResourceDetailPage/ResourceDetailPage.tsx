@@ -27,6 +27,9 @@ import { RelatedRecordsSection } from '../../components/RelatedRecordsSection/Re
 import { ActivityTimeline } from '../../components/ActivityTimeline/ActivityTimeline'
 import { NotesSection } from '../../components/NotesSection/NotesSection'
 import { AttachmentsSection } from '../../components/AttachmentsSection/AttachmentsSection'
+import { usePageLayout } from '../../hooks/usePageLayout'
+import { LayoutFieldSections } from '../../components/LayoutFieldSections/LayoutFieldSections'
+import { LayoutRelatedLists } from '../../components/LayoutRelatedLists/LayoutRelatedLists'
 import { unwrapResource } from '../../utils/jsonapi'
 import type { ApiClient } from '../../services/apiClient'
 
@@ -333,6 +336,9 @@ export function ResourceDetailPage({
     queryFn: () => fetchCollectionSchema(apiClient, collectionName),
     enabled: !!collectionName,
   })
+
+  // Resolve page layout for this collection (returns null if none configured)
+  const { layout, isLoading: layoutLoading } = usePageLayout(schema?.id, user?.id)
 
   // Fetch resource data
   const {
@@ -732,7 +738,7 @@ export function ResourceDetailPage({
   )
 
   // Loading state
-  const isLoading = schemaLoading || resourceLoading
+  const isLoading = schemaLoading || resourceLoading || layoutLoading
 
   if (isLoading) {
     return (
@@ -849,52 +855,62 @@ export function ResourceDetailPage({
         apiClient={apiClient}
       />
 
-      {/* Field Values Section */}
-      <section
-        className="rounded-md border border-border bg-card p-6 max-md:p-4"
-        aria-labelledby="fields-heading"
-      >
-        <h2 id="fields-heading" className="m-0 mb-4 text-lg font-semibold text-foreground">
-          {t('collections.fields')}
-        </h2>
+      {/* Field Values Section — use page layout sections when available */}
+      {layout && layout.sections.length > 0 ? (
+        <LayoutFieldSections
+          sections={layout.sections}
+          schemaFields={schema.fields}
+          record={resource as Record<string, unknown> & { id: string }}
+          tenantSlug={getTenantSlug()}
+          lookupDisplayMap={lookupDisplayMap}
+        />
+      ) : (
+        <section
+          className="rounded-md border border-border bg-card p-6 max-md:p-4"
+          aria-labelledby="fields-heading"
+        >
+          <h2 id="fields-heading" className="m-0 mb-4 text-lg font-semibold text-foreground">
+            {t('collections.fields')}
+          </h2>
 
-        {sortedFields.length === 0 ? (
-          <div
-            className="flex flex-col items-center justify-center rounded-md bg-muted p-8 text-center text-muted-foreground"
-            data-testid="no-fields"
-          >
-            <p className="m-0 text-base">{t('common.noData')}</p>
-          </div>
-        ) : (
-          <div
-            className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-6 max-lg:grid-cols-[repeat(auto-fill,minmax(250px,1fr))] max-md:grid-cols-1"
-            data-testid="fields-grid"
-          >
-            {sortedFields.map((field, index) => (
-              <div
-                key={field.id}
-                className="flex flex-col gap-1"
-                data-testid={`field-item-${index}`}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-medium text-muted-foreground">
-                    {field.displayName || field.name}
-                  </span>
-                  <span className="rounded bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">
-                    {getFieldTypeLabel(field.type)}
-                  </span>
-                </div>
+          {sortedFields.length === 0 ? (
+            <div
+              className="flex flex-col items-center justify-center rounded-md bg-muted p-8 text-center text-muted-foreground"
+              data-testid="no-fields"
+            >
+              <p className="m-0 text-base">{t('common.noData')}</p>
+            </div>
+          ) : (
+            <div
+              className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-6 max-lg:grid-cols-[repeat(auto-fill,minmax(250px,1fr))] max-md:grid-cols-1"
+              data-testid="fields-grid"
+            >
+              {sortedFields.map((field, index) => (
                 <div
-                  className="min-h-[1.5em] break-words text-base text-foreground"
-                  data-testid={`field-value-${field.name}`}
+                  key={field.id}
+                  className="flex flex-col gap-1"
+                  data-testid={`field-item-${index}`}
                 >
-                  {formatFieldValue(resource[field.name], field)}
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-medium text-muted-foreground">
+                      {field.displayName || field.name}
+                    </span>
+                    <span className="rounded bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">
+                      {getFieldTypeLabel(field.type)}
+                    </span>
+                  </div>
+                  <div
+                    className="min-h-[1.5em] break-words text-base text-foreground"
+                    data-testid={`field-value-${field.name}`}
+                  >
+                    {formatFieldValue(resource[field.name], field)}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Metadata Section */}
       <section
@@ -1067,12 +1083,20 @@ export function ResourceDetailPage({
         )}
       </section>
 
-      {/* Related Records Section (T6) */}
-      <RelatedRecordsSection
-        collectionName={collectionName}
-        recordId={resourceId}
-        apiClient={apiClient}
-      />
+      {/* Related Records Section (T6) — use layout related lists when available */}
+      {layout && layout.relatedLists.length > 0 ? (
+        <LayoutRelatedLists
+          relatedLists={layout.relatedLists}
+          parentRecordId={resourceId}
+          tenantSlug={getTenantSlug()}
+        />
+      ) : (
+        <RelatedRecordsSection
+          collectionName={collectionName}
+          recordId={resourceId}
+          apiClient={apiClient}
+        />
+      )}
 
       {/* Notes Section (T20) */}
       <NotesSection collectionId={schema.id} recordId={resourceId} apiClient={apiClient} />

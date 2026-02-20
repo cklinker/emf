@@ -1,7 +1,9 @@
 package com.emf.controlplane.tenant;
 
 import com.emf.controlplane.entity.Tenant;
+import com.emf.controlplane.exception.GovernorLimitExceededException;
 import com.emf.controlplane.repository.TenantRepository;
+import com.emf.controlplane.service.GovernorLimitsService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -10,6 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -43,9 +46,11 @@ public class TenantResolutionFilter extends OncePerRequestFilter {
     );
 
     private final TenantRepository tenantRepository;
+    private final GovernorLimitsService governorLimitsService;
 
-    public TenantResolutionFilter(TenantRepository tenantRepository) {
+    public TenantResolutionFilter(TenantRepository tenantRepository, GovernorLimitsService governorLimitsService) {
         this.tenantRepository = tenantRepository;
+        this.governorLimitsService = governorLimitsService;
     }
 
     @Override
@@ -57,6 +62,17 @@ public class TenantResolutionFilter extends OncePerRequestFilter {
                 String tenantSlug = resolveTenantSlug(request, tenantId);
                 TenantContextHolder.set(tenantId, tenantSlug);
                 log.debug("Resolved tenant: {} ({})", tenantSlug, tenantId);
+
+                // Track daily API call usage and enforce governor limit
+                try {
+                    governorLimitsService.checkApiCallLimit(tenantId);
+                } catch (GovernorLimitExceededException e) {
+                    log.warn("API call limit exceeded for tenant {}: {}", tenantId, e.getMessage());
+                    response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
+                    response.setContentType("application/json");
+                    response.getWriter().write("{\"error\":\"API call limit exceeded\",\"message\":\"" + e.getMessage() + "\"}");
+                    return;
+                }
             } else if (!isExemptPath(request)) {
                 log.debug("No tenant context for non-exempt path: {}", request.getRequestURI());
                 // For now, allow requests without tenant context during transition

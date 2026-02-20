@@ -27,6 +27,8 @@ export interface DetailSectionProps {
   lookupDisplayMap?: Record<string, Record<string, string>>
   /** Whether the section starts collapsed */
   defaultCollapsed?: boolean
+  /** Number of columns (1-3). Default: 2 */
+  columns?: 1 | 2 | 3
 }
 
 export function DetailSection({
@@ -36,6 +38,7 @@ export function DetailSection({
   tenantSlug,
   lookupDisplayMap,
   defaultCollapsed = false,
+  columns = 2,
 }: DetailSectionProps): React.ReactElement {
   const [isOpen, setIsOpen] = useState(!defaultCollapsed)
 
@@ -64,7 +67,14 @@ export function DetailSection({
 
         <CollapsibleContent>
           <CardContent className="pt-0">
-            <div className="grid grid-cols-1 gap-x-8 gap-y-4 md:grid-cols-2">
+            <div
+              className={cn(
+                'grid grid-cols-1 gap-x-8 gap-y-4',
+                columns === 1 && '',
+                columns === 2 && 'md:grid-cols-2',
+                columns >= 3 && 'md:grid-cols-2 lg:grid-cols-3'
+              )}
+            >
               {fields.map((field) => {
                 const value = record[field.name]
                 const isLookup =

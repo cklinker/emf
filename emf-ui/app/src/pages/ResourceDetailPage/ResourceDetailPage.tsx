@@ -28,6 +28,7 @@ import { ActivityTimeline } from '../../components/ActivityTimeline/ActivityTime
 import { NotesSection } from '../../components/NotesSection/NotesSection'
 import { AttachmentsSection } from '../../components/AttachmentsSection/AttachmentsSection'
 import { usePageLayout } from '../../hooks/usePageLayout'
+import { useLookupDisplayMap } from '../../hooks/useLookupDisplayMap'
 import { LayoutFieldSections } from '../../components/LayoutFieldSections/LayoutFieldSections'
 import { LayoutRelatedLists } from '../../components/LayoutRelatedLists/LayoutRelatedLists'
 import { unwrapResource } from '../../utils/jsonapi'
@@ -462,92 +463,11 @@ export function ResourceDetailPage({
     [createdByUser, updatedByUser]
   )
 
-  // Identify master_detail fields for display name resolution
-  const lookupFields = useMemo(() => {
-    if (!schema?.fields) return []
-    return schema.fields.filter((f) => f.type === 'master_detail' && f.referenceCollectionId)
-  }, [schema])
-
-  // Fetch display labels for master_detail field values.
-  // Builds a map: { [fieldName]: { [recordId]: displayLabel } }
-  // Also tracks field name -> target collection name for deep linking.
-  const { data: lookupData } = useQuery({
-    queryKey: ['lookup-display-detail', collectionName, resourceId, lookupFields.map((f) => f.id)],
-    queryFn: async () => {
-      const displayMap: Record<string, Record<string, string>> = {}
-      const targetNameMap: Record<string, string> = {}
-
-      const targetGroupMap = new Map<string, FieldDefinition[]>()
-      for (const field of lookupFields) {
-        const target = field.referenceCollectionId!
-        if (!targetGroupMap.has(target)) {
-          targetGroupMap.set(target, [])
-        }
-        targetGroupMap.get(target)!.push(field)
-      }
-
-      await Promise.all(
-        Array.from(targetGroupMap.entries()).map(async ([targetCollectionId, fields]) => {
-          try {
-            const targetSchema = await apiClient.get<{
-              name: string
-              displayFieldName?: string
-              fields?: Array<{ name: string; type: string }>
-            }>(`/control/collections/${targetCollectionId}`)
-            const targetName = targetSchema.name
-
-            for (const field of fields) {
-              targetNameMap[field.name] = targetName
-            }
-
-            let displayFieldName = 'id'
-            if (targetSchema.displayFieldName) {
-              displayFieldName = targetSchema.displayFieldName
-            } else if (targetSchema.fields) {
-              const nameField = targetSchema.fields.find((f) => f.name.toLowerCase() === 'name')
-              if (nameField) {
-                displayFieldName = nameField.name
-              } else {
-                const firstStringField = targetSchema.fields.find(
-                  (f) => f.type.toUpperCase() === 'STRING'
-                )
-                if (firstStringField) {
-                  displayFieldName = firstStringField.name
-                }
-              }
-            }
-
-            const recordsResponse = await apiClient.get<Record<string, unknown>>(
-              `/api/${targetName}?page[size]=200`
-            )
-            const data = recordsResponse?.data
-            const records: Array<Record<string, unknown>> = Array.isArray(data) ? data : []
-
-            const idToLabel: Record<string, string> = {}
-            for (const record of records) {
-              const attrs = (record.attributes || record) as Record<string, unknown>
-              const id = String(record.id || attrs.id || '')
-              const label = attrs[displayFieldName] ? String(attrs[displayFieldName]) : id
-              idToLabel[id] = label
-            }
-
-            for (const field of fields) {
-              displayMap[field.name] = idToLabel
-            }
-          } catch {
-            for (const field of fields) {
-              displayMap[field.name] = {}
-            }
-          }
-        })
-      )
-      return { displayMap, targetNameMap }
-    },
-    enabled: lookupFields.length > 0,
-  })
-
-  const lookupDisplayMap = lookupData?.displayMap
-  const lookupTargetNameMap = lookupData?.targetNameMap
+  // Resolve display labels for reference/lookup/master_detail fields
+  const { lookupDisplayMap, lookupTargetNameMap } = useLookupDisplayMap(
+    schema?.fields,
+    'lookup-display-detail'
+  )
 
   // Sort fields by order
   const sortedFields = useMemo(() => {

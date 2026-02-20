@@ -1,6 +1,10 @@
 package com.emf.controlplane.controller;
 
+import com.emf.controlplane.dto.GovernorLimits;
 import com.emf.controlplane.service.DashboardService;
+import com.emf.controlplane.service.GovernorLimitsService;
+import com.emf.controlplane.service.GovernorLimitsService.GovernorLimitsStatus;
+import com.emf.controlplane.tenant.TenantContextHolder;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -16,8 +20,8 @@ import java.util.Map;
 
 /**
  * REST controller for admin dashboard and monitoring endpoints.
- * 
- * <p>Provides dashboard data including system health, metrics, and recent errors.
+ *
+ * <p>Provides dashboard data including tenant usage, governor limits, and system health.
  */
 @RestController
 @RequestMapping("/control/_admin")
@@ -26,23 +30,27 @@ import java.util.Map;
 public class AdminController {
 
     private static final Logger log = LoggerFactory.getLogger(AdminController.class);
-    
-    private final DashboardService dashboardService;
 
-    public AdminController(DashboardService dashboardService) {
+    private final DashboardService dashboardService;
+    private final GovernorLimitsService governorLimitsService;
+
+    public AdminController(DashboardService dashboardService, GovernorLimitsService governorLimitsService) {
         this.dashboardService = dashboardService;
+        this.governorLimitsService = governorLimitsService;
     }
 
     /**
-     * Returns dashboard data including health status, metrics, and recent errors.
-     * 
+     * Returns tenant dashboard data including usage statistics and governor limits.
+     * When a tenant context is set (via gateway), returns tenant-scoped usage and limits.
+     * Otherwise falls back to system-level dashboard data.
+     *
      * @param timeRange Time range for metrics (5m, 15m, 1h, 6h, 24h)
-     * @return Dashboard data
+     * @return Dashboard data with limits and usage
      */
     @GetMapping("/dashboard")
     @Operation(
             summary = "Get dashboard data",
-            description = "Returns system health status, metrics, and recent errors for the dashboard"
+            description = "Returns tenant usage statistics and governor limits for the dashboard"
     )
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Successfully retrieved dashboard data"),
@@ -52,9 +60,34 @@ public class AdminController {
     public ResponseEntity<Map<String, Object>> getDashboard(
             @Parameter(description = "Time range for metrics (5m, 15m, 1h, 6h, 24h)")
             @RequestParam(required = false, defaultValue = "15m") String timeRange) {
-        
-        log.debug("REST request to get dashboard data - timeRange: {}", timeRange);
-        
+
+        String tenantId = TenantContextHolder.getTenantId();
+        log.debug("REST request to get dashboard data - tenantId: {}, timeRange: {}", tenantId, timeRange);
+
+        if (tenantId != null) {
+            GovernorLimitsStatus status = governorLimitsService.getStatus(tenantId);
+            GovernorLimits limits = status.limits();
+
+            Map<String, Object> limitsMap = Map.of(
+                    "apiCallsPerDay", limits.apiCallsPerDay(),
+                    "storageGb", limits.storageGb(),
+                    "maxUsers", limits.maxUsers(),
+                    "maxCollections", limits.maxCollections(),
+                    "maxFieldsPerCollection", limits.maxFieldsPerCollection(),
+                    "maxWorkflows", limits.maxWorkflows(),
+                    "maxReports", limits.maxReports()
+            );
+
+            Map<String, Object> usageMap = Map.of(
+                    "apiCallsToday", status.apiCallsUsed(),
+                    "storageUsedGb", 0,
+                    "activeUsers", status.usersUsed(),
+                    "collectionsCount", status.collectionsUsed()
+            );
+
+            return ResponseEntity.ok(Map.of("limits", limitsMap, "usage", usageMap));
+        }
+
         Map<String, Object> dashboard = dashboardService.getDashboardData(timeRange);
         return ResponseEntity.ok(dashboard);
     }

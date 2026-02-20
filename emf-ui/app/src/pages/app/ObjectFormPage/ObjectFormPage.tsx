@@ -9,12 +9,16 @@
  * - Schema-driven form field generation
  * - Create and edit modes
  * - JSON:API request wrapping via useRecordMutation
+ * - Picklist dropdowns with fetched values
+ * - Reference field (master_detail/lookup) searchable dropdowns
+ * - Proper date/datetime value binding
  * - Cancel/Save actions
  * - Loading states
  */
 
 import React, { useState, useCallback, useMemo } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { Save, X, Loader2, AlertCircle } from 'lucide-react'
 import {
   Breadcrumb,
@@ -32,13 +36,25 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Separator } from '@/components/ui/separator'
+import { LookupSelect } from '@/components/LookupSelect'
+import { useApi } from '@/context/ApiContext'
 import { useCollectionSchema } from '@/hooks/useCollectionSchema'
 import { useRecord } from '@/hooks/useRecord'
 import { useRecordMutation } from '@/hooks/useRecordMutation'
 import { useObjectPermissions } from '@/hooks/useObjectPermissions'
 import { useFieldPermissions } from '@/hooks/useFieldPermissions'
 import { InsufficientPrivileges } from '@/components/InsufficientPrivileges'
-import type { FieldDefinition, FieldType } from '@/hooks/useCollectionSchema'
+import type { FieldDefinition, FieldType, CollectionSchema } from '@/hooks/useCollectionSchema'
+import type { LookupOption } from '@/components/LookupSelect'
+
+/** Picklist value returned from the API */
+interface PicklistValueDto {
+  value: string
+  label: string
+  isDefault: boolean
+  active: boolean
+  sortOrder: number
+}
 
 /** System fields excluded from forms */
 const SYSTEM_FIELDS = new Set([
@@ -55,6 +71,9 @@ const SYSTEM_FIELDS = new Set([
 
 /** Read-only field types that should not be editable */
 const READ_ONLY_TYPES: Set<FieldType> = new Set(['auto_number', 'formula', 'rollup_summary'])
+
+/** Reference field types that need lookup dropdowns */
+const REFERENCE_TYPES: Set<FieldType> = new Set(['master_detail', 'lookup', 'reference'])
 
 /**
  * Get the HTML input type for a field type.
@@ -107,6 +126,13 @@ function FormField({
   const isReadOnly = READ_ONLY_TYPES.has(field.type) || readOnly
   const fieldId = `field-${field.name}`
 
+  const labelEl = (
+    <Label htmlFor={fieldId} className="text-sm font-medium">
+      {field.displayName || field.name}
+      {field.required && <span className="ml-1 text-destructive">*</span>}
+    </Label>
+  )
+
   // Boolean fields use a checkbox
   if (field.type === 'boolean') {
     return (
@@ -127,14 +153,54 @@ function FormField({
     )
   }
 
+  // Picklist fields use a dropdown select
+  if (field.type === 'picklist' || field.type === 'multi_picklist') {
+    return (
+      <div className="space-y-2">
+        {labelEl}
+        <select
+          id={fieldId}
+          value={value != null ? String(value) : ''}
+          onChange={(e) => onChange(field.name, e.target.value)}
+          disabled={isReadOnly}
+          className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <option value="">Select...</option>
+          {(field.enumValues || []).map((val: string) => (
+            <option key={val} value={val}>
+              {val}
+            </option>
+          ))}
+        </select>
+      </div>
+    )
+  }
+
+  // Reference fields (master_detail, lookup, reference) use a searchable LookupSelect
+  if (REFERENCE_TYPES.has(field.type)) {
+    const options = field.lookupOptions || []
+    return (
+      <div className="space-y-2">
+        {labelEl}
+        <LookupSelect
+          id={fieldId}
+          name={field.name}
+          value={value != null ? String(value) : ''}
+          options={options}
+          onChange={(v) => onChange(field.name, v)}
+          placeholder="Select..."
+          required={field.required}
+          disabled={isReadOnly}
+        />
+      </div>
+    )
+  }
+
   // Textarea fields (rich_text, json)
   if (isTextareaField(field.type)) {
     return (
       <div className="space-y-2">
-        <Label htmlFor={fieldId} className="text-sm font-medium">
-          {field.displayName || field.name}
-          {field.required && <span className="ml-1 text-destructive">*</span>}
-        </Label>
+        {labelEl}
         <Textarea
           id={fieldId}
           value={value != null ? String(value) : ''}
@@ -152,10 +218,7 @@ function FormField({
   if (field.type === 'encrypted') {
     return (
       <div className="space-y-2">
-        <Label htmlFor={fieldId} className="text-sm font-medium">
-          {field.displayName || field.name}
-          {field.required && <span className="ml-1 text-destructive">*</span>}
-        </Label>
+        {labelEl}
         <Input
           id={fieldId}
           type="password"
@@ -172,10 +235,7 @@ function FormField({
 
   return (
     <div className="space-y-2">
-      <Label htmlFor={fieldId} className="text-sm font-medium">
-        {field.displayName || field.name}
-        {field.required && <span className="ml-1 text-destructive">*</span>}
-      </Label>
+      {labelEl}
       <Input
         id={fieldId}
         type={inputType}
@@ -199,6 +259,7 @@ function FormField({
 
 /**
  * Compute initial form data from record (edit) or field defaults (create).
+ * Formats date/datetime values for HTML input compatibility.
  */
 function computeInitialFormData(
   isNew: boolean,
@@ -206,7 +267,21 @@ function computeInitialFormData(
   fields: FieldDefinition[]
 ): Record<string, unknown> {
   if (!isNew && record) {
-    return { ...record }
+    const data: Record<string, unknown> = { ...record }
+    // Format date/datetime values for HTML inputs
+    for (const field of fields) {
+      const value = data[field.name]
+      if (value != null && typeof value === 'string') {
+        if (field.type === 'date') {
+          // HTML date input expects YYYY-MM-DD
+          data[field.name] = value.split('T')[0]
+        } else if (field.type === 'datetime') {
+          // HTML datetime-local input expects YYYY-MM-DDTHH:MM
+          data[field.name] = value.slice(0, 16)
+        }
+      }
+    }
+    return data
   }
   const defaults: Record<string, unknown> = {}
   for (const field of fields) {
@@ -396,6 +471,7 @@ export function ObjectFormPage(): React.ReactElement {
   const basePath = `/${tenantSlug}/app`
   const isNew = !recordId
   const navigate = useNavigate()
+  const { apiClient } = useApi()
 
   // Fetch collection schema
   const {
@@ -421,6 +497,150 @@ export function ObjectFormPage(): React.ReactElement {
     return fields.filter((f) => isFieldVisible(f.name))
   }, [fields, isFieldVisible])
 
+  // ---------------------------------------------------------------
+  // Picklist values: fetch enum values for picklist/multi_picklist fields
+  // ---------------------------------------------------------------
+  const picklistFields = useMemo(() => {
+    return permissionFilteredFields.filter(
+      (f) => f.type === 'picklist' || f.type === 'multi_picklist'
+    )
+  }, [permissionFilteredFields])
+
+  const { data: picklistValuesMap } = useQuery({
+    queryKey: ['picklist-values-for-form', collectionName, picklistFields.map((f) => f.id)],
+    queryFn: async () => {
+      const map: Record<string, string[]> = {}
+      await Promise.all(
+        picklistFields.map(async (field) => {
+          try {
+            const values = await apiClient.get<PicklistValueDto[]>(
+              `/control/picklists/fields/${field.id}/values`
+            )
+            map[field.id] = values
+              .filter((v) => v.active)
+              .sort((a, b) => a.sortOrder - b.sortOrder)
+              .map((v) => v.value)
+          } catch {
+            map[field.id] = []
+          }
+        })
+      )
+      return map
+    },
+    enabled: picklistFields.length > 0,
+  })
+
+  // ---------------------------------------------------------------
+  // Lookup options: fetch display labels for reference fields
+  // ---------------------------------------------------------------
+  const lookupFields = useMemo(() => {
+    return permissionFilteredFields.filter(
+      (f) => REFERENCE_TYPES.has(f.type) && f.referenceCollectionId
+    )
+  }, [permissionFilteredFields])
+
+  const { data: lookupOptionsMap } = useQuery({
+    queryKey: ['lookup-options-for-form', collectionName, lookupFields.map((f) => f.id)],
+    queryFn: async () => {
+      const optionsMap: Record<string, LookupOption[]> = {}
+
+      // Group fields by referenceCollectionId to avoid duplicate requests
+      const targetMap = new Map<string, FieldDefinition[]>()
+      for (const field of lookupFields) {
+        const target = field.referenceCollectionId!
+        if (!targetMap.has(target)) {
+          targetMap.set(target, [])
+        }
+        targetMap.get(target)!.push(field)
+      }
+
+      await Promise.all(
+        Array.from(targetMap.entries()).map(async ([targetCollectionId, targetFields]) => {
+          try {
+            // Fetch target collection schema by UUID
+            const targetSchema = await apiClient.get<CollectionSchema>(
+              `/control/collections/${targetCollectionId}`
+            )
+            const targetName = targetSchema.name
+
+            // Determine display field: displayFieldName → 'name' → first string → 'id'
+            let displayFieldName = 'id'
+            if (targetSchema.displayFieldName) {
+              displayFieldName = targetSchema.displayFieldName
+            } else if (targetSchema.fields) {
+              const nameField = targetSchema.fields.find(
+                (f) => f.name.toLowerCase() === 'name'
+              )
+              if (nameField) {
+                displayFieldName = nameField.name
+              } else {
+                const firstStringField = targetSchema.fields.find(
+                  (f) => f.type.toUpperCase() === 'STRING'
+                )
+                if (firstStringField) {
+                  displayFieldName = firstStringField.name
+                }
+              }
+            }
+
+            // Fetch records from target collection
+            const recordsResponse = await apiClient.get<Record<string, unknown>>(
+              `/api/${targetName}?page[size]=200`
+            )
+
+            const data = recordsResponse?.data
+            const records: Array<Record<string, unknown>> = Array.isArray(data) ? data : []
+
+            // Build options
+            const options: LookupOption[] = records.map(
+              (rec: Record<string, unknown>) => {
+                const attrs = (rec.attributes || rec) as Record<string, unknown>
+                const id = String(rec.id || attrs.id || '')
+                const label = attrs[displayFieldName]
+                  ? String(attrs[displayFieldName])
+                  : id
+                return { id, label }
+              }
+            )
+
+            // Assign to all fields targeting this collection
+            for (const f of targetFields) {
+              optionsMap[f.id] = options
+            }
+          } catch {
+            for (const f of targetFields) {
+              optionsMap[f.id] = []
+            }
+          }
+        })
+      )
+      return optionsMap
+    },
+    enabled: lookupFields.length > 0,
+  })
+
+  // ---------------------------------------------------------------
+  // Merge picklist values and lookup options into enriched fields
+  // ---------------------------------------------------------------
+  const enrichedFields = useMemo(() => {
+    const hasPicklists = picklistValuesMap && picklistFields.length > 0
+    const hasLookups = lookupOptionsMap && lookupFields.length > 0
+    if (!hasPicklists && !hasLookups) return permissionFilteredFields
+    return permissionFilteredFields.map((f) => {
+      let updated = f
+      if (
+        (f.type === 'picklist' || f.type === 'multi_picklist') &&
+        picklistValuesMap?.[f.id]
+      ) {
+        updated = { ...updated, enumValues: picklistValuesMap[f.id] }
+      }
+      if (REFERENCE_TYPES.has(f.type) && lookupOptionsMap?.[f.id]) {
+        updated = { ...updated, lookupOptions: lookupOptionsMap[f.id] }
+      }
+      return updated
+    })
+  }, [permissionFilteredFields, picklistValuesMap, picklistFields, lookupOptionsMap, lookupFields])
+
   const isLoading = schemaLoading || (!isNew && recordLoading) || permissionsLoading
 
   // Collection label
@@ -431,11 +651,11 @@ export function ObjectFormPage(): React.ReactElement {
   // Compute initial data and a key that changes when the data source changes.
   // The key forces ObjectFormBody to remount, running useState with fresh initialData.
   const initialData = useMemo(
-    () => computeInitialFormData(isNew, record, permissionFilteredFields),
-    [isNew, record, permissionFilteredFields]
+    () => computeInitialFormData(isNew, record, enrichedFields),
+    [isNew, record, enrichedFields]
   )
   const formKey = isNew
-    ? `new:${permissionFilteredFields.length}`
+    ? `new:${enrichedFields.length}`
     : `edit:${recordId}:${record?.id ?? 'loading'}`
 
   // Handle cancel (needed for error state)
@@ -495,7 +715,7 @@ export function ObjectFormPage(): React.ReactElement {
       key={formKey}
       isNew={isNew}
       initialData={initialData}
-      fields={permissionFilteredFields}
+      fields={enrichedFields}
       collectionName={collectionName || ''}
       collectionLabel={collectionLabel}
       recordId={recordId}

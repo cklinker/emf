@@ -115,7 +115,7 @@ interface ApiFieldPlacement {
 interface ApiRelatedList {
   id: string
   relatedCollectionId: string
-  relationshipField: string
+  relationshipFieldId: string
   displayColumns: string
   sortField?: string
   sortDirection: string
@@ -209,7 +209,7 @@ function apiRelatedListToEditor(r: ApiRelatedList): EditorRelatedList {
   return {
     id: r.id,
     relatedCollectionId: r.relatedCollectionId,
-    relationshipFieldId: r.relationshipField,
+    relationshipFieldId: r.relationshipFieldId,
     displayColumns: r.displayColumns,
     sortField: r.sortField,
     sortDirection: r.sortDirection,

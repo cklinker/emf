@@ -51,10 +51,7 @@ export function PropertyPanel(): React.ReactElement {
   }
 
   return (
-    <div
-      className="flex w-[300px] flex-col overflow-y-auto border-l border-border bg-background max-md:w-full max-md:max-h-[300px] max-md:border-l-0 max-md:border-t"
-      data-testid="property-panel"
-    >
+    <div className="flex flex-col bg-background" data-testid="property-panel">
       {content}
     </div>
   )

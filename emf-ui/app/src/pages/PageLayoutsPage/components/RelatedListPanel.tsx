@@ -101,12 +101,28 @@ export function RelatedListPanel(): React.ReactElement {
     return map
   }, [collections])
 
-  // Look up the current collection name so we can filter reference fields
-  const currentCollectionName = useMemo(() => {
-    if (!collectionId) return null
-    const col = collections.find((c) => c.id === collectionId)
-    return col?.name ?? null
-  }, [collectionId, collections])
+  // Look up collection names by ID for reference-target matching
+  const collectionNameById = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const col of collections) {
+      map.set(col.id, col.name)
+    }
+    return map
+  }, [collections])
+
+  const currentCollectionName = collectionId ? (collectionNameById.get(collectionId) ?? null) : null
+
+  // Fetch the current layout collection's fields (to find master-side relationships)
+  const { data: currentCollectionDetail } = useQuery({
+    queryKey: ['collection-detail-for-rl', collectionId],
+    queryFn: () => apiClient.get<CollectionDetailResponse>(`/control/collections/${collectionId}`),
+    enabled: !!collectionId,
+  })
+
+  const currentCollectionFields = useMemo<CollectionFieldDetail[]>(
+    () => currentCollectionDetail?.fields ?? [],
+    [currentCollectionDetail]
+  )
 
   // Fetch fields for the selected related collection
   const selectedCollectionId = formData.relatedCollectionId
@@ -122,16 +138,67 @@ export function RelatedListPanel(): React.ReactElement {
     [relatedCollectionDetail]
   )
 
-  // Filter to only reference fields that point back to the current layout collection
-  const referenceFields = useMemo(
-    () =>
-      relatedCollectionFields.filter(
-        (f) =>
-          REFERENCE_FIELD_TYPES.has(f.type) &&
-          (f.referenceTarget === currentCollectionName || f.referenceCollectionId === collectionId)
-      ),
-    [relatedCollectionFields, currentCollectionName, collectionId]
-  )
+  // Look up selected related collection name for reference-target matching
+  const selectedCollectionName = selectedCollectionId
+    ? (collectionNameById.get(selectedCollectionId) ?? null)
+    : null
+
+  // Relationship fields from BOTH sides:
+  // 1. Fields on the related collection that point to the current collection (detail → master)
+  // 2. Fields on the current collection that point to the related collection (master → detail)
+  interface RelationshipFieldOption {
+    id: string
+    label: string
+    source: 'related' | 'current'
+  }
+
+  const relationshipFieldOptions = useMemo<RelationshipFieldOption[]>(() => {
+    if (!selectedCollectionId) return []
+    const options: RelationshipFieldOption[] = []
+
+    // Fields on the related collection pointing to the current collection
+    for (const f of relatedCollectionFields) {
+      if (
+        REFERENCE_FIELD_TYPES.has(f.type) &&
+        (f.referenceTarget === currentCollectionName || f.referenceCollectionId === collectionId)
+      ) {
+        const relatedDisplayName =
+          collectionNameMap.get(selectedCollectionId) || selectedCollectionName || 'Related'
+        options.push({
+          id: f.id,
+          label: `${f.displayName || f.name} (on ${relatedDisplayName})`,
+          source: 'related',
+        })
+      }
+    }
+
+    // Fields on the current collection pointing to the related collection
+    for (const f of currentCollectionFields) {
+      if (
+        REFERENCE_FIELD_TYPES.has(f.type) &&
+        (f.referenceTarget === selectedCollectionName ||
+          f.referenceCollectionId === selectedCollectionId)
+      ) {
+        const currentDisplayName =
+          collectionNameMap.get(collectionId!) || currentCollectionName || 'Current'
+        options.push({
+          id: f.id,
+          label: `${f.displayName || f.name} (on ${currentDisplayName})`,
+          source: 'current',
+        })
+      }
+    }
+
+    return options
+  }, [
+    selectedCollectionId,
+    relatedCollectionFields,
+    currentCollectionFields,
+    currentCollectionName,
+    selectedCollectionName,
+    collectionId,
+    collectionNameMap,
+  ])
 
   // Non-reference fields for display columns and sort
   const displayableFields = useMemo(
@@ -139,14 +206,19 @@ export function RelatedListPanel(): React.ReactElement {
     [relatedCollectionFields]
   )
 
-  // Build a map of field id -> display name
+  // Build a map of field id -> display name (from both collections)
   const fieldNameMap = useMemo(() => {
     const map = new Map<string, string>()
     for (const f of relatedCollectionFields) {
       map.set(f.id, f.displayName || f.name)
     }
+    for (const f of currentCollectionFields) {
+      if (!map.has(f.id)) {
+        map.set(f.id, f.displayName || f.name)
+      }
+    }
     return map
-  }, [relatedCollectionFields])
+  }, [relatedCollectionFields, currentCollectionFields])
 
   // ---------------------------------------------------------------------------
   // Handlers
@@ -371,13 +443,13 @@ export function RelatedListPanel(): React.ReactElement {
                   <option value="">
                     {!formData.relatedCollectionId
                       ? 'Select a collection first'
-                      : referenceFields.length === 0
+                      : relationshipFieldOptions.length === 0
                         ? 'No relationship fields found'
                         : 'Select a relationship field...'}
                   </option>
-                  {referenceFields.map((f) => (
-                    <option key={f.id} value={f.id}>
-                      {f.displayName || f.name}
+                  {relationshipFieldOptions.map((opt) => (
+                    <option key={opt.id} value={opt.id}>
+                      {opt.label}
                     </option>
                   ))}
                 </select>

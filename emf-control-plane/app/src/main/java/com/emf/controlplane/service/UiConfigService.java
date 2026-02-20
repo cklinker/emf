@@ -1,5 +1,6 @@
 package com.emf.controlplane.service;
 
+import com.emf.controlplane.dto.CreateUiMenuRequest;
 import com.emf.controlplane.dto.CreateUiPageRequest;
 import com.emf.controlplane.dto.UiMenuItemRequest;
 import com.emf.controlplane.dto.UpdateUiMenuRequest;
@@ -221,6 +222,66 @@ public class UiConfigService {
     }
 
     /**
+     * Creates a new UI menu with the given configuration.
+     * Validates that the menu name is unique within the tenant before persisting.
+     *
+     * @param request The menu creation request
+     * @return The created UI menu with generated ID
+     * @throws DuplicateResourceException if a menu with the same name already exists for this tenant
+     */
+    @Transactional
+    public UiMenu createMenu(CreateUiMenuRequest request) {
+        String tenantId = TenantContextHolder.getTenantId();
+        log.info("Creating UI menu with name: {} for tenant: {}", request.getName(), tenantId);
+
+        // Check for duplicate name within tenant
+        if (tenantId != null) {
+            if (menuRepository.existsByTenantIdAndName(tenantId, request.getName())) {
+                throw new DuplicateResourceException("UiMenu", "name", request.getName());
+            }
+        } else {
+            if (menuRepository.existsByName(request.getName())) {
+                throw new DuplicateResourceException("UiMenu", "name", request.getName());
+            }
+        }
+
+        // Create the menu entity
+        UiMenu menu = new UiMenu(request.getName());
+        if (tenantId != null) {
+            menu.setTenantId(tenantId);
+        }
+        if (request.getDescription() != null) {
+            menu.setDescription(request.getDescription());
+        }
+
+        // Add items if provided
+        if (request.getItems() != null) {
+            for (int i = 0; i < request.getItems().size(); i++) {
+                UiMenuItemRequest itemRequest = request.getItems().get(i);
+                UiMenuItem item = new UiMenuItem(
+                        itemRequest.getLabel(),
+                        itemRequest.getPath(),
+                        itemRequest.getDisplayOrder() != null ? itemRequest.getDisplayOrder() : i
+                );
+                if (itemRequest.getIcon() != null) {
+                    item.setIcon(itemRequest.getIcon());
+                }
+                item.setActive(itemRequest.getActive() != null ? itemRequest.getActive() : true);
+                menu.addItem(item);
+            }
+        }
+
+        // Save the menu
+        menu = menuRepository.save(menu);
+
+        // Publish event
+        publishUiChangedEvent();
+
+        log.info("Created UI menu with id: {}", menu.getId());
+        return menu;
+    }
+
+    /**
      * Updates an existing UI menu.
      * Only provided fields will be updated.
      * If items are provided, they will replace the existing items.
@@ -278,6 +339,28 @@ public class UiConfigService {
 
         log.info("Updated UI menu with id: {}", id);
         return menu;
+    }
+
+    /**
+     * Deletes a UI menu by its ID.
+     * Cascade deletes all associated menu items.
+     *
+     * @param id The menu ID to delete
+     * @throws ResourceNotFoundException if the menu does not exist
+     */
+    @Transactional
+    public void deleteMenu(String id) {
+        log.info("Deleting UI menu with id: {}", id);
+
+        UiMenu menu = menuRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("UiMenu", id));
+
+        menuRepository.delete(menu);
+
+        // Publish event
+        publishUiChangedEvent();
+
+        log.info("Deleted UI menu with id: {}", id);
     }
 
     /**

@@ -19,6 +19,7 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -166,6 +167,12 @@ public class SecurityAuditService {
                                                   String eventType, String actorId,
                                                   Pageable pageable) {
         return repository.findByFilters(tenantId, category, eventType, actorId, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public List<SecurityAuditLog> queryAuditLogList(String tenantId, String category,
+                                                     String eventType, String actorId) {
+        return repository.findAllByFilters(tenantId, category, eventType, actorId);
     }
 
     @Transactional(readOnly = true)

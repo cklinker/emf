@@ -8,10 +8,7 @@ import java.time.Instant;
 
 @Entity
 @Table(name = "flow_execution")
-public class FlowExecution extends BaseEntity {
-
-    @Column(name = "tenant_id", nullable = false, length = 36)
-    private String tenantId;
+public class FlowExecution extends TenantScopedEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "flow_id", nullable = false)
@@ -44,8 +41,6 @@ public class FlowExecution extends BaseEntity {
 
     public FlowExecution() { super(); }
 
-    public String getTenantId() { return tenantId; }
-    public void setTenantId(String tenantId) { this.tenantId = tenantId; }
     public Flow getFlow() { return flow; }
     public void setFlow(Flow flow) { this.flow = flow; }
     public String getStatus() { return status; }

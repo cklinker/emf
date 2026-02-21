@@ -22,7 +22,7 @@ import java.util.Set;
 @Entity
 @Table(name = "user_group")
 @EntityListeners(AuditingEntityListener.class)
-public class UserGroup extends BaseEntity {
+public class UserGroup extends TenantScopedEntity {
 
     public static final String SOURCE_MANUAL = "MANUAL";
     public static final String SOURCE_OIDC = "OIDC";
@@ -31,9 +31,6 @@ public class UserGroup extends BaseEntity {
     public static final String TYPE_PUBLIC = "PUBLIC";
     public static final String TYPE_QUEUE = "QUEUE";
     public static final String TYPE_SYSTEM = "SYSTEM";
-
-    @Column(name = "tenant_id", nullable = false, length = 36)
-    private String tenantId;
 
     @Column(name = "name", nullable = false, length = 100)
     private String name;
@@ -68,14 +65,10 @@ public class UserGroup extends BaseEntity {
     }
 
     public UserGroup(String tenantId, String name, String description) {
-        super();
-        this.tenantId = tenantId;
+        super(tenantId);
         this.name = name;
         this.description = description;
     }
-
-    public String getTenantId() { return tenantId; }
-    public void setTenantId(String tenantId) { this.tenantId = tenantId; }
 
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }

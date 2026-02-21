@@ -12,10 +12,7 @@ import java.time.Instant;
  */
 @Entity
 @Table(name = "field_history")
-public class FieldHistory extends BaseEntity {
-
-    @Column(name = "tenant_id", nullable = false, length = 36)
-    private String tenantId;
+public class FieldHistory extends TenantScopedEntity {
 
     @Column(name = "collection_id", nullable = false, length = 36)
     private String collectionId;
@@ -49,14 +46,6 @@ public class FieldHistory extends BaseEntity {
 
     public FieldHistory() {
         super();
-    }
-
-    public String getTenantId() {
-        return tenantId;
-    }
-
-    public void setTenantId(String tenantId) {
-        this.tenantId = tenantId;
     }
 
     public String getCollectionId() {

@@ -6,16 +6,19 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 import org.springframework.lang.Nullable;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtException;
+import org.springframework.security.oauth2.jwt.JwtTimestampValidator;
 import org.springframework.security.oauth2.jwt.NimbusReactiveJwtDecoder;
 import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
@@ -38,6 +41,7 @@ public class DynamicReactiveJwtDecoder implements ReactiveJwtDecoder {
     private final ReactiveStringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
     private final String fallbackIssuerUri;
+    private final Duration clockSkew;
 
     // In-memory cache of JwtDecoders keyed by JWKS URI
     private final ConcurrentHashMap<String, NimbusReactiveJwtDecoder> decoderCache = new ConcurrentHashMap<>();
@@ -50,16 +54,37 @@ public class DynamicReactiveJwtDecoder implements ReactiveJwtDecoder {
      */
     record ProviderInfo(String jwksUri, String audience) {}
 
+    /**
+     * Creates a DynamicReactiveJwtDecoder with default clock skew (0 seconds).
+     */
     public DynamicReactiveJwtDecoder(
             WebClient controlPlaneClient,
             @Nullable ReactiveStringRedisTemplate redisTemplate,
             String fallbackIssuerUri) {
+        this(controlPlaneClient, redisTemplate, fallbackIssuerUri, Duration.ZERO);
+    }
+
+    /**
+     * Creates a DynamicReactiveJwtDecoder with configurable clock skew tolerance.
+     *
+     * @param controlPlaneClient WebClient for control plane API calls
+     * @param redisTemplate Redis template for caching (nullable)
+     * @param fallbackIssuerUri fallback OIDC issuer URI
+     * @param clockSkew tolerance for clock drift between gateway and identity provider
+     */
+    public DynamicReactiveJwtDecoder(
+            WebClient controlPlaneClient,
+            @Nullable ReactiveStringRedisTemplate redisTemplate,
+            String fallbackIssuerUri,
+            Duration clockSkew) {
         this.controlPlaneClient = controlPlaneClient;
         this.redisTemplate = redisTemplate;
         this.objectMapper = new ObjectMapper();
         this.fallbackIssuerUri = fallbackIssuerUri;
-        log.info("DynamicReactiveJwtDecoder initialized: fallbackIssuerUri={}, redis={}",
-                fallbackIssuerUri, redisTemplate != null ? "enabled" : "disabled");
+        this.clockSkew = clockSkew != null ? clockSkew : Duration.ZERO;
+        log.info("DynamicReactiveJwtDecoder initialized: fallbackIssuerUri={}, redis={}, clockSkew={}s",
+                fallbackIssuerUri, redisTemplate != null ? "enabled" : "disabled",
+                this.clockSkew.getSeconds());
     }
 
     @Override
@@ -100,12 +125,25 @@ public class DynamicReactiveJwtDecoder implements ReactiveJwtDecoder {
                 info.jwksUri(),
                 uri -> {
                     NimbusReactiveJwtDecoder d = NimbusReactiveJwtDecoder.withJwkSetUri(uri).build();
+                    // Build a composite validator: timestamp (with clock skew) + optional audience
+                    List<OAuth2TokenValidator<Jwt>> validators = new ArrayList<>();
+
+                    // Always add timestamp validation with clock skew tolerance
+                    JwtTimestampValidator timestampValidator = new JwtTimestampValidator(clockSkew);
+                    validators.add(timestampValidator);
+                    if (!clockSkew.isZero()) {
+                        log.debug("Added clock skew tolerance of {}s for JWKS URI {}",
+                                clockSkew.getSeconds(), uri);
+                    }
+
                     // If audience is configured, add audience validation
                     if (info.audience() != null && !info.audience().isBlank()) {
                         log.debug("Adding audience validation for JWKS URI {}: expected audience={}",
                                 uri, info.audience());
-                        d.setJwtValidator(new AudienceValidator(info.audience()));
+                        validators.add(new AudienceValidator(info.audience()));
                     }
+
+                    d.setJwtValidator(new DelegatingOAuth2TokenValidator<>(validators));
                     return d;
                 });
         return decoder.decode(token);

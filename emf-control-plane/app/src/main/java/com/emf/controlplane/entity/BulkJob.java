@@ -8,10 +8,7 @@ import java.util.List;
 
 @Entity
 @Table(name = "bulk_job")
-public class BulkJob extends BaseEntity {
-
-    @Column(name = "tenant_id", nullable = false, length = 36)
-    private String tenantId;
+public class BulkJob extends TenantScopedEntity {
 
     @Column(name = "collection_id", nullable = false, length = 36)
     private String collectionId;
@@ -58,8 +55,6 @@ public class BulkJob extends BaseEntity {
 
     public BulkJob() { super(); }
 
-    public String getTenantId() { return tenantId; }
-    public void setTenantId(String tenantId) { this.tenantId = tenantId; }
     public String getCollectionId() { return collectionId; }
     public void setCollectionId(String collectionId) { this.collectionId = collectionId; }
     public String getOperation() { return operation; }

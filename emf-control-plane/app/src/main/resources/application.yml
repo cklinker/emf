@@ -201,8 +201,12 @@ emf:
     # Security
     security:
       enabled: ${SECURITY_ENABLED:true}
+      permissions-enabled: ${SECURITY_PERMISSIONS_ENABLED:true}
       admin-role: ADMIN
       role-claim-name: roles
+      audit:
+        retention-days: ${SECURITY_AUDIT_RETENTION_DAYS:90}
+        purge-batch-size: ${SECURITY_AUDIT_PURGE_BATCH_SIZE:10000}
     # Worker service URL for routing data API requests through the gateway
     worker-service-url: ${WORKER_SERVICE_URL:http://emf-worker:80}
 

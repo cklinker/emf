@@ -5,10 +5,7 @@ import java.time.Instant;
 
 @Entity
 @Table(name = "script_execution_log")
-public class ScriptExecutionLog extends BaseEntity {
-
-    @Column(name = "tenant_id", nullable = false, length = 36)
-    private String tenantId;
+public class ScriptExecutionLog extends TenantScopedEntity {
 
     @Column(name = "script_id", nullable = false, length = 36)
     private String scriptId;
@@ -48,8 +45,6 @@ public class ScriptExecutionLog extends BaseEntity {
 
     public ScriptExecutionLog() { super(); }
 
-    public String getTenantId() { return tenantId; }
-    public void setTenantId(String tenantId) { this.tenantId = tenantId; }
     public String getScriptId() { return scriptId; }
     public void setScriptId(String scriptId) { this.scriptId = scriptId; }
     public String getStatus() { return status; }

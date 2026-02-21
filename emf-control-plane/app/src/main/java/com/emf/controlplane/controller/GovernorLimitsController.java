@@ -28,7 +28,7 @@ public class GovernorLimitsController {
     }
 
     @PutMapping
-    @PreAuthorize("hasRole('PLATFORM_ADMIN')")
+    @PreAuthorize("@securityService.isPlatformAdmin(#root.authentication)")
     public ResponseEntity<GovernorLimits> updateLimits(@RequestBody GovernorLimits limits) {
         String tenantId = TenantContextHolder.requireTenantId();
         GovernorLimits updated = tenantService.updateGovernorLimits(tenantId, limits);

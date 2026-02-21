@@ -12,10 +12,7 @@ import java.time.Instant;
  */
 @Entity
 @Table(name = "worker")
-public class Worker extends BaseEntity {
-
-    @Column(name = "tenant_id", length = 36)
-    private String tenantId = "default";
+public class Worker extends TenantScopedEntity {
 
     @Column(name = "pod_name", length = 253)
     private String podName;
@@ -55,22 +52,14 @@ public class Worker extends BaseEntity {
     private Instant lastHeartbeat;
 
     public Worker() {
-        super();
+        super("default");
     }
 
     public Worker(String host, int port, String baseUrl) {
-        super();
+        super("default");
         this.host = host;
         this.port = port;
         this.baseUrl = baseUrl;
-    }
-
-    public String getTenantId() {
-        return tenantId;
-    }
-
-    public void setTenantId(String tenantId) {
-        this.tenantId = tenantId;
     }
 
     public String getPodName() {

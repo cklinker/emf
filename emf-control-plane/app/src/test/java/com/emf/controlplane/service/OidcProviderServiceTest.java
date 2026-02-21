@@ -46,7 +46,7 @@ class OidcProviderServiceTest {
 
     @BeforeEach
     void setUp() {
-        oidcProviderService = new OidcProviderService(providerRepository, null, null);  // ConfigEventPublisher and JwksCache are optional in tests
+        oidcProviderService = new OidcProviderService(providerRepository, null, null, null);  // ConfigEventPublisher, JwksCache, SecurityAuditService are optional in tests
     }
 
     @Nested

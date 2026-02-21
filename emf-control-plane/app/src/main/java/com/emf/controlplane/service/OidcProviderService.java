@@ -39,15 +39,18 @@ public class OidcProviderService {
     private final ConfigEventPublisher eventPublisher;
     private final JwksCache jwksCache;
     private final ObjectMapper objectMapper;
+    private final SecurityAuditService securityAuditService;
 
     public OidcProviderService(
             OidcProviderRepository providerRepository,
             @Nullable ConfigEventPublisher eventPublisher,
-            @Nullable JwksCache jwksCache) {
+            @Nullable JwksCache jwksCache,
+            @Nullable SecurityAuditService securityAuditService) {
         this.providerRepository = providerRepository;
         this.eventPublisher = eventPublisher;
         this.jwksCache = jwksCache;
         this.objectMapper = new ObjectMapper();
+        this.securityAuditService = securityAuditService;
     }
 
     /**
@@ -137,6 +140,12 @@ public class OidcProviderService {
 
         // Publish event (stubbed for now - will be implemented in task 11)
         publishOidcChangedEvent();
+
+        // Audit log
+        if (securityAuditService != null) {
+            securityAuditService.log("OIDC_PROVIDER_CREATED", "CONFIG",
+                    "OIDC_PROVIDER", provider.getId(), provider.getName(), null);
+        }
 
         log.info("Created OIDC provider with id: {}", provider.getId());
         return provider;
@@ -243,6 +252,12 @@ public class OidcProviderService {
         // Publish event
         publishOidcChangedEvent();
 
+        // Audit log
+        if (securityAuditService != null) {
+            securityAuditService.log("OIDC_PROVIDER_UPDATED", "CONFIG",
+                    "OIDC_PROVIDER", provider.getId(), provider.getName(), null);
+        }
+
         log.info("Updated OIDC provider with id: {}", id);
         return provider;
     }
@@ -279,6 +294,12 @@ public class OidcProviderService {
 
         // Publish event
         publishOidcChangedEvent();
+
+        // Audit log
+        if (securityAuditService != null) {
+            securityAuditService.log("OIDC_PROVIDER_DELETED", "CONFIG",
+                    "OIDC_PROVIDER", provider.getId(), provider.getName(), null);
+        }
 
         log.info("Soft-deleted OIDC provider with id: {}", id);
     }

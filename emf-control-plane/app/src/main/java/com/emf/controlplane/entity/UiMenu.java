@@ -10,10 +10,7 @@ import java.util.List;
  */
 @Entity
 @Table(name = "ui_menu")
-public class UiMenu extends BaseEntity {
-
-    @Column(name = "tenant_id", nullable = false, length = 36)
-    private String tenantId;
+public class UiMenu extends TenantScopedEntity {
 
     @Column(name = "name", nullable = false, length = 100)
     private String name;
@@ -35,14 +32,6 @@ public class UiMenu extends BaseEntity {
     public UiMenu(String name) {
         super();
         this.name = name;
-    }
-
-    public String getTenantId() {
-        return tenantId;
-    }
-
-    public void setTenantId(String tenantId) {
-        this.tenantId = tenantId;
     }
 
     public String getName() {

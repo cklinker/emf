@@ -41,6 +41,7 @@ public class CacheConfig {
 
     public static final String COLLECTIONS_CACHE = "collections";
     public static final String JWKS_CACHE = "jwks";
+    public static final String PERMISSIONS_CACHE = "permissions";
 
     private final ControlPlaneProperties properties;
 
@@ -87,6 +88,11 @@ public class CacheConfig {
                 .entryTtl(Duration.ofSeconds(jwksTtl)));
         log.info("JWKS cache configured with TTL: {} seconds", jwksTtl);
 
+        // Permissions cache configuration (5-minute TTL)
+        cacheConfigurations.put(PERMISSIONS_CACHE, defaultConfig
+                .entryTtl(Duration.ofMinutes(5)));
+        log.info("Permissions cache configured with TTL: 5 minutes");
+
         return RedisCacheManager.builder(connectionFactory)
                 .cacheDefaults(defaultConfig.entryTtl(Duration.ofSeconds(collectionsTtl)))
                 .withInitialCacheConfigurations(cacheConfigurations)
@@ -104,6 +110,6 @@ public class CacheConfig {
     @ConditionalOnProperty(name = "spring.cache.type", havingValue = "none", matchIfMissing = true)
     public CacheManager inMemoryCacheManager() {
         log.info("Configuring in-memory cache manager (Redis not available)");
-        return new ConcurrentMapCacheManager(COLLECTIONS_CACHE, JWKS_CACHE);
+        return new ConcurrentMapCacheManager(COLLECTIONS_CACHE, JWKS_CACHE, PERMISSIONS_CACHE);
     }
 }

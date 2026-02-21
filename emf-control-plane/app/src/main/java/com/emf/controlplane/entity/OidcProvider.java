@@ -8,10 +8,7 @@ import jakarta.persistence.*;
  */
 @Entity
 @Table(name = "oidc_provider")
-public class OidcProvider extends BaseEntity {
-
-    @Column(name = "tenant_id", nullable = false, length = 36)
-    private String tenantId;
+public class OidcProvider extends TenantScopedEntity {
 
     @Column(name = "name", nullable = false, length = 100)
     private String name;
@@ -55,14 +52,6 @@ public class OidcProvider extends BaseEntity {
         this.name = name;
         this.issuer = issuer;
         this.jwksUri = jwksUri;
-    }
-
-    public String getTenantId() {
-        return tenantId;
-    }
-
-    public void setTenantId(String tenantId) {
-        this.tenantId = tenantId;
     }
 
     public String getName() {

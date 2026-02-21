@@ -4,10 +4,7 @@ import jakarta.persistence.*;
 
 @Entity
 @Table(name = "layout_assignment")
-public class LayoutAssignment extends BaseEntity {
-
-    @Column(name = "tenant_id", nullable = false, length = 36)
-    private String tenantId;
+public class LayoutAssignment extends TenantScopedEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "collection_id", nullable = false)
@@ -24,9 +21,6 @@ public class LayoutAssignment extends BaseEntity {
     private PageLayout layout;
 
     public LayoutAssignment() { super(); }
-
-    public String getTenantId() { return tenantId; }
-    public void setTenantId(String tenantId) { this.tenantId = tenantId; }
 
     public Collection getCollection() { return collection; }
     public void setCollection(Collection collection) { this.collection = collection; }

@@ -44,6 +44,7 @@ import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp/Keyboa
 import { ToastProvider } from './components/Toast'
 import { LiveRegionProvider } from './components/LiveRegion'
 import { ProtectedRoute } from './components/ProtectedRoute'
+import { RequirePermission } from './components/RequirePermission/RequirePermission'
 import { Header } from './components/Header'
 import { PageTransition } from './components/PageTransition'
 import { PageLoader } from './components/PageLoader'
@@ -460,7 +461,9 @@ function TenantRoutes(): React.ReactElement {
         path="system-health"
         element={
           <AdminPageRoute>
-            <DashboardPage />
+            <RequirePermission permission="VIEW_SETUP">
+              <DashboardPage />
+            </RequirePermission>
           </AdminPageRoute>
         }
       />
@@ -470,7 +473,9 @@ function TenantRoutes(): React.ReactElement {
         path="collections"
         element={
           <AdminPageRoute>
-            <CollectionsPage />
+            <RequirePermission permission="CUSTOMIZE_APPLICATION">
+              <CollectionsPage />
+            </RequirePermission>
           </AdminPageRoute>
         }
       />
@@ -478,7 +483,9 @@ function TenantRoutes(): React.ReactElement {
         path="collections/new"
         element={
           <AdminPageRoute>
-            <CollectionWizardPage />
+            <RequirePermission permission="CUSTOMIZE_APPLICATION">
+              <CollectionWizardPage />
+            </RequirePermission>
           </AdminPageRoute>
         }
       />
@@ -486,7 +493,9 @@ function TenantRoutes(): React.ReactElement {
         path="collections/:id"
         element={
           <AdminPageRoute>
-            <CollectionDetailPage />
+            <RequirePermission permission="CUSTOMIZE_APPLICATION">
+              <CollectionDetailPage />
+            </RequirePermission>
           </AdminPageRoute>
         }
       />
@@ -494,7 +503,9 @@ function TenantRoutes(): React.ReactElement {
         path="collections/:id/edit"
         element={
           <AdminPageRoute>
-            <CollectionFormPage />
+            <RequirePermission permission="CUSTOMIZE_APPLICATION">
+              <CollectionFormPage />
+            </RequirePermission>
           </AdminPageRoute>
         }
       />
@@ -504,7 +515,9 @@ function TenantRoutes(): React.ReactElement {
         path="oidc-providers"
         element={
           <AdminPageRoute>
-            <OIDCProvidersPage />
+            <RequirePermission permission="MANAGE_CONNECTED_APPS">
+              <OIDCProvidersPage />
+            </RequirePermission>
           </AdminPageRoute>
         }
       />
@@ -514,7 +527,9 @@ function TenantRoutes(): React.ReactElement {
         path="workers"
         element={
           <AdminPageRoute>
-            <WorkersPage />
+            <RequirePermission permission="VIEW_SETUP">
+              <WorkersPage />
+            </RequirePermission>
           </AdminPageRoute>
         }
       />
@@ -524,7 +539,9 @@ function TenantRoutes(): React.ReactElement {
         path="pages"
         element={
           <AdminPageRoute>
-            <PageBuilderPage />
+            <RequirePermission permission="CUSTOMIZE_APPLICATION">
+              <PageBuilderPage />
+            </RequirePermission>
           </AdminPageRoute>
         }
       />
@@ -532,7 +549,9 @@ function TenantRoutes(): React.ReactElement {
         path="menus"
         element={
           <AdminPageRoute>
-            <MenuBuilderPage />
+            <RequirePermission permission="CUSTOMIZE_APPLICATION">
+              <MenuBuilderPage />
+            </RequirePermission>
           </AdminPageRoute>
         }
       />
@@ -542,7 +561,9 @@ function TenantRoutes(): React.ReactElement {
         path="packages"
         element={
           <AdminPageRoute>
-            <PackagesPage />
+            <RequirePermission permission="CUSTOMIZE_APPLICATION">
+              <PackagesPage />
+            </RequirePermission>
           </AdminPageRoute>
         }
       />
@@ -552,7 +573,9 @@ function TenantRoutes(): React.ReactElement {
         path="migrations"
         element={
           <AdminPageRoute>
-            <MigrationsPage />
+            <RequirePermission permission="CUSTOMIZE_APPLICATION">
+              <MigrationsPage />
+            </RequirePermission>
           </AdminPageRoute>
         }
       />
@@ -604,7 +627,9 @@ function TenantRoutes(): React.ReactElement {
         path="picklists"
         element={
           <AdminPageRoute>
-            <PicklistsPage />
+            <RequirePermission permission="CUSTOMIZE_APPLICATION">
+              <PicklistsPage />
+            </RequirePermission>
           </AdminPageRoute>
         }
       />
@@ -614,7 +639,9 @@ function TenantRoutes(): React.ReactElement {
         path="layouts"
         element={
           <AdminPageRoute>
-            <PageLayoutsPage />
+            <RequirePermission permission="CUSTOMIZE_APPLICATION">
+              <PageLayoutsPage />
+            </RequirePermission>
           </AdminPageRoute>
         }
       />
@@ -624,7 +651,9 @@ function TenantRoutes(): React.ReactElement {
         path="listviews"
         element={
           <AdminPageRoute>
-            <ListViewsPage />
+            <RequirePermission permission="MANAGE_LISTVIEWS">
+              <ListViewsPage />
+            </RequirePermission>
           </AdminPageRoute>
         }
       />
@@ -634,7 +663,9 @@ function TenantRoutes(): React.ReactElement {
         path="reports"
         element={
           <AdminPageRoute>
-            <ReportsPage />
+            <RequirePermission permission="MANAGE_REPORTS">
+              <ReportsPage />
+            </RequirePermission>
           </AdminPageRoute>
         }
       />
@@ -644,7 +675,9 @@ function TenantRoutes(): React.ReactElement {
         path="dashboards"
         element={
           <AdminPageRoute>
-            <DashboardsPage />
+            <RequirePermission permission="MANAGE_REPORTS">
+              <DashboardsPage />
+            </RequirePermission>
           </AdminPageRoute>
         }
       />
@@ -654,7 +687,9 @@ function TenantRoutes(): React.ReactElement {
         path="workflow-rules"
         element={
           <AdminPageRoute>
-            <WorkflowRulesPage />
+            <RequirePermission permission="MANAGE_WORKFLOWS">
+              <WorkflowRulesPage />
+            </RequirePermission>
           </AdminPageRoute>
         }
       />
@@ -664,7 +699,9 @@ function TenantRoutes(): React.ReactElement {
         path="approvals"
         element={
           <AdminPageRoute>
-            <ApprovalProcessesPage />
+            <RequirePermission permission="MANAGE_APPROVALS">
+              <ApprovalProcessesPage />
+            </RequirePermission>
           </AdminPageRoute>
         }
       />
@@ -674,7 +711,9 @@ function TenantRoutes(): React.ReactElement {
         path="flows"
         element={
           <AdminPageRoute>
-            <FlowsPage />
+            <RequirePermission permission="MANAGE_WORKFLOWS">
+              <FlowsPage />
+            </RequirePermission>
           </AdminPageRoute>
         }
       />
@@ -684,7 +723,9 @@ function TenantRoutes(): React.ReactElement {
         path="scheduled-jobs"
         element={
           <AdminPageRoute>
-            <ScheduledJobsPage />
+            <RequirePermission permission="MANAGE_WORKFLOWS">
+              <ScheduledJobsPage />
+            </RequirePermission>
           </AdminPageRoute>
         }
       />
@@ -694,7 +735,9 @@ function TenantRoutes(): React.ReactElement {
         path="email-templates"
         element={
           <AdminPageRoute>
-            <EmailTemplatesPage />
+            <RequirePermission permission="MANAGE_EMAIL_TEMPLATES">
+              <EmailTemplatesPage />
+            </RequirePermission>
           </AdminPageRoute>
         }
       />
@@ -704,7 +747,9 @@ function TenantRoutes(): React.ReactElement {
         path="plugins"
         element={
           <AdminPageRoute>
-            <PluginsPage />
+            <RequirePermission permission="CUSTOMIZE_APPLICATION">
+              <PluginsPage />
+            </RequirePermission>
           </AdminPageRoute>
         }
       />
@@ -714,7 +759,9 @@ function TenantRoutes(): React.ReactElement {
         path="users"
         element={
           <AdminPageRoute>
-            <UsersPage />
+            <RequirePermission permission="MANAGE_USERS">
+              <UsersPage />
+            </RequirePermission>
           </AdminPageRoute>
         }
       />
@@ -722,7 +769,9 @@ function TenantRoutes(): React.ReactElement {
         path="users/:id"
         element={
           <AdminPageRoute>
-            <UserDetailPage />
+            <RequirePermission permission="MANAGE_USERS">
+              <UserDetailPage />
+            </RequirePermission>
           </AdminPageRoute>
         }
       />
@@ -732,7 +781,9 @@ function TenantRoutes(): React.ReactElement {
         path="audit-trail"
         element={
           <AdminPageRoute>
-            <SetupAuditTrailPage />
+            <RequirePermission permission="VIEW_SETUP">
+              <SetupAuditTrailPage />
+            </RequirePermission>
           </AdminPageRoute>
         }
       />
@@ -742,7 +793,9 @@ function TenantRoutes(): React.ReactElement {
         path="profiles"
         element={
           <AdminPageRoute>
-            <ProfilesPage />
+            <RequirePermission permission="MANAGE_USERS">
+              <ProfilesPage />
+            </RequirePermission>
           </AdminPageRoute>
         }
       />
@@ -750,7 +803,9 @@ function TenantRoutes(): React.ReactElement {
         path="permission-sets"
         element={
           <AdminPageRoute>
-            <PermissionSetsPage />
+            <RequirePermission permission="MANAGE_USERS">
+              <PermissionSetsPage />
+            </RequirePermission>
           </AdminPageRoute>
         }
       />
@@ -758,7 +813,9 @@ function TenantRoutes(): React.ReactElement {
         path="login-history"
         element={
           <AdminPageRoute>
-            <LoginHistoryPage />
+            <RequirePermission permission="MANAGE_USERS">
+              <LoginHistoryPage />
+            </RequirePermission>
           </AdminPageRoute>
         }
       />
@@ -766,7 +823,9 @@ function TenantRoutes(): React.ReactElement {
         path="security-audit"
         element={
           <AdminPageRoute>
-            <SecurityAuditPage />
+            <RequirePermission permission="MANAGE_USERS">
+              <SecurityAuditPage />
+            </RequirePermission>
           </AdminPageRoute>
         }
       />
@@ -776,7 +835,9 @@ function TenantRoutes(): React.ReactElement {
         path="governor-limits"
         element={
           <AdminPageRoute>
-            <GovernorLimitsPage />
+            <RequirePermission permission="VIEW_SETUP">
+              <GovernorLimitsPage />
+            </RequirePermission>
           </AdminPageRoute>
         }
       />
@@ -786,7 +847,9 @@ function TenantRoutes(): React.ReactElement {
         path="tenants"
         element={
           <AdminPageRoute requiredRoles={['PLATFORM_ADMIN']}>
-            <TenantsPage />
+            <RequirePermission permission="PLATFORM_ADMIN">
+              <TenantsPage />
+            </RequirePermission>
           </AdminPageRoute>
         }
       />
@@ -794,7 +857,9 @@ function TenantRoutes(): React.ReactElement {
         path="tenant-dashboard"
         element={
           <AdminPageRoute>
-            <TenantDashboardPage />
+            <RequirePermission permission="VIEW_SETUP">
+              <TenantDashboardPage />
+            </RequirePermission>
           </AdminPageRoute>
         }
       />
@@ -804,7 +869,9 @@ function TenantRoutes(): React.ReactElement {
         path="scripts"
         element={
           <AdminPageRoute>
-            <ScriptsPage />
+            <RequirePermission permission="MANAGE_CONNECTED_APPS">
+              <ScriptsPage />
+            </RequirePermission>
           </AdminPageRoute>
         }
       />
@@ -814,7 +881,9 @@ function TenantRoutes(): React.ReactElement {
         path="webhooks"
         element={
           <AdminPageRoute>
-            <WebhooksPage />
+            <RequirePermission permission="MANAGE_CONNECTED_APPS">
+              <WebhooksPage />
+            </RequirePermission>
           </AdminPageRoute>
         }
       />
@@ -824,7 +893,9 @@ function TenantRoutes(): React.ReactElement {
         path="connected-apps"
         element={
           <AdminPageRoute>
-            <ConnectedAppsPage />
+            <RequirePermission permission="MANAGE_CONNECTED_APPS">
+              <ConnectedAppsPage />
+            </RequirePermission>
           </AdminPageRoute>
         }
       />
@@ -834,7 +905,9 @@ function TenantRoutes(): React.ReactElement {
         path="bulk-jobs"
         element={
           <AdminPageRoute>
-            <BulkJobsPage />
+            <RequirePermission permission="MANAGE_DATA">
+              <BulkJobsPage />
+            </RequirePermission>
           </AdminPageRoute>
         }
       />
@@ -844,7 +917,9 @@ function TenantRoutes(): React.ReactElement {
         path="setup"
         element={
           <AdminPageRoute>
-            <SetupHomePage />
+            <RequirePermission permission="VIEW_SETUP">
+              <SetupHomePage />
+            </RequirePermission>
           </AdminPageRoute>
         }
       />

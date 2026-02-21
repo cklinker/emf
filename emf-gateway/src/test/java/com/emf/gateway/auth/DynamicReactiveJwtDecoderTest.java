@@ -10,6 +10,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtException;
 import reactor.test.StepVerifier;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
@@ -54,6 +55,51 @@ class DynamicReactiveJwtDecoderTest {
     void evictAllClearsCache() {
         decoder.evictAll();
         // no exception — cache is empty
+    }
+
+    @Nested
+    @DisplayName("Clock Skew Configuration")
+    class ClockSkewTest {
+
+        @Test
+        @DisplayName("should accept zero clock skew via 3-arg constructor")
+        void shouldAcceptZeroClockSkewDefault() {
+            DynamicReactiveJwtDecoder d = new DynamicReactiveJwtDecoder(
+                    null, null, "http://localhost:9000/realms/emf");
+            // No exception — default clock skew is Duration.ZERO
+            d.evictAll();
+        }
+
+        @Test
+        @DisplayName("should accept explicit clock skew via 4-arg constructor")
+        void shouldAcceptExplicitClockSkew() {
+            DynamicReactiveJwtDecoder d = new DynamicReactiveJwtDecoder(
+                    null, null, "http://localhost:9000/realms/emf",
+                    Duration.ofSeconds(30));
+            // No exception — clock skew is 30 seconds
+            d.evictAll();
+        }
+
+        @Test
+        @DisplayName("should handle null clock skew gracefully")
+        void shouldHandleNullClockSkew() {
+            DynamicReactiveJwtDecoder d = new DynamicReactiveJwtDecoder(
+                    null, null, "http://localhost:9000/realms/emf", null);
+            // No exception — null clock skew defaults to Duration.ZERO
+            d.evictAll();
+        }
+
+        @Test
+        @DisplayName("should reject invalid JWT even with clock skew configured")
+        void shouldStillRejectInvalidJwtWithClockSkew() {
+            DynamicReactiveJwtDecoder d = new DynamicReactiveJwtDecoder(
+                    null, null, "http://localhost:9000/realms/emf",
+                    Duration.ofSeconds(60));
+
+            StepVerifier.create(d.decode("not.a.jwt"))
+                    .expectError(JwtException.class)
+                    .verify();
+        }
     }
 
     @Nested

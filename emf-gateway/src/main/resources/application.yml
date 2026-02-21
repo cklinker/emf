@@ -42,12 +42,27 @@ spring:
     gateway:
       default-filters:
         - name: RequestTime
+        - name: RequestSize
+          args:
+            maxSize: 10MB          # Default 10 MB request body limit
       httpclient:
         connect-timeout: 5000
         response-timeout: 30s
+        max-header-size: 16384     # 16 KB max header size to prevent header-based attacks
         pool:
           max-connections: 500
           max-idle-time: 30s
+
+      # Per-route overrides (e.g., attachment uploads allow larger bodies)
+      routes:
+        - id: attachment-upload
+          predicates:
+            - Path=/api/**/attachments/**
+            - Method=POST,PUT
+          filters:
+            - name: RequestSize
+              args:
+                maxSize: 50MB      # 50 MB for attachment uploads
 
 # EMF Gateway specific configuration
 emf:
@@ -76,6 +91,10 @@ emf:
     # Rate limiting is driven by per-tenant governor limits (apiCallsPerDay)
     # fetched from the control plane during bootstrap.
     # See TenantGovernorLimitCache for details.
+
+    # Security settings
+    security:
+      jwt-clock-skew-seconds: 30   # Tolerance for clock drift between gateway and IdP
 
 # Actuator configuration for health and metrics
 management:

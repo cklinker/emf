@@ -15,6 +15,7 @@ import org.springframework.web.cors.reactive.CorsConfigurationSource;
 import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 
@@ -40,6 +41,9 @@ public class SecurityConfig {
 
     @Value("${CORS_ALLOWED_ORIGIN_PATTERN:*}")
     private String corsAllowedOriginPattern;
+
+    @Value("${emf.gateway.security.jwt-clock-skew-seconds:30}")
+    private long jwtClockSkewSeconds;
 
     /**
      * Configures CORS at the WebFlux security layer.
@@ -91,6 +95,7 @@ public class SecurityConfig {
         WebClient controlPlaneClient = WebClient.builder()
                 .baseUrl(controlPlaneUrl)
                 .build();
-        return new DynamicReactiveJwtDecoder(controlPlaneClient, redisTemplate, issuerUri);
+        return new DynamicReactiveJwtDecoder(controlPlaneClient, redisTemplate, issuerUri,
+                Duration.ofSeconds(jwtClockSkewSeconds));
     }
 }

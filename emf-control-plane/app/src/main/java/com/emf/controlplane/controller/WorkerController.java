@@ -151,7 +151,7 @@ public class WorkerController {
      * @return The rebalance report with details of moves made
      */
     @PostMapping("/rebalance")
-    @PreAuthorize("hasRole('PLATFORM_ADMIN')")
+    @PreAuthorize("@securityService.isPlatformAdmin(#root.authentication)")
     public ResponseEntity<WorkerRebalanceService.RebalanceReport> rebalance() {
         WorkerRebalanceService.RebalanceReport report = workerRebalanceService.rebalance();
         return ResponseEntity.ok(report);

@@ -2,6 +2,7 @@ package com.emf.controlplane.controller;
 
 import com.emf.controlplane.entity.*;
 import com.emf.controlplane.repository.*;
+import com.emf.controlplane.service.PermissionResolutionService;
 import com.emf.controlplane.service.SecurityAuditService;
 import com.emf.controlplane.tenant.TenantContextHolder;
 import io.swagger.v3.oas.annotations.Operation;
@@ -33,19 +34,22 @@ public class ProfileController {
     private final ProfileFieldPermissionRepository profileFieldPermRepo;
     private final UserRepository userRepository;
     private final SecurityAuditService auditService;
+    private final PermissionResolutionService permissionResolutionService;
 
     public ProfileController(ProfileRepository profileRepository,
                              ProfileSystemPermissionRepository profileSysPermRepo,
                              ProfileObjectPermissionRepository profileObjPermRepo,
                              ProfileFieldPermissionRepository profileFieldPermRepo,
                              UserRepository userRepository,
-                             SecurityAuditService auditService) {
+                             SecurityAuditService auditService,
+                             PermissionResolutionService permissionResolutionService) {
         this.profileRepository = profileRepository;
         this.profileSysPermRepo = profileSysPermRepo;
         this.profileObjPermRepo = profileObjPermRepo;
         this.profileFieldPermRepo = profileFieldPermRepo;
         this.userRepository = userRepository;
         this.auditService = auditService;
+        this.permissionResolutionService = permissionResolutionService;
     }
 
     @GetMapping
@@ -111,6 +115,7 @@ public class ProfileController {
         String name = profile.getName();
         profileRepository.delete(profile);
         auditService.logProfileDeleted(id, name);
+        permissionResolutionService.evictPermissionsCache();
         return ResponseEntity.noContent().build();
     }
 
@@ -183,6 +188,7 @@ public class ProfileController {
         }
 
         auditService.logProfileUpdated(id, opt.get().getName(), null);
+        permissionResolutionService.evictPermissionsCache();
         return ResponseEntity.ok().build();
     }
 
@@ -220,6 +226,7 @@ public class ProfileController {
         }
 
         auditService.logProfileUpdated(id, opt.get().getName(), null);
+        permissionResolutionService.evictPermissionsCache();
         return ResponseEntity.ok().build();
     }
 
@@ -253,6 +260,7 @@ public class ProfileController {
         }
 
         auditService.logProfileUpdated(id, opt.get().getName(), null);
+        permissionResolutionService.evictPermissionsCache();
         return ResponseEntity.ok().build();
     }
 }

@@ -5,10 +5,7 @@ import java.time.Instant;
 
 @Entity
 @Table(name = "workflow_execution_log")
-public class WorkflowExecutionLog extends BaseEntity {
-
-    @Column(name = "tenant_id", nullable = false, length = 36)
-    private String tenantId;
+public class WorkflowExecutionLog extends TenantScopedEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "workflow_rule_id", nullable = false)
@@ -37,8 +34,6 @@ public class WorkflowExecutionLog extends BaseEntity {
 
     public WorkflowExecutionLog() { super(); }
 
-    public String getTenantId() { return tenantId; }
-    public void setTenantId(String tenantId) { this.tenantId = tenantId; }
     public WorkflowRule getWorkflowRule() { return workflowRule; }
     public void setWorkflowRule(WorkflowRule workflowRule) { this.workflowRule = workflowRule; }
     public String getRecordId() { return recordId; }

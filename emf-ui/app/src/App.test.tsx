@@ -235,6 +235,11 @@ vi.mock('./components/ErrorBoundary', () => ({
   ErrorBoundary: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }))
 
+// Mock RequirePermission to always render children (permissions tested in RequirePermission.test.tsx)
+vi.mock('./components/RequirePermission/RequirePermission', () => ({
+  RequirePermission: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}))
+
 // Mock the ProtectedRoute component
 vi.mock('./components/ProtectedRoute', () => ({
   ProtectedRoute: ({ children }: { children: React.ReactNode }) => {

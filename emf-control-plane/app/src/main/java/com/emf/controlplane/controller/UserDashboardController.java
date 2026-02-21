@@ -6,12 +6,14 @@ import com.emf.controlplane.service.UserDashboardService;
 import com.emf.controlplane.tenant.TenantContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/control/dashboards")
+@PreAuthorize("@securityService.hasPermission(#root, 'MANAGE_REPORTS')")
 public class UserDashboardController {
 
     private final UserDashboardService dashboardService;

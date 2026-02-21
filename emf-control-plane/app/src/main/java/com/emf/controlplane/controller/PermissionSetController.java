@@ -2,6 +2,7 @@ package com.emf.controlplane.controller;
 
 import com.emf.controlplane.entity.*;
 import com.emf.controlplane.repository.*;
+import com.emf.controlplane.service.PermissionResolutionService;
 import com.emf.controlplane.service.SecurityAuditService;
 import com.emf.controlplane.tenant.TenantContextHolder;
 import io.swagger.v3.oas.annotations.Operation;
@@ -35,6 +36,7 @@ public class PermissionSetController {
     private final UserPermissionSetRepository userPermSetRepo;
     private final GroupPermissionSetRepository groupPermSetRepo;
     private final SecurityAuditService auditService;
+    private final PermissionResolutionService permissionResolutionService;
 
     public PermissionSetController(PermissionSetRepository permissionSetRepository,
                                     PermsetSystemPermissionRepository permsetSysPermRepo,
@@ -42,7 +44,8 @@ public class PermissionSetController {
                                     PermsetFieldPermissionRepository permsetFieldPermRepo,
                                     UserPermissionSetRepository userPermSetRepo,
                                     GroupPermissionSetRepository groupPermSetRepo,
-                                    SecurityAuditService auditService) {
+                                    SecurityAuditService auditService,
+                                    PermissionResolutionService permissionResolutionService) {
         this.permissionSetRepository = permissionSetRepository;
         this.permsetSysPermRepo = permsetSysPermRepo;
         this.permsetObjPermRepo = permsetObjPermRepo;
@@ -50,6 +53,7 @@ public class PermissionSetController {
         this.userPermSetRepo = userPermSetRepo;
         this.groupPermSetRepo = groupPermSetRepo;
         this.auditService = auditService;
+        this.permissionResolutionService = permissionResolutionService;
     }
 
     @GetMapping
@@ -116,6 +120,7 @@ public class PermissionSetController {
         String name = permSet.getName();
         permissionSetRepository.delete(permSet);
         auditService.logPermsetDeleted(id, name);
+        permissionResolutionService.evictPermissionsCache();
         return ResponseEntity.noContent().build();
     }
 
@@ -150,6 +155,7 @@ public class PermissionSetController {
                 }
             }
         }
+        permissionResolutionService.evictPermissionsCache();
         return ResponseEntity.ok().build();
     }
 
@@ -162,6 +168,7 @@ public class PermissionSetController {
         }
 
         userPermSetRepo.deleteByUserIdAndPermissionSetId(userId, id);
+        permissionResolutionService.evictPermissionsCache();
         return ResponseEntity.noContent().build();
     }
 
@@ -182,6 +189,7 @@ public class PermissionSetController {
                 }
             }
         }
+        permissionResolutionService.evictPermissionsCache();
         return ResponseEntity.ok().build();
     }
 
@@ -194,6 +202,7 @@ public class PermissionSetController {
         }
 
         groupPermSetRepo.deleteByGroupIdAndPermissionSetId(groupId, id);
+        permissionResolutionService.evictPermissionsCache();
         return ResponseEntity.noContent().build();
     }
 }

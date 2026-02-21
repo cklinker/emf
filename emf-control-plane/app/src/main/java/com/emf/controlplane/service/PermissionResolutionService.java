@@ -1,11 +1,15 @@
 package com.emf.controlplane.service;
 
+import com.emf.controlplane.config.CacheConfig;
+import com.emf.controlplane.config.ControlPlaneProperties;
 import com.emf.controlplane.dto.ObjectPermissions;
 import com.emf.controlplane.dto.ResolvedPermissions;
 import com.emf.controlplane.entity.*;
 import com.emf.controlplane.repository.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +41,7 @@ public class PermissionResolutionService {
     private final GroupPermissionSetRepository groupPermSetRepo;
     private final UserGroupRepository userGroupRepository;
     private final UserRepository userRepository;
+    private final ControlPlaneProperties properties;
 
     public PermissionResolutionService(
             ProfileRepository profileRepository,
@@ -50,7 +55,8 @@ public class PermissionResolutionService {
             UserPermissionSetRepository userPermSetRepo,
             GroupPermissionSetRepository groupPermSetRepo,
             UserGroupRepository userGroupRepository,
-            UserRepository userRepository) {
+            UserRepository userRepository,
+            ControlPlaneProperties properties) {
         this.profileRepository = profileRepository;
         this.profileSysPermRepo = profileSysPermRepo;
         this.profileObjPermRepo = profileObjPermRepo;
@@ -63,13 +69,21 @@ public class PermissionResolutionService {
         this.groupPermSetRepo = groupPermSetRepo;
         this.userGroupRepository = userGroupRepository;
         this.userRepository = userRepository;
+        this.properties = properties;
     }
 
     /**
      * Resolves the full effective permissions for a user.
+     * Results are cached in Redis (or in-memory fallback) with a 5-minute TTL.
+     * When the permissions feature flag is disabled, returns all-permissive defaults.
      */
+    @Cacheable(value = CacheConfig.PERMISSIONS_CACHE, key = "'permissions:' + #tenantId + ':' + #userId")
     @Transactional(readOnly = true)
     public ResolvedPermissions resolveForUser(String tenantId, String userId) {
+        if (!properties.getSecurity().isPermissionsEnabled()) {
+            log.debug("Permissions feature disabled, returning all-permissive defaults for user {}", userId);
+            return allPermissiveDefaults();
+        }
         log.debug("Resolving permissions for user {} in tenant {}", userId, tenantId);
 
         User user = userRepository.findByIdAndTenantId(userId, tenantId).orElse(null);
@@ -215,5 +229,22 @@ public class PermissionResolutionService {
             systemPerms.put(perm.name(), false);
         }
         return new ResolvedPermissions(systemPerms, Collections.emptyMap(), Collections.emptyMap());
+    }
+
+    private ResolvedPermissions allPermissiveDefaults() {
+        Map<String, Boolean> systemPerms = new LinkedHashMap<>();
+        for (SystemPermission perm : SystemPermission.values()) {
+            systemPerms.put(perm.name(), true);
+        }
+        return new ResolvedPermissions(systemPerms, Collections.emptyMap(), Collections.emptyMap());
+    }
+
+    /**
+     * Evicts all entries from the permissions cache.
+     * Call this when profiles, permission sets, or user/group assignments change.
+     */
+    @CacheEvict(value = CacheConfig.PERMISSIONS_CACHE, allEntries = true)
+    public void evictPermissionsCache() {
+        log.info("Evicting all entries from permissions cache");
     }
 }

@@ -33,7 +33,7 @@ class ClaimPathValidationTest {
 
     @BeforeEach
     void setUp() {
-        oidcProviderService = new OidcProviderService(providerRepository, null, null);
+        oidcProviderService = new OidcProviderService(providerRepository, null, null, null);
         
         // Setup default mocks with lenient stubbing since not all tests use these
         lenient().when(providerRepository.existsByName(anyString())).thenReturn(false);

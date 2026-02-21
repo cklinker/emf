@@ -9,10 +9,7 @@ import java.util.List;
 
 @Entity
 @Table(name = "webhook")
-public class Webhook extends BaseEntity {
-
-    @Column(name = "tenant_id", nullable = false, length = 36)
-    private String tenantId;
+public class Webhook extends TenantScopedEntity {
 
     @Column(name = "name", nullable = false, length = 200)
     private String name;
@@ -53,8 +50,6 @@ public class Webhook extends BaseEntity {
 
     public Webhook() { super(); }
 
-    public String getTenantId() { return tenantId; }
-    public void setTenantId(String tenantId) { this.tenantId = tenantId; }
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
     public String getUrl() { return url; }

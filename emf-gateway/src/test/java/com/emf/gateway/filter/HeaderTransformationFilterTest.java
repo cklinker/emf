@@ -262,6 +262,45 @@ class HeaderTransformationFilterTest {
     }
     
     @Test
+    void shouldStripForgedInternalHeaders() {
+        // Given: A request with client-supplied internal headers (forgery attempt)
+        MockServerHttpRequest request = MockServerHttpRequest
+                .get("/api/users")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer test-token")
+                .header("X-Forwarded-User", "forged-admin")
+                .header("X-User-Id", "forged-user-id")
+                .header("X-Forwarded-Roles", "SUPER_ADMIN")
+                .build();
+
+        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        GatewayPrincipal principal = new GatewayPrincipal(
+                "real.user",
+                Arrays.asList("USER"),
+                Map.of("sub", "real-user-id")
+        );
+        exchange.getAttributes().put("gateway.principal", principal);
+
+        // Capture the mutated exchange
+        final ServerWebExchange[] capturedExchange = new ServerWebExchange[1];
+        when(chain.filter(any(ServerWebExchange.class))).thenAnswer(invocation -> {
+            capturedExchange[0] = invocation.getArgument(0);
+            return Mono.empty();
+        });
+
+        // When: Filter is applied
+        StepVerifier.create(filter.filter(exchange, chain))
+                .verifyComplete();
+
+        // Then: Forged headers should be replaced with gateway-verified values
+        assertThat(capturedExchange[0]).isNotNull();
+        HttpHeaders headers = capturedExchange[0].getRequest().getHeaders();
+        assertThat(headers.getFirst("X-Forwarded-User")).isEqualTo("real.user");
+        assertThat(headers.getFirst("X-User-Id")).isEqualTo("real-user-id");
+        assertThat(headers.getFirst("X-Forwarded-Roles")).isEqualTo("USER");
+    }
+
+    @Test
     void shouldHandleSingleRole() {
         // Given: A request with principal having single role
         MockServerHttpRequest request = MockServerHttpRequest

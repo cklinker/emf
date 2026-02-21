@@ -69,6 +69,12 @@ public class HeaderTransformationFilter implements GlobalFilter, Ordered {
         // Build the mutated request with transformed headers
         ServerHttpRequest mutatedRequest = exchange.getRequest().mutate()
                 .headers(headers -> {
+                    // Strip any client-supplied internal headers to prevent forgery.
+                    // These headers are gateway-verified and must not be set by clients.
+                    headers.remove(X_FORWARDED_USER_HEADER);
+                    headers.remove(X_USER_ID_HEADER);
+                    headers.remove(X_FORWARDED_ROLES_HEADER);
+
                     // Add X-Forwarded-User header
                     headers.set(X_FORWARDED_USER_HEADER, principal.getUsername());
 

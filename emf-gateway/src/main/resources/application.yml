@@ -1,7 +1,11 @@
 spring:
   application:
     name: emf-gateway
-  
+
+  # Request size limits for in-memory buffering
+  codec:
+    max-in-memory-size: 10MB
+
   # Kafka configuration for receiving configuration updates
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}

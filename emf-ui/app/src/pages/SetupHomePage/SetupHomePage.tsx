@@ -64,12 +64,6 @@ const CATEGORIES: SetupCategory[] = [
         permission: 'MANAGE_USERS',
       },
       {
-        name: 'Roles',
-        path: '/roles',
-        description: 'Define roles and assign to users',
-        permission: 'MANAGE_USERS',
-      },
-      {
         name: 'Profiles',
         path: '/profiles',
         description: 'Configure profile-based permissions',

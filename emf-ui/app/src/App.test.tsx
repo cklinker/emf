@@ -235,6 +235,11 @@ vi.mock('./components/ErrorBoundary', () => ({
   ErrorBoundary: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }))
 
+// Mock RequirePermission to always render children (permissions tested in RequirePermission.test.tsx)
+vi.mock('./components/RequirePermission/RequirePermission', () => ({
+  RequirePermission: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}))
+
 // Mock the ProtectedRoute component
 vi.mock('./components/ProtectedRoute', () => ({
   ProtectedRoute: ({ children }: { children: React.ReactNode }) => {
@@ -289,6 +294,10 @@ vi.mock('./pages', () => ({
   UserDetailPage: () => <div data-testid="user-detail-page">User Detail Page</div>,
   SetupAuditTrailPage: () => <div data-testid="audit-trail-page">Audit Trail Page</div>,
   GovernorLimitsPage: () => <div data-testid="governor-limits-page">Governor Limits Page</div>,
+  ProfilesPage: () => <div data-testid="profiles-page">Profiles Page</div>,
+  PermissionSetsPage: () => <div data-testid="permission-sets-page">Permission Sets Page</div>,
+  LoginHistoryPage: () => <div data-testid="login-history-page">Login History Page</div>,
+  SecurityAuditPage: () => <div data-testid="security-audit-page">Security Audit Page</div>,
   TenantsPage: () => <div data-testid="tenants-page">Tenants Page</div>,
   TenantDashboardPage: () => <div data-testid="tenant-dashboard-page">Tenant Dashboard Page</div>,
   LoginPage: () => <div data-testid="login-page">Login Page</div>,

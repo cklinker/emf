@@ -53,6 +53,7 @@ public class CollectionService {
     private final ObjectMapper objectMapper;
     private final ConfigEventPublisher eventPublisher;
     private final CollectionAssignmentService collectionAssignmentService;
+    private final DefaultProfileSeeder defaultProfileSeeder;
 
     public CollectionService(
             CollectionRepository collectionRepository,
@@ -60,13 +61,15 @@ public class CollectionService {
             FieldRepository fieldRepository,
             ObjectMapper objectMapper,
             @Nullable ConfigEventPublisher eventPublisher,
-            @Nullable CollectionAssignmentService collectionAssignmentService) {
+            @Nullable CollectionAssignmentService collectionAssignmentService,
+            @Nullable DefaultProfileSeeder defaultProfileSeeder) {
         this.collectionRepository = collectionRepository;
         this.versionRepository = versionRepository;
         this.fieldRepository = fieldRepository;
         this.objectMapper = objectMapper;
         this.eventPublisher = eventPublisher;
         this.collectionAssignmentService = collectionAssignmentService;
+        this.defaultProfileSeeder = defaultProfileSeeder;
     }
 
     /**
@@ -157,6 +160,16 @@ public class CollectionService {
 
         // Publish event
         publishCollectionChangedEvent(collection, ChangeType.CREATED);
+
+        // Auto-create object permissions for all profiles in the tenant
+        if (defaultProfileSeeder != null && tenantId != null) {
+            try {
+                defaultProfileSeeder.seedObjectPermissionsForCollection(tenantId, collection.getId());
+            } catch (Exception e) {
+                log.warn("Failed to seed object permissions for collection {}: {}",
+                        collection.getId(), e.getMessage());
+            }
+        }
 
         // Auto-assign to an available worker (best-effort)
         if (collectionAssignmentService != null) {

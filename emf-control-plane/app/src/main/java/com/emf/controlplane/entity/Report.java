@@ -6,10 +6,7 @@ import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "report")
-public class Report extends BaseEntity {
-
-    @Column(name = "tenant_id", nullable = false, length = 36)
-    private String tenantId;
+public class Report extends TenantScopedEntity {
 
     @Column(name = "name", nullable = false, length = 200)
     private String name;
@@ -73,8 +70,6 @@ public class Report extends BaseEntity {
 
     public Report() { super(); }
 
-    public String getTenantId() { return tenantId; }
-    public void setTenantId(String tenantId) { this.tenantId = tenantId; }
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
     public String getDescription() { return description; }

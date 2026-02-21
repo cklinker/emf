@@ -3,13 +3,8 @@ package com.emf.controlplane.entity;
 import jakarta.persistence.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
-import org.springframework.data.annotation.CreatedDate;
-import org.springframework.data.annotation.LastModifiedDate;
-import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.Instant;
-import java.util.Objects;
-import java.util.UUID;
 
 /**
  * Represents a platform user within a tenant.
@@ -17,15 +12,7 @@ import java.util.UUID;
  */
 @Entity
 @Table(name = "platform_user")
-@EntityListeners(AuditingEntityListener.class)
-public class User {
-
-    @Id
-    @Column(name = "id", nullable = false, updatable = false, length = 36)
-    private String id;
-
-    @Column(name = "tenant_id", nullable = false, length = 36)
-    private String tenantId;
+public class User extends TenantScopedEntity {
 
     @Column(name = "email", nullable = false, length = 320)
     private String email;
@@ -48,6 +35,9 @@ public class User {
     @Column(name = "timezone", length = 50)
     private String timezone = "UTC";
 
+    @Column(name = "profile_id", length = 36)
+    private String profileId;
+
     @Column(name = "manager_id", length = 36)
     private String managerId;
 
@@ -64,20 +54,12 @@ public class User {
     @Column(name = "settings", columnDefinition = "jsonb")
     private String settings = "{}";
 
-    @CreatedDate
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private Instant createdAt;
-
-    @LastModifiedDate
-    @Column(name = "updated_at")
-    private Instant updatedAt;
-
     public User() {
-        this.id = UUID.randomUUID().toString();
+        super();
     }
 
     public User(String email, String firstName, String lastName) {
-        this();
+        super();
         this.email = email;
         this.firstName = firstName;
         this.lastName = lastName;
@@ -91,12 +73,6 @@ public class User {
     }
 
     // Getters and setters
-
-    public String getId() { return id; }
-    public void setId(String id) { this.id = id; }
-
-    public String getTenantId() { return tenantId; }
-    public void setTenantId(String tenantId) { this.tenantId = tenantId; }
 
     public String getEmail() { return email; }
     public void setEmail(String email) { this.email = email; }
@@ -119,6 +95,9 @@ public class User {
     public String getTimezone() { return timezone; }
     public void setTimezone(String timezone) { this.timezone = timezone; }
 
+    public String getProfileId() { return profileId; }
+    public void setProfileId(String profileId) { this.profileId = profileId; }
+
     public String getManagerId() { return managerId; }
     public void setManagerId(String managerId) { this.managerId = managerId; }
 
@@ -134,29 +113,10 @@ public class User {
     public String getSettings() { return settings; }
     public void setSettings(String settings) { this.settings = settings; }
 
-    public Instant getCreatedAt() { return createdAt; }
-    public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
-
-    public Instant getUpdatedAt() { return updatedAt; }
-    public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        User user = (User) o;
-        return Objects.equals(id, user.id);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(id);
-    }
-
     @Override
     public String toString() {
         return "User{" +
-                "id='" + id + '\'' +
+                "id='" + getId() + '\'' +
                 ", email='" + email + '\'' +
                 ", status='" + status + '\'' +
                 '}';

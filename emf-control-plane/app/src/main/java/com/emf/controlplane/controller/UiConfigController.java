@@ -60,7 +60,7 @@ public class UiConfigController {
      * Validates: Requirement 5.2
      */
     @GetMapping("/pages")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'CUSTOMIZE_APPLICATION')")
     @Operation(
             summary = "List UI pages",
             description = "Returns a list of all active UI pages. Requires ADMIN role."
@@ -91,7 +91,7 @@ public class UiConfigController {
      * Validates: Requirement 5.3
      */
     @PostMapping("/pages")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'CUSTOMIZE_APPLICATION')")
     @Operation(
             summary = "Create UI page",
             description = "Creates a new UI page with the provided configuration. Requires ADMIN role."
@@ -125,7 +125,7 @@ public class UiConfigController {
      * Validates: Requirement 5.4
      */
     @PutMapping("/pages/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'CUSTOMIZE_APPLICATION')")
     @Operation(
             summary = "Update UI page",
             description = "Updates an existing UI page. Only provided fields will be updated. Requires ADMIN role."
@@ -159,7 +159,7 @@ public class UiConfigController {
      * Validates: Requirement 5.5
      */
     @GetMapping("/menus")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'CUSTOMIZE_APPLICATION')")
     @Operation(
             summary = "List UI menus",
             description = "Returns a list of all UI menus. Requires ADMIN role."
@@ -188,7 +188,7 @@ public class UiConfigController {
      * @return The created UI menu with generated ID
      */
     @PostMapping("/menus")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'CUSTOMIZE_APPLICATION')")
     @Operation(
             summary = "Create UI menu",
             description = "Creates a new UI menu with the provided configuration. Requires ADMIN role."
@@ -223,7 +223,7 @@ public class UiConfigController {
      * Validates: Requirement 5.6
      */
     @PutMapping("/menus/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'CUSTOMIZE_APPLICATION')")
     @Operation(
             summary = "Update UI menu",
             description = "Updates an existing UI menu. Only provided fields will be updated. " +
@@ -258,7 +258,7 @@ public class UiConfigController {
      * @return 204 No Content on success
      */
     @DeleteMapping("/menus/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'CUSTOMIZE_APPLICATION')")
     @Operation(
             summary = "Delete UI menu",
             description = "Deletes a UI menu and all its items. Requires ADMIN role."

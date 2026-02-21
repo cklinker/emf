@@ -11,16 +11,13 @@ import java.time.Instant;
 @Table(name = "collection_assignment", uniqueConstraints = {
     @UniqueConstraint(columnNames = {"collection_id", "worker_id"})
 })
-public class CollectionAssignment extends BaseEntity {
+public class CollectionAssignment extends TenantScopedEntity {
 
     @Column(name = "collection_id", nullable = false, length = 36)
     private String collectionId;
 
     @Column(name = "worker_id", nullable = false, length = 36)
     private String workerId;
-
-    @Column(name = "tenant_id", nullable = false, length = 36)
-    private String tenantId = "default";
 
     @Column(name = "status", nullable = false, length = 20)
     private String status = "PENDING";
@@ -32,14 +29,13 @@ public class CollectionAssignment extends BaseEntity {
     private Instant readyAt;
 
     public CollectionAssignment() {
-        super();
+        super("default");
     }
 
     public CollectionAssignment(String collectionId, String workerId, String tenantId) {
-        super();
+        super(tenantId);
         this.collectionId = collectionId;
         this.workerId = workerId;
-        this.tenantId = tenantId;
         this.assignedAt = Instant.now();
     }
 
@@ -57,14 +53,6 @@ public class CollectionAssignment extends BaseEntity {
 
     public void setWorkerId(String workerId) {
         this.workerId = workerId;
-    }
-
-    public String getTenantId() {
-        return tenantId;
-    }
-
-    public void setTenantId(String tenantId) {
-        this.tenantId = tenantId;
     }
 
     public String getStatus() {

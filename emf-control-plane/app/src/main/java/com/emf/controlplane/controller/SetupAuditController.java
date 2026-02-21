@@ -23,7 +23,7 @@ public class SetupAuditController {
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'VIEW_SETUP')")
     public ResponseEntity<Page<SetupAuditTrailDto>> getAuditTrail(
             @RequestParam(required = false) String section,
             @RequestParam(required = false) String entityType,
@@ -36,7 +36,7 @@ public class SetupAuditController {
     }
 
     @GetMapping("/entity/{entityType}/{entityId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'VIEW_SETUP')")
     public ResponseEntity<Page<SetupAuditTrailDto>> getEntityHistory(
             @PathVariable String entityType,
             @PathVariable String entityId,

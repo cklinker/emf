@@ -59,7 +59,7 @@ public class OidcProviderController {
      * Validates: Requirement 4.1
      */
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'MANAGE_CONNECTED_APPS')")
     @Operation(
             summary = "List OIDC providers",
             description = "Returns a list of all active OIDC providers. Requires ADMIN role."
@@ -90,7 +90,7 @@ public class OidcProviderController {
      * Validates: Requirement 4.2
      */
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'MANAGE_CONNECTED_APPS')")
     @Operation(
             summary = "Add OIDC provider",
             description = "Adds a new OIDC provider with the provided configuration. Requires ADMIN role."
@@ -124,7 +124,7 @@ public class OidcProviderController {
      * Validates: Requirement 4.4
      */
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'MANAGE_CONNECTED_APPS')")
     @Operation(
             summary = "Update OIDC provider",
             description = "Updates an existing OIDC provider. Only provided fields will be updated. Requires ADMIN role."
@@ -159,7 +159,7 @@ public class OidcProviderController {
      * Validates: Requirement 4.5
      */
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'MANAGE_CONNECTED_APPS')")
     @Operation(
             summary = "Delete OIDC provider",
             description = "Soft-deletes an OIDC provider by marking it as inactive. " +

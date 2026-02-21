@@ -2,8 +2,10 @@ package com.emf.controlplane.tenant;
 
 import com.emf.controlplane.entity.*;
 import com.emf.controlplane.repository.UiMenuRepository;
+import com.emf.controlplane.service.DefaultProfileSeeder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,9 +21,12 @@ public class TenantSchemaManager {
     private static final Logger log = LoggerFactory.getLogger(TenantSchemaManager.class);
 
     private final UiMenuRepository uiMenuRepository;
+    private final DefaultProfileSeeder defaultProfileSeeder;
 
-    public TenantSchemaManager(UiMenuRepository uiMenuRepository) {
+    public TenantSchemaManager(UiMenuRepository uiMenuRepository,
+                               @Nullable DefaultProfileSeeder defaultProfileSeeder) {
         this.uiMenuRepository = uiMenuRepository;
+        this.defaultProfileSeeder = defaultProfileSeeder;
     }
 
     /**
@@ -36,6 +41,7 @@ public class TenantSchemaManager {
         log.info("Provisioning default data for tenant: {} ({})", tenantSlug, tenantId);
 
         seedDefaultMenus(tenantId);
+        seedDefaultProfiles(tenantId);
 
         log.info("Provisioning complete for tenant: {} ({})", tenantSlug, tenantId);
     }
@@ -74,6 +80,15 @@ public class TenantSchemaManager {
 
         uiMenuRepository.save(mainMenu);
         log.debug("Seeded default menus for tenant: {}", tenantId);
+    }
+
+    /**
+     * Seeds default security profiles for the tenant.
+     */
+    private void seedDefaultProfiles(String tenantId) {
+        if (defaultProfileSeeder != null) {
+            defaultProfileSeeder.seedDefaultProfiles(tenantId);
+        }
     }
 
     /**

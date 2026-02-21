@@ -3,16 +3,19 @@ package com.emf.controlplane.service;
 import com.emf.controlplane.dto.CreateUserRequest;
 import com.emf.controlplane.dto.UpdateUserRequest;
 import com.emf.controlplane.entity.LoginHistory;
+import com.emf.controlplane.entity.Profile;
 import com.emf.controlplane.entity.User;
 import com.emf.controlplane.exception.DuplicateResourceException;
 import com.emf.controlplane.exception.ResourceNotFoundException;
 import com.emf.controlplane.repository.LoginHistoryRepository;
+import com.emf.controlplane.repository.ProfileRepository;
 import com.emf.controlplane.repository.UserRepository;
 import com.emf.controlplane.tenant.TenantContextHolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,11 +34,17 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final LoginHistoryRepository loginHistoryRepository;
+    private final ProfileRepository profileRepository;
+    private final SecurityAuditService auditService;
 
     public UserService(UserRepository userRepository,
-                       LoginHistoryRepository loginHistoryRepository) {
+                       LoginHistoryRepository loginHistoryRepository,
+                       @Nullable ProfileRepository profileRepository,
+                       @Nullable SecurityAuditService auditService) {
         this.userRepository = userRepository;
         this.loginHistoryRepository = loginHistoryRepository;
+        this.profileRepository = profileRepository;
+        this.auditService = auditService;
     }
 
     @Transactional(readOnly = true)
@@ -78,6 +87,7 @@ public class UserService {
         user.setLocale(request.getLocale() != null ? request.getLocale() : "en_US");
         user.setTimezone(request.getTimezone() != null ? request.getTimezone() : "UTC");
         user.setStatus("ACTIVE");
+        assignDefaultProfile(user, tenantId, "Standard User");
 
         user = userRepository.save(user);
         log.info("Created user {} in tenant {}", user.getId(), tenantId);
@@ -133,6 +143,9 @@ public class UserService {
         User user = getUser(id);
         user.setStatus("INACTIVE");
         userRepository.save(user);
+        if (auditService != null) {
+            auditService.logUserDeactivated(user.getId(), user.getEmail());
+        }
         log.info("Deactivated user {}", user.getId());
     }
 
@@ -141,6 +154,9 @@ public class UserService {
         User user = getUser(id);
         user.setStatus("ACTIVE");
         userRepository.save(user);
+        if (auditService != null) {
+            auditService.logUserActivated(user.getId(), user.getEmail());
+        }
         log.info("Activated user {}", user.getId());
     }
 
@@ -206,8 +222,24 @@ public class UserService {
         user.setTenantId(tenantId);
         user.setUsername(username);
         user.setStatus("ACTIVE");
+
+        // First user in tenant gets System Administrator, subsequent get Standard User
+        boolean isFirstUser = !userRepository.existsByTenantId(tenantId);
+        String profileName = isFirstUser ? "System Administrator" : "Standard User";
+        assignDefaultProfile(user, tenantId, profileName);
+
         user = userRepository.save(user);
-        log.info("JIT provisioned user {} ({}) in tenant {}", user.getId(), email, tenantId);
+        if (auditService != null) {
+            auditService.logUserProvisioned(user.getId(), email, "OIDC");
+        }
+        log.info("JIT provisioned user {} ({}) in tenant {} with profile {}",
+                user.getId(), email, tenantId, profileName);
         return user;
+    }
+
+    private void assignDefaultProfile(User user, String tenantId, String profileName) {
+        if (profileRepository == null || tenantId == null) return;
+        profileRepository.findByTenantIdAndName(tenantId, profileName)
+                .ifPresent(profile -> user.setProfileId(profile.getId()));
     }
 }

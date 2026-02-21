@@ -10,10 +10,7 @@ import java.util.List;
  */
 @Entity
 @Table(name = "migration_run")
-public class MigrationRun extends BaseEntity {
-
-    @Column(name = "tenant_id", nullable = false, length = 36)
-    private String tenantId;
+public class MigrationRun extends TenantScopedEntity {
 
     @Column(name = "collection_id", nullable = false, length = 36)
     private String collectionId;
@@ -44,14 +41,6 @@ public class MigrationRun extends BaseEntity {
         this.fromVersion = fromVersion;
         this.toVersion = toVersion;
         this.status = "PENDING";
-    }
-
-    public String getTenantId() {
-        return tenantId;
-    }
-
-    public void setTenantId(String tenantId) {
-        this.tenantId = tenantId;
     }
 
     public String getCollectionId() {

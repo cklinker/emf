@@ -7,10 +7,7 @@ import java.util.List;
 
 @Entity
 @Table(name = "approval_instance")
-public class ApprovalInstance extends BaseEntity {
-
-    @Column(name = "tenant_id", nullable = false, length = 36)
-    private String tenantId;
+public class ApprovalInstance extends TenantScopedEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "approval_process_id", nullable = false)
@@ -42,8 +39,6 @@ public class ApprovalInstance extends BaseEntity {
 
     public ApprovalInstance() { super(); }
 
-    public String getTenantId() { return tenantId; }
-    public void setTenantId(String tenantId) { this.tenantId = tenantId; }
     public ApprovalProcess getApprovalProcess() { return approvalProcess; }
     public void setApprovalProcess(ApprovalProcess approvalProcess) { this.approvalProcess = approvalProcess; }
     public String getCollectionId() { return collectionId; }

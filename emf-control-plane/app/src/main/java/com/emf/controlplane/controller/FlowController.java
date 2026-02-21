@@ -7,12 +7,14 @@ import com.emf.controlplane.service.FlowService;
 import com.emf.controlplane.tenant.TenantContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/control/flows")
+@PreAuthorize("@securityService.hasPermission(#root, 'MANAGE_WORKFLOWS')")
 public class FlowController {
 
     private final FlowService flowService;

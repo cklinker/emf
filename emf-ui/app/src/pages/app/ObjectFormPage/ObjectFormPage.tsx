@@ -568,9 +568,7 @@ export function ObjectFormPage(): React.ReactElement {
             if (targetSchema.displayFieldName) {
               displayFieldName = targetSchema.displayFieldName
             } else if (targetSchema.fields) {
-              const nameField = targetSchema.fields.find(
-                (f) => f.name.toLowerCase() === 'name'
-              )
+              const nameField = targetSchema.fields.find((f) => f.name.toLowerCase() === 'name')
               if (nameField) {
                 displayFieldName = nameField.name
               } else {
@@ -592,16 +590,12 @@ export function ObjectFormPage(): React.ReactElement {
             const records: Array<Record<string, unknown>> = Array.isArray(data) ? data : []
 
             // Build options
-            const options: LookupOption[] = records.map(
-              (rec: Record<string, unknown>) => {
-                const attrs = (rec.attributes || rec) as Record<string, unknown>
-                const id = String(rec.id || attrs.id || '')
-                const label = attrs[displayFieldName]
-                  ? String(attrs[displayFieldName])
-                  : id
-                return { id, label }
-              }
-            )
+            const options: LookupOption[] = records.map((rec: Record<string, unknown>) => {
+              const attrs = (rec.attributes || rec) as Record<string, unknown>
+              const id = String(rec.id || attrs.id || '')
+              const label = attrs[displayFieldName] ? String(attrs[displayFieldName]) : id
+              return { id, label }
+            })
 
             // Assign to all fields targeting this collection
             for (const f of targetFields) {
@@ -628,10 +622,7 @@ export function ObjectFormPage(): React.ReactElement {
     if (!hasPicklists && !hasLookups) return permissionFilteredFields
     return permissionFilteredFields.map((f) => {
       let updated = f
-      if (
-        (f.type === 'picklist' || f.type === 'multi_picklist') &&
-        picklistValuesMap?.[f.id]
-      ) {
+      if ((f.type === 'picklist' || f.type === 'multi_picklist') && picklistValuesMap?.[f.id]) {
         updated = { ...updated, enumValues: picklistValuesMap[f.id] }
       }
       if (REFERENCE_TYPES.has(f.type) && lookupOptionsMap?.[f.id]) {

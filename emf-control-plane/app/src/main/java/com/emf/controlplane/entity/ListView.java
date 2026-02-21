@@ -6,10 +6,7 @@ import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "list_view")
-public class ListView extends BaseEntity {
-
-    @Column(name = "tenant_id", nullable = false, length = 36)
-    private String tenantId;
+public class ListView extends TenantScopedEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "collection_id", nullable = false)
@@ -54,15 +51,12 @@ public class ListView extends BaseEntity {
     public ListView() { super(); }
 
     public ListView(String tenantId, Collection collection, String name, String createdBy) {
-        super();
-        this.tenantId = tenantId;
+        super(tenantId);
         this.collection = collection;
         this.name = name;
         this.createdBy = createdBy;
     }
 
-    public String getTenantId() { return tenantId; }
-    public void setTenantId(String tenantId) { this.tenantId = tenantId; }
     public Collection getCollection() { return collection; }
     public void setCollection(Collection collection) { this.collection = collection; }
     public String getName() { return name; }

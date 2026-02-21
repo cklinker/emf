@@ -21,14 +21,14 @@ public class GovernorLimitsController {
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'VIEW_SETUP')")
     public ResponseEntity<GovernorLimitsService.GovernorLimitsStatus> getStatus() {
         String tenantId = TenantContextHolder.requireTenantId();
         return ResponseEntity.ok(governorLimitsService.getStatus(tenantId));
     }
 
     @PutMapping
-    @PreAuthorize("hasRole('PLATFORM_ADMIN')")
+    @PreAuthorize("@securityService.isPlatformAdmin(#root.authentication)")
     public ResponseEntity<GovernorLimits> updateLimits(@RequestBody GovernorLimits limits) {
         String tenantId = TenantContextHolder.requireTenantId();
         GovernorLimits updated = tenantService.updateGovernorLimits(tenantId, limits);

@@ -54,7 +54,7 @@ public class PackageController {
      * @return List of package history records
      */
     @GetMapping("/history")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'CUSTOMIZE_APPLICATION')")
     @Operation(
             summary = "Get package history",
             description = "Retrieves the history of all package export and import operations. " +
@@ -84,7 +84,7 @@ public class PackageController {
      * Validates: Requirement 6.1
      */
     @PostMapping("/export")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'CUSTOMIZE_APPLICATION')")
     @Operation(
             summary = "Export configuration package",
             description = "Exports selected configuration items (collections, roles, policies, " +
@@ -119,7 +119,7 @@ public class PackageController {
      * Validates: Requirements 6.2, 6.3
      */
     @PostMapping("/import")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'CUSTOMIZE_APPLICATION')")
     @Operation(
             summary = "Import configuration package",
             description = "Imports a configuration package into the current environment. " +

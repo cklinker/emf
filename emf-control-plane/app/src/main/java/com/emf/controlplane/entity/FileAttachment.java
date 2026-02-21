@@ -15,10 +15,7 @@ import java.time.Instant;
  */
 @Entity
 @Table(name = "file_attachment")
-public class FileAttachment extends BaseEntity {
-
-    @Column(name = "tenant_id", nullable = false, length = 36)
-    private String tenantId;
+public class FileAttachment extends TenantScopedEntity {
 
     @Column(name = "collection_id", nullable = false, length = 36)
     private String collectionId;
@@ -47,14 +44,6 @@ public class FileAttachment extends BaseEntity {
     public FileAttachment() {
         super();
         this.uploadedAt = Instant.now();
-    }
-
-    public String getTenantId() {
-        return tenantId;
-    }
-
-    public void setTenantId(String tenantId) {
-        this.tenantId = tenantId;
     }
 
     public String getCollectionId() {

@@ -31,7 +31,7 @@ public class CollectionAssignmentController {
      * @return The created assignment
      */
     @PostMapping("/assign")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'CUSTOMIZE_APPLICATION')")
     public ResponseEntity<CollectionAssignment> assign(@RequestBody AssignmentRequest request) {
         CollectionAssignment assignment = assignmentService.assignCollection(
                 request.collectionId(), request.tenantId());
@@ -45,7 +45,7 @@ public class CollectionAssignmentController {
      * @return No content
      */
     @PostMapping("/unassign/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'CUSTOMIZE_APPLICATION')")
     public ResponseEntity<Void> unassign(@PathVariable String id) {
         assignmentService.unassignCollection(id);
         return ResponseEntity.noContent().build();
@@ -57,7 +57,7 @@ public class CollectionAssignmentController {
      * @return List of all assignments
      */
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'CUSTOMIZE_APPLICATION')")
     public ResponseEntity<List<CollectionAssignment>> listAssignments() {
         List<CollectionAssignment> assignments = assignmentService.findAll();
         return ResponseEntity.ok(assignments);

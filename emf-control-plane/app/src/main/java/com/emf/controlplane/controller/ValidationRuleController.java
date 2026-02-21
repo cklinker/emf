@@ -48,7 +48,7 @@ public class ValidationRuleController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('CUSTOMIZE_APPLICATION')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'CUSTOMIZE_APPLICATION')")
     @Operation(summary = "Create a validation rule")
     public ResponseEntity<ValidationRuleDto> createRule(
             @PathVariable String collectionId,
@@ -69,7 +69,7 @@ public class ValidationRuleController {
     }
 
     @PutMapping("/{ruleId}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('CUSTOMIZE_APPLICATION')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'CUSTOMIZE_APPLICATION')")
     @Operation(summary = "Update a validation rule")
     public ResponseEntity<ValidationRuleDto> updateRule(
             @PathVariable String collectionId,
@@ -81,7 +81,7 @@ public class ValidationRuleController {
     }
 
     @DeleteMapping("/{ruleId}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('CUSTOMIZE_APPLICATION')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'CUSTOMIZE_APPLICATION')")
     @Operation(summary = "Delete a validation rule")
     public ResponseEntity<Void> deleteRule(
             @PathVariable String collectionId,
@@ -92,7 +92,7 @@ public class ValidationRuleController {
     }
 
     @PostMapping("/{ruleId}/activate")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('CUSTOMIZE_APPLICATION')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'CUSTOMIZE_APPLICATION')")
     @Operation(summary = "Activate a validation rule")
     public ResponseEntity<Void> activateRule(
             @PathVariable String collectionId,
@@ -103,7 +103,7 @@ public class ValidationRuleController {
     }
 
     @PostMapping("/{ruleId}/deactivate")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('CUSTOMIZE_APPLICATION')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'CUSTOMIZE_APPLICATION')")
     @Operation(summary = "Deactivate a validation rule")
     public ResponseEntity<Void> deactivateRule(
             @PathVariable String collectionId,
@@ -114,7 +114,7 @@ public class ValidationRuleController {
     }
 
     @PostMapping("/test")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('CUSTOMIZE_APPLICATION')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'CUSTOMIZE_APPLICATION')")
     @Operation(summary = "Test validation rules against a sample record")
     public ResponseEntity<List<ValidationError>> testRules(
             @PathVariable String collectionId,

@@ -2,24 +2,18 @@ package com.emf.controlplane.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
-import java.util.UUID;
 
+/**
+ * Tracks all configuration changes made through the control plane.
+ */
 @Entity
 @Table(name = "setup_audit_trail")
-public class SetupAuditTrail {
-
-    @Id
-    @Column(name = "id", nullable = false, updatable = false, length = 36)
-    private String id;
-
-    @Column(name = "tenant_id", nullable = false, length = 36)
-    private String tenantId;
+public class SetupAuditTrail extends TenantScopedEntity {
 
     @Column(name = "user_id", nullable = false, length = 36)
     private String userId;
@@ -51,15 +45,15 @@ public class SetupAuditTrail {
     private Instant timestamp;
 
     public SetupAuditTrail() {
-        this.id = UUID.randomUUID().toString();
+        super();
         this.timestamp = Instant.now();
     }
 
     public SetupAuditTrail(String tenantId, String userId, String action, String section,
                            String entityType, String entityId, String entityName,
                            String oldValue, String newValue) {
-        this();
-        this.tenantId = tenantId;
+        super(tenantId);
+        this.timestamp = Instant.now();
         this.userId = userId;
         this.action = action;
         this.section = section;
@@ -69,12 +63,6 @@ public class SetupAuditTrail {
         this.oldValue = oldValue;
         this.newValue = newValue;
     }
-
-    public String getId() { return id; }
-    public void setId(String id) { this.id = id; }
-
-    public String getTenantId() { return tenantId; }
-    public void setTenantId(String tenantId) { this.tenantId = tenantId; }
 
     public String getUserId() { return userId; }
     public void setUserId(String userId) { this.userId = userId; }

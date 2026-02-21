@@ -5,10 +5,7 @@ import java.time.Instant;
 
 @Entity
 @Table(name = "email_log")
-public class EmailLog extends BaseEntity {
-
-    @Column(name = "tenant_id", nullable = false, length = 36)
-    private String tenantId;
+public class EmailLog extends TenantScopedEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "template_id")
@@ -37,8 +34,6 @@ public class EmailLog extends BaseEntity {
 
     public EmailLog() { super(); }
 
-    public String getTenantId() { return tenantId; }
-    public void setTenantId(String tenantId) { this.tenantId = tenantId; }
     public EmailTemplate getTemplate() { return template; }
     public void setTemplate(EmailTemplate template) { this.template = template; }
     public String getRecipientEmail() { return recipientEmail; }

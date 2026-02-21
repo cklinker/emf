@@ -5,10 +5,7 @@ import java.time.Instant;
 
 @Entity
 @Table(name = "scheduled_job")
-public class ScheduledJob extends BaseEntity {
-
-    @Column(name = "tenant_id", nullable = false, length = 36)
-    private String tenantId;
+public class ScheduledJob extends TenantScopedEntity {
 
     @Column(name = "name", nullable = false, length = 200)
     private String name;
@@ -45,8 +42,6 @@ public class ScheduledJob extends BaseEntity {
 
     public ScheduledJob() { super(); }
 
-    public String getTenantId() { return tenantId; }
-    public void setTenantId(String tenantId) { this.tenantId = tenantId; }
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
     public String getDescription() { return description; }

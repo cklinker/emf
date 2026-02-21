@@ -45,7 +45,7 @@ public class RecordTypeController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('CUSTOMIZE_APPLICATION')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'CUSTOMIZE_APPLICATION')")
     @Operation(summary = "Create a record type")
     public ResponseEntity<RecordTypeDto> createRecordType(
             @PathVariable String collectionId,
@@ -66,7 +66,7 @@ public class RecordTypeController {
     }
 
     @PutMapping("/{recordTypeId}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('CUSTOMIZE_APPLICATION')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'CUSTOMIZE_APPLICATION')")
     @Operation(summary = "Update a record type")
     public ResponseEntity<RecordTypeDto> updateRecordType(
             @PathVariable String collectionId,
@@ -78,7 +78,7 @@ public class RecordTypeController {
     }
 
     @DeleteMapping("/{recordTypeId}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('CUSTOMIZE_APPLICATION')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'CUSTOMIZE_APPLICATION')")
     @Operation(summary = "Delete a record type")
     public ResponseEntity<Void> deleteRecordType(
             @PathVariable String collectionId,
@@ -101,7 +101,7 @@ public class RecordTypeController {
     }
 
     @PutMapping("/{recordTypeId}/picklists/{fieldId}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('CUSTOMIZE_APPLICATION')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'CUSTOMIZE_APPLICATION')")
     @Operation(summary = "Set picklist override for a record type")
     public ResponseEntity<RecordTypePicklistDto> setPicklistOverride(
             @PathVariable String collectionId,
@@ -114,7 +114,7 @@ public class RecordTypeController {
     }
 
     @DeleteMapping("/{recordTypeId}/picklists/{fieldId}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('CUSTOMIZE_APPLICATION')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'CUSTOMIZE_APPLICATION')")
     @Operation(summary = "Remove picklist override for a record type")
     public ResponseEntity<Void> removePicklistOverride(
             @PathVariable String collectionId,

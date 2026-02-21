@@ -24,6 +24,7 @@ import { unwrapCollection } from '../../utils/jsonapi'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
 import { useSavedViews } from '../../hooks/useSavedViews'
 import { useLookupDisplayMap } from '../../hooks/useLookupDisplayMap'
+import { useObjectPermissions } from '../../hooks/useObjectPermissions'
 import { ViewSelector } from '../../components/ViewSelector/ViewSelector'
 import { InlineEditCell } from '../../components/InlineEditCell/InlineEditCell'
 import { SummaryStatsBar } from '../../components/SummaryStatsBar/SummaryStatsBar'
@@ -389,6 +390,7 @@ export function ResourceListPage({
   const { t, formatDate } = useI18n()
   const { apiClient } = useApi()
   const { showToast } = useToast()
+  const { permissions: objectPermissions } = useObjectPermissions(collectionName)
 
   // Pagination state
   const [page, setPage] = useState(1)
@@ -994,15 +996,17 @@ export function ResourceListPage({
           </h1>
         </div>
         <div className="flex gap-2 items-center max-md:flex-col">
-          <button
-            type="button"
-            className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-primary-foreground bg-primary border-none rounded-md cursor-pointer transition-colors duration-200 hover:bg-primary/90 focus:outline-2 focus:outline-primary focus:outline-offset-2 active:bg-primary/80 max-md:w-full"
-            onClick={handleCreate}
-            aria-label={t('resources.createRecord')}
-            data-testid="create-record-button"
-          >
-            {t('resources.createRecord')}
-          </button>
+          {objectPermissions.canCreate && (
+            <button
+              type="button"
+              className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-primary-foreground bg-primary border-none rounded-md cursor-pointer transition-colors duration-200 hover:bg-primary/90 focus:outline-2 focus:outline-primary focus:outline-offset-2 active:bg-primary/80 max-md:w-full"
+              onClick={handleCreate}
+              aria-label={t('resources.createRecord')}
+              data-testid="create-record-button"
+            >
+              {t('resources.createRecord')}
+            </button>
+          )}
         </div>
       </header>
 
@@ -1103,15 +1107,17 @@ export function ResourceListPage({
                 )}
               </div>
 
-              <button
-                type="button"
-                className="px-2 py-1 text-xs font-medium text-destructive bg-background border border-destructive/30 rounded cursor-pointer transition-all duration-150 hover:bg-destructive/10 hover:border-destructive focus:outline-2 focus:outline-primary focus:outline-offset-2"
-                onClick={handleBulkDeleteClick}
-                aria-label={t('resources.bulkDelete')}
-                data-testid="bulk-delete-button"
-              >
-                {t('resources.bulkDelete')}
-              </button>
+              {objectPermissions.canDelete && (
+                <button
+                  type="button"
+                  className="px-2 py-1 text-xs font-medium text-destructive bg-background border border-destructive/30 rounded cursor-pointer transition-all duration-150 hover:bg-destructive/10 hover:border-destructive focus:outline-2 focus:outline-primary focus:outline-offset-2"
+                  onClick={handleBulkDeleteClick}
+                  aria-label={t('resources.bulkDelete')}
+                  data-testid="bulk-delete-button"
+                >
+                  {t('resources.bulkDelete')}
+                </button>
+              )}
             </div>
           )}
 
@@ -1497,24 +1503,28 @@ export function ResourceListPage({
                           onClick={(e) => e.stopPropagation()}
                           onKeyDown={(e) => e.stopPropagation()}
                         >
-                          <button
-                            type="button"
-                            className="px-2 py-1 text-xs font-medium text-foreground bg-background border border-border rounded cursor-pointer transition-all duration-150 hover:bg-muted hover:border-muted-foreground/40 focus:outline-2 focus:outline-primary focus:outline-offset-2"
-                            onClick={() => handleEdit(resource)}
-                            aria-label={`${t('common.edit')} ${resource.id}`}
-                            data-testid={`edit-button-${index}`}
-                          >
-                            {t('common.edit')}
-                          </button>
-                          <button
-                            type="button"
-                            className="px-2 py-1 text-xs font-medium text-destructive bg-background border border-destructive/30 rounded cursor-pointer transition-all duration-150 hover:bg-destructive/10 hover:border-destructive focus:outline-2 focus:outline-primary focus:outline-offset-2"
-                            onClick={() => handleDeleteClick(resource)}
-                            aria-label={`${t('common.delete')} ${resource.id}`}
-                            data-testid={`delete-button-${index}`}
-                          >
-                            {t('common.delete')}
-                          </button>
+                          {objectPermissions.canEdit && (
+                            <button
+                              type="button"
+                              className="px-2 py-1 text-xs font-medium text-foreground bg-background border border-border rounded cursor-pointer transition-all duration-150 hover:bg-muted hover:border-muted-foreground/40 focus:outline-2 focus:outline-primary focus:outline-offset-2"
+                              onClick={() => handleEdit(resource)}
+                              aria-label={`${t('common.edit')} ${resource.id}`}
+                              data-testid={`edit-button-${index}`}
+                            >
+                              {t('common.edit')}
+                            </button>
+                          )}
+                          {objectPermissions.canDelete && (
+                            <button
+                              type="button"
+                              className="px-2 py-1 text-xs font-medium text-destructive bg-background border border-destructive/30 rounded cursor-pointer transition-all duration-150 hover:bg-destructive/10 hover:border-destructive focus:outline-2 focus:outline-primary focus:outline-offset-2"
+                              onClick={() => handleDeleteClick(resource)}
+                              aria-label={`${t('common.delete')} ${resource.id}`}
+                              data-testid={`delete-button-${index}`}
+                            >
+                              {t('common.delete')}
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

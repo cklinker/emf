@@ -6,6 +6,7 @@ import com.emf.controlplane.service.ListViewService;
 import com.emf.controlplane.tenant.TenantContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -38,6 +39,7 @@ public class ListViewController {
         return ListViewDto.fromEntity(listViewService.getView(id));
     }
 
+    @PreAuthorize("@securityService.hasPermission(#root, 'MANAGE_LISTVIEWS')")
     @PostMapping
     public ResponseEntity<ListViewDto> createView(
             @RequestParam String collectionId,
@@ -48,6 +50,7 @@ public class ListViewController {
         return ResponseEntity.status(HttpStatus.CREATED).body(ListViewDto.fromEntity(view));
     }
 
+    @PreAuthorize("@securityService.hasPermission(#root, 'MANAGE_LISTVIEWS')")
     @PutMapping("/{id}")
     public ListViewDto updateView(
             @PathVariable String id,
@@ -55,6 +58,7 @@ public class ListViewController {
         return ListViewDto.fromEntity(listViewService.updateView(id, request));
     }
 
+    @PreAuthorize("@securityService.hasPermission(#root, 'MANAGE_LISTVIEWS')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteView(@PathVariable String id) {
         listViewService.deleteView(id);

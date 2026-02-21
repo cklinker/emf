@@ -7,6 +7,7 @@ import com.emf.controlplane.service.ReportService;
 import com.emf.controlplane.tenant.TenantContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -38,6 +39,7 @@ public class ReportController {
         return ReportDto.fromEntity(reportService.getReport(id));
     }
 
+    @PreAuthorize("@securityService.hasPermission(#root, 'MANAGE_REPORTS')")
     @PostMapping
     public ResponseEntity<ReportDto> createReport(
             @RequestParam String userId,
@@ -47,6 +49,7 @@ public class ReportController {
         return ResponseEntity.status(HttpStatus.CREATED).body(ReportDto.fromEntity(report));
     }
 
+    @PreAuthorize("@securityService.hasPermission(#root, 'MANAGE_REPORTS')")
     @PutMapping("/{id}")
     public ReportDto updateReport(
             @PathVariable String id,
@@ -54,6 +57,7 @@ public class ReportController {
         return ReportDto.fromEntity(reportService.updateReport(id, request));
     }
 
+    @PreAuthorize("@securityService.hasPermission(#root, 'MANAGE_REPORTS')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteReport(@PathVariable String id) {
         reportService.deleteReport(id);
@@ -68,6 +72,7 @@ public class ReportController {
         return reportService.listFolders(tenantId);
     }
 
+    @PreAuthorize("@securityService.hasPermission(#root, 'MANAGE_REPORTS')")
     @PostMapping("/folders")
     public ResponseEntity<ReportFolder> createFolder(
             @RequestParam String userId,
@@ -78,6 +83,7 @@ public class ReportController {
         return ResponseEntity.status(HttpStatus.CREATED).body(folder);
     }
 
+    @PreAuthorize("@securityService.hasPermission(#root, 'MANAGE_REPORTS')")
     @DeleteMapping("/folders/{id}")
     public ResponseEntity<Void> deleteFolder(@PathVariable String id) {
         reportService.deleteFolder(id);

@@ -50,7 +50,7 @@ public class FieldHistoryController {
     }
 
     @GetMapping("/control/collections/{collectionId}/field-history/{fieldName}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('VIEW_ALL_DATA')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'VIEW_ALL_DATA')")
     @Operation(summary = "Get field history across records", description = "Admin: view all changes to a field across all records")
     public Page<FieldHistoryDto> getFieldHistoryAcrossRecords(
             @PathVariable String collectionId,
@@ -62,7 +62,7 @@ public class FieldHistoryController {
     }
 
     @GetMapping("/control/users/{userId}/field-history")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('VIEW_ALL_DATA')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'VIEW_ALL_DATA')")
     @Operation(summary = "Get user field history", description = "Admin: view all field changes made by a user")
     public Page<FieldHistoryDto> getUserHistory(
             @PathVariable String userId,

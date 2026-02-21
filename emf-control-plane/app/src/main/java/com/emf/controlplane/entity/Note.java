@@ -13,10 +13,7 @@ import jakarta.persistence.*;
  */
 @Entity
 @Table(name = "note")
-public class Note extends BaseEntity {
-
-    @Column(name = "tenant_id", nullable = false, length = 36)
-    private String tenantId;
+public class Note extends TenantScopedEntity {
 
     @Column(name = "collection_id", nullable = false, length = 36)
     private String collectionId;
@@ -32,14 +29,6 @@ public class Note extends BaseEntity {
 
     public Note() {
         super();
-    }
-
-    public String getTenantId() {
-        return tenantId;
-    }
-
-    public void setTenantId(String tenantId) {
-        this.tenantId = tenantId;
     }
 
     public String getCollectionId() {

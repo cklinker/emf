@@ -10,10 +10,7 @@ import org.hibernate.type.SqlTypes;
  */
 @Entity
 @Table(name = "ui_page")
-public class UiPage extends BaseEntity {
-
-    @Column(name = "tenant_id", nullable = false, length = 36)
-    private String tenantId;
+public class UiPage extends TenantScopedEntity {
 
     @Column(name = "name", nullable = false, length = 100)
     private String name;
@@ -39,14 +36,6 @@ public class UiPage extends BaseEntity {
         super();
         this.name = name;
         this.path = path;
-    }
-
-    public String getTenantId() {
-        return tenantId;
-    }
-
-    public void setTenantId(String tenantId) {
-        this.tenantId = tenantId;
     }
 
     public String getName() {

@@ -43,6 +43,7 @@ import { Separator } from '@/components/ui/separator'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { useTheme } from '@/context/ThemeContext'
 import type { ThemeMode } from '@/context/ThemeContext'
+import { useSystemPermissions } from '@/hooks/useSystemPermissions'
 
 /**
  * Navigation tab definition — represents a collection in the top nav.
@@ -86,14 +87,14 @@ export function TopNavBar({
   onSearchOpen,
   notificationCount = 0,
   onNotificationsOpen,
-  userRoles = [],
 }: TopNavBarProps): React.ReactElement {
   const { tenantSlug } = useParams<{ tenantSlug: string }>()
   const navigate = useNavigate()
   const { mode, setMode, resolvedMode } = useTheme()
+  const { hasPermission } = useSystemPermissions()
   const [activeTabIndex, setActiveTabIndex] = useState<number | null>(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const isAdmin = userRoles.some((role) => role === 'ADMIN' || role === 'PLATFORM_ADMIN')
+  const canAccessSetup = hasPermission('VIEW_SETUP')
 
   const basePath = `/${tenantSlug}/app`
 
@@ -169,7 +170,7 @@ export function TopNavBar({
                   {tab.label}
                 </button>
               ))}
-              {isAdmin && (
+              {canAccessSetup && (
                 <>
                   <Separator className="my-2" />
                   <button
@@ -243,7 +244,7 @@ export function TopNavBar({
       {/* Right section: Admin mode, Search, notifications, user menu */}
       <div className="flex items-center gap-1">
         {/* Admin Mode button (visible only for admins on desktop) */}
-        {isAdmin && (
+        {canAccessSetup && (
           <>
             <Button
               variant="outline"
@@ -354,7 +355,7 @@ export function TopNavBar({
               )}
               {resolvedMode === 'dark' ? 'Light Mode' : 'Dark Mode'}
             </DropdownMenuItem>
-            {isAdmin && (
+            {canAccessSetup && (
               <DropdownMenuItem onClick={() => navigate(`/${tenantSlug}/setup`)}>
                 <Settings className="mr-2 h-4 w-4" />
                 Switch to Setup

@@ -25,6 +25,7 @@ import {
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
 import { useTenant } from '../../context/TenantContext'
+import { useSystemPermissions } from '../../hooks/useSystemPermissions'
 import { cn } from '@/lib/utils'
 
 export interface SetupHomePageProps {
@@ -35,6 +36,7 @@ interface SetupItem {
   name: string
   path: string
   description: string
+  permission?: string
 }
 
 interface SetupCategory {
@@ -59,26 +61,31 @@ const CATEGORIES: SetupCategory[] = [
         name: 'Users',
         path: '/users',
         description: 'Manage user accounts and permissions',
+        permission: 'MANAGE_USERS',
       },
       {
         name: 'Roles',
         path: '/roles',
         description: 'Define roles and assign to users',
+        permission: 'MANAGE_USERS',
       },
       {
         name: 'Profiles',
         path: '/profiles',
         description: 'Configure profile-based permissions',
+        permission: 'MANAGE_USERS',
       },
       {
         name: 'Permission Sets',
         path: '/permission-sets',
         description: 'Create additional permission grants',
+        permission: 'MANAGE_USERS',
       },
       {
         name: 'OIDC Providers',
         path: '/oidc-providers',
         description: 'Configure identity providers',
+        permission: 'MANAGE_CONNECTED_APPS',
       },
     ],
   },
@@ -91,21 +98,25 @@ const CATEGORIES: SetupCategory[] = [
         name: 'Collections',
         path: '/collections',
         description: 'Define data objects and schemas',
+        permission: 'CUSTOMIZE_APPLICATION',
       },
       {
         name: 'Picklists',
         path: '/picklists',
         description: 'Manage global picklist values',
+        permission: 'CUSTOMIZE_APPLICATION',
       },
       {
         name: 'Page Layouts',
         path: '/layouts',
         description: 'Configure record page layouts',
+        permission: 'CUSTOMIZE_APPLICATION',
       },
       {
         name: 'List Views',
         path: '/listviews',
         description: 'Manage list view configurations',
+        permission: 'MANAGE_LISTVIEWS',
       },
     ],
   },
@@ -115,19 +126,28 @@ const CATEGORIES: SetupCategory[] = [
     icon: <Shield size={20} />,
     items: [
       {
-        name: 'Sharing Settings',
-        path: '/sharing',
-        description: 'Configure record-level sharing',
+        name: 'Profiles',
+        path: '/profiles',
+        description: 'Configure profile-based permissions',
+        permission: 'MANAGE_USERS',
       },
       {
-        name: 'Role Hierarchy',
-        path: '/role-hierarchy',
-        description: 'Define role inheritance',
+        name: 'Permission Sets',
+        path: '/permission-sets',
+        description: 'Create additional permission grants',
+        permission: 'MANAGE_USERS',
       },
       {
-        name: 'Policies',
-        path: '/policies',
-        description: 'Manage access control policies',
+        name: 'Login History',
+        path: '/login-history',
+        description: 'View user login activity',
+        permission: 'MANAGE_USERS',
+      },
+      {
+        name: 'Security Audit',
+        path: '/security-audit',
+        description: 'Review security event trail',
+        permission: 'MANAGE_USERS',
       },
     ],
   },
@@ -140,21 +160,25 @@ const CATEGORIES: SetupCategory[] = [
         name: 'Workflow Rules',
         path: '/workflow-rules',
         description: 'Automate field updates and actions',
+        permission: 'MANAGE_WORKFLOWS',
       },
       {
         name: 'Approval Processes',
         path: '/approvals',
         description: 'Configure approval workflows',
+        permission: 'MANAGE_APPROVALS',
       },
       {
         name: 'Flows',
         path: '/flows',
         description: 'Build visual process flows',
+        permission: 'MANAGE_WORKFLOWS',
       },
       {
         name: 'Scheduled Jobs',
         path: '/scheduled-jobs',
         description: 'Manage scheduled tasks',
+        permission: 'MANAGE_WORKFLOWS',
       },
     ],
   },
@@ -167,21 +191,25 @@ const CATEGORIES: SetupCategory[] = [
         name: 'Connected Apps',
         path: '/connected-apps',
         description: 'Manage OAuth connected apps',
+        permission: 'MANAGE_CONNECTED_APPS',
       },
       {
         name: 'Webhooks',
         path: '/webhooks',
         description: 'Configure outbound webhooks',
+        permission: 'MANAGE_CONNECTED_APPS',
       },
       {
         name: 'Email Templates',
         path: '/email-templates',
         description: 'Design email templates',
+        permission: 'MANAGE_EMAIL_TEMPLATES',
       },
       {
         name: 'Scripts',
         path: '/scripts',
         description: 'Manage server-side scripts',
+        permission: 'MANAGE_CONNECTED_APPS',
       },
     ],
   },
@@ -194,11 +222,13 @@ const CATEGORIES: SetupCategory[] = [
         name: 'Reports',
         path: '/reports',
         description: 'Build and manage reports',
+        permission: 'MANAGE_REPORTS',
       },
       {
         name: 'Dashboards',
         path: '/dashboards',
         description: 'Create visual dashboards',
+        permission: 'MANAGE_REPORTS',
       },
     ],
   },
@@ -211,21 +241,25 @@ const CATEGORIES: SetupCategory[] = [
         name: 'Layouts',
         path: '/layouts',
         description: 'Configure record page layouts',
+        permission: 'CUSTOMIZE_APPLICATION',
       },
       {
         name: 'Pages',
         path: '/pages',
         description: 'Build custom UI pages',
+        permission: 'CUSTOMIZE_APPLICATION',
       },
       {
         name: 'Menus',
         path: '/menus',
         description: 'Configure navigation menus',
+        permission: 'CUSTOMIZE_APPLICATION',
       },
       {
         name: 'Plugins',
         path: '/plugins',
         description: 'Manage installed plugins',
+        permission: 'CUSTOMIZE_APPLICATION',
       },
     ],
   },
@@ -238,31 +272,37 @@ const CATEGORIES: SetupCategory[] = [
         name: 'Packages',
         path: '/packages',
         description: 'Import/export configuration packages',
+        permission: 'CUSTOMIZE_APPLICATION',
       },
       {
         name: 'Migrations',
         path: '/migrations',
         description: 'View database migration history',
+        permission: 'CUSTOMIZE_APPLICATION',
       },
       {
         name: 'Governor Limits',
         path: '/governor-limits',
         description: 'Monitor usage limits',
+        permission: 'VIEW_SETUP',
       },
       {
         name: 'Audit Trail',
         path: '/audit-trail',
         description: 'View configuration changes',
+        permission: 'VIEW_SETUP',
       },
       {
         name: 'Tenants',
         path: '/tenants',
         description: 'Platform-level tenant management',
+        permission: 'PLATFORM_ADMIN',
       },
       {
         name: 'Bulk Jobs',
         path: '/bulk-jobs',
         description: 'Monitor bulk data operations',
+        permission: 'MANAGE_DATA',
       },
     ],
   },
@@ -289,6 +329,7 @@ export function SetupHomePage({ testId = 'setup-home-page' }: SetupHomePageProps
   const { t } = useI18n()
   const { apiClient } = useApi()
   const { tenantSlug } = useTenant()
+  const { hasPermission } = useSystemPermissions()
   const [searchQuery, setSearchQuery] = useState('')
 
   // Fetch stats
@@ -348,16 +389,26 @@ export function SetupHomePage({ testId = 'setup-home-page' }: SetupHomePageProps
 
   const filteredCategories = useMemo(() => {
     const query = searchQuery.toLowerCase().trim()
-    if (!query) return CATEGORIES
 
-    return CATEGORIES.map((category) => ({
+    // First filter by permission, then by search query
+    const permissionFiltered = CATEGORIES.map((category) => ({
       ...category,
-      items: category.items.filter(
-        (item) =>
-          item.name.toLowerCase().includes(query) || item.description.toLowerCase().includes(query)
-      ),
+      items: category.items.filter((item) => !item.permission || hasPermission(item.permission)),
     })).filter((category) => category.items.length > 0)
-  }, [searchQuery])
+
+    if (!query) return permissionFiltered
+
+    return permissionFiltered
+      .map((category) => ({
+        ...category,
+        items: category.items.filter(
+          (item) =>
+            item.name.toLowerCase().includes(query) ||
+            item.description.toLowerCase().includes(query)
+        ),
+      }))
+      .filter((category) => category.items.length > 0)
+  }, [searchQuery, hasPermission])
 
   return (
     <div className="mx-auto max-w-[1400px] p-8 max-[767px]:p-4" data-testid={testId}>

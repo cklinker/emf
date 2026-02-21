@@ -7,6 +7,7 @@ import com.emf.controlplane.service.PageLayoutService;
 import com.emf.controlplane.tenant.TenantContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -21,6 +22,7 @@ public class PageLayoutController {
         this.layoutService = layoutService;
     }
 
+    @PreAuthorize("@securityService.hasPermission(#root, 'VIEW_SETUP')")
     @GetMapping
     public List<PageLayoutDto> listLayouts(
             @RequestParam(required = false) String collectionId) {
@@ -28,11 +30,13 @@ public class PageLayoutController {
         return layoutService.listLayoutDtos(tenantId, collectionId);
     }
 
+    @PreAuthorize("@securityService.hasPermission(#root, 'VIEW_SETUP')")
     @GetMapping("/{id}")
     public PageLayoutDto getLayout(@PathVariable String id) {
         return layoutService.getLayoutDto(id);
     }
 
+    @PreAuthorize("@securityService.hasPermission(#root, 'CUSTOMIZE_APPLICATION')")
     @PostMapping
     public ResponseEntity<PageLayoutDto> createLayout(
             @RequestParam String collectionId,
@@ -42,6 +46,7 @@ public class PageLayoutController {
         return ResponseEntity.status(HttpStatus.CREATED).body(dto);
     }
 
+    @PreAuthorize("@securityService.hasPermission(#root, 'CUSTOMIZE_APPLICATION')")
     @PutMapping("/{id}")
     public PageLayoutDto updateLayout(
             @PathVariable String id,
@@ -49,6 +54,7 @@ public class PageLayoutController {
         return layoutService.updateLayout(id, request);
     }
 
+    @PreAuthorize("@securityService.hasPermission(#root, 'CUSTOMIZE_APPLICATION')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteLayout(@PathVariable String id) {
         layoutService.deleteLayout(id);
@@ -57,6 +63,7 @@ public class PageLayoutController {
 
     // --- Layout Assignments ---
 
+    @PreAuthorize("@securityService.hasPermission(#root, 'VIEW_SETUP')")
     @GetMapping("/assignments")
     public List<LayoutAssignmentDto> listAssignments(
             @RequestParam String collectionId) {
@@ -65,6 +72,7 @@ public class PageLayoutController {
                 .map(LayoutAssignmentDto::fromEntity).toList();
     }
 
+    @PreAuthorize("@securityService.hasPermission(#root, 'CUSTOMIZE_APPLICATION')")
     @PutMapping("/assignments")
     public LayoutAssignmentDto assignLayout(
             @RequestParam String collectionId,
@@ -76,6 +84,7 @@ public class PageLayoutController {
         return LayoutAssignmentDto.fromEntity(assignment);
     }
 
+    @PreAuthorize("@securityService.hasPermission(#root, 'VIEW_SETUP')")
     @GetMapping("/resolve")
     public ResponseEntity<PageLayoutDto> resolveLayout(
             @RequestParam String collectionId,

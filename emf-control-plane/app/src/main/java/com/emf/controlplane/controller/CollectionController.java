@@ -120,7 +120,7 @@ public class CollectionController {
      * Validates: Requirement 1.2
      */
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'CUSTOMIZE_APPLICATION')")
     @Operation(
             summary = "Create collection",
             description = "Creates a new collection with the provided name and description. Requires ADMIN role."
@@ -204,7 +204,7 @@ public class CollectionController {
      * Validates: Requirement 1.6
      */
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'CUSTOMIZE_APPLICATION')")
     @Operation(
             summary = "Update collection",
             description = "Updates an existing collection. Creates a new version. Requires ADMIN role."
@@ -240,7 +240,7 @@ public class CollectionController {
      * Validates: Requirement 1.7
      */
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'CUSTOMIZE_APPLICATION')")
     @Operation(
             summary = "Delete collection",
             description = "Soft-deletes a collection by marking it as inactive. Requires ADMIN role."
@@ -372,7 +372,7 @@ public class CollectionController {
      * Validates: Requirement 2.2
      */
     @PostMapping("/{id}/fields")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'CUSTOMIZE_APPLICATION')")
     @Operation(
             summary = "Add field",
             description = "Adds a new field to the collection. Creates a new version. Requires ADMIN role."
@@ -411,7 +411,7 @@ public class CollectionController {
      * Validates: Requirement 2.4
      */
     @PutMapping("/{id}/fields/{fieldId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'CUSTOMIZE_APPLICATION')")
     @Operation(
             summary = "Update field",
             description = "Updates an existing field in the collection. Creates a new version. Requires ADMIN role."
@@ -448,7 +448,7 @@ public class CollectionController {
      * @param id The collection ID
      */
     @PutMapping("/{id}/fields/reorder")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'CUSTOMIZE_APPLICATION')")
     @Operation(
             summary = "Reorder fields",
             description = "Bulk-reorders fields in a collection. The position of each field ID in the list becomes its new order. Creates a single new version."
@@ -481,7 +481,7 @@ public class CollectionController {
      * Validates: Requirement 2.5
      */
     @DeleteMapping("/{id}/fields/{fieldId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'CUSTOMIZE_APPLICATION')")
     @Operation(
             summary = "Delete field",
             description = "Soft-deletes a field by marking it as inactive. Creates a new version. Requires ADMIN role."

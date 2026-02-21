@@ -177,6 +177,7 @@ public class ControlPlaneProperties {
      */
     public static class SecurityConfig {
         private boolean enabled = true;
+        private boolean permissionsEnabled = true;
         private String adminRole = "ADMIN";
         private String roleClaimName = "roles";
 
@@ -186,6 +187,14 @@ public class ControlPlaneProperties {
 
         public void setEnabled(boolean enabled) {
             this.enabled = enabled;
+        }
+
+        public boolean isPermissionsEnabled() {
+            return permissionsEnabled;
+        }
+
+        public void setPermissionsEnabled(boolean permissionsEnabled) {
+            this.permissionsEnabled = permissionsEnabled;
         }
 
         public String getAdminRole() {

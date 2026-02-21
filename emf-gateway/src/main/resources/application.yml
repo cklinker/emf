@@ -53,16 +53,6 @@ spring:
           max-connections: 500
           max-idle-time: 30s
 
-      # Per-route overrides (e.g., attachment uploads allow larger bodies)
-      routes:
-        - id: attachment-upload
-          predicates:
-            - Path=/api/**/attachments/**
-            - Method=POST,PUT
-          filters:
-            - name: RequestSize
-              args:
-                maxSize: 50MB      # 50 MB for attachment uploads
 
 # EMF Gateway specific configuration
 emf:

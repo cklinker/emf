@@ -23,7 +23,7 @@ import org.hibernate.annotations.ParamDef;
 @FilterDef(name = "tenantFilter", parameters = @ParamDef(name = "tenantId", type = String.class))
 @Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 @EntityListeners(TenantWriteGuard.class)
-public abstract class TenantScopedEntity extends BaseEntity {
+public abstract class TenantScopedEntity extends BaseEntity implements TenantAware {
 
     @Column(name = "tenant_id", nullable = false, length = 36)
     private String tenantId;

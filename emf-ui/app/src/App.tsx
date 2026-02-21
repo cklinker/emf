@@ -99,6 +99,7 @@ import {
   NotFoundPage,
   ProfilesPage,
   PermissionSetsPage,
+  PermissionSetDetailPage,
   LoginHistoryPage,
   SecurityAuditPage,
 } from './pages'
@@ -805,6 +806,16 @@ function TenantRoutes(): React.ReactElement {
           <AdminPageRoute>
             <RequirePermission permission="MANAGE_USERS">
               <PermissionSetsPage />
+            </RequirePermission>
+          </AdminPageRoute>
+        }
+      />
+      <Route
+        path="permission-sets/:id"
+        element={
+          <AdminPageRoute>
+            <RequirePermission permission="MANAGE_USERS">
+              <PermissionSetDetailPage />
             </RequirePermission>
           </AdminPageRoute>
         }

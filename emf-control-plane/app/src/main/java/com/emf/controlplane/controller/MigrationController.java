@@ -58,7 +58,7 @@ public class MigrationController {
      * Validates: Requirement 7.1
      */
     @PostMapping("/plan")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'CUSTOMIZE_APPLICATION')")
     @Operation(
             summary = "Plan a schema migration",
             description = "Generates a migration plan showing the steps required to migrate " +
@@ -91,7 +91,7 @@ public class MigrationController {
      * Validates: Requirement 7.2
      */
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'CUSTOMIZE_APPLICATION')")
     @Operation(
             summary = "List migration runs",
             description = "Returns the history of all migration runs ordered by creation date descending. " +
@@ -119,7 +119,7 @@ public class MigrationController {
      * Validates: Requirement 7.2
      */
     @GetMapping("/runs")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'CUSTOMIZE_APPLICATION')")
     @Operation(
             summary = "List migration runs",
             description = "Returns the history of all migration runs ordered by creation date descending. " +
@@ -149,7 +149,7 @@ public class MigrationController {
      * Validates: Requirement 7.3
      */
     @GetMapping("/runs/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'CUSTOMIZE_APPLICATION')")
     @Operation(
             summary = "Get migration run details",
             description = "Returns the details of a specific migration run including all steps " +

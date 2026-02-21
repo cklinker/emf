@@ -2,6 +2,7 @@ package com.emf.controlplane.controller;
 
 import com.emf.controlplane.service.WorkerMetricsService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -17,6 +18,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/control/metrics")
+@PreAuthorize("@securityService.hasPermission(#root, 'VIEW_SETUP')")
 public class WorkerMetricsController {
 
     private final WorkerMetricsService workerMetricsService;

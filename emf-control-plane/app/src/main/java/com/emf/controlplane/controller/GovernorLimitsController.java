@@ -21,7 +21,7 @@ public class GovernorLimitsController {
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'VIEW_SETUP')")
     public ResponseEntity<GovernorLimitsService.GovernorLimitsStatus> getStatus() {
         String tenantId = TenantContextHolder.requireTenantId();
         return ResponseEntity.ok(governorLimitsService.getStatus(tenantId));

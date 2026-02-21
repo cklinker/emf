@@ -48,7 +48,7 @@ public class PicklistController {
     }
 
     @PostMapping("/global")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('CUSTOMIZE_APPLICATION')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'CUSTOMIZE_APPLICATION')")
     @Operation(summary = "Create global picklist")
     public ResponseEntity<GlobalPicklistDto> createGlobalPicklist(
             @Valid @RequestBody CreateGlobalPicklistRequest request) {
@@ -66,7 +66,7 @@ public class PicklistController {
     }
 
     @PutMapping("/global/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('CUSTOMIZE_APPLICATION')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'CUSTOMIZE_APPLICATION')")
     @Operation(summary = "Update global picklist")
     public ResponseEntity<GlobalPicklistDto> updateGlobalPicklist(
             @PathVariable String id,
@@ -77,7 +77,7 @@ public class PicklistController {
     }
 
     @DeleteMapping("/global/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('CUSTOMIZE_APPLICATION')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'CUSTOMIZE_APPLICATION')")
     @Operation(summary = "Delete global picklist")
     public ResponseEntity<Void> deleteGlobalPicklist(@PathVariable String id) {
         log.info("REST request to delete global picklist: {}", id);
@@ -96,7 +96,7 @@ public class PicklistController {
     }
 
     @PutMapping("/global/{id}/values")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('CUSTOMIZE_APPLICATION')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'CUSTOMIZE_APPLICATION')")
     @Operation(summary = "Set global picklist values")
     public ResponseEntity<List<PicklistValueDto>> setGlobalPicklistValues(
             @PathVariable String id,
@@ -122,7 +122,7 @@ public class PicklistController {
     }
 
     @PutMapping("/fields/{fieldId}/values")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('CUSTOMIZE_APPLICATION')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'CUSTOMIZE_APPLICATION')")
     @Operation(summary = "Set field picklist values")
     public ResponseEntity<List<PicklistValueDto>> setFieldPicklistValues(
             @PathVariable String fieldId,
@@ -148,7 +148,7 @@ public class PicklistController {
     }
 
     @PutMapping("/dependencies")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('CUSTOMIZE_APPLICATION')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'CUSTOMIZE_APPLICATION')")
     @Operation(summary = "Set picklist dependency")
     public ResponseEntity<PicklistDependencyDto> setDependency(
             @Valid @RequestBody SetDependencyRequest request) {
@@ -162,7 +162,7 @@ public class PicklistController {
     }
 
     @DeleteMapping("/dependencies/{controllingFieldId}/{dependentFieldId}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('CUSTOMIZE_APPLICATION')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'CUSTOMIZE_APPLICATION')")
     @Operation(summary = "Remove picklist dependency")
     public ResponseEntity<Void> removeDependency(
             @PathVariable String controllingFieldId,

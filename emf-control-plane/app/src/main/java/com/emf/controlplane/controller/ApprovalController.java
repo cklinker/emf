@@ -7,6 +7,7 @@ import com.emf.controlplane.service.ApprovalService;
 import com.emf.controlplane.tenant.TenantContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -35,6 +36,7 @@ public class ApprovalController {
         return ApprovalProcessDto.fromEntity(approvalService.getProcess(id));
     }
 
+    @PreAuthorize("@securityService.hasPermission(#root, 'MANAGE_APPROVALS')")
     @PostMapping("/processes")
     public ResponseEntity<ApprovalProcessDto> createProcess(
             @RequestBody CreateApprovalProcessRequest request) {
@@ -43,6 +45,7 @@ public class ApprovalController {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApprovalProcessDto.fromEntity(process));
     }
 
+    @PreAuthorize("@securityService.hasPermission(#root, 'MANAGE_APPROVALS')")
     @PutMapping("/processes/{id}")
     public ApprovalProcessDto updateProcess(
             @PathVariable String id,
@@ -50,6 +53,7 @@ public class ApprovalController {
         return ApprovalProcessDto.fromEntity(approvalService.updateProcess(id, request));
     }
 
+    @PreAuthorize("@securityService.hasPermission(#root, 'MANAGE_APPROVALS')")
     @DeleteMapping("/processes/{id}")
     public ResponseEntity<Void> deleteProcess(@PathVariable String id) {
         approvalService.deleteProcess(id);

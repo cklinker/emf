@@ -4,6 +4,7 @@ import com.emf.controlplane.service.ExportService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
@@ -12,6 +13,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/control/export")
+@PreAuthorize("@securityService.hasPermission(#root, 'MANAGE_DATA')")
 public class ExportController {
 
     private final ExportService exportService;

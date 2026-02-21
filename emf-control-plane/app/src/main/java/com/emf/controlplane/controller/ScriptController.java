@@ -7,12 +7,14 @@ import com.emf.controlplane.service.ScriptService;
 import com.emf.controlplane.tenant.TenantContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/control/scripts")
+@PreAuthorize("@securityService.hasPermission(#root, 'MANAGE_CONNECTED_APPS')")
 public class ScriptController {
 
     private final ScriptService scriptService;

@@ -107,3 +107,10 @@ export {
 
 // Prefetch hook for hovering rows in data tables
 export { usePrefetch, type UsePrefetchOptions, type UsePrefetchReturn } from './usePrefetch'
+
+// System-level permission hook (feature access per user)
+export {
+  useSystemPermissions,
+  type SystemPermissions,
+  type UseSystemPermissionsReturn,
+} from './useSystemPermissions'

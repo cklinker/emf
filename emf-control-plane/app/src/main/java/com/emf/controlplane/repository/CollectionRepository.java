@@ -61,6 +61,9 @@ public interface CollectionRepository extends JpaRepository<Collection, String> 
     @Query("SELECT DISTINCT c FROM Collection c LEFT JOIN FETCH c.fields WHERE c.tenantId = :tenantId AND c.active = true")
     List<Collection> findByTenantIdAndActiveTrueWithFields(@Param("tenantId") String tenantId);
 
+    @Query("SELECT c.id FROM Collection c WHERE c.tenantId = :tenantId AND c.active = true")
+    List<String> findActiveTenantCollectionIds(@Param("tenantId") String tenantId);
+
     // ---- Legacy methods (kept for platform-level operations) ----
 
     Page<Collection> findByActiveTrue(Pageable pageable);

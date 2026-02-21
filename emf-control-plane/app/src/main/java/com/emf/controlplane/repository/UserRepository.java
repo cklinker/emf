@@ -29,6 +29,8 @@ public interface UserRepository extends JpaRepository<User, String> {
 
     boolean existsByTenantIdAndEmail(String tenantId, String email);
 
+    boolean existsByTenantId(String tenantId);
+
     long countByTenantIdAndStatus(String tenantId, String status);
 
     long countByTenantId(String tenantId);

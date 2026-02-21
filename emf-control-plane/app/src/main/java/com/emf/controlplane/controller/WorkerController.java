@@ -91,7 +91,7 @@ public class WorkerController {
      * @return List of all workers
      */
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'VIEW_SETUP')")
     public ResponseEntity<List<Worker>> listWorkers() {
         List<Worker> workers = workerService.findAll();
         return ResponseEntity.ok(workers);
@@ -104,7 +104,7 @@ public class WorkerController {
      * @return The worker
      */
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'VIEW_SETUP')")
     public ResponseEntity<Worker> getWorker(@PathVariable String id) {
         Worker worker = workerService.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Worker", id));
@@ -118,7 +118,7 @@ public class WorkerController {
      * @return List of enriched assignment DTOs for the worker
      */
     @GetMapping("/{id}/assignments")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@securityService.hasPermission(#root, 'VIEW_SETUP')")
     public ResponseEntity<List<WorkerAssignmentDto>> getWorkerAssignments(@PathVariable String id) {
         List<CollectionAssignment> assignments = collectionAssignmentService.findByWorker(id);
 
@@ -151,7 +151,7 @@ public class WorkerController {
      * @return The rebalance report with details of moves made
      */
     @PostMapping("/rebalance")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('PLATFORM_ADMIN')")
     public ResponseEntity<WorkerRebalanceService.RebalanceReport> rebalance() {
         WorkerRebalanceService.RebalanceReport report = workerRebalanceService.rebalance();
         return ResponseEntity.ok(report);

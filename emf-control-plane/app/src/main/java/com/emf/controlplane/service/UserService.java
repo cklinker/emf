@@ -35,13 +35,16 @@ public class UserService {
     private final UserRepository userRepository;
     private final LoginHistoryRepository loginHistoryRepository;
     private final ProfileRepository profileRepository;
+    private final SecurityAuditService auditService;
 
     public UserService(UserRepository userRepository,
                        LoginHistoryRepository loginHistoryRepository,
-                       @Nullable ProfileRepository profileRepository) {
+                       @Nullable ProfileRepository profileRepository,
+                       @Nullable SecurityAuditService auditService) {
         this.userRepository = userRepository;
         this.loginHistoryRepository = loginHistoryRepository;
         this.profileRepository = profileRepository;
+        this.auditService = auditService;
     }
 
     @Transactional(readOnly = true)
@@ -140,6 +143,9 @@ public class UserService {
         User user = getUser(id);
         user.setStatus("INACTIVE");
         userRepository.save(user);
+        if (auditService != null) {
+            auditService.logUserDeactivated(user.getId(), user.getEmail());
+        }
         log.info("Deactivated user {}", user.getId());
     }
 
@@ -148,6 +154,9 @@ public class UserService {
         User user = getUser(id);
         user.setStatus("ACTIVE");
         userRepository.save(user);
+        if (auditService != null) {
+            auditService.logUserActivated(user.getId(), user.getEmail());
+        }
         log.info("Activated user {}", user.getId());
     }
 
@@ -220,6 +229,9 @@ public class UserService {
         assignDefaultProfile(user, tenantId, profileName);
 
         user = userRepository.save(user);
+        if (auditService != null) {
+            auditService.logUserProvisioned(user.getId(), email, "OIDC");
+        }
         log.info("JIT provisioned user {} ({}) in tenant {} with profile {}",
                 user.getId(), email, tenantId, profileName);
         return user;

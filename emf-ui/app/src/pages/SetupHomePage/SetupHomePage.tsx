@@ -115,19 +115,24 @@ const CATEGORIES: SetupCategory[] = [
     icon: <Shield size={20} />,
     items: [
       {
-        name: 'Sharing Settings',
-        path: '/sharing',
-        description: 'Configure record-level sharing',
+        name: 'Profiles',
+        path: '/profiles',
+        description: 'Configure profile-based permissions',
       },
       {
-        name: 'Role Hierarchy',
-        path: '/role-hierarchy',
-        description: 'Define role inheritance',
+        name: 'Permission Sets',
+        path: '/permission-sets',
+        description: 'Create additional permission grants',
       },
       {
-        name: 'Policies',
-        path: '/policies',
-        description: 'Manage access control policies',
+        name: 'Login History',
+        path: '/login-history',
+        description: 'View user login activity',
+      },
+      {
+        name: 'Security Audit',
+        path: '/security-audit',
+        description: 'Review security event trail',
       },
     ],
   },

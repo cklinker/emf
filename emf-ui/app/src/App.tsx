@@ -12,7 +12,15 @@
  */
 
 import React from 'react'
-import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation, Link } from 'react-router-dom'
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+  useNavigate,
+  useLocation,
+  Link,
+} from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AlertTriangle } from 'lucide-react'
 
@@ -88,6 +96,10 @@ import {
   LoginPage,
   UnauthorizedPage,
   NotFoundPage,
+  ProfilesPage,
+  PermissionSetsPage,
+  LoginHistoryPage,
+  SecurityAuditPage,
 } from './pages'
 import { NoTenantPage } from './pages/NoTenantPage/NoTenantPage'
 
@@ -721,6 +733,40 @@ function TenantRoutes(): React.ReactElement {
         element={
           <AdminPageRoute>
             <SetupAuditTrailPage />
+          </AdminPageRoute>
+        }
+      />
+
+      {/* Security Management routes */}
+      <Route
+        path="profiles"
+        element={
+          <AdminPageRoute>
+            <ProfilesPage />
+          </AdminPageRoute>
+        }
+      />
+      <Route
+        path="permission-sets"
+        element={
+          <AdminPageRoute>
+            <PermissionSetsPage />
+          </AdminPageRoute>
+        }
+      />
+      <Route
+        path="login-history"
+        element={
+          <AdminPageRoute>
+            <LoginHistoryPage />
+          </AdminPageRoute>
+        }
+      />
+      <Route
+        path="security-audit"
+        element={
+          <AdminPageRoute>
+            <SecurityAuditPage />
           </AdminPageRoute>
         }
       />

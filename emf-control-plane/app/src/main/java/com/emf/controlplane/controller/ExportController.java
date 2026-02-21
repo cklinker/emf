@@ -1,6 +1,7 @@
 package com.emf.controlplane.controller;
 
 import com.emf.controlplane.service.ExportService;
+import com.emf.controlplane.service.SecurityAuditService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -17,14 +18,20 @@ import java.util.Map;
 public class ExportController {
 
     private final ExportService exportService;
+    private final SecurityAuditService auditService;
 
-    public ExportController(ExportService exportService) {
+    public ExportController(ExportService exportService,
+                            @org.springframework.lang.Nullable SecurityAuditService auditService) {
         this.exportService = exportService;
+        this.auditService = auditService;
     }
 
     @PostMapping("/csv")
     public ResponseEntity<byte[]> exportCsv(@RequestBody ExportRequest request) {
         byte[] data = exportService.exportToCsv(request.columns(), request.rows());
+        if (auditService != null) {
+            auditService.logBulkExport(request.filename(), request.rows() != null ? request.rows().size() : 0, "CSV");
+        }
         String filename = (request.filename() != null ? request.filename() : "export") + ".csv";
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
@@ -36,6 +43,9 @@ public class ExportController {
     public ResponseEntity<byte[]> exportXlsx(@RequestBody ExportRequest request) throws IOException {
         String sheetName = request.filename() != null ? request.filename() : "Export";
         byte[] data = exportService.exportToXlsx(sheetName, request.columns(), request.rows());
+        if (auditService != null) {
+            auditService.logBulkExport(request.filename(), request.rows() != null ? request.rows().size() : 0, "XLSX");
+        }
         String filename = (request.filename() != null ? request.filename() : "export") + ".xlsx";
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")

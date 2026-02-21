@@ -213,6 +213,18 @@ export { NoTenantPage } from './NoTenantPage/NoTenantPage'
 export { WorkersPage } from './WorkersPage'
 export type { WorkersPageProps, Worker, WorkerAssignment, RebalanceResult } from './WorkersPage'
 
+// ProfilesPage - Security profiles management page
+export { ProfilesPage } from './ProfilesPage'
+
+// PermissionSetsPage - Permission sets management page
+export { PermissionSetsPage } from './PermissionSetsPage'
+
+// LoginHistoryPage - Login history management page
+export { LoginHistoryPage } from './LoginHistoryPage'
+
+// SecurityAuditPage - Security audit log page
+export { SecurityAuditPage } from './SecurityAuditPage'
+
 // NotFoundPage - 404 error page
 export { NotFoundPage } from './NotFoundPage'
 export type { NotFoundPageProps } from './NotFoundPage'

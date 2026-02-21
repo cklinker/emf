@@ -58,7 +58,7 @@ class LoginTrackingFilterTest {
 
     @BeforeEach
     void setUp() {
-        filter = new LoginTrackingFilter(userService);
+        filter = new LoginTrackingFilter(userService, null);
     }
 
     @AfterEach

@@ -1,5 +1,6 @@
 package com.emf.controlplane.config;
 
+import com.emf.controlplane.service.SecurityAuditService;
 import com.emf.controlplane.service.UserService;
 import com.emf.controlplane.tenant.TenantContextHolder;
 import jakarta.servlet.FilterChain;
@@ -46,12 +47,15 @@ public class LoginTrackingFilter extends OncePerRequestFilter {
     private static final long TRACKING_INTERVAL_SECONDS = 1800; // 30 minutes
 
     private final UserService userService;
+    private final SecurityAuditService auditService;
 
     /** Maps "tenantId:email" to the epoch-second of the last tracking write. */
     private final Map<String, Long> lastTrackedAt = new ConcurrentHashMap<>();
 
-    public LoginTrackingFilter(UserService userService) {
+    public LoginTrackingFilter(UserService userService,
+                               @org.springframework.lang.Nullable SecurityAuditService auditService) {
         this.userService = userService;
+        this.auditService = auditService;
     }
 
     @Override
@@ -103,6 +107,11 @@ public class LoginTrackingFilter extends OncePerRequestFilter {
         String userAgent = request.getHeader("User-Agent");
         userService.recordLogin(user.getId(), tenantId, sourceIp, "OAUTH", "SUCCESS",
                 userAgent != null ? truncate(userAgent, 500) : null);
+
+        // Audit log the login
+        if (auditService != null) {
+            auditService.logUserProvisioned(user.getId(), email, "OIDC");
+        }
 
         lastTrackedAt.put(cacheKey, now);
         log.debug("Tracked login for user {} ({}) in tenant {}", user.getId(), email, tenantId);

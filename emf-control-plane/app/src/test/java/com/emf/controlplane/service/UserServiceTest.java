@@ -43,7 +43,7 @@ class UserServiceTest {
 
     @BeforeEach
     void setUp() {
-        userService = new UserService(userRepository, loginHistoryRepository, null);
+        userService = new UserService(userRepository, loginHistoryRepository, null, null);
         TenantContextHolder.set(TENANT_ID, "test-tenant");
     }
 

@@ -26,11 +26,14 @@ public class SecurityService {
 
     private final PermissionResolutionService permissionService;
     private final UserRepository userRepository;
+    private final SecurityAuditService auditService;
 
     public SecurityService(PermissionResolutionService permissionService,
-                           UserRepository userRepository) {
+                           UserRepository userRepository,
+                           @org.springframework.lang.Nullable SecurityAuditService auditService) {
         this.permissionService = permissionService;
         this.userRepository = userRepository;
+        this.auditService = auditService;
     }
 
     /**
@@ -48,7 +51,11 @@ public class SecurityService {
         String userId = resolveUserId(auth, tenantId);
         if (userId == null) return false;
 
-        return permissionService.hasSystemPermission(tenantId, userId, permission);
+        boolean granted = permissionService.hasSystemPermission(tenantId, userId, permission);
+        if (!granted && auditService != null) {
+            auditService.logPermissionDenied(null, null, permission);
+        }
+        return granted;
     }
 
     /**
@@ -68,7 +75,7 @@ public class SecurityService {
         if (userId == null) return false;
 
         ObjectPermissions perms = permissionService.getObjectPermissions(tenantId, userId, collectionId);
-        return switch (action.toUpperCase()) {
+        boolean granted = switch (action.toUpperCase()) {
             case "CREATE" -> perms.canCreate();
             case "READ" -> perms.canRead();
             case "EDIT" -> perms.canEdit();
@@ -77,6 +84,10 @@ public class SecurityService {
             case "MODIFY_ALL" -> perms.canModifyAll();
             default -> false;
         };
+        if (!granted && auditService != null) {
+            auditService.logPermissionDenied(collectionId, action, "OBJECT_" + action.toUpperCase());
+        }
+        return granted;
     }
 
     /**

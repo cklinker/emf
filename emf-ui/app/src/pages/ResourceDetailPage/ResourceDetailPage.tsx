@@ -13,6 +13,7 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { cn } from '@/lib/utils'
 import { useI18n } from '../../context/I18nContext'
 import { getTenantSlug } from '../../context/TenantContext'
 import { useApi } from '../../context/ApiContext'
@@ -26,9 +27,12 @@ import { RelatedRecordsSection } from '../../components/RelatedRecordsSection/Re
 import { ActivityTimeline } from '../../components/ActivityTimeline/ActivityTimeline'
 import { NotesSection } from '../../components/NotesSection/NotesSection'
 import { AttachmentsSection } from '../../components/AttachmentsSection/AttachmentsSection'
+import { usePageLayout } from '../../hooks/usePageLayout'
+import { useLookupDisplayMap } from '../../hooks/useLookupDisplayMap'
+import { LayoutFieldSections } from '../../components/LayoutFieldSections/LayoutFieldSections'
+import { LayoutRelatedLists } from '../../components/LayoutRelatedLists/LayoutRelatedLists'
 import { unwrapResource } from '../../utils/jsonapi'
 import type { ApiClient } from '../../services/apiClient'
-import styles from './ResourceDetailPage.module.css'
 
 /**
  * Field definition interface for collection schema
@@ -146,40 +150,40 @@ function ShareForm({ onSubmit, onCancel, isSubmitting }: ShareFormProps): React.
 
   return (
     <div
-      className={styles.shareModalOverlay}
+      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 p-4"
       onClick={(e) => e.target === e.currentTarget && onCancel()}
       onKeyDown={(e) => e.key === 'Escape' && onCancel()}
       role="presentation"
     >
       <div
-        className={styles.shareModal}
+        className="w-full max-w-[480px] rounded-md bg-card shadow-xl"
         role="dialog"
         aria-modal="true"
         aria-labelledby="share-form-title"
       >
-        <div className={styles.shareModalHeader}>
-          <h3 id="share-form-title" className={styles.shareModalTitle}>
+        <div className="flex items-center justify-between border-b border-border px-6 py-5">
+          <h3 id="share-form-title" className="m-0 text-lg font-semibold text-foreground">
             Share Record
           </h3>
           <button
             type="button"
-            className={styles.shareModalClose}
+            className="rounded border-none bg-transparent p-1 text-2xl leading-none text-muted-foreground hover:text-foreground"
             onClick={onCancel}
             aria-label="Close"
           >
             &times;
           </button>
         </div>
-        <form className={styles.shareModalBody} onSubmit={handleSubmit}>
-          <div className={styles.shareFormGroup}>
-            <label htmlFor="share-with-id" className={styles.shareFormLabel}>
+        <form className="flex flex-col gap-4 p-6" onSubmit={handleSubmit}>
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="share-with-id" className="text-sm font-medium text-foreground">
               Shared With ID
             </label>
             <input
               ref={inputRef}
               id="share-with-id"
               type="text"
-              className={styles.shareFormInput}
+              className="rounded border border-border bg-card px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
               value={sharedWithId}
               onChange={(e) => setSharedWithId(e.target.value)}
               placeholder="Enter user, group, or role ID"
@@ -187,13 +191,13 @@ function ShareForm({ onSubmit, onCancel, isSubmitting }: ShareFormProps): React.
               disabled={isSubmitting}
             />
           </div>
-          <div className={styles.shareFormGroup}>
-            <label htmlFor="share-type" className={styles.shareFormLabel}>
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="share-type" className="text-sm font-medium text-foreground">
               Type
             </label>
             <select
               id="share-type"
-              className={styles.shareFormInput}
+              className="rounded border border-border bg-card px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
               value={sharedWithType}
               onChange={(e) => setSharedWithType(e.target.value)}
               disabled={isSubmitting}
@@ -203,13 +207,13 @@ function ShareForm({ onSubmit, onCancel, isSubmitting }: ShareFormProps): React.
               <option value="ROLE">Role</option>
             </select>
           </div>
-          <div className={styles.shareFormGroup}>
-            <label htmlFor="share-access" className={styles.shareFormLabel}>
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="share-access" className="text-sm font-medium text-foreground">
               Access Level
             </label>
             <select
               id="share-access"
-              className={styles.shareFormInput}
+              className="rounded border border-border bg-card px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
               value={accessLevel}
               onChange={(e) => setAccessLevel(e.target.value)}
               disabled={isSubmitting}
@@ -218,16 +222,20 @@ function ShareForm({ onSubmit, onCancel, isSubmitting }: ShareFormProps): React.
               <option value="READ_WRITE">Read/Write</option>
             </select>
           </div>
-          <div className={styles.shareFormActions}>
+          <div className="flex justify-end gap-3 border-t border-border pt-2">
             <button
               type="button"
-              className={styles.shareFormCancel}
+              className="cursor-pointer rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
               onClick={onCancel}
               disabled={isSubmitting}
             >
               Cancel
             </button>
-            <button type="submit" className={styles.shareFormSubmit} disabled={isSubmitting}>
+            <button
+              type="submit"
+              className="cursor-pointer rounded-md border-none bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={isSubmitting}
+            >
               {isSubmitting ? 'Sharing...' : 'Share'}
             </button>
           </div>
@@ -329,6 +337,9 @@ export function ResourceDetailPage({
     queryFn: () => fetchCollectionSchema(apiClient, collectionName),
     enabled: !!collectionName,
   })
+
+  // Resolve page layout for this collection (returns null if none configured)
+  const { layout, isLoading: layoutLoading } = usePageLayout(schema?.id, user?.id)
 
   // Fetch resource data
   const {
@@ -452,92 +463,11 @@ export function ResourceDetailPage({
     [createdByUser, updatedByUser]
   )
 
-  // Identify master_detail fields for display name resolution
-  const lookupFields = useMemo(() => {
-    if (!schema?.fields) return []
-    return schema.fields.filter((f) => f.type === 'master_detail' && f.referenceCollectionId)
-  }, [schema])
-
-  // Fetch display labels for master_detail field values.
-  // Builds a map: { [fieldName]: { [recordId]: displayLabel } }
-  // Also tracks field name → target collection name for deep linking.
-  const { data: lookupData } = useQuery({
-    queryKey: ['lookup-display-detail', collectionName, resourceId, lookupFields.map((f) => f.id)],
-    queryFn: async () => {
-      const displayMap: Record<string, Record<string, string>> = {}
-      const targetNameMap: Record<string, string> = {}
-
-      const targetGroupMap = new Map<string, FieldDefinition[]>()
-      for (const field of lookupFields) {
-        const target = field.referenceCollectionId!
-        if (!targetGroupMap.has(target)) {
-          targetGroupMap.set(target, [])
-        }
-        targetGroupMap.get(target)!.push(field)
-      }
-
-      await Promise.all(
-        Array.from(targetGroupMap.entries()).map(async ([targetCollectionId, fields]) => {
-          try {
-            const targetSchema = await apiClient.get<{
-              name: string
-              displayFieldName?: string
-              fields?: Array<{ name: string; type: string }>
-            }>(`/control/collections/${targetCollectionId}`)
-            const targetName = targetSchema.name
-
-            for (const field of fields) {
-              targetNameMap[field.name] = targetName
-            }
-
-            let displayFieldName = 'id'
-            if (targetSchema.displayFieldName) {
-              displayFieldName = targetSchema.displayFieldName
-            } else if (targetSchema.fields) {
-              const nameField = targetSchema.fields.find((f) => f.name.toLowerCase() === 'name')
-              if (nameField) {
-                displayFieldName = nameField.name
-              } else {
-                const firstStringField = targetSchema.fields.find(
-                  (f) => f.type.toUpperCase() === 'STRING'
-                )
-                if (firstStringField) {
-                  displayFieldName = firstStringField.name
-                }
-              }
-            }
-
-            const recordsResponse = await apiClient.get<Record<string, unknown>>(
-              `/api/${targetName}?page[size]=200`
-            )
-            const data = recordsResponse?.data
-            const records: Array<Record<string, unknown>> = Array.isArray(data) ? data : []
-
-            const idToLabel: Record<string, string> = {}
-            for (const record of records) {
-              const attrs = (record.attributes || record) as Record<string, unknown>
-              const id = String(record.id || attrs.id || '')
-              const label = attrs[displayFieldName] ? String(attrs[displayFieldName]) : id
-              idToLabel[id] = label
-            }
-
-            for (const field of fields) {
-              displayMap[field.name] = idToLabel
-            }
-          } catch {
-            for (const field of fields) {
-              displayMap[field.name] = {}
-            }
-          }
-        })
-      )
-      return { displayMap, targetNameMap }
-    },
-    enabled: lookupFields.length > 0,
-  })
-
-  const lookupDisplayMap = lookupData?.displayMap
-  const lookupTargetNameMap = lookupData?.targetNameMap
+  // Resolve display labels for reference/lookup/master_detail fields
+  const { lookupDisplayMap, lookupTargetNameMap } = useLookupDisplayMap(
+    schema?.fields,
+    'lookup-display-detail'
+  )
 
   // Sort fields by order
   const sortedFields = useMemo(() => {
@@ -620,19 +550,24 @@ export function ResourceDetailPage({
   const formatFieldValue = useCallback(
     (value: unknown, field: FieldDefinition): React.ReactNode => {
       if (value === null || value === undefined) {
-        return <span className={styles.emptyValue}>-</span>
+        return <span className="italic text-muted-foreground/60">-</span>
       }
 
       switch (field.type) {
         case 'boolean':
           return (
-            <span className={value ? styles.booleanTrue : styles.booleanFalse}>
+            <span
+              className={cn(
+                'font-medium',
+                value ? 'text-green-700 dark:text-green-300' : 'text-red-600 dark:text-red-300'
+              )}
+            >
               {value ? t('common.yes') : t('common.no')}
             </span>
           )
 
         case 'number':
-          return <span className={styles.numberValue}>{formatNumber(value as number)}</span>
+          return <span className="font-mono">{formatNumber(value as number)}</span>
 
         case 'date':
           try {
@@ -662,8 +597,8 @@ export function ResourceDetailPage({
         case 'json':
           if (typeof value === 'object') {
             return (
-              <pre className={styles.jsonValue}>
-                <code>{JSON.stringify(value, null, 2)}</code>
+              <pre className="m-0 max-h-[300px] overflow-x-auto overflow-y-auto rounded bg-muted p-4 text-sm">
+                <code className="whitespace-pre font-mono">{JSON.stringify(value, null, 2)}</code>
               </pre>
             )
           }
@@ -680,11 +615,11 @@ export function ResourceDetailPage({
             | undefined
           const targetCollection = relData?.type ?? lookupTargetNameMap?.[field.name]
           return (
-            <span className={styles.referenceValue}>
+            <span className="font-mono">
               {targetCollection ? (
                 <Link
                   to={`/${getTenantSlug()}/resources/${targetCollection}/${recordId}`}
-                  className={styles.referenceLink}
+                  className="text-primary no-underline transition-colors duration-200 hover:text-primary/80 hover:underline focus:rounded focus:outline-2 focus:outline-offset-2 focus:outline-ring motion-reduce:transition-none"
                 >
                   {displayLabel}
                 </Link>
@@ -699,7 +634,11 @@ export function ResourceDetailPage({
         default: {
           const stringValue = String(value)
           if (stringValue.length > 500) {
-            return <div className={styles.longTextValue}>{stringValue}</div>
+            return (
+              <div className="max-h-[200px] overflow-y-auto whitespace-pre-wrap rounded bg-muted p-2">
+                {stringValue}
+              </div>
+            )
           }
           return stringValue
         }
@@ -719,12 +658,15 @@ export function ResourceDetailPage({
   )
 
   // Loading state
-  const isLoading = schemaLoading || resourceLoading
+  const isLoading = schemaLoading || resourceLoading || layoutLoading
 
   if (isLoading) {
     return (
-      <div className={styles.container} data-testid={testId}>
-        <div className={styles.loadingContainer}>
+      <div
+        className="flex w-full flex-col gap-6 p-6 max-lg:p-4 max-md:gap-4 max-md:p-2"
+        data-testid={testId}
+      >
+        <div className="flex min-h-[300px] items-center justify-center">
           <LoadingSpinner size="large" label={t('common.loading')} />
         </div>
       </div>
@@ -734,7 +676,10 @@ export function ResourceDetailPage({
   // Error state - schema error
   if (schemaError) {
     return (
-      <div className={styles.container} data-testid={testId}>
+      <div
+        className="flex w-full flex-col gap-6 p-6 max-lg:p-4 max-md:gap-4 max-md:p-2"
+        data-testid={testId}
+      >
         <ErrorMessage
           error={schemaError instanceof Error ? schemaError : new Error(t('errors.generic'))}
           onRetry={() =>
@@ -748,7 +693,10 @@ export function ResourceDetailPage({
   // Error state - resource error
   if (resourceError) {
     return (
-      <div className={styles.container} data-testid={testId}>
+      <div
+        className="flex w-full flex-col gap-6 p-6 max-lg:p-4 max-md:gap-4 max-md:p-2"
+        data-testid={testId}
+      >
         <ErrorMessage
           error={resourceError instanceof Error ? resourceError : new Error(t('errors.generic'))}
           onRetry={() => refetchResource()}
@@ -760,32 +708,46 @@ export function ResourceDetailPage({
   // Not found state
   if (!schema || !resource) {
     return (
-      <div className={styles.container} data-testid={testId}>
+      <div
+        className="flex w-full flex-col gap-6 p-6 max-lg:p-4 max-md:gap-4 max-md:p-2"
+        data-testid={testId}
+      >
         <ErrorMessage error={new Error(t('errors.notFound'))} />
       </div>
     )
   }
 
   return (
-    <div className={styles.container} data-testid={testId}>
+    <div
+      className="flex w-full flex-col gap-6 p-6 max-lg:p-4 max-md:gap-4 max-md:p-2"
+      data-testid={testId}
+    >
       {/* Breadcrumb Navigation */}
-      <nav className={styles.breadcrumb} aria-label="Breadcrumb">
-        <Link to={`/${getTenantSlug()}/resources`} className={styles.breadcrumbLink}>
+      <nav
+        className="flex items-center gap-1 text-sm text-muted-foreground max-md:flex-wrap"
+        aria-label="Breadcrumb"
+      >
+        <Link
+          to={`/${getTenantSlug()}/resources`}
+          className="text-primary no-underline transition-colors duration-200 hover:text-primary/80 hover:underline focus:rounded focus:outline-2 focus:outline-offset-2 focus:outline-ring motion-reduce:transition-none"
+        >
           {t('resources.title')}
         </Link>
-        <span className={styles.breadcrumbSeparator} aria-hidden="true">
+        <span className="mx-1 text-muted-foreground/60" aria-hidden="true">
           /
         </span>
         <Link
           to={`/${getTenantSlug()}/resources/${collectionName}`}
-          className={styles.breadcrumbLink}
+          className="text-primary no-underline transition-colors duration-200 hover:text-primary/80 hover:underline focus:rounded focus:outline-2 focus:outline-offset-2 focus:outline-ring motion-reduce:transition-none"
         >
           {schema.displayName}
         </Link>
-        <span className={styles.breadcrumbSeparator} aria-hidden="true">
+        <span className="mx-1 text-muted-foreground/60" aria-hidden="true">
           /
         </span>
-        <span className={styles.breadcrumbCurrent}>{resource.id}</span>
+        <span className="max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap font-medium text-foreground max-md:max-w-[150px]">
+          {resource.id}
+        </span>
       </nav>
 
       {/* Record Header (T9) */}
@@ -813,43 +775,78 @@ export function ResourceDetailPage({
         apiClient={apiClient}
       />
 
-      {/* Field Values Section */}
-      <section className={styles.fieldsSection} aria-labelledby="fields-heading">
-        <h2 id="fields-heading" className={styles.sectionTitle}>
-          {t('collections.fields')}
-        </h2>
+      {/* Field Values Section — use page layout sections when available */}
+      {layout && layout.sections.length > 0 ? (
+        <LayoutFieldSections
+          sections={layout.sections}
+          schemaFields={schema.fields}
+          record={resource as Record<string, unknown> & { id: string }}
+          tenantSlug={getTenantSlug()}
+          lookupDisplayMap={lookupDisplayMap}
+        />
+      ) : (
+        <section
+          className="rounded-md border border-border bg-card p-6 max-md:p-4"
+          aria-labelledby="fields-heading"
+        >
+          <h2 id="fields-heading" className="m-0 mb-4 text-lg font-semibold text-foreground">
+            {t('collections.fields')}
+          </h2>
 
-        {sortedFields.length === 0 ? (
-          <div className={styles.emptyState} data-testid="no-fields">
-            <p>{t('common.noData')}</p>
-          </div>
-        ) : (
-          <div className={styles.fieldsGrid} data-testid="fields-grid">
-            {sortedFields.map((field, index) => (
-              <div key={field.id} className={styles.fieldItem} data-testid={`field-item-${index}`}>
-                <div className={styles.fieldHeader}>
-                  <span className={styles.fieldName}>{field.displayName || field.name}</span>
-                  <span className={styles.fieldType}>{getFieldTypeLabel(field.type)}</span>
+          {sortedFields.length === 0 ? (
+            <div
+              className="flex flex-col items-center justify-center rounded-md bg-muted p-8 text-center text-muted-foreground"
+              data-testid="no-fields"
+            >
+              <p className="m-0 text-base">{t('common.noData')}</p>
+            </div>
+          ) : (
+            <div
+              className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-6 max-lg:grid-cols-[repeat(auto-fill,minmax(250px,1fr))] max-md:grid-cols-1"
+              data-testid="fields-grid"
+            >
+              {sortedFields.map((field, index) => (
+                <div
+                  key={field.id}
+                  className="flex flex-col gap-1"
+                  data-testid={`field-item-${index}`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-medium text-muted-foreground">
+                      {field.displayName || field.name}
+                    </span>
+                    <span className="rounded bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">
+                      {getFieldTypeLabel(field.type)}
+                    </span>
+                  </div>
+                  <div
+                    className="min-h-[1.5em] break-words text-base text-foreground"
+                    data-testid={`field-value-${field.name}`}
+                  >
+                    {formatFieldValue(resource[field.name], field)}
+                  </div>
                 </div>
-                <div className={styles.fieldValue} data-testid={`field-value-${field.name}`}>
-                  {formatFieldValue(resource[field.name], field)}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Metadata Section */}
-      <section className={styles.metadataSection} aria-labelledby="metadata-heading">
-        <h2 id="metadata-heading" className={styles.sectionTitle}>
+      <section
+        className="rounded-md border border-border bg-card p-6 max-md:p-4"
+        aria-labelledby="metadata-heading"
+      >
+        <h2 id="metadata-heading" className="m-0 mb-4 text-lg font-semibold text-foreground">
           Metadata
         </h2>
-        <div className={styles.metadataGrid}>
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-4 max-md:grid-cols-1">
           {(resource.created_at || resource.createdAt) && (
-            <div className={styles.metadataItem}>
-              <span className={styles.metadataLabel}>{t('collections.created')}</span>
-              <span className={styles.metadataValue} data-testid="created-at">
+            <div className="flex flex-col gap-1">
+              <span className="text-sm font-medium text-muted-foreground">
+                {t('collections.created')}
+              </span>
+              <span className="text-base text-foreground" data-testid="created-at">
                 {formatDate(new Date((resource.created_at || resource.createdAt) as string), {
                   year: 'numeric',
                   month: 'long',
@@ -861,9 +858,11 @@ export function ResourceDetailPage({
             </div>
           )}
           {(resource.updated_at || resource.updatedAt) && (
-            <div className={styles.metadataItem}>
-              <span className={styles.metadataLabel}>{t('collections.updated')}</span>
-              <span className={styles.metadataValue} data-testid="updated-at">
+            <div className="flex flex-col gap-1">
+              <span className="text-sm font-medium text-muted-foreground">
+                {t('collections.updated')}
+              </span>
+              <span className="text-base text-foreground" data-testid="updated-at">
                 {formatDate(new Date((resource.updated_at || resource.updatedAt) as string), {
                   year: 'numeric',
                   month: 'long',
@@ -875,13 +874,16 @@ export function ResourceDetailPage({
             </div>
           )}
           {resource.created_by && (
-            <div className={styles.metadataItem}>
-              <span className={styles.metadataLabel}>Created by</span>
-              <span className={styles.metadataValue} data-testid="created-by">
+            <div className="flex flex-col gap-1">
+              <span className="text-sm font-medium text-muted-foreground">Created by</span>
+              <span className="text-base text-foreground" data-testid="created-by">
                 {(() => {
                   const display = getUserDisplay(String(resource.created_by))
                   return display ? (
-                    <Link to={display.linkTo} className={styles.metadataLink}>
+                    <Link
+                      to={display.linkTo}
+                      className="text-primary no-underline hover:underline hover:text-primary/80"
+                    >
                       {display.name}
                     </Link>
                   ) : (
@@ -892,13 +894,16 @@ export function ResourceDetailPage({
             </div>
           )}
           {resource.updated_by && (
-            <div className={styles.metadataItem}>
-              <span className={styles.metadataLabel}>Last modified by</span>
-              <span className={styles.metadataValue} data-testid="updated-by">
+            <div className="flex flex-col gap-1">
+              <span className="text-sm font-medium text-muted-foreground">Last modified by</span>
+              <span className="text-base text-foreground" data-testid="updated-by">
                 {(() => {
                   const display = getUserDisplay(String(resource.updated_by))
                   return display ? (
-                    <Link to={display.linkTo} className={styles.metadataLink}>
+                    <Link
+                      to={display.linkTo}
+                      className="text-primary no-underline hover:underline hover:text-primary/80"
+                    >
                       {display.name}
                     </Link>
                   ) : (
@@ -912,14 +917,17 @@ export function ResourceDetailPage({
       </section>
 
       {/* Sharing Section */}
-      <section className={styles.sharingSection} aria-labelledby="sharing-heading">
-        <div className={styles.sharingSectionHeader}>
-          <h2 id="sharing-heading" className={styles.sectionTitle}>
+      <section
+        className="rounded-md border border-border bg-card p-6 max-md:p-4"
+        aria-labelledby="sharing-heading"
+      >
+        <div className="mb-4 flex items-center justify-between">
+          <h2 id="sharing-heading" className="m-0 text-lg font-semibold text-foreground">
             Sharing
           </h2>
           <button
             type="button"
-            className={styles.shareButton}
+            className="inline-flex cursor-pointer items-center rounded-md border border-primary bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors duration-200 hover:bg-primary/90 focus:outline-2 focus:outline-offset-2 focus:outline-ring motion-reduce:transition-none"
             onClick={() => setShareModalOpen(true)}
             data-testid="share-button"
           >
@@ -927,36 +935,59 @@ export function ResourceDetailPage({
           </button>
         </div>
         {sharesList.length === 0 ? (
-          <div className={styles.emptyState} data-testid="no-shares">
-            <p>{t('sharing.noShares')}</p>
+          <div
+            className="flex flex-col items-center justify-center rounded-md bg-muted p-8 text-center text-muted-foreground"
+            data-testid="no-shares"
+          >
+            <p className="m-0 text-base">{t('sharing.noShares')}</p>
           </div>
         ) : (
-          <div className={styles.sharingTableContainer}>
-            <table className={styles.sharingTable} role="grid" aria-label="Record shares">
+          <div className="overflow-x-auto">
+            <table
+              className="w-full border-collapse text-sm"
+              role="grid"
+              aria-label="Record shares"
+            >
               <thead>
                 <tr>
-                  <th>{t('sharing.sharedWith')}</th>
-                  <th>{t('sharing.sharedWithType')}</th>
-                  <th>{t('sharing.accessLevel')}</th>
-                  <th>Reason</th>
-                  <th>{t('common.actions')}</th>
+                  <th className="whitespace-nowrap border-b border-border px-4 py-2 text-left font-semibold text-muted-foreground">
+                    {t('sharing.sharedWith')}
+                  </th>
+                  <th className="whitespace-nowrap border-b border-border px-4 py-2 text-left font-semibold text-muted-foreground">
+                    {t('sharing.sharedWithType')}
+                  </th>
+                  <th className="whitespace-nowrap border-b border-border px-4 py-2 text-left font-semibold text-muted-foreground">
+                    {t('sharing.accessLevel')}
+                  </th>
+                  <th className="whitespace-nowrap border-b border-border px-4 py-2 text-left font-semibold text-muted-foreground">
+                    Reason
+                  </th>
+                  <th className="whitespace-nowrap border-b border-border px-4 py-2 text-left font-semibold text-muted-foreground">
+                    {t('common.actions')}
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {sharesList.map((share) => (
                   <tr key={share.id}>
-                    <td className={styles.monoCell}>{share.sharedWithId}</td>
-                    <td>
-                      <span className={styles.shareBadge}>{share.sharedWithType}</span>
+                    <td className="border-b border-border px-4 py-2 font-mono text-sm">
+                      {share.sharedWithId}
                     </td>
-                    <td>
-                      <span className={styles.shareBadge}>{share.accessLevel}</span>
+                    <td className="border-b border-border px-4 py-2">
+                      <span className="inline-block rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-primary">
+                        {share.sharedWithType}
+                      </span>
                     </td>
-                    <td>{share.reason || '-'}</td>
-                    <td>
+                    <td className="border-b border-border px-4 py-2">
+                      <span className="inline-block rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-primary">
+                        {share.accessLevel}
+                      </span>
+                    </td>
+                    <td className="border-b border-border px-4 py-2">{share.reason || '-'}</td>
+                    <td className="border-b border-border px-4 py-2">
                       <button
                         type="button"
-                        className={styles.removeButton}
+                        className="cursor-pointer rounded border border-red-200 bg-transparent px-2 py-1 text-xs font-medium text-red-600 transition-colors duration-200 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950 motion-reduce:transition-none"
                         onClick={() => deleteShareMutation.mutate(share.id)}
                         disabled={deleteShareMutation.isPending}
                         aria-label={`Remove share for ${share.sharedWithId}`}
@@ -972,12 +1003,20 @@ export function ResourceDetailPage({
         )}
       </section>
 
-      {/* Related Records Section (T6) */}
-      <RelatedRecordsSection
-        collectionName={collectionName}
-        recordId={resourceId}
-        apiClient={apiClient}
-      />
+      {/* Related Records Section (T6) — use layout related lists when available */}
+      {layout && layout.relatedLists.length > 0 ? (
+        <LayoutRelatedLists
+          relatedLists={layout.relatedLists}
+          parentRecordId={resourceId}
+          tenantSlug={getTenantSlug()}
+        />
+      ) : (
+        <RelatedRecordsSection
+          collectionName={collectionName}
+          recordId={resourceId}
+          apiClient={apiClient}
+        />
+      )}
 
       {/* Notes Section (T20) */}
       <NotesSection collectionId={schema.id} recordId={resourceId} apiClient={apiClient} />

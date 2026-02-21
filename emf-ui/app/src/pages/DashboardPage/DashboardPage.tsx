@@ -20,7 +20,7 @@ import { AlertTriangle } from 'lucide-react'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
 import { LoadingSpinner, ErrorMessage } from '../../components'
-import styles from './DashboardPage.module.css'
+import { cn } from '@/lib/utils'
 
 /**
  * Health status for a service
@@ -161,35 +161,52 @@ function HealthCard({
     }
   }, [status, t])
 
-  const statusClassName = useMemo(() => {
+  const borderColor = useMemo(() => {
     switch (status) {
       case 'healthy':
-        return styles.statusHealthy
+        return 'border-l-emerald-500'
       case 'unhealthy':
-        return styles.statusUnhealthy
+        return 'border-l-red-500'
       default:
-        return styles.statusUnknown
+        return 'border-l-amber-500'
+    }
+  }, [status])
+
+  const badgeColor = useMemo(() => {
+    switch (status) {
+      case 'healthy':
+        return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300'
+      case 'unhealthy':
+        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
+      default:
+        return 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300'
     }
   }, [status])
 
   return (
     <div
-      className={`${styles.healthCard} ${statusClassName}`}
+      className={cn(
+        'flex flex-col gap-2 rounded-md border border-border border-l-4 bg-card p-4 transition-shadow hover:shadow-md',
+        borderColor
+      )}
       data-testid={testId}
       role="article"
       aria-label={`${service} health status: ${statusLabel}`}
     >
-      <div className={styles.healthCardHeader}>
-        <h3 className={styles.healthCardTitle}>{service}</h3>
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="m-0 text-base font-medium text-foreground">{service}</h3>
         <span
-          className={`${styles.statusBadge} ${statusClassName}`}
+          className={cn(
+            'inline-flex items-center rounded-full px-2 py-1 text-xs font-medium capitalize',
+            badgeColor
+          )}
           aria-label={`Status: ${statusLabel}`}
         >
           {statusLabel}
         </span>
       </div>
-      {details && <p className={styles.healthCardDetails}>{details}</p>}
-      <p className={styles.healthCardTimestamp}>
+      {details && <p className="m-0 text-sm text-muted-foreground">{details}</p>}
+      <p className="m-0 text-xs text-muted-foreground/70">
         {formatDate(new Date(lastChecked), {
           hour: '2-digit',
           minute: '2-digit',
@@ -240,11 +257,22 @@ function MetricsCard({ title, data, unit = '', testId }: MetricsCardProps): Reac
   const trendIcon = useMemo(() => {
     switch (trend) {
       case 'up':
-        return '↑'
+        return '\u2191'
       case 'down':
-        return '↓'
+        return '\u2193'
       default:
-        return '→'
+        return '\u2192'
+    }
+  }, [trend])
+
+  const trendColor = useMemo(() => {
+    switch (trend) {
+      case 'up':
+        return 'text-red-500'
+      case 'down':
+        return 'text-emerald-500'
+      default:
+        return 'text-muted-foreground/70'
     }
   }, [trend])
 
@@ -262,37 +290,34 @@ function MetricsCard({ title, data, unit = '', testId }: MetricsCardProps): Reac
 
   return (
     <div
-      className={styles.metricsCard}
+      className="flex flex-col gap-2 rounded-md border border-border bg-card p-4 transition-shadow hover:shadow-md"
       data-testid={testId}
       role="article"
       aria-label={`${title}: ${formatNumber(currentValue)}${unit}`}
     >
-      <h3 className={styles.metricsCardTitle}>{title}</h3>
-      <div className={styles.metricsCardValue}>
-        <span className={styles.metricsValue}>
+      <h3 className="m-0 text-sm font-medium text-muted-foreground">{title}</h3>
+      <div className="flex items-baseline gap-2">
+        <span className="text-2xl font-bold text-foreground">
           {formatNumber(currentValue, { maximumFractionDigits: 2 })}
           {unit}
         </span>
-        <span
-          className={`${styles.metricsTrend} ${styles[`trend${trend.charAt(0).toUpperCase() + trend.slice(1)}`]}`}
-          aria-label={`Trend: ${trend}`}
-        >
+        <span className={cn('text-lg font-medium', trendColor)} aria-label={`Trend: ${trend}`}>
           {trendIcon}
         </span>
       </div>
       {sparklineData.length > 0 && (
-        <div className={styles.sparkline} aria-hidden="true">
+        <div className="flex h-10 items-end gap-0.5 py-1" aria-hidden="true">
           {sparklineData.map((point, index) => (
             <div
               key={index}
-              className={styles.sparklineBar}
+              className="flex-1 min-w-1 rounded-t-sm bg-primary opacity-70 transition-opacity hover:opacity-100"
               style={{ height: `${Math.max(point.height, 5)}%` }}
               title={`${formatNumber(point.value, { maximumFractionDigits: 2 })}${unit}`}
             />
           ))}
         </div>
       )}
-      <p className={styles.metricsCardAverage}>
+      <p className="m-0 text-xs text-muted-foreground/70">
         Avg: {formatNumber(averageValue, { maximumFractionDigits: 2 })}
         {unit}
       </p>
@@ -314,28 +339,43 @@ function ErrorsList({ errors, testId }: ErrorsListProps): React.ReactElement {
 
   if (errors.length === 0) {
     return (
-      <div className={styles.emptyErrors} data-testid={testId}>
-        <p>{t('common.noResults')}</p>
+      <div
+        className="flex items-center justify-center rounded-md bg-muted p-8 text-muted-foreground"
+        data-testid={testId}
+      >
+        <p className="m-0">{t('common.noResults')}</p>
       </div>
     )
   }
 
   return (
-    <ul className={styles.errorsList} data-testid={testId} aria-label={t('dashboard.recentErrors')}>
+    <ul
+      className="m-0 flex list-none flex-col gap-2 p-0"
+      data-testid={testId}
+      aria-label={t('dashboard.recentErrors')}
+    >
       {errors.map((error) => (
         <li
           key={error.id}
-          className={`${styles.errorItem} ${error.level === 'error' ? styles.errorLevelError : styles.errorLevelWarning}`}
+          className={cn(
+            'flex flex-col gap-1 rounded-md border border-border border-l-4 bg-card p-4',
+            error.level === 'error' ? 'border-l-red-500' : 'border-l-amber-500'
+          )}
           data-testid={`error-item-${error.id}`}
         >
-          <div className={styles.errorHeader}>
+          <div className="flex items-center justify-between gap-2">
             <span
-              className={`${styles.errorLevel} ${error.level === 'error' ? styles.levelError : styles.levelWarning}`}
+              className={cn(
+                'inline-flex items-center rounded px-2 py-1 text-xs font-bold',
+                error.level === 'error'
+                  ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
+                  : 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300'
+              )}
               aria-label={`Level: ${error.level}`}
             >
               {error.level.toUpperCase()}
             </span>
-            <span className={styles.errorTimestamp}>
+            <span className="text-xs text-muted-foreground/70">
               {formatDate(new Date(error.timestamp), {
                 month: 'short',
                 day: 'numeric',
@@ -344,11 +384,11 @@ function ErrorsList({ errors, testId }: ErrorsListProps): React.ReactElement {
               })}
             </span>
           </div>
-          <p className={styles.errorMessage}>{error.message}</p>
-          <div className={styles.errorMeta}>
-            <span className={styles.errorSource}>{error.source}</span>
+          <p className="m-0 text-sm leading-relaxed text-foreground">{error.message}</p>
+          <div className="flex gap-4 text-xs text-muted-foreground/70">
+            <span className="font-medium">{error.source}</span>
             {error.traceId && (
-              <span className={styles.errorTraceId} title="Trace ID">
+              <span className="font-mono" title="Trace ID">
                 {error.traceId.substring(0, 8)}...
               </span>
             )}
@@ -384,13 +424,16 @@ function TimeRangeSelector({
   )
 
   return (
-    <div className={styles.controlGroup} data-testid={testId}>
-      <label htmlFor="time-range-select" className={styles.controlLabel}>
+    <div className="flex items-center gap-2" data-testid={testId}>
+      <label
+        htmlFor="time-range-select"
+        className="whitespace-nowrap text-sm font-medium text-muted-foreground"
+      >
         {t('dashboard.timeRange')}
       </label>
       <select
         id="time-range-select"
-        className={styles.controlSelect}
+        className="min-w-[120px] rounded border border-border bg-background px-2 py-1 text-sm text-foreground hover:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
         value={value}
         onChange={handleChange}
         aria-label={t('dashboard.timeRange')}
@@ -430,13 +473,16 @@ function RefreshIntervalSelector({
   )
 
   return (
-    <div className={styles.controlGroup} data-testid={testId}>
-      <label htmlFor="refresh-interval-select" className={styles.controlLabel}>
+    <div className="flex items-center gap-2" data-testid={testId}>
+      <label
+        htmlFor="refresh-interval-select"
+        className="whitespace-nowrap text-sm font-medium text-muted-foreground"
+      >
         {t('dashboard.autoRefresh')}
       </label>
       <select
         id="refresh-interval-select"
-        className={styles.controlSelect}
+        className="min-w-[120px] rounded border border-border bg-background px-2 py-1 text-sm text-foreground hover:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
         value={value}
         onChange={handleChange}
         aria-label={t('dashboard.autoRefresh')}
@@ -474,23 +520,32 @@ function HealthAlerts({ healthStatuses, testId }: HealthAlertsProps): React.Reac
   }
 
   return (
-    <div className={styles.healthAlerts} data-testid={testId} role="alert" aria-live="polite">
-      <div className={styles.healthAlertsHeader}>
-        <span className={styles.alertIcon} aria-hidden="true">
+    <div
+      className="flex flex-col gap-2 rounded-md border border-red-500 border-l-4 bg-red-50 p-4 dark:bg-red-950/50"
+      data-testid={testId}
+      role="alert"
+      aria-live="polite"
+    >
+      <div className="flex items-center gap-2">
+        <span aria-hidden="true">
           <AlertTriangle size={18} />
         </span>
-        <h3 className={styles.healthAlertsTitle}>{t('dashboard.healthAlerts')}</h3>
+        <h3 className="m-0 text-base font-semibold text-red-700 dark:text-red-400">
+          {t('dashboard.healthAlerts')}
+        </h3>
       </div>
       {/* eslint-disable-next-line jsx-a11y/no-redundant-roles */}
-      <ul className={styles.alertsList} role="list">
+      <ul className="m-0 flex list-none flex-col gap-1 p-0" role="list">
         {unhealthyServices.map((health) => (
           <li
             key={health.service}
-            className={styles.alertItem}
+            className="flex flex-col gap-1 rounded bg-white/50 p-2 dark:bg-gray-800/50"
             data-testid={`health-alert-${health.service.toLowerCase().replace(/\s+/g, '-')}`}
           >
-            <span className={styles.alertServiceName}>{health.service}</span>
-            {health.details && <span className={styles.alertDetails}>{health.details}</span>}
+            <span className="text-sm font-semibold text-red-700 dark:text-red-400">
+              {health.service}
+            </span>
+            {health.details && <span className="text-sm text-foreground">{health.details}</span>}
           </li>
         ))}
       </ul>
@@ -580,8 +635,8 @@ export function DashboardPage({
   // Render loading state
   if (isLoading) {
     return (
-      <div className={styles.container} data-testid={testId}>
-        <div className={styles.loadingContainer}>
+      <div className="mx-auto max-w-[1400px] space-y-8 p-6 lg:p-8" data-testid={testId}>
+        <div className="flex min-h-[400px] items-center justify-center">
           <LoadingSpinner size="large" label={t('common.loading')} />
         </div>
       </div>
@@ -591,7 +646,7 @@ export function DashboardPage({
   // Render error state
   if (error) {
     return (
-      <div className={styles.container} data-testid={testId}>
+      <div className="mx-auto max-w-[1400px] space-y-8 p-6 lg:p-8" data-testid={testId}>
         <ErrorMessage
           error={error instanceof Error ? error : new Error(t('errors.generic'))}
           onRetry={() => refetch()}
@@ -601,11 +656,11 @@ export function DashboardPage({
   }
 
   return (
-    <div className={styles.container} data-testid={testId}>
+    <div className="mx-auto max-w-[1400px] space-y-8 p-6 lg:p-8" data-testid={testId}>
       {/* Page Header */}
-      <header className={styles.header}>
-        <h1 className={styles.title}>{t('dashboard.title')}</h1>
-        <div className={styles.controls} data-testid="dashboard-controls">
+      <header className="flex flex-wrap items-center justify-between gap-4">
+        <h1 className="m-0 text-2xl font-semibold text-foreground">{t('dashboard.title')}</h1>
+        <div className="flex flex-wrap items-center gap-4" data-testid="dashboard-controls">
           <TimeRangeSelector
             value={timeRange}
             onChange={handleTimeRangeChange}
@@ -623,11 +678,14 @@ export function DashboardPage({
       <HealthAlerts healthStatuses={healthStatuses} testId="health-alerts" />
 
       {/* System Health Section */}
-      <section className={styles.section} aria-labelledby="health-heading">
-        <h2 id="health-heading" className={styles.sectionTitle}>
+      <section className="flex flex-col gap-4" aria-labelledby="health-heading">
+        <h2 id="health-heading" className="m-0 text-lg font-semibold text-foreground">
           {t('dashboard.systemHealth')}
         </h2>
-        <div className={styles.healthGrid} data-testid="health-cards">
+        <div
+          className="grid grid-cols-[repeat(auto-fit,minmax(250px,1fr))] gap-4"
+          data-testid="health-cards"
+        >
           {healthStatuses.map((health, index) => (
             <HealthCard
               key={health.service}
@@ -642,11 +700,14 @@ export function DashboardPage({
       </section>
 
       {/* Metrics Section */}
-      <section className={styles.section} aria-labelledby="metrics-heading">
-        <h2 id="metrics-heading" className={styles.sectionTitle}>
+      <section className="flex flex-col gap-4" aria-labelledby="metrics-heading">
+        <h2 id="metrics-heading" className="m-0 text-lg font-semibold text-foreground">
           {t('dashboard.metrics')}
         </h2>
-        <div className={styles.metricsGrid} data-testid="metrics-cards">
+        <div
+          className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4"
+          data-testid="metrics-cards"
+        >
           <MetricsCard
             title={t('dashboard.requestRate')}
             data={metrics.requestRate}
@@ -675,8 +736,8 @@ export function DashboardPage({
       </section>
 
       {/* Recent Errors Section */}
-      <section className={styles.section} aria-labelledby="errors-heading">
-        <h2 id="errors-heading" className={styles.sectionTitle}>
+      <section className="flex flex-col gap-4" aria-labelledby="errors-heading">
+        <h2 id="errors-heading" className="m-0 text-lg font-semibold text-foreground">
           {t('dashboard.recentErrors')}
         </h2>
         <ErrorsList errors={recentErrors} testId="errors-list" />

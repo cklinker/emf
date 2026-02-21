@@ -9,7 +9,7 @@
 import React, { useCallback } from 'react'
 import { GripVertical, X } from 'lucide-react'
 import { useLayoutEditor, type EditorFieldPlacement } from './LayoutEditorContext'
-import styles from './LayoutFieldSlot.module.css'
+import { cn } from '@/lib/utils'
 
 export interface LayoutFieldSlotProps {
   fieldPlacement: EditorFieldPlacement
@@ -80,13 +80,16 @@ export function LayoutFieldSlot({
     setDragSource(null)
   }, [setDragSource])
 
-  const slotClasses = [styles.fieldSlot, isSelected ? styles.fieldSlotSelected : '']
-    .filter(Boolean)
-    .join(' ')
-
   return (
     <div
-      className={slotClasses}
+      className={cn(
+        'group relative mb-1 flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2 cursor-grab transition-all duration-150 motion-reduce:transition-none',
+        'hover:border-input',
+        'focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2',
+        'active:cursor-grabbing',
+        'max-md:px-2.5 max-md:py-1.5',
+        isSelected && 'border-primary bg-primary/5 shadow-[0_0_0_2px_rgba(37,99,235,0.15)]'
+      )}
       onClick={handleClick}
       onKeyDown={handleKeyDown}
       role="button"
@@ -94,7 +97,7 @@ export function LayoutFieldSlot({
       data-testid={`layout-field-slot-${fieldPlacement.id}`}
     >
       <div
-        className={styles.fieldDragHandle}
+        className="flex shrink-0 items-center text-input cursor-grab active:cursor-grabbing"
         draggable
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
@@ -103,21 +106,31 @@ export function LayoutFieldSlot({
         <GripVertical size={14} />
       </div>
 
-      <div className={styles.fieldInfo}>
-        <span className={styles.fieldName}>{displayName}</span>
+      <div className="flex flex-1 flex-col gap-0.5 overflow-hidden min-w-0">
+        <span className="text-[13px] text-foreground whitespace-nowrap overflow-hidden text-ellipsis">
+          {displayName}
+        </span>
         {fieldPlacement.fieldType && (
-          <span className={styles.fieldType}>{fieldPlacement.fieldType}</span>
+          <span className="text-[11px] text-muted-foreground">{fieldPlacement.fieldType}</span>
         )}
       </div>
 
-      <div className={styles.fieldBadges}>
-        {fieldPlacement.requiredOnLayout && <span className={styles.requiredBadge}>Required</span>}
-        {fieldPlacement.readOnlyOnLayout && <span className={styles.readOnlyBadge}>Read-only</span>}
+      <div className="flex shrink-0 gap-1">
+        {fieldPlacement.requiredOnLayout && (
+          <span className="rounded-sm bg-destructive/10 px-1 py-px text-[10px] text-destructive">
+            Required
+          </span>
+        )}
+        {fieldPlacement.readOnlyOnLayout && (
+          <span className="rounded-sm bg-muted px-1 py-px text-[10px] text-muted-foreground">
+            Read-only
+          </span>
+        )}
       </div>
 
       <button
         type="button"
-        className={styles.deleteFieldButton}
+        className="flex h-5 w-5 items-center justify-center rounded border-none bg-transparent p-0 text-destructive cursor-pointer opacity-0 transition-opacity duration-150 group-hover:opacity-100 hover:bg-destructive/10 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-destructive focus-visible:outline-offset-2 motion-reduce:transition-none"
         onClick={handleDelete}
         aria-label={`Remove ${displayName}`}
         title="Remove field"

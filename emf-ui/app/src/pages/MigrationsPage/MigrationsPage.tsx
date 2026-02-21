@@ -23,7 +23,7 @@ import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
 import { LoadingSpinner, ErrorMessage } from '../../components'
 import type { ApiClient } from '../../services/apiClient'
-import styles from './MigrationsPage.module.css'
+import { cn } from '@/lib/utils'
 
 /**
  * Migration run status type
@@ -217,10 +217,19 @@ function StatusBadge({ status }: StatusBadgeProps): React.ReactElement {
     rolled_back: t('migrations.status.rolledBack'),
   }
 
-  const statusClass = status.replace('_', '')
+  const statusColorMap: Record<MigrationStatus, string> = {
+    pending: 'text-amber-800 bg-amber-50 dark:text-amber-300 dark:bg-amber-950',
+    running: 'text-blue-800 bg-blue-50 dark:text-blue-300 dark:bg-blue-950',
+    completed: 'text-green-800 bg-green-50 dark:text-green-300 dark:bg-green-950',
+    failed: 'text-red-600 bg-red-50 dark:text-red-400 dark:bg-red-950',
+    rolled_back: 'text-purple-800 bg-purple-50 dark:text-purple-300 dark:bg-purple-950',
+  }
   return (
     <span
-      className={`${styles.statusBadge} ${styles[`status${statusClass.charAt(0).toUpperCase() + statusClass.slice(1)}`]}`}
+      className={cn(
+        'inline-flex items-center rounded-full px-2 py-1 text-xs font-medium',
+        statusColorMap[status]
+      )}
       data-testid="status-badge"
     >
       {statusLabels[status] || status}
@@ -244,9 +253,18 @@ function StepStatusBadge({ status }: StepStatusBadgeProps): React.ReactElement {
     failed: t('migrations.status.failed'),
   }
 
+  const stepStatusColorMap: Record<string, string> = {
+    pending: 'text-amber-800 bg-amber-50 dark:text-amber-300 dark:bg-amber-950',
+    running: 'text-blue-800 bg-blue-50 dark:text-blue-300 dark:bg-blue-950',
+    completed: 'text-green-800 bg-green-50 dark:text-green-300 dark:bg-green-950',
+    failed: 'text-red-600 bg-red-50 dark:text-red-400 dark:bg-red-950',
+  }
   return (
     <span
-      className={`${styles.stepStatusBadge} ${styles[`stepStatus${status.charAt(0).toUpperCase() + status.slice(1)}`]}`}
+      className={cn(
+        'inline-flex items-center rounded px-2 py-1 text-xs font-medium',
+        stepStatusColorMap[status]
+      )}
       data-testid="step-status-badge"
     >
       {statusLabels[status] || status}
@@ -270,9 +288,18 @@ function RiskBadge({ level }: RiskBadgeProps): React.ReactElement {
     high: t('migrations.riskLevels.high'),
   }
 
+  const riskColorMap: Record<string, string> = {
+    low: 'text-emerald-700 bg-emerald-100 dark:text-emerald-300 dark:bg-emerald-900/40',
+    medium: 'text-amber-700 bg-amber-100 dark:text-amber-300 dark:bg-amber-900/40',
+    high: 'text-red-700 bg-red-100 dark:text-red-300 dark:bg-red-900/40',
+  }
+
   return (
     <span
-      className={`${styles.riskBadge} ${styles[`risk${level.charAt(0).toUpperCase() + level.slice(1)}`]}`}
+      className={cn(
+        'inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold',
+        riskColorMap[level]
+      )}
       data-testid="risk-badge"
     >
       {levelLabels[level] || level}
@@ -317,7 +344,7 @@ function MigrationPlanDisplay({
 
   return (
     <div
-      className={styles.modalOverlay}
+      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 p-4"
       onClick={onClose}
       onKeyDown={(e) => e.key === 'Escape' && onClose()}
       role="presentation"
@@ -325,20 +352,20 @@ function MigrationPlanDisplay({
     >
       {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
       <div
-        className={styles.modalContent}
+        className="w-full max-w-[600px] max-h-[90vh] overflow-y-auto rounded-lg bg-card shadow-xl"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-labelledby="migration-plan-title"
       >
-        <div className={styles.modalHeader}>
-          <h2 id="migration-plan-title" className={styles.modalTitle}>
+        <div className="flex items-center justify-between border-b border-border p-6">
+          <h2 id="migration-plan-title" className="m-0 text-lg font-semibold text-foreground">
             {t('migrations.planDetails')}
           </h2>
           <button
             type="button"
-            className={styles.closeButton}
+            className="flex h-8 w-8 items-center justify-center rounded-md border-none bg-transparent text-xl text-muted-foreground hover:bg-muted hover:text-foreground"
             onClick={onClose}
             aria-label={t('common.close')}
             data-testid="close-plan-button"
@@ -347,28 +374,40 @@ function MigrationPlanDisplay({
           </button>
         </div>
 
-        <div className={styles.modalBody}>
+        <div className="p-6">
           {/* Overview Section */}
-          <div className={styles.detailsSection}>
-            <h3 className={styles.detailsSectionTitle}>{t('migrations.overview')}</h3>
-            <div className={styles.detailsGrid}>
-              <div className={styles.detailItem}>
-                <span className={styles.detailLabel}>{t('migrations.collection')}</span>
-                <span className={styles.detailValue}>{plan.collectionName}</span>
+          <div className="mb-6">
+            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+              {t('migrations.overview')}
+            </h3>
+            <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
+              <div className="flex flex-col gap-1">
+                <span className="text-xs font-medium text-muted-foreground">
+                  {t('migrations.collection')}
+                </span>
+                <span className="text-sm text-foreground">{plan.collectionName}</span>
               </div>
-              <div className={styles.detailItem}>
-                <span className={styles.detailLabel}>{t('migrations.versionChange')}</span>
-                <span className={styles.detailValue}>
+              <div className="flex flex-col gap-1">
+                <span className="text-xs font-medium text-muted-foreground">
+                  {t('migrations.versionChange')}
+                </span>
+                <span className="text-sm text-foreground">
                   v{plan.fromVersion} → v{plan.toVersion}
                 </span>
               </div>
-              <div className={styles.detailItem}>
-                <span className={styles.detailLabel}>{t('migrations.estimatedDuration')}</span>
-                <span className={styles.detailValue}>{formatDuration(plan.estimatedDuration)}</span>
+              <div className="flex flex-col gap-1">
+                <span className="text-xs font-medium text-muted-foreground">
+                  {t('migrations.estimatedDuration')}
+                </span>
+                <span className="text-sm text-foreground">
+                  {formatDuration(plan.estimatedDuration)}
+                </span>
               </div>
-              <div className={styles.detailItem}>
-                <span className={styles.detailLabel}>{t('migrations.recordsAffected')}</span>
-                <span className={styles.detailValue}>
+              <div className="flex flex-col gap-1">
+                <span className="text-xs font-medium text-muted-foreground">
+                  {t('migrations.recordsAffected')}
+                </span>
+                <span className="text-sm text-foreground">
                   {plan.estimatedRecordsAffected.toLocaleString()}
                 </span>
               </div>
@@ -376,39 +415,47 @@ function MigrationPlanDisplay({
           </div>
 
           {/* Steps Section - Requirement 10.3 */}
-          <div className={styles.detailsSection} data-testid="plan-steps-section">
-            <h3 className={styles.detailsSectionTitle}>
+          <div className="mb-6" data-testid="plan-steps-section">
+            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
               {t('migrations.steps')} ({plan.steps.length})
             </h3>
             {plan.steps.length === 0 ? (
-              <p className={styles.noSteps}>{t('migrations.noSteps')}</p>
+              <p className="text-sm italic text-muted-foreground">{t('migrations.noSteps')}</p>
             ) : (
-              <div className={styles.stepsList} data-testid="plan-steps-list">
+              <div className="flex flex-col gap-3" data-testid="plan-steps-list">
                 {plan.steps.map((step) => (
                   <div
                     key={step.order}
-                    className={styles.stepItem}
+                    className="rounded-md border border-border bg-muted/30 p-3"
                     data-testid={`plan-step-${step.order}`}
                   >
-                    <div className={styles.stepHeader}>
-                      <span className={styles.stepNumber}>{step.order}</span>
-                      <span className={styles.stepOperation}>{step.operation}</span>
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                        {step.order}
+                      </span>
+                      <span className="text-sm font-medium text-foreground">{step.operation}</span>
                       {step.reversible ? (
-                        <span className={styles.reversibleBadge} data-testid="reversible-badge">
+                        <span
+                          className="inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold text-emerald-700 bg-emerald-100 dark:text-emerald-300 dark:bg-emerald-900/40"
+                          data-testid="reversible-badge"
+                        >
                           {t('migrations.reversible')}
                         </span>
                       ) : (
-                        <span className={styles.irreversibleBadge} data-testid="irreversible-badge">
+                        <span
+                          className="inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold text-red-700 bg-red-100 dark:text-red-300 dark:bg-red-900/40"
+                          data-testid="irreversible-badge"
+                        >
                           {t('migrations.irreversible')}
                         </span>
                       )}
                     </div>
                     {step.details && Object.keys(step.details).length > 0 && (
-                      <div className={styles.stepDetails}>
+                      <div className="mt-2 space-y-1 border-t border-border pt-2">
                         {Object.entries(step.details).map(([key, value]) => (
-                          <div key={key} className={styles.stepDetailItem}>
-                            <span className={styles.stepDetailKey}>{key}:</span>
-                            <span className={styles.stepDetailValue}>
+                          <div key={key} className="flex gap-2 text-xs">
+                            <span className="font-medium text-muted-foreground">{key}:</span>
+                            <span className="text-foreground">
                               {typeof value === 'object' ? JSON.stringify(value) : String(value)}
                             </span>
                           </div>
@@ -422,20 +469,24 @@ function MigrationPlanDisplay({
           </div>
 
           {/* Risks Section - Requirement 10.4 */}
-          <div className={styles.detailsSection} data-testid="plan-risks-section">
-            <h3 className={styles.detailsSectionTitle}>
+          <div className="mb-6" data-testid="plan-risks-section">
+            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
               {t('migrations.risks')} ({plan.risks.length})
             </h3>
             {plan.risks.length === 0 ? (
-              <p className={styles.noRisks} data-testid="no-risks">
+              <p className="text-sm italic text-muted-foreground" data-testid="no-risks">
                 {t('migrations.noRisks')}
               </p>
             ) : (
-              <div className={styles.risksList} data-testid="plan-risks-list">
+              <div className="flex flex-col gap-2" data-testid="plan-risks-list">
                 {plan.risks.map((risk, index) => (
-                  <div key={index} className={styles.riskItem} data-testid={`plan-risk-${index}`}>
+                  <div
+                    key={index}
+                    className="flex items-center gap-3 rounded-md border border-border p-3"
+                    data-testid={`plan-risk-${index}`}
+                  >
                     <RiskBadge level={risk.level} />
-                    <span className={styles.riskDescription}>{risk.description}</span>
+                    <span className="text-sm text-foreground">{risk.description}</span>
                   </div>
                 ))}
               </div>
@@ -443,10 +494,10 @@ function MigrationPlanDisplay({
           </div>
         </div>
 
-        <div className={styles.modalFooter}>
+        <div className="flex items-center justify-end gap-3 border-t border-border p-6">
           <button
             type="button"
-            className={styles.secondaryButton}
+            className="rounded-md border border-border bg-background px-5 py-2.5 text-sm font-medium text-foreground hover:bg-muted"
             onClick={onClose}
             data-testid="close-plan-details-button"
           >
@@ -454,7 +505,7 @@ function MigrationPlanDisplay({
           </button>
           <button
             type="button"
-            className={styles.primaryButton}
+            className="inline-flex items-center gap-2 rounded-md bg-primary px-6 py-3 text-base font-medium text-primary-foreground hover:bg-primary/90"
             onClick={handleExecute}
             data-testid="execute-migration-button"
           >
@@ -583,30 +634,37 @@ function MigrationExecutionModal({
 
   return (
     <div
-      className={styles.modalOverlay}
+      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="migration-execution-title"
       data-testid="migration-execution-modal"
     >
-      <div className={styles.modalContent} role="document">
-        <div className={styles.modalHeader}>
-          <h2 id="migration-execution-title" className={styles.modalTitle}>
+      <div
+        className="w-full max-w-[600px] max-h-[90vh] overflow-y-auto rounded-lg bg-card shadow-xl"
+        role="document"
+      >
+        <div className="flex items-center justify-between border-b border-border p-6">
+          <h2 id="migration-execution-title" className="m-0 text-lg font-semibold text-foreground">
             {t('migrations.executingMigration')}
           </h2>
         </div>
 
-        <div className={styles.modalBody}>
+        <div className="p-6">
           {/* Overview */}
-          <div className={styles.detailsSection}>
-            <div className={styles.detailsGrid}>
-              <div className={styles.detailItem}>
-                <span className={styles.detailLabel}>{t('migrations.collection')}</span>
-                <span className={styles.detailValue}>{plan.collectionName}</span>
+          <div className="mb-6">
+            <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
+              <div className="flex flex-col gap-1">
+                <span className="text-xs font-medium text-muted-foreground">
+                  {t('migrations.collection')}
+                </span>
+                <span className="text-sm text-foreground">{plan.collectionName}</span>
               </div>
-              <div className={styles.detailItem}>
-                <span className={styles.detailLabel}>{t('migrations.versionChange')}</span>
-                <span className={styles.detailValue}>
+              <div className="flex flex-col gap-1">
+                <span className="text-xs font-medium text-muted-foreground">
+                  {t('migrations.versionChange')}
+                </span>
+                <span className="text-sm text-foreground">
                   v{plan.fromVersion} → v{plan.toVersion}
                 </span>
               </div>
@@ -615,9 +673,12 @@ function MigrationExecutionModal({
 
           {/* Execution Error - Requirement 10.6 */}
           {executeMutation.isError && (
-            <div className={styles.errorBox} data-testid="execution-error">
-              <span className={styles.errorLabel}>{t('common.error')}:</span>
-              <span className={styles.errorText}>
+            <div
+              className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 p-4"
+              data-testid="execution-error"
+            >
+              <span className="font-semibold text-destructive">{t('common.error')}:</span>
+              <span className="ml-2 text-sm text-destructive">
                 {(executeMutation.error as Error)?.message || t('migrations.executionFailed')}
               </span>
             </div>
@@ -625,29 +686,39 @@ function MigrationExecutionModal({
 
           {/* Progress Section - Requirement 10.5 */}
           {(isPolling || currentRun) && (
-            <div className={styles.detailsSection} data-testid="execution-progress-section">
-              <h3 className={styles.detailsSectionTitle}>{t('migrations.progress')}</h3>
+            <div className="mb-6" data-testid="execution-progress-section">
+              <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                {t('migrations.progress')}
+              </h3>
 
               {/* Progress Bar */}
-              <div className={styles.progressContainer} data-testid="progress-container">
-                <div className={styles.progressBar}>
+              <div className="mb-4 flex items-center gap-3" data-testid="progress-container">
+                <div className="relative h-2.5 flex-1 overflow-hidden rounded-full bg-muted">
                   <div
-                    className={`${styles.progressFill} ${
-                      currentRun?.status === 'failed' ? styles.progressFailed : ''
-                    } ${currentRun?.status === 'completed' ? styles.progressCompleted : ''}`}
+                    className={cn(
+                      'h-full rounded-full transition-all duration-300',
+                      currentRun?.status === 'failed'
+                        ? 'bg-destructive'
+                        : currentRun?.status === 'completed'
+                          ? 'bg-emerald-500'
+                          : 'bg-primary'
+                    )}
                     style={{ width: `${progressPercentage}%` }}
                     data-testid="progress-fill"
                   />
                 </div>
-                <span className={styles.progressText} data-testid="progress-text">
+                <span
+                  className="text-sm font-medium text-muted-foreground"
+                  data-testid="progress-text"
+                >
                   {progressPercentage}%
                 </span>
               </div>
 
               {/* Status */}
-              <div className={styles.executionStatus} data-testid="execution-status">
+              <div className="mb-4" data-testid="execution-status">
                 {currentRun?.status === 'running' && currentStep && (
-                  <div className={styles.currentStepInfo}>
+                  <div className="flex items-center gap-2 text-sm text-foreground">
                     <LoadingSpinner size="small" />
                     <span>
                       {t('migrations.executingStep', {
@@ -659,20 +730,29 @@ function MigrationExecutionModal({
                   </div>
                 )}
                 {currentRun?.status === 'completed' && (
-                  <div className={styles.successMessage} data-testid="success-message">
-                    <span className={styles.successIcon}>✓</span>
+                  <div
+                    className="flex items-center gap-2 text-sm font-medium text-emerald-600 dark:text-emerald-400"
+                    data-testid="success-message"
+                  >
+                    <span className="text-lg">✓</span>
                     <span>{t('migrations.executionCompleted')}</span>
                   </div>
                 )}
                 {currentRun?.status === 'failed' && (
-                  <div className={styles.failureMessage} data-testid="failure-message">
-                    <span className={styles.failureIcon}>✗</span>
+                  <div
+                    className="flex items-center gap-2 text-sm font-medium text-destructive"
+                    data-testid="failure-message"
+                  >
+                    <span className="text-lg">✗</span>
                     <span>{t('migrations.executionFailed')}</span>
                   </div>
                 )}
                 {currentRun?.status === 'rolled_back' && (
-                  <div className={styles.rolledBackMessage} data-testid="rolled-back-message">
-                    <span className={styles.rolledBackIcon}>↩</span>
+                  <div
+                    className="flex items-center gap-2 text-sm font-medium text-purple-600 dark:text-purple-400"
+                    data-testid="rolled-back-message"
+                  >
+                    <span className="text-lg">↩</span>
                     <span>{t('migrations.rollbackCompleted')}</span>
                   </div>
                 )}
@@ -680,25 +760,34 @@ function MigrationExecutionModal({
 
               {/* Steps Progress */}
               {currentRun && currentRun.steps.length > 0 && (
-                <div className={styles.stepsProgress} data-testid="steps-progress">
+                <div className="flex flex-col gap-2" data-testid="steps-progress">
                   {currentRun.steps.map((step) => (
                     <div
                       key={step.stepOrder}
-                      className={`${styles.stepProgressItem} ${
-                        step.status === 'completed' ? styles.stepCompleted : ''
-                      } ${step.status === 'running' ? styles.stepRunning : ''} ${
-                        step.status === 'failed' ? styles.stepFailed : ''
-                      }`}
+                      className={cn(
+                        'rounded-md border p-3',
+                        step.status === 'completed'
+                          ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30'
+                          : step.status === 'running'
+                            ? 'border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30'
+                            : step.status === 'failed'
+                              ? 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/30'
+                              : 'border-border bg-muted/30'
+                      )}
                       data-testid={`step-progress-${step.stepOrder}`}
                     >
-                      <div className={styles.stepProgressHeader}>
-                        <span className={styles.stepProgressNumber}>{step.stepOrder}</span>
-                        <span className={styles.stepProgressOperation}>{step.operation}</span>
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground">
+                          {step.stepOrder}
+                        </span>
+                        <span className="text-sm font-medium text-foreground">
+                          {step.operation}
+                        </span>
                         <StepStatusBadge status={step.status} />
                       </div>
                       {step.error && (
                         <div
-                          className={styles.stepProgressError}
+                          className="mt-2 text-xs text-destructive"
                           data-testid={`step-error-${step.stepOrder}`}
                         >
                           {step.error}
@@ -711,17 +800,25 @@ function MigrationExecutionModal({
 
               {/* Error Details - Requirement 10.6 */}
               {currentRun?.error && (
-                <div className={styles.errorBox} data-testid="migration-run-error">
-                  <span className={styles.errorLabel}>{t('common.error')}:</span>
-                  <span className={styles.errorText}>{currentRun.error}</span>
+                <div
+                  className="mt-4 rounded-md border border-destructive/30 bg-destructive/10 p-4"
+                  data-testid="migration-run-error"
+                >
+                  <span className="font-semibold text-destructive">{t('common.error')}:</span>
+                  <span className="ml-2 text-sm text-destructive">{currentRun.error}</span>
                 </div>
               )}
 
               {/* Rollback Error */}
               {rollbackMutation.isError && (
-                <div className={styles.errorBox} data-testid="rollback-error">
-                  <span className={styles.errorLabel}>{t('migrations.rollbackFailed')}:</span>
-                  <span className={styles.errorText}>
+                <div
+                  className="mt-4 rounded-md border border-destructive/30 bg-destructive/10 p-4"
+                  data-testid="rollback-error"
+                >
+                  <span className="font-semibold text-destructive">
+                    {t('migrations.rollbackFailed')}:
+                  </span>
+                  <span className="ml-2 text-sm text-destructive">
                     {(rollbackMutation.error as Error)?.message || t('errors.generic')}
                   </span>
                 </div>
@@ -731,18 +828,21 @@ function MigrationExecutionModal({
 
           {/* Loading state while starting */}
           {executeMutation.isPending && !currentRun && (
-            <div className={styles.loadingContainer} data-testid="starting-execution">
+            <div
+              className="flex min-h-[200px] items-center justify-center"
+              data-testid="starting-execution"
+            >
               <LoadingSpinner label={t('migrations.startingExecution')} />
             </div>
           )}
         </div>
 
-        <div className={styles.modalFooter}>
+        <div className="flex items-center justify-end gap-3 border-t border-border p-6">
           {/* Rollback Button - Requirement 10.7 */}
           {canRollback && (
             <button
               type="button"
-              className={styles.dangerButton}
+              className="rounded-md bg-destructive px-5 py-2.5 text-sm font-medium text-destructive-foreground hover:bg-destructive/90"
               onClick={handleRollback}
               disabled={rollbackMutation.isPending}
               data-testid="rollback-button"
@@ -753,7 +853,7 @@ function MigrationExecutionModal({
 
           <button
             type="button"
-            className={styles.primaryButton}
+            className="inline-flex items-center gap-2 rounded-md bg-primary px-6 py-3 text-base font-medium text-primary-foreground hover:bg-primary/90"
             onClick={handleClose}
             disabled={isPolling && currentRun?.status === 'running'}
             data-testid="close-execution-button"
@@ -846,7 +946,7 @@ function MigrationPlanningForm({
 
   return (
     <div
-      className={styles.modalOverlay}
+      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 p-4"
       onClick={onClose}
       onKeyDown={(e) => e.key === 'Escape' && onClose()}
       role="presentation"
@@ -854,20 +954,20 @@ function MigrationPlanningForm({
     >
       {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
       <div
-        className={styles.modalContent}
+        className="w-full max-w-[600px] max-h-[90vh] overflow-y-auto rounded-lg bg-card shadow-xl"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-labelledby="plan-migration-title"
       >
-        <div className={styles.modalHeader}>
-          <h2 id="plan-migration-title" className={styles.modalTitle}>
+        <div className="flex items-center justify-between border-b border-border p-6">
+          <h2 id="plan-migration-title" className="m-0 text-lg font-semibold text-foreground">
             {t('migrations.planMigration')}
           </h2>
           <button
             type="button"
-            className={styles.closeButton}
+            className="flex h-8 w-8 items-center justify-center rounded-md border-none bg-transparent text-xl text-muted-foreground hover:bg-muted hover:text-foreground"
             onClick={onClose}
             aria-label={t('common.close')}
             data-testid="close-planning-button"
@@ -877,30 +977,33 @@ function MigrationPlanningForm({
         </div>
 
         <form onSubmit={handleSubmit}>
-          <div className={styles.modalBody}>
+          <div className="p-6">
             {collectionsLoading && (
-              <div className={styles.loadingContainer}>
+              <div className="flex min-h-[200px] items-center justify-center">
                 <LoadingSpinner label={t('common.loading')} />
               </div>
             )}
 
             {collectionsError && (
-              <div className={styles.errorContainer}>
+              <div className="py-4">
                 <ErrorMessage error={collectionsError as Error} />
               </div>
             )}
 
             {!collectionsLoading && !collectionsError && (
-              <div className={styles.formFields}>
+              <div className="flex flex-col gap-5">
                 {/* Collection Selection - Requirement 10.2 */}
-                <div className={styles.formField}>
-                  <label htmlFor="collection-select" className={styles.formLabel}>
+                <div className="flex flex-col gap-2">
+                  <label
+                    htmlFor="collection-select"
+                    className="text-sm font-medium text-foreground"
+                  >
                     {t('migrations.selectCollection')}
-                    <span className={styles.requiredMark}>*</span>
+                    <span className="ml-0.5 text-destructive">*</span>
                   </label>
                   <select
                     id="collection-select"
-                    className={styles.formSelect}
+                    className="rounded-md border border-border bg-background px-3.5 py-2.5 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/10"
                     value={selectedCollectionId}
                     onChange={handleCollectionChange}
                     data-testid="collection-select"
@@ -913,20 +1016,23 @@ function MigrationPlanningForm({
                       </option>
                     ))}
                   </select>
-                  <span id="collection-hint" className={styles.formHint}>
+                  <span id="collection-hint" className="text-xs text-muted-foreground">
                     {t('migrations.selectCollectionHint')}
                   </span>
                 </div>
 
                 {/* Target Version Selection - Requirement 10.2 */}
-                <div className={styles.formField}>
-                  <label htmlFor="target-version-select" className={styles.formLabel}>
+                <div className="flex flex-col gap-2">
+                  <label
+                    htmlFor="target-version-select"
+                    className="text-sm font-medium text-foreground"
+                  >
                     {t('migrations.targetVersion')}
-                    <span className={styles.requiredMark}>*</span>
+                    <span className="ml-0.5 text-destructive">*</span>
                   </label>
                   <select
                     id="target-version-select"
-                    className={styles.formSelect}
+                    className="rounded-md border border-border bg-background px-3.5 py-2.5 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
                     value={targetVersion}
                     onChange={handleTargetVersionChange}
                     disabled={!selectedCollectionId || availableTargetVersions.length === 0}
@@ -940,7 +1046,7 @@ function MigrationPlanningForm({
                       </option>
                     ))}
                   </select>
-                  <span id="target-version-hint" className={styles.formHint}>
+                  <span id="target-version-hint" className="text-xs text-muted-foreground">
                     {selectedCollection
                       ? t('migrations.currentVersionHint', {
                           version: String(selectedCollection.currentVersion),
@@ -948,7 +1054,10 @@ function MigrationPlanningForm({
                       : t('migrations.selectCollectionFirst')}
                   </span>
                   {selectedCollectionId && availableTargetVersions.length === 0 && (
-                    <span className={styles.formWarning} data-testid="no-versions-warning">
+                    <span
+                      className="text-xs text-amber-600 dark:text-amber-400"
+                      data-testid="no-versions-warning"
+                    >
                       {t('migrations.noOtherVersions')}
                     </span>
                   )}
@@ -956,9 +1065,14 @@ function MigrationPlanningForm({
 
                 {/* Current Selection Summary */}
                 {selectedCollection && targetVersion !== '' && (
-                  <div className={styles.selectionSummary} data-testid="selection-summary">
-                    <span className={styles.summaryLabel}>{t('migrations.plannedChange')}:</span>
-                    <span className={styles.summaryValue}>
+                  <div
+                    className="rounded-md border border-primary/20 bg-primary/5 p-3"
+                    data-testid="selection-summary"
+                  >
+                    <span className="text-xs font-medium text-muted-foreground">
+                      {t('migrations.plannedChange')}:
+                    </span>
+                    <span className="ml-2 text-sm font-medium text-foreground">
                       {selectedCollection.displayName || selectedCollection.name}: v
                       {selectedCollection.currentVersion} → v{targetVersion}
                     </span>
@@ -967,7 +1081,10 @@ function MigrationPlanningForm({
 
                 {/* Error Display */}
                 {planMutation.error && (
-                  <div className={styles.errorBox} data-testid="plan-error">
+                  <div
+                    className="rounded-md border border-destructive/30 bg-destructive/10 p-4"
+                    data-testid="plan-error"
+                  >
                     <ErrorMessage error={planMutation.error as Error} />
                   </div>
                 )}
@@ -975,10 +1092,10 @@ function MigrationPlanningForm({
             )}
           </div>
 
-          <div className={styles.modalFooter}>
+          <div className="flex items-center justify-end gap-3 border-t border-border p-6">
             <button
               type="button"
-              className={styles.secondaryButton}
+              className="rounded-md border border-border bg-background px-5 py-2.5 text-sm font-medium text-foreground hover:bg-muted"
               onClick={onClose}
               data-testid="cancel-planning-button"
             >
@@ -986,7 +1103,7 @@ function MigrationPlanningForm({
             </button>
             <button
               type="submit"
-              className={styles.primaryButton}
+              className="inline-flex items-center gap-2 rounded-md bg-primary px-6 py-3 text-base font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
               disabled={!isFormValid || planMutation.isPending}
               data-testid="create-plan-button"
             >
@@ -1056,7 +1173,7 @@ function MigrationRunDetails({
 
   return (
     <div
-      className={styles.modalOverlay}
+      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 p-4"
       onClick={onClose}
       onKeyDown={handleKeyDown}
       role="presentation"
@@ -1064,20 +1181,20 @@ function MigrationRunDetails({
     >
       {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
       <div
-        className={styles.modalContent}
+        className="w-full max-w-[600px] max-h-[90vh] overflow-y-auto rounded-lg bg-card shadow-xl"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-labelledby="migration-details-title"
       >
-        <div className={styles.modalHeader}>
-          <h2 id="migration-details-title" className={styles.modalTitle}>
+        <div className="flex items-center justify-between border-b border-border p-6">
+          <h2 id="migration-details-title" className="m-0 text-lg font-semibold text-foreground">
             {t('migrations.runDetails')}
           </h2>
           <button
             type="button"
-            className={styles.closeButton}
+            className="flex h-8 w-8 items-center justify-center rounded-md border-none bg-transparent text-xl text-muted-foreground hover:bg-muted hover:text-foreground"
             onClick={onClose}
             aria-label={t('common.close')}
             data-testid="close-details-button"
@@ -1086,48 +1203,60 @@ function MigrationRunDetails({
           </button>
         </div>
 
-        <div className={styles.modalBody}>
+        <div className="p-6">
           {isLoading && (
-            <div className={styles.loadingContainer}>
+            <div className="flex min-h-[200px] items-center justify-center">
               <LoadingSpinner label={t('common.loading')} />
             </div>
           )}
 
           {error && (
-            <div className={styles.errorContainer}>
+            <div className="py-4">
               <ErrorMessage error={error as Error} />
             </div>
           )}
 
           {migration && (
             <>
-              <div className={styles.detailsSection}>
-                <h3 className={styles.detailsSectionTitle}>{t('migrations.overview')}</h3>
-                <div className={styles.detailsGrid}>
-                  <div className={styles.detailItem}>
-                    <span className={styles.detailLabel}>{t('migrations.collection')}</span>
-                    <span className={styles.detailValue}>{migration.collectionName}</span>
+              <div className="mb-6">
+                <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                  {t('migrations.overview')}
+                </h3>
+                <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs font-medium text-muted-foreground">
+                      {t('migrations.collection')}
+                    </span>
+                    <span className="text-sm text-foreground">{migration.collectionName}</span>
                   </div>
-                  <div className={styles.detailItem}>
-                    <span className={styles.detailLabel}>{t('migrations.versionChange')}</span>
-                    <span className={styles.detailValue}>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs font-medium text-muted-foreground">
+                      {t('migrations.versionChange')}
+                    </span>
+                    <span className="text-sm text-foreground">
                       v{migration.fromVersion} → v{migration.toVersion}
                     </span>
                   </div>
-                  <div className={styles.detailItem}>
-                    <span className={styles.detailLabel}>{t('packages.status')}</span>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs font-medium text-muted-foreground">
+                      {t('packages.status')}
+                    </span>
                     <StatusBadge status={migration.status} />
                   </div>
-                  <div className={styles.detailItem}>
-                    <span className={styles.detailLabel}>{t('migrations.duration')}</span>
-                    <span className={styles.detailValue}>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs font-medium text-muted-foreground">
+                      {t('migrations.duration')}
+                    </span>
+                    <span className="text-sm text-foreground">
                       {calculateDuration(migration.startedAt, migration.completedAt)}
                     </span>
                   </div>
                   {migration.startedAt && (
-                    <div className={styles.detailItem}>
-                      <span className={styles.detailLabel}>{t('migrations.startedAt')}</span>
-                      <span className={styles.detailValue}>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs font-medium text-muted-foreground">
+                        {t('migrations.startedAt')}
+                      </span>
+                      <span className="text-sm text-foreground">
                         {formatDate(new Date(migration.startedAt), {
                           year: 'numeric',
                           month: 'short',
@@ -1140,9 +1269,11 @@ function MigrationRunDetails({
                     </div>
                   )}
                   {migration.completedAt && (
-                    <div className={styles.detailItem}>
-                      <span className={styles.detailLabel}>{t('migrations.completedAt')}</span>
-                      <span className={styles.detailValue}>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs font-medium text-muted-foreground">
+                        {t('migrations.completedAt')}
+                      </span>
+                      <span className="text-sm text-foreground">
                         {formatDate(new Date(migration.completedAt), {
                           year: 'numeric',
                           month: 'short',
@@ -1157,38 +1288,45 @@ function MigrationRunDetails({
                 </div>
 
                 {migration.error && (
-                  <div className={styles.errorBox} data-testid="migration-error">
-                    <span className={styles.errorLabel}>{t('common.error')}:</span>
-                    <span className={styles.errorText}>{migration.error}</span>
+                  <div
+                    className="mt-4 rounded-md border border-destructive/30 bg-destructive/10 p-4"
+                    data-testid="migration-error"
+                  >
+                    <span className="font-semibold text-destructive">{t('common.error')}:</span>
+                    <span className="ml-2 text-sm text-destructive">{migration.error}</span>
                   </div>
                 )}
               </div>
 
-              <div className={styles.detailsSection}>
-                <h3 className={styles.detailsSectionTitle}>
+              <div className="mb-6">
+                <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
                   {t('migrations.steps')} ({migration.steps.length})
                 </h3>
                 {migration.steps.length === 0 ? (
-                  <p className={styles.noSteps}>{t('migrations.noSteps')}</p>
+                  <p className="text-sm italic text-muted-foreground">{t('migrations.noSteps')}</p>
                 ) : (
-                  <div className={styles.stepsList} data-testid="steps-list">
+                  <div className="flex flex-col gap-3" data-testid="steps-list">
                     {migration.steps.map((step, index) => (
                       <div
                         key={step.stepOrder}
-                        className={styles.stepItem}
+                        className="rounded-md border border-border bg-muted/30 p-3"
                         data-testid={`step-${step.stepOrder}`}
                       >
-                        <div className={styles.stepHeader}>
-                          <span className={styles.stepNumber}>{index + 1}</span>
-                          <span className={styles.stepOperation}>{step.operation}</span>
+                        <div className="flex items-center gap-3">
+                          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                            {index + 1}
+                          </span>
+                          <span className="text-sm font-medium text-foreground">
+                            {step.operation}
+                          </span>
                           <StepStatusBadge status={step.status} />
                         </div>
                         {step.details && Object.keys(step.details).length > 0 && (
-                          <div className={styles.stepDetails}>
+                          <div className="mt-2 space-y-1 border-t border-border pt-2">
                             {Object.entries(step.details).map(([key, value]) => (
-                              <div key={key} className={styles.stepDetailItem}>
-                                <span className={styles.stepDetailKey}>{key}:</span>
-                                <span className={styles.stepDetailValue}>
+                              <div key={key} className="flex gap-2 text-xs">
+                                <span className="font-medium text-muted-foreground">{key}:</span>
+                                <span className="text-foreground">
                                   {typeof value === 'object'
                                     ? JSON.stringify(value)
                                     : String(value)}
@@ -1198,19 +1336,17 @@ function MigrationRunDetails({
                           </div>
                         )}
                         {step.error && (
-                          <div className={styles.stepError}>
-                            <span className={styles.errorLabel}>{t('common.error')}:</span>
-                            <span className={styles.errorText}>{step.error}</span>
+                          <div className="mt-2 rounded border border-destructive/20 bg-destructive/5 p-2">
+                            <span className="text-xs font-semibold text-destructive">
+                              {t('common.error')}:
+                            </span>
+                            <span className="ml-1 text-xs text-destructive">{step.error}</span>
                           </div>
                         )}
                         {step.startedAt && (
-                          <div className={styles.stepTiming}>
-                            <span className={styles.stepTimingLabel}>
-                              {t('migrations.duration')}:
-                            </span>
-                            <span className={styles.stepTimingValue}>
-                              {calculateDuration(step.startedAt, step.completedAt)}
-                            </span>
+                          <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                            <span className="font-medium">{t('migrations.duration')}:</span>
+                            <span>{calculateDuration(step.startedAt, step.completedAt)}</span>
                           </div>
                         )}
                       </div>
@@ -1222,10 +1358,10 @@ function MigrationRunDetails({
           )}
         </div>
 
-        <div className={styles.modalFooter}>
+        <div className="flex items-center justify-end gap-3 border-t border-border p-6">
           <button
             type="button"
-            className={styles.primaryButton}
+            className="inline-flex items-center gap-2 rounded-md bg-primary px-6 py-3 text-base font-medium text-primary-foreground hover:bg-primary/90"
             onClick={onClose}
             data-testid="close-button"
           >
@@ -1254,46 +1390,67 @@ function MigrationHistoryTable({
 
   if (migrations.length === 0) {
     return (
-      <div className={styles.emptyState} data-testid="history-empty">
+      <div
+        className="flex flex-col items-center gap-2 rounded-lg border border-border bg-card px-8 py-16 text-center text-muted-foreground"
+        data-testid="history-empty"
+      >
         <p>{t('migrations.noHistory')}</p>
-        <p className={styles.emptyStateHint}>{t('migrations.noHistoryHint')}</p>
+        <p className="text-sm">{t('migrations.noHistoryHint')}</p>
       </div>
     )
   }
 
   return (
-    <div className={styles.tableContainer} data-testid="history-table">
-      <table className={styles.table}>
+    <div className="overflow-x-auto rounded-lg border border-border" data-testid="history-table">
+      <table className="w-full border-collapse text-sm">
         <thead>
-          <tr>
-            <th>{t('migrations.collection')}</th>
-            <th>{t('migrations.versionChange')}</th>
-            <th>{t('packages.status')}</th>
-            <th>{t('migrations.steps')}</th>
-            <th>{t('migrations.duration')}</th>
-            <th>{t('packages.date')}</th>
-            <th>{t('common.actions')}</th>
+          <tr className="bg-muted">
+            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b border-border">
+              {t('migrations.collection')}
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b border-border">
+              {t('migrations.versionChange')}
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b border-border">
+              {t('packages.status')}
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b border-border">
+              {t('migrations.steps')}
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b border-border">
+              {t('migrations.duration')}
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b border-border">
+              {t('packages.date')}
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b border-border">
+              {t('common.actions')}
+            </th>
           </tr>
         </thead>
         <tbody>
           {migrations.map((migration) => (
             <tr
               key={migration.id}
-              className={styles.tableRow}
+              className="hover:bg-accent/50"
               data-testid={`history-row-${migration.id}`}
             >
-              <td className={styles.collectionCell}>{migration.collectionName}</td>
-              <td className={styles.versionCell}>
+              <td className="px-4 py-3 font-medium text-foreground border-b border-border">
+                {migration.collectionName}
+              </td>
+              <td className="px-4 py-3 text-foreground border-b border-border">
                 v{migration.fromVersion} → v{migration.toVersion}
               </td>
-              <td>
+              <td className="px-4 py-3 border-b border-border">
                 <StatusBadge status={migration.status} />
               </td>
-              <td className={styles.stepsCell}>{migration.steps.length}</td>
-              <td className={styles.durationCell}>
+              <td className="px-4 py-3 text-foreground border-b border-border">
+                {migration.steps.length}
+              </td>
+              <td className="px-4 py-3 text-foreground border-b border-border">
                 {calculateDuration(migration.startedAt, migration.completedAt)}
               </td>
-              <td className={styles.dateCell}>
+              <td className="px-4 py-3 text-foreground border-b border-border">
                 {migration.startedAt
                   ? formatDate(new Date(migration.startedAt), {
                       year: 'numeric',
@@ -1304,10 +1461,10 @@ function MigrationHistoryTable({
                     })
                   : '-'}
               </td>
-              <td className={styles.actionsCell}>
+              <td className="px-4 py-3 border-b border-border">
                 <button
                   type="button"
-                  className={styles.viewButton}
+                  className="rounded-md px-3 py-1.5 text-sm font-medium text-primary hover:bg-primary/10 hover:underline"
                   onClick={() => onViewDetails(migration.id)}
                   aria-label={t('migrations.viewDetails')}
                   data-testid={`view-details-${migration.id}`}
@@ -1400,12 +1557,15 @@ export function MigrationsPage({ testId }: MigrationsPageProps): React.ReactElem
   }, [queryClient])
 
   return (
-    <div className={styles.container} data-testid={testId || 'migrations-page'}>
-      <header className={styles.header}>
-        <h1 className={styles.title}>{t('migrations.title')}</h1>
+    <div
+      className="mx-auto max-w-[1400px] p-8 max-md:p-4"
+      data-testid={testId || 'migrations-page'}
+    >
+      <header className="mb-8 flex items-center justify-between">
+        <h1 className="m-0 text-3xl font-semibold text-foreground">{t('migrations.title')}</h1>
         <button
           type="button"
-          className={styles.primaryButton}
+          className="inline-flex items-center gap-2 rounded-md bg-primary px-6 py-3 text-base font-medium text-primary-foreground hover:bg-primary/90"
           onClick={handleOpenPlanningForm}
           data-testid="plan-migration-button"
         >
@@ -1413,19 +1573,19 @@ export function MigrationsPage({ testId }: MigrationsPageProps): React.ReactElem
         </button>
       </header>
 
-      <div className={styles.content}>
-        <div className={styles.sectionHeader}>
-          <h2 className={styles.sectionTitle}>{t('migrations.history')}</h2>
+      <div>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="m-0 text-xl font-semibold text-foreground">{t('migrations.history')}</h2>
         </div>
 
         {isLoading && (
-          <div className={styles.loadingContainer}>
+          <div className="flex min-h-[400px] items-center justify-center">
             <LoadingSpinner label={t('common.loading')} />
           </div>
         )}
 
         {error && (
-          <div className={styles.errorContainer}>
+          <div className="py-4">
             <ErrorMessage error={error as Error} onRetry={() => refetch()} />
           </div>
         )}

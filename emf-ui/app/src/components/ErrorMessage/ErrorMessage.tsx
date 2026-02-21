@@ -7,21 +7,12 @@
  * Requirements:
  * - 18.1: Display appropriate error messages when API requests fail
  * - 18.5: Offer retry option when network errors occur
- *
- * Features:
- * - Display error message from Error object or string
- * - Optional retry button for recoverable errors
- * - Error icon with type-specific styling
- * - Accessible with role="alert" and aria-live="assertive"
- * - Support for different error types (network, validation, generic)
- * - Compact and inline variants
- * - Reduced motion support
  */
 
 import React, { useMemo } from 'react'
 import { Zap, AlertTriangle, Search, Lock, Monitor, X, RotateCw } from 'lucide-react'
 import { useI18n } from '../../context/I18nContext'
-import styles from './ErrorMessage.module.css'
+import { cn } from '@/lib/utils'
 
 /**
  * Error type variants
@@ -136,33 +127,35 @@ function getErrorIcon(type: ErrorType): React.ReactNode {
   }
 }
 
+const TYPE_STYLES: Record<ErrorType, string> = {
+  network:
+    'bg-amber-50 border-amber-300 text-amber-900 dark:bg-amber-950 dark:border-amber-800 dark:text-amber-100',
+  validation:
+    'bg-red-50 border-red-200 text-red-900 dark:bg-red-950 dark:border-red-800 dark:text-red-100',
+  notFound:
+    'bg-gray-100 border-gray-300 text-gray-700 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-200',
+  forbidden:
+    'bg-red-50 border-red-200 text-red-900 dark:bg-red-950 dark:border-red-800 dark:text-red-100',
+  server:
+    'bg-red-50 border-red-200 text-red-900 dark:bg-red-950 dark:border-red-800 dark:text-red-100',
+  generic:
+    'bg-red-50 border-red-200 text-red-900 dark:bg-red-950 dark:border-red-800 dark:text-red-100',
+}
+
+const ICON_BG_STYLES: Record<ErrorType, string> = {
+  network: 'bg-amber-400',
+  validation: 'bg-red-500',
+  notFound: 'bg-gray-500',
+  forbidden: 'bg-red-600',
+  server: 'bg-red-700',
+  generic: 'bg-red-500',
+}
+
 /**
  * ErrorMessage Component
  *
  * Displays an error message with optional retry functionality.
  * Automatically detects error type if not specified.
- *
- * @example
- * ```tsx
- * // Basic usage with string
- * <ErrorMessage error="Something went wrong" />
- *
- * // With Error object
- * <ErrorMessage error={new Error("Network error")} />
- *
- * // With retry button
- * <ErrorMessage
- *   error="Failed to load data"
- *   onRetry={() => refetch()}
- * />
- *
- * // Compact variant
- * <ErrorMessage
- *   error="Invalid input"
- *   variant="compact"
- *   type="validation"
- * />
- * ```
  */
 export function ErrorMessage({
   error,
@@ -213,14 +206,18 @@ export function ErrorMessage({
     return errorType === 'network' || errorType === 'server' || errorType === 'generic'
   }, [onRetry, errorType])
 
-  // Combine class names
-  const containerClasses = [styles.container, styles[variant], styles[errorType], className]
-    .filter(Boolean)
-    .join(' ')
-
   return (
     <div
-      className={containerClasses}
+      className={cn(
+        'flex items-start gap-3 rounded-lg border animate-in fade-in slide-in-from-top-1 motion-reduce:animate-none',
+        TYPE_STYLES[errorType],
+        variant === 'default' && 'p-4 flex-row',
+        variant === 'compact' && 'px-3.5 py-2.5 gap-2 items-center',
+        variant === 'inline' &&
+          'inline-flex px-2.5 py-1.5 gap-1.5 items-center rounded border-0 bg-transparent',
+        'max-sm:flex-col max-sm:items-stretch',
+        className
+      )}
       role="alert"
       aria-live="assertive"
       aria-atomic="true"
@@ -229,22 +226,50 @@ export function ErrorMessage({
     >
       {/* Error icon */}
       {showIcon && (
-        <span className={styles.icon} aria-hidden="true" data-testid={`${testId}-icon`}>
+        <span
+          className={cn(
+            'flex items-center justify-center shrink-0 rounded-full text-white',
+            variant === 'inline'
+              ? 'size-4 text-xs'
+              : variant === 'compact'
+                ? 'size-5 text-sm'
+                : 'size-8 text-base',
+            variant === 'inline' && 'bg-transparent text-current',
+            variant !== 'inline' && ICON_BG_STYLES[errorType]
+          )}
+          aria-hidden="true"
+          data-testid={`${testId}-icon`}
+        >
           {icon}
         </span>
       )}
 
       {/* Error content */}
-      <div className={styles.content}>
+      <div
+        className={cn(
+          'flex flex-col flex-1 min-w-0',
+          variant === 'compact' && 'flex-row items-center gap-2',
+          variant === 'inline' && 'flex-row items-center'
+        )}
+      >
         {/* Title (only shown in default variant) */}
         {variant === 'default' && (
-          <h3 className={styles.title} data-testid={`${testId}-title`}>
+          <h3
+            className="m-0 mb-1 text-[0.9375rem] font-semibold leading-snug"
+            data-testid={`${testId}-title`}
+          >
             {displayTitle}
           </h3>
         )}
 
         {/* Error message */}
-        <p className={styles.message} data-testid={`${testId}-message`}>
+        <p
+          className={cn(
+            'm-0 leading-relaxed break-words opacity-90',
+            variant === 'inline' ? 'text-[0.8125rem]' : 'text-sm'
+          )}
+          data-testid={`${testId}-message`}
+        >
           {message}
         </p>
       </div>
@@ -253,15 +278,22 @@ export function ErrorMessage({
       {showRetry && onRetry && (
         <button
           type="button"
-          className={styles.retryButton}
+          className={cn(
+            'inline-flex items-center gap-1.5 border border-current rounded-md bg-transparent font-medium cursor-pointer shrink-0 self-start transition-colors motion-reduce:transition-none',
+            'hover:bg-black/5 dark:hover:bg-white/10',
+            'focus-visible:outline-2 focus-visible:outline-current focus-visible:outline-offset-2',
+            'active:opacity-80',
+            variant === 'inline' ? 'px-2 py-1 text-xs' : 'px-3.5 py-2 text-sm',
+            'max-sm:self-stretch max-sm:justify-center max-sm:mt-2'
+          )}
           onClick={onRetry}
           aria-label={t('common.retry')}
           data-testid={`${testId}-retry`}
         >
-          <span className={styles.retryIcon} aria-hidden="true">
+          <span className="inline-flex text-base leading-none" aria-hidden="true">
             <RotateCw size={14} />
           </span>
-          <span className={styles.retryText}>{t('common.retry')}</span>
+          <span className="leading-none">{t('common.retry')}</span>
         </button>
       )}
     </div>

@@ -15,7 +15,7 @@
 
 import React, { useMemo } from 'react'
 import { useI18n } from '../../context/I18nContext'
-import styles from './SummaryStatsBar.module.css'
+import { cn } from '@/lib/utils'
 
 /**
  * A single filter condition applied to the data
@@ -189,26 +189,34 @@ export function SummaryStatsBar({
   )
 
   return (
-    <div className={styles.bar} data-testid="summary-stats-bar">
+    <div
+      className={cn(
+        'flex justify-between items-center flex-wrap gap-4',
+        'px-4 py-2 bg-muted/50 border border-border/50 rounded-md mb-4',
+        'text-sm text-foreground',
+        'max-md:flex-col max-md:items-start max-md:gap-1'
+      )}
+      data-testid="summary-stats-bar"
+    >
       {/* Left side: record count and filter info */}
-      <div className={styles.leftSide}>
-        <span className={styles.recordCount} data-testid="summary-record-count">
+      <div className="flex items-center gap-2 flex-wrap min-w-0">
+        <span className="font-semibold whitespace-nowrap" data-testid="summary-record-count">
           {t('summaryStats.recordCount', { count: totalCount })}
         </span>
 
         {hasActiveFilters ? (
           <>
-            <span className={styles.separator} aria-hidden="true">
+            <span className="text-muted-foreground text-xs select-none" aria-hidden="true">
               &middot;
             </span>
             <span data-testid="summary-filtered-count">
               {t('summaryStats.filteredCount', { count: filteredCount })}
             </span>
-            <span className={styles.separator} aria-hidden="true">
+            <span className="text-muted-foreground text-xs select-none" aria-hidden="true">
               &middot;
             </span>
             <span
-              className={styles.filterDescription}
+              className="text-muted-foreground whitespace-nowrap overflow-hidden text-ellipsis max-w-[400px] max-lg:max-w-[250px] max-md:max-w-full"
               title={filterDescription}
               data-testid="summary-filter-description"
             >
@@ -216,7 +224,13 @@ export function SummaryStatsBar({
             </span>
             <button
               type="button"
-              className={styles.clearFilters}
+              className={cn(
+                'text-primary bg-transparent border-0 p-0 text-sm font-medium',
+                'cursor-pointer whitespace-nowrap no-underline',
+                'transition-colors motion-reduce:transition-none',
+                'hover:text-primary/80 hover:underline',
+                'focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2'
+              )}
               onClick={onClearFilters}
               data-testid="summary-clear-filters"
             >
@@ -225,7 +239,7 @@ export function SummaryStatsBar({
           </>
         ) : (
           <>
-            <span className={styles.separator} aria-hidden="true">
+            <span className="text-muted-foreground text-xs select-none" aria-hidden="true">
               &middot;
             </span>
             <span data-testid="summary-showing-all">{t('summaryStats.showingAll')}</span>
@@ -235,15 +249,21 @@ export function SummaryStatsBar({
 
       {/* Right side: aggregates for numeric fields */}
       {aggregates.length > 0 && (
-        <div className={styles.rightSide} data-testid="summary-aggregates">
+        <div
+          className="flex items-center gap-4 text-muted-foreground shrink-0 max-md:flex-wrap"
+          data-testid="summary-aggregates"
+        >
           {aggregates.map((agg, index) => (
             <React.Fragment key={agg.label}>
               {index > 0 && (
-                <span className={styles.separator} aria-hidden="true">
+                <span className="text-muted-foreground/60 text-xs select-none" aria-hidden="true">
                   &middot;
                 </span>
               )}
-              <span className={styles.aggregate} data-testid={`summary-aggregate-${agg.label}`}>
+              <span
+                className="text-xs text-muted-foreground whitespace-nowrap"
+                data-testid={`summary-aggregate-${agg.label}`}
+              >
                 {t('summaryStats.sumOf', {
                   field: agg.label,
                   value: agg.sum.toLocaleString(),

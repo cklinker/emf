@@ -15,6 +15,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
+import { cn } from '@/lib/utils'
 
 import {
   LayoutEditorProvider,
@@ -23,6 +24,7 @@ import {
   FieldPalette,
   PropertyPanel,
   MobilePreview,
+  RelatedListPanel,
 } from './components'
 import type {
   EditorSection,
@@ -30,7 +32,6 @@ import type {
   EditorRelatedList,
   AvailableField,
 } from './components/LayoutEditorContext'
-import styles from './PageLayoutsPage.module.css'
 
 // ---------------------------------------------------------------------------
 // Shared types
@@ -114,7 +115,7 @@ interface ApiFieldPlacement {
 interface ApiRelatedList {
   id: string
   relatedCollectionId: string
-  relationshipField: string
+  relationshipFieldId: string
   displayColumns: string
   sortField?: string
   sortDirection: string
@@ -208,7 +209,7 @@ function apiRelatedListToEditor(r: ApiRelatedList): EditorRelatedList {
   return {
     id: r.id,
     relatedCollectionId: r.relatedCollectionId,
-    relationshipFieldId: r.relationshipField,
+    relationshipFieldId: r.relationshipFieldId,
     displayColumns: r.displayColumns,
     sortField: r.sortField,
     sortDirection: r.sortDirection,
@@ -378,26 +379,26 @@ function PageLayoutForm({
 
   return (
     <div
-      className={styles.modalOverlay}
+      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 p-4"
       onClick={(e) => e.target === e.currentTarget && onCancel()}
       onKeyDown={handleKeyDown}
       data-testid="layout-form-overlay"
       role="presentation"
     >
       <div
-        className={styles.modal}
+        className="max-h-[90vh] w-full max-w-[600px] overflow-y-auto rounded-lg bg-background shadow-xl"
         role="dialog"
         aria-modal="true"
         aria-labelledby="layout-form-title"
         data-testid="layout-form-modal"
       >
-        <div className={styles.modalHeader}>
-          <h2 id="layout-form-title" className={styles.modalTitle}>
+        <div className="flex items-center justify-between border-b border-border p-6">
+          <h2 id="layout-form-title" className="m-0 text-xl font-semibold text-foreground">
             {title}
           </h2>
           <button
             type="button"
-            className={styles.modalCloseButton}
+            className="cursor-pointer rounded border-none bg-transparent p-2 text-2xl leading-none text-muted-foreground transition-all duration-200 hover:bg-muted hover:text-foreground"
             onClick={onCancel}
             aria-label="Close"
             data-testid="layout-form-close"
@@ -405,12 +406,12 @@ function PageLayoutForm({
             &times;
           </button>
         </div>
-        <div className={styles.modalBody}>
-          <form className={styles.form} onSubmit={handleSubmit} noValidate>
-            <div className={styles.formGroup}>
-              <label htmlFor="layout-name" className={styles.formLabel}>
+        <div className="p-6">
+          <form className="flex flex-col gap-5" onSubmit={handleSubmit} noValidate>
+            <div className="flex flex-col gap-2">
+              <label htmlFor="layout-name" className="text-sm font-medium text-foreground">
                 Name
-                <span className={styles.required} aria-hidden="true">
+                <span className="ml-1 text-destructive" aria-hidden="true">
                   *
                 </span>
               </label>
@@ -418,7 +419,10 @@ function PageLayoutForm({
                 ref={nameInputRef}
                 id="layout-name"
                 type="text"
-                className={`${styles.formInput} ${touched.name && errors.name ? styles.hasError : ''}`}
+                className={cn(
+                  'rounded-md border border-border bg-background px-3.5 py-2.5 text-sm text-foreground transition-all duration-200 focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/10 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground',
+                  touched.name && errors.name && 'border-destructive'
+                )}
                 value={formData.name}
                 onChange={(e) => handleChange('name', e.target.value)}
                 onBlur={() => handleBlur('name')}
@@ -429,19 +433,22 @@ function PageLayoutForm({
                 data-testid="layout-name-input"
               />
               {touched.name && errors.name && (
-                <span className={styles.formError} role="alert">
+                <span className="text-xs text-destructive" role="alert">
                   {errors.name}
                 </span>
               )}
             </div>
 
-            <div className={styles.formGroup}>
-              <label htmlFor="layout-description" className={styles.formLabel}>
+            <div className="flex flex-col gap-2">
+              <label htmlFor="layout-description" className="text-sm font-medium text-foreground">
                 Description
               </label>
               <textarea
                 id="layout-description"
-                className={`${styles.formInput} ${styles.formTextarea} ${touched.description && errors.description ? styles.hasError : ''}`}
+                className={cn(
+                  'min-h-[80px] resize-y rounded-md border border-border bg-background px-3.5 py-2.5 font-[inherit] text-sm text-foreground transition-all duration-200 focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/10 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground',
+                  touched.description && errors.description && 'border-destructive'
+                )}
                 value={formData.description}
                 onChange={(e) => handleChange('description', e.target.value)}
                 onBlur={() => handleBlur('description')}
@@ -451,22 +458,22 @@ function PageLayoutForm({
                 data-testid="layout-description-input"
               />
               {touched.description && errors.description && (
-                <span className={styles.formError} role="alert">
+                <span className="text-xs text-destructive" role="alert">
                   {errors.description}
                 </span>
               )}
             </div>
 
-            <div className={styles.formGroup}>
-              <label htmlFor="layout-type" className={styles.formLabel}>
+            <div className="flex flex-col gap-2">
+              <label htmlFor="layout-type" className="text-sm font-medium text-foreground">
                 Layout Type
-                <span className={styles.required} aria-hidden="true">
+                <span className="ml-1 text-destructive" aria-hidden="true">
                   *
                 </span>
               </label>
               <select
                 id="layout-type"
-                className={styles.formInput}
+                className="rounded-md border border-border bg-background px-3.5 py-2.5 text-sm text-foreground transition-all duration-200 focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/10 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
                 value={formData.layoutType}
                 onChange={(e) => handleChange('layoutType', e.target.value)}
                 disabled={isSubmitting}
@@ -480,16 +487,19 @@ function PageLayoutForm({
               </select>
             </div>
 
-            <div className={styles.formGroup}>
-              <label htmlFor="layout-collection-id" className={styles.formLabel}>
+            <div className="flex flex-col gap-2">
+              <label htmlFor="layout-collection-id" className="text-sm font-medium text-foreground">
                 Collection
-                <span className={styles.required} aria-hidden="true">
+                <span className="ml-1 text-destructive" aria-hidden="true">
                   *
                 </span>
               </label>
               <select
                 id="layout-collection-id"
-                className={`${styles.formInput} ${touched.collectionId && errors.collectionId ? styles.hasError : ''}`}
+                className={cn(
+                  'rounded-md border border-border bg-background px-3.5 py-2.5 text-sm text-foreground transition-all duration-200 focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/10 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground',
+                  touched.collectionId && errors.collectionId && 'border-destructive'
+                )}
                 value={formData.collectionId}
                 onChange={(e) => handleChange('collectionId', e.target.value)}
                 onBlur={() => handleBlur('collectionId')}
@@ -506,30 +516,31 @@ function PageLayoutForm({
                 ))}
               </select>
               {touched.collectionId && errors.collectionId && (
-                <span className={styles.formError} role="alert">
+                <span className="text-xs text-destructive" role="alert">
                   {errors.collectionId}
                 </span>
               )}
             </div>
 
-            <div className={styles.checkboxGroup}>
+            <div className="flex items-center gap-2">
               <input
                 id="layout-is-default"
                 type="checkbox"
+                className="h-4 w-4 accent-primary"
                 checked={formData.isDefault}
                 onChange={(e) => handleChange('isDefault', e.target.checked)}
                 disabled={isSubmitting}
                 data-testid="layout-is-default-input"
               />
-              <label htmlFor="layout-is-default" className={styles.formLabel}>
+              <label htmlFor="layout-is-default" className="text-sm font-medium text-foreground">
                 Default Layout
               </label>
             </div>
 
-            <div className={styles.formActions}>
+            <div className="mt-2 flex justify-end gap-3 border-t border-border pt-4">
               <button
                 type="button"
-                className={styles.cancelButton}
+                className="cursor-pointer rounded-md border border-border bg-background px-5 py-2.5 text-sm font-medium text-foreground transition-all duration-200 hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
                 onClick={onCancel}
                 disabled={isSubmitting}
                 data-testid="layout-form-cancel"
@@ -538,7 +549,7 @@ function PageLayoutForm({
               </button>
               <button
                 type="submit"
-                className={styles.submitButton}
+                className="cursor-pointer rounded-md border-none bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors duration-200 hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={isSubmitting}
                 data-testid="layout-form-submit"
               >
@@ -642,24 +653,29 @@ function LayoutEditorViewInner({ layoutId, onBack }: LayoutEditorViewProps): Rea
 
   if (isLoadingLayout) {
     return (
-      <div className={styles.editorLoading}>
+      <div className="flex h-screen items-center justify-center">
         <LoadingSpinner size="large" label="Loading layout..." />
       </div>
     )
   }
 
   return (
-    <div className={styles.editorContainer} data-testid="layout-editor">
+    <div className="flex h-screen flex-col overflow-hidden" data-testid="layout-editor">
       <LayoutToolbar
         onBack={handleBack}
         layoutName={layoutDetail?.name ?? 'Layout'}
         onSave={handleSave}
         isSaving={saveMutation.isPending}
       />
-      <div className={styles.editorBody}>
+      <div className="flex flex-1 min-h-0 overflow-hidden">
         <FieldPalette />
         <MobilePreview />
-        <PropertyPanel />
+        <div className="flex w-[300px] flex-col overflow-y-auto border-l border-border bg-background max-md:w-full max-md:max-h-[300px] max-md:border-l-0 max-md:border-t">
+          <PropertyPanel />
+          <div className="border-t border-border">
+            <RelatedListPanel />
+          </div>
+        </div>
       </div>
     </div>
   )
@@ -843,8 +859,8 @@ export function PageLayoutsPage({
   // List mode: loading
   if (isLoading) {
     return (
-      <div className={styles.container} data-testid={testId}>
-        <div className={styles.loadingContainer}>
+      <div className="mx-auto max-w-[1400px] p-8 max-md:p-4" data-testid={testId}>
+        <div className="flex min-h-[400px] items-center justify-center">
           <LoadingSpinner size="large" label="Loading layouts..." />
         </div>
       </div>
@@ -854,7 +870,7 @@ export function PageLayoutsPage({
   // List mode: error
   if (error) {
     return (
-      <div className={styles.container} data-testid={testId}>
+      <div className="mx-auto max-w-[1400px] p-8 max-md:p-4" data-testid={testId}>
         <ErrorMessage
           error={error instanceof Error ? error : new Error('An error occurred')}
           onRetry={() => refetch()}
@@ -867,12 +883,12 @@ export function PageLayoutsPage({
 
   // List mode
   return (
-    <div className={styles.container} data-testid={testId}>
-      <header className={styles.header}>
-        <h1 className={styles.title}>Page Layouts</h1>
+    <div className="mx-auto max-w-[1400px] p-8 max-md:p-4" data-testid={testId}>
+      <header className="mb-8 flex items-center justify-between max-md:mb-4 max-md:flex-col max-md:items-start max-md:gap-4">
+        <h1 className="m-0 text-3xl font-semibold text-foreground">Page Layouts</h1>
         <button
           type="button"
-          className={styles.createButton}
+          className="cursor-pointer rounded-md border-none bg-primary px-6 py-3 text-base font-medium text-primary-foreground transition-colors duration-200 hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 max-md:w-full"
           onClick={handleCreate}
           aria-label="Create Layout"
           data-testid="add-layout-button"
@@ -882,35 +898,62 @@ export function PageLayoutsPage({
       </header>
 
       {layoutList.length === 0 ? (
-        <div className={styles.emptyState} data-testid="empty-state">
+        <div
+          className="rounded-lg border border-border bg-background px-8 py-16 text-center text-muted-foreground"
+          data-testid="empty-state"
+        >
           <p>No page layouts found. Create one to get started.</p>
         </div>
       ) : (
-        <div className={styles.tableContainer}>
+        <div className="overflow-hidden rounded-lg border border-border bg-background max-md:overflow-x-auto">
           <table
-            className={styles.table}
+            className="w-full border-collapse max-md:min-w-[700px]"
             role="grid"
             aria-label="Page Layouts"
             data-testid="page-layouts-table"
           >
-            <thead>
+            <thead className="bg-muted">
               <tr role="row">
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-sm font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   Name
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-sm font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   Collection
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-sm font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   Type
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-sm font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   Default
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-sm font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   Created
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-sm font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   Actions
                 </th>
               </tr>
@@ -920,33 +963,44 @@ export function PageLayoutsPage({
                 <tr
                   key={layout.id}
                   role="row"
-                  className={styles.tableRow}
+                  className="border-b border-border transition-colors duration-150 last:border-b-0 hover:bg-muted/50"
                   data-testid={`layout-row-${index}`}
                 >
-                  <td role="gridcell">{layout.name}</td>
-                  <td role="gridcell">{getCollectionName(layout.collectionId)}</td>
-                  <td role="gridcell">
-                    <span className={styles.badge}>{layout.layoutType}</span>
+                  <td role="gridcell" className="px-4 py-4 text-sm text-foreground">
+                    {layout.name}
                   </td>
-                  <td role="gridcell">
+                  <td role="gridcell" className="px-4 py-4 text-sm text-foreground">
+                    {getCollectionName(layout.collectionId)}
+                  </td>
+                  <td role="gridcell" className="px-4 py-4 text-sm">
+                    <span className="inline-block rounded-full bg-muted px-3 py-1 text-xs font-semibold uppercase tracking-wider text-primary">
+                      {layout.layoutType}
+                    </span>
+                  </td>
+                  <td role="gridcell" className="px-4 py-4 text-sm">
                     <span
-                      className={`${styles.boolBadge} ${layout.isDefault ? styles.boolTrue : styles.boolFalse}`}
+                      className={cn(
+                        'inline-block rounded-full px-3 py-1 text-xs font-semibold',
+                        layout.isDefault
+                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                          : 'bg-muted text-muted-foreground'
+                      )}
                     >
                       {layout.isDefault ? 'Yes' : 'No'}
                     </span>
                   </td>
-                  <td role="gridcell">
+                  <td role="gridcell" className="px-4 py-4 text-sm text-foreground">
                     {formatDate(new Date(layout.createdAt), {
                       year: 'numeric',
                       month: 'short',
                       day: 'numeric',
                     })}
                   </td>
-                  <td role="gridcell" className={styles.actionsCell}>
-                    <div className={styles.actions}>
+                  <td role="gridcell" className="px-4 py-4 text-right text-sm">
+                    <div className="flex justify-end gap-2 max-md:flex-col">
                       <button
                         type="button"
-                        className={`${styles.actionButton} ${styles.designButton}`}
+                        className="cursor-pointer rounded-md border border-primary bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-all duration-200 hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 max-md:w-full"
                         onClick={() => handleDesign(layout)}
                         aria-label={`Design ${layout.name}`}
                         data-testid={`design-button-${index}`}
@@ -955,7 +1009,7 @@ export function PageLayoutsPage({
                       </button>
                       <button
                         type="button"
-                        className={styles.actionButton}
+                        className="cursor-pointer rounded-md border border-border bg-transparent px-4 py-2 text-sm font-medium text-primary transition-all duration-200 hover:border-primary hover:bg-muted focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 max-md:w-full"
                         onClick={() => handleEditMetadata(layout)}
                         aria-label={`Edit ${layout.name}`}
                         data-testid={`edit-button-${index}`}
@@ -964,7 +1018,7 @@ export function PageLayoutsPage({
                       </button>
                       <button
                         type="button"
-                        className={`${styles.actionButton} ${styles.deleteButton}`}
+                        className="cursor-pointer rounded-md border border-border bg-transparent px-4 py-2 text-sm font-medium text-destructive transition-all duration-200 hover:border-destructive hover:bg-destructive/10 focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 max-md:w-full"
                         onClick={() => handleDeleteClick(layout)}
                         aria-label={`Delete ${layout.name}`}
                         data-testid={`delete-button-${index}`}

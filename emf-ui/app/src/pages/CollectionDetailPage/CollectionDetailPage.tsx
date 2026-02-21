@@ -27,6 +27,7 @@ import { ValidationRuleEditor } from '../../components/ValidationRuleEditor'
 import { RecordTypeEditor } from '../../components/RecordTypeEditor'
 import { RecordTypePicklistEditor } from '../../components/RecordTypePicklistEditor'
 import { PicklistDependencyEditor } from '../../components/PicklistDependencyEditor'
+import { cn } from '@/lib/utils'
 import type {
   Collection,
   FieldDefinition,
@@ -38,7 +39,6 @@ import type {
   FieldHistoryEntry,
 } from '../../types/collections'
 import type { FieldType } from '../../types/collections'
-import styles from './CollectionDetailPage.module.css'
 
 /**
  * Reverse mapping from backend canonical types (uppercase) to UI types (lowercase).
@@ -90,6 +90,24 @@ function getStorageModeDisplay(mode: Collection['storageMode']): string {
       return 'JSONB'
     default:
       return mode
+  }
+}
+
+/** Helper to get action badge color classes */
+function getActionBadgeClasses(action: string): string {
+  switch (action) {
+    case 'CREATED':
+    case 'ACTIVATED':
+      return 'text-emerald-800 bg-emerald-100 dark:text-emerald-300 dark:bg-emerald-900'
+    case 'DELETED':
+      return 'text-red-800 bg-red-100 dark:text-red-300 dark:bg-red-900'
+    case 'UPDATED':
+    case 'MODIFIED':
+      return 'text-amber-800 bg-amber-100 dark:text-amber-300 dark:bg-amber-900'
+    case 'DEACTIVATED':
+      return 'text-gray-500 bg-gray-100 dark:text-gray-400 dark:bg-gray-800'
+    default:
+      return 'text-blue-800 bg-blue-100 dark:text-blue-300 dark:bg-blue-900'
   }
 }
 
@@ -885,8 +903,11 @@ export function CollectionDetailPage({
   // Render loading state
   if (isLoadingCollection) {
     return (
-      <div className={styles.container} data-testid={testId}>
-        <div className={styles.loadingContainer}>
+      <div
+        className="flex flex-col gap-6 p-6 w-full max-md:p-4 max-sm:gap-4 max-sm:p-2"
+        data-testid={testId}
+      >
+        <div className="flex justify-center items-center min-h-[200px]">
           <LoadingSpinner size="large" label={t('common.loading')} />
         </div>
       </div>
@@ -896,7 +917,10 @@ export function CollectionDetailPage({
   // Render error state
   if (collectionError) {
     return (
-      <div className={styles.container} data-testid={testId}>
+      <div
+        className="flex flex-col gap-6 p-6 w-full max-md:p-4 max-sm:gap-4 max-sm:p-2"
+        data-testid={testId}
+      >
         <ErrorMessage
           error={
             collectionError instanceof Error ? collectionError : new Error(t('errors.generic'))
@@ -910,44 +934,56 @@ export function CollectionDetailPage({
   // Render not found state
   if (!collection) {
     return (
-      <div className={styles.container} data-testid={testId}>
+      <div
+        className="flex flex-col gap-6 p-6 w-full max-md:p-4 max-sm:gap-4 max-sm:p-2"
+        data-testid={testId}
+      >
         <ErrorMessage error={new Error(t('errors.notFound'))} type="notFound" />
       </div>
     )
   }
 
   return (
-    <div className={styles.container} data-testid={testId}>
+    <div
+      className="flex flex-col gap-6 p-6 w-full max-md:p-4 max-sm:gap-4 max-sm:p-2"
+      data-testid={testId}
+    >
       {/* Page Header */}
-      <header className={styles.header}>
-        <div className={styles.headerLeft}>
+      <header className="flex justify-between items-start flex-wrap gap-4 max-sm:flex-col max-sm:items-stretch">
+        <div className="flex flex-col gap-2">
           <button
             type="button"
-            className={styles.backButton}
+            className="inline-flex items-center py-1 text-sm font-medium text-primary bg-transparent border-none cursor-pointer transition-colors duration-200 motion-reduce:transition-none hover:text-primary/80 hover:underline focus:outline-2 focus:outline-primary focus:outline-offset-2"
             onClick={handleBack}
             aria-label={t('common.back')}
             data-testid="back-button"
           >
             ← {t('common.back')}
           </button>
-          <div className={styles.titleSection}>
-            <h1 className={styles.title} data-testid="collection-title">
+          <div className="flex items-center gap-4 flex-wrap">
+            <h1
+              className="m-0 text-2xl font-semibold text-foreground max-sm:text-xl"
+              data-testid="collection-title"
+            >
               {collection.displayName || collection.name}
             </h1>
             <span
-              className={`${styles.statusBadge} ${
-                collection.active ? styles.statusActive : styles.statusInactive
-              }`}
+              className={cn(
+                'inline-flex items-center px-2 py-1 text-xs font-medium rounded-full capitalize',
+                collection.active
+                  ? 'text-green-800 bg-green-100 dark:text-green-300 dark:bg-green-900'
+                  : 'text-yellow-800 bg-yellow-100 dark:text-yellow-300 dark:bg-yellow-900'
+              )}
               data-testid="collection-status"
             >
               {collection.active ? t('collections.active') : t('collections.inactive')}
             </span>
           </div>
         </div>
-        <div className={styles.headerActions}>
+        <div className="flex gap-2 max-sm:flex-col">
           <button
             type="button"
-            className={styles.editButton}
+            className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-foreground bg-background border border-border rounded-md cursor-pointer transition-colors duration-200 motion-reduce:transition-none hover:bg-muted hover:border-border/80 focus:outline-2 focus:outline-primary focus:outline-offset-2 max-sm:w-full"
             onClick={handleEdit}
             aria-label={t('collections.editCollection')}
             data-testid="edit-button"
@@ -956,7 +992,7 @@ export function CollectionDetailPage({
           </button>
           <button
             type="button"
-            className={styles.deleteButton}
+            className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-destructive bg-background border border-destructive/30 rounded-md cursor-pointer transition-colors duration-200 motion-reduce:transition-none hover:bg-destructive/5 hover:border-destructive focus:outline-2 focus:outline-destructive focus:outline-offset-2 max-sm:w-full"
             onClick={handleDeleteClick}
             aria-label={t('collections.deleteCollection')}
             data-testid="delete-button"
@@ -967,44 +1003,67 @@ export function CollectionDetailPage({
       </header>
 
       {/* Collection Metadata */}
-      <section className={styles.metadataSection} aria-labelledby="metadata-heading">
-        <h2 id="metadata-heading" className={styles.sectionTitle}>
+      <section className="p-6 bg-muted rounded-md" aria-labelledby="metadata-heading">
+        <h2 id="metadata-heading" className="m-0 mb-4 text-lg font-semibold text-foreground">
           {t('collections.collectionName')}
         </h2>
-        <div className={styles.metadataGrid}>
-          <div className={styles.metadataItem}>
-            <span className={styles.metadataLabel}>{t('collections.collectionName')}</span>
-            <span className={styles.metadataValue} data-testid="collection-name">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-4 max-lg:grid-cols-2 max-sm:grid-cols-1">
+          <div className="flex flex-col gap-1">
+            <span className="text-sm font-medium text-muted-foreground">
+              {t('collections.collectionName')}
+            </span>
+            <span className="text-base text-foreground break-words" data-testid="collection-name">
               {collection.name}
             </span>
           </div>
-          <div className={styles.metadataItem}>
-            <span className={styles.metadataLabel}>{t('collections.displayName')}</span>
-            <span className={styles.metadataValue} data-testid="collection-display-name">
+          <div className="flex flex-col gap-1">
+            <span className="text-sm font-medium text-muted-foreground">
+              {t('collections.displayName')}
+            </span>
+            <span
+              className="text-base text-foreground break-words"
+              data-testid="collection-display-name"
+            >
               {collection.displayName || '-'}
             </span>
           </div>
-          <div className={styles.metadataItem}>
-            <span className={styles.metadataLabel}>{t('collections.storageMode')}</span>
-            <span className={styles.metadataValue} data-testid="collection-storage-mode">
+          <div className="flex flex-col gap-1">
+            <span className="text-sm font-medium text-muted-foreground">
+              {t('collections.storageMode')}
+            </span>
+            <span
+              className="text-base text-foreground break-words"
+              data-testid="collection-storage-mode"
+            >
               {getStorageModeDisplay(collection.storageMode)}
             </span>
           </div>
-          <div className={styles.metadataItem}>
-            <span className={styles.metadataLabel}>{t('collections.status')}</span>
-            <span className={styles.metadataValue} data-testid="collection-status-value">
+          <div className="flex flex-col gap-1">
+            <span className="text-sm font-medium text-muted-foreground">
+              {t('collections.status')}
+            </span>
+            <span
+              className="text-base text-foreground break-words"
+              data-testid="collection-status-value"
+            >
               {collection.active ? t('collections.active') : t('collections.inactive')}
             </span>
           </div>
-          <div className={styles.metadataItem}>
-            <span className={styles.metadataLabel}>Version</span>
-            <span className={styles.metadataValue} data-testid="collection-version">
+          <div className="flex flex-col gap-1">
+            <span className="text-sm font-medium text-muted-foreground">Version</span>
+            <span
+              className="text-base text-foreground break-words"
+              data-testid="collection-version"
+            >
               {collection.currentVersion}
             </span>
           </div>
-          <div className={styles.metadataItem}>
-            <span className={styles.metadataLabel}>Created</span>
-            <span className={styles.metadataValue} data-testid="collection-created">
+          <div className="flex flex-col gap-1">
+            <span className="text-sm font-medium text-muted-foreground">Created</span>
+            <span
+              className="text-base text-foreground break-words"
+              data-testid="collection-created"
+            >
               {formatDate(new Date(collection.createdAt), {
                 year: 'numeric',
                 month: 'short',
@@ -1014,9 +1073,12 @@ export function CollectionDetailPage({
               })}
             </span>
           </div>
-          <div className={styles.metadataItem}>
-            <span className={styles.metadataLabel}>Updated</span>
-            <span className={styles.metadataValue} data-testid="collection-updated">
+          <div className="flex flex-col gap-1">
+            <span className="text-sm font-medium text-muted-foreground">Updated</span>
+            <span
+              className="text-base text-foreground break-words"
+              data-testid="collection-updated"
+            >
               {formatDate(new Date(collection.updatedAt), {
                 year: 'numeric',
                 month: 'short',
@@ -1027,9 +1089,14 @@ export function CollectionDetailPage({
             </span>
           </div>
           {collection.description && (
-            <div className={`${styles.metadataItem} ${styles.metadataItemFull}`}>
-              <span className={styles.metadataLabel}>{t('collections.description')}</span>
-              <span className={styles.metadataValue} data-testid="collection-description">
+            <div className="flex flex-col gap-1 col-span-full">
+              <span className="text-sm font-medium text-muted-foreground">
+                {t('collections.description')}
+              </span>
+              <span
+                className="text-base text-foreground break-words"
+                data-testid="collection-description"
+              >
                 {collection.description}
               </span>
             </div>
@@ -1038,91 +1105,52 @@ export function CollectionDetailPage({
       </section>
 
       {/* Tabs Navigation */}
-      <div className={styles.tabsNav} role="tablist" aria-label="Collection sections">
-        <button
-          type="button"
-          role="tab"
-          className={`${styles.tab} ${activeTab === 'fields' ? styles.tabActive : ''}`}
-          onClick={() => handleTabChange('fields')}
-          aria-selected={activeTab === 'fields'}
-          aria-controls="fields-panel"
-          id="fields-tab"
-          data-testid="fields-tab"
-        >
-          {t('collections.fields')} ({sortedFields.length})
-        </button>
-        <button
-          type="button"
-          role="tab"
-          className={`${styles.tab} ${activeTab === 'validationRules' ? styles.tabActive : ''}`}
-          onClick={() => handleTabChange('validationRules')}
-          aria-selected={activeTab === 'validationRules'}
-          aria-controls="validation-rules-panel"
-          id="validation-rules-tab"
-          data-testid="validation-rules-tab"
-        >
-          {t('collections.validationRules')}
-        </button>
-        <button
-          type="button"
-          role="tab"
-          className={`${styles.tab} ${activeTab === 'recordTypes' ? styles.tabActive : ''}`}
-          onClick={() => handleTabChange('recordTypes')}
-          aria-selected={activeTab === 'recordTypes'}
-          aria-controls="record-types-panel"
-          id="record-types-tab"
-          data-testid="record-types-tab"
-        >
-          {t('collections.recordTypes')}
-        </button>
-        <button
-          type="button"
-          role="tab"
-          className={`${styles.tab} ${activeTab === 'picklistDependencies' ? styles.tabActive : ''}`}
-          onClick={() => handleTabChange('picklistDependencies')}
-          aria-selected={activeTab === 'picklistDependencies'}
-          aria-controls="picklist-dependencies-panel"
-          id="picklist-dependencies-tab"
-          data-testid="picklist-dependencies-tab"
-        >
-          {t('picklistDependencies.title')}
-        </button>
-        <button
-          type="button"
-          role="tab"
-          className={`${styles.tab} ${activeTab === 'fieldHistory' ? styles.tabActive : ''}`}
-          onClick={() => handleTabChange('fieldHistory')}
-          aria-selected={activeTab === 'fieldHistory'}
-          aria-controls="field-history-panel"
-          id="field-history-tab"
-          data-testid="field-history-tab"
-        >
-          {t('collections.fieldHistory')}
-        </button>
-        <button
-          type="button"
-          role="tab"
-          className={`${styles.tab} ${activeTab === 'setupAudit' ? styles.tabActive : ''}`}
-          onClick={() => handleTabChange('setupAudit')}
-          aria-selected={activeTab === 'setupAudit'}
-          aria-controls="setup-audit-panel"
-          id="setup-audit-tab"
-          data-testid="setup-audit-tab"
-        >
-          {t('collections.setupAudit')}
-        </button>
-        <button
-          type="button"
-          role="tab"
-          className={`${styles.tab} ${activeTab === 'versions' ? styles.tabActive : ''}`}
-          onClick={() => handleTabChange('versions')}
-          aria-selected={activeTab === 'versions'}
-          aria-controls="versions-panel"
-          id="versions-tab"
-          data-testid="versions-tab"
-        >
-          {t('collections.versionHistory')}
-        </button>
+      <div
+        className="flex gap-1 border-b-2 border-border max-sm:overflow-x-auto max-sm:[-webkit-overflow-scrolling:touch]"
+        role="tablist"
+        aria-label="Collection sections"
+      >
+        {(
+          [
+            {
+              key: 'fields',
+              label: `${t('collections.fields')} (${sortedFields.length})`,
+              id: 'fields',
+            },
+            {
+              key: 'validationRules',
+              label: t('collections.validationRules'),
+              id: 'validation-rules',
+            },
+            { key: 'recordTypes', label: t('collections.recordTypes'), id: 'record-types' },
+            {
+              key: 'picklistDependencies',
+              label: t('picklistDependencies.title'),
+              id: 'picklist-dependencies',
+            },
+            { key: 'fieldHistory', label: t('collections.fieldHistory'), id: 'field-history' },
+            { key: 'setupAudit', label: t('collections.setupAudit'), id: 'setup-audit' },
+            { key: 'versions', label: t('collections.versionHistory'), id: 'versions' },
+          ] as const
+        ).map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            role="tab"
+            className={cn(
+              'px-4 py-2 text-sm font-medium text-muted-foreground bg-transparent border-none border-b-2 border-transparent -mb-[2px] cursor-pointer transition-colors duration-200 motion-reduce:transition-none whitespace-nowrap',
+              'hover:text-foreground focus:outline-2 focus:outline-primary focus:-outline-offset-2',
+              activeTab === tab.key && 'text-primary border-b-primary'
+            )}
+            onClick={() => handleTabChange(tab.key)}
+            aria-selected={activeTab === tab.key}
+            aria-controls={`${tab.id}-panel`}
+            id={`${tab.id}-tab`}
+            data-testid={`${tab.id}-tab`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       {/* Fields Panel */}
@@ -1131,14 +1159,14 @@ export function CollectionDetailPage({
           id="fields-panel"
           role="tabpanel"
           aria-labelledby="fields-tab"
-          className={styles.tabPanel}
+          className="py-6"
           data-testid="fields-panel"
         >
-          <div className={styles.panelHeader}>
-            <h2 className={styles.panelTitle}>{t('collections.fields')}</h2>
+          <div className="flex justify-between items-center mb-4 max-sm:flex-col max-sm:items-stretch max-sm:gap-2">
+            <h2 className="m-0 text-lg font-semibold text-foreground">{t('collections.fields')}</h2>
             <button
               type="button"
-              className={styles.addButton}
+              className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-primary-foreground bg-primary border-none rounded-md cursor-pointer transition-colors duration-200 motion-reduce:transition-none hover:bg-primary/90 focus:outline-2 focus:outline-primary focus:outline-offset-2 max-sm:w-full"
               onClick={handleAddField}
               aria-label={t('collections.addField')}
               data-testid="add-field-button"
@@ -1147,39 +1175,99 @@ export function CollectionDetailPage({
             </button>
           </div>
           {displayFields.length === 0 ? (
-            <div className={styles.emptyState} data-testid="fields-empty-state">
-              <p>{t('common.noData')}</p>
-              <button type="button" className={styles.addButton} onClick={handleAddField}>
+            <div
+              className="flex flex-col items-center justify-center gap-4 p-12 text-center text-muted-foreground bg-muted rounded-md"
+              data-testid="fields-empty-state"
+            >
+              <p className="m-0 text-base">{t('common.noData')}</p>
+              <button
+                type="button"
+                className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-primary-foreground bg-primary border-none rounded-md cursor-pointer transition-colors duration-200 motion-reduce:transition-none hover:bg-primary/90 focus:outline-2 focus:outline-primary focus:outline-offset-2"
+                onClick={handleAddField}
+              >
                 {t('collections.addField')}
               </button>
             </div>
           ) : (
-            <div className={styles.tableContainer}>
+            <div className="overflow-x-auto border border-border rounded-md bg-card">
               <table
-                className={styles.table}
+                className="w-full border-collapse text-sm"
                 aria-label={t('collections.fields')}
                 data-testid="fields-table"
               >
-                <thead>
+                <thead className="bg-muted">
                   <tr>
-                    <th scope="col" className={styles.dragHandleCol}></th>
-                    <th scope="col">{t('collections.fieldName')}</th>
-                    <th scope="col">{t('collections.displayName')}</th>
-                    <th scope="col">{t('collections.fieldType')}</th>
-                    <th scope="col">{t('collections.description')}</th>
-                    <th scope="col">{t('fields.validation.required')}</th>
-                    <th scope="col">{t('fields.validation.unique')}</th>
-                    <th scope="col">{t('fields.validation.indexed')}</th>
-                    <th scope="col">{t('fieldEditor.trackHistory')}</th>
-                    <th scope="col">{t('fields.relationship')}</th>
-                    <th scope="col">{t('common.actions')}</th>
+                    <th scope="col" className="w-8 !p-0"></th>
+                    <th
+                      scope="col"
+                      className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap"
+                    >
+                      {t('collections.fieldName')}
+                    </th>
+                    <th
+                      scope="col"
+                      className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap"
+                    >
+                      {t('collections.displayName')}
+                    </th>
+                    <th
+                      scope="col"
+                      className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap"
+                    >
+                      {t('collections.fieldType')}
+                    </th>
+                    <th
+                      scope="col"
+                      className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap"
+                    >
+                      {t('collections.description')}
+                    </th>
+                    <th
+                      scope="col"
+                      className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap"
+                    >
+                      {t('fields.validation.required')}
+                    </th>
+                    <th
+                      scope="col"
+                      className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap"
+                    >
+                      {t('fields.validation.unique')}
+                    </th>
+                    <th
+                      scope="col"
+                      className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap"
+                    >
+                      {t('fields.validation.indexed')}
+                    </th>
+                    <th
+                      scope="col"
+                      className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap"
+                    >
+                      {t('fieldEditor.trackHistory')}
+                    </th>
+                    <th
+                      scope="col"
+                      className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap"
+                    >
+                      {t('fields.relationship')}
+                    </th>
+                    <th
+                      scope="col"
+                      className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap"
+                    >
+                      {t('common.actions')}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {displayFields.map((field, index) => (
                     <tr
                       key={field.id}
-                      className={`${styles.tableRow} ${dragOverIndex === index ? styles.dragOver : ''}`}
+                      className={cn(
+                        'transition-colors duration-150 motion-reduce:transition-none hover:bg-muted/50',
+                        dragOverIndex === index && 'border-t-2 border-t-primary bg-primary/5'
+                      )}
                       data-testid={`field-row-${index}`}
                       draggable
                       onDragStart={() => handleDragStart(index)}
@@ -1187,19 +1275,26 @@ export function CollectionDetailPage({
                       onDragEnd={handleDragEnd}
                       onDrop={(e) => handleDrop(e, index)}
                     >
-                      <td className={styles.dragHandleCell}>
-                        <span className={styles.dragHandle} aria-label="Drag to reorder">
-                          ⠿
+                      <td className="w-8 !p-0 !px-1 text-center cursor-grab active:cursor-grabbing">
+                        <span
+                          className="text-base text-muted-foreground select-none leading-none group-hover:text-foreground"
+                          aria-label="Drag to reorder"
+                        >
+                          &#x283F;
                         </span>
                       </td>
-                      <td className={styles.fieldNameCell}>{field.name}</td>
-                      <td>{field.displayName || '-'}</td>
-                      <td>
-                        <span className={styles.fieldTypeBadge}>
+                      <td className="p-4 text-foreground border-b border-border/50 font-medium font-mono max-sm:p-2">
+                        {field.name}
+                      </td>
+                      <td className="p-4 text-foreground border-b border-border/50 max-sm:p-2">
+                        {field.displayName || '-'}
+                      </td>
+                      <td className="p-4 text-foreground border-b border-border/50 max-sm:p-2">
+                        <span className="inline-flex items-center px-2 py-1 text-xs font-medium text-blue-800 bg-blue-100 rounded dark:text-blue-300 dark:bg-blue-900">
                           {getFieldTypeDisplay(field.type, t)}
                         </span>
                       </td>
-                      <td className={styles.descriptionCell}>
+                      <td className="p-4 border-b border-border/50 max-w-[200px] text-xs text-muted-foreground max-sm:p-2">
                         {field.description ? (
                           <span title={field.description}>
                             {field.description.length > 50
@@ -1210,45 +1305,69 @@ export function CollectionDetailPage({
                           '-'
                         )}
                       </td>
-                      <td>
-                        <span className={field.required ? styles.checkMark : styles.crossMark}>
-                          {field.required ? '✓' : '✕'}
+                      <td className="p-4 text-foreground border-b border-border/50 max-sm:p-2">
+                        <span
+                          className={
+                            field.required
+                              ? 'text-green-800 font-bold dark:text-green-400'
+                              : 'text-muted-foreground'
+                          }
+                        >
+                          {field.required ? '\u2713' : '\u2715'}
                         </span>
                       </td>
-                      <td>
-                        <span className={field.unique ? styles.checkMark : styles.crossMark}>
-                          {field.unique ? '✓' : '✕'}
+                      <td className="p-4 text-foreground border-b border-border/50 max-sm:p-2">
+                        <span
+                          className={
+                            field.unique
+                              ? 'text-green-800 font-bold dark:text-green-400'
+                              : 'text-muted-foreground'
+                          }
+                        >
+                          {field.unique ? '\u2713' : '\u2715'}
                         </span>
                       </td>
-                      <td>
-                        <span className={field.indexed ? styles.checkMark : styles.crossMark}>
-                          {field.indexed ? '✓' : '✕'}
+                      <td className="p-4 text-foreground border-b border-border/50 max-sm:p-2">
+                        <span
+                          className={
+                            field.indexed
+                              ? 'text-green-800 font-bold dark:text-green-400'
+                              : 'text-muted-foreground'
+                          }
+                        >
+                          {field.indexed ? '\u2713' : '\u2715'}
                         </span>
                       </td>
-                      <td>
-                        <span className={field.trackHistory ? styles.checkMark : styles.crossMark}>
-                          {field.trackHistory ? '✓' : '✕'}
+                      <td className="p-4 text-foreground border-b border-border/50 max-sm:p-2">
+                        <span
+                          className={
+                            field.trackHistory
+                              ? 'text-green-800 font-bold dark:text-green-400'
+                              : 'text-muted-foreground'
+                          }
+                        >
+                          {field.trackHistory ? '\u2713' : '\u2715'}
                         </span>
                       </td>
-                      <td>
+                      <td className="p-4 text-foreground border-b border-border/50 max-sm:p-2">
                         {field.relationshipType ? (
                           <span
-                            className={styles.relationshipBadge}
+                            className="inline-flex items-center px-2 py-1 text-xs font-medium text-purple-600 bg-purple-100 rounded whitespace-nowrap dark:text-purple-300 dark:bg-purple-900"
                             title={field.referenceTarget || ''}
                           >
                             {field.relationshipType === 'MASTER_DETAIL'
                               ? 'Master-Detail'
                               : 'Lookup'}
-                            {field.relationshipName ? ` → ${field.relationshipName}` : ''}
+                            {field.relationshipName ? ` \u2192 ${field.relationshipName}` : ''}
                           </span>
                         ) : (
                           '-'
                         )}
                       </td>
-                      <td className={styles.actionsCell}>
+                      <td className="p-4 border-b border-border/50 w-[1%] whitespace-nowrap max-sm:p-2">
                         <button
                           type="button"
-                          className={styles.actionButton}
+                          className="px-2 py-1 text-xs font-medium text-foreground bg-background border border-border rounded cursor-pointer transition-colors duration-150 motion-reduce:transition-none hover:bg-muted hover:border-border/80 focus:outline-2 focus:outline-primary focus:outline-offset-2"
                           onClick={() => handleEditField(field)}
                           aria-label={`${t('common.edit')} ${field.name}`}
                           data-testid={`edit-field-button-${index}`}
@@ -1271,14 +1390,16 @@ export function CollectionDetailPage({
           id="validation-rules-panel"
           role="tabpanel"
           aria-labelledby="validation-rules-tab"
-          className={styles.tabPanel}
+          className="py-6"
           data-testid="validation-rules-panel"
         >
-          <div className={styles.panelHeader}>
-            <h2 className={styles.panelTitle}>{t('collections.validationRules')}</h2>
+          <div className="flex justify-between items-center mb-4 max-sm:flex-col max-sm:items-stretch max-sm:gap-2">
+            <h2 className="m-0 text-lg font-semibold text-foreground">
+              {t('collections.validationRules')}
+            </h2>
             <button
               type="button"
-              className={styles.addButton}
+              className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-primary-foreground bg-primary border-none rounded-md cursor-pointer transition-colors duration-200 motion-reduce:transition-none hover:bg-primary/90 focus:outline-2 focus:outline-primary focus:outline-offset-2 max-sm:w-full"
               onClick={handleAddValidationRule}
               aria-label={t('validationRules.addRule')}
               data-testid="add-validation-rule-button"
@@ -1287,56 +1408,106 @@ export function CollectionDetailPage({
             </button>
           </div>
           {isLoadingRules ? (
-            <div className={styles.loadingContainer}>
+            <div className="flex justify-center items-center min-h-[200px]">
               <LoadingSpinner size="medium" label={t('common.loading')} />
             </div>
           ) : validationRules.length === 0 ? (
-            <div className={styles.emptyState} data-testid="validation-rules-empty">
-              <p>{t('common.noData')}</p>
-              <button type="button" className={styles.addButton} onClick={handleAddValidationRule}>
+            <div
+              className="flex flex-col items-center justify-center gap-4 p-12 text-center text-muted-foreground bg-muted rounded-md"
+              data-testid="validation-rules-empty"
+            >
+              <p className="m-0 text-base">{t('common.noData')}</p>
+              <button
+                type="button"
+                className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-primary-foreground bg-primary border-none rounded-md cursor-pointer transition-colors duration-200 motion-reduce:transition-none hover:bg-primary/90 focus:outline-2 focus:outline-primary focus:outline-offset-2"
+                onClick={handleAddValidationRule}
+              >
                 {t('validationRules.addRule')}
               </button>
             </div>
           ) : (
-            <div className={styles.tableContainer}>
+            <div className="overflow-x-auto border border-border rounded-md bg-card">
               <table
-                className={styles.table}
+                className="w-full border-collapse text-sm"
                 aria-label={t('collections.validationRules')}
                 data-testid="validation-rules-table"
               >
-                <thead>
+                <thead className="bg-muted">
                   <tr>
-                    <th scope="col">{t('common.name')}</th>
-                    <th scope="col">{t('validationRules.formula')}</th>
-                    <th scope="col">{t('validationRules.errorMessage')}</th>
-                    <th scope="col">{t('validationRules.evaluateOn')}</th>
-                    <th scope="col">{t('collections.status')}</th>
-                    <th scope="col">{t('common.actions')}</th>
+                    <th
+                      scope="col"
+                      className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap"
+                    >
+                      {t('common.name')}
+                    </th>
+                    <th
+                      scope="col"
+                      className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap"
+                    >
+                      {t('validationRules.formula')}
+                    </th>
+                    <th
+                      scope="col"
+                      className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap"
+                    >
+                      {t('validationRules.errorMessage')}
+                    </th>
+                    <th
+                      scope="col"
+                      className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap"
+                    >
+                      {t('validationRules.evaluateOn')}
+                    </th>
+                    <th
+                      scope="col"
+                      className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap"
+                    >
+                      {t('collections.status')}
+                    </th>
+                    <th
+                      scope="col"
+                      className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap"
+                    >
+                      {t('common.actions')}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {validationRules.map((rule, index) => (
                     <tr key={rule.id} data-testid={`validation-rule-row-${index}`}>
-                      <td className={styles.fieldNameCell}>{rule.name}</td>
-                      <td>
-                        <code className={styles.formulaCode}>{rule.errorConditionFormula}</code>
+                      <td className="p-4 text-foreground border-b border-border/50 font-medium font-mono">
+                        {rule.name}
                       </td>
-                      <td>{rule.errorMessage}</td>
-                      <td>
-                        <span className={styles.evaluateOnBadge}>{rule.evaluateOn}</span>
+                      <td className="p-4 border-b border-border/50">
+                        <code className="inline-block max-w-[300px] px-2 py-1 font-mono text-xs text-foreground bg-muted rounded overflow-hidden text-ellipsis whitespace-nowrap">
+                          {rule.errorConditionFormula}
+                        </code>
                       </td>
-                      <td>
+                      <td className="p-4 text-foreground border-b border-border/50">
+                        {rule.errorMessage}
+                      </td>
+                      <td className="p-4 border-b border-border/50">
+                        <span className="inline-flex items-center px-2 py-1 text-xs font-medium text-amber-800 bg-amber-100 rounded dark:text-amber-300 dark:bg-amber-900">
+                          {rule.evaluateOn}
+                        </span>
+                      </td>
+                      <td className="p-4 border-b border-border/50">
                         <span
-                          className={`${styles.statusBadge} ${rule.active ? styles.statusActive : styles.statusInactive}`}
+                          className={cn(
+                            'inline-flex items-center px-2 py-1 text-xs font-medium rounded-full capitalize',
+                            rule.active
+                              ? 'text-green-800 bg-green-100 dark:text-green-300 dark:bg-green-900'
+                              : 'text-yellow-800 bg-yellow-100 dark:text-yellow-300 dark:bg-yellow-900'
+                          )}
                         >
                           {rule.active ? t('collections.active') : t('collections.inactive')}
                         </span>
                       </td>
-                      <td className={styles.actionsCell}>
-                        <div className={styles.actionButtons}>
+                      <td className="p-4 border-b border-border/50 w-[1%] whitespace-nowrap">
+                        <div className="flex gap-1 flex-nowrap">
                           <button
                             type="button"
-                            className={styles.actionButton}
+                            className="px-2 py-1 text-xs font-medium text-foreground bg-background border border-border rounded cursor-pointer transition-colors duration-150 motion-reduce:transition-none hover:bg-muted hover:border-border/80 focus:outline-2 focus:outline-primary focus:outline-offset-2"
                             onClick={() => handleEditValidationRule(rule)}
                             aria-label={`${t('common.edit')} ${rule.name}`}
                             data-testid={`edit-validation-rule-${index}`}
@@ -1346,7 +1517,7 @@ export function CollectionDetailPage({
                           {rule.active ? (
                             <button
                               type="button"
-                              className={styles.actionButton}
+                              className="px-2 py-1 text-xs font-medium text-foreground bg-background border border-border rounded cursor-pointer transition-colors duration-150 motion-reduce:transition-none hover:bg-muted hover:border-border/80 focus:outline-2 focus:outline-primary focus:outline-offset-2"
                               onClick={() => handleDeactivateValidationRule(rule.id)}
                               aria-label={`${t('common.deactivate')} ${rule.name}`}
                               data-testid={`deactivate-validation-rule-${index}`}
@@ -1356,7 +1527,7 @@ export function CollectionDetailPage({
                           ) : (
                             <button
                               type="button"
-                              className={styles.actionButton}
+                              className="px-2 py-1 text-xs font-medium text-foreground bg-background border border-border rounded cursor-pointer transition-colors duration-150 motion-reduce:transition-none hover:bg-muted hover:border-border/80 focus:outline-2 focus:outline-primary focus:outline-offset-2"
                               onClick={() => handleActivateValidationRule(rule.id)}
                               aria-label={`${t('common.activate')} ${rule.name}`}
                               data-testid={`activate-validation-rule-${index}`}
@@ -1366,7 +1537,7 @@ export function CollectionDetailPage({
                           )}
                           <button
                             type="button"
-                            className={`${styles.actionButton} ${styles.actionButtonDanger}`}
+                            className="px-2 py-1 text-xs font-medium text-destructive bg-background border border-destructive/30 rounded cursor-pointer transition-colors duration-150 motion-reduce:transition-none hover:bg-destructive/5 hover:border-destructive focus:outline-2 focus:outline-destructive focus:outline-offset-2"
                             onClick={() => handleDeleteValidationRuleClick(rule)}
                             aria-label={`${t('common.delete')} ${rule.name}`}
                             data-testid={`delete-validation-rule-${index}`}
@@ -1390,14 +1561,16 @@ export function CollectionDetailPage({
           id="record-types-panel"
           role="tabpanel"
           aria-labelledby="record-types-tab"
-          className={styles.tabPanel}
+          className="py-6"
           data-testid="record-types-panel"
         >
-          <div className={styles.panelHeader}>
-            <h2 className={styles.panelTitle}>{t('collections.recordTypes')}</h2>
+          <div className="flex justify-between items-center mb-4 max-sm:flex-col max-sm:items-stretch max-sm:gap-2">
+            <h2 className="m-0 text-lg font-semibold text-foreground">
+              {t('collections.recordTypes')}
+            </h2>
             <button
               type="button"
-              className={styles.addButton}
+              className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-primary-foreground bg-primary border-none rounded-md cursor-pointer transition-colors duration-200 motion-reduce:transition-none hover:bg-primary/90 focus:outline-2 focus:outline-primary focus:outline-offset-2 max-sm:w-full"
               onClick={handleAddRecordType}
               aria-label={t('recordTypes.addRecordType')}
               data-testid="add-record-type-button"
@@ -1406,54 +1579,97 @@ export function CollectionDetailPage({
             </button>
           </div>
           {isLoadingRecordTypes ? (
-            <div className={styles.loadingContainer}>
+            <div className="flex justify-center items-center min-h-[200px]">
               <LoadingSpinner size="medium" label={t('common.loading')} />
             </div>
           ) : recordTypes.length === 0 ? (
-            <div className={styles.emptyState} data-testid="record-types-empty">
-              <p>{t('common.noData')}</p>
-              <button type="button" className={styles.addButton} onClick={handleAddRecordType}>
+            <div
+              className="flex flex-col items-center justify-center gap-4 p-12 text-center text-muted-foreground bg-muted rounded-md"
+              data-testid="record-types-empty"
+            >
+              <p className="m-0 text-base">{t('common.noData')}</p>
+              <button
+                type="button"
+                className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-primary-foreground bg-primary border-none rounded-md cursor-pointer transition-colors duration-200 motion-reduce:transition-none hover:bg-primary/90 focus:outline-2 focus:outline-primary focus:outline-offset-2"
+                onClick={handleAddRecordType}
+              >
                 {t('recordTypes.addRecordType')}
               </button>
             </div>
           ) : (
-            <div className={styles.tableContainer}>
+            <div className="overflow-x-auto border border-border rounded-md bg-card">
               <table
-                className={styles.table}
+                className="w-full border-collapse text-sm"
                 aria-label={t('collections.recordTypes')}
                 data-testid="record-types-table"
               >
-                <thead>
+                <thead className="bg-muted">
                   <tr>
-                    <th scope="col">{t('common.name')}</th>
-                    <th scope="col">{t('collections.description')}</th>
-                    <th scope="col">{t('recordTypes.default')}</th>
-                    <th scope="col">{t('collections.status')}</th>
-                    <th scope="col">{t('common.actions')}</th>
+                    <th
+                      scope="col"
+                      className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap"
+                    >
+                      {t('common.name')}
+                    </th>
+                    <th
+                      scope="col"
+                      className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap"
+                    >
+                      {t('collections.description')}
+                    </th>
+                    <th
+                      scope="col"
+                      className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap"
+                    >
+                      {t('recordTypes.default')}
+                    </th>
+                    <th
+                      scope="col"
+                      className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap"
+                    >
+                      {t('collections.status')}
+                    </th>
+                    <th
+                      scope="col"
+                      className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap"
+                    >
+                      {t('common.actions')}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {recordTypes.map((rt, index) => (
                     <tr key={rt.id} data-testid={`record-type-row-${index}`}>
-                      <td className={styles.fieldNameCell}>{rt.name}</td>
-                      <td>{rt.description || '-'}</td>
-                      <td>
+                      <td className="p-4 text-foreground border-b border-border/50 font-medium font-mono">
+                        {rt.name}
+                      </td>
+                      <td className="p-4 text-foreground border-b border-border/50">
+                        {rt.description || '-'}
+                      </td>
+                      <td className="p-4 border-b border-border/50">
                         {rt.isDefault && (
-                          <span className={styles.defaultBadge}>{t('recordTypes.default')}</span>
+                          <span className="inline-flex items-center px-2 py-1 text-xs font-medium text-emerald-800 bg-emerald-100 rounded dark:text-emerald-300 dark:bg-emerald-900">
+                            {t('recordTypes.default')}
+                          </span>
                         )}
                       </td>
-                      <td>
+                      <td className="p-4 border-b border-border/50">
                         <span
-                          className={`${styles.statusBadge} ${rt.active ? styles.statusActive : styles.statusInactive}`}
+                          className={cn(
+                            'inline-flex items-center px-2 py-1 text-xs font-medium rounded-full capitalize',
+                            rt.active
+                              ? 'text-green-800 bg-green-100 dark:text-green-300 dark:bg-green-900'
+                              : 'text-yellow-800 bg-yellow-100 dark:text-yellow-300 dark:bg-yellow-900'
+                          )}
                         >
                           {rt.active ? t('collections.active') : t('collections.inactive')}
                         </span>
                       </td>
-                      <td className={styles.actionsCell}>
-                        <div className={styles.actionButtons}>
+                      <td className="p-4 border-b border-border/50 w-[1%] whitespace-nowrap">
+                        <div className="flex gap-1 flex-nowrap">
                           <button
                             type="button"
-                            className={styles.actionButton}
+                            className="px-2 py-1 text-xs font-medium text-foreground bg-background border border-border rounded cursor-pointer transition-colors duration-150 motion-reduce:transition-none hover:bg-muted hover:border-border/80 focus:outline-2 focus:outline-primary focus:outline-offset-2"
                             onClick={() => handleEditRecordType(rt)}
                             aria-label={`${t('common.edit')} ${rt.name}`}
                             data-testid={`edit-record-type-${index}`}
@@ -1462,7 +1678,7 @@ export function CollectionDetailPage({
                           </button>
                           <button
                             type="button"
-                            className={styles.actionButton}
+                            className="px-2 py-1 text-xs font-medium text-foreground bg-background border border-border rounded cursor-pointer transition-colors duration-150 motion-reduce:transition-none hover:bg-muted hover:border-border/80 focus:outline-2 focus:outline-primary focus:outline-offset-2"
                             onClick={() => handlePicklistOverrides(rt)}
                             aria-label={`${t('recordTypes.picklists')} ${rt.name}`}
                             data-testid={`picklist-overrides-${index}`}
@@ -1471,7 +1687,7 @@ export function CollectionDetailPage({
                           </button>
                           <button
                             type="button"
-                            className={`${styles.actionButton} ${styles.actionButtonDanger}`}
+                            className="px-2 py-1 text-xs font-medium text-destructive bg-background border border-destructive/30 rounded cursor-pointer transition-colors duration-150 motion-reduce:transition-none hover:bg-destructive/5 hover:border-destructive focus:outline-2 focus:outline-destructive focus:outline-offset-2"
                             onClick={() => handleDeleteRecordTypeClick(rt)}
                             aria-label={`${t('common.delete')} ${rt.name}`}
                             data-testid={`delete-record-type-${index}`}
@@ -1495,15 +1711,17 @@ export function CollectionDetailPage({
           id="picklist-dependencies-panel"
           role="tabpanel"
           aria-labelledby="picklist-dependencies-tab"
-          className={styles.tabPanel}
+          className="py-6"
           data-testid="picklist-dependencies-panel"
         >
-          <div className={styles.panelHeader}>
-            <h2 className={styles.panelTitle}>{t('picklistDependencies.title')}</h2>
+          <div className="flex justify-between items-center mb-4 max-sm:flex-col max-sm:items-stretch max-sm:gap-2">
+            <h2 className="m-0 text-lg font-semibold text-foreground">
+              {t('picklistDependencies.title')}
+            </h2>
             {picklistFieldIds.length >= 2 && (
               <button
                 type="button"
-                className={styles.addButton}
+                className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-primary-foreground bg-primary border-none rounded-md cursor-pointer transition-colors duration-200 motion-reduce:transition-none hover:bg-primary/90 focus:outline-2 focus:outline-primary focus:outline-offset-2 max-sm:w-full"
                 onClick={handleAddDependency}
                 aria-label={t('picklistDependencies.addDependency')}
                 data-testid="add-dependency-button"
@@ -1513,55 +1731,87 @@ export function CollectionDetailPage({
             )}
           </div>
           {picklistFieldIds.length < 2 ? (
-            <div className={styles.emptyState} data-testid="dependencies-no-fields">
-              <p>
+            <div
+              className="flex flex-col items-center justify-center gap-4 p-12 text-center text-muted-foreground bg-muted rounded-md"
+              data-testid="dependencies-no-fields"
+            >
+              <p className="m-0 text-base">
                 {picklistFieldIds.length === 0
                   ? t('picklistDependencies.noPicklistFields')
                   : t('picklistDependencies.needTwoPicklistFields')}
               </p>
             </div>
           ) : isLoadingDependencies ? (
-            <div className={styles.loadingContainer}>
+            <div className="flex justify-center items-center min-h-[200px]">
               <LoadingSpinner size="medium" label={t('common.loading')} />
             </div>
           ) : allDependencies.length === 0 ? (
-            <div className={styles.emptyState} data-testid="dependencies-empty">
-              <p>{t('picklistDependencies.noDependencies')}</p>
-              <button type="button" className={styles.addButton} onClick={handleAddDependency}>
+            <div
+              className="flex flex-col items-center justify-center gap-4 p-12 text-center text-muted-foreground bg-muted rounded-md"
+              data-testid="dependencies-empty"
+            >
+              <p className="m-0 text-base">{t('picklistDependencies.noDependencies')}</p>
+              <button
+                type="button"
+                className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-primary-foreground bg-primary border-none rounded-md cursor-pointer transition-colors duration-200 motion-reduce:transition-none hover:bg-primary/90 focus:outline-2 focus:outline-primary focus:outline-offset-2"
+                onClick={handleAddDependency}
+              >
                 {t('picklistDependencies.addDependency')}
               </button>
             </div>
           ) : (
-            <div className={styles.tableContainer}>
+            <div className="overflow-x-auto border border-border rounded-md bg-card">
               <table
-                className={styles.table}
+                className="w-full border-collapse text-sm"
                 aria-label={t('picklistDependencies.title')}
                 data-testid="dependencies-table"
               >
-                <thead>
+                <thead className="bg-muted">
                   <tr>
-                    <th scope="col">{t('picklistDependencies.controllingField')}</th>
-                    <th scope="col">{t('picklistDependencies.dependentField')}</th>
-                    <th scope="col">{t('picklistDependencies.mapping')}</th>
-                    <th scope="col">{t('common.actions')}</th>
+                    <th
+                      scope="col"
+                      className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap"
+                    >
+                      {t('picklistDependencies.controllingField')}
+                    </th>
+                    <th
+                      scope="col"
+                      className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap"
+                    >
+                      {t('picklistDependencies.dependentField')}
+                    </th>
+                    <th
+                      scope="col"
+                      className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap"
+                    >
+                      {t('picklistDependencies.mapping')}
+                    </th>
+                    <th
+                      scope="col"
+                      className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap"
+                    >
+                      {t('common.actions')}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {allDependencies.map((dep, index) => (
                     <tr key={dep.id} data-testid={`dependency-row-${index}`}>
-                      <td className={styles.fieldNameCell}>
+                      <td className="p-4 text-foreground border-b border-border/50 font-medium font-mono">
                         {getFieldName(dep.controllingFieldId)}
                       </td>
-                      <td className={styles.fieldNameCell}>{getFieldName(dep.dependentFieldId)}</td>
-                      <td>
+                      <td className="p-4 text-foreground border-b border-border/50 font-medium font-mono">
+                        {getFieldName(dep.dependentFieldId)}
+                      </td>
+                      <td className="p-4 text-foreground border-b border-border/50">
                         {Object.keys(dep.mapping).length} mapping
                         {Object.keys(dep.mapping).length !== 1 ? 's' : ''}
                       </td>
-                      <td className={styles.actionsCell}>
-                        <div className={styles.actionButtons}>
+                      <td className="p-4 border-b border-border/50 w-[1%] whitespace-nowrap">
+                        <div className="flex gap-1 flex-nowrap">
                           <button
                             type="button"
-                            className={styles.actionButton}
+                            className="px-2 py-1 text-xs font-medium text-foreground bg-background border border-border rounded cursor-pointer transition-colors duration-150 motion-reduce:transition-none hover:bg-muted hover:border-border/80 focus:outline-2 focus:outline-primary focus:outline-offset-2"
                             onClick={() => handleEditDependency(dep)}
                             aria-label={`${t('common.edit')} dependency`}
                             data-testid={`edit-dependency-${index}`}
@@ -1570,7 +1820,7 @@ export function CollectionDetailPage({
                           </button>
                           <button
                             type="button"
-                            className={`${styles.actionButton} ${styles.actionButtonDanger}`}
+                            className="px-2 py-1 text-xs font-medium text-destructive bg-background border border-destructive/30 rounded cursor-pointer transition-colors duration-150 motion-reduce:transition-none hover:bg-destructive/5 hover:border-destructive focus:outline-2 focus:outline-destructive focus:outline-offset-2"
                             onClick={() => handleDeleteDependencyClick(dep)}
                             aria-label={`${t('common.delete')} dependency`}
                             data-testid={`delete-dependency-${index}`}
@@ -1594,26 +1844,34 @@ export function CollectionDetailPage({
           id="field-history-panel"
           role="tabpanel"
           aria-labelledby="field-history-tab"
-          className={styles.tabPanel}
+          className="py-6"
           data-testid="field-history-panel"
         >
-          <div className={styles.panelHeader}>
-            <h2 className={styles.panelTitle}>{t('collections.fieldHistory')}</h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="m-0 text-lg font-semibold text-foreground">
+              {t('collections.fieldHistory')}
+            </h2>
           </div>
-          <div className={styles.infoMessage}>
-            <p>{t('fieldHistory.description')}</p>
-            <p className={styles.trackedFieldsNote}>{t('fieldHistory.trackedFieldsNote')}</p>
+          <div className="p-6 text-muted-foreground">
+            <p className="m-0 mb-2">{t('fieldHistory.description')}</p>
+            <p className="m-0 mb-2 italic text-sm">{t('fieldHistory.trackedFieldsNote')}</p>
             {sortedFields.length > 0 && (
-              <div className={styles.trackedFieldsList}>
-                <h3>{t('fieldHistory.trackedFields')}</h3>
-                <ul>
+              <div className="mt-4">
+                <h3 className="text-sm font-semibold m-0 mb-1">
+                  {t('fieldHistory.trackedFields')}
+                </h3>
+                <ul className="list-disc pl-6 m-0">
                   {sortedFields
                     .filter((f: FieldDefinition) => f.trackHistory)
                     .map((f: FieldDefinition) => (
-                      <li key={f.id}>{f.displayName || f.name}</li>
+                      <li key={f.id} className="text-sm py-1">
+                        {f.displayName || f.name}
+                      </li>
                     ))}
                   {sortedFields.filter((f: FieldDefinition) => f.trackHistory).length === 0 && (
-                    <li className={styles.emptyNote}>{t('fieldHistory.noTrackedFields')}</li>
+                    <li className="text-muted-foreground/60 italic">
+                      {t('fieldHistory.noTrackedFields')}
+                    </li>
                   )}
                 </ul>
               </div>
@@ -1622,46 +1880,93 @@ export function CollectionDetailPage({
 
           {/* Recent Field Changes */}
           {isLoadingFieldHistory ? (
-            <div className={styles.loadingContainer}>
+            <div className="flex justify-center items-center min-h-[200px]">
               <LoadingSpinner size="medium" label={t('common.loading')} />
             </div>
           ) : fieldHistoryPage?.content && fieldHistoryPage.content.length > 0 ? (
             <>
-              <h3 className={styles.panelSubtitle}>{t('fieldHistory.recentChanges')}</h3>
-              <div className={styles.tableContainer}>
+              <h3 className="text-base font-semibold text-foreground my-6 mb-2">
+                {t('fieldHistory.recentChanges')}
+              </h3>
+              <div className="overflow-x-auto border border-border rounded-md bg-card">
                 <table
-                  className={styles.table}
+                  className="w-full border-collapse text-sm"
                   aria-label={t('fieldHistory.recentChanges')}
                   data-testid="field-history-table"
                 >
-                  <thead>
+                  <thead className="bg-muted">
                     <tr>
-                      <th scope="col">{t('collections.fieldName')}</th>
-                      <th scope="col">{t('fieldHistory.recordId')}</th>
-                      <th scope="col">{t('fieldHistory.oldValue')}</th>
-                      <th scope="col">{t('fieldHistory.newValue')}</th>
-                      <th scope="col">{t('fieldHistory.changedBy')}</th>
-                      <th scope="col">{t('fieldHistory.changedAt')}</th>
-                      <th scope="col">{t('fieldHistory.source')}</th>
+                      <th
+                        scope="col"
+                        className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap"
+                      >
+                        {t('collections.fieldName')}
+                      </th>
+                      <th
+                        scope="col"
+                        className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap"
+                      >
+                        {t('fieldHistory.recordId')}
+                      </th>
+                      <th
+                        scope="col"
+                        className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap"
+                      >
+                        {t('fieldHistory.oldValue')}
+                      </th>
+                      <th
+                        scope="col"
+                        className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap"
+                      >
+                        {t('fieldHistory.newValue')}
+                      </th>
+                      <th
+                        scope="col"
+                        className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap"
+                      >
+                        {t('fieldHistory.changedBy')}
+                      </th>
+                      <th
+                        scope="col"
+                        className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap"
+                      >
+                        {t('fieldHistory.changedAt')}
+                      </th>
+                      <th
+                        scope="col"
+                        className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap"
+                      >
+                        {t('fieldHistory.source')}
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {fieldHistoryPage.content.map((entry: FieldHistoryEntry) => (
                       <tr key={entry.id}>
-                        <td className={styles.fieldNameCell}>
+                        <td className="p-4 text-foreground border-b border-border/50 font-medium font-mono">
                           {getFieldName(entry.fieldName) || entry.fieldName}
                         </td>
-                        <td>
-                          <code className={styles.recordIdCode}>
+                        <td className="p-4 border-b border-border/50">
+                          <code className="font-mono text-xs px-1.5 py-0.5 bg-muted rounded">
                             {entry.recordId.substring(0, 8)}...
                           </code>
                         </td>
-                        <td>{entry.oldValue != null ? String(entry.oldValue) : '-'}</td>
-                        <td>{entry.newValue != null ? String(entry.newValue) : '-'}</td>
-                        <td>{entry.changedBy || '-'}</td>
-                        <td>{new Date(entry.changedAt).toLocaleString()}</td>
-                        <td>
-                          <span className={styles.sourceTag}>{entry.changeSource}</span>
+                        <td className="p-4 text-foreground border-b border-border/50">
+                          {entry.oldValue != null ? String(entry.oldValue) : '-'}
+                        </td>
+                        <td className="p-4 text-foreground border-b border-border/50">
+                          {entry.newValue != null ? String(entry.newValue) : '-'}
+                        </td>
+                        <td className="p-4 text-foreground border-b border-border/50">
+                          {entry.changedBy || '-'}
+                        </td>
+                        <td className="p-4 text-foreground border-b border-border/50">
+                          {new Date(entry.changedAt).toLocaleString()}
+                        </td>
+                        <td className="p-4 border-b border-border/50">
+                          <span className="inline-flex items-center px-2 py-1 text-xs font-medium text-emerald-800 bg-emerald-100 rounded uppercase tracking-wide dark:text-emerald-300 dark:bg-emerald-900">
+                            {entry.changeSource}
+                          </span>
                         </td>
                       </tr>
                     ))}
@@ -1671,8 +1976,11 @@ export function CollectionDetailPage({
             </>
           ) : (
             sortedFields.some((f: FieldDefinition) => f.trackHistory) && (
-              <div className={styles.emptyState} data-testid="field-history-empty">
-                <p>{t('fieldHistory.noChanges')}</p>
+              <div
+                className="flex flex-col items-center justify-center gap-4 p-12 text-center text-muted-foreground bg-muted rounded-md"
+                data-testid="field-history-empty"
+              >
+                <p className="m-0 text-base">{t('fieldHistory.noChanges')}</p>
               </div>
             )
           )}
@@ -1685,46 +1993,75 @@ export function CollectionDetailPage({
           id="setup-audit-panel"
           role="tabpanel"
           aria-labelledby="setup-audit-tab"
-          className={styles.tabPanel}
+          className="py-6"
           data-testid="setup-audit-panel"
         >
-          <div className={styles.panelHeader}>
-            <h2 className={styles.panelTitle}>{t('collections.setupAudit')}</h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="m-0 text-lg font-semibold text-foreground">
+              {t('collections.setupAudit')}
+            </h2>
           </div>
           {isLoadingAudit ? (
             <LoadingSpinner />
           ) : setupAuditPage?.content && setupAuditPage.content.length > 0 ? (
-            <div className={styles.tableContainer}>
-              <table className={styles.table} aria-label={t('collections.setupAudit')}>
-                <thead>
+            <div className="overflow-x-auto border border-border rounded-md bg-card">
+              <table
+                className="w-full border-collapse text-sm"
+                aria-label={t('collections.setupAudit')}
+              >
+                <thead className="bg-muted">
                   <tr>
-                    <th>{t('setupAudit.action')}</th>
-                    <th>{t('setupAudit.section')}</th>
-                    <th>{t('setupAudit.entityType')}</th>
-                    <th>{t('setupAudit.entityName')}</th>
-                    <th>{t('setupAudit.performedAt')}</th>
+                    <th className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap">
+                      {t('setupAudit.action')}
+                    </th>
+                    <th className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap">
+                      {t('setupAudit.section')}
+                    </th>
+                    <th className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap">
+                      {t('setupAudit.entityType')}
+                    </th>
+                    <th className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap">
+                      {t('setupAudit.entityName')}
+                    </th>
+                    <th className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap">
+                      {t('setupAudit.performedAt')}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {setupAuditPage.content.map((entry: SetupAuditTrailEntry) => (
                     <tr key={entry.id}>
-                      <td>
-                        <span className={styles.actionBadge} data-action={entry.action}>
+                      <td className="p-4 border-b border-border/50">
+                        <span
+                          className={cn(
+                            'inline-flex items-center px-2 py-1 text-xs font-medium rounded',
+                            getActionBadgeClasses(entry.action)
+                          )}
+                          data-action={entry.action}
+                        >
                           {entry.action}
                         </span>
                       </td>
-                      <td>{entry.section}</td>
-                      <td>{entry.entityType}</td>
-                      <td>{entry.entityName || '-'}</td>
-                      <td>{new Date(entry.timestamp).toLocaleString()}</td>
+                      <td className="p-4 text-foreground border-b border-border/50">
+                        {entry.section}
+                      </td>
+                      <td className="p-4 text-foreground border-b border-border/50">
+                        {entry.entityType}
+                      </td>
+                      <td className="p-4 text-foreground border-b border-border/50">
+                        {entry.entityName || '-'}
+                      </td>
+                      <td className="p-4 text-foreground border-b border-border/50">
+                        {new Date(entry.timestamp).toLocaleString()}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           ) : (
-            <div className={styles.emptyState}>
-              <p>{t('setupAudit.empty')}</p>
+            <div className="flex flex-col items-center justify-center gap-4 p-12 text-center text-muted-foreground bg-muted rounded-md">
+              <p className="m-0 text-base">{t('setupAudit.empty')}</p>
             </div>
           )}
         </section>
@@ -1736,14 +2073,16 @@ export function CollectionDetailPage({
           id="versions-panel"
           role="tabpanel"
           aria-labelledby="versions-tab"
-          className={styles.tabPanel}
+          className="py-6"
           data-testid="versions-panel"
         >
-          <div className={styles.panelHeader}>
-            <h2 className={styles.panelTitle}>{t('collections.versionHistory')}</h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="m-0 text-lg font-semibold text-foreground">
+              {t('collections.versionHistory')}
+            </h2>
           </div>
           {isLoadingVersions ? (
-            <div className={styles.loadingContainer}>
+            <div className="flex justify-center items-center min-h-[200px]">
               <LoadingSpinner size="medium" label={t('common.loading')} />
             </div>
           ) : versionsError ? (
@@ -1754,41 +2093,63 @@ export function CollectionDetailPage({
               variant="compact"
             />
           ) : versions.length === 0 ? (
-            <div className={styles.emptyState} data-testid="versions-empty-state">
-              <p>{t('common.noData')}</p>
+            <div
+              className="flex flex-col items-center justify-center gap-4 p-12 text-center text-muted-foreground bg-muted rounded-md"
+              data-testid="versions-empty-state"
+            >
+              <p className="m-0 text-base">{t('common.noData')}</p>
             </div>
           ) : (
-            <div className={styles.tableContainer}>
+            <div className="overflow-x-auto border border-border rounded-md bg-card">
               <table
-                className={styles.table}
+                className="w-full border-collapse text-sm"
                 aria-label={t('collections.versionHistory')}
                 data-testid="versions-table"
               >
-                <thead>
+                <thead className="bg-muted">
                   <tr>
-                    <th scope="col">Version</th>
-                    <th scope="col">Created</th>
-                    <th scope="col">{t('common.actions')}</th>
+                    <th
+                      scope="col"
+                      className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap"
+                    >
+                      Version
+                    </th>
+                    <th
+                      scope="col"
+                      className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap"
+                    >
+                      Created
+                    </th>
+                    <th
+                      scope="col"
+                      className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap"
+                    >
+                      {t('common.actions')}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {versions.map((version, index) => (
                     <tr
                       key={version.id}
-                      className={`${styles.tableRow} ${
-                        version.version === collection.currentVersion ? styles.currentVersion : ''
-                      }`}
+                      className={cn(
+                        'transition-colors duration-150 motion-reduce:transition-none hover:bg-muted/50',
+                        version.version === collection.currentVersion &&
+                          'bg-blue-50 dark:bg-blue-950'
+                      )}
                       data-testid={`version-row-${index}`}
                     >
-                      <td>
-                        <span className={styles.versionNumber}>
+                      <td className="p-4 text-foreground border-b border-border/50">
+                        <span className="inline-flex items-center gap-2 font-medium">
                           v{version.version}
                           {version.version === collection.currentVersion && (
-                            <span className={styles.currentBadge}>(Current)</span>
+                            <span className="text-xs font-normal text-green-800 dark:text-green-400">
+                              (Current)
+                            </span>
                           )}
                         </span>
                       </td>
-                      <td>
+                      <td className="p-4 text-foreground border-b border-border/50">
                         {formatDate(new Date(version.createdAt), {
                           year: 'numeric',
                           month: 'short',
@@ -1797,10 +2158,10 @@ export function CollectionDetailPage({
                           minute: '2-digit',
                         })}
                       </td>
-                      <td className={styles.actionsCell}>
+                      <td className="p-4 border-b border-border/50 w-[1%] whitespace-nowrap">
                         <button
                           type="button"
-                          className={styles.actionButton}
+                          className="px-2 py-1 text-xs font-medium text-foreground bg-background border border-border rounded cursor-pointer transition-colors duration-150 motion-reduce:transition-none hover:bg-muted hover:border-border/80 focus:outline-2 focus:outline-primary focus:outline-offset-2"
                           onClick={() => handleViewVersion(version)}
                           aria-label={`View version ${version.version}`}
                           data-testid={`view-version-button-${index}`}
@@ -1855,10 +2216,14 @@ export function CollectionDetailPage({
 
       {/* Field Editor Modal */}
       {fieldEditorOpen && (
-        <div className={styles.modalOverlay} role="presentation" onMouseDown={handleFieldCancel}>
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-[1000] p-4 overflow-y-auto max-sm:p-0 max-sm:items-end"
+          role="presentation"
+          onMouseDown={handleFieldCancel}
+        >
           {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
           <div
-            className={styles.modalContent}
+            className="bg-card rounded-lg shadow-xl max-w-[600px] w-full max-h-[90vh] overflow-y-auto p-6 dark:shadow-2xl max-sm:max-w-full max-sm:max-h-[95vh] max-sm:rounded-b-none"
             onClick={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
           >
@@ -1885,13 +2250,13 @@ export function CollectionDetailPage({
       {/* Validation Rule Editor Modal */}
       {validationRuleEditorOpen && (
         <div
-          className={styles.modalOverlay}
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-[1000] p-4 overflow-y-auto max-sm:p-0 max-sm:items-end"
           role="presentation"
           onMouseDown={handleValidationRuleCancel}
         >
           {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
           <div
-            className={styles.modalContent}
+            className="bg-card rounded-lg shadow-xl max-w-[600px] w-full max-h-[90vh] overflow-y-auto p-6 dark:shadow-2xl max-sm:max-w-full max-sm:max-h-[95vh] max-sm:rounded-b-none"
             onClick={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
           >
@@ -1935,13 +2300,13 @@ export function CollectionDetailPage({
       {/* Record Type Editor Modal */}
       {recordTypeEditorOpen && (
         <div
-          className={styles.modalOverlay}
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-[1000] p-4 overflow-y-auto max-sm:p-0 max-sm:items-end"
           role="presentation"
           onMouseDown={handleRecordTypeCancel}
         >
           {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
           <div
-            className={styles.modalContent}
+            className="bg-card rounded-lg shadow-xl max-w-[600px] w-full max-h-[90vh] overflow-y-auto p-6 dark:shadow-2xl max-sm:max-w-full max-sm:max-h-[95vh] max-sm:rounded-b-none"
             onClick={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
           >

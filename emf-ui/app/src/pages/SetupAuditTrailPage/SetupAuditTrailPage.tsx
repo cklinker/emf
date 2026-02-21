@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
 import { LoadingSpinner, ErrorMessage } from '../../components'
-import styles from './SetupAuditTrailPage.module.css'
+import { cn } from '@/lib/utils'
 
 export interface SetupAuditTrailPageProps {
   className?: string
@@ -65,14 +65,16 @@ export function SetupAuditTrailPage({ className }: SetupAuditTrailPageProps): Re
   const totalPages = auditData?.totalPages || 0
 
   return (
-    <div className={`${styles.container} ${className || ''}`}>
-      <div className={styles.header}>
-        <h1 className={styles.title}>{t('audit.title')}</h1>
+    <div className={cn('mx-auto max-w-[1200px] p-6', className)}>
+      <div className="mb-6 flex items-center justify-between">
+        <h1 className="m-0 text-2xl font-semibold text-foreground">{t('audit.title')}</h1>
       </div>
 
-      <div className={styles.filters}>
-        <div className={styles.filterGroup}>
-          <label htmlFor="section-filter">{t('audit.section')}</label>
+      <div className="mb-6 flex flex-wrap gap-4">
+        <div className="flex flex-col gap-1">
+          <label htmlFor="section-filter" className="text-sm font-medium text-muted-foreground">
+            {t('audit.section')}
+          </label>
           <select
             id="section-filter"
             value={section}
@@ -80,6 +82,7 @@ export function SetupAuditTrailPage({ className }: SetupAuditTrailPageProps): Re
               setSection(e.target.value)
               setPage(0)
             }}
+            className="min-w-[200px] rounded-md border border-border bg-background p-2 text-sm text-foreground"
           >
             <option value="">{t('audit.allSections')}</option>
             <option value="Collections">{t('audit.sectionCollections')}</option>
@@ -91,8 +94,10 @@ export function SetupAuditTrailPage({ className }: SetupAuditTrailPageProps): Re
             <option value="Sharing">{t('audit.sectionSharing')}</option>
           </select>
         </div>
-        <div className={styles.filterGroup}>
-          <label htmlFor="entity-filter">{t('audit.entityType')}</label>
+        <div className="flex flex-col gap-1">
+          <label htmlFor="entity-filter" className="text-sm font-medium text-muted-foreground">
+            {t('audit.entityType')}
+          </label>
           <input
             id="entity-filter"
             type="text"
@@ -102,76 +107,120 @@ export function SetupAuditTrailPage({ className }: SetupAuditTrailPageProps): Re
               setPage(0)
             }}
             placeholder={t('audit.entityTypePlaceholder')}
+            className="min-w-[200px] rounded-md border border-border bg-background p-2 text-sm text-foreground placeholder:text-muted-foreground"
           />
         </div>
       </div>
 
       {entries.length === 0 ? (
-        <div className={styles.empty}>
+        <div className="p-12 text-center text-muted-foreground">
           <p>{t('audit.noEntries')}</p>
         </div>
       ) : (
         <>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>{t('audit.timestamp')}</th>
-                <th>{t('audit.action')}</th>
-                <th>{t('audit.section')}</th>
-                <th>{t('audit.entityType')}</th>
-                <th>{t('audit.entityName')}</th>
-                <th>{t('audit.user')}</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {entries.map((entry) => (
-                <React.Fragment key={entry.id}>
-                  <tr
-                    className={expandedRows.has(entry.id) ? styles.rowExpanded : ''}
-                    onClick={() => toggleRow(entry.id)}
-                  >
-                    <td>{new Date(entry.timestamp).toLocaleString()}</td>
-                    <td>
-                      <span className={`${styles.badge} ${styles[`badge${entry.action}`]}`}>
-                        {entry.action}
-                      </span>
-                    </td>
-                    <td>{entry.section}</td>
-                    <td>{entry.entityType}</td>
-                    <td>{entry.entityName || entry.entityId || '-'}</td>
-                    <td>{entry.userId}</td>
-                    <td>
-                      <span className={styles.expandIcon}>
-                        {expandedRows.has(entry.id) ? '\u25BC' : '\u25B6'}
-                      </span>
-                    </td>
-                  </tr>
-                  {expandedRows.has(entry.id) && (
-                    <tr className={styles.detailRow}>
-                      <td colSpan={7}>
-                        <div className={styles.diffView}>
-                          <div className={styles.diffColumn}>
-                            <h4>{t('audit.oldValue')}</h4>
-                            <pre>{formatJson(entry.oldValue)}</pre>
-                          </div>
-                          <div className={styles.diffColumn}>
-                            <h4>{t('audit.newValue')}</h4>
-                            <pre>{formatJson(entry.newValue)}</pre>
-                          </div>
-                        </div>
+          <div className="overflow-x-auto rounded-lg border border-border bg-card">
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="bg-muted">
+                  <th className="border-b border-border p-3 text-left font-semibold text-muted-foreground">
+                    {t('audit.timestamp')}
+                  </th>
+                  <th className="border-b border-border p-3 text-left font-semibold text-muted-foreground">
+                    {t('audit.action')}
+                  </th>
+                  <th className="border-b border-border p-3 text-left font-semibold text-muted-foreground">
+                    {t('audit.section')}
+                  </th>
+                  <th className="border-b border-border p-3 text-left font-semibold text-muted-foreground">
+                    {t('audit.entityType')}
+                  </th>
+                  <th className="border-b border-border p-3 text-left font-semibold text-muted-foreground">
+                    {t('audit.entityName')}
+                  </th>
+                  <th className="border-b border-border p-3 text-left font-semibold text-muted-foreground">
+                    {t('audit.user')}
+                  </th>
+                  <th className="border-b border-border p-3 text-left font-semibold text-muted-foreground"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {entries.map((entry) => (
+                  <React.Fragment key={entry.id}>
+                    <tr
+                      className={cn(
+                        'cursor-pointer hover:bg-accent',
+                        expandedRows.has(entry.id) && 'bg-muted'
+                      )}
+                      onClick={() => toggleRow(entry.id)}
+                    >
+                      <td className="border-b border-border p-3">
+                        {new Date(entry.timestamp).toLocaleString()}
+                      </td>
+                      <td className="border-b border-border p-3">
+                        <span
+                          className={cn(
+                            'inline-block rounded-full px-2 py-0.5 text-xs font-medium',
+                            entry.action === 'CREATED' &&
+                              'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300',
+                            entry.action === 'UPDATED' &&
+                              'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300',
+                            entry.action === 'DELETED' &&
+                              'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300',
+                            entry.action === 'ACTIVATED' &&
+                              'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300',
+                            entry.action === 'DEACTIVATED' &&
+                              'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                          )}
+                        >
+                          {entry.action}
+                        </span>
+                      </td>
+                      <td className="border-b border-border p-3">{entry.section}</td>
+                      <td className="border-b border-border p-3">{entry.entityType}</td>
+                      <td className="border-b border-border p-3">
+                        {entry.entityName || entry.entityId || '-'}
+                      </td>
+                      <td className="border-b border-border p-3">{entry.userId}</td>
+                      <td className="border-b border-border p-3">
+                        <span className="text-xs text-muted-foreground">
+                          {expandedRows.has(entry.id) ? '\u25BC' : '\u25B6'}
+                        </span>
                       </td>
                     </tr>
-                  )}
-                </React.Fragment>
-              ))}
-            </tbody>
-          </table>
+                    {expandedRows.has(entry.id) && (
+                      <tr className="bg-muted">
+                        <td colSpan={7} className="!p-0">
+                          <div className="grid grid-cols-2 gap-4 p-4">
+                            <div>
+                              <h4 className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
+                                {t('audit.oldValue')}
+                              </h4>
+                              <pre className="m-0 max-h-[300px] overflow-x-auto whitespace-pre-wrap break-all rounded border border-border bg-card p-3 text-xs">
+                                {formatJson(entry.oldValue)}
+                              </pre>
+                            </div>
+                            <div>
+                              <h4 className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
+                                {t('audit.newValue')}
+                              </h4>
+                              <pre className="m-0 max-h-[300px] overflow-x-auto whitespace-pre-wrap break-all rounded border border-border bg-card p-3 text-xs">
+                                {formatJson(entry.newValue)}
+                              </pre>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
           {totalPages > 1 && (
-            <div className={styles.pagination}>
+            <div className="mt-4 flex items-center justify-center gap-4 text-sm">
               <button
-                className={styles.btn}
+                className="cursor-pointer rounded-md border border-border bg-card px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={page === 0}
                 onClick={() => setPage((p) => p - 1)}
               >
@@ -181,7 +230,7 @@ export function SetupAuditTrailPage({ className }: SetupAuditTrailPageProps): Re
                 {t('audit.pageInfo', { current: String(page + 1), total: String(totalPages) })}
               </span>
               <button
-                className={styles.btn}
+                className="cursor-pointer rounded-md border border-border bg-card px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={page >= totalPages - 1}
                 onClick={() => setPage((p) => p + 1)}
               >

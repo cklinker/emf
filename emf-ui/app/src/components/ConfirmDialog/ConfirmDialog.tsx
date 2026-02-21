@@ -2,7 +2,7 @@
  * ConfirmDialog Component
  *
  * A reusable confirmation dialog for destructive or important actions.
- * Provides modal overlay with confirm/cancel actions and accessibility support.
+ * Built on shadcn AlertDialog (Radix UI) with Tailwind CSS styling.
  *
  * Requirements:
  * - 3.10: Display confirmation dialog before collection deletion
@@ -15,16 +15,24 @@
  * - Title and message display
  * - Confirm and Cancel buttons
  * - Danger variant with red confirm button for destructive actions
- * - Focus trap (focus stays within dialog)
+ * - Focus trap (handled by Radix AlertDialog)
  * - Escape key closes dialog
  * - Click outside closes dialog
- * - Accessible with ARIA dialog role
- * - Reduced motion support
+ * - Accessible with ARIA alertdialog role
  */
 
-import React, { useEffect, useRef, useCallback } from 'react'
 import { useI18n } from '../../context/I18nContext'
-import styles from './ConfirmDialog.module.css'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { cn } from '@/lib/utils'
 
 /**
  * ConfirmDialog variant type
@@ -60,22 +68,6 @@ export interface ConfirmDialogProps {
 }
 
 /**
- * Get all focusable elements within a container
- */
-function getFocusableElements(container: HTMLElement): HTMLElement[] {
-  const focusableSelectors = [
-    'button:not([disabled])',
-    'input:not([disabled])',
-    'select:not([disabled])',
-    'textarea:not([disabled])',
-    'a[href]',
-    '[tabindex]:not([tabindex="-1"])',
-  ].join(', ')
-
-  return Array.from(container.querySelectorAll<HTMLElement>(focusableSelectors))
-}
-
-/**
  * ConfirmDialog Component
  *
  * Displays a modal confirmation dialog with customizable title, message,
@@ -107,10 +99,8 @@ export function ConfirmDialog({
   closeOnOverlayClick = true,
   closeOnEscape = true,
   id,
-}: ConfirmDialogProps): React.ReactElement | null {
+}: ConfirmDialogProps): React.ReactElement {
   const { t } = useI18n()
-  const dialogRef = useRef<HTMLDivElement>(null)
-  const previousActiveElement = useRef<HTMLElement | null>(null)
 
   // Default labels with i18n support
   const resolvedConfirmLabel = confirmLabel ?? t('common.confirm')
@@ -121,168 +111,59 @@ export function ConfirmDialog({
   const titleId = `${dialogId}-title`
   const descriptionId = `${dialogId}-description`
 
-  /**
-   * Handle keyboard events for focus trap and escape key
-   */
-  const handleKeyDown = useCallback(
-    (event: KeyboardEvent) => {
-      if (!open) return
-
-      // Handle Escape key
-      if (event.key === 'Escape' && closeOnEscape) {
-        event.preventDefault()
-        onCancel()
-        return
-      }
-
-      // Handle Tab key for focus trap
-      if (event.key === 'Tab' && dialogRef.current) {
-        const focusableElements = getFocusableElements(dialogRef.current)
-        if (focusableElements.length === 0) return
-
-        const firstElement = focusableElements[0]
-        const lastElement = focusableElements[focusableElements.length - 1]
-
-        if (event.shiftKey) {
-          // Shift + Tab: if on first element, move to last
-          if (document.activeElement === firstElement) {
-            event.preventDefault()
-            lastElement.focus()
-          }
-        } else {
-          // Tab: if on last element, move to first
-          if (document.activeElement === lastElement) {
-            event.preventDefault()
-            firstElement.focus()
-          }
-        }
-      }
-    },
-    [open, closeOnEscape, onCancel]
-  )
-
-  /**
-   * Handle overlay click
-   */
-  const handleOverlayClick = useCallback(
-    (event: React.MouseEvent<HTMLDivElement>) => {
-      // Only close if clicking directly on the overlay, not the dialog content
-      if (event.target === event.currentTarget && closeOnOverlayClick) {
-        onCancel()
-      }
-    },
-    [closeOnOverlayClick, onCancel]
-  )
-
-  /**
-   * Handle confirm button click
-   */
-  const handleConfirm = useCallback(() => {
-    onConfirm()
-  }, [onConfirm])
-
-  /**
-   * Handle cancel button click
-   */
-  const handleCancel = useCallback(() => {
-    onCancel()
-  }, [onCancel])
-
-  /**
-   * Set up focus management and keyboard listeners when dialog opens/closes
-   */
-  useEffect(() => {
-    if (open) {
-      // Store the currently focused element to restore later
-      previousActiveElement.current = document.activeElement as HTMLElement
-
-      // Focus the dialog or first focusable element
-      if (dialogRef.current) {
-        const focusableElements = getFocusableElements(dialogRef.current)
-        if (focusableElements.length > 0) {
-          // Focus the cancel button by default (safer option)
-          const cancelButton = dialogRef.current.querySelector<HTMLElement>(
-            '[data-testid="confirm-dialog-cancel"]'
-          )
-          if (cancelButton) {
-            cancelButton.focus()
-          } else {
-            focusableElements[0].focus()
-          }
-        } else {
-          dialogRef.current.focus()
-        }
-      }
-
-      // Add keyboard event listener
-      document.addEventListener('keydown', handleKeyDown)
-
-      // Prevent body scroll when dialog is open
-      document.body.style.overflow = 'hidden'
-    } else {
-      // Restore focus to previously focused element
-      if (previousActiveElement.current) {
-        previousActiveElement.current.focus()
-      }
-
-      // Restore body scroll
-      document.body.style.overflow = ''
+  const handleOpenChange = (isOpen: boolean) => {
+    if (!isOpen) {
+      onCancel()
     }
+  }
 
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown)
-      document.body.style.overflow = ''
+  const handleInteractOutside = (e: Event) => {
+    if (!closeOnOverlayClick) {
+      e.preventDefault()
     }
-  }, [open, handleKeyDown])
+  }
 
-  // Don't render anything if not open
-  if (!open) {
-    return null
+  const handleEscapeKeyDown = (e: KeyboardEvent) => {
+    if (!closeOnEscape) {
+      e.preventDefault()
+    }
   }
 
   return (
-    <div
-      className={styles.overlay}
-      onClick={handleOverlayClick}
-      data-testid="confirm-dialog-overlay"
-      aria-hidden="true"
-    >
-      <div
-        ref={dialogRef}
-        className={`${styles.dialog} ${styles[variant]}`}
-        role="alertdialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        aria-describedby={descriptionId}
+    <AlertDialog open={open} onOpenChange={handleOpenChange}>
+      <AlertDialogContent
         data-testid="confirm-dialog"
-        tabIndex={-1}
+        data-variant={variant}
+        className={cn('max-w-md', variant === 'danger' && 'border-destructive/20')}
+        onInteractOutside={handleInteractOutside}
+        onEscapeKeyDown={handleEscapeKeyDown}
       >
-        <h2 id={titleId} className={styles.title} data-testid="confirm-dialog-title">
-          {title}
-        </h2>
-        <p id={descriptionId} className={styles.message} data-testid="confirm-dialog-message">
-          {message}
-        </p>
-        <div className={styles.actions}>
-          <button
-            type="button"
-            className={styles.cancelButton}
-            onClick={handleCancel}
-            data-testid="confirm-dialog-cancel"
+        <AlertDialogHeader>
+          <AlertDialogTitle
+            id={titleId}
+            data-testid="confirm-dialog-title"
+            className={cn(variant === 'danger' && 'text-destructive')}
           >
+            {title}
+          </AlertDialogTitle>
+          <AlertDialogDescription id={descriptionId} data-testid="confirm-dialog-message">
+            {message}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel data-testid="confirm-dialog-cancel">
             {resolvedCancelLabel}
-          </button>
-          <button
-            type="button"
-            className={`${styles.confirmButton} ${variant === 'danger' ? styles.dangerButton : ''}`}
-            onClick={handleConfirm}
+          </AlertDialogCancel>
+          <AlertDialogAction
             data-testid="confirm-dialog-confirm"
+            variant={variant === 'danger' ? 'destructive' : 'default'}
+            onClick={onConfirm}
           >
             {resolvedConfirmLabel}
-          </button>
-        </div>
-      </div>
-    </div>
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   )
 }
 

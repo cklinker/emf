@@ -25,8 +25,7 @@ import {
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
 import { useTenant } from '../../context/TenantContext'
-
-import styles from './SetupHomePage.module.css'
+import { cn } from '@/lib/utils'
 
 export interface SetupHomePageProps {
   testId?: string
@@ -356,15 +355,26 @@ export function SetupHomePage({ testId = 'setup-home-page' }: SetupHomePageProps
   }, [searchQuery])
 
   return (
-    <div className={styles.container} data-testid={testId}>
+    <div className="mx-auto max-w-[1400px] p-8 max-[767px]:p-4" data-testid={testId}>
       {/* Header */}
-      <div className={styles.header}>
-        <h1 className={styles.title}>{t('setup.title')}</h1>
-        <div className={styles.searchContainer}>
-          <Search size={16} className={styles.searchIcon} aria-hidden="true" />
+      <div className="mb-6 flex items-center justify-between gap-4 max-[767px]:flex-col max-[767px]:items-stretch">
+        <h1 className="m-0 text-[1.75rem] font-bold text-foreground max-[767px]:text-[1.375rem]">
+          {t('setup.title')}
+        </h1>
+        <div className="relative flex w-80 items-center max-[767px]:w-full">
+          <Search
+            size={16}
+            className="pointer-events-none absolute left-3 text-muted-foreground"
+            aria-hidden="true"
+          />
           <input
             type="text"
-            className={styles.searchInput}
+            className={cn(
+              'w-full rounded-md border border-border bg-card py-2 pl-9 pr-8 text-sm text-foreground',
+              'placeholder:text-muted-foreground',
+              'outline-none transition-[border-color] duration-150',
+              'focus:border-primary focus:shadow-[0_0_0_2px_rgba(0,102,204,0.15)]'
+            )}
             placeholder={t('setup.searchPlaceholder')}
             value={searchQuery}
             onChange={handleSearchChange}
@@ -373,7 +383,13 @@ export function SetupHomePage({ testId = 'setup-home-page' }: SetupHomePageProps
           />
           {searchQuery && (
             <button
-              className={styles.clearButton}
+              className={cn(
+                'absolute right-2 flex h-5 w-5 items-center justify-center rounded-full border-none bg-muted-foreground text-white',
+                'cursor-pointer transition-colors duration-150',
+                'hover:bg-foreground',
+                'focus:outline-2 focus:outline-offset-2 focus:outline-primary',
+                'focus:not(:focus-visible):outline-none'
+              )}
               onClick={handleClearSearch}
               data-testid="setup-search-clear"
               aria-label={t('common.clear')}
@@ -385,47 +401,73 @@ export function SetupHomePage({ testId = 'setup-home-page' }: SetupHomePageProps
       </div>
 
       {/* Quick Stats */}
-      <div className={styles.statsGrid} data-testid="setup-stats">
+      <div
+        className="mb-8 grid grid-cols-4 gap-4 max-[767px]:grid-cols-2"
+        data-testid="setup-stats"
+      >
         {stats.map((stat) => (
-          <div key={stat.label} className={styles.statCard}>
-            <span className={styles.statValue}>{stat.value}</span>
-            <span className={styles.statLabel}>{stat.label}</span>
+          <div
+            key={stat.label}
+            className="flex flex-col items-center gap-1 rounded-md border border-border bg-card px-4 py-5"
+          >
+            <span className="text-[1.75rem] font-bold leading-tight text-primary">
+              {stat.value}
+            </span>
+            <span className="text-center text-[0.8125rem] font-medium text-muted-foreground">
+              {stat.label}
+            </span>
           </div>
         ))}
       </div>
 
       {/* Category Grid */}
       {filteredCategories.length === 0 ? (
-        <div className={styles.noResults} data-testid="setup-no-results">
-          <p>{t('common.noResults')}</p>
+        <div
+          className="flex items-center justify-center rounded-md border border-dashed border-border bg-card p-12"
+          data-testid="setup-no-results"
+        >
+          <p className="m-0 text-sm text-muted-foreground">{t('common.noResults')}</p>
         </div>
       ) : (
-        <div className={styles.categoryGrid}>
+        <div className="grid grid-cols-2 gap-6 max-[767px]:grid-cols-1">
           {filteredCategories.map((category) => (
             <div
               key={category.key}
-              className={styles.categoryCard}
+              className="overflow-hidden rounded-md border border-border bg-card"
               data-testid={`setup-category-${category.key}`}
             >
-              <div className={styles.categoryHeader}>
-                <span className={styles.categoryIcon} aria-hidden="true">
+              <div className="flex items-center gap-2.5 border-b border-border bg-muted px-5 py-4">
+                <span className="flex items-center justify-center text-primary" aria-hidden="true">
                   {category.icon}
                 </span>
-                <h2 className={styles.categoryTitle}>{t(category.titleKey)}</h2>
+                <h2 className="m-0 text-[0.9375rem] font-semibold text-foreground">
+                  {t(category.titleKey)}
+                </h2>
               </div>
-              <ul className={styles.itemList}>
+              <ul className="m-0 list-none p-0">
                 {category.items.map((item) => (
-                  <li key={item.path} className={styles.itemRow}>
+                  <li key={item.path} className="border-b border-border last:border-b-0">
                     <Link
                       to={`/${tenantSlug}${item.path}`}
-                      className={styles.itemLink}
+                      className={cn(
+                        'flex items-center justify-between px-5 py-3 text-inherit no-underline',
+                        'transition-colors duration-150',
+                        'hover:bg-muted',
+                        'focus:outline-2 focus:outline-offset-[-2px] focus:outline-primary',
+                        'focus:not(:focus-visible):outline-none',
+                        'group'
+                      )}
                       data-testid={`setup-item-${item.path.replace(/\//g, '').replace(/-/g, '')}`}
                     >
-                      <div className={styles.itemInfo}>
-                        <span className={styles.itemName}>{item.name}</span>
-                        <span className={styles.itemDescription}>{item.description}</span>
+                      <div className="flex min-w-0 flex-col gap-0.5">
+                        <span className="text-sm font-medium text-primary">{item.name}</span>
+                        <span className="text-xs text-muted-foreground">{item.description}</span>
                       </div>
-                      <ChevronRight size={14} className={styles.itemArrow} aria-hidden="true" />
+                      <ChevronRight
+                        size={14}
+                        className="shrink-0 text-muted-foreground transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-primary"
+                        aria-hidden="true"
+                      />
                     </Link>
                   </li>
                 ))}

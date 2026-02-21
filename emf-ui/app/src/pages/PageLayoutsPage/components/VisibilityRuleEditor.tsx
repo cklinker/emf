@@ -8,7 +8,6 @@
 
 import React, { useMemo, useCallback } from 'react'
 import type { AvailableField } from './LayoutEditorContext'
-import styles from './PropertyPanel.module.css'
 
 export interface VisibilityRuleEditorProps {
   value: string | undefined
@@ -118,9 +117,9 @@ export function VisibilityRuleEditor({
   return (
     <div data-testid="visibility-rule-editor">
       {/* Field Selector */}
-      <div className={styles.formGroup}>
+      <div className="flex flex-col gap-1">
         <select
-          className={styles.formSelect}
+          className="cursor-pointer appearance-none rounded-md border border-input bg-background bg-[url('data:image/svg+xml,%3csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20fill=%27none%27%20viewBox=%270%200%2020%2020%27%3e%3cpath%20stroke=%27%236b7280%27%20stroke-linecap=%27round%27%20stroke-linejoin=%27round%27%20stroke-width=%271.5%27%20d=%27M6%208l4%204%204-4%27/%3e%3c/svg%3e')] bg-[length:1.25em_1.25em] bg-[right_6px_center] bg-no-repeat px-2.5 py-1.5 pr-7 text-[13px] text-foreground transition-colors duration-150 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground motion-reduce:transition-none"
           value={rule?.fieldId ?? ''}
           onChange={handleFieldChange}
           aria-label="Visibility rule field"
@@ -138,9 +137,9 @@ export function VisibilityRuleEditor({
       {rule?.fieldId && (
         <>
           {/* Operator Selector */}
-          <div className={styles.formGroup} style={{ marginTop: '8px' }}>
+          <div className="mt-2 flex flex-col gap-1">
             <select
-              className={styles.formSelect}
+              className="cursor-pointer appearance-none rounded-md border border-input bg-background bg-[url('data:image/svg+xml,%3csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20fill=%27none%27%20viewBox=%270%200%2020%2020%27%3e%3cpath%20stroke=%27%236b7280%27%20stroke-linecap=%27round%27%20stroke-linejoin=%27round%27%20stroke-width=%271.5%27%20d=%27M6%208l4%204%204-4%27/%3e%3c/svg%3e')] bg-[length:1.25em_1.25em] bg-[right_6px_center] bg-no-repeat px-2.5 py-1.5 pr-7 text-[13px] text-foreground transition-colors duration-150 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground motion-reduce:transition-none"
               value={rule.operator}
               onChange={handleOperatorChange}
               aria-label="Visibility rule operator"
@@ -156,10 +155,10 @@ export function VisibilityRuleEditor({
 
           {/* Value Input */}
           {showValueInput && (
-            <div className={styles.formGroup} style={{ marginTop: '8px' }}>
+            <div className="mt-2 flex flex-col gap-1">
               <input
                 type="text"
-                className={styles.formInput}
+                className="rounded-md border border-input bg-background px-2.5 py-1.5 text-[13px] text-foreground placeholder:text-muted-foreground transition-colors duration-150 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground motion-reduce:transition-none"
                 value={rule.value ?? ''}
                 onChange={handleValueChange}
                 placeholder="Value"
@@ -172,16 +171,7 @@ export function VisibilityRuleEditor({
           {/* Clear Button */}
           <button
             type="button"
-            style={{
-              marginTop: '8px',
-              padding: '4px 8px',
-              fontSize: '12px',
-              color: 'var(--color-text-secondary, #6b7280)',
-              backgroundColor: 'transparent',
-              border: '1px solid var(--color-border-input, #d1d5db)',
-              borderRadius: '4px',
-              cursor: 'pointer',
-            }}
+            className="mt-2 cursor-pointer rounded border border-input bg-transparent px-2 py-1 text-xs text-muted-foreground hover:bg-muted"
             onClick={handleClear}
             data-testid="visibility-rule-clear"
           >

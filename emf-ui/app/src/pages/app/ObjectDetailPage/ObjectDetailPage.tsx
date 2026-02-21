@@ -13,6 +13,7 @@
 
 import React, { useState, useCallback, useMemo, useEffect } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { Loader2, AlertCircle, Pencil, Copy, Trash2, MoreHorizontal } from 'lucide-react'
 import {
   Breadcrumb,
@@ -52,10 +53,15 @@ import { useFieldPermissions } from '@/hooks/useFieldPermissions'
 import { FieldRenderer } from '@/components/FieldRenderer'
 import { DetailSection } from '@/components/DetailSection'
 import { RelatedList } from '@/components/RelatedList'
+import { LayoutRelatedLists } from '@/components/LayoutRelatedLists'
 import { InsufficientPrivileges } from '@/components/InsufficientPrivileges'
 import { QuickActionsMenu } from '@/components/QuickActions'
 import { useAnnounce } from '@/components/LiveRegion'
 import { useAppContext } from '@/context/AppContext'
+import { useAuth } from '@/context/AuthContext'
+import { useApi } from '@/context/ApiContext'
+import { usePageLayout } from '@/hooks/usePageLayout'
+import { useLookupDisplayMap } from '@/hooks/useLookupDisplayMap'
 import type { FieldDefinition } from '@/hooks/useCollectionSchema'
 import type { QuickActionExecutionContext } from '@/types/quickActions'
 
@@ -68,6 +74,20 @@ interface RelatedCollection {
   collectionName: string
   /** Field on the related collection that points to this record */
   foreignKeyField: string
+}
+
+/** Collection schema summary for reverse-relationship discovery */
+interface CollectionWithFields {
+  id: string
+  name: string
+  displayName: string
+  fields: {
+    id: string
+    name: string
+    displayName?: string
+    type: string
+    referenceTarget?: string
+  }[]
 }
 
 /** System fields to exclude from detail sections */
@@ -123,6 +143,8 @@ export function ObjectDetailPage(): React.ReactElement {
   }>()
   const navigate = useNavigate()
   const { addRecentItem } = useAppContext()
+  const { user } = useAuth()
+  const { apiClient } = useApi()
   const basePath = `/${tenantSlug}/app`
 
   // Delete confirmation state
@@ -135,6 +157,12 @@ export function ObjectDetailPage(): React.ReactElement {
     isLoading: schemaLoading,
     error: schemaError,
   } = useCollectionSchema(collectionName)
+
+  // Resolve page layout for this collection (returns null if none configured)
+  const { layout, isLoading: layoutLoading } = usePageLayout(schema?.id, user?.id)
+
+  // Resolve display labels for reference/lookup/master_detail fields
+  const { lookupDisplayMap } = useLookupDisplayMap(fields)
 
   // Fetch record
   const {
@@ -214,44 +242,42 @@ export function ObjectDetailPage(): React.ReactElement {
     return fields.filter((f) => SYSTEM_FIELDS.has(f.name))
   }, [fields])
 
-  // Discover related collections: fields on THIS collection that reference other collections
-  // These represent forward relationships. For reverse relationships (child records),
-  // we look for fields with referenceCollectionId matching the current collection's ID.
-  // Since we don't have a full schema graph, we derive related lists from fields
-  // on the current collection that are lookup/reference types with referenceTarget.
+  // Discover reverse relationships (fallback when no layout is configured).
+  // Fetches all collections and finds those with master_detail fields pointing
+  // to the current collection, so we show child records (e.g., Order Items on Orders).
+  const hasLayoutRelatedLists = !!(layout && layout.relatedLists.length > 0)
+
+  const { data: allCollections } = useQuery({
+    queryKey: ['all-collections-for-related', collectionName],
+    queryFn: () =>
+      apiClient.get<{ content: CollectionWithFields[] }>('/control/collections?size=1000'),
+    enabled: !!collectionName && !hasLayoutRelatedLists && !layoutLoading,
+  })
+
   const relatedCollections = useMemo<RelatedCollection[]>(() => {
-    if (!schema || !fields.length || !collectionName) return []
+    if (hasLayoutRelatedLists || !allCollections?.content || !collectionName) return []
 
-    // Find fields that have a referenceTarget (they point to another collection).
-    // These are forward lookups — we can show related records from the target
-    // collection that reference back to this record.
-    // For a true reverse lookup, we'd need a backend endpoint that tells us
-    // which collections have fields referencing this collection. For now,
-    // we expose the forward reference info and let the component gracefully
-    // handle empty results.
     const related: RelatedCollection[] = []
-    const seen = new Set<string>()
-
-    for (const field of fields) {
-      if (
-        (field.type === 'reference' || field.type === 'lookup' || field.type === 'master_detail') &&
-        field.referenceTarget &&
-        field.referenceTarget !== collectionName &&
-        !seen.has(field.referenceTarget)
-      ) {
-        seen.add(field.referenceTarget)
-        // The reverse: the referenced collection should have records
-        // that point back to this collection via a lookup field.
-        // We store the field name on the referenced collection that links back.
-        related.push({
-          collectionName: field.referenceTarget,
-          foreignKeyField: collectionName,
-        })
+    for (const coll of allCollections.content) {
+      if (coll.name === collectionName) continue
+      const collFields = Array.isArray(coll.fields) ? coll.fields : []
+      for (const field of collFields) {
+        if (
+          (field.type === 'master_detail' ||
+            field.type === 'MASTER_DETAIL' ||
+            field.type === 'lookup' ||
+            field.type === 'LOOKUP') &&
+          field.referenceTarget === collectionName
+        ) {
+          related.push({
+            collectionName: coll.name,
+            foreignKeyField: field.name,
+          })
+        }
       }
     }
-
     return related
-  }, [schema, fields, collectionName])
+  }, [hasLayoutRelatedLists, allCollections, collectionName])
 
   // Handlers
   const handleEdit = useCallback(() => {
@@ -284,7 +310,7 @@ export function ObjectDetailPage(): React.ReactElement {
     [collectionName, recordId, record, tenantSlug]
   )
 
-  const isLoading = schemaLoading || recordLoading || permissionsLoading
+  const isLoading = schemaLoading || recordLoading || permissionsLoading || layoutLoading
 
   // Loading state
   if (isLoading) {
@@ -424,24 +450,37 @@ export function ObjectDetailPage(): React.ReactElement {
         <Card>
           <CardContent className="py-4">
             <div className="grid grid-cols-2 gap-x-8 gap-y-3 md:grid-cols-4">
-              {highlightFields.map((field) => (
-                <div key={field.name} className="space-y-1">
-                  <dt className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    {field.displayName || field.name}
-                  </dt>
-                  <dd className="text-sm font-medium">
-                    <FieldRenderer
-                      type={field.type}
-                      value={record[field.name]}
-                      fieldName={field.name}
-                      displayName={field.displayName || field.name}
-                      tenantSlug={tenantSlug}
-                      targetCollection={field.referenceTarget}
-                      truncate
-                    />
-                  </dd>
-                </div>
-              ))}
+              {highlightFields.map((field) => {
+                const value = record[field.name]
+                const isRef =
+                  field.type === 'master_detail' ||
+                  field.type === 'lookup' ||
+                  field.type === 'reference'
+                const displayLabel =
+                  isRef && lookupDisplayMap?.[field.name]
+                    ? lookupDisplayMap[field.name][String(value)] || undefined
+                    : undefined
+
+                return (
+                  <div key={field.name} className="space-y-1">
+                    <dt className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      {field.displayName || field.name}
+                    </dt>
+                    <dd className="text-sm font-medium">
+                      <FieldRenderer
+                        type={field.type}
+                        value={value}
+                        fieldName={field.name}
+                        displayName={field.displayName || field.name}
+                        tenantSlug={tenantSlug}
+                        targetCollection={field.referenceTarget}
+                        displayLabel={displayLabel}
+                        truncate
+                      />
+                    </dd>
+                  </div>
+                )
+              })}
             </div>
           </CardContent>
         </Card>
@@ -456,6 +495,7 @@ export function ObjectDetailPage(): React.ReactElement {
           fields={detailFields}
           record={record}
           tenantSlug={tenantSlug}
+          lookupDisplayMap={lookupDisplayMap}
         />
       )}
 
@@ -470,8 +510,17 @@ export function ObjectDetailPage(): React.ReactElement {
         />
       )}
 
-      {/* Related Lists */}
-      {relatedCollections.length > 0 && recordId && (
+      {/* Related Lists — use layout when available, otherwise auto-discover reverse relationships */}
+      {recordId && hasLayoutRelatedLists ? (
+        <div className="space-y-4">
+          <Separator />
+          <LayoutRelatedLists
+            relatedLists={layout!.relatedLists}
+            parentRecordId={recordId}
+            tenantSlug={tenantSlug || ''}
+          />
+        </div>
+      ) : relatedCollections.length > 0 && recordId ? (
         <div className="space-y-4">
           <Separator />
           {relatedCollections.map((rel) => (
@@ -484,7 +533,7 @@ export function ObjectDetailPage(): React.ReactElement {
             />
           ))}
         </div>
-      )}
+      ) : null}
 
       {/* Delete confirmation */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>

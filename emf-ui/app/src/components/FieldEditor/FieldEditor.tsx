@@ -29,9 +29,9 @@ import React, { useEffect, useCallback, useMemo } from 'react'
 import { useForm, useFieldArray, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
+import { cn } from '@/lib/utils'
 import { useI18n } from '../../context/I18nContext'
 import { LoadingSpinner } from '../LoadingSpinner'
-import styles from './FieldEditor.module.css'
 
 /**
  * Field type enumeration
@@ -297,19 +297,26 @@ function generateFieldId(): string {
   return `field_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
 }
 
+// Common input classes
+const inputClasses = cn(
+  'px-3 py-2 text-base leading-6 text-foreground bg-background border border-input rounded-md',
+  'transition-colors duration-150 motion-reduce:transition-none',
+  'focus:outline-none focus:border-primary focus:ring-2 focus:ring-ring',
+  'disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed',
+  'placeholder:text-muted-foreground'
+)
+
+const selectClasses = cn(
+  inputClasses,
+  'appearance-none bg-[length:1.5em_1.5em] bg-[right_0.5rem_center] bg-no-repeat pr-10 cursor-pointer',
+  "bg-[url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e\")]",
+  'disabled:cursor-not-allowed'
+)
+
+const errorInputClasses = 'border-destructive focus:border-destructive focus:ring-destructive/25'
+
 /**
  * FieldEditor Component
- *
- * Provides a form for creating and editing field definitions with:
- * - Name validation (alphanumeric, underscores, lowercase)
- * - Display name (optional)
- * - Field type selection
- * - Reference target selection for reference fields
- * - Required, unique, indexed flags
- * - Default value
- * - Validation rules configuration
- * - Inline validation errors
- * - Loading state during submission
  */
 export function FieldEditor({
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -566,27 +573,30 @@ export function FieldEditor({
 
   return (
     <form
-      className={styles.form}
+      className="flex flex-col gap-6 max-w-[600px] w-full md:gap-4"
       onSubmit={handleSubmit(handleFormSubmit)}
       data-testid={testId}
       noValidate
     >
-      <h3 className={styles.formTitle}>
+      <h3 className="m-0 mb-4 text-lg font-semibold text-foreground">
         {isEditMode ? t('collections.editField') : t('collections.addField')}
       </h3>
 
       {/* Name Field */}
-      <div className={styles.fieldGroup}>
-        <label htmlFor="field-name" className={styles.label}>
+      <div className="flex flex-col gap-1">
+        <label
+          htmlFor="field-name"
+          className="flex items-center gap-1 text-sm font-medium text-foreground"
+        >
           {t('collections.fieldName')}
-          <span className={styles.required} aria-hidden="true">
+          <span className="text-destructive font-semibold" aria-hidden="true">
             *
           </span>
         </label>
         <input
           id="field-name"
           type="text"
-          className={`${styles.input} ${errors.name ? styles.inputError : ''}`}
+          className={cn(inputClasses, errors.name && errorInputClasses)}
           placeholder={t('fieldEditor.namePlaceholder')}
           disabled={isEditMode || isSubmitting}
           aria-required="true"
@@ -598,7 +608,7 @@ export function FieldEditor({
         {errors.name && (
           <span
             id="field-name-error"
-            className={styles.errorMessage}
+            className="flex items-center gap-1 text-sm text-destructive mt-1 before:content-['\u26A0'] before:text-xs"
             role="alert"
             data-testid="field-name-error"
           >
@@ -606,22 +616,31 @@ export function FieldEditor({
           </span>
         )}
         {!isEditMode && (
-          <span id="field-name-hint" className={styles.hint} data-testid="field-name-hint">
+          <span
+            id="field-name-hint"
+            className="text-xs text-muted-foreground mt-1"
+            data-testid="field-name-hint"
+          >
             {t('fieldEditor.nameHint')}
           </span>
         )}
       </div>
 
       {/* Display Name Field */}
-      <div className={styles.fieldGroup}>
-        <label htmlFor="field-display-name" className={styles.label}>
+      <div className="flex flex-col gap-1">
+        <label
+          htmlFor="field-display-name"
+          className="flex items-center gap-1 text-sm font-medium text-foreground"
+        >
           {t('collections.displayName')}
-          <span className={styles.optional}>({t('common.optional')})</span>
+          <span className="text-xs font-normal text-muted-foreground ml-1">
+            ({t('common.optional')})
+          </span>
         </label>
         <input
           id="field-display-name"
           type="text"
-          className={`${styles.input} ${errors.displayName ? styles.inputError : ''}`}
+          className={cn(inputClasses, errors.displayName && errorInputClasses)}
           placeholder={t('fieldEditor.displayNamePlaceholder')}
           disabled={isSubmitting}
           aria-invalid={!!errors.displayName}
@@ -632,7 +651,7 @@ export function FieldEditor({
         {errors.displayName && (
           <span
             id="field-display-name-error"
-            className={styles.errorMessage}
+            className="flex items-center gap-1 text-sm text-destructive mt-1 before:content-['\u26A0'] before:text-xs"
             role="alert"
             data-testid="field-display-name-error"
           >
@@ -642,16 +661,19 @@ export function FieldEditor({
       </div>
 
       {/* Field Type */}
-      <div className={styles.fieldGroup}>
-        <label htmlFor="field-type" className={styles.label}>
+      <div className="flex flex-col gap-1">
+        <label
+          htmlFor="field-type"
+          className="flex items-center gap-1 text-sm font-medium text-foreground"
+        >
           {t('collections.fieldType')}
-          <span className={styles.required} aria-hidden="true">
+          <span className="text-destructive font-semibold" aria-hidden="true">
             *
           </span>
         </label>
         <select
           id="field-type"
-          className={`${styles.select} ${errors.type ? styles.inputError : ''}`}
+          className={cn(selectClasses, errors.type && errorInputClasses)}
           disabled={isEditMode || isSubmitting}
           aria-required="true"
           aria-invalid={!!errors.type}
@@ -668,7 +690,7 @@ export function FieldEditor({
         {errors.type && (
           <span
             id="field-type-error"
-            className={styles.errorMessage}
+            className="flex items-center gap-1 text-sm text-destructive mt-1 before:content-['\u26A0'] before:text-xs"
             role="alert"
             data-testid="field-type-error"
           >
@@ -679,16 +701,19 @@ export function FieldEditor({
 
       {/* Reference Target (for master_detail type) */}
       {watchedType === 'master_detail' && (
-        <div className={styles.fieldGroup}>
-          <label htmlFor="field-reference-target" className={styles.label}>
+        <div className="flex flex-col gap-1">
+          <label
+            htmlFor="field-reference-target"
+            className="flex items-center gap-1 text-sm font-medium text-foreground"
+          >
             {t('fieldEditor.referenceTarget')}
-            <span className={styles.required} aria-hidden="true">
+            <span className="text-destructive font-semibold" aria-hidden="true">
               *
             </span>
           </label>
           <select
             id="field-reference-target"
-            className={`${styles.select} ${errors.referenceTarget ? styles.inputError : ''}`}
+            className={cn(selectClasses, errors.referenceTarget && errorInputClasses)}
             disabled={isSubmitting}
             aria-required="true"
             aria-invalid={!!errors.referenceTarget}
@@ -710,14 +735,14 @@ export function FieldEditor({
           {errors.referenceTarget && (
             <span
               id="field-reference-target-error"
-              className={styles.errorMessage}
+              className="flex items-center gap-1 text-sm text-destructive mt-1 before:content-['\u26A0'] before:text-xs"
               role="alert"
               data-testid="field-reference-target-error"
             >
               {getErrorMessage(errors.referenceTarget.message)}
             </span>
           )}
-          <span id="field-reference-target-hint" className={styles.hint}>
+          <span id="field-reference-target-hint" className="text-xs text-muted-foreground mt-1">
             {t('fieldEditor.referenceTargetHint')}
           </span>
         </div>
@@ -725,16 +750,19 @@ export function FieldEditor({
 
       {/* Picklist Selection (for picklist and multi_picklist types) */}
       {(watchedType === 'picklist' || watchedType === 'multi_picklist') && (
-        <div className={styles.fieldGroup}>
-          <label htmlFor="field-global-picklist" className={styles.label}>
+        <div className="flex flex-col gap-1">
+          <label
+            htmlFor="field-global-picklist"
+            className="flex items-center gap-1 text-sm font-medium text-foreground"
+          >
             {t('fieldEditor.globalPicklist')}
-            <span className={styles.required} aria-hidden="true">
+            <span className="text-destructive font-semibold" aria-hidden="true">
               *
             </span>
           </label>
           <select
             id="field-global-picklist"
-            className={`${styles.select} ${errors.globalPicklistId ? styles.inputError : ''}`}
+            className={cn(selectClasses, errors.globalPicklistId && errorInputClasses)}
             disabled={isSubmitting}
             aria-required="true"
             aria-invalid={!!errors.globalPicklistId}
@@ -754,14 +782,14 @@ export function FieldEditor({
           {errors.globalPicklistId && (
             <span
               id="field-global-picklist-error"
-              className={styles.errorMessage}
+              className="flex items-center gap-1 text-sm text-destructive mt-1 before:content-['\u26A0'] before:text-xs"
               role="alert"
               data-testid="field-global-picklist-error"
             >
               {getErrorMessage(errors.globalPicklistId.message)}
             </span>
           )}
-          <span id="field-global-picklist-hint" className={styles.hint}>
+          <span id="field-global-picklist-hint" className="text-xs text-muted-foreground mt-1">
             {t('fieldEditor.globalPicklistHint')}
           </span>
         </div>
@@ -769,28 +797,36 @@ export function FieldEditor({
 
       {/* Auto Number Config */}
       {watchedType === 'auto_number' && (
-        <div className={styles.fieldGroup}>
-          <label htmlFor="field-auto-number-prefix" className={styles.label}>
+        <div className="flex flex-col gap-1">
+          <label
+            htmlFor="field-auto-number-prefix"
+            className="flex items-center gap-1 text-sm font-medium text-foreground"
+          >
             {t('fields.config.prefix')}
-            <span className={styles.optional}>({t('common.optional')})</span>
+            <span className="text-xs font-normal text-muted-foreground ml-1">
+              ({t('common.optional')})
+            </span>
           </label>
           <input
             id="field-auto-number-prefix"
             type="text"
-            className={styles.input}
+            className={inputClasses}
             placeholder={'e.g., TICKET-'}
             disabled={isSubmitting}
             data-testid="field-auto-number-prefix-input"
             {...register('autoNumberPrefix')}
           />
 
-          <label htmlFor="field-auto-number-padding" className={styles.label}>
+          <label
+            htmlFor="field-auto-number-padding"
+            className="flex items-center gap-1 text-sm font-medium text-foreground"
+          >
             {t('fields.config.padding')}
           </label>
           <input
             id="field-auto-number-padding"
             type="number"
-            className={styles.input}
+            className={inputClasses}
             min={1}
             max={10}
             disabled={isSubmitting}
@@ -802,15 +838,20 @@ export function FieldEditor({
 
       {/* Currency Config */}
       {watchedType === 'currency' && (
-        <div className={styles.fieldGroup}>
-          <label htmlFor="field-currency-code" className={styles.label}>
+        <div className="flex flex-col gap-1">
+          <label
+            htmlFor="field-currency-code"
+            className="flex items-center gap-1 text-sm font-medium text-foreground"
+          >
             {t('fields.config.currencyCode')}
-            <span className={styles.optional}>({t('common.optional')})</span>
+            <span className="text-xs font-normal text-muted-foreground ml-1">
+              ({t('common.optional')})
+            </span>
           </label>
           <input
             id="field-currency-code"
             type="text"
-            className={styles.input}
+            className={inputClasses}
             placeholder={'USD'}
             maxLength={3}
             disabled={isSubmitting}
@@ -818,13 +859,16 @@ export function FieldEditor({
             {...register('currencyCode')}
           />
 
-          <label htmlFor="field-currency-precision" className={styles.label}>
+          <label
+            htmlFor="field-currency-precision"
+            className="flex items-center gap-1 text-sm font-medium text-foreground"
+          >
             {t('fields.config.precision')}
           </label>
           <input
             id="field-currency-precision"
             type="number"
-            className={styles.input}
+            className={inputClasses}
             min={0}
             max={6}
             disabled={isSubmitting}
@@ -835,73 +879,78 @@ export function FieldEditor({
       )}
 
       {/* Field Flags */}
-      <div className={styles.flagsGroup}>
-        <div className={styles.checkboxGroup}>
+      <div className="flex flex-wrap gap-6 p-4 bg-secondary rounded-md max-md:flex-col max-md:gap-2">
+        <div className="flex items-center gap-2">
           <input
             id="field-required"
             type="checkbox"
-            className={styles.checkbox}
+            className="w-[1.125rem] h-[1.125rem] accent-primary cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
             disabled={isSubmitting}
             data-testid="field-required-checkbox"
             {...register('required')}
           />
-          <label htmlFor="field-required" className={styles.checkboxLabel}>
+          <label htmlFor="field-required" className="text-sm text-foreground cursor-pointer">
             {t('fields.validation.required')}
           </label>
         </div>
 
-        <div className={styles.checkboxGroup}>
+        <div className="flex items-center gap-2">
           <input
             id="field-unique"
             type="checkbox"
-            className={styles.checkbox}
+            className="w-[1.125rem] h-[1.125rem] accent-primary cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
             disabled={isSubmitting}
             data-testid="field-unique-checkbox"
             {...register('unique')}
           />
-          <label htmlFor="field-unique" className={styles.checkboxLabel}>
+          <label htmlFor="field-unique" className="text-sm text-foreground cursor-pointer">
             {t('fields.validation.unique')}
           </label>
         </div>
 
-        <div className={styles.checkboxGroup}>
+        <div className="flex items-center gap-2">
           <input
             id="field-indexed"
             type="checkbox"
-            className={styles.checkbox}
+            className="w-[1.125rem] h-[1.125rem] accent-primary cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
             disabled={isSubmitting}
             data-testid="field-indexed-checkbox"
             {...register('indexed')}
           />
-          <label htmlFor="field-indexed" className={styles.checkboxLabel}>
+          <label htmlFor="field-indexed" className="text-sm text-foreground cursor-pointer">
             {t('fields.validation.indexed')}
           </label>
         </div>
 
-        <div className={styles.checkboxGroup}>
+        <div className="flex items-center gap-2">
           <input
             id="field-track-history"
             type="checkbox"
-            className={styles.checkbox}
+            className="w-[1.125rem] h-[1.125rem] accent-primary cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
             disabled={isSubmitting}
             data-testid="field-track-history-checkbox"
             {...register('trackHistory')}
           />
-          <label htmlFor="field-track-history" className={styles.checkboxLabel}>
+          <label htmlFor="field-track-history" className="text-sm text-foreground cursor-pointer">
             {t('fieldEditor.trackHistory')}
           </label>
         </div>
       </div>
 
       {/* Description */}
-      <div className={styles.fieldGroup}>
-        <label htmlFor="field-description" className={styles.label}>
+      <div className="flex flex-col gap-1">
+        <label
+          htmlFor="field-description"
+          className="flex items-center gap-1 text-sm font-medium text-foreground"
+        >
           {t('collections.description')}
-          <span className={styles.optional}>({t('common.optional')})</span>
+          <span className="text-xs font-normal text-muted-foreground ml-1">
+            ({t('common.optional')})
+          </span>
         </label>
         <textarea
           id="field-description"
-          className={`${styles.textarea} ${errors.description ? styles.inputError : ''}`}
+          className={cn(inputClasses, 'resize-y min-h-12', errors.description && errorInputClasses)}
           placeholder={t('fieldEditor.descriptionPlaceholder')}
           rows={3}
           disabled={isSubmitting}
@@ -913,7 +962,7 @@ export function FieldEditor({
         {errors.description && (
           <span
             id="field-description-error"
-            className={styles.errorMessage}
+            className="flex items-center gap-1 text-sm text-destructive mt-1 before:content-['\u26A0'] before:text-xs"
             role="alert"
             data-testid="field-description-error"
           >
@@ -923,34 +972,46 @@ export function FieldEditor({
       </div>
 
       {/* Default Value */}
-      <div className={styles.fieldGroup}>
-        <label htmlFor="field-default-value" className={styles.label}>
+      <div className="flex flex-col gap-1">
+        <label
+          htmlFor="field-default-value"
+          className="flex items-center gap-1 text-sm font-medium text-foreground"
+        >
           {t('fieldEditor.defaultValue')}
-          <span className={styles.optional}>({t('common.optional')})</span>
+          <span className="text-xs font-normal text-muted-foreground ml-1">
+            ({t('common.optional')})
+          </span>
         </label>
         <input
           id="field-default-value"
           type="text"
-          className={styles.input}
+          className={inputClasses}
           placeholder={t('fieldEditor.defaultValuePlaceholder')}
           disabled={isSubmitting}
           aria-describedby="field-default-value-hint"
           data-testid="field-default-value-input"
           {...register('defaultValue')}
         />
-        <span id="field-default-value-hint" className={styles.hint}>
+        <span id="field-default-value-hint" className="text-xs text-muted-foreground mt-1">
           {t('fieldEditor.defaultValueHint')}
         </span>
       </div>
 
       {/* Validation Rules Section */}
       {availableValidationRules.length > 0 && (
-        <div className={styles.validationSection}>
-          <div className={styles.sectionHeader}>
-            <h4 className={styles.sectionTitle}>{t('fieldEditor.validationRules')}</h4>
+        <div className="flex flex-col gap-4 p-4 bg-secondary border border-border rounded-md">
+          <div className="flex justify-between items-center">
+            <h4 className="m-0 text-base font-medium text-foreground">
+              {t('fieldEditor.validationRules')}
+            </h4>
             <button
               type="button"
-              className={styles.addRuleButton}
+              className={cn(
+                'inline-flex items-center px-2 py-1 text-sm font-medium text-primary',
+                'bg-transparent border border-primary rounded',
+                'transition-colors duration-150 motion-reduce:transition-none',
+                'hover:bg-primary/10 disabled:opacity-50 disabled:cursor-not-allowed'
+              )}
               onClick={handleAddValidationRule}
               disabled={isSubmitting || validationFields.length >= availableValidationRules.length}
               data-testid="add-validation-rule-button"
@@ -960,7 +1021,10 @@ export function FieldEditor({
           </div>
 
           {validationFields.length === 0 && (
-            <p className={styles.noRulesMessage} data-testid="no-validation-rules">
+            <p
+              className="m-0 text-sm text-muted-foreground italic"
+              data-testid="no-validation-rules"
+            >
               {t('fieldEditor.noValidationRules')}
             </p>
           )}
@@ -968,12 +1032,15 @@ export function FieldEditor({
           {validationFields.map((validationField, index) => (
             <div
               key={validationField.id}
-              className={styles.validationRule}
+              className="flex items-start gap-2 p-2 bg-background border border-border rounded"
               data-testid={`validation-rule-${index}`}
             >
-              <div className={styles.ruleFields}>
-                <div className={styles.ruleTypeField}>
-                  <label htmlFor={`validation-rule-type-${index}`} className={styles.ruleLabel}>
+              <div className="flex flex-wrap gap-2 flex-1 max-md:flex-col">
+                <div className="flex-none min-w-[120px] max-md:min-w-full">
+                  <label
+                    htmlFor={`validation-rule-type-${index}`}
+                    className="block text-xs font-medium text-muted-foreground mb-1"
+                  >
                     {t('fieldEditor.ruleType')}
                   </label>
                   <Controller
@@ -982,7 +1049,12 @@ export function FieldEditor({
                     render={({ field: controllerField }) => (
                       <select
                         id={`validation-rule-type-${index}`}
-                        className={styles.ruleSelect}
+                        className={cn(
+                          'w-full px-2 py-1 text-sm text-foreground bg-background border border-input rounded',
+                          'appearance-none bg-[length:1.25em_1.25em] bg-[right_0.25rem_center] bg-no-repeat pr-7 cursor-pointer',
+                          "bg-[url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e\")]",
+                          'disabled:bg-muted disabled:cursor-not-allowed'
+                        )}
                         disabled={isSubmitting}
                         data-testid={`validation-rule-type-${index}`}
                         {...controllerField}
@@ -1005,14 +1077,17 @@ export function FieldEditor({
 
                 {/* Value field for min, max, pattern */}
                 {['min', 'max', 'pattern'].includes(validationFields[index]?.type) && (
-                  <div className={styles.ruleValueField}>
-                    <label htmlFor={`validation-rule-value-${index}`} className={styles.ruleLabel}>
+                  <div className="flex-none min-w-[100px] max-md:min-w-full">
+                    <label
+                      htmlFor={`validation-rule-value-${index}`}
+                      className="block text-xs font-medium text-muted-foreground mb-1"
+                    >
                       {t('fieldEditor.ruleValue')}
                     </label>
                     <input
                       id={`validation-rule-value-${index}`}
                       type={validationFields[index]?.type === 'pattern' ? 'text' : 'number'}
-                      className={styles.ruleInput}
+                      className="w-full px-2 py-1 text-sm text-foreground bg-background border border-input rounded disabled:bg-muted disabled:cursor-not-allowed"
                       placeholder={
                         validationFields[index]?.type === 'pattern'
                           ? t('fieldEditor.patternPlaceholder')
@@ -1025,15 +1100,20 @@ export function FieldEditor({
                   </div>
                 )}
 
-                <div className={styles.ruleMessageField}>
-                  <label htmlFor={`validation-rule-message-${index}`} className={styles.ruleLabel}>
+                <div className="flex-1 min-w-[150px] max-md:min-w-full">
+                  <label
+                    htmlFor={`validation-rule-message-${index}`}
+                    className="block text-xs font-medium text-muted-foreground mb-1"
+                  >
                     {t('fieldEditor.ruleMessage')}
-                    <span className={styles.optional}>({t('common.optional')})</span>
+                    <span className="text-xs font-normal text-muted-foreground ml-1">
+                      ({t('common.optional')})
+                    </span>
                   </label>
                   <input
                     id={`validation-rule-message-${index}`}
                     type="text"
-                    className={styles.ruleInput}
+                    className="w-full px-2 py-1 text-sm text-foreground bg-background border border-input rounded disabled:bg-muted disabled:cursor-not-allowed"
                     placeholder={t('fieldEditor.ruleMessagePlaceholder')}
                     disabled={isSubmitting}
                     data-testid={`validation-rule-message-${index}`}
@@ -1044,7 +1124,13 @@ export function FieldEditor({
 
               <button
                 type="button"
-                className={styles.removeRuleButton}
+                className={cn(
+                  'flex items-center justify-center w-6 h-6 mt-5 text-lg font-semibold',
+                  'text-muted-foreground bg-transparent border-none rounded cursor-pointer',
+                  'transition-colors duration-150 motion-reduce:transition-none',
+                  'hover:text-destructive hover:bg-destructive/10',
+                  'disabled:opacity-50 disabled:cursor-not-allowed'
+                )}
                 onClick={() => remove(index)}
                 disabled={isSubmitting}
                 aria-label={t('fieldEditor.removeRule')}
@@ -1058,10 +1144,17 @@ export function FieldEditor({
       )}
 
       {/* Form Actions */}
-      <div className={styles.actions}>
+      <div className="flex justify-end gap-3 mt-6 pt-6 border-t border-border max-md:flex-col-reverse max-md:gap-2">
         <button
           type="button"
-          className={styles.cancelButton}
+          className={cn(
+            'inline-flex items-center justify-center gap-2 px-6 py-2 text-base font-medium leading-6 rounded-md cursor-pointer',
+            'text-foreground bg-secondary border border-input',
+            'transition-colors duration-150 motion-reduce:transition-none',
+            'hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring',
+            'disabled:opacity-50 disabled:cursor-not-allowed',
+            'max-md:w-full'
+          )}
           onClick={onCancel}
           disabled={isSubmitting}
           data-testid="field-editor-cancel"
@@ -1070,16 +1163,21 @@ export function FieldEditor({
         </button>
         <button
           type="submit"
-          className={styles.submitButton}
+          className={cn(
+            'inline-flex items-center justify-center gap-2 px-6 py-2 text-base font-medium leading-6 rounded-md cursor-pointer',
+            'text-primary-foreground bg-primary border border-transparent',
+            'transition-colors duration-150 motion-reduce:transition-none',
+            'hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring',
+            'disabled:opacity-50 disabled:cursor-not-allowed',
+            'max-md:w-full'
+          )}
           disabled={isSubmitting || (!isDirty && isEditMode)}
           data-testid="field-editor-submit"
         >
           {isSubmitting ? (
             <>
               <LoadingSpinner size="small" />
-              <span className={styles.submitText}>
-                {isEditMode ? t('common.save') : t('common.create')}
-              </span>
+              <span className="ml-1">{isEditMode ? t('common.save') : t('common.create')}</span>
             </>
           ) : isEditMode ? (
             t('common.save')

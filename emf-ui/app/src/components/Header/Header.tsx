@@ -20,7 +20,6 @@ import { SearchModal } from '../SearchModal'
 import { RecentItemsDropdown } from '../RecentItemsDropdown'
 import { getGravatarUrl } from '../../utils/gravatar'
 import { getTenantSlug } from '../../context/TenantContext'
-import styles from './Header.module.css'
 
 /**
  * Props for the Header component
@@ -138,25 +137,32 @@ export function Header({ branding, user, onLogout }: HeaderProps): JSX.Element {
 
   return (
     <>
-      <header className={styles.header} data-testid="header" role="banner">
+      <header
+        className="flex items-center w-full h-full px-6 gap-4 md:max-lg:px-4 max-md:px-4 print:border-b print:border-black"
+        data-testid="header"
+        role="banner"
+      >
         {/* Branding section */}
-        <div className={styles.branding}>
+        <div className="flex items-center gap-2 shrink-0">
           {branding.logoUrl && (
             <img
               src={branding.logoUrl}
               alt={`${branding.applicationName} logo`}
-              className={styles.logo}
+              className="h-9 w-auto object-contain max-md:h-7"
               data-testid="header-logo"
             />
           )}
           {!isMobile && (
-            <h1 className={styles.appName} data-testid="header-app-name">
+            <h1
+              className="m-0 text-xl font-semibold text-[var(--app-shell-text,var(--color-text,#1a1a1a))] whitespace-nowrap overflow-hidden text-ellipsis max-w-[300px] md:max-lg:max-w-[200px]"
+              data-testid="header-app-name"
+            >
               {branding.applicationName}
             </h1>
           )}
           <button
             type="button"
-            className={styles.backToApp}
+            className="flex items-center gap-1 py-1 px-2 bg-transparent border border-[var(--app-shell-border,var(--color-border,#e0e0e0))] rounded cursor-pointer text-[var(--color-text-secondary,#666666)] text-[0.8125rem] font-medium whitespace-nowrap transition-[background-color,border-color] duration-150 ease-in-out hover:bg-[var(--color-surface-hover,rgba(0,0,0,0.05))] hover:border-[var(--color-text-secondary,#999999)] hover:text-[var(--app-shell-text,var(--color-text,#1a1a1a))] focus:outline-2 focus:outline-[var(--color-focus,#0066cc)] focus:outline-offset-2 [&:focus:not(:focus-visible)]:outline-none"
             onClick={() => navigate(`/${tenantSlug}/app`)}
             aria-label="Back to application"
             data-testid="back-to-app-button"
@@ -169,36 +175,38 @@ export function Header({ branding, user, onLogout }: HeaderProps): JSX.Element {
         {/* Search trigger */}
         <button
           type="button"
-          className={styles.searchTrigger}
+          className="flex items-center gap-2 py-1 px-4 bg-[var(--color-surface-hover,rgba(0,0,0,0.03))] border border-[var(--app-shell-border,var(--color-border,#e0e0e0))] rounded cursor-pointer text-[var(--color-text-secondary,#666666)] text-sm min-w-[200px] transition-[border-color] duration-150 ease-in-out hover:border-[var(--color-text-secondary,#999999)] focus:outline-2 focus:outline-[var(--color-focus,#0066cc)] focus:outline-offset-2 [&:focus:not(:focus-visible)]:outline-none max-md:min-w-0 max-md:py-1 max-md:px-2 motion-reduce:transition-none"
           onClick={() => setSearchOpen(true)}
           aria-label="Search (Cmd+K)"
           data-testid="search-trigger"
         >
-          <span className={styles.searchTriggerIcon} aria-hidden="true">
+          <span className="text-sm opacity-60" aria-hidden="true">
             <Search size={16} />
           </span>
           {!isMobile && (
-            <span className={styles.searchTriggerText}>
+            <span className="flex items-center gap-4 flex-1">
               Search...
-              <kbd className={styles.searchKbd}>&#x2318;K</kbd>
+              <kbd className="ml-auto inline-flex items-center py-px px-[5px] text-[0.6875rem] font-[inherit] text-[var(--color-text-secondary,#999999)] bg-[var(--app-shell-surface,var(--color-surface,#ffffff))] border border-[var(--app-shell-border,var(--color-border,#e0e0e0))] rounded-[3px]">
+                &#x2318;K
+              </kbd>
             </span>
           )}
         </button>
 
         {/* Spacer to push items to the right */}
-        <div className={styles.spacer} aria-hidden="true" />
+        <div className="flex-1" aria-hidden="true" />
 
         {/* Recent items + User menu */}
         {user && (
-          <div className={styles.headerActions}>
+          <div className="flex items-center gap-2">
             <RecentItemsDropdown />
 
             {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
-            <div className={styles.userSection} onKeyDown={handleKeyDown}>
+            <div className="relative flex items-center" onKeyDown={handleKeyDown}>
               <button
                 ref={buttonRef}
                 type="button"
-                className={styles.userButton}
+                className="flex items-center gap-2 py-1 px-2 bg-transparent border border-transparent rounded cursor-pointer text-[var(--app-shell-text,var(--color-text,#1a1a1a))] transition-[background-color,border-color] duration-150 ease-in-out hover:bg-[var(--color-surface-hover,rgba(0,0,0,0.05))] hover:border-[var(--app-shell-border,var(--color-border,#e0e0e0))] focus:outline-2 focus:outline-[var(--color-focus,#0066cc)] focus:outline-offset-2 [&:focus:not(:focus-visible)]:outline-none motion-reduce:transition-none forced-colors:border forced-colors:border-current"
                 onClick={toggleMenu}
                 aria-expanded={isMenuOpen}
                 aria-haspopup="menu"
@@ -206,29 +214,38 @@ export function Header({ branding, user, onLogout }: HeaderProps): JSX.Element {
                 aria-label={`User menu for ${getDisplayName(user)}`}
                 data-testid="user-menu-button"
               >
-                <div className={styles.avatar} aria-hidden="true">
+                <div
+                  className="flex items-center justify-center w-8 h-8 rounded-full bg-[var(--app-shell-primary,var(--color-primary,#0066cc))] text-[var(--color-text-inverse,#ffffff)] text-sm font-semibold overflow-hidden shrink-0 forced-colors:border forced-colors:border-current"
+                  aria-hidden="true"
+                >
                   {avatarImageUrl ? (
                     <img
                       src={avatarImageUrl}
                       alt=""
-                      className={styles.avatarImage}
+                      className="w-full h-full object-cover"
                       onError={() => setGravatarFailed(true)}
                       data-testid="user-avatar-image"
                     />
                   ) : (
-                    <span className={styles.avatarInitials} data-testid="user-avatar-initials">
+                    <span className="leading-none" data-testid="user-avatar-initials">
                       {getUserInitials(user.name, user.email)}
                     </span>
                   )}
                 </div>
 
                 {!isMobile && (
-                  <span className={styles.userName} data-testid="user-name">
+                  <span
+                    className="text-sm font-medium max-w-[150px] overflow-hidden text-ellipsis whitespace-nowrap md:max-lg:max-w-[100px]"
+                    data-testid="user-name"
+                  >
                     {getDisplayName(user)}
                   </span>
                 )}
 
-                <span className={styles.dropdownIcon} aria-hidden="true">
+                <span
+                  className="text-[0.625rem] opacity-70 transition-transform duration-150 ease-in-out motion-reduce:transition-none"
+                  aria-hidden="true"
+                >
                   {isMenuOpen ? '\u25B2' : '\u25BC'}
                 </span>
               </button>
@@ -237,26 +254,34 @@ export function Header({ branding, user, onLogout }: HeaderProps): JSX.Element {
                 <div
                   ref={menuRef}
                   id="user-dropdown-menu"
-                  className={styles.dropdownMenu}
+                  className="absolute top-[calc(100%+4px)] right-0 min-w-[220px] bg-[var(--app-shell-surface,var(--color-surface,#ffffff))] border border-[var(--app-shell-border,var(--color-border,#e0e0e0))] rounded shadow-[0_4px_12px_rgba(0,0,0,0.15)] z-[1000] overflow-hidden max-md:min-w-[200px] max-md:-right-2 forced-colors:border-2 forced-colors:border-current"
                   role="menu"
                   aria-label="User menu"
                   data-testid="user-dropdown-menu"
                 >
-                  <div className={styles.menuUserInfo} role="presentation">
-                    <span className={styles.menuUserName}>{getDisplayName(user)}</span>
-                    <span className={styles.menuUserEmail}>{user.email}</span>
+                  <div className="flex flex-col p-4 gap-1" role="presentation">
+                    <span className="text-sm font-semibold text-[var(--app-shell-text,var(--color-text,#1a1a1a))]">
+                      {getDisplayName(user)}
+                    </span>
+                    <span className="text-xs text-[var(--color-text-secondary,#666666)] overflow-hidden text-ellipsis whitespace-nowrap">
+                      {user.email}
+                    </span>
                   </div>
 
-                  <div className={styles.menuDivider} role="separator" aria-hidden="true" />
+                  <div
+                    className="h-px bg-[var(--app-shell-border,var(--color-border,#e0e0e0))] m-0"
+                    role="separator"
+                    aria-hidden="true"
+                  />
 
                   <button
                     type="button"
-                    className={styles.menuItem}
+                    className="flex items-center gap-2 w-full py-2 px-4 bg-transparent border-none cursor-pointer text-[var(--app-shell-text,var(--color-text,#1a1a1a))] text-sm text-left transition-[background-color] duration-150 ease-in-out hover:bg-[var(--color-surface-hover,rgba(0,0,0,0.05))] focus:outline-2 focus:outline-[var(--color-focus,#0066cc)] focus:outline-offset-[-2px] focus:bg-[var(--color-surface-hover,rgba(0,0,0,0.05))] [&:focus:not(:focus-visible)]:outline-none motion-reduce:transition-none forced-colors:focus:outline-2 forced-colors:focus:outline-current"
                     onClick={handleLogout}
                     role="menuitem"
                     data-testid="logout-button"
                   >
-                    <span className={styles.menuItemIcon} aria-hidden="true">
+                    <span className="text-base opacity-70" aria-hidden="true">
                       &#x238B;
                     </span>
                     <span>Logout</span>

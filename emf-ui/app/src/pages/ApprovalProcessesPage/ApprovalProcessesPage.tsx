@@ -10,8 +10,8 @@ import {
   ExecutionLogModal,
 } from '../../components'
 import type { LogColumn } from '../../components'
-
-import styles from './ApprovalProcessesPage.module.css'
+import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
 
 interface ApprovalProcess {
   id: string
@@ -181,26 +181,26 @@ function ApprovalProcessForm({
 
   return (
     <div
-      className={styles.modalOverlay}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
       onClick={(e) => e.target === e.currentTarget && onCancel()}
       onKeyDown={handleKeyDown}
       data-testid="approval-process-form-overlay"
       role="presentation"
     >
       <div
-        className={styles.modal}
+        className="w-full max-w-[600px] max-h-[90vh] overflow-y-auto rounded-lg bg-background shadow-xl"
         role="dialog"
         aria-modal="true"
         aria-labelledby="approval-process-form-title"
         data-testid="approval-process-form-modal"
       >
-        <div className={styles.modalHeader}>
-          <h2 id="approval-process-form-title" className={styles.modalTitle}>
+        <div className="flex items-center justify-between border-b border-border p-6">
+          <h2 id="approval-process-form-title" className="text-lg font-semibold text-foreground">
             {title}
           </h2>
           <button
             type="button"
-            className={styles.modalCloseButton}
+            className="rounded p-2 text-2xl leading-none text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             onClick={onCancel}
             aria-label="Close"
             data-testid="approval-process-form-close"
@@ -208,12 +208,15 @@ function ApprovalProcessForm({
             &times;
           </button>
         </div>
-        <div className={styles.modalBody}>
-          <form className={styles.form} onSubmit={handleSubmit} noValidate>
-            <div className={styles.formGroup}>
-              <label htmlFor="approval-process-name" className={styles.formLabel}>
+        <div className="p-6">
+          <form className="flex flex-col gap-5" onSubmit={handleSubmit} noValidate>
+            <div className="flex flex-col gap-2">
+              <label
+                htmlFor="approval-process-name"
+                className="text-sm font-medium text-foreground"
+              >
                 Name
-                <span className={styles.required} aria-hidden="true">
+                <span className="ml-1 text-destructive" aria-hidden="true">
                   *
                 </span>
               </label>
@@ -221,7 +224,12 @@ function ApprovalProcessForm({
                 ref={nameInputRef}
                 id="approval-process-name"
                 type="text"
-                className={`${styles.formInput} ${touched.name && errors.name ? styles.hasError : ''}`}
+                className={cn(
+                  'rounded-md border border-border bg-background px-3 py-2.5 text-sm text-foreground transition-colors',
+                  'focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20',
+                  'disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground',
+                  touched.name && errors.name && 'border-destructive'
+                )}
                 value={formData.name}
                 onChange={(e) => handleChange('name', e.target.value)}
                 onBlur={() => handleBlur('name')}
@@ -232,19 +240,27 @@ function ApprovalProcessForm({
                 data-testid="approval-process-name-input"
               />
               {touched.name && errors.name && (
-                <span className={styles.formError} role="alert">
+                <span className="text-xs text-destructive" role="alert">
                   {errors.name}
                 </span>
               )}
             </div>
 
-            <div className={styles.formGroup}>
-              <label htmlFor="approval-process-description" className={styles.formLabel}>
+            <div className="flex flex-col gap-2">
+              <label
+                htmlFor="approval-process-description"
+                className="text-sm font-medium text-foreground"
+              >
                 Description
               </label>
               <textarea
                 id="approval-process-description"
-                className={`${styles.formInput} ${styles.formTextarea} ${touched.description && errors.description ? styles.hasError : ''}`}
+                className={cn(
+                  'min-h-[80px] resize-y rounded-md border border-border bg-background px-3 py-2.5 font-[inherit] text-sm text-foreground transition-colors',
+                  'focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20',
+                  'disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground',
+                  touched.description && errors.description && 'border-destructive'
+                )}
                 value={formData.description}
                 onChange={(e) => handleChange('description', e.target.value)}
                 onBlur={() => handleBlur('description')}
@@ -254,20 +270,28 @@ function ApprovalProcessForm({
                 data-testid="approval-process-description-input"
               />
               {touched.description && errors.description && (
-                <span className={styles.formError} role="alert">
+                <span className="text-xs text-destructive" role="alert">
                   {errors.description}
                 </span>
               )}
             </div>
 
-            <div className={styles.formGroup}>
-              <label htmlFor="approval-process-collection-id" className={styles.formLabel}>
+            <div className="flex flex-col gap-2">
+              <label
+                htmlFor="approval-process-collection-id"
+                className="text-sm font-medium text-foreground"
+              >
                 Collection ID
               </label>
               <input
                 id="approval-process-collection-id"
                 type="text"
-                className={`${styles.formInput} ${touched.collectionId && errors.collectionId ? styles.hasError : ''}`}
+                className={cn(
+                  'rounded-md border border-border bg-background px-3 py-2.5 text-sm text-foreground transition-colors',
+                  'focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20',
+                  'disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground',
+                  touched.collectionId && errors.collectionId && 'border-destructive'
+                )}
                 value={formData.collectionId}
                 onChange={(e) => handleChange('collectionId', e.target.value)}
                 onBlur={() => handleBlur('collectionId')}
@@ -276,19 +300,27 @@ function ApprovalProcessForm({
                 data-testid="approval-process-collection-id-input"
               />
               {touched.collectionId && errors.collectionId && (
-                <span className={styles.formError} role="alert">
+                <span className="text-xs text-destructive" role="alert">
                   {errors.collectionId}
                 </span>
               )}
             </div>
 
-            <div className={styles.formGroup}>
-              <label htmlFor="approval-process-entry-criteria" className={styles.formLabel}>
+            <div className="flex flex-col gap-2">
+              <label
+                htmlFor="approval-process-entry-criteria"
+                className="text-sm font-medium text-foreground"
+              >
                 Entry Criteria
               </label>
               <textarea
                 id="approval-process-entry-criteria"
-                className={`${styles.formInput} ${styles.formTextarea} ${touched.entryCriteria && errors.entryCriteria ? styles.hasError : ''}`}
+                className={cn(
+                  'min-h-[80px] resize-y rounded-md border border-border bg-background px-3 py-2.5 font-[inherit] text-sm text-foreground transition-colors',
+                  'focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20',
+                  'disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground',
+                  touched.entryCriteria && errors.entryCriteria && 'border-destructive'
+                )}
                 value={formData.entryCriteria}
                 onChange={(e) => handleChange('entryCriteria', e.target.value)}
                 onBlur={() => handleBlur('entryCriteria')}
@@ -298,22 +330,25 @@ function ApprovalProcessForm({
                 data-testid="approval-process-entry-criteria-input"
               />
               {touched.entryCriteria && errors.entryCriteria && (
-                <span className={styles.formError} role="alert">
+                <span className="text-xs text-destructive" role="alert">
                   {errors.entryCriteria}
                 </span>
               )}
             </div>
 
-            <div className={styles.formGroup}>
-              <label htmlFor="approval-process-record-editability" className={styles.formLabel}>
+            <div className="flex flex-col gap-2">
+              <label
+                htmlFor="approval-process-record-editability"
+                className="text-sm font-medium text-foreground"
+              >
                 Record Editability
-                <span className={styles.required} aria-hidden="true">
+                <span className="ml-1 text-destructive" aria-hidden="true">
                   *
                 </span>
               </label>
               <select
                 id="approval-process-record-editability"
-                className={styles.formInput}
+                className="rounded-md border border-border bg-background px-3 py-2.5 text-sm text-foreground transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
                 value={formData.recordEditability}
                 onChange={(e) => handleChange('recordEditability', e.target.value)}
                 disabled={isSubmitting}
@@ -324,17 +359,25 @@ function ApprovalProcessForm({
               </select>
             </div>
 
-            <div className={styles.formGroup}>
-              <label htmlFor="approval-process-execution-order" className={styles.formLabel}>
+            <div className="flex flex-col gap-2">
+              <label
+                htmlFor="approval-process-execution-order"
+                className="text-sm font-medium text-foreground"
+              >
                 Execution Order
-                <span className={styles.required} aria-hidden="true">
+                <span className="ml-1 text-destructive" aria-hidden="true">
                   *
                 </span>
               </label>
               <input
                 id="approval-process-execution-order"
                 type="number"
-                className={`${styles.formInput} ${touched.executionOrder && errors.executionOrder ? styles.hasError : ''}`}
+                className={cn(
+                  'rounded-md border border-border bg-background px-3 py-2.5 text-sm text-foreground transition-colors',
+                  'focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20',
+                  'disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground',
+                  touched.executionOrder && errors.executionOrder && 'border-destructive'
+                )}
                 value={formData.executionOrder}
                 onChange={(e) => handleChange('executionOrder', parseInt(e.target.value, 10) || 0)}
                 onBlur={() => handleBlur('executionOrder')}
@@ -343,58 +386,65 @@ function ApprovalProcessForm({
                 data-testid="approval-process-execution-order-input"
               />
               {touched.executionOrder && errors.executionOrder && (
-                <span className={styles.formError} role="alert">
+                <span className="text-xs text-destructive" role="alert">
                   {errors.executionOrder}
                 </span>
               )}
             </div>
 
-            <div className={styles.checkboxGroup}>
+            <div className="flex items-center gap-2">
               <input
                 id="approval-process-allow-recall"
                 type="checkbox"
+                className="h-4 w-4 accent-primary"
                 checked={formData.allowRecall}
                 onChange={(e) => handleChange('allowRecall', e.target.checked)}
                 disabled={isSubmitting}
                 data-testid="approval-process-allow-recall-input"
               />
-              <label htmlFor="approval-process-allow-recall" className={styles.formLabel}>
+              <label
+                htmlFor="approval-process-allow-recall"
+                className="text-sm font-medium text-foreground"
+              >
                 Allow Recall
               </label>
             </div>
 
-            <div className={styles.checkboxGroup}>
+            <div className="flex items-center gap-2">
               <input
                 id="approval-process-active"
                 type="checkbox"
+                className="h-4 w-4 accent-primary"
                 checked={formData.active}
                 onChange={(e) => handleChange('active', e.target.checked)}
                 disabled={isSubmitting}
                 data-testid="approval-process-active-input"
               />
-              <label htmlFor="approval-process-active" className={styles.formLabel}>
+              <label
+                htmlFor="approval-process-active"
+                className="text-sm font-medium text-foreground"
+              >
                 Active
               </label>
             </div>
 
-            <div className={styles.formActions}>
-              <button
+            <div className="mt-2 flex justify-end gap-3 border-t border-border pt-4">
+              <Button
                 type="button"
-                className={styles.cancelButton}
+                variant="outline"
                 onClick={onCancel}
                 disabled={isSubmitting}
                 data-testid="approval-process-form-cancel"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 type="submit"
-                className={styles.submitButton}
                 disabled={isSubmitting}
                 data-testid="approval-process-form-submit"
               >
                 {isSubmitting ? 'Saving...' : 'Save'}
-              </button>
+              </Button>
             </div>
           </form>
         </div>
@@ -429,18 +479,14 @@ export function ApprovalProcessesPage({
     refetch,
   } = useQuery({
     queryKey: ['approvalProcesses'],
-    queryFn: () =>
-      apiClient.get<ApprovalProcess[]>(`/control/approvals/processes`),
+    queryFn: () => apiClient.get<ApprovalProcess[]>(`/control/approvals/processes`),
   })
 
   const approvalProcessList: ApprovalProcess[] = approvalProcesses ?? []
 
   const createMutation = useMutation({
     mutationFn: (data: ApprovalProcessFormData) =>
-      apiClient.post<ApprovalProcess>(
-        `/control/approvals/processes?userId=system`,
-        data
-      ),
+      apiClient.post<ApprovalProcess>(`/control/approvals/processes?userId=system`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['approvalProcesses'] })
       showToast('Approval process created successfully', 'success')
@@ -484,8 +530,7 @@ export function ApprovalProcessesPage({
     error: instancesError,
   } = useQuery({
     queryKey: ['approval-instances'],
-    queryFn: () =>
-      apiClient.get<ApprovalInstance[]>(`/control/approvals/instances`),
+    queryFn: () => apiClient.get<ApprovalInstance[]>(`/control/approvals/instances`),
     enabled: !!instancesItemId,
   })
 
@@ -611,38 +656,41 @@ export function ApprovalProcessesPage({
         if (row.status === 'PENDING') {
           const pendingStep = row.stepInstances?.find((s) => s.status === 'PENDING')
           return (
-            <div className={styles.actions}>
+            <div className="flex justify-end gap-2">
               {pendingStep && (
                 <>
-                  <button
+                  <Button
                     type="button"
-                    className={styles.actionButton}
+                    variant="outline"
+                    size="sm"
                     onClick={() => approveMutation.mutate(pendingStep.id)}
                     disabled={approveMutation.isPending}
-                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                    className="h-auto px-2 py-1 text-xs"
                   >
                     {t('approvals.approve')}
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
-                    className={`${styles.actionButton} ${styles.deleteButton}`}
+                    variant="outline"
+                    size="sm"
                     onClick={() => rejectMutation.mutate(pendingStep.id)}
                     disabled={rejectMutation.isPending}
-                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                    className="h-auto border-destructive/30 px-2 py-1 text-xs text-destructive hover:bg-destructive/10"
                   >
                     {t('approvals.reject')}
-                  </button>
+                  </Button>
                 </>
               )}
-              <button
+              <Button
                 type="button"
-                className={styles.actionButton}
+                variant="outline"
+                size="sm"
                 onClick={() => recallMutation.mutate(row.id)}
                 disabled={recallMutation.isPending}
-                style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                className="h-auto px-2 py-1 text-xs"
               >
                 {t('approvals.recall')}
-              </button>
+              </Button>
             </div>
           )
         }
@@ -695,8 +743,8 @@ export function ApprovalProcessesPage({
 
   if (isLoading) {
     return (
-      <div className={styles.container} data-testid={testId}>
-        <div className={styles.loadingContainer}>
+      <div className="mx-auto max-w-[1400px] space-y-6 p-6 lg:p-8" data-testid={testId}>
+        <div className="flex min-h-[400px] items-center justify-center">
           <LoadingSpinner size="large" label="Loading approval processes..." />
         </div>
       </div>
@@ -705,7 +753,7 @@ export function ApprovalProcessesPage({
 
   if (error) {
     return (
-      <div className={styles.container} data-testid={testId}>
+      <div className="mx-auto max-w-[1400px] space-y-6 p-6 lg:p-8" data-testid={testId}>
         <ErrorMessage
           error={error instanceof Error ? error : new Error('An error occurred')}
           onRetry={() => refetch()}
@@ -717,53 +765,83 @@ export function ApprovalProcessesPage({
   const isSubmitting = createMutation.isPending || updateMutation.isPending
 
   return (
-    <div className={styles.container} data-testid={testId}>
-      <header className={styles.header}>
-        <h1 className={styles.title}>Approval Processes</h1>
-        <button
+    <div className="mx-auto max-w-[1400px] space-y-6 p-6 lg:p-8" data-testid={testId}>
+      <header className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold text-foreground">Approval Processes</h1>
+        <Button
           type="button"
-          className={styles.createButton}
           onClick={handleCreate}
           aria-label="Create Approval Process"
           data-testid="add-approval-process-button"
         >
           Create Approval Process
-        </button>
+        </Button>
       </header>
 
       {approvalProcessList.length === 0 ? (
-        <div className={styles.emptyState} data-testid="empty-state">
+        <div
+          className="rounded-lg border border-border bg-card py-16 text-center text-muted-foreground"
+          data-testid="empty-state"
+        >
           <p>No approval processes found.</p>
         </div>
       ) : (
-        <div className={styles.tableContainer}>
+        <div className="overflow-x-auto rounded-lg border border-border bg-card">
           <table
-            className={styles.table}
+            className="w-full border-collapse"
             role="grid"
             aria-label="Approval Processes"
             data-testid="approval-processes-table"
           >
             <thead>
-              <tr role="row">
-                <th role="columnheader" scope="col">
+              <tr role="row" className="bg-muted">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   Name
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   Collection ID
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   Record Editability
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   Active
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   Allow Recall
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   Order
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   Actions
                 </th>
               </tr>
@@ -773,38 +851,55 @@ export function ApprovalProcessesPage({
                 <tr
                   key={approvalProcess.id}
                   role="row"
-                  className={styles.tableRow}
+                  className="border-b border-border transition-colors last:border-b-0 hover:bg-muted/50"
                   data-testid={`approval-process-row-${index}`}
                 >
-                  <td role="gridcell">{approvalProcess.name}</td>
-                  <td role="gridcell">
-                    <span className={styles.descriptionCell}>
+                  <td role="gridcell" className="px-4 py-3 text-sm text-foreground">
+                    {approvalProcess.name}
+                  </td>
+                  <td role="gridcell" className="px-4 py-3 text-sm text-foreground">
+                    <span className="max-w-[300px] truncate text-muted-foreground">
                       {approvalProcess.collectionId || '-'}
                     </span>
                   </td>
-                  <td role="gridcell">
-                    <span className={styles.badge}>{approvalProcess.recordEditability}</span>
+                  <td role="gridcell" className="px-4 py-3 text-sm text-foreground">
+                    <span className="inline-block rounded-full bg-muted px-3 py-1 text-xs font-semibold uppercase tracking-wider text-primary">
+                      {approvalProcess.recordEditability}
+                    </span>
                   </td>
-                  <td role="gridcell">
+                  <td role="gridcell" className="px-4 py-3 text-sm text-foreground">
                     <span
-                      className={`${styles.boolBadge} ${approvalProcess.active ? styles.boolTrue : styles.boolFalse}`}
+                      className={cn(
+                        'inline-block rounded-full px-3 py-1 text-xs font-semibold',
+                        approvalProcess.active
+                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                          : 'bg-muted text-muted-foreground'
+                      )}
                     >
                       {approvalProcess.active ? 'Yes' : 'No'}
                     </span>
                   </td>
-                  <td role="gridcell">
+                  <td role="gridcell" className="px-4 py-3 text-sm text-foreground">
                     <span
-                      className={`${styles.boolBadge} ${approvalProcess.allowRecall ? styles.boolTrue : styles.boolFalse}`}
+                      className={cn(
+                        'inline-block rounded-full px-3 py-1 text-xs font-semibold',
+                        approvalProcess.allowRecall
+                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                          : 'bg-muted text-muted-foreground'
+                      )}
                     >
                       {approvalProcess.allowRecall ? 'Yes' : 'No'}
                     </span>
                   </td>
-                  <td role="gridcell">{approvalProcess.executionOrder}</td>
-                  <td role="gridcell" className={styles.actionsCell}>
-                    <div className={styles.actions}>
-                      <button
+                  <td role="gridcell" className="px-4 py-3 text-sm text-foreground">
+                    {approvalProcess.executionOrder}
+                  </td>
+                  <td role="gridcell" className="px-4 py-3 text-right text-sm">
+                    <div className="flex justify-end gap-2">
+                      <Button
                         type="button"
-                        className={styles.actionButton}
+                        variant="outline"
+                        size="sm"
                         onClick={() => {
                           setInstancesItemId(approvalProcess.id)
                           setInstancesItemName(approvalProcess.name)
@@ -813,25 +908,28 @@ export function ApprovalProcessesPage({
                         data-testid={`instances-button-${index}`}
                       >
                         {t('approvals.instances')}
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
-                        className={styles.actionButton}
+                        variant="outline"
+                        size="sm"
                         onClick={() => handleEdit(approvalProcess)}
                         aria-label={`Edit ${approvalProcess.name}`}
                         data-testid={`edit-button-${index}`}
                       >
                         Edit
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
-                        className={`${styles.actionButton} ${styles.deleteButton}`}
+                        variant="outline"
+                        size="sm"
+                        className="border-destructive/30 text-destructive hover:bg-destructive/10"
                         onClick={() => handleDeleteClick(approvalProcess)}
                         aria-label={`Delete ${approvalProcess.name}`}
                         data-testid={`delete-button-${index}`}
                       >
                         Delete
-                      </button>
+                      </Button>
                     </div>
                   </td>
                 </tr>

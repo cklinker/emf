@@ -13,11 +13,11 @@
 import React, { useState, useCallback, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Package, FolderOpen } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
 import { useToast, LoadingSpinner, ErrorMessage } from '../../components'
 import type { ApiClient } from '../../services/apiClient'
-import styles from './PackagesPage.module.css'
 
 /**
  * Package interface matching the API response
@@ -217,7 +217,13 @@ function StatusBadge({ status }: StatusBadgeProps): React.ReactElement {
   }
   return (
     <span
-      className={`${styles.statusBadge} ${styles[`status${status.charAt(0).toUpperCase() + status.slice(1)}`]}`}
+      className={cn(
+        'inline-flex items-center px-2 py-1 text-xs font-medium rounded-full',
+        status === 'success' && 'text-green-800 bg-green-50 dark:text-green-300 dark:bg-green-950',
+        status === 'failed' && 'text-red-600 bg-red-50 dark:text-red-300 dark:bg-red-950',
+        status === 'pending' &&
+          'text-yellow-800 bg-yellow-50 dark:text-yellow-300 dark:bg-yellow-950'
+      )}
       data-testid="status-badge"
     >
       {statusLabels[status] || status}
@@ -236,7 +242,11 @@ function TypeBadge({ type }: TypeBadgeProps): React.ReactElement {
   const { t } = useI18n()
   return (
     <span
-      className={`${styles.typeBadge} ${styles[`type${type.charAt(0).toUpperCase() + type.slice(1)}`]}`}
+      className={cn(
+        'inline-flex items-center px-2 py-1 text-xs font-medium rounded',
+        type === 'export' && 'text-blue-800 bg-blue-50 dark:text-blue-300 dark:bg-blue-950',
+        type === 'import' && 'text-purple-800 bg-purple-50 dark:text-purple-300 dark:bg-purple-950'
+      )}
       data-testid="type-badge"
     >
       {type === 'export' ? t('packages.export') : t('packages.import')}
@@ -285,9 +295,9 @@ function ItemSelection({
 
   if (isLoading) {
     return (
-      <div className={styles.itemSection}>
-        <h4 className={styles.itemSectionTitle}>{title}</h4>
-        <div className={styles.itemSectionLoading}>
+      <div className="rounded-md border border-border bg-muted p-4">
+        <h4 className="m-0 text-sm font-semibold text-foreground">{title}</h4>
+        <div className="flex justify-center p-4">
           <LoadingSpinner size="small" />
         </div>
       </div>
@@ -295,13 +305,16 @@ function ItemSelection({
   }
 
   return (
-    <div className={styles.itemSection} data-testid={`item-section-${title.toLowerCase()}`}>
-      <div className={styles.itemSectionHeader}>
-        <h4 className={styles.itemSectionTitle}>{title}</h4>
+    <div
+      className="rounded-md border border-border bg-muted p-4"
+      data-testid={`item-section-${title.toLowerCase()}`}
+    >
+      <div className="flex items-center justify-between mb-2">
+        <h4 className="m-0 text-sm font-semibold text-foreground">{title}</h4>
         {items.length > 0 && (
           <button
             type="button"
-            className={styles.selectAllButton}
+            className="px-2 py-1 text-xs text-primary bg-transparent border-none cursor-pointer transition-colors duration-150 hover:text-primary/80 hover:underline focus:outline-2 focus:outline-ring focus:outline-offset-2"
             onClick={handleSelectAll}
             data-testid={`select-all-${title.toLowerCase()}`}
           >
@@ -310,18 +323,31 @@ function ItemSelection({
         )}
       </div>
       {items.length === 0 ? (
-        <p className={styles.noItems}>{t('packages.noItemsAvailable')}</p>
+        <p className="m-0 p-2 text-sm text-muted-foreground text-center">
+          {t('packages.noItemsAvailable')}
+        </p>
       ) : (
-        <div className={styles.itemList} role="group" aria-label={title}>
+        <div
+          className="flex flex-col gap-1 max-h-[200px] overflow-y-auto"
+          role="group"
+          aria-label={title}
+        >
           {items.map((item) => (
-            <label key={item.id} className={styles.itemCheckbox} data-testid={`item-${item.id}`}>
+            <label
+              key={item.id}
+              className="flex items-center gap-2 px-2 py-1 rounded cursor-pointer transition-colors duration-150 hover:bg-accent"
+              data-testid={`item-${item.id}`}
+            >
               <input
                 type="checkbox"
+                className="shrink-0 w-4 h-4 cursor-pointer"
                 checked={selectedIds.includes(item.id)}
                 onChange={() => handleToggle(item.id)}
                 data-testid={`checkbox-${item.id}`}
               />
-              <span className={styles.itemName}>{item.name}</span>
+              <span className="text-sm text-foreground whitespace-nowrap overflow-hidden text-ellipsis">
+                {item.name}
+              </span>
             </label>
           ))}
         </div>
@@ -429,43 +455,48 @@ function ExportPanel({ onExportComplete }: ExportPanelProps): React.ReactElement
   ])
 
   return (
-    <div className={styles.panel} data-testid="export-panel">
-      <h3 className={styles.panelTitle}>{t('packages.packageDetails')}</h3>
-      <div className={styles.formGroup}>
-        <label htmlFor="package-name" className={styles.label}>
-          {t('packages.packageName')} <span className={styles.required}>*</span>
+    <div className="rounded-md border border-border bg-card p-6" data-testid="export-panel">
+      <h3 className="m-0 mb-1 text-lg font-semibold text-foreground">
+        {t('packages.packageDetails')}
+      </h3>
+      <div className="mb-4">
+        <label htmlFor="package-name" className="block mb-1 text-sm font-medium text-foreground">
+          {t('packages.packageName')} <span className="text-destructive">*</span>
         </label>
         <input
           id="package-name"
           type="text"
-          className={styles.input}
+          className="w-full p-2 text-sm text-foreground bg-background border border-border rounded-md transition-colors duration-150 focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/10 placeholder:text-muted-foreground"
           value={packageName}
           onChange={(e) => setPackageName(e.target.value)}
           placeholder={t('packages.packageNamePlaceholder')}
           required
         />
       </div>
-      <div className={styles.formGroup}>
-        <label htmlFor="package-version" className={styles.label}>
-          {t('packages.packageVersion')} <span className={styles.required}>*</span>
+      <div className="mb-4">
+        <label htmlFor="package-version" className="block mb-1 text-sm font-medium text-foreground">
+          {t('packages.packageVersion')} <span className="text-destructive">*</span>
         </label>
         <input
           id="package-version"
           type="text"
-          className={styles.input}
+          className="w-full p-2 text-sm text-foreground bg-background border border-border rounded-md transition-colors duration-150 focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/10 placeholder:text-muted-foreground"
           value={packageVersion}
           onChange={(e) => setPackageVersion(e.target.value)}
           placeholder="1.0.0"
           required
         />
       </div>
-      <div className={styles.formGroup}>
-        <label htmlFor="package-description" className={styles.label}>
+      <div className="mb-4">
+        <label
+          htmlFor="package-description"
+          className="block mb-1 text-sm font-medium text-foreground"
+        >
           {t('packages.packageDescription')}
         </label>
         <textarea
           id="package-description"
-          className={styles.textarea}
+          className="w-full p-2 text-sm text-foreground bg-background border border-border rounded-md transition-colors duration-150 resize-y min-h-[80px] focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/10 placeholder:text-muted-foreground"
           value={packageDescription}
           onChange={(e) => setPackageDescription(e.target.value)}
           placeholder={t('packages.packageDescriptionPlaceholder')}
@@ -473,10 +504,14 @@ function ExportPanel({ onExportComplete }: ExportPanelProps): React.ReactElement
         />
       </div>
 
-      <h3 className={styles.panelTitle}>{t('packages.selectItems')}</h3>
-      <p className={styles.panelDescription}>{t('packages.selectItemsDescription')}</p>
+      <h3 className="m-0 mb-1 text-lg font-semibold text-foreground">
+        {t('packages.selectItems')}
+      </h3>
+      <p className="m-0 mb-6 text-sm text-muted-foreground">
+        {t('packages.selectItemsDescription')}
+      </p>
 
-      <div className={styles.itemSections}>
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4 max-lg:grid-cols-2 max-md:grid-cols-1">
         <ItemSelection
           title={t('navigation.collections')}
           items={collections}
@@ -514,10 +549,10 @@ function ExportPanel({ onExportComplete }: ExportPanelProps): React.ReactElement
         />
       </div>
 
-      <div className={styles.panelActions}>
+      <div className="flex justify-end gap-2 mt-6 pt-6 border-t border-border max-md:flex-col">
         <button
           type="button"
-          className={styles.primaryButton}
+          className="px-6 py-2 text-sm font-medium text-primary-foreground bg-primary border-none rounded-md cursor-pointer transition-colors duration-200 hover:bg-primary/90 focus:outline-2 focus:outline-ring focus:outline-offset-2 disabled:opacity-60 disabled:cursor-not-allowed max-md:w-full"
           onClick={handleExport}
           disabled={!canExport || exportMutation.isPending}
           data-testid="export-button"
@@ -624,12 +659,19 @@ function ImportPanel({ onImportComplete }: ImportPanelProps): React.ReactElement
   }, [])
 
   return (
-    <div className={styles.panel} data-testid="import-panel">
-      <h3 className={styles.panelTitle}>{t('packages.uploadPackage')}</h3>
-      <p className={styles.panelDescription}>{t('packages.uploadDescription')}</p>
+    <div className="rounded-md border border-border bg-card p-6" data-testid="import-panel">
+      <h3 className="m-0 mb-1 text-lg font-semibold text-foreground">
+        {t('packages.uploadPackage')}
+      </h3>
+      <p className="m-0 mb-6 text-sm text-muted-foreground">{t('packages.uploadDescription')}</p>
 
       <div
-        className={`${styles.dropZone} ${selectedFile ? styles.dropZoneActive : ''}`}
+        className={cn(
+          'flex flex-col items-center justify-center min-h-[150px] p-6 border-2 border-dashed border-border rounded-md bg-muted cursor-pointer transition-all duration-200',
+          'hover:border-primary hover:bg-accent',
+          'focus:outline-2 focus:outline-ring focus:outline-offset-2',
+          selectedFile && 'border-green-500 bg-green-50 dark:bg-green-950'
+        )}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onClick={() => fileInputRef.current?.click()}
@@ -644,18 +686,18 @@ function ImportPanel({ onImportComplete }: ImportPanelProps): React.ReactElement
           type="file"
           accept=".json"
           onChange={handleFileSelect}
-          className={styles.fileInput}
+          className="hidden"
           data-testid="file-input"
         />
         {selectedFile ? (
-          <div className={styles.selectedFile}>
-            <span className={styles.fileIcon}>
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">
               <Package size={16} />
             </span>
-            <span className={styles.fileName}>{selectedFile.name}</span>
+            <span className="text-base font-medium text-foreground">{selectedFile.name}</span>
             <button
               type="button"
-              className={styles.clearFileButton}
+              className="flex items-center justify-center w-6 h-6 p-0 text-lg text-muted-foreground bg-transparent border-none rounded-full cursor-pointer transition-all duration-150 hover:bg-red-50 hover:text-destructive dark:hover:bg-red-950 focus:outline-2 focus:outline-ring focus:outline-offset-2"
               onClick={(e) => {
                 e.stopPropagation()
                 handleReset()
@@ -663,41 +705,60 @@ function ImportPanel({ onImportComplete }: ImportPanelProps): React.ReactElement
               aria-label={t('common.clear')}
               data-testid="clear-file-button"
             >
-              ×
+              &times;
             </button>
           </div>
         ) : (
-          <div className={styles.dropZoneContent}>
-            <span className={styles.dropZoneIcon}>
+          <div className="flex flex-col items-center gap-2 text-center">
+            <span className="text-[2rem]">
               <FolderOpen size={24} />
             </span>
-            <span className={styles.dropZoneText}>{t('packages.dropZoneText')}</span>
-            <span className={styles.dropZoneHint}>{t('packages.dropZoneHint')}</span>
+            <span className="text-base font-medium text-foreground">
+              {t('packages.dropZoneText')}
+            </span>
+            <span className="text-sm text-muted-foreground">{t('packages.dropZoneHint')}</span>
           </div>
         )}
       </div>
 
       {previewMutation.isPending && (
-        <div className={styles.previewLoading}>
+        <div className="flex justify-center p-6">
           <LoadingSpinner size="small" label={t('packages.analyzingPackage')} />
         </div>
       )}
 
       {preview && (
-        <div className={styles.previewSection} data-testid="import-preview">
-          <h4 className={styles.previewTitle}>{t('packages.preview')}</h4>
-          <div className={styles.previewStats}>
-            <div className={styles.previewStat}>
-              <span className={styles.previewStatLabel}>{t('packages.toCreate')}</span>
-              <span className={styles.previewStatValue}>{preview.creates.length}</span>
+        <div
+          className="mt-6 p-4 bg-muted border border-border rounded-md"
+          data-testid="import-preview"
+        >
+          <h4 className="m-0 mb-4 text-base font-semibold text-foreground">
+            {t('packages.preview')}
+          </h4>
+          <div className="flex gap-6 flex-wrap max-md:flex-col max-md:gap-2">
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground uppercase tracking-wide">
+                {t('packages.toCreate')}
+              </span>
+              <span className="text-xl font-semibold text-foreground">
+                {preview.creates.length}
+              </span>
             </div>
-            <div className={styles.previewStat}>
-              <span className={styles.previewStatLabel}>{t('packages.toUpdate')}</span>
-              <span className={styles.previewStatValue}>{preview.updates.length}</span>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground uppercase tracking-wide">
+                {t('packages.toUpdate')}
+              </span>
+              <span className="text-xl font-semibold text-foreground">
+                {preview.updates.length}
+              </span>
             </div>
-            <div className={styles.previewStat}>
-              <span className={styles.previewStatLabel}>{t('packages.conflicts')}</span>
-              <span className={styles.previewStatValue}>{preview.conflicts.length}</span>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground uppercase tracking-wide">
+                {t('packages.conflicts')}
+              </span>
+              <span className="text-xl font-semibold text-foreground">
+                {preview.conflicts.length}
+              </span>
             </div>
           </div>
         </div>
@@ -705,15 +766,27 @@ function ImportPanel({ onImportComplete }: ImportPanelProps): React.ReactElement
 
       {importResult && (
         <div
-          className={`${styles.resultSection} ${importResult.success ? styles.resultSuccess : styles.resultError}`}
+          className={cn(
+            'mt-6 p-4 rounded-md',
+            importResult.success
+              ? 'bg-green-50 border border-green-500 dark:bg-green-950'
+              : 'bg-red-50 border border-red-500 dark:bg-red-950'
+          )}
           data-testid="import-result"
         >
-          <h4 className={styles.resultTitle}>
+          <h4
+            className={cn(
+              'm-0 mb-2 text-base font-semibold',
+              importResult.success
+                ? 'text-green-800 dark:text-green-300'
+                : 'text-red-600 dark:text-red-300'
+            )}
+          >
             {importResult.success
               ? t('packages.importResultSuccess')
               : t('packages.importResultFailed')}
           </h4>
-          <div className={styles.resultStats}>
+          <div className="flex gap-4 text-sm text-muted-foreground max-md:flex-col max-md:gap-1">
             <span>
               {t('packages.created')}: {importResult.created}
             </span>
@@ -725,9 +798,9 @@ function ImportPanel({ onImportComplete }: ImportPanelProps): React.ReactElement
             </span>
           </div>
           {importResult.errors.length > 0 && (
-            <div className={styles.resultErrors}>
+            <div className="mt-4 pt-4 border-t border-red-200 dark:border-red-800">
               {importResult.errors.map((err, idx) => (
-                <div key={idx} className={styles.resultError}>
+                <div key={idx} className="text-sm text-red-600 dark:text-red-300 mb-1">
                   {err.item.name}: {err.message}
                 </div>
               ))}
@@ -736,10 +809,10 @@ function ImportPanel({ onImportComplete }: ImportPanelProps): React.ReactElement
         </div>
       )}
 
-      <div className={styles.panelActions}>
+      <div className="flex justify-end gap-2 mt-6 pt-6 border-t border-border max-md:flex-col">
         <button
           type="button"
-          className={styles.secondaryButton}
+          className="px-6 py-2 text-sm font-medium text-foreground bg-background border border-border rounded-md cursor-pointer transition-all duration-150 hover:bg-muted hover:border-muted-foreground/50 focus:outline-2 focus:outline-ring focus:outline-offset-2 disabled:opacity-60 disabled:cursor-not-allowed max-md:w-full"
           onClick={handleDryRun}
           disabled={!selectedFile || importMutation.isPending}
           data-testid="dry-run-button"
@@ -748,7 +821,7 @@ function ImportPanel({ onImportComplete }: ImportPanelProps): React.ReactElement
         </button>
         <button
           type="button"
-          className={styles.primaryButton}
+          className="px-6 py-2 text-sm font-medium text-primary-foreground bg-primary border-none rounded-md cursor-pointer transition-colors duration-200 hover:bg-primary/90 focus:outline-2 focus:outline-ring focus:outline-offset-2 disabled:opacity-60 disabled:cursor-not-allowed max-md:w-full"
           onClick={handleImport}
           disabled={!selectedFile || importMutation.isPending}
           data-testid="import-button"
@@ -781,7 +854,7 @@ function HistoryPanel({
 
   if (isLoading) {
     return (
-      <div className={styles.loadingContainer}>
+      <div className="flex items-center justify-center min-h-[300px]">
         <LoadingSpinner label={t('common.loading')} />
       </div>
     )
@@ -794,15 +867,18 @@ function HistoryPanel({
 
     if (isNotImplemented) {
       return (
-        <div className={styles.emptyState} data-testid="history-not-available">
-          <p>{t('packages.historyNotAvailable')}</p>
-          <p className={styles.emptyStateHint}>{t('packages.historyNotAvailableHint')}</p>
+        <div
+          className="flex flex-col items-center justify-center p-12 text-center text-muted-foreground bg-muted rounded-md"
+          data-testid="history-not-available"
+        >
+          <p className="m-0 text-base">{t('packages.historyNotAvailable')}</p>
+          <p className="text-sm mt-2">{t('packages.historyNotAvailableHint')}</p>
         </div>
       )
     }
 
     return (
-      <div className={styles.errorContainer}>
+      <div className="flex items-center justify-center min-h-[200px]">
         <ErrorMessage error={error} onRetry={onRetry} />
       </div>
     )
@@ -810,37 +886,61 @@ function HistoryPanel({
 
   if (packages.length === 0) {
     return (
-      <div className={styles.emptyState} data-testid="history-empty">
-        <p>{t('packages.noHistory')}</p>
-        <p className={styles.emptyStateHint}>{t('packages.noHistoryHint')}</p>
+      <div
+        className="flex flex-col items-center justify-center p-12 text-center text-muted-foreground bg-muted rounded-md"
+        data-testid="history-empty"
+      >
+        <p className="m-0 text-base">{t('packages.noHistory')}</p>
+        <p className="text-sm mt-2">{t('packages.noHistoryHint')}</p>
       </div>
     )
   }
 
   return (
-    <div className={styles.tableContainer} data-testid="history-table">
-      <table className={styles.table}>
-        <thead>
+    <div
+      className="overflow-x-auto border border-border rounded-md bg-card"
+      data-testid="history-table"
+    >
+      <table className="w-full border-collapse text-sm">
+        <thead className="bg-muted">
           <tr>
-            <th>{t('packages.packageName')}</th>
-            <th>{t('packages.type')}</th>
-            <th>{t('packages.status')}</th>
-            <th>{t('packages.items')}</th>
-            <th>{t('packages.date')}</th>
+            <th className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap">
+              {t('packages.packageName')}
+            </th>
+            <th className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap">
+              {t('packages.type')}
+            </th>
+            <th className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap">
+              {t('packages.status')}
+            </th>
+            <th className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap">
+              {t('packages.items')}
+            </th>
+            <th className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap">
+              {t('packages.date')}
+            </th>
           </tr>
         </thead>
         <tbody>
           {packages.map((pkg) => (
-            <tr key={pkg.id} className={styles.tableRow} data-testid={`history-row-${pkg.id}`}>
-              <td className={styles.nameCell}>{pkg.name}</td>
-              <td>
+            <tr
+              key={pkg.id}
+              className="transition-colors duration-150 hover:bg-accent"
+              data-testid={`history-row-${pkg.id}`}
+            >
+              <td className="p-4 text-foreground border-b border-border/50 font-medium">
+                {pkg.name}
+              </td>
+              <td className="p-4 text-foreground border-b border-border/50">
                 <TypeBadge type={pkg.type} />
               </td>
-              <td>
+              <td className="p-4 text-foreground border-b border-border/50">
                 <StatusBadge status={pkg.status} />
               </td>
-              <td className={styles.countCell}>{pkg.items.length}</td>
-              <td className={styles.dateCell}>
+              <td className="p-4 text-muted-foreground border-b border-border/50">
+                {pkg.items.length}
+              </td>
+              <td className="p-4 text-muted-foreground border-b border-border/50 whitespace-nowrap">
                 {formatDate(new Date(pkg.createdAt), {
                   year: 'numeric',
                   month: 'short',
@@ -895,18 +995,32 @@ export function PackagesPage({ testId }: PackagesPageProps): React.ReactElement 
   }, [queryClient])
 
   return (
-    <div className={styles.container} data-testid={testId || 'packages-page'}>
-      <header className={styles.header}>
-        <h1 className={styles.title}>{t('packages.title')}</h1>
+    <div
+      className="flex flex-col h-full min-h-0 p-6 w-full max-lg:p-4 max-md:p-2"
+      data-testid={testId || 'packages-page'}
+    >
+      <header className="mb-6">
+        <h1 className="m-0 text-2xl font-semibold text-foreground max-md:text-xl">
+          {t('packages.title')}
+        </h1>
       </header>
 
-      <div className={styles.tabs} role="tablist" aria-label={t('packages.title')}>
+      <div
+        className="flex gap-1 border-b-2 border-border mb-6 max-md:overflow-x-auto max-md:[&::-webkit-scrollbar]:hidden"
+        role="tablist"
+        aria-label={t('packages.title')}
+      >
         <button
           type="button"
           role="tab"
           aria-selected={activeTab === 'export'}
           aria-controls="export-panel"
-          className={`${styles.tab} ${activeTab === 'export' ? styles.tabActive : ''}`}
+          className={cn(
+            'px-6 py-2 text-sm font-medium text-muted-foreground bg-transparent border-none border-b-2 border-transparent -mb-[2px] cursor-pointer transition-all duration-200 max-md:px-4 max-md:whitespace-nowrap',
+            'hover:text-foreground',
+            'focus:outline-2 focus:outline-ring focus:outline-offset-2',
+            activeTab === 'export' && 'text-primary border-b-primary'
+          )}
           onClick={() => setActiveTab('export')}
           data-testid="tab-export"
         >
@@ -917,7 +1031,12 @@ export function PackagesPage({ testId }: PackagesPageProps): React.ReactElement 
           role="tab"
           aria-selected={activeTab === 'import'}
           aria-controls="import-panel"
-          className={`${styles.tab} ${activeTab === 'import' ? styles.tabActive : ''}`}
+          className={cn(
+            'px-6 py-2 text-sm font-medium text-muted-foreground bg-transparent border-none border-b-2 border-transparent -mb-[2px] cursor-pointer transition-all duration-200 max-md:px-4 max-md:whitespace-nowrap',
+            'hover:text-foreground',
+            'focus:outline-2 focus:outline-ring focus:outline-offset-2',
+            activeTab === 'import' && 'text-primary border-b-primary'
+          )}
           onClick={() => setActiveTab('import')}
           data-testid="tab-import"
         >
@@ -928,7 +1047,12 @@ export function PackagesPage({ testId }: PackagesPageProps): React.ReactElement 
           role="tab"
           aria-selected={activeTab === 'history'}
           aria-controls="history-panel"
-          className={`${styles.tab} ${activeTab === 'history' ? styles.tabActive : ''}`}
+          className={cn(
+            'px-6 py-2 text-sm font-medium text-muted-foreground bg-transparent border-none border-b-2 border-transparent -mb-[2px] cursor-pointer transition-all duration-200 max-md:px-4 max-md:whitespace-nowrap',
+            'hover:text-foreground',
+            'focus:outline-2 focus:outline-ring focus:outline-offset-2',
+            activeTab === 'history' && 'text-primary border-b-primary'
+          )}
           onClick={() => setActiveTab('history')}
           data-testid="tab-history"
         >
@@ -936,7 +1060,7 @@ export function PackagesPage({ testId }: PackagesPageProps): React.ReactElement 
         </button>
       </div>
 
-      <div className={styles.tabContent}>
+      <div className="flex-1 min-h-0 overflow-y-auto">
         {activeTab === 'export' && (
           <div id="export-panel" role="tabpanel" aria-labelledby="tab-export">
             <ExportPanel onExportComplete={handleExportComplete} />

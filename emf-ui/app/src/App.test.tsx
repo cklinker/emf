@@ -403,7 +403,6 @@ describe('App', () => {
         expect(screen.getByTestId('redirect-to-login')).toBeInTheDocument()
       })
     })
-
   })
 
   describe('Protected Routes - Authenticated', () => {
@@ -570,7 +569,6 @@ describe('App', () => {
         expect(screen.getByTestId('user-detail-page')).toBeInTheDocument()
       })
     })
-
   })
 
   describe('Route Configuration', () => {

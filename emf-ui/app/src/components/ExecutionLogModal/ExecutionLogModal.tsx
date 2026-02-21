@@ -1,6 +1,27 @@
-import React, { useCallback } from 'react'
+/**
+ * ExecutionLogModal Component
+ *
+ * A modal dialog for displaying execution logs in a tabular format.
+ * Built on shadcn Dialog + ScrollArea with Tailwind CSS styling.
+ *
+ * Features:
+ * - Modal overlay with centered dialog
+ * - Table display with configurable columns
+ * - Loading, error, and empty states
+ * - Scrollable content area via ScrollArea
+ * - Accessible with ARIA dialog role
+ */
+
+import React from 'react'
 import { LoadingSpinner, ErrorMessage } from '..'
-import styles from './ExecutionLogModal.module.css'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog'
+import { ScrollArea } from '@/components/ui/scroll-area'
 
 export interface LogColumn<T> {
   key: string
@@ -29,73 +50,71 @@ export function ExecutionLogModal<T extends Record<string, unknown>>({
   onClose,
   emptyMessage = 'No logs found.',
 }: ExecutionLogModalProps<T>): React.ReactElement {
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose()
-      }
-    },
-    [onClose]
-  )
-
   return (
-    <div
-      className={styles.overlay}
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-      onKeyDown={handleKeyDown}
-      role="presentation"
-      data-testid="execution-log-overlay"
-    >
-      <div
-        className={styles.modal}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="execution-log-title"
+    <Dialog open={true} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent
+        className="sm:max-w-[900px] max-h-[80vh] flex flex-col p-0"
         data-testid="execution-log-modal"
       >
-        <div className={styles.header}>
-          <div>
-            <h2 id="execution-log-title" className={styles.title}>
-              {title}
-            </h2>
-            {subtitle && <p className={styles.subtitle}>{subtitle}</p>}
-          </div>
-          <button
-            type="button"
-            className={styles.closeButton}
-            onClick={onClose}
-            aria-label="Close"
-            data-testid="execution-log-close"
+        {/* Header */}
+        <DialogHeader className="px-6 pt-5 pb-4 border-b">
+          <DialogTitle
+            id="execution-log-title"
+            className="text-lg font-semibold"
+            data-testid="execution-log-title"
           >
-            &times;
-          </button>
-        </div>
-        <div className={styles.body}>
+            {title}
+          </DialogTitle>
+          {subtitle && (
+            <DialogDescription className="text-sm text-muted-foreground mt-1">
+              {subtitle}
+            </DialogDescription>
+          )}
+          {!subtitle && <DialogDescription className="sr-only">{title}</DialogDescription>}
+        </DialogHeader>
+
+        {/* Body */}
+        <ScrollArea className="flex-1 px-6 py-5">
           {isLoading ? (
-            <div className={styles.centered}>
+            <div className="flex items-center justify-center p-8">
               <LoadingSpinner size="medium" label="Loading logs..." />
             </div>
           ) : error ? (
             <ErrorMessage error={error} />
           ) : data.length === 0 ? (
-            <div className={styles.centered}>
-              <p className={styles.emptyMessage}>{emptyMessage}</p>
+            <div className="flex items-center justify-center p-8">
+              <p className="text-sm text-muted-foreground">{emptyMessage}</p>
             </div>
           ) : (
-            <div className={styles.tableContainer}>
-              <table className={styles.table} role="grid" aria-label={title}>
+            <div className="overflow-x-auto">
+              <table
+                className="w-full border-collapse text-[0.8125rem]"
+                role="grid"
+                aria-label={title}
+              >
                 <thead>
                   <tr>
                     {columns.map((col) => (
-                      <th key={col.key}>{col.header}</th>
+                      <th
+                        key={col.key}
+                        className="px-3 py-2 text-left text-xs font-semibold uppercase text-muted-foreground border-b whitespace-nowrap sticky top-0 bg-background"
+                      >
+                        {col.header}
+                      </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {data.map((row, rowIndex) => (
-                    <tr key={((row as Record<string, unknown>).id as string) ?? rowIndex}>
+                    <tr
+                      key={((row as Record<string, unknown>).id as string) ?? rowIndex}
+                      className="hover:bg-muted/50 transition-colors"
+                    >
                       {columns.map((col) => (
-                        <td key={col.key}>
+                        <td
+                          key={col.key}
+                          className="px-3 py-2 text-left border-b whitespace-nowrap"
+                        >
                           {col.render
                             ? col.render(row[col.key], row)
                             : row[col.key] != null
@@ -109,8 +128,8 @@ export function ExecutionLogModal<T extends Record<string, unknown>>({
               </table>
             </div>
           )}
-        </div>
-      </div>
-    </div>
+        </ScrollArea>
+      </DialogContent>
+    </Dialog>
   )
 }

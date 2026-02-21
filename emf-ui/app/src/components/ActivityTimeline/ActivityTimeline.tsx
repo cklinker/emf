@@ -16,9 +16,9 @@
 import React, { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
+import { cn } from '@/lib/utils'
 
 import type { ApiClient } from '../../services/apiClient'
-import styles from './ActivityTimeline.module.css'
 
 /**
  * Approval step instance from the control plane
@@ -141,17 +141,17 @@ function formatRelativeTime(dateStr: string): string {
 }
 
 /**
- * Get the CSS class name for a timeline entry type icon
+ * Get Tailwind classes for a timeline entry type icon
  */
-function getIconClassName(type: TimelineEntryType): string {
+function getIconClasses(type: TimelineEntryType): string {
   const classMap: Record<TimelineEntryType, string> = {
-    CREATED: styles.created,
-    UPDATED: styles.updated,
-    APPROVAL_SUBMITTED: styles.approvalSubmitted,
-    APPROVAL_APPROVED: styles.approvalApproved,
-    APPROVAL_REJECTED: styles.approvalRejected,
-    APPROVAL_RECALLED: styles.approvalRecalled,
-    SHARED: styles.shared,
+    CREATED: 'bg-green-50 text-green-700 border-2 border-green-700',
+    UPDATED: 'bg-blue-50 text-blue-700 border-2 border-blue-700',
+    APPROVAL_SUBMITTED: 'bg-amber-50 text-amber-700 border-2 border-amber-700',
+    APPROVAL_APPROVED: 'bg-green-50 text-green-700 border-2 border-green-700',
+    APPROVAL_REJECTED: 'bg-red-50 text-red-700 border-2 border-red-700',
+    APPROVAL_RECALLED: 'bg-muted text-muted-foreground border-2 border-muted-foreground',
+    SHARED: 'bg-blue-50 text-blue-700 border-2 border-blue-700',
   }
   return classMap[type] || ''
 }
@@ -218,9 +218,7 @@ export function ActivityTimeline({
     queryKey: ['activity-approvals', collectionId, recordId],
     queryFn: async () => {
       try {
-        const instances = await apiClient.get<ApprovalInstance[]>(
-          `/control/approvals/instances`
-        )
+        const instances = await apiClient.get<ApprovalInstance[]>(`/control/approvals/instances`)
         // Filter client-side for instances matching this record
         return (instances || []).filter((instance) => instance.recordId === recordId)
       } catch {
@@ -334,45 +332,66 @@ export function ActivityTimeline({
 
   return (
     <section
-      className={styles.section}
+      className="bg-background border border-border rounded-lg overflow-hidden"
       aria-labelledby="activity-timeline-heading"
       data-testid="activity-timeline"
     >
       {/* Header */}
-      <div className={styles.sectionHeader}>
-        <h3 id="activity-timeline-heading">{t('activity.title')}</h3>
-        <span className={styles.countBadge}>{totalCount}</span>
+      <div className="flex justify-between items-center p-4 border-b border-border bg-muted/50 max-md:flex-col max-md:items-start max-md:gap-1">
+        <h3 id="activity-timeline-heading" className="m-0 text-lg font-semibold text-foreground">
+          {t('activity.title')}
+        </h3>
+        <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded bg-background text-muted-foreground">
+          {totalCount}
+        </span>
       </div>
 
       {/* Timeline or Empty State */}
       {entries.length === 0 ? (
-        <div className={styles.emptyState} data-testid="activity-timeline-empty">
-          <p>{t('activity.empty')}</p>
+        <div
+          className="flex flex-col items-center justify-center px-6 py-8 text-center"
+          data-testid="activity-timeline-empty"
+        >
+          <p className="m-0 text-sm text-muted-foreground">{t('activity.empty')}</p>
         </div>
       ) : (
-        <div className={styles.timeline} role="list" aria-label={t('activity.title')}>
-          {visibleEntries.map((entry) => (
+        <div className="relative p-4" role="list" aria-label={t('activity.title')}>
+          {visibleEntries.map((entry, index) => (
             <div
               key={entry.id}
-              className={styles.timelineEntry}
+              className={cn(
+                'flex items-start gap-4 relative max-md:gap-2',
+                index < visibleEntries.length - 1 ? 'pb-4' : 'pb-0'
+              )}
               role="listitem"
               data-testid={`activity-entry-${entry.id}`}
             >
               {/* Icon */}
               <div
-                className={`${styles.timelineIcon} ${getIconClassName(entry.type)}`}
+                className={cn(
+                  'relative flex items-center justify-center w-8 h-8 rounded-full shrink-0 text-sm z-[1]',
+                  'max-md:w-7 max-md:h-7 max-md:text-xs',
+                  getIconClasses(entry.type)
+                )}
                 aria-hidden="true"
               >
                 {getIconSymbol(entry.type)}
               </div>
 
               {/* Connector line */}
-              <div className={styles.timelineConnector} aria-hidden="true" />
+              {index < visibleEntries.length - 1 && (
+                <div
+                  className="absolute left-[15px] top-8 bottom-0 w-0.5 bg-border max-md:left-[13px] max-md:top-7"
+                  aria-hidden="true"
+                />
+              )}
 
               {/* Content */}
-              <div className={styles.timelineContent}>
-                <p className={styles.timelineDescription}>{entry.description}</p>
-                <p className={styles.timelineTimestamp}>
+              <div className="flex flex-col gap-1 pt-1 min-w-0 flex-1">
+                <p className="m-0 text-sm font-medium text-foreground leading-snug">
+                  {entry.description}
+                </p>
+                <p className="m-0 text-xs text-muted-foreground leading-snug">
                   <time dateTime={entry.timestamp}>{formatRelativeTime(entry.timestamp)}</time>
                 </p>
               </div>
@@ -385,7 +404,14 @@ export function ActivityTimeline({
       {hasMore && (
         <button
           type="button"
-          className={styles.showMoreButton}
+          className={cn(
+            'flex items-center justify-center w-full px-4 py-2 m-0',
+            'bg-transparent border-0 border-t border-border',
+            'text-sm font-medium text-primary cursor-pointer',
+            'transition-colors motion-reduce:transition-none',
+            'hover:bg-muted/50',
+            'focus:outline-2 focus:outline-primary focus:-outline-offset-2'
+          )}
           onClick={() => setExpanded((prev) => !prev)}
           aria-expanded={expanded}
           data-testid="activity-timeline-toggle"

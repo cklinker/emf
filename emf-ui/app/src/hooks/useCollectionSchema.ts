@@ -49,6 +49,10 @@ export interface FieldDefinition {
   required: boolean
   referenceTarget?: string
   referenceCollectionId?: string
+  /** Picklist enum values (populated at runtime by form pages) */
+  enumValues?: string[]
+  /** Lookup options for reference fields (populated at runtime by form pages) */
+  lookupOptions?: Array<{ id: string; label: string }>
 }
 
 /**

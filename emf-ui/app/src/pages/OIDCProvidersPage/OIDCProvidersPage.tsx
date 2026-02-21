@@ -18,7 +18,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
-import styles from './OIDCProvidersPage.module.css'
+import { cn } from '@/lib/utils'
 
 /**
  * OIDC Provider interface matching the API response
@@ -254,42 +254,54 @@ function OIDCProviderForm({
 
   const title = isEditing ? t('oidc.editProvider') : t('oidc.addProvider')
 
+  const inputClassName = (field: keyof FormErrors) =>
+    cn(
+      'w-full rounded-md border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary',
+      touched[field] && errors[field] ? 'border-destructive' : 'border-border'
+    )
+
+  const textareaClassName = (field: keyof FormErrors) =>
+    cn(
+      'w-full min-h-[80px] resize-y rounded-md border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary',
+      touched[field] && errors[field] ? 'border-destructive' : 'border-border'
+    )
+
   return (
     <div
-      className={styles.modalOverlay}
+      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 p-4"
       onClick={(e) => e.target === e.currentTarget && onCancel()}
       onKeyDown={handleKeyDown}
       data-testid="oidc-form-overlay"
       role="presentation"
     >
       <div
-        className={styles.modal}
+        className="w-full max-w-[600px] max-h-[90vh] overflow-y-auto rounded-lg bg-card shadow-xl"
         role="dialog"
         aria-modal="true"
         aria-labelledby="oidc-form-title"
         data-testid="oidc-form-modal"
       >
-        <div className={styles.modalHeader}>
-          <h2 id="oidc-form-title" className={styles.modalTitle}>
+        <div className="flex items-center justify-between border-b border-border p-6">
+          <h2 id="oidc-form-title" className="m-0 text-lg font-semibold text-foreground">
             {title}
           </h2>
           <button
             type="button"
-            className={styles.modalCloseButton}
+            className="flex h-8 w-8 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
             onClick={onCancel}
             aria-label={t('common.close')}
             data-testid="oidc-form-close"
           >
-            ×
+            &times;
           </button>
         </div>
-        <div className={styles.modalBody}>
-          <form className={styles.form} onSubmit={handleSubmit} noValidate>
+        <div className="p-6">
+          <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
             {/* Name Field */}
-            <div className={styles.formGroup}>
-              <label htmlFor="oidc-name" className={styles.formLabel}>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="oidc-name" className="text-sm font-medium text-foreground">
                 {t('oidc.providerName')}
-                <span className={styles.required} aria-hidden="true">
+                <span className="ml-0.5 text-destructive" aria-hidden="true">
                   *
                 </span>
               </label>
@@ -297,7 +309,7 @@ function OIDCProviderForm({
                 ref={nameInputRef}
                 id="oidc-name"
                 type="text"
-                className={`${styles.formInput} ${touched.name && errors.name ? styles.hasError : ''}`}
+                className={inputClassName('name')}
                 value={formData.name}
                 onChange={(e) => handleChange('name', e.target.value)}
                 onBlur={() => handleBlur('name')}
@@ -309,24 +321,24 @@ function OIDCProviderForm({
                 data-testid="oidc-name-input"
               />
               {touched.name && errors.name && (
-                <span id="oidc-name-error" className={styles.formError} role="alert">
+                <span id="oidc-name-error" className="mt-1 text-xs text-destructive" role="alert">
                   {errors.name}
                 </span>
               )}
             </div>
 
             {/* Issuer URL Field */}
-            <div className={styles.formGroup}>
-              <label htmlFor="oidc-issuer" className={styles.formLabel}>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="oidc-issuer" className="text-sm font-medium text-foreground">
                 {t('oidc.issuer')}
-                <span className={styles.required} aria-hidden="true">
+                <span className="ml-0.5 text-destructive" aria-hidden="true">
                   *
                 </span>
               </label>
               <input
                 id="oidc-issuer"
                 type="url"
-                className={`${styles.formInput} ${touched.issuer && errors.issuer ? styles.hasError : ''}`}
+                className={inputClassName('issuer')}
                 value={formData.issuer}
                 onChange={(e) => handleChange('issuer', e.target.value)}
                 onBlur={() => handleBlur('issuer')}
@@ -337,28 +349,28 @@ function OIDCProviderForm({
                 disabled={isSubmitting}
                 data-testid="oidc-issuer-input"
               />
-              <span id="oidc-issuer-hint" className={styles.formHint}>
+              <span id="oidc-issuer-hint" className="mt-1 text-xs text-muted-foreground">
                 {t('oidc.issuerHint')}
               </span>
               {touched.issuer && errors.issuer && (
-                <span id="oidc-issuer-error" className={styles.formError} role="alert">
+                <span id="oidc-issuer-error" className="mt-1 text-xs text-destructive" role="alert">
                   {errors.issuer}
                 </span>
               )}
             </div>
 
             {/* Client ID Field */}
-            <div className={styles.formGroup}>
-              <label htmlFor="oidc-client-id" className={styles.formLabel}>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="oidc-client-id" className="text-sm font-medium text-foreground">
                 {t('oidc.clientId')}
-                <span className={styles.required} aria-hidden="true">
+                <span className="ml-0.5 text-destructive" aria-hidden="true">
                   *
                 </span>
               </label>
               <input
                 id="oidc-client-id"
                 type="text"
-                className={`${styles.formInput} ${touched.clientId && errors.clientId ? styles.hasError : ''}`}
+                className={inputClassName('clientId')}
                 value={formData.clientId}
                 onChange={(e) => handleChange('clientId', e.target.value)}
                 onBlur={() => handleBlur('clientId')}
@@ -370,18 +382,22 @@ function OIDCProviderForm({
                 data-testid="oidc-client-id-input"
               />
               {touched.clientId && errors.clientId && (
-                <span id="oidc-client-id-error" className={styles.formError} role="alert">
+                <span
+                  id="oidc-client-id-error"
+                  className="mt-1 text-xs text-destructive"
+                  role="alert"
+                >
                   {errors.clientId}
                 </span>
               )}
             </div>
 
             {/* Client Secret Field */}
-            <div className={styles.formGroup}>
-              <label htmlFor="oidc-client-secret" className={styles.formLabel}>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="oidc-client-secret" className="text-sm font-medium text-foreground">
                 {t('oidc.clientSecret')}
                 {!isEditing && (
-                  <span className={styles.required} aria-hidden="true">
+                  <span className="ml-0.5 text-destructive" aria-hidden="true">
                     *
                   </span>
                 )}
@@ -389,7 +405,7 @@ function OIDCProviderForm({
               <input
                 id="oidc-client-secret"
                 type="password"
-                className={`${styles.formInput} ${touched.clientSecret && errors.clientSecret ? styles.hasError : ''}`}
+                className={inputClassName('clientSecret')}
                 value={formData.clientSecret}
                 onChange={(e) => handleChange('clientSecret', e.target.value)}
                 onBlur={() => handleBlur('clientSecret')}
@@ -406,28 +422,32 @@ function OIDCProviderForm({
                 disabled={isSubmitting}
                 data-testid="oidc-client-secret-input"
               />
-              <span id="oidc-client-secret-hint" className={styles.formHint}>
+              <span id="oidc-client-secret-hint" className="mt-1 text-xs text-muted-foreground">
                 {isEditing ? t('oidc.clientSecretHintEdit') : t('oidc.clientSecretHint')}
               </span>
               {touched.clientSecret && errors.clientSecret && (
-                <span id="oidc-client-secret-error" className={styles.formError} role="alert">
+                <span
+                  id="oidc-client-secret-error"
+                  className="mt-1 text-xs text-destructive"
+                  role="alert"
+                >
                   {errors.clientSecret}
                 </span>
               )}
             </div>
 
             {/* Scopes Field */}
-            <div className={styles.formGroup}>
-              <label htmlFor="oidc-scopes" className={styles.formLabel}>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="oidc-scopes" className="text-sm font-medium text-foreground">
                 {t('oidc.scopes')}
-                <span className={styles.required} aria-hidden="true">
+                <span className="ml-0.5 text-destructive" aria-hidden="true">
                   *
                 </span>
               </label>
               <input
                 id="oidc-scopes"
                 type="text"
-                className={`${styles.formInput} ${touched.scopes && errors.scopes ? styles.hasError : ''}`}
+                className={inputClassName('scopes')}
                 value={formData.scopes}
                 onChange={(e) => handleChange('scopes', e.target.value)}
                 onBlur={() => handleBlur('scopes')}
@@ -438,25 +458,25 @@ function OIDCProviderForm({
                 disabled={isSubmitting}
                 data-testid="oidc-scopes-input"
               />
-              <span id="oidc-scopes-hint" className={styles.formHint}>
+              <span id="oidc-scopes-hint" className="mt-1 text-xs text-muted-foreground">
                 {t('oidc.scopesHint')}
               </span>
               {touched.scopes && errors.scopes && (
-                <span id="oidc-scopes-error" className={styles.formError} role="alert">
+                <span id="oidc-scopes-error" className="mt-1 text-xs text-destructive" role="alert">
                   {errors.scopes}
                 </span>
               )}
             </div>
 
             {/* Roles Claim Field */}
-            <div className={styles.formGroup}>
-              <label htmlFor="oidc-roles-claim" className={styles.formLabel}>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="oidc-roles-claim" className="text-sm font-medium text-foreground">
                 {t('oidc.rolesClaim')}
               </label>
               <input
                 id="oidc-roles-claim"
                 type="text"
-                className={`${styles.formInput} ${touched.rolesClaim && errors.rolesClaim ? styles.hasError : ''}`}
+                className={inputClassName('rolesClaim')}
                 value={formData.rolesClaim || ''}
                 onChange={(e) => handleChange('rolesClaim', e.target.value)}
                 onBlur={() => handleBlur('rolesClaim')}
@@ -465,24 +485,24 @@ function OIDCProviderForm({
                 disabled={isSubmitting}
                 data-testid="oidc-roles-claim-input"
               />
-              <span id="oidc-roles-claim-hint" className={styles.formHint}>
+              <span id="oidc-roles-claim-hint" className="mt-1 text-xs text-muted-foreground">
                 {t('oidc.rolesClaimHint')}
               </span>
               {touched.rolesClaim && errors.rolesClaim && (
-                <span className={styles.formError} role="alert">
+                <span className="mt-1 text-xs text-destructive" role="alert">
                   {errors.rolesClaim}
                 </span>
               )}
             </div>
 
             {/* Roles Mapping Field */}
-            <div className={styles.formGroup}>
-              <label htmlFor="oidc-roles-mapping" className={styles.formLabel}>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="oidc-roles-mapping" className="text-sm font-medium text-foreground">
                 {t('oidc.rolesMapping')}
               </label>
               <textarea
                 id="oidc-roles-mapping"
-                className={`${styles.formTextarea} ${touched.rolesMapping && errors.rolesMapping ? styles.hasError : ''}`}
+                className={textareaClassName('rolesMapping')}
                 value={formData.rolesMapping || ''}
                 onChange={(e) => handleChange('rolesMapping', e.target.value)}
                 onBlur={() => handleBlur('rolesMapping')}
@@ -492,25 +512,25 @@ function OIDCProviderForm({
                 disabled={isSubmitting}
                 data-testid="oidc-roles-mapping-input"
               />
-              <span id="oidc-roles-mapping-hint" className={styles.formHint}>
+              <span id="oidc-roles-mapping-hint" className="mt-1 text-xs text-muted-foreground">
                 {t('oidc.rolesMappingHint')}
               </span>
               {touched.rolesMapping && errors.rolesMapping && (
-                <span className={styles.formError} role="alert">
+                <span className="mt-1 text-xs text-destructive" role="alert">
                   {errors.rolesMapping}
                 </span>
               )}
             </div>
 
             {/* Email Claim Field */}
-            <div className={styles.formGroup}>
-              <label htmlFor="oidc-email-claim" className={styles.formLabel}>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="oidc-email-claim" className="text-sm font-medium text-foreground">
                 {t('oidc.emailClaim')}
               </label>
               <input
                 id="oidc-email-claim"
                 type="text"
-                className={`${styles.formInput} ${touched.emailClaim && errors.emailClaim ? styles.hasError : ''}`}
+                className={inputClassName('emailClaim')}
                 value={formData.emailClaim || ''}
                 onChange={(e) => handleChange('emailClaim', e.target.value)}
                 onBlur={() => handleBlur('emailClaim')}
@@ -519,25 +539,25 @@ function OIDCProviderForm({
                 disabled={isSubmitting}
                 data-testid="oidc-email-claim-input"
               />
-              <span id="oidc-email-claim-hint" className={styles.formHint}>
+              <span id="oidc-email-claim-hint" className="mt-1 text-xs text-muted-foreground">
                 {t('oidc.emailClaimHint')}
               </span>
               {touched.emailClaim && errors.emailClaim && (
-                <span className={styles.formError} role="alert">
+                <span className="mt-1 text-xs text-destructive" role="alert">
                   {errors.emailClaim}
                 </span>
               )}
             </div>
 
             {/* Username Claim Field */}
-            <div className={styles.formGroup}>
-              <label htmlFor="oidc-username-claim" className={styles.formLabel}>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="oidc-username-claim" className="text-sm font-medium text-foreground">
                 {t('oidc.usernameClaim')}
               </label>
               <input
                 id="oidc-username-claim"
                 type="text"
-                className={`${styles.formInput} ${touched.usernameClaim && errors.usernameClaim ? styles.hasError : ''}`}
+                className={inputClassName('usernameClaim')}
                 value={formData.usernameClaim || ''}
                 onChange={(e) => handleChange('usernameClaim', e.target.value)}
                 onBlur={() => handleBlur('usernameClaim')}
@@ -546,25 +566,25 @@ function OIDCProviderForm({
                 disabled={isSubmitting}
                 data-testid="oidc-username-claim-input"
               />
-              <span id="oidc-username-claim-hint" className={styles.formHint}>
+              <span id="oidc-username-claim-hint" className="mt-1 text-xs text-muted-foreground">
                 {t('oidc.usernameClaimHint')}
               </span>
               {touched.usernameClaim && errors.usernameClaim && (
-                <span className={styles.formError} role="alert">
+                <span className="mt-1 text-xs text-destructive" role="alert">
                   {errors.usernameClaim}
                 </span>
               )}
             </div>
 
             {/* Name Claim Field */}
-            <div className={styles.formGroup}>
-              <label htmlFor="oidc-name-claim" className={styles.formLabel}>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="oidc-name-claim" className="text-sm font-medium text-foreground">
                 {t('oidc.nameClaim')}
               </label>
               <input
                 id="oidc-name-claim"
                 type="text"
-                className={`${styles.formInput} ${touched.nameClaim && errors.nameClaim ? styles.hasError : ''}`}
+                className={inputClassName('nameClaim')}
                 value={formData.nameClaim || ''}
                 onChange={(e) => handleChange('nameClaim', e.target.value)}
                 onBlur={() => handleBlur('nameClaim')}
@@ -573,21 +593,21 @@ function OIDCProviderForm({
                 disabled={isSubmitting}
                 data-testid="oidc-name-claim-input"
               />
-              <span id="oidc-name-claim-hint" className={styles.formHint}>
+              <span id="oidc-name-claim-hint" className="mt-1 text-xs text-muted-foreground">
                 {t('oidc.nameClaimHint')}
               </span>
               {touched.nameClaim && errors.nameClaim && (
-                <span className={styles.formError} role="alert">
+                <span className="mt-1 text-xs text-destructive" role="alert">
                   {errors.nameClaim}
                 </span>
               )}
             </div>
 
             {/* Form Actions */}
-            <div className={styles.formActions}>
+            <div className="mt-4 flex justify-end gap-2 border-t border-border pt-4">
               <button
                 type="button"
-                className={styles.cancelButton}
+                className="rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50"
                 onClick={onCancel}
                 disabled={isSubmitting}
                 data-testid="oidc-form-cancel"
@@ -596,7 +616,7 @@ function OIDCProviderForm({
               </button>
               <button
                 type="submit"
-                className={styles.submitButton}
+                className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                 disabled={isSubmitting}
                 data-testid="oidc-form-submit"
               >
@@ -621,7 +641,12 @@ function StatusBadge({ active }: StatusBadgeProps): React.ReactElement {
   const { t } = useI18n()
   return (
     <span
-      className={`${styles.statusBadge} ${active ? styles.statusActive : styles.statusInactive}`}
+      className={cn(
+        'inline-flex items-center rounded-full px-2 py-1 text-xs font-medium',
+        active
+          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300'
+          : 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300'
+      )}
       data-testid="status-badge"
     >
       {active ? t('collections.active') : t('collections.inactive')}
@@ -812,8 +837,8 @@ export function OIDCProvidersPage({
   // Render loading state
   if (isLoading) {
     return (
-      <div className={styles.container} data-testid={testId}>
-        <div className={styles.loadingContainer}>
+      <div className="mx-auto max-w-[1400px] space-y-6 p-6 lg:p-8" data-testid={testId}>
+        <div className="flex min-h-[400px] items-center justify-center">
           <LoadingSpinner size="large" label={t('common.loading')} />
         </div>
       </div>
@@ -823,7 +848,7 @@ export function OIDCProvidersPage({
   // Render error state
   if (error) {
     return (
-      <div className={styles.container} data-testid={testId}>
+      <div className="mx-auto max-w-[1400px] space-y-6 p-6 lg:p-8" data-testid={testId}>
         <ErrorMessage
           error={error instanceof Error ? error : new Error(t('errors.generic'))}
           onRetry={() => refetch()}
@@ -835,13 +860,13 @@ export function OIDCProvidersPage({
   const isSubmitting = createMutation.isPending || updateMutation.isPending
 
   return (
-    <div className={styles.container} data-testid={testId}>
+    <div className="mx-auto max-w-[1400px] space-y-6 p-6 lg:p-8" data-testid={testId}>
       {/* Page Header */}
-      <header className={styles.header}>
-        <h1 className={styles.title}>{t('oidc.title')}</h1>
+      <header className="flex items-center justify-between">
+        <h1 className="m-0 text-2xl font-semibold text-foreground">{t('oidc.title')}</h1>
         <button
           type="button"
-          className={styles.createButton}
+          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
           onClick={handleCreate}
           aria-label={t('oidc.addProvider')}
           data-testid="add-provider-button"
@@ -852,35 +877,62 @@ export function OIDCProvidersPage({
 
       {/* Providers Table */}
       {providers.length === 0 ? (
-        <div className={styles.emptyState} data-testid="empty-state">
+        <div
+          className="rounded-lg border border-border bg-card p-16 text-center text-muted-foreground"
+          data-testid="empty-state"
+        >
           <p>{t('common.noResults')}</p>
         </div>
       ) : (
-        <div className={styles.tableContainer}>
+        <div className="overflow-x-auto rounded-lg border border-border bg-card">
           <table
-            className={styles.table}
+            className="w-full border-collapse text-sm"
             role="grid"
             aria-label={t('oidc.title')}
             data-testid="providers-table"
           >
             <thead>
-              <tr role="row">
-                <th role="columnheader" scope="col">
+              <tr role="row" className="bg-muted">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="whitespace-nowrap border-b-2 border-border px-4 py-3 text-left font-semibold text-foreground"
+                >
                   {t('oidc.providerName')}
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="whitespace-nowrap border-b-2 border-border px-4 py-3 text-left font-semibold text-foreground"
+                >
                   {t('oidc.issuer')}
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="whitespace-nowrap border-b-2 border-border px-4 py-3 text-left font-semibold text-foreground"
+                >
                   {t('oidc.clientId')}
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="whitespace-nowrap border-b-2 border-border px-4 py-3 text-left font-semibold text-foreground"
+                >
                   {t('collections.status')}
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="whitespace-nowrap border-b-2 border-border px-4 py-3 text-left font-semibold text-foreground"
+                >
                   {t('collections.created')}
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="whitespace-nowrap border-b-2 border-border px-4 py-3 text-left font-semibold text-foreground"
+                >
                   {t('common.actions')}
                 </th>
               </tr>
@@ -890,35 +942,40 @@ export function OIDCProvidersPage({
                 <tr
                   key={provider.id}
                   role="row"
-                  className={styles.tableRow}
+                  className="border-b border-border transition-colors last:border-b-0 hover:bg-muted/50"
                   data-testid={`provider-row-${index}`}
                 >
-                  <td role="gridcell" className={styles.nameCell}>
+                  <td role="gridcell" className="px-4 py-3 font-medium text-foreground">
                     {provider.name}
                   </td>
-                  <td role="gridcell" className={styles.issuerCell}>
-                    <span className={styles.issuerUrl} title={provider.issuer}>
+                  <td role="gridcell" className="max-w-[300px] px-4 py-3">
+                    <span
+                      className="block overflow-hidden text-ellipsis whitespace-nowrap text-xs text-muted-foreground"
+                      title={provider.issuer}
+                    >
                       {provider.issuer}
                     </span>
                   </td>
-                  <td role="gridcell" className={styles.clientIdCell}>
-                    <code className={styles.clientIdCode}>{provider.clientId}</code>
+                  <td role="gridcell" className="max-w-[200px] px-4 py-3">
+                    <code className="inline-block max-w-full overflow-hidden text-ellipsis whitespace-nowrap rounded bg-muted px-2 py-1 font-mono text-xs text-foreground">
+                      {provider.clientId}
+                    </code>
                   </td>
-                  <td role="gridcell" className={styles.statusCell}>
+                  <td role="gridcell" className="whitespace-nowrap px-4 py-3">
                     <StatusBadge active={provider.active} />
                   </td>
-                  <td role="gridcell" className={styles.dateCell}>
+                  <td role="gridcell" className="whitespace-nowrap px-4 py-3 text-muted-foreground">
                     {formatDate(new Date(provider.createdAt), {
                       year: 'numeric',
                       month: 'short',
                       day: 'numeric',
                     })}
                   </td>
-                  <td role="gridcell" className={styles.actionsCell}>
-                    <div className={styles.actions}>
+                  <td role="gridcell" className="w-[1%] whitespace-nowrap px-4 py-3">
+                    <div className="flex gap-2">
                       <button
                         type="button"
-                        className={`${styles.actionButton} ${styles.testButton}`}
+                        className="rounded border border-blue-300 px-2 py-1 text-xs font-medium text-blue-700 hover:border-blue-500 hover:bg-blue-50 disabled:opacity-60 dark:border-blue-700 dark:text-blue-300 dark:hover:border-blue-400 dark:hover:bg-blue-950"
                         onClick={() => handleTestConnection(provider)}
                         disabled={testingProviderId === provider.id}
                         aria-label={`${t('oidc.testConnection')} ${provider.name}`}
@@ -930,7 +987,7 @@ export function OIDCProvidersPage({
                       </button>
                       <button
                         type="button"
-                        className={styles.actionButton}
+                        className="rounded border border-border px-2 py-1 text-xs font-medium text-primary hover:border-primary hover:bg-muted"
                         onClick={() => handleEdit(provider)}
                         aria-label={`${t('common.edit')} ${provider.name}`}
                         data-testid={`edit-button-${index}`}
@@ -939,7 +996,7 @@ export function OIDCProvidersPage({
                       </button>
                       <button
                         type="button"
-                        className={`${styles.actionButton} ${styles.deleteButton}`}
+                        className="rounded border border-border px-2 py-1 text-xs font-medium text-destructive hover:border-destructive hover:bg-destructive/10"
                         onClick={() => handleDeleteClick(provider)}
                         aria-label={`${t('common.delete')} ${provider.name}`}
                         data-testid={`delete-button-${index}`}

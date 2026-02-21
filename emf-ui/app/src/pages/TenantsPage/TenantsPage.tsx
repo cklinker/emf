@@ -13,7 +13,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
-import styles from './TenantsPage.module.css'
+import { cn } from '@/lib/utils'
 
 /**
  * Tenant interface matching the API response
@@ -254,47 +254,50 @@ function TenantForm({
 
   return (
     <div
-      className={styles.modalOverlay}
+      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 p-4"
       onClick={(e) => e.target === e.currentTarget && onCancel()}
       onKeyDown={handleKeyDown}
       data-testid="tenant-form-overlay"
       role="presentation"
     >
       <div
-        className={styles.modal}
+        className="w-full max-w-[600px] max-h-[90vh] overflow-y-auto rounded-lg bg-card shadow-xl"
         role="dialog"
         aria-modal="true"
         aria-labelledby="tenant-form-title"
         data-testid="tenant-form-modal"
       >
-        <div className={styles.modalHeader}>
-          <h2 id="tenant-form-title" className={styles.modalTitle}>
+        <div className="flex items-center justify-between border-b border-border p-6">
+          <h2 id="tenant-form-title" className="m-0 text-lg font-semibold text-foreground">
             {title}
           </h2>
           <button
             type="button"
-            className={styles.modalCloseButton}
+            className="flex h-8 w-8 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
             onClick={onCancel}
             aria-label="Close"
             data-testid="tenant-form-close"
           >
-            ×
+            &times;
           </button>
         </div>
-        <div className={styles.modalBody}>
-          <form className={styles.form} onSubmit={handleSubmit} noValidate>
+        <div className="p-6">
+          <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
             {!isEditing && (
-              <div className={styles.formGroup}>
-                <label htmlFor="tenant-slug" className={styles.formLabel}>
+              <div className="flex flex-col gap-1">
+                <label htmlFor="tenant-slug" className="text-sm font-medium text-foreground">
                   Slug
-                  <span className={styles.required} aria-hidden="true">
+                  <span className="ml-0.5 text-destructive" aria-hidden="true">
                     *
                   </span>
                 </label>
                 <input
                   id="tenant-slug"
                   type="text"
-                  className={`${styles.formInput} ${touched.slug && errors.slug ? styles.hasError : ''}`}
+                  className={cn(
+                    'w-full rounded-md border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary',
+                    touched.slug && errors.slug ? 'border-destructive' : 'border-border'
+                  )}
                   value={formData.slug}
                   onChange={(e) => handleChange('slug', e.target.value)}
                   onBlur={() => handleBlur('slug')}
@@ -305,17 +308,17 @@ function TenantForm({
                   data-testid="tenant-slug-input"
                 />
                 {touched.slug && errors.slug && (
-                  <span className={styles.formError} role="alert">
+                  <span className="mt-1 block text-xs text-destructive" role="alert">
                     {errors.slug}
                   </span>
                 )}
               </div>
             )}
 
-            <div className={styles.formGroup}>
-              <label htmlFor="tenant-name" className={styles.formLabel}>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="tenant-name" className="text-sm font-medium text-foreground">
                 Name
-                <span className={styles.required} aria-hidden="true">
+                <span className="ml-0.5 text-destructive" aria-hidden="true">
                   *
                 </span>
               </label>
@@ -323,7 +326,10 @@ function TenantForm({
                 ref={nameInputRef}
                 id="tenant-name"
                 type="text"
-                className={`${styles.formInput} ${touched.name && errors.name ? styles.hasError : ''}`}
+                className={cn(
+                  'w-full rounded-md border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary',
+                  touched.name && errors.name ? 'border-destructive' : 'border-border'
+                )}
                 value={formData.name}
                 onChange={(e) => handleChange('name', e.target.value)}
                 onBlur={() => handleBlur('name')}
@@ -334,19 +340,19 @@ function TenantForm({
                 data-testid="tenant-name-input"
               />
               {touched.name && errors.name && (
-                <span className={styles.formError} role="alert">
+                <span className="mt-1 block text-xs text-destructive" role="alert">
                   {errors.name}
                 </span>
               )}
             </div>
 
-            <div className={styles.formGroup}>
-              <label htmlFor="tenant-edition" className={styles.formLabel}>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="tenant-edition" className="text-sm font-medium text-foreground">
                 Edition
               </label>
               <select
                 id="tenant-edition"
-                className={styles.formInput}
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 value={formData.edition}
                 onChange={(e) => handleChange('edition', e.target.value)}
                 disabled={isSubmitting}
@@ -360,18 +366,26 @@ function TenantForm({
               </select>
             </div>
 
-            <fieldset className={styles.limitsFieldset} data-testid="governor-limits-section">
-              <legend className={styles.limitsLegend}>Governor Limits</legend>
-              <div className={styles.limitsGrid}>
+            <fieldset
+              className="m-0 rounded-md border border-border p-4"
+              data-testid="governor-limits-section"
+            >
+              <legend className="px-1 text-sm font-semibold text-foreground">
+                Governor Limits
+              </legend>
+              <div className="grid grid-cols-2 gap-4">
                 {LIMIT_FIELDS.map((field) => (
-                  <div key={field.key} className={styles.limitField}>
-                    <label htmlFor={`limit-${field.key}`} className={styles.limitLabel}>
+                  <div key={field.key} className="flex flex-col gap-1">
+                    <label
+                      htmlFor={`limit-${field.key}`}
+                      className="text-xs font-medium text-muted-foreground"
+                    >
                       {field.label}
                     </label>
                     <input
                       id={`limit-${field.key}`}
                       type="number"
-                      className={styles.formInput}
+                      className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                       value={formData.limits[field.key]}
                       onChange={(e) => handleLimitChange(field.key, e.target.value)}
                       min={field.min}
@@ -384,10 +398,10 @@ function TenantForm({
               </div>
             </fieldset>
 
-            <div className={styles.formActions}>
+            <div className="mt-4 flex justify-end gap-2 border-t border-border pt-4">
               <button
                 type="button"
-                className={styles.cancelButton}
+                className="rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50"
                 onClick={onCancel}
                 disabled={isSubmitting}
                 data-testid="tenant-form-cancel"
@@ -396,7 +410,7 @@ function TenantForm({
               </button>
               <button
                 type="submit"
-                className={styles.submitButton}
+                className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                 disabled={isSubmitting}
                 data-testid="tenant-form-submit"
               >
@@ -414,16 +428,23 @@ function TenantForm({
  * Status badge component
  */
 function StatusBadge({ status }: { status: string }): React.ReactElement {
-  const className = `${styles.statusBadge} ${
-    status === 'ACTIVE'
-      ? styles.statusActive
-      : status === 'SUSPENDED'
-        ? styles.statusSuspended
-        : status === 'PROVISIONING'
-          ? styles.statusProvisioning
-          : styles.statusDefault
-  }`
-  return <span className={className}>{status}</span>
+  const colorMap: Record<string, string> = {
+    ACTIVE: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300',
+    SUSPENDED: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
+    PROVISIONING: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300',
+  }
+  const defaultColor = 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
+
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
+        colorMap[status] ?? defaultColor
+      )}
+    >
+      {status}
+    </span>
+  )
 }
 
 /**
@@ -574,8 +595,8 @@ export function TenantsPage({ testId = 'tenants-page' }: TenantsPageProps): Reac
 
   if (isLoading) {
     return (
-      <div className={styles.container} data-testid={testId}>
-        <div className={styles.loadingContainer}>
+      <div className="mx-auto max-w-[1400px] space-y-6 p-6 lg:p-8" data-testid={testId}>
+        <div className="flex min-h-[400px] items-center justify-center">
           <LoadingSpinner size="large" label="Loading tenants..." />
         </div>
       </div>
@@ -584,7 +605,7 @@ export function TenantsPage({ testId = 'tenants-page' }: TenantsPageProps): Reac
 
   if (error) {
     return (
-      <div className={styles.container} data-testid={testId}>
+      <div className="mx-auto max-w-[1400px] space-y-6 p-6 lg:p-8" data-testid={testId}>
         <ErrorMessage
           error={error instanceof Error ? error : new Error('Failed to load tenants.')}
           onRetry={() => refetch()}
@@ -596,12 +617,12 @@ export function TenantsPage({ testId = 'tenants-page' }: TenantsPageProps): Reac
   const isSubmitting = createMutation.isPending || updateMutation.isPending
 
   return (
-    <div className={styles.container} data-testid={testId}>
-      <header className={styles.header}>
-        <h1 className={styles.title}>Tenants</h1>
+    <div className="mx-auto max-w-[1400px] space-y-6 p-6 lg:p-8" data-testid={testId}>
+      <header className="flex items-center justify-between">
+        <h1 className="m-0 text-2xl font-semibold text-foreground">Tenants</h1>
         <button
           type="button"
-          className={styles.createButton}
+          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
           onClick={handleCreate}
           aria-label="Create Tenant"
           data-testid="create-tenant-button"
@@ -611,35 +632,62 @@ export function TenantsPage({ testId = 'tenants-page' }: TenantsPageProps): Reac
       </header>
 
       {tenants.length === 0 ? (
-        <div className={styles.emptyState} data-testid="empty-state">
+        <div
+          className="rounded-lg border border-border bg-card p-16 text-center text-muted-foreground"
+          data-testid="empty-state"
+        >
           <p>No tenants found.</p>
         </div>
       ) : (
-        <div className={styles.tableContainer}>
+        <div className="overflow-x-auto rounded-lg border border-border bg-card">
           <table
-            className={styles.table}
+            className="w-full border-collapse text-sm"
             role="grid"
             aria-label="Tenants"
             data-testid="tenants-table"
           >
             <thead>
-              <tr role="row">
-                <th role="columnheader" scope="col">
+              <tr role="row" className="bg-muted">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   Slug
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   Name
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   Edition
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   Status
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   Created
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   Actions
                 </th>
               </tr>
@@ -649,29 +697,33 @@ export function TenantsPage({ testId = 'tenants-page' }: TenantsPageProps): Reac
                 <tr
                   key={tenant.id}
                   role="row"
-                  className={styles.tableRow}
+                  className="border-b border-border transition-colors last:border-b-0 hover:bg-muted/50"
                   data-testid={`tenant-row-${index}`}
                 >
-                  <td role="gridcell" className={styles.nameCell}>
+                  <td role="gridcell" className="px-4 py-3 font-medium font-mono text-foreground">
                     {tenant.slug}
                   </td>
-                  <td role="gridcell">{tenant.name}</td>
-                  <td role="gridcell">{tenant.edition}</td>
-                  <td role="gridcell">
+                  <td role="gridcell" className="px-4 py-3 text-foreground">
+                    {tenant.name}
+                  </td>
+                  <td role="gridcell" className="px-4 py-3 text-foreground">
+                    {tenant.edition}
+                  </td>
+                  <td role="gridcell" className="px-4 py-3">
                     <StatusBadge status={tenant.status} />
                   </td>
-                  <td role="gridcell" className={styles.dateCell}>
+                  <td role="gridcell" className="whitespace-nowrap px-4 py-3 text-muted-foreground">
                     {formatDate(new Date(tenant.createdAt), {
                       year: 'numeric',
                       month: 'short',
                       day: 'numeric',
                     })}
                   </td>
-                  <td role="gridcell" className={styles.actionsCell}>
-                    <div className={styles.actions}>
+                  <td role="gridcell" className="w-[1%] whitespace-nowrap px-4 py-3">
+                    <div className="flex gap-2">
                       <button
                         type="button"
-                        className={styles.actionButton}
+                        className="rounded border border-border px-2 py-1 text-xs font-medium text-primary hover:border-primary hover:bg-muted"
                         onClick={() => handleEdit(tenant)}
                         aria-label={`Edit ${tenant.name}`}
                         data-testid={`edit-button-${index}`}
@@ -681,7 +733,7 @@ export function TenantsPage({ testId = 'tenants-page' }: TenantsPageProps): Reac
                       {tenant.status === 'ACTIVE' ? (
                         <button
                           type="button"
-                          className={`${styles.actionButton} ${styles.suspendButton}`}
+                          className="rounded border border-border px-2 py-1 text-xs font-medium text-destructive hover:border-destructive hover:bg-destructive/10"
                           onClick={() => handleSuspendClick(tenant)}
                           aria-label={`Suspend ${tenant.name}`}
                           data-testid={`suspend-button-${index}`}
@@ -691,7 +743,7 @@ export function TenantsPage({ testId = 'tenants-page' }: TenantsPageProps): Reac
                       ) : tenant.status === 'SUSPENDED' ? (
                         <button
                           type="button"
-                          className={`${styles.actionButton} ${styles.activateButton}`}
+                          className="rounded border border-emerald-300 px-2 py-1 text-xs font-medium text-emerald-600 hover:border-emerald-600 hover:bg-emerald-50 dark:border-emerald-700 dark:text-emerald-400 dark:hover:border-emerald-400 dark:hover:bg-emerald-950"
                           onClick={() => handleActivateClick(tenant)}
                           aria-label={`Activate ${tenant.name}`}
                           data-testid={`activate-button-${index}`}

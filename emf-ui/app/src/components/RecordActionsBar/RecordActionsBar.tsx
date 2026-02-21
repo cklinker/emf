@@ -11,16 +11,25 @@
  * Supports keyboard navigation, click-outside closing, and i18n.
  */
 
-import React, { useState, useRef, useEffect, useCallback } from 'react'
+import React, { useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { ArrowLeft, Star, ChevronDown } from 'lucide-react'
 import { useI18n } from '../../context/I18nContext'
 import { getTenantSlug } from '../../context/TenantContext'
+import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu'
 
 import { useToast } from '../../components'
 import type { ApiClient } from '../../services/apiClient'
-import styles from './RecordActionsBar.module.css'
 
 /**
  * Approval instance interface for tracking approval status
@@ -76,107 +85,8 @@ export function RecordActionsBar({
   const { t } = useI18n()
   const { showToast } = useToast()
 
-  const [dropdownOpen, setDropdownOpen] = useState(false)
-  const dropdownRef = useRef<HTMLDivElement>(null)
-  const toggleRef = useRef<HTMLButtonElement>(null)
-  const menuItemsRef = useRef<(HTMLButtonElement | null)[]>([])
-  const [focusedIndex, setFocusedIndex] = useState(-1)
-
-  // Number of menu items (Clone, Submit for Approval, Delete)
-  const MENU_ITEM_COUNT = 3
-
-  // Close dropdown on click outside
-  useEffect(() => {
-    if (!dropdownOpen) return
-
-    function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setDropdownOpen(false)
-        setFocusedIndex(-1)
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [dropdownOpen])
-
-  // Focus first item when dropdown opens
-  useEffect(() => {
-    if (dropdownOpen && menuItemsRef.current[0]) {
-      menuItemsRef.current[0].focus()
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setFocusedIndex(0)
-    }
-  }, [dropdownOpen])
-
-  // Toggle dropdown
-  const handleToggleDropdown = useCallback(() => {
-    setDropdownOpen((prev) => {
-      if (prev) {
-        setFocusedIndex(-1)
-      }
-      return !prev
-    })
-  }, [])
-
-  // Handle keyboard navigation in dropdown
-  const handleDropdownKeyDown = useCallback(
-    (event: React.KeyboardEvent) => {
-      switch (event.key) {
-        case 'Escape':
-          event.preventDefault()
-          setDropdownOpen(false)
-          setFocusedIndex(-1)
-          toggleRef.current?.focus()
-          break
-        case 'ArrowDown':
-          event.preventDefault()
-          setFocusedIndex((prev) => {
-            const next = prev < MENU_ITEM_COUNT - 1 ? prev + 1 : 0
-            menuItemsRef.current[next]?.focus()
-            return next
-          })
-          break
-        case 'ArrowUp':
-          event.preventDefault()
-          setFocusedIndex((prev) => {
-            const next = prev > 0 ? prev - 1 : MENU_ITEM_COUNT - 1
-            menuItemsRef.current[next]?.focus()
-            return next
-          })
-          break
-        case 'Tab':
-          setDropdownOpen(false)
-          setFocusedIndex(-1)
-          break
-        default:
-          break
-      }
-    },
-    [MENU_ITEM_COUNT]
-  )
-
-  // Handle toggle button keyboard
-  const handleToggleKeyDown = useCallback(
-    (event: React.KeyboardEvent) => {
-      if (event.key === 'ArrowDown' && !dropdownOpen) {
-        event.preventDefault()
-        setDropdownOpen(true)
-      } else if (event.key === 'Escape' && dropdownOpen) {
-        event.preventDefault()
-        setDropdownOpen(false)
-        setFocusedIndex(-1)
-      }
-    },
-    [dropdownOpen]
-  )
-
   // Clone action
   const handleClone = useCallback(() => {
-    setDropdownOpen(false)
-    setFocusedIndex(-1)
     navigate(`/${getTenantSlug()}/resources/${collectionName}/new?clone=${recordId}`)
   }, [navigate, collectionName, recordId])
 
@@ -201,25 +111,14 @@ export function RecordActionsBar({
 
   // Submit for approval action
   const handleSubmitForApproval = useCallback(() => {
-    setDropdownOpen(false)
-    setFocusedIndex(-1)
     submitApprovalMutation.mutate()
   }, [submitApprovalMutation])
-
-  // Delete action
-  const handleDelete = useCallback(() => {
-    setDropdownOpen(false)
-    setFocusedIndex(-1)
-    onDelete()
-  }, [onDelete])
 
   // Query approval status
   const { data: approvalInstances } = useQuery({
     queryKey: ['approval-instances', collectionName, recordId],
     queryFn: async () => {
-      const result = await apiClient.get<ApprovalInstance[]>(
-        `/control/approvals/instances`
-      )
+      const result = await apiClient.get<ApprovalInstance[]>(`/control/approvals/instances`)
       return result
     },
     enabled: !!collectionName && !!recordId,
@@ -230,21 +129,18 @@ export function RecordActionsBar({
     ? approvalInstances.find((instance) => instance.recordId === recordId)
     : undefined
 
-  // Determine approval pill style
-  const getApprovalPillClass = (status: string): string => {
+  // Determine approval pill style and text
+  const getApprovalBadgeVariant = (status: string) => {
     switch (status) {
-      case 'PENDING':
-        return styles.approvalPillPending
       case 'APPROVED':
-        return styles.approvalPillApproved
+        return 'default' as const
       case 'REJECTED':
-        return styles.approvalPillRejected
+        return 'destructive' as const
       default:
-        return styles.approvalPillPending
+        return 'secondary' as const
     }
   }
 
-  // Determine approval pill text
   const getApprovalPillText = (status: string): string => {
     switch (status) {
       case 'PENDING':
@@ -259,130 +155,103 @@ export function RecordActionsBar({
   }
 
   return (
-    <div className={styles.actionsBar} data-testid="record-actions-bar">
+    <div
+      className="flex justify-between items-center gap-4 flex-wrap max-md:flex-col max-md:items-stretch"
+      data-testid="record-actions-bar"
+    >
       {/* Left section - Back button */}
-      <div className={styles.leftActions}>
-        <button
-          type="button"
-          className={styles.backButton}
+      <div className="flex items-center gap-2 max-md:order-2">
+        <Button
+          variant="outline"
           onClick={onBack}
           aria-label={t('common.back')}
           data-testid="actions-back-button"
+          className="max-md:w-full"
         >
           <ArrowLeft size={16} /> {t('common.back')}
-        </button>
+        </Button>
 
         {/* Approval status pill */}
         {recordApproval && (
-          <span
-            className={getApprovalPillClass(recordApproval.status)}
+          <Badge
+            variant={getApprovalBadgeVariant(recordApproval.status)}
+            className={cn(
+              recordApproval.status === 'PENDING' &&
+                'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
+              recordApproval.status === 'APPROVED' &&
+                'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+              recordApproval.status === 'REJECTED' &&
+                'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+            )}
             data-testid="approval-status-pill"
           >
             {getApprovalPillText(recordApproval.status)}
-          </span>
+          </Badge>
         )}
       </div>
 
       {/* Right section - Edit, Favorite, Dropdown */}
-      <div className={styles.rightActions}>
-        <button
-          type="button"
-          className={styles.primaryButton}
+      <div className="flex items-center gap-2 max-md:order-1 max-md:justify-end">
+        <Button
           onClick={onEdit}
           aria-label={t('recordActions.edit')}
           data-testid="actions-edit-button"
         >
           {t('recordActions.edit')}
-        </button>
+        </Button>
 
-        <button
-          type="button"
-          className={styles.favoriteButton}
+        <Button
+          variant="outline"
+          size="icon"
           onClick={onToggleFavorite}
           aria-label={isFavorite ? t('favorites.remove') : t('favorites.add')}
           aria-pressed={isFavorite}
           data-testid="actions-favorite-button"
           title={isFavorite ? t('favorites.remove') : t('favorites.add')}
+          className={cn(
+            'hover:text-amber-500 hover:border-amber-500',
+            isFavorite && 'text-amber-500'
+          )}
         >
           <Star size={16} fill={isFavorite ? 'currentColor' : 'none'} />
-        </button>
+        </Button>
 
         {/* Dropdown menu */}
-        <div className={styles.dropdownContainer} ref={dropdownRef}>
-          <button
-            ref={toggleRef}
-            type="button"
-            className={styles.dropdownToggle}
-            onClick={handleToggleDropdown}
-            onKeyDown={handleToggleKeyDown}
-            aria-haspopup="true"
-            aria-expanded={dropdownOpen}
-            aria-label={t('recordActions.moreActions')}
-            data-testid="actions-dropdown-toggle"
-          >
-            <ChevronDown size={16} />
-          </button>
-
-          {dropdownOpen && (
-            <div
-              className={styles.dropdownMenu}
-              role="menu"
-              tabIndex={-1}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              size="icon"
               aria-label={t('recordActions.moreActions')}
-              onKeyDown={handleDropdownKeyDown}
-              data-testid="actions-dropdown-menu"
+              data-testid="actions-dropdown-toggle"
             >
-              {/* Clone */}
-              <button
-                ref={(el) => {
-                  menuItemsRef.current[0] = el
-                }}
-                type="button"
-                className={styles.dropdownItem}
-                role="menuitem"
-                tabIndex={focusedIndex === 0 ? 0 : -1}
-                onClick={handleClone}
-                data-testid="actions-clone"
-              >
-                {t('recordActions.clone')}
-              </button>
+              <ChevronDown size={16} />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" data-testid="actions-dropdown-menu">
+            {/* Clone */}
+            <DropdownMenuItem onClick={handleClone} data-testid="actions-clone">
+              {t('recordActions.clone')}
+            </DropdownMenuItem>
 
-              <div className={styles.dropdownDivider} role="separator" />
+            <DropdownMenuSeparator />
 
-              {/* Submit for Approval */}
-              <button
-                ref={(el) => {
-                  menuItemsRef.current[1] = el
-                }}
-                type="button"
-                className={styles.dropdownItem}
-                role="menuitem"
-                tabIndex={focusedIndex === 1 ? 0 : -1}
-                onClick={handleSubmitForApproval}
-                data-testid="actions-submit-approval"
-              >
-                {t('recordActions.submitForApproval')}
-              </button>
+            {/* Submit for Approval */}
+            <DropdownMenuItem
+              onClick={handleSubmitForApproval}
+              data-testid="actions-submit-approval"
+            >
+              {t('recordActions.submitForApproval')}
+            </DropdownMenuItem>
 
-              <div className={styles.dropdownDivider} role="separator" />
+            <DropdownMenuSeparator />
 
-              {/* Delete */}
-              <button
-                ref={(el) => {
-                  menuItemsRef.current[2] = el
-                }}
-                type="button"
-                className={styles.dropdownItemDanger}
-                role="menuitem"
-                tabIndex={focusedIndex === 2 ? 0 : -1}
-                onClick={handleDelete}
-                data-testid="actions-delete"
-              >
-                {t('recordActions.delete')}
-              </button>
-            </div>
-          )}
-        </div>
+            {/* Delete */}
+            <DropdownMenuItem variant="destructive" onClick={onDelete} data-testid="actions-delete">
+              {t('recordActions.delete')}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   )

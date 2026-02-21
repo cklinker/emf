@@ -189,10 +189,11 @@ describe('ErrorMessage', () => {
       expect(screen.getByTestId('error-message-message')).toBeInTheDocument()
     })
 
-    it('applies variant class to container', () => {
+    it('applies variant-specific Tailwind classes to container', () => {
       const { rerender } = renderErrorMessage({ error: 'Test', variant: 'compact' })
 
-      expect(screen.getByTestId('error-message').className).toContain('compact')
+      // Compact variant uses smaller padding and inline alignment
+      expect(screen.getByTestId('error-message')).toHaveClass('items-center')
 
       rerender(
         <I18nProvider>
@@ -200,7 +201,8 @@ describe('ErrorMessage', () => {
         </I18nProvider>
       )
 
-      expect(screen.getByTestId('error-message').className).toContain('inline')
+      // Inline variant uses inline-flex layout
+      expect(screen.getByTestId('error-message')).toHaveClass('inline-flex')
     })
   })
 
@@ -237,10 +239,10 @@ describe('ErrorMessage', () => {
       expect(screen.getByTestId('error-message').className).toContain('custom-class')
     })
 
-    it('applies error type class to container', () => {
+    it('applies error type data attribute to container', () => {
       renderErrorMessage({ error: 'Test', type: 'network' })
 
-      expect(screen.getByTestId('error-message').className).toContain('network')
+      expect(screen.getByTestId('error-message')).toHaveAttribute('data-error-type', 'network')
     })
   })
 

@@ -23,10 +23,11 @@ import { ApiClient } from '../../services/apiClient'
 import { unwrapCollection } from '../../utils/jsonapi'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
 import { useSavedViews } from '../../hooks/useSavedViews'
+import { useLookupDisplayMap } from '../../hooks/useLookupDisplayMap'
 import { ViewSelector } from '../../components/ViewSelector/ViewSelector'
 import { InlineEditCell } from '../../components/InlineEditCell/InlineEditCell'
 import { SummaryStatsBar } from '../../components/SummaryStatsBar/SummaryStatsBar'
-import styles from './ResourceListPage.module.css'
+import { cn } from '@/lib/utils'
 
 /**
  * Export format type
@@ -504,91 +505,8 @@ export function ResourceListPage({
     },
   })
 
-  // Identify master_detail fields so we can resolve their display values.
-  // referenceCollectionId (UUID) is the canonical FK — always set by the backend.
-  const lookupFields = useMemo(() => {
-    if (!schema?.fields) return []
-    return schema.fields.filter((f) => f.type === 'master_detail' && f.referenceCollectionId)
-  }, [schema])
-
-  // Fetch display labels for all lookup field values.
-  // Builds a map: { [fieldName]: { [recordId]: displayLabel } }
-  const { data: lookupDisplayMap } = useQuery({
-    queryKey: ['lookup-display-map', collectionName, lookupFields.map((f) => f.id)],
-    queryFn: async () => {
-      const map: Record<string, Record<string, string>> = {}
-
-      // Group by referenceCollectionId (UUID) to avoid duplicate requests
-      const targetMap = new Map<string, FieldDefinition[]>()
-      for (const field of lookupFields) {
-        const target = field.referenceCollectionId!
-        if (!targetMap.has(target)) {
-          targetMap.set(target, [])
-        }
-        targetMap.get(target)!.push(field)
-      }
-
-      await Promise.all(
-        Array.from(targetMap.entries()).map(async ([targetCollectionId, fields]) => {
-          try {
-            // Fetch target collection schema by UUID to find display field
-            // and resolve the collection name for the /api/ endpoint.
-            const targetSchema = await apiClient.get<{
-              name: string
-              displayFieldName?: string
-              fields?: Array<{ name: string; type: string }>
-            }>(`/control/collections/${targetCollectionId}`)
-            const targetName = targetSchema.name
-
-            // Determine display field
-            let displayFieldName = 'id'
-            if (targetSchema.displayFieldName) {
-              displayFieldName = targetSchema.displayFieldName
-            } else if (targetSchema.fields) {
-              const nameField = targetSchema.fields.find((f) => f.name.toLowerCase() === 'name')
-              if (nameField) {
-                displayFieldName = nameField.name
-              } else {
-                const firstStringField = targetSchema.fields.find(
-                  (f) => f.type.toUpperCase() === 'STRING'
-                )
-                if (firstStringField) {
-                  displayFieldName = firstStringField.name
-                }
-              }
-            }
-
-            // Fetch records from target collection
-            const recordsResponse = await apiClient.get<Record<string, unknown>>(
-              `/api/${targetName}?page[size]=200`
-            )
-            const data = recordsResponse?.data
-            const records: Array<Record<string, unknown>> = Array.isArray(data) ? data : []
-
-            // Build id → label map
-            const idToLabel: Record<string, string> = {}
-            for (const record of records) {
-              const attrs = (record.attributes || record) as Record<string, unknown>
-              const id = String(record.id || attrs.id || '')
-              const label = attrs[displayFieldName] ? String(attrs[displayFieldName]) : id
-              idToLabel[id] = label
-            }
-
-            // Assign to all fields targeting this collection
-            for (const field of fields) {
-              map[field.name] = idToLabel
-            }
-          } catch {
-            for (const field of fields) {
-              map[field.name] = {}
-            }
-          }
-        })
-      )
-      return map
-    },
-    enabled: lookupFields.length > 0,
-  })
+  // Resolve display labels for reference/lookup/master_detail fields
+  const { lookupDisplayMap } = useLookupDisplayMap(schema?.fields, 'lookup-display-list')
 
   // Get visible fields for table columns
   const visibleFields = useMemo(() => {
@@ -927,7 +845,7 @@ export function ResourceListPage({
   const getSortIndicator = useCallback(
     (field: string) => {
       if (sort?.field !== field) return null
-      return sort.direction === 'asc' ? ' ↑' : ' ↓'
+      return sort.direction === 'asc' ? ' \u2191' : ' \u2193'
     },
     [sort]
   )
@@ -975,7 +893,7 @@ export function ResourceListPage({
         case 'percent':
           return typeof value === 'number' ? `${value.toFixed(2)}%` : String(value)
         case 'encrypted':
-          return '••••••••'
+          return '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022'
         case 'geolocation':
           if (typeof value === 'object' && value !== null) {
             const geo = value as Record<string, unknown>
@@ -1006,8 +924,11 @@ export function ResourceListPage({
   // Loading state
   if (schemaLoading) {
     return (
-      <div className={styles.container} data-testid={testId}>
-        <div className={styles.loadingContainer}>
+      <div
+        className="flex flex-col gap-6 p-6 w-full max-md:p-2 max-md:gap-4 max-lg:p-4"
+        data-testid={testId}
+      >
+        <div className="flex justify-center items-center min-h-[400px]">
           <LoadingSpinner size="large" label={t('common.loading')} />
         </div>
       </div>
@@ -1017,7 +938,10 @@ export function ResourceListPage({
   // Error state
   if (schemaError) {
     return (
-      <div className={styles.container} data-testid={testId}>
+      <div
+        className="flex flex-col gap-6 p-6 w-full max-md:p-2 max-md:gap-4 max-lg:p-4"
+        data-testid={testId}
+      >
         <ErrorMessage
           error={schemaError instanceof Error ? schemaError : new Error(t('errors.generic'))}
           onRetry={() =>
@@ -1030,7 +954,10 @@ export function ResourceListPage({
 
   if (!schema) {
     return (
-      <div className={styles.container} data-testid={testId}>
+      <div
+        className="flex flex-col gap-6 p-6 w-full max-md:p-2 max-md:gap-4 max-lg:p-4"
+        data-testid={testId}
+      >
         <ErrorMessage error={new Error(t('errors.notFound'))} />
       </div>
     )
@@ -1040,25 +967,36 @@ export function ResourceListPage({
   const totalCount = resourcesData?.total ?? 0
 
   return (
-    <div className={styles.container} data-testid={testId}>
+    <div
+      className="flex flex-col gap-6 p-6 w-full max-md:p-2 max-md:gap-4 max-lg:p-4"
+      data-testid={testId}
+    >
       {/* Page Header */}
-      <header className={styles.header}>
-        <div className={styles.headerLeft}>
-          <nav className={styles.breadcrumb} aria-label="Breadcrumb">
-            <Link to={`/${getTenantSlug()}/resources`} className={styles.breadcrumbLink}>
+      <header className="flex justify-between items-start flex-wrap gap-4 max-md:flex-col max-md:items-stretch">
+        <div className="flex flex-col gap-1">
+          <nav
+            className="flex items-center gap-1 text-sm text-muted-foreground"
+            aria-label="Breadcrumb"
+          >
+            <Link
+              to={`/${getTenantSlug()}/resources`}
+              className="text-primary no-underline cursor-pointer hover:underline"
+            >
               {t('resources.title')}
             </Link>
-            <span className={styles.breadcrumbSeparator} aria-hidden="true">
+            <span className="text-muted-foreground/60" aria-hidden="true">
               /
             </span>
             <span>{schema.displayName}</span>
           </nav>
-          <h1 className={styles.title}>{schema.displayName}</h1>
+          <h1 className="m-0 text-2xl font-semibold text-foreground max-md:text-xl">
+            {schema.displayName}
+          </h1>
         </div>
-        <div className={styles.headerActions}>
+        <div className="flex gap-2 items-center max-md:flex-col">
           <button
             type="button"
-            className={styles.createButton}
+            className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-primary-foreground bg-primary border-none rounded-md cursor-pointer transition-colors duration-200 hover:bg-primary/90 focus:outline-2 focus:outline-primary focus:outline-offset-2 active:bg-primary/80 max-md:w-full"
             onClick={handleCreate}
             aria-label={t('resources.createRecord')}
             data-testid="create-record-button"
@@ -1080,20 +1018,23 @@ export function ResourceListPage({
       />
 
       {/* Toolbar */}
-      <div className={styles.toolbar}>
-        <div className={styles.toolbarLeft}>
+      <div className="flex justify-between items-center flex-wrap gap-4 p-4 bg-muted rounded-md max-lg:flex-col max-lg:items-stretch">
+        <div className="flex items-center gap-4 flex-wrap max-lg:justify-start">
           {/* Bulk Actions - Requirement 11.11, 11.12 */}
           {selectedIds.size > 0 && (
-            <div className={styles.bulkActions} data-testid="bulk-actions">
-              <span className={styles.selectedCount}>
+            <div
+              className="flex items-center gap-2 px-4 py-2 bg-blue-50 dark:bg-blue-950 rounded-md"
+              data-testid="bulk-actions"
+            >
+              <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
                 {selectedIds.size} {t('common.selected')}
               </span>
 
               {/* Export Dropdown - Requirement 11.12 */}
-              <div className={styles.exportDropdownContainer} ref={exportDropdownRef}>
+              <div className="relative" ref={exportDropdownRef}>
                 <button
                   type="button"
-                  className={styles.bulkButton}
+                  className="px-2 py-1 text-xs font-medium text-foreground bg-background border border-border rounded cursor-pointer transition-all duration-150 hover:bg-muted hover:border-muted-foreground/40 focus:outline-2 focus:outline-primary focus:outline-offset-2"
                   onClick={handleToggleExportDropdown}
                   aria-expanded={showExportDropdown}
                   aria-haspopup="menu"
@@ -1104,18 +1045,18 @@ export function ResourceListPage({
                 </button>
                 {showExportDropdown && (
                   <div
-                    className={styles.exportDropdown}
+                    className="absolute top-full left-0 z-20 min-w-[200px] mt-1 py-2 bg-background border border-border rounded-md shadow-lg"
                     role="menu"
                     aria-label={t('resources.exportOptions')}
                     data-testid="export-dropdown"
                   >
-                    <div className={styles.exportSection}>
-                      <span className={styles.exportSectionLabel}>
+                    <div className="flex flex-col py-1">
+                      <span className="px-4 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                         {t('resources.exportSelectedLabel', { count: selectedIds.size })}
                       </span>
                       <button
                         type="button"
-                        className={styles.exportOption}
+                        className="block w-full px-4 py-2 text-sm text-foreground text-left bg-transparent border-none cursor-pointer transition-colors duration-150 hover:bg-muted focus:outline-none focus:bg-accent"
                         onClick={() => handleExportSelected('csv')}
                         role="menuitem"
                         data-testid="export-selected-csv"
@@ -1124,7 +1065,7 @@ export function ResourceListPage({
                       </button>
                       <button
                         type="button"
-                        className={styles.exportOption}
+                        className="block w-full px-4 py-2 text-sm text-foreground text-left bg-transparent border-none cursor-pointer transition-colors duration-150 hover:bg-muted focus:outline-none focus:bg-accent"
                         onClick={() => handleExportSelected('json')}
                         role="menuitem"
                         data-testid="export-selected-json"
@@ -1132,16 +1073,16 @@ export function ResourceListPage({
                         {t('resources.exportToJSON')}
                       </button>
                     </div>
-                    <div className={styles.exportDivider} />
-                    <div className={styles.exportSection}>
-                      <span className={styles.exportSectionLabel}>
+                    <div className="h-px my-1 bg-border" />
+                    <div className="flex flex-col py-1">
+                      <span className="px-4 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                         {t('resources.exportAllVisible', {
                           count: resourcesData?.data.length ?? 0,
                         })}
                       </span>
                       <button
                         type="button"
-                        className={styles.exportOption}
+                        className="block w-full px-4 py-2 text-sm text-foreground text-left bg-transparent border-none cursor-pointer transition-colors duration-150 hover:bg-muted focus:outline-none focus:bg-accent"
                         onClick={() => handleExportAll('csv')}
                         role="menuitem"
                         data-testid="export-all-csv"
@@ -1150,7 +1091,7 @@ export function ResourceListPage({
                       </button>
                       <button
                         type="button"
-                        className={styles.exportOption}
+                        className="block w-full px-4 py-2 text-sm text-foreground text-left bg-transparent border-none cursor-pointer transition-colors duration-150 hover:bg-muted focus:outline-none focus:bg-accent"
                         onClick={() => handleExportAll('json')}
                         role="menuitem"
                         data-testid="export-all-json"
@@ -1164,7 +1105,7 @@ export function ResourceListPage({
 
               <button
                 type="button"
-                className={`${styles.bulkButton} ${styles.bulkDeleteButton}`}
+                className="px-2 py-1 text-xs font-medium text-destructive bg-background border border-destructive/30 rounded cursor-pointer transition-all duration-150 hover:bg-destructive/10 hover:border-destructive focus:outline-2 focus:outline-primary focus:outline-offset-2"
                 onClick={handleBulkDeleteClick}
                 aria-label={t('resources.bulkDelete')}
                 data-testid="bulk-delete-button"
@@ -1177,7 +1118,11 @@ export function ResourceListPage({
           {/* Filter Toggle - Requirement 11.3 */}
           <button
             type="button"
-            className={`${styles.filterToggle} ${showFilters ? styles.filterToggleActive : ''}`}
+            className={cn(
+              'inline-flex items-center gap-1 px-2 py-1 text-sm font-medium text-foreground bg-background border border-border rounded-md cursor-pointer transition-all duration-150 hover:bg-muted hover:border-muted-foreground/40 focus:outline-2 focus:outline-primary focus:outline-offset-2',
+              showFilters &&
+                'bg-blue-50 dark:bg-blue-950 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300'
+            )}
             onClick={handleToggleFilters}
             aria-expanded={showFilters}
             aria-controls="filter-builder"
@@ -1185,19 +1130,22 @@ export function ResourceListPage({
           >
             {t('common.filter')}
             {filters.length > 0 && (
-              <span className={styles.filterCount} data-testid="filter-count">
+              <span
+                className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-xs font-semibold text-primary-foreground bg-primary rounded-full"
+                data-testid="filter-count"
+              >
                 {filters.length}
               </span>
             )}
           </button>
         </div>
 
-        <div className={styles.toolbarRight}>
+        <div className="flex items-center gap-2 max-lg:justify-start">
           {/* Column Selector */}
-          <div className={styles.columnSelector}>
+          <div className="relative">
             <button
               type="button"
-              className={styles.columnSelectorButton}
+              className="inline-flex items-center gap-1 px-2 py-1 text-sm font-medium text-foreground bg-background border border-border rounded-md cursor-pointer transition-all duration-150 hover:bg-muted hover:border-muted-foreground/40 focus:outline-2 focus:outline-primary focus:outline-offset-2"
               onClick={handleToggleColumnSelector}
               aria-expanded={showColumnSelector}
               aria-haspopup="listbox"
@@ -1207,25 +1155,28 @@ export function ResourceListPage({
             </button>
             {showColumnSelector && (
               <div
-                className={styles.columnDropdown}
+                className="absolute top-full right-0 z-10 min-w-[200px] max-h-[300px] overflow-y-auto mt-1 p-2 bg-background border border-border rounded-md shadow-lg"
                 role="listbox"
                 aria-label="Select columns"
                 data-testid="column-dropdown"
               >
-                <label className={styles.columnOption}>
+                <label className="flex items-center gap-2 px-2 py-1 text-sm text-foreground cursor-pointer rounded hover:bg-muted">
                   <input
                     type="checkbox"
-                    className={styles.columnCheckbox}
+                    className="w-4 h-4 cursor-pointer"
                     checked={visibleColumns.has('id')}
                     onChange={() => handleToggleColumn('id')}
                   />
                   ID
                 </label>
                 {(Array.isArray(schema.fields) ? schema.fields : []).map((field) => (
-                  <label key={field.name} className={styles.columnOption}>
+                  <label
+                    key={field.name}
+                    className="flex items-center gap-2 px-2 py-1 text-sm text-foreground cursor-pointer rounded hover:bg-muted"
+                  >
                     <input
                       type="checkbox"
-                      className={styles.columnCheckbox}
+                      className="w-4 h-4 cursor-pointer"
                       checked={visibleColumns.has(field.name)}
                       onChange={() => handleToggleColumn(field.name)}
                     />
@@ -1239,7 +1190,11 @@ export function ResourceListPage({
           {/* Inline Edit Toggle (T11) */}
           <button
             type="button"
-            className={`${styles.columnSelectorButton} ${inlineEditEnabled ? styles.filterToggleActive : ''}`}
+            className={cn(
+              'inline-flex items-center gap-1 px-2 py-1 text-sm font-medium text-foreground bg-background border border-border rounded-md cursor-pointer transition-all duration-150 hover:bg-muted hover:border-muted-foreground/40 focus:outline-2 focus:outline-primary focus:outline-offset-2',
+              inlineEditEnabled &&
+                'bg-blue-50 dark:bg-blue-950 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300'
+            )}
             onClick={handleToggleInlineEdit}
             aria-pressed={inlineEditEnabled}
             data-testid="inline-edit-toggle"
@@ -1251,19 +1206,23 @@ export function ResourceListPage({
 
       {/* Filter Builder - Requirements 11.3, 11.4, 11.5 */}
       {showFilters && (
-        <div id="filter-builder" className={styles.filterBuilder} data-testid="filter-builder">
+        <div
+          id="filter-builder"
+          className="p-4 bg-background border border-border rounded-md"
+          data-testid="filter-builder"
+        >
           {pendingFilters.length === 0 ? (
             <p>{t('common.noResults')}</p>
           ) : (
             pendingFilters.map((filter) => (
               <div
                 key={filter.id}
-                className={styles.filterRow}
+                className="flex items-center gap-2 mb-2 last:mb-0 max-md:flex-wrap"
                 data-testid={`filter-row-${filter.id}`}
               >
                 {/* Field Selector */}
                 <select
-                  className={`${styles.filterSelect} ${styles.filterFieldSelect}`}
+                  className="p-2 text-sm text-foreground bg-background border border-border rounded-md transition-all duration-200 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 min-w-[150px] max-md:min-w-full"
                   value={filter.field}
                   onChange={(e) => handleFilterFieldChange(filter.id, e.target.value)}
                   aria-label="Filter field"
@@ -1278,7 +1237,7 @@ export function ResourceListPage({
 
                 {/* Operator Selector - Requirement 11.5 */}
                 <select
-                  className={`${styles.filterSelect} ${styles.filterOperatorSelect}`}
+                  className="p-2 text-sm text-foreground bg-background border border-border rounded-md transition-all duration-200 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 min-w-[120px] max-md:min-w-full"
                   value={filter.operator}
                   onChange={(e) =>
                     handleFilterOperatorChange(filter.id, e.target.value as FilterOperator)
@@ -1296,7 +1255,7 @@ export function ResourceListPage({
                 {/* Value Input */}
                 <input
                   type="text"
-                  className={`${styles.filterInput} ${styles.filterValueInput}`}
+                  className="flex-1 p-2 text-sm text-foreground bg-background border border-border rounded-md transition-all duration-200 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 min-w-[150px] max-md:min-w-full"
                   value={filter.value}
                   onChange={(e) => handleFilterValueChange(filter.id, e.target.value)}
                   placeholder="Value"
@@ -1307,21 +1266,21 @@ export function ResourceListPage({
                 {/* Remove Filter Button */}
                 <button
                   type="button"
-                  className={styles.removeFilterButton}
+                  className="flex items-center justify-center w-8 h-8 p-0 text-lg text-muted-foreground bg-transparent border border-border rounded-md cursor-pointer transition-all duration-150 hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 focus:outline-2 focus:outline-primary focus:outline-offset-2"
                   onClick={() => handleRemoveFilter(filter.id)}
                   aria-label="Remove filter"
                   data-testid={`remove-filter-${filter.id}`}
                 >
-                  ×
+                  &times;
                 </button>
               </div>
             ))
           )}
 
-          <div className={styles.filterActions}>
+          <div className="flex gap-2 mt-4">
             <button
               type="button"
-              className={styles.addFilterButton}
+              className="px-2 py-1 text-sm font-medium text-primary bg-transparent border border-dashed border-border rounded-md cursor-pointer transition-all duration-150 hover:bg-blue-50 dark:hover:bg-blue-950 hover:border-primary focus:outline-2 focus:outline-primary focus:outline-offset-2"
               onClick={handleAddFilter}
               data-testid="add-filter-button"
             >
@@ -1329,7 +1288,7 @@ export function ResourceListPage({
             </button>
             <button
               type="button"
-              className={styles.applyFilterButton}
+              className="px-2 py-1 text-sm font-medium text-primary-foreground bg-primary border-none rounded-md cursor-pointer transition-colors duration-200 hover:bg-primary/90 focus:outline-2 focus:outline-primary focus:outline-offset-2"
               onClick={handleApplyFilters}
               data-testid="apply-filters-button"
             >
@@ -1338,7 +1297,7 @@ export function ResourceListPage({
             {(pendingFilters.length > 0 || filters.length > 0) && (
               <button
                 type="button"
-                className={styles.clearFiltersButton}
+                className="px-2 py-1 text-sm font-medium text-muted-foreground bg-transparent border border-border rounded-md cursor-pointer transition-colors duration-150 hover:bg-muted focus:outline-2 focus:outline-primary focus:outline-offset-2"
                 onClick={handleClearFilters}
                 data-testid="clear-filters-button"
               >
@@ -1363,7 +1322,7 @@ export function ResourceListPage({
 
       {/* Data Table - Requirement 11.2 */}
       {resourcesLoading ? (
-        <div className={styles.loadingContainer}>
+        <div className="flex justify-center items-center min-h-[400px]">
           <LoadingSpinner size="medium" label={t('common.loading')} />
         </div>
       ) : resourcesError ? (
@@ -1372,14 +1331,17 @@ export function ResourceListPage({
           onRetry={() => refetchResources()}
         />
       ) : resources.length === 0 ? (
-        <div className={styles.emptyState} data-testid="empty-state">
-          <p>{t('common.noResults')}</p>
+        <div
+          className="flex flex-col items-center justify-center p-12 text-center text-muted-foreground bg-muted rounded-md"
+          data-testid="empty-state"
+        >
+          <p className="m-0 text-base">{t('common.noResults')}</p>
         </div>
       ) : (
         <>
-          <div className={styles.tableContainer}>
+          <div className="overflow-x-auto border border-border rounded-md bg-background">
             <table
-              className={styles.table}
+              className="w-full border-collapse text-sm [&_thead]:bg-muted [&_th]:p-4 [&_th]:text-left [&_th]:font-semibold [&_th]:text-foreground [&_th]:border-b-2 [&_th]:border-border [&_th]:whitespace-nowrap [&_td]:p-4 [&_td]:text-foreground [&_td]:border-b [&_td]:border-border/50 [&_td]:max-w-[300px] [&_td]:overflow-hidden [&_td]:text-ellipsis [&_td]:whitespace-nowrap max-md:[&_th]:p-2 max-md:[&_td]:p-2"
               role="grid"
               aria-label={`${schema.displayName} records`}
               data-testid="resources-table"
@@ -1387,10 +1349,10 @@ export function ResourceListPage({
               <thead>
                 <tr role="row">
                   {/* Select All Checkbox - Requirement 11.11 */}
-                  <th role="columnheader" className={styles.checkboxCell}>
+                  <th role="columnheader" className="!w-10 !text-center">
                     <input
                       type="checkbox"
-                      className={styles.rowCheckbox}
+                      className="w-[18px] h-[18px] cursor-pointer"
                       checked={allSelected}
                       onChange={handleSelectAll}
                       aria-label={allSelected ? t('common.deselectAll') : t('common.selectAll')}
@@ -1403,7 +1365,7 @@ export function ResourceListPage({
                     <th
                       role="columnheader"
                       scope="col"
-                      className={styles.sortableHeader}
+                      className="cursor-pointer select-none transition-colors duration-150 hover:bg-muted-foreground/10 focus:outline-2 focus:outline-primary focus:-outline-offset-2"
                       onClick={() => handleSortChange('id')}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
@@ -1416,7 +1378,7 @@ export function ResourceListPage({
                       data-testid="header-id"
                     >
                       ID
-                      <span className={styles.sortIndicator} aria-hidden="true">
+                      <span className="ml-1 text-xs" aria-hidden="true">
                         {getSortIndicator('id')}
                       </span>
                     </th>
@@ -1428,7 +1390,7 @@ export function ResourceListPage({
                       key={field.name}
                       role="columnheader"
                       scope="col"
-                      className={styles.sortableHeader}
+                      className="cursor-pointer select-none transition-colors duration-150 hover:bg-muted-foreground/10 focus:outline-2 focus:outline-primary focus:-outline-offset-2"
                       onClick={() => handleSortChange(field.name)}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
@@ -1441,7 +1403,7 @@ export function ResourceListPage({
                       data-testid={`header-${field.name}`}
                     >
                       {field.displayName || field.name}
-                      <span className={styles.sortIndicator} aria-hidden="true">
+                      <span className="ml-1 text-xs" aria-hidden="true">
                         {getSortIndicator(field.name)}
                       </span>
                     </th>
@@ -1461,19 +1423,23 @@ export function ResourceListPage({
                     <tr
                       key={resource.id}
                       role="row"
-                      className={`${styles.tableRow} ${isSelected ? styles.tableRowSelected : ''}`}
+                      className={cn(
+                        'cursor-pointer transition-colors duration-150 hover:bg-muted focus-within:bg-accent',
+                        isSelected &&
+                          'bg-blue-50 dark:bg-blue-950 hover:bg-blue-100 dark:hover:bg-blue-900'
+                      )}
                       onClick={() => handleView(resource)}
                       data-testid={`resource-row-${index}`}
                     >
                       {/* Row Checkbox - Requirement 11.11 */}
                       <td
                         role="gridcell"
-                        className={styles.checkboxCell}
+                        className="!w-10 !text-center"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <input
                           type="checkbox"
-                          className={styles.rowCheckbox}
+                          className="w-[18px] h-[18px] cursor-pointer"
                           checked={isSelected}
                           onChange={() => handleSelectRow(resource.id)}
                           aria-label={`Select row ${index + 1}`}
@@ -1524,16 +1490,16 @@ export function ResourceListPage({
                       ))}
 
                       {/* Actions Cell */}
-                      <td role="gridcell" className={styles.actionsCell}>
+                      <td role="gridcell" className="!w-[1%] !whitespace-nowrap">
                         <div
-                          className={styles.actions}
+                          className="flex gap-2 max-md:flex-col max-md:gap-1"
                           role="toolbar"
                           onClick={(e) => e.stopPropagation()}
                           onKeyDown={(e) => e.stopPropagation()}
                         >
                           <button
                             type="button"
-                            className={styles.actionButton}
+                            className="px-2 py-1 text-xs font-medium text-foreground bg-background border border-border rounded cursor-pointer transition-all duration-150 hover:bg-muted hover:border-muted-foreground/40 focus:outline-2 focus:outline-primary focus:outline-offset-2"
                             onClick={() => handleEdit(resource)}
                             aria-label={`${t('common.edit')} ${resource.id}`}
                             data-testid={`edit-button-${index}`}
@@ -1542,7 +1508,7 @@ export function ResourceListPage({
                           </button>
                           <button
                             type="button"
-                            className={`${styles.actionButton} ${styles.deleteButton}`}
+                            className="px-2 py-1 text-xs font-medium text-destructive bg-background border border-destructive/30 rounded cursor-pointer transition-all duration-150 hover:bg-destructive/10 hover:border-destructive focus:outline-2 focus:outline-primary focus:outline-offset-2"
                             onClick={() => handleDeleteClick(resource)}
                             aria-label={`${t('common.delete')} ${resource.id}`}
                             data-testid={`delete-button-${index}`}
@@ -1560,18 +1526,18 @@ export function ResourceListPage({
 
           {/* Pagination - Requirement 11.2 */}
           <nav
-            className={styles.pagination}
+            className="flex justify-between items-center flex-wrap gap-4 py-4 max-md:flex-col max-md:items-stretch"
             role="navigation"
             aria-label="Table pagination"
             data-testid="pagination"
           >
-            <div className={styles.paginationLeft}>
-              <label className={styles.pageSizeLabel} htmlFor="page-size-select">
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-muted-foreground" htmlFor="page-size-select">
                 Rows per page:
               </label>
               <select
                 id="page-size-select"
-                className={styles.pageSizeSelect}
+                className="px-2 py-1 text-sm text-foreground bg-background border border-border rounded-md focus:outline-2 focus:outline-primary focus:outline-offset-2"
                 value={pageSize}
                 onChange={handlePageSizeChange}
                 data-testid="page-size-select"
@@ -1584,10 +1550,10 @@ export function ResourceListPage({
               </select>
             </div>
 
-            <div className={styles.paginationCenter}>
+            <div className="flex items-center gap-2 max-md:justify-center">
               <button
                 type="button"
-                className={styles.paginationButton}
+                className="px-4 py-2 text-sm font-medium text-foreground bg-background border border-border rounded-md cursor-pointer transition-all duration-150 hover:enabled:bg-muted hover:enabled:border-muted-foreground/40 focus:outline-2 focus:outline-primary focus:outline-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={page <= 1}
                 onClick={() => handlePageChange(page - 1)}
                 aria-label={t('common.previous')}
@@ -1595,12 +1561,12 @@ export function ResourceListPage({
               >
                 {t('common.previous')}
               </button>
-              <span className={styles.paginationInfo} aria-live="polite">
+              <span className="text-sm text-muted-foreground" aria-live="polite">
                 Page {page} of {totalPages || 1}
               </span>
               <button
                 type="button"
-                className={styles.paginationButton}
+                className="px-4 py-2 text-sm font-medium text-foreground bg-background border border-border rounded-md cursor-pointer transition-all duration-150 hover:enabled:bg-muted hover:enabled:border-muted-foreground/40 focus:outline-2 focus:outline-primary focus:outline-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={page >= totalPages}
                 onClick={() => handlePageChange(page + 1)}
                 aria-label={t('common.next')}
@@ -1610,7 +1576,7 @@ export function ResourceListPage({
               </button>
             </div>
 
-            <div className={styles.paginationRight} data-testid="total-count">
+            <div className="text-sm text-muted-foreground/60" data-testid="total-count">
               {totalCount} total records
             </div>
           </nav>

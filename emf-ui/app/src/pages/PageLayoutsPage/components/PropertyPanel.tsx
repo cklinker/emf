@@ -10,7 +10,6 @@ import React from 'react'
 import { useLayoutEditor } from './LayoutEditorContext'
 import { SectionPropertyForm } from './SectionPropertyForm'
 import { FieldPropertyForm } from './FieldPropertyForm'
-import styles from './PropertyPanel.module.css'
 
 export function PropertyPanel(): React.ReactElement {
   const { state } = useLayoutEditor()
@@ -21,10 +20,10 @@ export function PropertyPanel(): React.ReactElement {
   if (selectedFieldPlacementId) {
     content = (
       <>
-        <div className={styles.panelHeader}>
-          <h3 className={styles.panelTitle}>Field Properties</h3>
+        <div className="border-b border-border px-4 py-3">
+          <h3 className="m-0 text-sm font-semibold text-foreground">Field Properties</h3>
         </div>
-        <div className={styles.panelContent}>
+        <div className="flex flex-col gap-4 p-4">
           <FieldPropertyForm fieldPlacementId={selectedFieldPlacementId} />
         </div>
       </>
@@ -32,24 +31,27 @@ export function PropertyPanel(): React.ReactElement {
   } else if (selectedSectionId) {
     content = (
       <>
-        <div className={styles.panelHeader}>
-          <h3 className={styles.panelTitle}>Section Properties</h3>
+        <div className="border-b border-border px-4 py-3">
+          <h3 className="m-0 text-sm font-semibold text-foreground">Section Properties</h3>
         </div>
-        <div className={styles.panelContent}>
+        <div className="flex flex-col gap-4 p-4">
           <SectionPropertyForm sectionId={selectedSectionId} />
         </div>
       </>
     )
   } else {
     content = (
-      <div className={styles.panelEmpty} data-testid="property-panel-empty">
+      <div
+        className="px-4 py-6 text-center text-[13px] text-muted-foreground"
+        data-testid="property-panel-empty"
+      >
         Select a field or section to edit properties
       </div>
     )
   }
 
   return (
-    <div className={styles.panel} data-testid="property-panel">
+    <div className="flex flex-col bg-background" data-testid="property-panel">
       {content}
     </div>
   )

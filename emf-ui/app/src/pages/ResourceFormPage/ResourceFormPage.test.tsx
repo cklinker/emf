@@ -33,6 +33,15 @@ import type { CollectionSchema, Resource } from './ResourceFormPage'
 import { PluginProvider } from '../../context/PluginContext'
 import type { Plugin, FieldRendererProps } from '../../types/plugin'
 
+// Mock usePageLayout to return no layout (fallback to flat form)
+vi.mock('../../hooks/usePageLayout', () => ({
+  usePageLayout: () => ({ layout: null, isLoading: false, error: null }),
+}))
+
+vi.mock('../../components/LayoutFormSections/LayoutFormSections', () => ({
+  LayoutFormSections: () => <div data-testid="layout-form-sections">Layout Form</div>,
+}))
+
 // Mock navigate
 const mockNavigate = vi.fn()
 vi.mock('react-router-dom', async () => {

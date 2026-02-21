@@ -28,7 +28,7 @@ import { useApi } from '../../context/ApiContext'
 import { usePlugins } from '../../context/PluginContext'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
 import type { PageComponentProps } from '../../types/plugin'
-import styles from './PageBuilderPage.module.css'
+import { cn } from '@/lib/utils'
 
 /**
  * UI Page interface matching the API response
@@ -165,7 +165,12 @@ function StatusBadge({ published }: StatusBadgeProps): React.ReactElement {
   const { t } = useI18n()
   return (
     <span
-      className={`${styles.statusBadge} ${published ? styles.statusPublished : styles.statusDraft}`}
+      className={cn(
+        'inline-flex items-center px-2 py-1 text-xs font-medium rounded-full',
+        published
+          ? 'text-green-800 bg-green-100 dark:text-green-300 dark:bg-green-900'
+          : 'text-yellow-800 bg-yellow-100 dark:text-yellow-300 dark:bg-yellow-900'
+      )}
       data-testid="status-badge"
     >
       {published ? t('builder.pages.published') : t('builder.pages.draft')}
@@ -188,22 +193,27 @@ function ComponentPalette({
   const { t } = useI18n()
 
   return (
-    <div className={styles.palette} data-testid="component-palette">
-      <h3 className={styles.paletteTitle}>{t('builder.pages.components')}</h3>
-      <div className={styles.paletteGrid}>
+    <div
+      className="bg-background border border-border rounded-md p-4 overflow-y-auto"
+      data-testid="component-palette"
+    >
+      <h3 className="m-0 mb-4 text-sm font-semibold text-foreground">
+        {t('builder.pages.components')}
+      </h3>
+      <div className="grid grid-cols-2 max-md:grid-cols-4 gap-2">
         {AVAILABLE_COMPONENTS.map((comp) => (
           <button
             key={comp.type}
             type="button"
-            className={styles.paletteItem}
+            className="flex flex-col items-center justify-center p-2 bg-muted border border-border rounded cursor-grab transition-colors hover:bg-accent hover:border-muted-foreground/40 focus:outline-2 focus:outline-primary focus:outline-offset-2 active:cursor-grabbing"
             draggable
             onDragStart={() => onDragStart(comp.type)}
             onClick={() => onAddComponent(comp.type)}
             aria-label={`Add ${comp.label} component`}
             data-testid={`palette-item-${comp.type}`}
           >
-            <span className={styles.paletteIcon}>{comp.icon}</span>
-            <span className={styles.paletteLabel}>{comp.label}</span>
+            <span className="text-lg mb-1">{comp.icon}</span>
+            <span className="text-xs text-muted-foreground">{comp.label}</span>
           </button>
         ))}
       </div>
@@ -224,9 +234,16 @@ function PropertyPanel({ component, onChange }: PropertyPanelProps): React.React
 
   if (!component) {
     return (
-      <div className={styles.propertyPanel} data-testid="property-panel">
-        <h3 className={styles.propertyTitle}>{t('builder.pages.properties')}</h3>
-        <p className={styles.propertyEmpty}>{t('builder.pages.selectComponent')}</p>
+      <div
+        className="bg-background border border-border rounded-md p-4 overflow-y-auto"
+        data-testid="property-panel"
+      >
+        <h3 className="m-0 mb-4 text-sm font-semibold text-foreground">
+          {t('builder.pages.properties')}
+        </h3>
+        <p className="text-muted-foreground text-sm text-center py-6">
+          {t('builder.pages.selectComponent')}
+        </p>
       </div>
     )
   }
@@ -238,25 +255,30 @@ function PropertyPanel({ component, onChange }: PropertyPanelProps): React.React
   }
 
   return (
-    <div className={styles.propertyPanel} data-testid="property-panel">
-      <h3 className={styles.propertyTitle}>{t('builder.pages.properties')}</h3>
-      <div className={styles.propertyContent}>
-        <div className={styles.propertyGroup}>
-          <label className={styles.propertyLabel} htmlFor="prop-type">
+    <div
+      className="bg-background border border-border rounded-md p-4 overflow-y-auto"
+      data-testid="property-panel"
+    >
+      <h3 className="m-0 mb-4 text-sm font-semibold text-foreground">
+        {t('builder.pages.properties')}
+      </h3>
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-muted-foreground" htmlFor="prop-type">
             Component Type
           </label>
-          <span id="prop-type" className={styles.propertyValue}>
+          <span id="prop-type" className="text-sm text-foreground capitalize">
             {component.type}
           </span>
         </div>
-        <div className={styles.propertyGroup}>
-          <label className={styles.propertyLabel} htmlFor="prop-id">
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-muted-foreground" htmlFor="prop-id">
             ID
           </label>
           <input
             id="prop-id"
             type="text"
-            className={styles.propertyInput}
+            className="p-2 text-sm text-foreground bg-background border border-border rounded transition-[border-color,box-shadow] focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:bg-muted disabled:text-muted-foreground"
             value={component.id}
             disabled
             data-testid="property-id"
@@ -264,27 +286,27 @@ function PropertyPanel({ component, onChange }: PropertyPanelProps): React.React
         </div>
         {component.type === 'heading' && (
           <>
-            <div className={styles.propertyGroup}>
-              <label className={styles.propertyLabel} htmlFor="prop-text">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-muted-foreground" htmlFor="prop-text">
                 Text
               </label>
               <input
                 id="prop-text"
                 type="text"
-                className={styles.propertyInput}
+                className="p-2 text-sm text-foreground bg-background border border-border rounded transition-[border-color,box-shadow] focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                 value={(component.props.text as string) || ''}
                 onChange={(e) => handlePropChange('text', e.target.value)}
                 placeholder="Enter heading text"
                 data-testid="property-text"
               />
             </div>
-            <div className={styles.propertyGroup}>
-              <label className={styles.propertyLabel} htmlFor="prop-level">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-muted-foreground" htmlFor="prop-level">
                 Level
               </label>
               <select
                 id="prop-level"
-                className={styles.propertySelect}
+                className="p-2 text-sm text-foreground bg-background border border-border rounded transition-[border-color,box-shadow] focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                 value={(component.props.level as string) || 'h1'}
                 onChange={(e) => handlePropChange('level', e.target.value)}
                 data-testid="property-level"
@@ -298,13 +320,13 @@ function PropertyPanel({ component, onChange }: PropertyPanelProps): React.React
           </>
         )}
         {component.type === 'text' && (
-          <div className={styles.propertyGroup}>
-            <label className={styles.propertyLabel} htmlFor="prop-content">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-muted-foreground" htmlFor="prop-content">
               Content
             </label>
             <textarea
               id="prop-content"
-              className={styles.propertyTextarea}
+              className="p-2 text-sm text-foreground bg-background border border-border rounded transition-[border-color,box-shadow] focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 resize-y min-h-[80px]"
               value={(component.props.content as string) || ''}
               onChange={(e) => handlePropChange('content', e.target.value)}
               placeholder="Enter text content"
@@ -315,27 +337,27 @@ function PropertyPanel({ component, onChange }: PropertyPanelProps): React.React
         )}
         {component.type === 'button' && (
           <>
-            <div className={styles.propertyGroup}>
-              <label className={styles.propertyLabel} htmlFor="prop-label">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-muted-foreground" htmlFor="prop-label">
                 Label
               </label>
               <input
                 id="prop-label"
                 type="text"
-                className={styles.propertyInput}
+                className="p-2 text-sm text-foreground bg-background border border-border rounded transition-[border-color,box-shadow] focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                 value={(component.props.label as string) || ''}
                 onChange={(e) => handlePropChange('label', e.target.value)}
                 placeholder="Button label"
                 data-testid="property-label"
               />
             </div>
-            <div className={styles.propertyGroup}>
-              <label className={styles.propertyLabel} htmlFor="prop-variant">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-muted-foreground" htmlFor="prop-variant">
                 Variant
               </label>
               <select
                 id="prop-variant"
-                className={styles.propertySelect}
+                className="p-2 text-sm text-foreground bg-background border border-border rounded transition-[border-color,box-shadow] focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                 value={(component.props.variant as string) || 'primary'}
                 onChange={(e) => handlePropChange('variant', e.target.value)}
                 data-testid="property-variant"
@@ -349,28 +371,28 @@ function PropertyPanel({ component, onChange }: PropertyPanelProps): React.React
         )}
         {component.type === 'image' && (
           <>
-            <div className={styles.propertyGroup}>
-              <label className={styles.propertyLabel} htmlFor="prop-src">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-muted-foreground" htmlFor="prop-src">
                 Source URL
               </label>
               <input
                 id="prop-src"
                 type="text"
-                className={styles.propertyInput}
+                className="p-2 text-sm text-foreground bg-background border border-border rounded transition-[border-color,box-shadow] focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                 value={(component.props.src as string) || ''}
                 onChange={(e) => handlePropChange('src', e.target.value)}
                 placeholder="https://example.com/image.png"
                 data-testid="property-src"
               />
             </div>
-            <div className={styles.propertyGroup}>
-              <label className={styles.propertyLabel} htmlFor="prop-alt">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-muted-foreground" htmlFor="prop-alt">
                 Alt Text
               </label>
               <input
                 id="prop-alt"
                 type="text"
-                className={styles.propertyInput}
+                className="p-2 text-sm text-foreground bg-background border border-border rounded transition-[border-color,box-shadow] focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                 value={(component.props.alt as string) || ''}
                 onChange={(e) => handlePropChange('alt', e.target.value)}
                 placeholder="Image description"
@@ -411,7 +433,7 @@ function Preview({
       return (
         <div
           key={comp.id}
-          className={styles.previewCustomComponent}
+          className="p-4 bg-background border border-border rounded-md dark:bg-muted dark:border-border"
           data-testid={`preview-custom-${comp.id}`}
         >
           <CustomComponent config={comp.props} />
@@ -426,14 +448,14 @@ function Preview({
         const text = (comp.props.text as string) || 'Heading'
         const HeadingTag = level as keyof JSX.IntrinsicElements
         return (
-          <HeadingTag key={comp.id} className={styles.previewHeadingElement}>
+          <HeadingTag key={comp.id} className="m-0 text-foreground">
             {text}
           </HeadingTag>
         )
       }
       case 'text':
         return (
-          <p key={comp.id} className={styles.previewTextElement}>
+          <p key={comp.id} className="m-0 text-foreground leading-relaxed">
             {(comp.props.content as string) || 'Text content'}
           </p>
         )
@@ -442,7 +464,15 @@ function Preview({
           <button
             key={comp.id}
             type="button"
-            className={`${styles.previewButtonElement} ${styles[`previewButton${(comp.props.variant as string) || 'primary'}`]}`}
+            className={cn(
+              'inline-block px-4 py-2 text-sm font-medium border-none rounded-md cursor-default',
+              ((comp.props.variant as string) || 'primary') === 'primary' &&
+                'text-primary-foreground bg-primary',
+              (comp.props.variant as string) === 'secondary' &&
+                'text-foreground bg-muted border border-border',
+              (comp.props.variant as string) === 'danger' &&
+                'text-primary-foreground bg-destructive'
+            )}
             disabled
           >
             {(comp.props.label as string) || 'Button'}
@@ -450,15 +480,15 @@ function Preview({
         )
       case 'image':
         return (
-          <div key={comp.id} className={styles.previewImageElement}>
+          <div key={comp.id} className="max-w-full">
             {(comp.props.src as string) ? (
               <img
                 src={comp.props.src as string}
                 alt={(comp.props.alt as string) || 'Image'}
-                className={styles.previewImg}
+                className="max-w-full h-auto rounded-md"
               />
             ) : (
-              <div className={styles.previewImagePlaceholder}>
+              <div className="flex flex-col items-center justify-center p-6 bg-muted border border-dashed border-border rounded-md text-muted-foreground gap-2">
                 <span>
                   <Image size={24} />
                 </span>
@@ -469,8 +499,8 @@ function Preview({
         )
       case 'form':
         return (
-          <div key={comp.id} className={styles.previewFormElement}>
-            <div className={styles.previewFormPlaceholder}>
+          <div key={comp.id} className="w-full">
+            <div className="flex flex-col items-center justify-center p-6 bg-muted border border-dashed border-border rounded-md text-muted-foreground gap-2">
               <span>
                 <FileEdit size={24} />
               </span>
@@ -480,8 +510,8 @@ function Preview({
         )
       case 'table':
         return (
-          <div key={comp.id} className={styles.previewTableElement}>
-            <div className={styles.previewTablePlaceholder}>
+          <div key={comp.id} className="w-full">
+            <div className="flex flex-col items-center justify-center p-6 bg-muted border border-dashed border-border rounded-md text-muted-foreground gap-2">
               <span>
                 <Grid3x3 size={24} />
               </span>
@@ -491,8 +521,8 @@ function Preview({
         )
       case 'card':
         return (
-          <div key={comp.id} className={styles.previewCardElement}>
-            <div className={styles.previewCardPlaceholder}>
+          <div key={comp.id} className="w-full">
+            <div className="flex flex-col items-center justify-center p-6 bg-muted border border-dashed border-border rounded-md text-muted-foreground gap-2">
               <span>
                 <Square size={24} />
               </span>
@@ -502,9 +532,9 @@ function Preview({
         )
       case 'container':
         return (
-          <div key={comp.id} className={styles.previewContainerElement}>
+          <div key={comp.id} className="w-full">
             {comp.children?.map(renderPreviewComponent) || (
-              <div className={styles.previewContainerPlaceholder}>
+              <div className="flex flex-col items-center justify-center p-6 bg-muted border border-dashed border-border rounded-md text-muted-foreground gap-2">
                 <span>
                   <Box size={24} />
                 </span>
@@ -515,7 +545,10 @@ function Preview({
         )
       default:
         return (
-          <div key={comp.id} className={styles.previewUnknownElement}>
+          <div
+            key={comp.id}
+            className="p-4 bg-yellow-50 border border-yellow-300 rounded-md text-yellow-800 dark:bg-yellow-900/30 dark:border-yellow-700 dark:text-yellow-300"
+          >
             Unknown component: {comp.type}
           </div>
         )
@@ -523,15 +556,21 @@ function Preview({
   }
 
   return (
-    <div className={styles.previewOverlay} data-testid="preview-overlay">
-      <div className={styles.previewContainer} data-testid="preview-container">
-        <header className={styles.previewHeader}>
-          <h2 className={styles.previewTitle}>
+    <div
+      className="fixed inset-0 bg-black/80 flex items-center justify-center z-[1100] p-4"
+      data-testid="preview-overlay"
+    >
+      <div
+        className="bg-background rounded-lg shadow-2xl w-full max-w-[1200px] max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-90 duration-300"
+        data-testid="preview-container"
+      >
+        <header className="flex justify-between items-center px-6 py-4 border-b border-border bg-muted">
+          <h2 className="m-0 text-lg font-semibold text-foreground">
             {t('builder.pages.preview')}: {page?.title || t('builder.pages.newPage')}
           </h2>
           <button
             type="button"
-            className={styles.previewCloseButton}
+            className="flex items-center justify-center w-8 h-8 p-0 text-xl text-muted-foreground bg-transparent border-none rounded cursor-pointer transition-colors hover:bg-accent hover:text-foreground focus:outline-2 focus:outline-primary focus:outline-offset-2"
             onClick={onClose}
             aria-label={t('common.close')}
             data-testid="preview-close-button"
@@ -539,22 +578,23 @@ function Preview({
             ×
           </button>
         </header>
-        <div className={styles.previewContent} data-testid="preview-content">
+        <div className="flex-1 overflow-y-auto p-6 min-h-[400px]" data-testid="preview-content">
           {components.length === 0 ? (
-            <div className={styles.previewEmpty}>
+            <div className="flex items-center justify-center h-full min-h-[300px] text-muted-foreground">
               <p>{t('builder.pages.canvasEmpty')}</p>
             </div>
           ) : (
-            <div className={styles.previewPage}>{components.map(renderPreviewComponent)}</div>
+            <div className="flex flex-col gap-4">{components.map(renderPreviewComponent)}</div>
           )}
         </div>
-        <footer className={styles.previewFooter}>
-          <span className={styles.previewPath}>
-            {t('builder.pages.pagePath')}: <code>{page?.path || '/'}</code>
+        <footer className="flex justify-between items-center px-6 py-4 border-t border-border bg-muted">
+          <span className="text-sm text-muted-foreground">
+            {t('builder.pages.pagePath')}:{' '}
+            <code className="font-mono px-2 py-1 bg-background rounded">{page?.path || '/'}</code>
           </span>
           <button
             type="button"
-            className={styles.previewExitButton}
+            className="px-4 py-2 text-sm font-medium text-primary-foreground bg-primary border-none rounded-md cursor-pointer transition-colors hover:bg-primary/90 focus:outline-2 focus:outline-primary focus:outline-offset-2"
             onClick={onClose}
             data-testid="preview-exit-button"
           >
@@ -625,7 +665,15 @@ function Canvas({
     return (
       <div
         key={comp.id}
-        className={`${styles.canvasComponent} ${isSelected ? styles.canvasComponentSelected : ''} ${isCustomComponent ? styles.canvasComponentCustom : ''}`}
+        className={cn(
+          'bg-muted border border-border rounded p-2 cursor-pointer transition-[border-color,box-shadow] hover:border-muted-foreground/40 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20',
+          isSelected && 'border-primary ring-2 ring-primary/20',
+          isCustomComponent &&
+            'border-blue-300 bg-blue-50 hover:border-blue-500 dark:border-blue-800 dark:bg-blue-950/40 dark:hover:border-blue-400',
+          isSelected &&
+            isCustomComponent &&
+            'border-blue-500 ring-2 ring-blue-500/20 dark:border-blue-400'
+        )}
         onClick={() => onSelect(comp.id)}
         onKeyDown={(e) => handleKeyDown(e, comp.id)}
         tabIndex={0}
@@ -635,18 +683,21 @@ function Canvas({
         data-testid={`canvas-component-${comp.id}`}
         data-custom={isCustomComponent ? 'true' : 'false'}
       >
-        <div className={styles.componentHeader}>
-          <span className={styles.componentType}>
+        <div className="flex justify-between items-center mb-1">
+          <span className="text-xs font-medium text-muted-foreground uppercase">
             {comp.type}
             {isCustomComponent && (
-              <span className={styles.customBadge} data-testid={`custom-badge-${comp.id}`}>
+              <span
+                className="inline-flex items-center ml-1 px-1 py-[2px] text-[10px] font-medium text-blue-700 bg-blue-100 rounded uppercase tracking-wide dark:text-blue-300 dark:bg-blue-900/60"
+                data-testid={`custom-badge-${comp.id}`}
+              >
                 Custom
               </span>
             )}
           </span>
           <button
             type="button"
-            className={styles.componentDeleteBtn}
+            className="flex items-center justify-center w-5 h-5 p-0 text-base text-muted-foreground bg-transparent border-none rounded cursor-pointer transition-colors hover:text-destructive hover:bg-destructive/10 focus:outline-2 focus:outline-primary focus:outline-offset-2"
             onClick={(e) => {
               e.stopPropagation()
               onDelete(comp.id)
@@ -657,11 +708,11 @@ function Canvas({
             ×
           </button>
         </div>
-        <div className={styles.componentPreview}>
+        <div className="text-sm text-foreground">
           {isCustomComponent ? (
             // Render custom component preview
             <div
-              className={styles.customComponentPreview}
+              className="p-2 bg-background rounded min-h-[40px] dark:bg-muted"
               data-testid={`custom-preview-${comp.id}`}
             >
               <CustomComponent config={comp.props} />
@@ -670,42 +721,40 @@ function Canvas({
             // Default component previews
             <>
               {comp.type === 'heading' && (
-                <span className={styles.previewHeading}>
-                  {(comp.props.text as string) || 'Heading'}
-                </span>
+                <span className="font-semibold">{(comp.props.text as string) || 'Heading'}</span>
               )}
               {comp.type === 'text' && (
-                <span className={styles.previewText}>
+                <span className="text-muted-foreground">
                   {(comp.props.content as string) || 'Text content'}
                 </span>
               )}
               {comp.type === 'button' && (
-                <span className={styles.previewButton}>
+                <span className="inline-block px-2 py-1 bg-primary text-primary-foreground rounded text-xs">
                   {(comp.props.label as string) || 'Button'}
                 </span>
               )}
               {comp.type === 'image' && (
-                <span className={styles.previewImage}>
+                <span className="text-muted-foreground">
                   <Image size={14} /> Image
                 </span>
               )}
               {comp.type === 'form' && (
-                <span className={styles.previewForm}>
+                <span className="text-muted-foreground">
                   <FileEdit size={14} /> Form
                 </span>
               )}
               {comp.type === 'table' && (
-                <span className={styles.previewTable}>
+                <span className="text-muted-foreground">
                   <Grid3x3 size={14} /> Table
                 </span>
               )}
               {comp.type === 'card' && (
-                <span className={styles.previewCard}>
+                <span className="text-muted-foreground">
                   <Square size={14} /> Card
                 </span>
               )}
               {comp.type === 'container' && (
-                <span className={styles.previewContainer}>
+                <span className="text-muted-foreground">
                   <Box size={14} /> Container
                 </span>
               )}
@@ -719,7 +768,10 @@ function Canvas({
   return (
     // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/click-events-have-key-events
     <div
-      className={`${styles.canvas} ${isDragOver ? styles.canvasDragOver : ''}`}
+      className={cn(
+        'bg-background border-2 border-dashed border-border rounded-md p-4 overflow-y-auto min-h-[400px] max-md:min-h-[300px] transition-[border-color,background-color]',
+        isDragOver && 'border-primary bg-primary/5'
+      )}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -729,13 +781,13 @@ function Canvas({
       aria-label="Page canvas"
     >
       {components.length === 0 ? (
-        <div className={styles.canvasEmpty}>
+        <div className="flex flex-col items-center justify-center h-full min-h-[300px] text-muted-foreground text-center">
           <p>{t('builder.pages.canvasEmpty')}</p>
-          <p className={styles.canvasHint}>{t('builder.pages.canvasHint')}</p>
+          <p className="text-sm mt-2">{t('builder.pages.canvasHint')}</p>
         </div>
       ) : (
         // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
-        <div className={styles.canvasContent} onClick={(e) => e.stopPropagation()}>
+        <div className="flex flex-col gap-2" onClick={(e) => e.stopPropagation()}>
           {components.map(renderComponent)}
         </div>
       )}
@@ -818,26 +870,26 @@ function PageForm({ page, onSubmit, onCancel, isSubmitting }: PageFormProps): Re
 
   return (
     <div
-      className={styles.modalOverlay}
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-[1000] p-4"
       onClick={(e) => e.target === e.currentTarget && onCancel()}
       onKeyDown={handleKeyDown}
       data-testid="page-form-overlay"
       role="presentation"
     >
       <div
-        className={styles.modal}
+        className="bg-background rounded-lg shadow-xl w-full max-w-[500px] max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200 max-md:max-w-full max-md:mx-2"
         role="dialog"
         aria-modal="true"
         aria-labelledby="page-form-title"
         data-testid="page-form-modal"
       >
-        <div className={styles.modalHeader}>
-          <h2 id="page-form-title" className={styles.modalTitle}>
+        <div className="flex justify-between items-center p-6 border-b border-border">
+          <h2 id="page-form-title" className="m-0 text-lg font-semibold text-foreground">
             {title}
           </h2>
           <button
             type="button"
-            className={styles.modalCloseButton}
+            className="flex items-center justify-center w-8 h-8 p-0 text-xl text-muted-foreground bg-transparent border-none rounded cursor-pointer transition-colors hover:bg-accent hover:text-foreground focus:outline-2 focus:outline-primary focus:outline-offset-2"
             onClick={onCancel}
             aria-label={t('common.close')}
             data-testid="page-form-close"
@@ -845,12 +897,12 @@ function PageForm({ page, onSubmit, onCancel, isSubmitting }: PageFormProps): Re
             ×
           </button>
         </div>
-        <div className={styles.modalBody}>
-          <form className={styles.form} onSubmit={handleSubmit} noValidate>
-            <div className={styles.formGroup}>
-              <label htmlFor="page-name" className={styles.formLabel}>
+        <div className="p-6">
+          <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="page-name" className="text-sm font-medium text-foreground">
                 {t('builder.pages.pageName')}
-                <span className={styles.required} aria-hidden="true">
+                <span className="text-destructive ml-0.5" aria-hidden="true">
                   *
                 </span>
               </label>
@@ -858,7 +910,10 @@ function PageForm({ page, onSubmit, onCancel, isSubmitting }: PageFormProps): Re
                 ref={nameInputRef}
                 id="page-name"
                 type="text"
-                className={`${styles.formInput} ${touched.name && errors.name ? styles.hasError : ''}`}
+                className={cn(
+                  'px-4 py-2 text-sm text-foreground bg-background border border-border rounded-md transition-[border-color,box-shadow] focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/20 placeholder:text-muted-foreground',
+                  touched.name && errors.name && 'border-destructive focus:ring-destructive/20'
+                )}
                 value={formData.name}
                 onChange={(e) => handleChange('name', e.target.value)}
                 onBlur={() => handleBlur('name')}
@@ -869,27 +924,30 @@ function PageForm({ page, onSubmit, onCancel, isSubmitting }: PageFormProps): Re
                 disabled={isSubmitting}
                 data-testid="page-name-input"
               />
-              <span id="page-name-hint" className={styles.formHint}>
+              <span id="page-name-hint" className="text-xs text-muted-foreground mt-1">
                 {t('builder.pages.nameHint')}
               </span>
               {touched.name && errors.name && (
-                <span id="page-name-error" className={styles.formError} role="alert">
+                <span id="page-name-error" className="text-xs text-destructive mt-1" role="alert">
                   {errors.name}
                 </span>
               )}
             </div>
 
-            <div className={styles.formGroup}>
-              <label htmlFor="page-path" className={styles.formLabel}>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="page-path" className="text-sm font-medium text-foreground">
                 {t('builder.pages.pagePath')}
-                <span className={styles.required} aria-hidden="true">
+                <span className="text-destructive ml-0.5" aria-hidden="true">
                   *
                 </span>
               </label>
               <input
                 id="page-path"
                 type="text"
-                className={`${styles.formInput} ${touched.path && errors.path ? styles.hasError : ''}`}
+                className={cn(
+                  'px-4 py-2 text-sm text-foreground bg-background border border-border rounded-md transition-[border-color,box-shadow] focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/20 placeholder:text-muted-foreground',
+                  touched.path && errors.path && 'border-destructive focus:ring-destructive/20'
+                )}
                 value={formData.path}
                 onChange={(e) => handleChange('path', e.target.value)}
                 onBlur={() => handleBlur('path')}
@@ -900,27 +958,30 @@ function PageForm({ page, onSubmit, onCancel, isSubmitting }: PageFormProps): Re
                 disabled={isSubmitting}
                 data-testid="page-path-input"
               />
-              <span id="page-path-hint" className={styles.formHint}>
+              <span id="page-path-hint" className="text-xs text-muted-foreground mt-1">
                 {t('builder.pages.pathHint')}
               </span>
               {touched.path && errors.path && (
-                <span id="page-path-error" className={styles.formError} role="alert">
+                <span id="page-path-error" className="text-xs text-destructive mt-1" role="alert">
                   {errors.path}
                 </span>
               )}
             </div>
 
-            <div className={styles.formGroup}>
-              <label htmlFor="page-title" className={styles.formLabel}>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="page-title" className="text-sm font-medium text-foreground">
                 {t('builder.pages.pageTitle')}
-                <span className={styles.required} aria-hidden="true">
+                <span className="text-destructive ml-0.5" aria-hidden="true">
                   *
                 </span>
               </label>
               <input
                 id="page-title"
                 type="text"
-                className={`${styles.formInput} ${touched.title && errors.title ? styles.hasError : ''}`}
+                className={cn(
+                  'px-4 py-2 text-sm text-foreground bg-background border border-border rounded-md transition-[border-color,box-shadow] focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/20 placeholder:text-muted-foreground',
+                  touched.title && errors.title && 'border-destructive focus:ring-destructive/20'
+                )}
                 value={formData.title}
                 onChange={(e) => handleChange('title', e.target.value)}
                 onBlur={() => handleBlur('title')}
@@ -932,19 +993,19 @@ function PageForm({ page, onSubmit, onCancel, isSubmitting }: PageFormProps): Re
                 data-testid="page-title-input"
               />
               {touched.title && errors.title && (
-                <span id="page-title-error" className={styles.formError} role="alert">
+                <span id="page-title-error" className="text-xs text-destructive mt-1" role="alert">
                   {errors.title}
                 </span>
               )}
             </div>
 
-            <div className={styles.formGroup}>
-              <label htmlFor="page-layout" className={styles.formLabel}>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="page-layout" className="text-sm font-medium text-foreground">
                 {t('builder.pages.layout')}
               </label>
               <select
                 id="page-layout"
-                className={styles.formSelect}
+                className="px-4 py-2 text-sm text-foreground bg-background border border-border rounded-md transition-[border-color,box-shadow] focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/20"
                 value={formData.layoutType}
                 onChange={(e) => handleChange('layoutType', e.target.value)}
                 disabled={isSubmitting}
@@ -956,10 +1017,10 @@ function PageForm({ page, onSubmit, onCancel, isSubmitting }: PageFormProps): Re
               </select>
             </div>
 
-            <div className={styles.formActions}>
+            <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-border max-md:flex-col">
               <button
                 type="button"
-                className={styles.cancelButton}
+                className="px-4 py-2 text-sm font-medium text-foreground bg-background border border-border rounded-md cursor-pointer transition-colors hover:bg-accent hover:border-muted-foreground/40 focus:outline-2 focus:outline-primary focus:outline-offset-2 max-md:w-full"
                 onClick={onCancel}
                 disabled={isSubmitting}
                 data-testid="page-form-cancel"
@@ -968,7 +1029,7 @@ function PageForm({ page, onSubmit, onCancel, isSubmitting }: PageFormProps): Re
               </button>
               <button
                 type="submit"
-                className={styles.submitButton}
+                className="px-4 py-2 text-sm font-medium text-primary-foreground bg-primary border-none rounded-md cursor-pointer transition-colors hover:bg-primary/90 focus:outline-2 focus:outline-primary focus:outline-offset-2 disabled:opacity-60 disabled:cursor-not-allowed max-md:w-full"
                 disabled={isSubmitting}
                 data-testid="page-form-submit"
               >
@@ -1328,8 +1389,11 @@ export function PageBuilderPage({
   // Render loading state
   if (viewMode === 'list' && isLoadingPages) {
     return (
-      <div className={styles.container} data-testid={testId}>
-        <div className={styles.loadingContainer}>
+      <div
+        className="flex flex-col h-full min-h-0 p-6 w-full max-md:p-2 max-lg:p-4"
+        data-testid={testId}
+      >
+        <div className="flex justify-center items-center min-h-[400px]">
           <LoadingSpinner size="large" label={t('common.loading')} />
         </div>
       </div>
@@ -1339,7 +1403,10 @@ export function PageBuilderPage({
   // Render error state
   if (viewMode === 'list' && pagesError) {
     return (
-      <div className={styles.container} data-testid={testId}>
+      <div
+        className="flex flex-col h-full min-h-0 p-6 w-full max-md:p-2 max-lg:p-4"
+        data-testid={testId}
+      >
         <ErrorMessage
           error={pagesError instanceof Error ? pagesError : new Error(t('errors.generic'))}
           onRetry={() => refetchPages()}
@@ -1351,29 +1418,34 @@ export function PageBuilderPage({
   // Render editor view
   if (viewMode === 'editor') {
     return (
-      <div className={styles.container} data-testid={testId}>
-        <header className={styles.editorHeader}>
-          <div className={styles.editorHeaderLeft}>
+      <div
+        className="flex flex-col h-full min-h-0 p-6 w-full max-md:p-2 max-lg:p-4"
+        data-testid={testId}
+      >
+        <header className="flex justify-between items-center pb-4 border-b border-border mb-4 max-md:flex-col max-md:gap-2">
+          <div className="flex items-center gap-4 max-md:w-full max-md:justify-between">
             <button
               type="button"
-              className={styles.backButton}
+              className="px-2 py-1 text-sm text-muted-foreground bg-transparent border-none cursor-pointer transition-colors hover:text-foreground focus:outline-2 focus:outline-primary focus:outline-offset-2"
               onClick={handleBackToList}
               aria-label={t('common.back')}
               data-testid="back-to-list-button"
             >
               ← {t('common.back')}
             </button>
-            <h1 className={styles.editorTitle}>
+            <h1 className="m-0 text-xl font-semibold text-foreground">
               {currentPage?.title || t('builder.pages.newPage')}
-              {hasUnsavedChanges && <span className={styles.unsavedIndicator}>*</span>}
+              {hasUnsavedChanges && (
+                <span className="text-yellow-800 dark:text-yellow-300 ml-1">*</span>
+              )}
             </h1>
             {currentPage && <StatusBadge published={currentPage.published} />}
           </div>
-          <div className={styles.editorHeaderRight}>
+          <div className="flex items-center gap-2 max-md:w-full max-md:justify-between">
             {/* Preview button (Requirement 7.7) */}
             <button
               type="button"
-              className={styles.previewButton}
+              className="px-4 py-2 text-sm font-medium text-foreground bg-background border border-border rounded-md cursor-pointer transition-colors hover:bg-accent hover:border-muted-foreground/40 focus:outline-2 focus:outline-primary focus:outline-offset-2"
               onClick={handleTogglePreview}
               aria-label={t('builder.pages.preview')}
               data-testid="preview-page-button"
@@ -1385,7 +1457,7 @@ export function PageBuilderPage({
                 {/* Duplicate button (Requirement 7.10) */}
                 <button
                   type="button"
-                  className={styles.duplicateButton}
+                  className="px-4 py-2 text-sm font-medium text-foreground bg-background border border-border rounded-md cursor-pointer transition-colors hover:bg-accent hover:border-muted-foreground/40 focus:outline-2 focus:outline-primary focus:outline-offset-2 disabled:opacity-60 disabled:cursor-not-allowed"
                   onClick={() => handleDuplicatePage(currentPage.id)}
                   disabled={isDuplicating}
                   aria-label={t('builder.pages.duplicate')}
@@ -1397,7 +1469,7 @@ export function PageBuilderPage({
                 {currentPage.published ? (
                   <button
                     type="button"
-                    className={styles.unpublishButton}
+                    className="px-4 py-2 text-sm font-medium text-yellow-800 bg-yellow-100 border border-yellow-300 rounded-md cursor-pointer transition-colors hover:bg-yellow-200 focus:outline-2 focus:outline-yellow-500 focus:outline-offset-2 disabled:opacity-60 disabled:cursor-not-allowed dark:text-yellow-300 dark:bg-yellow-900/30 dark:border-yellow-700"
                     onClick={handleUnpublishPage}
                     disabled={isPublishing || hasUnsavedChanges}
                     aria-label={t('builder.pages.unpublish') || 'Unpublish'}
@@ -1410,7 +1482,7 @@ export function PageBuilderPage({
                 ) : (
                   <button
                     type="button"
-                    className={styles.publishButton}
+                    className="px-4 py-2 text-sm font-medium text-primary-foreground bg-green-600 border-none rounded-md cursor-pointer transition-colors hover:bg-green-700 focus:outline-2 focus:outline-green-600 focus:outline-offset-2 disabled:opacity-60 disabled:cursor-not-allowed"
                     onClick={handlePublishPage}
                     disabled={isPublishing || hasUnsavedChanges}
                     aria-label={t('builder.pages.publish')}
@@ -1421,7 +1493,7 @@ export function PageBuilderPage({
                 )}
                 <button
                   type="button"
-                  className={styles.configButton}
+                  className="px-4 py-2 text-sm font-medium text-foreground bg-background border border-border rounded-md cursor-pointer transition-colors hover:bg-accent focus:outline-2 focus:outline-primary focus:outline-offset-2"
                   onClick={() => handleEditConfig(currentPage)}
                   data-testid="edit-config-button"
                 >
@@ -1432,7 +1504,7 @@ export function PageBuilderPage({
             {/* Save button (Requirement 7.8) */}
             <button
               type="button"
-              className={styles.saveButton}
+              className="px-4 py-2 text-sm font-medium text-primary-foreground bg-primary border-none rounded-md cursor-pointer transition-colors hover:bg-primary/90 focus:outline-2 focus:outline-primary focus:outline-offset-2 disabled:opacity-60 disabled:cursor-not-allowed"
               onClick={handleSavePage}
               disabled={!hasUnsavedChanges || updateMutation.isPending}
               data-testid="save-page-button"
@@ -1442,7 +1514,7 @@ export function PageBuilderPage({
           </div>
         </header>
 
-        <div className={styles.editorLayout}>
+        <div className="grid grid-cols-[200px_1fr_280px] max-lg:grid-cols-[160px_1fr_240px] max-md:grid-cols-1 max-md:grid-rows-[auto_1fr_auto] gap-4 flex-1 min-h-0 overflow-hidden">
           <ComponentPalette onDragStart={handleDragStart} onAddComponent={handleAddComponent} />
           <Canvas
             components={components}
@@ -1479,12 +1551,17 @@ export function PageBuilderPage({
 
   // Render list view
   return (
-    <div className={styles.container} data-testid={testId}>
-      <header className={styles.header}>
-        <h1 className={styles.title}>{t('builder.pages.title')}</h1>
+    <div
+      className="flex flex-col h-full min-h-0 p-6 w-full max-md:p-2 max-lg:p-4"
+      data-testid={testId}
+    >
+      <header className="flex justify-between items-center flex-wrap gap-4 mb-6 max-md:flex-col max-md:items-stretch">
+        <h1 className="m-0 text-2xl max-md:text-xl font-semibold text-foreground">
+          {t('builder.pages.title')}
+        </h1>
         <button
           type="button"
-          className={styles.createButton}
+          className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-primary-foreground bg-primary border-none rounded-md cursor-pointer transition-colors hover:bg-primary/90 focus:outline-2 focus:outline-primary focus:outline-offset-2 max-md:w-full"
           onClick={handleCreate}
           aria-label={t('builder.pages.createPage')}
           data-testid="create-page-button"
@@ -1494,35 +1571,62 @@ export function PageBuilderPage({
       </header>
 
       {pages.length === 0 ? (
-        <div className={styles.emptyState} data-testid="empty-state">
+        <div
+          className="flex flex-col items-center justify-center p-12 text-center text-muted-foreground bg-muted rounded-md"
+          data-testid="empty-state"
+        >
           <p>{t('common.noResults')}</p>
         </div>
       ) : (
-        <div className={styles.tableContainer}>
+        <div className="overflow-x-auto border border-border rounded-md bg-background">
           <table
-            className={styles.table}
+            className="w-full border-collapse text-sm"
             role="grid"
             aria-label={t('builder.pages.title')}
             data-testid="pages-table"
           >
-            <thead>
+            <thead className="bg-muted">
               <tr role="row">
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap"
+                >
                   {t('builder.pages.pageName')}
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap"
+                >
                   {t('builder.pages.pagePath')}
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap"
+                >
                   {t('builder.pages.pageTitle')}
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap"
+                >
                   {t('collections.status')}
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap"
+                >
                   {t('collections.updated')}
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="p-4 text-left font-semibold text-foreground border-b-2 border-border whitespace-nowrap"
+                >
                   {t('common.actions')}
                 </th>
               </tr>
@@ -1532,38 +1636,54 @@ export function PageBuilderPage({
                 <tr
                   key={page.id}
                   role="row"
-                  className={styles.tableRow}
+                  className="transition-colors hover:bg-accent/50"
                   data-testid={`page-row-${index}`}
                 >
-                  <td role="gridcell" className={styles.nameCell}>
+                  <td
+                    role="gridcell"
+                    className="p-4 text-foreground border-b border-border/50 font-medium"
+                  >
                     <button
                       type="button"
-                      className={styles.nameLink}
+                      className="bg-transparent border-none p-0 text-primary cursor-pointer font-inherit no-underline hover:underline focus:outline-2 focus:outline-primary focus:outline-offset-2"
                       onClick={() => handleOpenEditor(page)}
                       data-testid={`page-name-${index}`}
                     >
                       {page.name}
                     </button>
                   </td>
-                  <td role="gridcell" className={styles.pathCell}>
-                    <code className={styles.pathCode}>{page.path}</code>
+                  <td
+                    role="gridcell"
+                    className="p-4 text-foreground border-b border-border/50 max-w-[200px]"
+                  >
+                    <code className="font-mono text-xs px-2 py-1 bg-muted rounded text-foreground">
+                      {page.path}
+                    </code>
                   </td>
-                  <td role="gridcell">{page.title}</td>
-                  <td role="gridcell" className={styles.statusCell}>
+                  <td role="gridcell" className="p-4 text-foreground border-b border-border/50">
+                    {page.title}
+                  </td>
+                  <td role="gridcell" className="p-4 text-foreground border-b border-border/50">
                     <StatusBadge published={page.published} />
                   </td>
-                  <td role="gridcell" className={styles.dateCell}>
+                  <td
+                    role="gridcell"
+                    className="p-4 text-muted-foreground border-b border-border/50 whitespace-nowrap"
+                  >
                     {formatDate(new Date(page.updatedAt), {
                       year: 'numeric',
                       month: 'short',
                       day: 'numeric',
                     })}
                   </td>
-                  <td role="gridcell" className={styles.actionsCell}>
-                    <div className={styles.actions}>
+                  <td
+                    role="gridcell"
+                    className="p-4 text-foreground border-b border-border/50 w-[1%] whitespace-nowrap"
+                  >
+                    <div className="flex gap-2">
                       <button
                         type="button"
-                        className={styles.actionButton}
+                        className="px-2 py-1 text-xs font-medium text-foreground bg-background border border-border rounded cursor-pointer transition-colors hover:bg-accent hover:border-muted-foreground/40 focus:outline-2 focus:outline-primary focus:outline-offset-2"
                         onClick={() => handleOpenEditor(page)}
                         aria-label={`${t('common.edit')} ${page.name}`}
                         data-testid={`edit-button-${index}`}
@@ -1573,7 +1693,7 @@ export function PageBuilderPage({
                       {/* Duplicate button (Requirement 7.10) */}
                       <button
                         type="button"
-                        className={styles.actionButton}
+                        className="px-2 py-1 text-xs font-medium text-foreground bg-background border border-border rounded cursor-pointer transition-colors hover:bg-accent hover:border-muted-foreground/40 focus:outline-2 focus:outline-primary focus:outline-offset-2"
                         onClick={() => handleDuplicatePage(page.id)}
                         disabled={isDuplicating}
                         aria-label={`${t('builder.pages.duplicate')} ${page.name}`}
@@ -1583,7 +1703,7 @@ export function PageBuilderPage({
                       </button>
                       <button
                         type="button"
-                        className={`${styles.actionButton} ${styles.deleteButton}`}
+                        className="px-2 py-1 text-xs font-medium text-destructive bg-background border border-destructive/30 rounded cursor-pointer transition-colors hover:bg-destructive/5 hover:border-destructive focus:outline-2 focus:outline-primary focus:outline-offset-2"
                         onClick={() => handleDeleteClick(page)}
                         aria-label={`${t('common.delete')} ${page.name}`}
                         data-testid={`delete-button-${index}`}

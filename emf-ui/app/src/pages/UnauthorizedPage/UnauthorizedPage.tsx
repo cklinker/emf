@@ -10,7 +10,7 @@ import { ShieldOff } from 'lucide-react'
 import { useI18n } from '../../context/I18nContext'
 import { getTenantSlug } from '../../context/TenantContext'
 import { useAuth } from '../../context/AuthContext'
-import styles from './UnauthorizedPage.module.css'
+import { cn } from '@/lib/utils'
 
 /**
  * Props for the UnauthorizedPage component
@@ -54,46 +54,59 @@ export function UnauthorizedPage({ title, message }: UnauthorizedPageProps): Rea
   }
 
   return (
-    <div className={styles.unauthorizedPage} data-testid="unauthorized-page">
-      <div className={styles.container}>
+    <div
+      className="flex min-h-screen items-center justify-center bg-background p-6"
+      data-testid="unauthorized-page"
+    >
+      <div className="w-full max-w-[500px] rounded-lg bg-card p-8 text-center shadow-md max-[480px]:p-6">
         {/* Icon */}
-        <div className={styles.icon} aria-hidden="true">
+        <div className="mb-4 text-6xl max-[480px]:text-5xl" aria-hidden="true">
           <ShieldOff size={48} />
         </div>
 
         {/* Title */}
-        <h1 className={styles.title}>{title || t('unauthorized.title')}</h1>
+        <h1 className="mb-2 text-2xl font-semibold text-destructive">
+          {title || t('unauthorized.title')}
+        </h1>
 
         {/* Message */}
-        <p className={styles.message}>{message || t('unauthorized.message')}</p>
+        <p className="mb-4 text-base text-muted-foreground">
+          {message || t('unauthorized.message')}
+        </p>
 
         {/* User info */}
         {user && (
-          <p className={styles.userInfo}>
+          <p className="mb-6 text-sm text-muted-foreground">
             {t('unauthorized.loggedInAs', { email: user.email || user.name || 'Unknown' })}
           </p>
         )}
 
         {/* Required permissions info */}
         {(state?.requiredRoles || state?.requiredPolicies) && (
-          <div className={styles.requirements}>
-            <p className={styles.requirementsTitle}>{t('unauthorized.requiredPermissions')}</p>
+          <div className="mb-6 rounded-lg bg-muted p-4 text-left">
+            <p className="mb-2 font-medium text-foreground">
+              {t('unauthorized.requiredPermissions')}
+            </p>
             {state.requiredRoles && state.requiredRoles.length > 0 && (
-              <div className={styles.requirementsList}>
+              <div className="mb-2 text-sm text-muted-foreground">
                 <strong>{t('unauthorized.requiredRoles')}:</strong>
-                <ul>
+                <ul className="mt-1 pl-6">
                   {state.requiredRoles.map((role) => (
-                    <li key={role}>{role}</li>
+                    <li key={role} className="mb-1">
+                      {role}
+                    </li>
                   ))}
                 </ul>
               </div>
             )}
             {state.requiredPolicies && state.requiredPolicies.length > 0 && (
-              <div className={styles.requirementsList}>
+              <div className="mb-2 text-sm text-muted-foreground">
                 <strong>{t('unauthorized.requiredPolicies')}:</strong>
-                <ul>
+                <ul className="mt-1 pl-6">
                   {state.requiredPolicies.map((policy) => (
-                    <li key={policy}>{policy}</li>
+                    <li key={policy} className="mb-1">
+                      {policy}
+                    </li>
                   ))}
                 </ul>
               </div>
@@ -102,22 +115,52 @@ export function UnauthorizedPage({ title, message }: UnauthorizedPageProps): Rea
         )}
 
         {/* Actions */}
-        <div className={styles.actions}>
-          <button type="button" className={styles.primaryButton} onClick={handleGoHome}>
+        <div className="mb-6 flex flex-col gap-2">
+          <button
+            type="button"
+            className={cn(
+              'rounded-lg bg-primary px-6 py-2 text-base font-medium text-primary-foreground',
+              'transition-colors duration-200',
+              'hover:bg-primary/90',
+              'focus:outline-2 focus:outline-offset-2 focus:outline-ring'
+            )}
+            onClick={handleGoHome}
+          >
             {t('unauthorized.goHome')}
           </button>
-          <button type="button" className={styles.secondaryButton} onClick={handleGoBack}>
+          <button
+            type="button"
+            className={cn(
+              'rounded-lg border border-border bg-transparent px-6 py-2 text-base font-medium text-foreground',
+              'transition-colors duration-200',
+              'hover:bg-accent hover:border-primary',
+              'focus:outline-2 focus:outline-offset-2 focus:outline-ring'
+            )}
+            onClick={handleGoBack}
+          >
             {t('unauthorized.goBack')}
           </button>
-          <button type="button" className={styles.textButton} onClick={handleLogout}>
+          <button
+            type="button"
+            className={cn(
+              'border-none bg-transparent p-2 text-sm text-muted-foreground',
+              'cursor-pointer transition-colors duration-200',
+              'hover:text-foreground',
+              'focus:outline-2 focus:outline-offset-2 focus:outline-ring'
+            )}
+            onClick={handleLogout}
+          >
             {t('unauthorized.logout')}
           </button>
         </div>
 
         {/* Help link */}
-        <p className={styles.helpText}>
+        <p className="m-0 text-sm text-muted-foreground">
           {t('unauthorized.helpText')}{' '}
-          <Link to={`/${getTenantSlug()}/help`} className={styles.helpLink}>
+          <Link
+            to={`/${getTenantSlug()}/help`}
+            className="text-primary no-underline hover:underline"
+          >
             {t('unauthorized.contactSupport')}
           </Link>
         </p>

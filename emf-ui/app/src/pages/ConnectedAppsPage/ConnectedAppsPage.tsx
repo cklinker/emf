@@ -3,8 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
-
-import styles from './ConnectedAppsPage.module.css'
+import { cn } from '@/lib/utils'
 
 interface ConnectedApp {
   id: string
@@ -152,26 +151,26 @@ function ConnectedAppForm({
 
   return (
     <div
-      className={styles.modalOverlay}
+      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 p-4"
       onClick={(e) => e.target === e.currentTarget && onCancel()}
       onKeyDown={handleKeyDown}
       data-testid="connected-app-form-overlay"
       role="presentation"
     >
       <div
-        className={styles.modal}
+        className="w-full max-w-[700px] max-h-[90vh] overflow-y-auto rounded-lg bg-card shadow-xl"
         role="dialog"
         aria-modal="true"
         aria-labelledby="connected-app-form-title"
         data-testid="connected-app-form-modal"
       >
-        <div className={styles.modalHeader}>
-          <h2 id="connected-app-form-title" className={styles.modalTitle}>
+        <div className="flex items-center justify-between border-b border-border p-6">
+          <h2 id="connected-app-form-title" className="m-0 text-xl font-semibold text-foreground">
             {title}
           </h2>
           <button
             type="button"
-            className={styles.modalCloseButton}
+            className="rounded p-2 text-2xl leading-none text-muted-foreground hover:bg-muted hover:text-foreground"
             onClick={onCancel}
             aria-label="Close"
             data-testid="connected-app-form-close"
@@ -179,12 +178,15 @@ function ConnectedAppForm({
             &times;
           </button>
         </div>
-        <div className={styles.modalBody}>
-          <form className={styles.form} onSubmit={handleSubmit} noValidate>
-            <div className={styles.formGroup}>
-              <label htmlFor="connected-app-name" className={styles.formLabel}>
+        <div className="p-6">
+          <form className="space-y-4" onSubmit={handleSubmit} noValidate>
+            <div>
+              <label
+                htmlFor="connected-app-name"
+                className="mb-1 block text-sm font-medium text-foreground"
+              >
                 Name
-                <span className={styles.required} aria-hidden="true">
+                <span className="ml-0.5 text-destructive" aria-hidden="true">
                   *
                 </span>
               </label>
@@ -192,7 +194,10 @@ function ConnectedAppForm({
                 ref={nameInputRef}
                 id="connected-app-name"
                 type="text"
-                className={`${styles.formInput} ${touched.name && errors.name ? styles.hasError : ''}`}
+                className={cn(
+                  'w-full rounded-md border px-3 py-2 text-sm text-foreground bg-background focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary',
+                  touched.name && errors.name ? 'border-destructive' : 'border-border'
+                )}
                 value={formData.name}
                 onChange={(e) => handleChange('name', e.target.value)}
                 onBlur={() => handleBlur('name')}
@@ -203,19 +208,25 @@ function ConnectedAppForm({
                 data-testid="connected-app-name-input"
               />
               {touched.name && errors.name && (
-                <span className={styles.formError} role="alert">
+                <span className="mt-1 block text-xs text-destructive" role="alert">
                   {errors.name}
                 </span>
               )}
             </div>
 
-            <div className={styles.formGroup}>
-              <label htmlFor="connected-app-description" className={styles.formLabel}>
+            <div>
+              <label
+                htmlFor="connected-app-description"
+                className="mb-1 block text-sm font-medium text-foreground"
+              >
                 Description
               </label>
               <textarea
                 id="connected-app-description"
-                className={`${styles.formInput} ${styles.formTextarea} ${touched.description && errors.description ? styles.hasError : ''}`}
+                className={cn(
+                  'w-full rounded-md border px-3 py-2 text-sm text-foreground bg-background focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary',
+                  touched.description && errors.description ? 'border-destructive' : 'border-border'
+                )}
                 value={formData.description}
                 onChange={(e) => handleChange('description', e.target.value)}
                 onBlur={() => handleBlur('description')}
@@ -225,21 +236,27 @@ function ConnectedAppForm({
                 data-testid="connected-app-description-input"
               />
               {touched.description && errors.description && (
-                <span className={styles.formError} role="alert">
+                <span className="mt-1 block text-xs text-destructive" role="alert">
                   {errors.description}
                 </span>
               )}
             </div>
 
             {!isEditing && (
-              <div className={styles.formGroup}>
-                <label htmlFor="connected-app-scopes" className={styles.formLabel}>
+              <div>
+                <label
+                  htmlFor="connected-app-scopes"
+                  className="mb-1 block text-sm font-medium text-foreground"
+                >
                   Scopes
                 </label>
                 <input
                   id="connected-app-scopes"
                   type="text"
-                  className={`${styles.formInput} ${touched.scopes && errors.scopes ? styles.hasError : ''}`}
+                  className={cn(
+                    'w-full rounded-md border px-3 py-2 text-sm text-foreground bg-background focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary',
+                    touched.scopes && errors.scopes ? 'border-destructive' : 'border-border'
+                  )}
                   value={formData.scopes}
                   onChange={(e) => handleChange('scopes', e.target.value)}
                   onBlur={() => handleBlur('scopes')}
@@ -247,23 +264,33 @@ function ConnectedAppForm({
                   disabled={isSubmitting}
                   data-testid="connected-app-scopes-input"
                 />
-                <span className={styles.formHint}>JSON array of scope strings</span>
+                <span className="mt-1 block text-xs text-muted-foreground">
+                  JSON array of scope strings
+                </span>
                 {touched.scopes && errors.scopes && (
-                  <span className={styles.formError} role="alert">
+                  <span className="mt-1 block text-xs text-destructive" role="alert">
                     {errors.scopes}
                   </span>
                 )}
               </div>
             )}
 
-            <div className={styles.formGroup}>
-              <label htmlFor="connected-app-rate-limit" className={styles.formLabel}>
+            <div>
+              <label
+                htmlFor="connected-app-rate-limit"
+                className="mb-1 block text-sm font-medium text-foreground"
+              >
                 Rate Limit (per hour)
               </label>
               <input
                 id="connected-app-rate-limit"
                 type="number"
-                className={`${styles.formInput} ${touched.rateLimitPerHour && errors.rateLimitPerHour ? styles.hasError : ''}`}
+                className={cn(
+                  'w-full rounded-md border px-3 py-2 text-sm text-foreground bg-background focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary',
+                  touched.rateLimitPerHour && errors.rateLimitPerHour
+                    ? 'border-destructive'
+                    : 'border-border'
+                )}
                 value={formData.rateLimitPerHour}
                 onChange={(e) =>
                   handleChange('rateLimitPerHour', parseInt(e.target.value, 10) || 1)
@@ -275,30 +302,31 @@ function ConnectedAppForm({
                 data-testid="connected-app-rate-limit-input"
               />
               {touched.rateLimitPerHour && errors.rateLimitPerHour && (
-                <span className={styles.formError} role="alert">
+                <span className="mt-1 block text-xs text-destructive" role="alert">
                   {errors.rateLimitPerHour}
                 </span>
               )}
             </div>
 
-            <div className={styles.checkboxGroup}>
+            <div className="flex items-center gap-2">
               <input
                 id="connected-app-active"
                 type="checkbox"
                 checked={formData.active}
                 onChange={(e) => handleChange('active', e.target.checked)}
                 disabled={isSubmitting}
+                className="h-4 w-4 accent-primary"
                 data-testid="connected-app-active-input"
               />
-              <label htmlFor="connected-app-active" className={styles.formLabel}>
+              <label htmlFor="connected-app-active" className="text-sm font-medium text-foreground">
                 Active
               </label>
             </div>
 
-            <div className={styles.formActions}>
+            <div className="flex justify-end gap-2 pt-2">
               <button
                 type="button"
-                className={styles.cancelButton}
+                className="rounded-md border border-border bg-secondary px-4 py-2 text-sm text-foreground hover:bg-muted disabled:opacity-50"
                 onClick={onCancel}
                 disabled={isSubmitting}
                 data-testid="connected-app-form-cancel"
@@ -307,7 +335,7 @@ function ConnectedAppForm({
               </button>
               <button
                 type="submit"
-                className={styles.submitButton}
+                className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                 disabled={isSubmitting}
                 data-testid="connected-app-form-submit"
               >
@@ -343,26 +371,26 @@ function CredentialsDialog({
 
   return (
     <div
-      className={styles.modalOverlay}
+      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 p-4"
       onClick={(e) => e.target === e.currentTarget && onClose()}
       onKeyDown={handleKeyDown}
       data-testid="credentials-dialog-overlay"
       role="presentation"
     >
       <div
-        className={styles.modal}
+        className="w-full max-w-[700px] max-h-[90vh] overflow-y-auto rounded-lg bg-card shadow-xl"
         role="dialog"
         aria-modal="true"
         aria-labelledby="credentials-dialog-title"
         data-testid="credentials-dialog-modal"
       >
-        <div className={styles.modalHeader}>
-          <h2 id="credentials-dialog-title" className={styles.modalTitle}>
+        <div className="flex items-center justify-between border-b border-border p-6">
+          <h2 id="credentials-dialog-title" className="m-0 text-xl font-semibold text-foreground">
             Connected App Created
           </h2>
           <button
             type="button"
-            className={styles.modalCloseButton}
+            className="rounded p-2 text-2xl leading-none text-muted-foreground hover:bg-muted hover:text-foreground"
             onClick={onClose}
             aria-label="Close"
             data-testid="credentials-dialog-close"
@@ -370,28 +398,34 @@ function CredentialsDialog({
             &times;
           </button>
         </div>
-        <div className={styles.modalBody}>
-          <div className={styles.credentialsBox}>
-            <p className={styles.credentialsWarning}>
+        <div className="p-6">
+          <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 dark:border-amber-700 dark:bg-amber-950">
+            <p className="mb-3 text-sm font-medium text-amber-800 dark:text-amber-300">
               Save these credentials now. The client secret will not be shown again.
             </p>
-            <div className={styles.credentialField}>
-              <span className={styles.credentialLabel}>Client ID</span>
-              <code className={styles.credentialValue} data-testid="credentials-client-id">
+            <div className="mb-2 flex flex-col gap-1">
+              <span className="text-xs font-medium text-muted-foreground">Client ID</span>
+              <code
+                className="rounded bg-muted px-2 py-1 font-mono text-sm text-foreground"
+                data-testid="credentials-client-id"
+              >
                 {clientId}
               </code>
             </div>
-            <div className={styles.credentialField}>
-              <span className={styles.credentialLabel}>Client Secret</span>
-              <code className={styles.credentialValue} data-testid="credentials-client-secret">
+            <div className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-muted-foreground">Client Secret</span>
+              <code
+                className="rounded bg-muted px-2 py-1 font-mono text-sm text-foreground"
+                data-testid="credentials-client-secret"
+              >
                 {clientSecret}
               </code>
             </div>
           </div>
-          <div className={styles.formActions}>
+          <div className="mt-4 flex justify-end">
             <button
               type="button"
-              className={styles.submitButton}
+              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
               onClick={onClose}
               data-testid="credentials-dialog-done"
             >
@@ -428,26 +462,19 @@ export function ConnectedAppsPage({
     refetch,
   } = useQuery({
     queryKey: ['connected-apps'],
-    queryFn: () =>
-      apiClient.get<ConnectedApp[]>(`/control/connected-apps`),
+    queryFn: () => apiClient.get<ConnectedApp[]>(`/control/connected-apps`),
   })
 
   const appList: ConnectedApp[] = connectedApps ?? []
 
   const createMutation = useMutation({
     mutationFn: (data: ConnectedAppFormData) =>
-      apiClient.post<ConnectedAppCreatedResponse>(
-        `/control/connected-apps?userId=system`,
-        data
-      ),
+      apiClient.post<ConnectedAppCreatedResponse>(`/control/connected-apps?userId=system`, data),
     onSuccess: (result: ConnectedAppCreatedResponse) => {
       queryClient.invalidateQueries({ queryKey: ['connected-apps'] })
       showToast('Connected app created successfully', 'success')
       handleCloseForm()
-      setCreatedCredentials({
-        clientId: result.clientId,
-        clientSecret: result.clientSecret,
-      })
+      setCreatedCredentials({ clientId: result.clientId, clientSecret: result.clientSecret })
     },
     onError: (err: Error) => {
       showToast(err.message || 'An error occurred', 'error')
@@ -484,12 +511,10 @@ export function ConnectedAppsPage({
     setEditingApp(undefined)
     setIsFormOpen(true)
   }, [])
-
   const handleEdit = useCallback((app: ConnectedApp) => {
     setEditingApp(app)
     setIsFormOpen(true)
   }, [])
-
   const handleCloseForm = useCallback(() => {
     setIsFormOpen(false)
     setEditingApp(undefined)
@@ -510,26 +535,23 @@ export function ConnectedAppsPage({
     setAppToDelete(app)
     setDeleteDialogOpen(true)
   }, [])
-
   const handleDeleteConfirm = useCallback(() => {
     if (appToDelete) {
       deleteMutation.mutate(appToDelete.id)
     }
   }, [appToDelete, deleteMutation])
-
   const handleDeleteCancel = useCallback(() => {
     setDeleteDialogOpen(false)
     setAppToDelete(null)
   }, [])
-
   const handleCredentialsClose = useCallback(() => {
     setCreatedCredentials(null)
   }, [])
 
   if (isLoading) {
     return (
-      <div className={styles.container} data-testid={testId}>
-        <div className={styles.loadingContainer}>
+      <div className="mx-auto max-w-[1400px] space-y-6 p-6 lg:p-8" data-testid={testId}>
+        <div className="flex min-h-[400px] items-center justify-center">
           <LoadingSpinner size="large" label="Loading connected apps..." />
         </div>
       </div>
@@ -538,7 +560,7 @@ export function ConnectedAppsPage({
 
   if (error) {
     return (
-      <div className={styles.container} data-testid={testId}>
+      <div className="mx-auto max-w-[1400px] space-y-6 p-6 lg:p-8" data-testid={testId}>
         <ErrorMessage
           error={error instanceof Error ? error : new Error('An error occurred')}
           onRetry={() => refetch()}
@@ -550,12 +572,12 @@ export function ConnectedAppsPage({
   const isSubmitting = createMutation.isPending || updateMutation.isPending
 
   return (
-    <div className={styles.container} data-testid={testId}>
-      <header className={styles.header}>
-        <h1 className={styles.title}>Connected Apps</h1>
+    <div className="mx-auto max-w-[1400px] space-y-6 p-6 lg:p-8" data-testid={testId}>
+      <header className="flex items-center justify-between">
+        <h1 className="m-0 text-2xl font-semibold text-foreground">Connected Apps</h1>
         <button
           type="button"
-          className={styles.createButton}
+          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
           onClick={handleCreate}
           aria-label="Create Connected App"
           data-testid="add-connected-app-button"
@@ -565,38 +587,69 @@ export function ConnectedAppsPage({
       </header>
 
       {appList.length === 0 ? (
-        <div className={styles.emptyState} data-testid="empty-state">
+        <div
+          className="rounded-lg border border-border bg-card p-16 text-center text-muted-foreground"
+          data-testid="empty-state"
+        >
           <p>No connected apps found.</p>
         </div>
       ) : (
-        <div className={styles.tableContainer}>
+        <div className="overflow-x-auto rounded-lg border border-border bg-card">
           <table
-            className={styles.table}
+            className="w-full border-collapse text-sm"
             role="grid"
             aria-label="Connected Apps"
             data-testid="connected-apps-table"
           >
             <thead>
-              <tr role="row">
-                <th role="columnheader" scope="col">
+              <tr role="row" className="bg-muted">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   Name
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   Client ID
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   Rate Limit
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   Active
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   Last Used
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   Created
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   Actions
                 </th>
               </tr>
@@ -606,22 +659,33 @@ export function ConnectedAppsPage({
                 <tr
                   key={app.id}
                   role="row"
-                  className={styles.tableRow}
+                  className="border-b border-border transition-colors last:border-b-0 hover:bg-muted/50"
                   data-testid={`connected-app-row-${index}`}
                 >
-                  <td role="gridcell">{app.name}</td>
-                  <td role="gridcell">
-                    <code>{app.clientId}</code>
+                  <td role="gridcell" className="px-4 py-3 text-foreground">
+                    {app.name}
                   </td>
-                  <td role="gridcell">{app.rateLimitPerHour.toLocaleString()}</td>
-                  <td role="gridcell">
+                  <td role="gridcell" className="px-4 py-3">
+                    <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
+                      {app.clientId}
+                    </code>
+                  </td>
+                  <td role="gridcell" className="px-4 py-3 text-foreground">
+                    {app.rateLimitPerHour.toLocaleString()}
+                  </td>
+                  <td role="gridcell" className="px-4 py-3">
                     <span
-                      className={`${styles.boolBadge} ${app.active ? styles.boolTrue : styles.boolFalse}`}
+                      className={cn(
+                        'inline-block rounded px-2 py-0.5 text-xs font-medium',
+                        app.active
+                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                          : 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300'
+                      )}
                     >
                       {app.active ? 'Yes' : 'No'}
                     </span>
                   </td>
-                  <td role="gridcell">
+                  <td role="gridcell" className="px-4 py-3 text-foreground">
                     {app.lastUsedAt
                       ? formatDate(new Date(app.lastUsedAt), {
                           year: 'numeric',
@@ -630,18 +694,18 @@ export function ConnectedAppsPage({
                         })
                       : 'Never'}
                   </td>
-                  <td role="gridcell">
+                  <td role="gridcell" className="px-4 py-3 text-foreground">
                     {formatDate(new Date(app.createdAt), {
                       year: 'numeric',
                       month: 'short',
                       day: 'numeric',
                     })}
                   </td>
-                  <td role="gridcell" className={styles.actionsCell}>
-                    <div className={styles.actions}>
+                  <td role="gridcell" className="px-4 py-3 text-right">
+                    <div className="flex justify-end gap-2">
                       <button
                         type="button"
-                        className={styles.actionButton}
+                        className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-primary hover:border-primary hover:bg-muted"
                         onClick={() => handleEdit(app)}
                         aria-label={`Edit ${app.name}`}
                         data-testid={`edit-button-${index}`}
@@ -650,7 +714,7 @@ export function ConnectedAppsPage({
                       </button>
                       <button
                         type="button"
-                        className={`${styles.actionButton} ${styles.deleteButton}`}
+                        className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-destructive hover:border-destructive hover:bg-destructive/10"
                         onClick={() => handleDeleteClick(app)}
                         aria-label={`Delete ${app.name}`}
                         data-testid={`delete-button-${index}`}
@@ -674,7 +738,6 @@ export function ConnectedAppsPage({
           isSubmitting={isSubmitting}
         />
       )}
-
       {createdCredentials && (
         <CredentialsDialog
           clientId={createdCredentials.clientId}

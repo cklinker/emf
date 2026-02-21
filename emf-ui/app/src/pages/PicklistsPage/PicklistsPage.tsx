@@ -4,8 +4,8 @@ import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
 import { PicklistValuesEditor } from '../../components/PicklistValuesEditor'
-
-import styles from './PicklistsPage.module.css'
+import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
 
 interface GlobalPicklist {
   id: string
@@ -123,26 +123,26 @@ function PicklistForm({
 
   return (
     <div
-      className={styles.modalOverlay}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
       onClick={(e) => e.target === e.currentTarget && onCancel()}
       onKeyDown={handleKeyDown}
       data-testid="picklist-form-overlay"
       role="presentation"
     >
       <div
-        className={styles.modal}
+        className="w-full max-w-[600px] max-h-[90vh] overflow-y-auto rounded-lg bg-background shadow-xl"
         role="dialog"
         aria-modal="true"
         aria-labelledby="picklist-form-title"
         data-testid="picklist-form-modal"
       >
-        <div className={styles.modalHeader}>
-          <h2 id="picklist-form-title" className={styles.modalTitle}>
+        <div className="flex items-center justify-between border-b border-border p-6">
+          <h2 id="picklist-form-title" className="text-lg font-semibold text-foreground">
             {title}
           </h2>
           <button
             type="button"
-            className={styles.modalCloseButton}
+            className="rounded p-2 text-2xl leading-none text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             onClick={onCancel}
             aria-label={t('common.close')}
             data-testid="picklist-form-close"
@@ -150,12 +150,12 @@ function PicklistForm({
             &times;
           </button>
         </div>
-        <div className={styles.modalBody}>
-          <form className={styles.form} onSubmit={handleSubmit} noValidate>
-            <div className={styles.formGroup}>
-              <label htmlFor="picklist-name" className={styles.formLabel}>
+        <div className="p-6">
+          <form className="flex flex-col gap-5" onSubmit={handleSubmit} noValidate>
+            <div className="flex flex-col gap-2">
+              <label htmlFor="picklist-name" className="text-sm font-medium text-foreground">
                 {t('picklists.picklistName')}
-                <span className={styles.required} aria-hidden="true">
+                <span className="ml-1 text-destructive" aria-hidden="true">
                   *
                 </span>
               </label>
@@ -163,7 +163,12 @@ function PicklistForm({
                 ref={nameInputRef}
                 id="picklist-name"
                 type="text"
-                className={`${styles.formInput} ${touched.name && errors.name ? styles.hasError : ''}`}
+                className={cn(
+                  'rounded-md border border-border bg-background px-3 py-2.5 text-sm text-foreground transition-colors',
+                  'focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20',
+                  'disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground',
+                  touched.name && errors.name && 'border-destructive'
+                )}
                 value={formData.name}
                 onChange={(e) => handleChange('name', e.target.value)}
                 onBlur={() => handleBlur('name')}
@@ -174,19 +179,24 @@ function PicklistForm({
                 data-testid="picklist-name-input"
               />
               {touched.name && errors.name && (
-                <span className={styles.formError} role="alert">
+                <span className="text-xs text-destructive" role="alert">
                   {errors.name}
                 </span>
               )}
             </div>
 
-            <div className={styles.formGroup}>
-              <label htmlFor="picklist-description" className={styles.formLabel}>
+            <div className="flex flex-col gap-2">
+              <label htmlFor="picklist-description" className="text-sm font-medium text-foreground">
                 {t('picklists.description')}
               </label>
               <textarea
                 id="picklist-description"
-                className={`${styles.formInput} ${styles.formTextarea} ${touched.description && errors.description ? styles.hasError : ''}`}
+                className={cn(
+                  'min-h-[80px] resize-y rounded-md border border-border bg-background px-3 py-2.5 font-[inherit] text-sm text-foreground transition-colors',
+                  'focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20',
+                  'disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground',
+                  touched.description && errors.description && 'border-destructive'
+                )}
                 value={formData.description}
                 onChange={(e) => handleChange('description', e.target.value)}
                 onBlur={() => handleBlur('description')}
@@ -196,58 +206,55 @@ function PicklistForm({
                 data-testid="picklist-description-input"
               />
               {touched.description && errors.description && (
-                <span className={styles.formError} role="alert">
+                <span className="text-xs text-destructive" role="alert">
                   {errors.description}
                 </span>
               )}
             </div>
 
-            <div className={styles.checkboxGroup}>
+            <div className="flex items-center gap-2">
               <input
                 id="picklist-sorted"
                 type="checkbox"
+                className="h-4 w-4 accent-primary"
                 checked={formData.sorted}
                 onChange={(e) => handleChange('sorted', e.target.checked)}
                 disabled={isSubmitting}
                 data-testid="picklist-sorted-input"
               />
-              <label htmlFor="picklist-sorted" className={styles.formLabel}>
+              <label htmlFor="picklist-sorted" className="text-sm font-medium text-foreground">
                 {t('picklists.sorted')}
               </label>
             </div>
 
-            <div className={styles.checkboxGroup}>
+            <div className="flex items-center gap-2">
               <input
                 id="picklist-restricted"
                 type="checkbox"
+                className="h-4 w-4 accent-primary"
                 checked={formData.restricted}
                 onChange={(e) => handleChange('restricted', e.target.checked)}
                 disabled={isSubmitting}
                 data-testid="picklist-restricted-input"
               />
-              <label htmlFor="picklist-restricted" className={styles.formLabel}>
+              <label htmlFor="picklist-restricted" className="text-sm font-medium text-foreground">
                 {t('picklists.restricted')}
               </label>
             </div>
 
-            <div className={styles.formActions}>
-              <button
+            <div className="mt-2 flex justify-end gap-3 border-t border-border pt-4">
+              <Button
                 type="button"
-                className={styles.cancelButton}
+                variant="outline"
                 onClick={onCancel}
                 disabled={isSubmitting}
                 data-testid="picklist-form-cancel"
               >
                 {t('common.cancel')}
-              </button>
-              <button
-                type="submit"
-                className={styles.submitButton}
-                disabled={isSubmitting}
-                data-testid="picklist-form-submit"
-              >
+              </Button>
+              <Button type="submit" disabled={isSubmitting} data-testid="picklist-form-submit">
                 {isSubmitting ? t('common.loading') : t('common.save')}
-              </button>
+              </Button>
             </div>
           </form>
         </div>
@@ -278,8 +285,7 @@ export function PicklistsPage({
     refetch,
   } = useQuery({
     queryKey: ['picklists'],
-    queryFn: () =>
-      apiClient.get<GlobalPicklist[]>('/control/picklists/global'),
+    queryFn: () => apiClient.get<GlobalPicklist[]>('/control/picklists/global'),
   })
 
   const picklistList = picklists ?? []
@@ -377,8 +383,8 @@ export function PicklistsPage({
 
   if (isLoading) {
     return (
-      <div className={styles.container} data-testid={testId}>
-        <div className={styles.loadingContainer}>
+      <div className="mx-auto max-w-[1400px] space-y-6 p-6 lg:p-8" data-testid={testId}>
+        <div className="flex min-h-[400px] items-center justify-center">
           <LoadingSpinner size="large" label={t('common.loading')} />
         </div>
       </div>
@@ -387,7 +393,7 @@ export function PicklistsPage({
 
   if (error) {
     return (
-      <div className={styles.container} data-testid={testId}>
+      <div className="mx-auto max-w-[1400px] space-y-6 p-6 lg:p-8" data-testid={testId}>
         <ErrorMessage
           error={error instanceof Error ? error : new Error(t('errors.generic'))}
           onRetry={() => refetch()}
@@ -399,50 +405,76 @@ export function PicklistsPage({
   const isSubmitting = createMutation.isPending || updateMutation.isPending
 
   return (
-    <div className={styles.container} data-testid={testId}>
-      <header className={styles.header}>
-        <h1 className={styles.title}>{t('picklists.title')}</h1>
-        <button
+    <div className="mx-auto max-w-[1400px] space-y-6 p-6 lg:p-8" data-testid={testId}>
+      <header className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold text-foreground">{t('picklists.title')}</h1>
+        <Button
           type="button"
-          className={styles.createButton}
           onClick={handleCreate}
           aria-label={t('picklists.addPicklist')}
           data-testid="add-picklist-button"
         >
           {t('picklists.addPicklist')}
-        </button>
+        </Button>
       </header>
 
       {picklistList.length === 0 ? (
-        <div className={styles.emptyState} data-testid="empty-state">
+        <div
+          className="rounded-lg border border-border bg-card py-16 text-center text-muted-foreground"
+          data-testid="empty-state"
+        >
           <p>{t('common.noResults')}</p>
         </div>
       ) : (
-        <div className={styles.tableContainer}>
+        <div className="overflow-x-auto rounded-lg border border-border bg-card">
           <table
-            className={styles.table}
+            className="w-full border-collapse"
             role="grid"
             aria-label={t('picklists.title')}
             data-testid="picklists-table"
           >
             <thead>
-              <tr role="row">
-                <th role="columnheader" scope="col">
+              <tr role="row" className="bg-muted">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   {t('picklists.picklistName')}
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   {t('picklists.description')}
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   {t('picklists.sorted')}
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   {t('picklists.restricted')}
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   {t('collections.created')}
                 </th>
-                <th role="columnheader" scope="col">
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   {t('common.actions')}
                 </th>
               </tr>
@@ -452,63 +484,82 @@ export function PicklistsPage({
                 <tr
                   key={pl.id}
                   role="row"
-                  className={styles.tableRow}
+                  className="border-b border-border transition-colors last:border-b-0 hover:bg-muted/50"
                   data-testid={`picklist-row-${index}`}
                 >
-                  <td role="gridcell">{pl.name}</td>
-                  <td role="gridcell" className={styles.descriptionCell}>
+                  <td role="gridcell" className="px-4 py-3 text-sm text-foreground">
+                    {pl.name}
+                  </td>
+                  <td
+                    role="gridcell"
+                    className="max-w-[300px] truncate px-4 py-3 text-sm text-muted-foreground"
+                  >
                     {pl.description || '-'}
                   </td>
-                  <td role="gridcell">
+                  <td role="gridcell" className="px-4 py-3 text-sm text-foreground">
                     <span
-                      className={`${styles.boolBadge} ${pl.sorted ? styles.boolTrue : styles.boolFalse}`}
+                      className={cn(
+                        'inline-block rounded-full px-3 py-1 text-xs font-semibold',
+                        pl.sorted
+                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                          : 'bg-muted text-muted-foreground'
+                      )}
                     >
                       {pl.sorted ? 'Yes' : 'No'}
                     </span>
                   </td>
-                  <td role="gridcell">
+                  <td role="gridcell" className="px-4 py-3 text-sm text-foreground">
                     <span
-                      className={`${styles.boolBadge} ${pl.restricted ? styles.boolTrue : styles.boolFalse}`}
+                      className={cn(
+                        'inline-block rounded-full px-3 py-1 text-xs font-semibold',
+                        pl.restricted
+                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                          : 'bg-muted text-muted-foreground'
+                      )}
                     >
                       {pl.restricted ? 'Yes' : 'No'}
                     </span>
                   </td>
-                  <td role="gridcell">
+                  <td role="gridcell" className="px-4 py-3 text-sm text-foreground">
                     {formatDate(new Date(pl.createdAt), {
                       year: 'numeric',
                       month: 'short',
                       day: 'numeric',
                     })}
                   </td>
-                  <td role="gridcell" className={styles.actionsCell}>
-                    <div className={styles.actions}>
-                      <button
+                  <td role="gridcell" className="px-4 py-3 text-right text-sm">
+                    <div className="flex justify-end gap-2">
+                      <Button
                         type="button"
-                        className={styles.actionButton}
+                        variant="outline"
+                        size="sm"
                         onClick={() => handleManageValues(pl)}
                         aria-label={`${t('picklists.manageValues')} ${pl.name}`}
                         data-testid={`values-button-${index}`}
                       >
                         {t('picklists.manageValues')}
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
-                        className={styles.actionButton}
+                        variant="outline"
+                        size="sm"
                         onClick={() => handleEdit(pl)}
                         aria-label={`${t('common.edit')} ${pl.name}`}
                         data-testid={`edit-button-${index}`}
                       >
                         {t('common.edit')}
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
-                        className={`${styles.actionButton} ${styles.deleteButton}`}
+                        variant="outline"
+                        size="sm"
+                        className="border-destructive/30 text-destructive hover:bg-destructive/10"
                         onClick={() => handleDeleteClick(pl)}
                         aria-label={`${t('common.delete')} ${pl.name}`}
                         data-testid={`delete-button-${index}`}
                       >
                         {t('common.delete')}
-                      </button>
+                      </Button>
                     </div>
                   </td>
                 </tr>

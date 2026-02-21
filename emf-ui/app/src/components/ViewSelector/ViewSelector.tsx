@@ -15,8 +15,8 @@
  */
 
 import { useState, useCallback, useRef, useEffect } from 'react'
+import { cn } from '@/lib/utils'
 import type { SavedView } from '../../hooks/useSavedViews'
-import styles from './ViewSelector.module.css'
 
 export interface ViewSelectorProps {
   views: SavedView[]
@@ -159,11 +159,23 @@ export function ViewSelector({
   const displayLabel = activeView?.name ?? 'All Records'
 
   return (
-    <div className={styles.viewSelector} ref={containerRef} data-testid="view-selector">
+    <div
+      className="relative inline-flex items-center"
+      ref={containerRef}
+      data-testid="view-selector"
+    >
       <button
         ref={buttonRef}
         type="button"
-        className={styles.viewButton}
+        className={cn(
+          'inline-flex items-center gap-1.5 px-3 py-1.5 text-[0.8125rem] font-medium leading-snug',
+          'text-foreground bg-background border border-input rounded',
+          'cursor-pointer whitespace-nowrap',
+          'transition-colors duration-150 motion-reduce:transition-none',
+          'hover:bg-accent hover:border-muted-foreground/50',
+          'focus:outline-2 focus:outline-primary focus:outline-offset-2',
+          'focus:not(:focus-visible):outline-none'
+        )}
         onClick={toggleOpen}
         aria-expanded={open}
         aria-haspopup="listbox"
@@ -171,14 +183,14 @@ export function ViewSelector({
         data-testid="view-selector-trigger"
       >
         <span>{displayLabel}</span>
-        <span className={styles.viewButtonIcon} aria-hidden="true">
+        <span className="text-[0.625rem] leading-none opacity-60" aria-hidden="true">
           {open ? '\u25B2' : '\u25BC'}
         </span>
       </button>
 
       {open && (
         <div
-          className={styles.viewDropdown}
+          className="absolute top-[calc(100%+4px)] left-0 min-w-[240px] max-h-[360px] bg-background border border-input rounded shadow-lg z-[1000] overflow-y-auto flex flex-col max-md:min-w-[200px]"
           role="listbox"
           aria-label="Saved views"
           data-testid="view-selector-dropdown"
@@ -186,23 +198,39 @@ export function ViewSelector({
           {/* All Records option */}
           <button
             type="button"
-            className={`${styles.viewOption} ${activeView === null ? styles.viewOptionActive : ''}`}
+            className={cn(
+              'flex items-center w-full px-4 py-2 bg-transparent border-none cursor-pointer text-left text-[0.8125rem] text-foreground gap-2',
+              'transition-colors duration-100 motion-reduce:transition-none',
+              'hover:bg-accent',
+              'focus:outline-2 focus:outline-primary focus:-outline-offset-2',
+              'focus:not(:focus-visible):outline-none',
+              activeView === null && 'bg-primary/10 font-semibold hover:bg-primary/[0.12]'
+            )}
             role="option"
             aria-selected={activeView === null}
             onClick={handleSelectAllRecords}
             data-testid="view-option-all"
           >
-            <span className={styles.viewOptionName}>All Records</span>
+            <span className="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+              All Records
+            </span>
           </button>
 
-          {views.length > 0 && <hr className={styles.divider} />}
+          {views.length > 0 && <hr className="h-px my-1 bg-border border-none" />}
 
           {/* Saved views list */}
           {views.map((view) => (
             <button
               type="button"
               key={view.id}
-              className={`${styles.viewOption} ${activeView?.id === view.id ? styles.viewOptionActive : ''}`}
+              className={cn(
+                'group flex items-center w-full px-4 py-2 bg-transparent border-none cursor-pointer text-left text-[0.8125rem] text-foreground gap-2',
+                'transition-colors duration-100 motion-reduce:transition-none',
+                'hover:bg-accent',
+                'focus:outline-2 focus:outline-primary focus:-outline-offset-2',
+                'focus:not(:focus-visible):outline-none',
+                activeView?.id === view.id && 'bg-primary/10 font-semibold hover:bg-primary/[0.12]'
+              )}
               role="option"
               aria-selected={activeView?.id === view.id}
               onClick={() => handleSelectView(view.id)}
@@ -210,7 +238,7 @@ export function ViewSelector({
             >
               {view.isDefault && (
                 <span
-                  className={styles.viewOptionDefault}
+                  className="shrink-0 text-xs text-amber-500 leading-none"
                   title="Default view"
                   role="button"
                   tabIndex={0}
@@ -228,7 +256,7 @@ export function ViewSelector({
               )}
               {!view.isDefault && (
                 <span
-                  className={styles.viewOptionDefault}
+                  className="shrink-0 text-xs text-amber-500 leading-none opacity-30"
                   title="Set as default"
                   role="button"
                   tabIndex={0}
@@ -239,16 +267,25 @@ export function ViewSelector({
                       onSetDefault(view.id)
                     }
                   }}
-                  style={{ opacity: 0.3 }}
                   aria-label={`Set ${view.name} as default view`}
                 >
                   &#9734;
                 </span>
               )}
-              <span className={styles.viewOptionName}>{view.name}</span>
+              <span className="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+                {view.name}
+              </span>
               <button
                 type="button"
-                className={styles.viewDeleteButton}
+                className={cn(
+                  'shrink-0 inline-flex items-center justify-center w-5 h-5 p-0 bg-transparent border-none rounded cursor-pointer',
+                  'text-xs leading-none text-muted-foreground opacity-0',
+                  'transition-all duration-100 motion-reduce:transition-none',
+                  'group-hover:opacity-100',
+                  'hover:text-destructive hover:bg-destructive/10',
+                  'focus:opacity-100 focus:outline-2 focus:outline-primary focus:-outline-offset-2',
+                  'focus:not(:focus-visible):outline-none'
+                )}
                 onClick={(e) => handleDeleteView(e, view.id)}
                 aria-label={`Delete view ${view.name}`}
                 title={`Delete ${view.name}`}
@@ -259,13 +296,19 @@ export function ViewSelector({
             </button>
           ))}
 
-          <hr className={styles.divider} />
+          <hr className="h-px my-1 bg-border border-none" />
 
           {/* Save current view */}
           {!saving && (
             <button
               type="button"
-              className={styles.saveViewButton}
+              className={cn(
+                'flex items-center w-full px-4 py-2 bg-transparent border-none cursor-pointer text-left text-[0.8125rem] font-medium text-primary gap-1.5',
+                'transition-colors duration-100 motion-reduce:transition-none',
+                'hover:bg-accent',
+                'focus:outline-2 focus:outline-primary focus:-outline-offset-2',
+                'focus:not(:focus-visible):outline-none'
+              )}
               onClick={handleStartSave}
               data-testid="view-save-button"
             >
@@ -275,11 +318,14 @@ export function ViewSelector({
           )}
 
           {saving && (
-            <div className={styles.saveViewRow}>
+            <div className="flex items-center px-4 py-2 gap-2">
               <input
                 ref={saveInputRef}
                 type="text"
-                className={styles.saveViewInput}
+                className={cn(
+                  'flex-1 min-w-0 px-2 py-1 text-[0.8125rem] text-foreground bg-background border border-input rounded',
+                  'focus:outline-none focus:border-primary focus:ring-2 focus:ring-ring'
+                )}
                 value={saveName}
                 onChange={(e) => setSaveName(e.target.value)}
                 onKeyDown={handleSaveKeyDown}
@@ -289,7 +335,15 @@ export function ViewSelector({
               />
               <button
                 type="button"
-                className={styles.saveViewConfirm}
+                className={cn(
+                  'shrink-0 inline-flex items-center justify-center px-2 py-1 text-xs font-medium',
+                  'text-primary-foreground bg-primary border-none rounded cursor-pointer',
+                  'transition-colors duration-150 motion-reduce:transition-none',
+                  'hover:bg-primary/90',
+                  'focus:outline-2 focus:outline-primary focus:outline-offset-2',
+                  'focus:not(:focus-visible):outline-none',
+                  'disabled:opacity-50 disabled:cursor-not-allowed'
+                )}
                 onClick={handleConfirmSave}
                 disabled={!saveName.trim()}
                 aria-label="Confirm save view"

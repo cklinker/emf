@@ -7,18 +7,11 @@
  * Requirements:
  * - 18.4: Display loading indicators during async operations
  * - 14.7: Support reduced motion preferences from the operating system
- *
- * Features:
- * - Full-page loading state with centered spinner
- * - Skeleton loading states for content areas
- * - Multiple skeleton variants (text, card, table, form)
- * - Respects prefers-reduced-motion preference
- * - Accessible with proper ARIA attributes
  */
 
 import React from 'react'
 import { LoadingSpinner } from '../LoadingSpinner'
-import styles from './PageLoader.module.css'
+import { cn } from '@/lib/utils'
 
 /**
  * Skeleton variant types
@@ -79,19 +72,13 @@ export interface ContentLoaderProps {
   'data-testid'?: string
 }
 
+const shimmerClasses =
+  'bg-muted bg-[linear-gradient(90deg,hsl(var(--muted))_0%,hsl(var(--accent))_50%,hsl(var(--muted))_100%)] bg-[length:200%_100%] animate-[shimmer_1.5s_ease-in-out_infinite] motion-reduce:animate-none motion-reduce:bg-none rounded'
+
 /**
  * PageLoader Component
  *
  * Displays a full-page or inline loading state with a spinner.
- *
- * @example
- * ```tsx
- * // Full page loader
- * <PageLoader fullPage message="Loading dashboard..." />
- *
- * // Inline loader
- * <PageLoader message="Loading data..." />
- * ```
  */
 export function PageLoader({
   message = 'Loading...',
@@ -100,23 +87,21 @@ export function PageLoader({
   className,
   'data-testid': testId = 'page-loader',
 }: PageLoaderProps): React.ReactElement {
-  const containerClasses = [
-    styles.pageLoader,
-    fullPage ? styles.fullPage : styles.inline,
-    className,
-  ]
-    .filter(Boolean)
-    .join(' ')
-
   return (
     <div
-      className={containerClasses}
+      className={cn(
+        'flex items-center justify-center',
+        fullPage && 'fixed inset-0 z-[1000] bg-background/95 dark:bg-background/95',
+        !fullPage && 'min-h-[200px] w-full',
+        'print:hidden',
+        className
+      )}
       role="status"
       aria-live="polite"
       aria-busy="true"
       data-testid={testId}
     >
-      <div className={styles.loaderContent}>
+      <div className="flex flex-col items-center justify-center gap-4">
         <LoadingSpinner size={size} label={message} data-testid={`${testId}-spinner`} />
       </div>
     </div>
@@ -127,18 +112,6 @@ export function PageLoader({
  * Skeleton Component
  *
  * Displays a skeleton placeholder for content that is loading.
- *
- * @example
- * ```tsx
- * // Text skeleton
- * <Skeleton variant="text" />
- *
- * // Card skeleton
- * <Skeleton variant="card" />
- *
- * // Table skeleton with multiple rows
- * <Skeleton variant="table" count={5} />
- * ```
  */
 export function Skeleton({
   variant = 'text',
@@ -161,7 +134,7 @@ export function Skeleton({
         return (
           <div
             key={index}
-            className={`${styles.skeleton} ${styles.skeletonText}`}
+            className={cn(shimmerClasses, 'h-4 w-full mb-2 last:w-[70%]')}
             style={style}
             data-testid={itemTestId}
             aria-hidden="true"
@@ -172,16 +145,16 @@ export function Skeleton({
         return (
           <div
             key={index}
-            className={`${styles.skeleton} ${styles.skeletonCard}`}
+            className={cn(shimmerClasses, 'p-4 rounded-lg mb-4 min-h-[150px]')}
             style={style}
             data-testid={itemTestId}
             aria-hidden="true"
           >
-            <div className={styles.skeletonCardHeader} />
-            <div className={styles.skeletonCardBody}>
-              <div className={styles.skeletonLine} style={{ width: '80%' }} />
-              <div className={styles.skeletonLine} style={{ width: '60%' }} />
-              <div className={styles.skeletonLine} style={{ width: '70%' }} />
+            <div className={cn(shimmerClasses, 'h-5 w-[60%] mb-4')} />
+            <div className="flex flex-col gap-2">
+              <div className={cn(shimmerClasses, 'h-3.5 w-[80%]')} />
+              <div className={cn(shimmerClasses, 'h-3.5 w-[60%]')} />
+              <div className={cn(shimmerClasses, 'h-3.5 w-[70%]')} />
             </div>
           </div>
         )
@@ -190,15 +163,18 @@ export function Skeleton({
         return (
           <div
             key={index}
-            className={`${styles.skeleton} ${styles.skeletonTableRow}`}
+            className={cn(
+              shimmerClasses,
+              'flex gap-4 py-3 border-b border-border last:border-b-0 bg-transparent bg-none animate-none'
+            )}
             style={style}
             data-testid={itemTestId}
             aria-hidden="true"
           >
-            <div className={styles.skeletonCell} style={{ width: '20%' }} />
-            <div className={styles.skeletonCell} style={{ width: '30%' }} />
-            <div className={styles.skeletonCell} style={{ width: '25%' }} />
-            <div className={styles.skeletonCell} style={{ width: '15%' }} />
+            <div className={cn(shimmerClasses, 'h-4')} style={{ width: '20%' }} />
+            <div className={cn(shimmerClasses, 'h-4')} style={{ width: '30%' }} />
+            <div className={cn(shimmerClasses, 'h-4')} style={{ width: '25%' }} />
+            <div className={cn(shimmerClasses, 'h-4')} style={{ width: '15%' }} />
           </div>
         )
 
@@ -206,15 +182,13 @@ export function Skeleton({
         return (
           <div
             key={index}
-            className={`${styles.skeleton} ${styles.skeletonForm}`}
+            className="mb-6"
             style={style}
             data-testid={itemTestId}
             aria-hidden="true"
           >
-            <div className={styles.skeletonFormField}>
-              <div className={styles.skeletonLabel} />
-              <div className={styles.skeletonInput} />
-            </div>
+            <div className={cn(shimmerClasses, 'h-3.5 w-[30%] mb-2')} />
+            <div className={cn(shimmerClasses, 'h-10 w-full')} />
           </div>
         )
 
@@ -222,13 +196,13 @@ export function Skeleton({
         return (
           <div
             key={index}
-            className={`${styles.skeleton} ${styles.skeletonHeader}`}
+            className="mb-6"
             style={style}
             data-testid={itemTestId}
             aria-hidden="true"
           >
-            <div className={styles.skeletonTitle} />
-            <div className={styles.skeletonSubtitle} />
+            <div className={cn(shimmerClasses, 'h-8 w-1/2 mb-3')} />
+            <div className={cn(shimmerClasses, 'h-4 w-[35%]')} />
           </div>
         )
 
@@ -236,15 +210,15 @@ export function Skeleton({
         return (
           <div
             key={index}
-            className={`${styles.skeleton} ${styles.skeletonListItem}`}
+            className="flex items-center gap-4 py-3 border-b border-border last:border-b-0"
             style={style}
             data-testid={itemTestId}
             aria-hidden="true"
           >
-            <div className={styles.skeletonAvatar} />
-            <div className={styles.skeletonListContent}>
-              <div className={styles.skeletonLine} style={{ width: '70%' }} />
-              <div className={styles.skeletonLine} style={{ width: '50%' }} />
+            <div className={cn(shimmerClasses, 'size-10 rounded-full shrink-0')} />
+            <div className="flex-1 flex flex-col gap-2">
+              <div className={cn(shimmerClasses, 'h-3.5 w-[70%]')} />
+              <div className={cn(shimmerClasses, 'h-3.5 w-1/2')} />
             </div>
           </div>
         )
@@ -253,7 +227,7 @@ export function Skeleton({
         return (
           <div
             key={index}
-            className={`${styles.skeleton} ${styles.skeletonText}`}
+            className={cn(shimmerClasses, 'h-4 w-full mb-2 last:w-[70%]')}
             style={style}
             data-testid={itemTestId}
             aria-hidden="true"
@@ -262,16 +236,14 @@ export function Skeleton({
     }
   }
 
-  const containerClasses = [styles.skeletonContainer, className].filter(Boolean).join(' ')
-
   return (
     <div
-      className={containerClasses}
+      className={cn('w-full print:hidden', className)}
       role="status"
       aria-label="Loading content"
       data-testid={`${testId}-container`}
     >
-      <span className={styles.srOnly}>Loading...</span>
+      <span className="sr-only">Loading...</span>
       {Array.from({ length: count }, (_, index) => renderSkeletonItem(index))}
     </div>
   )
@@ -282,13 +254,6 @@ export function Skeleton({
  *
  * Wrapper component that shows skeleton loading state while content is loading,
  * then displays the actual content when ready.
- *
- * @example
- * ```tsx
- * <ContentLoader isLoading={isLoading} skeleton="card" skeletonCount={3}>
- *   <CardList items={items} />
- * </ContentLoader>
- * ```
  */
 export function ContentLoader({
   isLoading,
@@ -302,7 +267,7 @@ export function ContentLoader({
   if (isLoading) {
     return (
       <div className={className} data-testid={testId} aria-busy="true">
-        <span className={styles.srOnly}>{loadingMessage}</span>
+        <span className="sr-only">{loadingMessage}</span>
         <Skeleton variant={skeleton} count={skeletonCount} data-testid={`${testId}-skeleton`} />
       </div>
     )

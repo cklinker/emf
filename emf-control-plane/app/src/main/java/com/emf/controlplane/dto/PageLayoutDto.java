@@ -175,7 +175,9 @@ public class PageLayoutDto {
     public static class RelatedListDto {
         private String id;
         private String relatedCollectionId;
+        private String relatedCollectionName;
         private String relationshipFieldId;
+        private String relationshipFieldName;
         private String displayColumns;
         private String sortField;
         private String sortDirection;
@@ -186,7 +188,9 @@ public class PageLayoutDto {
             RelatedListDto dto = new RelatedListDto();
             dto.setId(entity.getId());
             dto.setRelatedCollectionId(entity.getRelatedCollection().getId());
+            dto.setRelatedCollectionName(entity.getRelatedCollection().getName());
             dto.setRelationshipFieldId(entity.getRelationshipField().getId());
+            dto.setRelationshipFieldName(entity.getRelationshipField().getName());
             dto.setDisplayColumns(entity.getDisplayColumns());
             dto.setSortField(entity.getSortField());
             dto.setSortDirection(entity.getSortDirection());
@@ -199,8 +203,12 @@ public class PageLayoutDto {
         public void setId(String id) { this.id = id; }
         public String getRelatedCollectionId() { return relatedCollectionId; }
         public void setRelatedCollectionId(String relatedCollectionId) { this.relatedCollectionId = relatedCollectionId; }
+        public String getRelatedCollectionName() { return relatedCollectionName; }
+        public void setRelatedCollectionName(String relatedCollectionName) { this.relatedCollectionName = relatedCollectionName; }
         public String getRelationshipFieldId() { return relationshipFieldId; }
         public void setRelationshipFieldId(String relationshipFieldId) { this.relationshipFieldId = relationshipFieldId; }
+        public String getRelationshipFieldName() { return relationshipFieldName; }
+        public void setRelationshipFieldName(String relationshipFieldName) { this.relationshipFieldName = relationshipFieldName; }
         public String getDisplayColumns() { return displayColumns; }
         public void setDisplayColumns(String displayColumns) { this.displayColumns = displayColumns; }
         public String getSortField() { return sortField; }

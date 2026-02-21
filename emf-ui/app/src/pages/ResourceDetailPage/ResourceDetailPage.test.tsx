@@ -195,6 +195,19 @@ vi.mock('../../components/AttachmentsSection/AttachmentsSection', () => ({
   AttachmentsSection: () => <div data-testid="attachments-section">Attachments</div>,
 }))
 
+// Mock usePageLayout to return no layout (fallback to flat grid)
+vi.mock('../../hooks/usePageLayout', () => ({
+  usePageLayout: () => ({ layout: null, isLoading: false, error: null }),
+}))
+
+vi.mock('../../components/LayoutFieldSections/LayoutFieldSections', () => ({
+  LayoutFieldSections: () => <div data-testid="layout-field-sections">Layout Fields</div>,
+}))
+
+vi.mock('../../components/LayoutRelatedLists/LayoutRelatedLists', () => ({
+  LayoutRelatedLists: () => <div data-testid="layout-related-lists">Layout Related</div>,
+}))
+
 // Sample test data
 const mockSchema: CollectionSchema = {
   id: 'col-1',

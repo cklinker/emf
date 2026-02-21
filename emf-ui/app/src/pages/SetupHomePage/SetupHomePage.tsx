@@ -208,6 +208,11 @@ const CATEGORIES: SetupCategory[] = [
     icon: <Palette size={20} />,
     items: [
       {
+        name: 'Layouts',
+        path: '/layouts',
+        description: 'Configure record page layouts',
+      },
+      {
         name: 'Pages',
         path: '/pages',
         description: 'Build custom UI pages',

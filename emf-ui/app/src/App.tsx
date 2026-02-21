@@ -12,7 +12,7 @@
  */
 
 import React from 'react'
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation, Link } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AlertTriangle } from 'lucide-react'
 
@@ -39,6 +39,12 @@ import { ProtectedRoute } from './components/ProtectedRoute'
 import { Header } from './components/Header'
 import { PageTransition } from './components/PageTransition'
 import { PageLoader } from './components/PageLoader'
+import {
+  Breadcrumb,
+  BreadcrumbList,
+  BreadcrumbItem,
+  BreadcrumbLink,
+} from './components/ui/breadcrumb'
 
 // Pages
 import {
@@ -258,6 +264,10 @@ function AdminLayout({ children }: { children: React.ReactNode }): React.ReactEl
   const { user, logout } = useAuth()
   const { config, isLoading: configLoading, error, reload } = useConfig()
   const { helpOpen, setHelpOpen } = useGlobalShortcuts()
+  const location = useLocation()
+  const { tenantSlug } = useTenant()
+
+  const isSetupPage = location.pathname.endsWith('/setup')
 
   if (configLoading) {
     return <PageLoader fullPage message="Loading application..." />
@@ -297,6 +307,26 @@ function AdminLayout({ children }: { children: React.ReactNode }): React.ReactEl
       >
         <Header branding={branding} user={user} onLogout={logout} />
       </div>
+      {!isSetupPage && (
+        <div
+          style={{
+            padding: '8px 24px',
+            borderBottom: '1px solid var(--color-border, #e0e0e0)',
+            backgroundColor: 'var(--color-surface, #ffffff)',
+            flexShrink: 0,
+          }}
+        >
+          <Breadcrumb>
+            <BreadcrumbList>
+              <BreadcrumbItem>
+                <BreadcrumbLink asChild>
+                  <Link to={`/${tenantSlug}/setup`}>← Setup</Link>
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
+        </div>
+      )}
       <main
         style={{
           flex: 1,

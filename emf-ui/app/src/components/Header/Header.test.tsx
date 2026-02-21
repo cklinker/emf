@@ -16,6 +16,17 @@ import { Header, type HeaderProps } from './Header'
 import type { BrandingConfig } from '../../types/config'
 import type { User } from '../../types/auth'
 
+// Mock react-router-dom
+const mockNavigate = vi.fn()
+vi.mock('react-router-dom', () => ({
+  useNavigate: () => mockNavigate,
+}))
+
+// Mock TenantContext
+vi.mock('../../context/TenantContext', () => ({
+  getTenantSlug: () => 'default',
+}))
+
 // Mock the AppShell context
 vi.mock('../AppShell', () => ({
   useAppShell: vi.fn(() => ({

@@ -585,18 +585,19 @@ export function AuthProvider({
 
       const slug = getTenantSlug()
       const tenantBase = `/${slug}`
-      let redirectPath = sessionStorage.getItem(STORAGE_KEYS.REDIRECT_PATH) || tenantBase
+      let redirectPath = sessionStorage.getItem(STORAGE_KEYS.REDIRECT_PATH) || `${tenantBase}/app`
       sessionStorage.removeItem(STORAGE_KEYS.REDIRECT_PATH)
 
-      // Redirect to tenant home if path points to login/callback pages
+      // Redirect to app home if path points to login/callback/root pages
       if (
         redirectPath === '/login' ||
         redirectPath === '/auth/callback' ||
         redirectPath === `${tenantBase}/login` ||
         redirectPath === `${tenantBase}/auth/callback` ||
-        redirectPath === '/'
+        redirectPath === '/' ||
+        redirectPath === tenantBase
       ) {
-        redirectPath = tenantBase
+        redirectPath = `${tenantBase}/app`
       }
 
       console.log('[Auth] Callback complete, redirecting to:', redirectPath)

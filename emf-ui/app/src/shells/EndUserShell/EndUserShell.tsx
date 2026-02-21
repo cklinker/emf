@@ -92,6 +92,7 @@ export function EndUserShell(): React.ReactElement {
         tabs={tabs}
         userName={userName}
         userEmail={userEmail}
+        userRoles={user?.roles}
         onLogout={handleLogout}
         onSearchOpen={() => setSearchOpen(true)}
         notificationCount={0}

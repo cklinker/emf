@@ -54,6 +54,43 @@
 }
 
 /* ==========================================================================
+   Back to App Button
+   ========================================================================== */
+
+.backToApp {
+  display: flex;
+  align-items: center;
+  gap: var(--app-shell-spacing-xs, 4px);
+  padding: var(--app-shell-spacing-xs, 4px) var(--app-shell-spacing-sm, 8px);
+  background: transparent;
+  border: 1px solid var(--app-shell-border, var(--color-border, #e0e0e0));
+  border-radius: var(--border-radius, 4px);
+  cursor: pointer;
+  color: var(--color-text-secondary, #666666);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  white-space: nowrap;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease;
+}
+
+.backToApp:hover {
+  background-color: var(--color-surface-hover, rgba(0, 0, 0, 0.05));
+  border-color: var(--color-text-secondary, #999999);
+  color: var(--app-shell-text, var(--color-text, #1a1a1a));
+}
+
+.backToApp:focus {
+  outline: 2px solid var(--color-focus, #0066cc);
+  outline-offset: 2px;
+}
+
+.backToApp:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ==========================================================================
    Search Trigger
    ========================================================================== */
 

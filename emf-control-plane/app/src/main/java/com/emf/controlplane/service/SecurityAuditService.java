@@ -138,6 +138,13 @@ public class SecurityAuditService {
         log("PERMSET_ASSIGNED", "CONFIG", targetType, targetId, targetName, details);
     }
 
+    public void logLoginSuccess(String userId, String email, String provider, String loginType) {
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("provider", provider);
+        details.put("loginType", loginType);
+        log("LOGIN_SUCCESS", "AUTH", "USER", userId, email, details);
+    }
+
     public void logUserProvisioned(String userId, String email, String provider) {
         Map<String, Object> details = new LinkedHashMap<>();
         details.put("provider", provider);

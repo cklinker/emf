@@ -110,7 +110,7 @@ public class LoginTrackingFilter extends OncePerRequestFilter {
 
         // Audit log the login
         if (auditService != null) {
-            auditService.logUserProvisioned(user.getId(), email, "OIDC");
+            auditService.logLoginSuccess(user.getId(), email, "OIDC", "OAUTH");
         }
 
         lastTrackedAt.put(cacheKey, now);

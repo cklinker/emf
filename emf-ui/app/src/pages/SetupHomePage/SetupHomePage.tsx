@@ -24,6 +24,7 @@ import {
 } from 'lucide-react'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
+import { useTenant } from '../../context/TenantContext'
 import { cn } from '@/lib/utils'
 
 export interface SetupHomePageProps {
@@ -282,6 +283,7 @@ function extractCount(data: unknown): number {
 export function SetupHomePage({ testId = 'setup-home-page' }: SetupHomePageProps): JSX.Element {
   const { t } = useI18n()
   const { apiClient } = useApi()
+  const { tenantSlug } = useTenant()
   const [searchQuery, setSearchQuery] = useState('')
 
   // Fetch stats
@@ -446,7 +448,7 @@ export function SetupHomePage({ testId = 'setup-home-page' }: SetupHomePageProps
                 {category.items.map((item) => (
                   <li key={item.path} className="border-b border-border last:border-b-0">
                     <Link
-                      to={item.path}
+                      to={`/${tenantSlug}${item.path}`}
                       className={cn(
                         'flex items-center justify-between px-5 py-3 text-inherit no-underline',
                         'transition-colors duration-150',

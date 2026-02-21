@@ -225,6 +225,11 @@ vi.mock('./components/Sidebar', () => ({
   Sidebar: () => <nav data-testid="sidebar">Sidebar</nav>,
 }))
 
+// Mock the EndUserShell
+vi.mock('./shells/EndUserShell', () => ({
+  EndUserShell: () => <div data-testid="end-user-shell">End User Shell</div>,
+}))
+
 // Mock the ErrorBoundary component
 vi.mock('./components/ErrorBoundary', () => ({
   ErrorBoundary: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -411,12 +416,13 @@ describe('App', () => {
       }
     })
 
-    it('should render home page at /:tenantSlug when authenticated', async () => {
+    it('should redirect to /app at /:tenantSlug when authenticated', async () => {
       window.history.pushState({}, '', '/test-tenant')
       render(<App />)
 
       await waitFor(() => {
-        expect(screen.getByTestId('home-page')).toBeInTheDocument()
+        // Root route redirects to /app which renders the EndUserShell
+        expect(screen.getByTestId('end-user-shell')).toBeInTheDocument()
       })
     })
 
@@ -631,12 +637,13 @@ describe('App Integration', () => {
     }
   })
 
-  it('should render app shell with header and sidebar for protected routes', async () => {
+  it('should render end-user shell when navigating to root', async () => {
     window.history.pushState({}, '', '/test-tenant')
     render(<App />)
 
     await waitFor(() => {
-      expect(screen.getByTestId('app-shell')).toBeInTheDocument()
+      // Root redirects to /app which renders EndUserShell
+      expect(screen.getByTestId('end-user-shell')).toBeInTheDocument()
     })
   })
 })

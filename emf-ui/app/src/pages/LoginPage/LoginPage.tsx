@@ -58,7 +58,7 @@ export function LoginPage({ title }: LoginPageProps): React.ReactElement {
 
   // Get the redirect path from location state
   const from =
-    (location.state as { from?: { pathname: string } })?.from?.pathname || `/${getTenantSlug()}`
+    (location.state as { from?: { pathname: string } })?.from?.pathname || `/${getTenantSlug()}/app`
 
   // Redirect if already authenticated
   useEffect(() => {

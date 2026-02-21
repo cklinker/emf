@@ -11,7 +11,7 @@
  * - 2.1: Redirect unauthenticated users to OIDC provider login page
  */
 
-import React, { useCallback } from 'react'
+import React from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AlertTriangle } from 'lucide-react'
@@ -36,15 +36,12 @@ import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp/Keyboa
 import { ToastProvider } from './components/Toast'
 import { LiveRegionProvider } from './components/LiveRegion'
 import { ProtectedRoute } from './components/ProtectedRoute'
-import { AppShell, useAppShell } from './components/AppShell'
 import { Header } from './components/Header'
-import { Sidebar } from './components/Sidebar'
 import { PageTransition } from './components/PageTransition'
 import { PageLoader } from './components/PageLoader'
 
 // Pages
 import {
-  HomePage,
   DashboardPage,
   CollectionsPage,
   CollectionDetailPage,
@@ -116,7 +113,6 @@ const EndUserCustomPage = React.lazy(() =>
 
 // Types
 import type { Plugin } from './types/plugin'
-import type { MenuConfig } from './types/config'
 
 // Create a QueryClient instance for TanStack Query
 const queryClient = new QueryClient({
@@ -255,72 +251,74 @@ function BootstrapError({
 }
 
 /**
- * Main application layout with AppShell, Header, and Sidebar
- * Wraps content with PageTransition for smooth page changes
+ * Admin layout without sidebar — the Setup page acts as the navigation hub.
+ * Uses a simple flex layout instead of AppShell to avoid the sidebar aside element.
  */
-function AppLayout({ children }: { children: React.ReactNode }): React.ReactElement {
+function AdminLayout({ children }: { children: React.ReactNode }): React.ReactElement {
   const { user, logout } = useAuth()
   const { config, isLoading: configLoading, error, reload } = useConfig()
   const { helpOpen, setHelpOpen } = useGlobalShortcuts()
 
-  // Show loading state while config is loading
   if (configLoading) {
     return <PageLoader fullPage message="Loading application..." />
   }
 
-  // Show error state if bootstrap failed
   if (error) {
     return <BootstrapError error={error} onRetry={reload} />
   }
 
-  // Extract branding and menus from config
   const branding = config?.branding ?? {
     logoUrl: '',
     applicationName: 'EMF Admin',
     faviconUrl: '',
   }
 
-  const menus = config?.menus ?? []
-
   return (
-    <AppShell
-      header={<Header branding={branding} user={user} onLogout={logout} />}
-      sidebar={<SidebarWithContext menus={menus} />}
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100vh',
+        overflow: 'hidden',
+      }}
     >
-      <PageTransition type="fade" duration={200}>
-        {children}
-      </PageTransition>
+      <div
+        style={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 100,
+          height: '60px',
+          flexShrink: 0,
+          backgroundColor: 'var(--color-surface, #ffffff)',
+          borderBottom: '1px solid var(--color-border, #e0e0e0)',
+          display: 'flex',
+          alignItems: 'center',
+        }}
+      >
+        <Header branding={branding} user={user} onLogout={logout} />
+      </div>
+      <main
+        style={{
+          flex: 1,
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          padding: '24px',
+          backgroundColor: 'var(--color-background, #ffffff)',
+        }}
+      >
+        <PageTransition type="fade" duration={200}>
+          {children}
+        </PageTransition>
+      </main>
       <KeyboardShortcutsHelp isOpen={helpOpen} onClose={() => setHelpOpen(false)} />
-    </AppShell>
+    </div>
   )
 }
 
 /**
- * Sidebar wrapper that uses AppShell context
+ * Protected route wrapper for admin pages (no sidebar)
  */
-function SidebarWithContext({ menus }: { menus: MenuConfig[] }): React.ReactElement {
-  const { sidebarCollapsed, toggleSidebar, closeMobileSidebar, screenSize } = useAppShell()
-
-  const handleItemClick = useCallback(() => {
-    if (screenSize === 'mobile') {
-      closeMobileSidebar()
-    }
-  }, [screenSize, closeMobileSidebar])
-
-  return (
-    <Sidebar
-      menus={menus}
-      collapsed={sidebarCollapsed}
-      onToggle={toggleSidebar}
-      onItemClick={handleItemClick}
-    />
-  )
-}
-
-/**
- * Protected route wrapper that includes the AppLayout
- */
-function ProtectedPageRoute({
+function AdminPageRoute({
   children,
   requiredRoles,
   requiredPolicies,
@@ -338,7 +336,7 @@ function ProtectedPageRoute({
       loginPath={`${tenantBasePath}/login`}
       unauthorizedPath={`${tenantBasePath}/unauthorized`}
     >
-      <AppLayout>{children}</AppLayout>
+      <AdminLayout>{children}</AdminLayout>
     </ProtectedRoute>
   )
 }
@@ -402,13 +400,16 @@ function TenantRoutes(): React.ReactElement {
       {/* OAuth callback route */}
       <Route path="auth/callback" element={<AuthCallbackPage />} />
 
-      {/* Home Page - default landing page */}
+      {/* Root redirects to end-user app */}
       <Route
         path=""
         element={
-          <ProtectedPageRoute>
-            <HomePage />
-          </ProtectedPageRoute>
+          <ProtectedRoute
+            loginPath={`/${tenantSlug}/login`}
+            unauthorizedPath={`/${tenantSlug}/unauthorized`}
+          >
+            <Navigate to="app" replace />
+          </ProtectedRoute>
         }
       />
 
@@ -416,9 +417,9 @@ function TenantRoutes(): React.ReactElement {
       <Route
         path="system-health"
         element={
-          <ProtectedPageRoute>
+          <AdminPageRoute>
             <DashboardPage />
-          </ProtectedPageRoute>
+          </AdminPageRoute>
         }
       />
 
@@ -426,33 +427,33 @@ function TenantRoutes(): React.ReactElement {
       <Route
         path="collections"
         element={
-          <ProtectedPageRoute>
+          <AdminPageRoute>
             <CollectionsPage />
-          </ProtectedPageRoute>
+          </AdminPageRoute>
         }
       />
       <Route
         path="collections/new"
         element={
-          <ProtectedPageRoute>
+          <AdminPageRoute>
             <CollectionWizardPage />
-          </ProtectedPageRoute>
+          </AdminPageRoute>
         }
       />
       <Route
         path="collections/:id"
         element={
-          <ProtectedPageRoute>
+          <AdminPageRoute>
             <CollectionDetailPage />
-          </ProtectedPageRoute>
+          </AdminPageRoute>
         }
       />
       <Route
         path="collections/:id/edit"
         element={
-          <ProtectedPageRoute>
+          <AdminPageRoute>
             <CollectionFormPage />
-          </ProtectedPageRoute>
+          </AdminPageRoute>
         }
       />
 
@@ -460,9 +461,9 @@ function TenantRoutes(): React.ReactElement {
       <Route
         path="oidc-providers"
         element={
-          <ProtectedPageRoute>
+          <AdminPageRoute>
             <OIDCProvidersPage />
-          </ProtectedPageRoute>
+          </AdminPageRoute>
         }
       />
 
@@ -470,9 +471,9 @@ function TenantRoutes(): React.ReactElement {
       <Route
         path="workers"
         element={
-          <ProtectedPageRoute>
+          <AdminPageRoute>
             <WorkersPage />
-          </ProtectedPageRoute>
+          </AdminPageRoute>
         }
       />
 
@@ -480,17 +481,17 @@ function TenantRoutes(): React.ReactElement {
       <Route
         path="pages"
         element={
-          <ProtectedPageRoute>
+          <AdminPageRoute>
             <PageBuilderPage />
-          </ProtectedPageRoute>
+          </AdminPageRoute>
         }
       />
       <Route
         path="menus"
         element={
-          <ProtectedPageRoute>
+          <AdminPageRoute>
             <MenuBuilderPage />
-          </ProtectedPageRoute>
+          </AdminPageRoute>
         }
       />
 
@@ -498,9 +499,9 @@ function TenantRoutes(): React.ReactElement {
       <Route
         path="packages"
         element={
-          <ProtectedPageRoute>
+          <AdminPageRoute>
             <PackagesPage />
-          </ProtectedPageRoute>
+          </AdminPageRoute>
         }
       />
 
@@ -508,9 +509,9 @@ function TenantRoutes(): React.ReactElement {
       <Route
         path="migrations"
         element={
-          <ProtectedPageRoute>
+          <AdminPageRoute>
             <MigrationsPage />
-          </ProtectedPageRoute>
+          </AdminPageRoute>
         }
       />
 
@@ -518,41 +519,41 @@ function TenantRoutes(): React.ReactElement {
       <Route
         path="resources"
         element={
-          <ProtectedPageRoute>
+          <AdminPageRoute>
             <ResourceBrowserPage />
-          </ProtectedPageRoute>
+          </AdminPageRoute>
         }
       />
       <Route
         path="resources/:collection"
         element={
-          <ProtectedPageRoute>
+          <AdminPageRoute>
             <ResourceListPage />
-          </ProtectedPageRoute>
+          </AdminPageRoute>
         }
       />
       <Route
         path="resources/:collection/new"
         element={
-          <ProtectedPageRoute>
+          <AdminPageRoute>
             <ResourceFormPage />
-          </ProtectedPageRoute>
+          </AdminPageRoute>
         }
       />
       <Route
         path="resources/:collection/:id"
         element={
-          <ProtectedPageRoute>
+          <AdminPageRoute>
             <ResourceDetailPage />
-          </ProtectedPageRoute>
+          </AdminPageRoute>
         }
       />
       <Route
         path="resources/:collection/:id/edit"
         element={
-          <ProtectedPageRoute>
+          <AdminPageRoute>
             <ResourceFormPage />
-          </ProtectedPageRoute>
+          </AdminPageRoute>
         }
       />
 
@@ -560,9 +561,9 @@ function TenantRoutes(): React.ReactElement {
       <Route
         path="picklists"
         element={
-          <ProtectedPageRoute>
+          <AdminPageRoute>
             <PicklistsPage />
-          </ProtectedPageRoute>
+          </AdminPageRoute>
         }
       />
 
@@ -570,9 +571,9 @@ function TenantRoutes(): React.ReactElement {
       <Route
         path="layouts"
         element={
-          <ProtectedPageRoute>
+          <AdminPageRoute>
             <PageLayoutsPage />
-          </ProtectedPageRoute>
+          </AdminPageRoute>
         }
       />
 
@@ -580,9 +581,9 @@ function TenantRoutes(): React.ReactElement {
       <Route
         path="listviews"
         element={
-          <ProtectedPageRoute>
+          <AdminPageRoute>
             <ListViewsPage />
-          </ProtectedPageRoute>
+          </AdminPageRoute>
         }
       />
 
@@ -590,9 +591,9 @@ function TenantRoutes(): React.ReactElement {
       <Route
         path="reports"
         element={
-          <ProtectedPageRoute>
+          <AdminPageRoute>
             <ReportsPage />
-          </ProtectedPageRoute>
+          </AdminPageRoute>
         }
       />
 
@@ -600,9 +601,9 @@ function TenantRoutes(): React.ReactElement {
       <Route
         path="dashboards"
         element={
-          <ProtectedPageRoute>
+          <AdminPageRoute>
             <DashboardsPage />
-          </ProtectedPageRoute>
+          </AdminPageRoute>
         }
       />
 
@@ -610,9 +611,9 @@ function TenantRoutes(): React.ReactElement {
       <Route
         path="workflow-rules"
         element={
-          <ProtectedPageRoute>
+          <AdminPageRoute>
             <WorkflowRulesPage />
-          </ProtectedPageRoute>
+          </AdminPageRoute>
         }
       />
 
@@ -620,9 +621,9 @@ function TenantRoutes(): React.ReactElement {
       <Route
         path="approvals"
         element={
-          <ProtectedPageRoute>
+          <AdminPageRoute>
             <ApprovalProcessesPage />
-          </ProtectedPageRoute>
+          </AdminPageRoute>
         }
       />
 
@@ -630,9 +631,9 @@ function TenantRoutes(): React.ReactElement {
       <Route
         path="flows"
         element={
-          <ProtectedPageRoute>
+          <AdminPageRoute>
             <FlowsPage />
-          </ProtectedPageRoute>
+          </AdminPageRoute>
         }
       />
 
@@ -640,9 +641,9 @@ function TenantRoutes(): React.ReactElement {
       <Route
         path="scheduled-jobs"
         element={
-          <ProtectedPageRoute>
+          <AdminPageRoute>
             <ScheduledJobsPage />
-          </ProtectedPageRoute>
+          </AdminPageRoute>
         }
       />
 
@@ -650,9 +651,9 @@ function TenantRoutes(): React.ReactElement {
       <Route
         path="email-templates"
         element={
-          <ProtectedPageRoute>
+          <AdminPageRoute>
             <EmailTemplatesPage />
-          </ProtectedPageRoute>
+          </AdminPageRoute>
         }
       />
 
@@ -660,9 +661,9 @@ function TenantRoutes(): React.ReactElement {
       <Route
         path="plugins"
         element={
-          <ProtectedPageRoute>
+          <AdminPageRoute>
             <PluginsPage />
-          </ProtectedPageRoute>
+          </AdminPageRoute>
         }
       />
 
@@ -670,17 +671,17 @@ function TenantRoutes(): React.ReactElement {
       <Route
         path="users"
         element={
-          <ProtectedPageRoute>
+          <AdminPageRoute>
             <UsersPage />
-          </ProtectedPageRoute>
+          </AdminPageRoute>
         }
       />
       <Route
         path="users/:id"
         element={
-          <ProtectedPageRoute>
+          <AdminPageRoute>
             <UserDetailPage />
-          </ProtectedPageRoute>
+          </AdminPageRoute>
         }
       />
 
@@ -688,9 +689,9 @@ function TenantRoutes(): React.ReactElement {
       <Route
         path="audit-trail"
         element={
-          <ProtectedPageRoute>
+          <AdminPageRoute>
             <SetupAuditTrailPage />
-          </ProtectedPageRoute>
+          </AdminPageRoute>
         }
       />
 
@@ -698,9 +699,9 @@ function TenantRoutes(): React.ReactElement {
       <Route
         path="governor-limits"
         element={
-          <ProtectedPageRoute>
+          <AdminPageRoute>
             <GovernorLimitsPage />
-          </ProtectedPageRoute>
+          </AdminPageRoute>
         }
       />
 
@@ -708,17 +709,17 @@ function TenantRoutes(): React.ReactElement {
       <Route
         path="tenants"
         element={
-          <ProtectedPageRoute requiredRoles={['PLATFORM_ADMIN']}>
+          <AdminPageRoute requiredRoles={['PLATFORM_ADMIN']}>
             <TenantsPage />
-          </ProtectedPageRoute>
+          </AdminPageRoute>
         }
       />
       <Route
         path="tenant-dashboard"
         element={
-          <ProtectedPageRoute>
+          <AdminPageRoute>
             <TenantDashboardPage />
-          </ProtectedPageRoute>
+          </AdminPageRoute>
         }
       />
 
@@ -726,9 +727,9 @@ function TenantRoutes(): React.ReactElement {
       <Route
         path="scripts"
         element={
-          <ProtectedPageRoute>
+          <AdminPageRoute>
             <ScriptsPage />
-          </ProtectedPageRoute>
+          </AdminPageRoute>
         }
       />
 
@@ -736,9 +737,9 @@ function TenantRoutes(): React.ReactElement {
       <Route
         path="webhooks"
         element={
-          <ProtectedPageRoute>
+          <AdminPageRoute>
             <WebhooksPage />
-          </ProtectedPageRoute>
+          </AdminPageRoute>
         }
       />
 
@@ -746,9 +747,9 @@ function TenantRoutes(): React.ReactElement {
       <Route
         path="connected-apps"
         element={
-          <ProtectedPageRoute>
+          <AdminPageRoute>
             <ConnectedAppsPage />
-          </ProtectedPageRoute>
+          </AdminPageRoute>
         }
       />
 
@@ -756,9 +757,9 @@ function TenantRoutes(): React.ReactElement {
       <Route
         path="bulk-jobs"
         element={
-          <ProtectedPageRoute>
+          <AdminPageRoute>
             <BulkJobsPage />
-          </ProtectedPageRoute>
+          </AdminPageRoute>
         }
       />
 
@@ -766,9 +767,9 @@ function TenantRoutes(): React.ReactElement {
       <Route
         path="setup"
         element={
-          <ProtectedPageRoute>
+          <AdminPageRoute>
             <SetupHomePage />
-          </ProtectedPageRoute>
+          </AdminPageRoute>
         }
       />
 

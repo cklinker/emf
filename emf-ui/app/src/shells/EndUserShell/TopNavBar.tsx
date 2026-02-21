@@ -73,6 +73,8 @@ interface TopNavBarProps {
   notificationCount?: number
   /** Callback when notifications bell is clicked */
   onNotificationsOpen?: () => void
+  /** Current user roles for role-gated UI */
+  userRoles?: string[]
 }
 
 export function TopNavBar({
@@ -84,12 +86,14 @@ export function TopNavBar({
   onSearchOpen,
   notificationCount = 0,
   onNotificationsOpen,
+  userRoles = [],
 }: TopNavBarProps): React.ReactElement {
   const { tenantSlug } = useParams<{ tenantSlug: string }>()
   const navigate = useNavigate()
   const { mode, setMode, resolvedMode } = useTheme()
   const [activeTabIndex, setActiveTabIndex] = useState<number | null>(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const isAdmin = userRoles.some((role) => role === 'ADMIN' || role === 'PLATFORM_ADMIN')
 
   const basePath = `/${tenantSlug}/app`
 
@@ -165,14 +169,18 @@ export function TopNavBar({
                   {tab.label}
                 </button>
               ))}
-              <Separator className="my-2" />
-              <button
-                onClick={() => handleMobileNavClick(`/${tenantSlug}/setup`)}
-                className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent"
-              >
-                <Settings className="h-4 w-4" />
-                Switch to Setup
-              </button>
+              {isAdmin && (
+                <>
+                  <Separator className="my-2" />
+                  <button
+                    onClick={() => handleMobileNavClick(`/${tenantSlug}/setup`)}
+                    className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent"
+                  >
+                    <Settings className="h-4 w-4" />
+                    Switch to Setup
+                  </button>
+                </>
+              )}
             </nav>
           </SheetContent>
         </Sheet>
@@ -232,8 +240,25 @@ export function TopNavBar({
       {/* Spacer for mobile */}
       <div className="flex-1 md:hidden" />
 
-      {/* Right section: Search, notifications, user menu */}
+      {/* Right section: Admin mode, Search, notifications, user menu */}
       <div className="flex items-center gap-1">
+        {/* Admin Mode button (visible only for admins on desktop) */}
+        {isAdmin && (
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              className="hidden items-center gap-1.5 text-xs md:inline-flex"
+              onClick={() => navigate(`/${tenantSlug}/setup`)}
+              aria-label="Switch to admin mode"
+            >
+              <Settings className="h-3.5 w-3.5" />
+              Admin
+            </Button>
+            <Separator orientation="vertical" className="mx-1 hidden h-5 md:block" />
+          </>
+        )}
+
         {/* Search trigger */}
         <Button
           variant="ghost"
@@ -329,10 +354,12 @@ export function TopNavBar({
               )}
               {resolvedMode === 'dark' ? 'Light Mode' : 'Dark Mode'}
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => navigate(`/${tenantSlug}/setup`)}>
-              <Settings className="mr-2 h-4 w-4" />
-              Switch to Setup
-            </DropdownMenuItem>
+            {isAdmin && (
+              <DropdownMenuItem onClick={() => navigate(`/${tenantSlug}/setup`)}>
+                <Settings className="mr-2 h-4 w-4" />
+                Switch to Setup
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem>
               <User className="mr-2 h-4 w-4" />
               Profile

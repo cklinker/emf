@@ -11,13 +11,15 @@
  */
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
-import { Search } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Search, ArrowLeft } from 'lucide-react'
 import type { BrandingConfig } from '../../types/config'
 import type { User } from '../../types/auth'
 import { useAppShell } from '../AppShell'
 import { SearchModal } from '../SearchModal'
 import { RecentItemsDropdown } from '../RecentItemsDropdown'
 import { getGravatarUrl } from '../../utils/gravatar'
+import { getTenantSlug } from '../../context/TenantContext'
 
 /**
  * Props for the Header component
@@ -35,6 +37,8 @@ export interface HeaderProps {
  * Header component provides the top navigation bar with branding and user menu.
  */
 export function Header({ branding, user, onLogout }: HeaderProps): JSX.Element {
+  const navigate = useNavigate()
+  const tenantSlug = getTenantSlug()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [gravatarFailed, setGravatarFailed] = useState(false)
@@ -156,6 +160,16 @@ export function Header({ branding, user, onLogout }: HeaderProps): JSX.Element {
               {branding.applicationName}
             </h1>
           )}
+          <button
+            type="button"
+            className="flex items-center gap-1 py-1 px-2 bg-transparent border border-[var(--app-shell-border,var(--color-border,#e0e0e0))] rounded cursor-pointer text-[var(--color-text-secondary,#666666)] text-[0.8125rem] font-medium whitespace-nowrap transition-[background-color,border-color] duration-150 ease-in-out hover:bg-[var(--color-surface-hover,rgba(0,0,0,0.05))] hover:border-[var(--color-text-secondary,#999999)] hover:text-[var(--app-shell-text,var(--color-text,#1a1a1a))] focus:outline-2 focus:outline-[var(--color-focus,#0066cc)] focus:outline-offset-2 [&:focus:not(:focus-visible)]:outline-none"
+            onClick={() => navigate(`/${tenantSlug}/app`)}
+            aria-label="Back to application"
+            data-testid="back-to-app-button"
+          >
+            <ArrowLeft size={14} aria-hidden="true" />
+            {!isMobile && <span>Back to App</span>}
+          </button>
         </div>
 
         {/* Search trigger */}

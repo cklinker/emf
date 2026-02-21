@@ -949,7 +949,10 @@
     "maxCollections": "Maximum Collections",
     "maxFieldsPerCollection": "Maximum Fields Per Collection",
     "maxWorkflows": "Maximum Workflows",
-    "maxReports": "Maximum Reports"
+    "maxReports": "Maximum Reports",
+    "editLimits": "Edit Limits",
+    "saveSuccess": "Governor limits updated successfully.",
+    "saveError": "Failed to update governor limits."
   },
   "workers": {
     "title": "Workers",

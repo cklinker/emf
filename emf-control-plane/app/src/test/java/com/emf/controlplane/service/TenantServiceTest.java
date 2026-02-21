@@ -448,4 +448,44 @@ class TenantServiceTest {
                     .isInstanceOf(ResourceNotFoundException.class);
         }
     }
+
+    @Nested
+    @DisplayName("updateGovernorLimits")
+    class UpdateGovernorLimitsTests {
+
+        @Test
+        @DisplayName("should persist limits and return updated values")
+        void shouldPersistLimitsAndReturnUpdatedValues() {
+            // Given
+            Tenant tenant = new Tenant("acme", "Acme");
+            GovernorLimits newLimits = new GovernorLimits(200_000, 20, 200, 400, 1000, 100, 400);
+            when(tenantRepository.findById(tenant.getId())).thenReturn(Optional.of(tenant));
+            when(tenantRepository.save(any(Tenant.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+            // When
+            GovernorLimits result = tenantService.updateGovernorLimits(tenant.getId(), newLimits);
+
+            // Then
+            assertThat(result).isEqualTo(newLimits);
+            ArgumentCaptor<Tenant> captor = ArgumentCaptor.forClass(Tenant.class);
+            verify(tenantRepository).save(captor.capture());
+            String savedLimits = captor.getValue().getLimits();
+            assertThat(savedLimits).contains("\"api_calls_per_day\"");
+            assertThat(savedLimits).contains("200000");
+            assertThat(savedLimits).contains("\"max_users\"");
+            assertThat(savedLimits).contains("200");
+        }
+
+        @Test
+        @DisplayName("should throw ResourceNotFoundException when tenant not found")
+        void shouldThrowResourceNotFoundExceptionWhenNotFound() {
+            // Given
+            when(tenantRepository.findById("missing")).thenReturn(Optional.empty());
+            GovernorLimits limits = GovernorLimits.defaults();
+
+            // Then
+            assertThatThrownBy(() -> tenantService.updateGovernorLimits("missing", limits))
+                    .isInstanceOf(ResourceNotFoundException.class);
+        }
+    }
 }

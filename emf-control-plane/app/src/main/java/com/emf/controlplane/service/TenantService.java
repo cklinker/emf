@@ -240,6 +240,38 @@ public class TenantService {
         }
     }
 
+    /**
+     * Updates the governor limits for a tenant.
+     *
+     * @param tenantId The tenant ID
+     * @param limits The new governor limits
+     * @return The updated governor limits
+     * @throws ResourceNotFoundException if the tenant does not exist
+     */
+    @Transactional
+    public GovernorLimits updateGovernorLimits(String tenantId, GovernorLimits limits) {
+        log.info("Updating governor limits for tenant: {}", tenantId);
+
+        Tenant tenant = tenantRepository.findById(tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Tenant", tenantId));
+
+        Map<String, Object> limitsMap = Map.of(
+                "api_calls_per_day", limits.apiCallsPerDay(),
+                "storage_gb", limits.storageGb(),
+                "max_users", limits.maxUsers(),
+                "max_collections", limits.maxCollections(),
+                "max_fields_per_collection", limits.maxFieldsPerCollection(),
+                "max_workflows", limits.maxWorkflows(),
+                "max_reports", limits.maxReports()
+        );
+
+        tenant.setLimits(toJson(limitsMap));
+        tenantRepository.save(tenant);
+
+        log.info("Updated governor limits for tenant: {}", tenantId);
+        return limits;
+    }
+
     private void validateEdition(String edition) {
         if (!VALID_EDITIONS.contains(edition)) {
             throw new IllegalArgumentException("Invalid edition: " + edition + ". Must be one of: " + VALID_EDITIONS);

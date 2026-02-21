@@ -1,21 +1,23 @@
 package com.emf.controlplane.controller;
 
+import com.emf.controlplane.dto.GovernorLimits;
 import com.emf.controlplane.service.GovernorLimitsService;
+import com.emf.controlplane.service.TenantService;
 import com.emf.controlplane.tenant.TenantContextHolder;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/control/governor-limits")
 public class GovernorLimitsController {
 
     private final GovernorLimitsService governorLimitsService;
+    private final TenantService tenantService;
 
-    public GovernorLimitsController(GovernorLimitsService governorLimitsService) {
+    public GovernorLimitsController(GovernorLimitsService governorLimitsService, TenantService tenantService) {
         this.governorLimitsService = governorLimitsService;
+        this.tenantService = tenantService;
     }
 
     @GetMapping
@@ -23,5 +25,13 @@ public class GovernorLimitsController {
     public ResponseEntity<GovernorLimitsService.GovernorLimitsStatus> getStatus() {
         String tenantId = TenantContextHolder.requireTenantId();
         return ResponseEntity.ok(governorLimitsService.getStatus(tenantId));
+    }
+
+    @PutMapping
+    @PreAuthorize("hasRole('PLATFORM_ADMIN')")
+    public ResponseEntity<GovernorLimits> updateLimits(@RequestBody GovernorLimits limits) {
+        String tenantId = TenantContextHolder.requireTenantId();
+        GovernorLimits updated = tenantService.updateGovernorLimits(tenantId, limits);
+        return ResponseEntity.ok(updated);
     }
 }

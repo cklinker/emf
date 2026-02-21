@@ -1,9 +1,31 @@
-import React from 'react'
-import { useQuery } from '@tanstack/react-query'
+import React, { useState } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
+import { useAuth } from '../../context/AuthContext'
+import { useToast } from '../../components/Toast'
 import { LoadingSpinner, ErrorMessage } from '../../components'
 import { cn } from '@/lib/utils'
+
+interface GovernorLimits {
+  apiCallsPerDay: number
+  storageGb: number
+  maxUsers: number
+  maxCollections: number
+  maxFieldsPerCollection: number
+  maxWorkflows: number
+  maxReports: number
+}
+
+interface GovernorLimitsStatus {
+  limits: GovernorLimits
+  apiCallsUsed: number
+  apiCallsLimit: number
+  usersUsed: number
+  usersLimit: number
+  collectionsUsed: number
+  collectionsLimit: number
+}
 
 export interface GovernorLimitsPageProps {
   className?: string
@@ -11,7 +33,14 @@ export interface GovernorLimitsPageProps {
 
 export function GovernorLimitsPage({ className }: GovernorLimitsPageProps): React.ReactElement {
   const { t } = useI18n()
-  const { adminClient } = useApi()
+  const { apiClient } = useApi()
+  const { user } = useAuth()
+  const { showToast } = useToast()
+  const queryClient = useQueryClient()
+
+  const isPlatformAdmin = user?.roles?.includes('PLATFORM_ADMIN') ?? false
+  const [isEditing, setIsEditing] = useState(false)
+  const [editLimits, setEditLimits] = useState<GovernorLimits | null>(null)
 
   const {
     data: status,
@@ -19,12 +48,53 @@ export function GovernorLimitsPage({ className }: GovernorLimitsPageProps): Reac
     error,
   } = useQuery({
     queryKey: ['governor-limits'],
-    queryFn: () => adminClient.governorLimits.getStatus(),
+    queryFn: () => apiClient.get<GovernorLimitsStatus>('/control/governor-limits'),
     refetchInterval: 60000,
   })
 
+  const saveMutation = useMutation({
+    mutationFn: (limits: GovernorLimits) =>
+      apiClient.put<GovernorLimits>('/control/governor-limits', limits),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['governor-limits'] })
+      showToast(t('governorLimits.saveSuccess'), 'success')
+      setIsEditing(false)
+      setEditLimits(null)
+    },
+    onError: () => {
+      showToast(t('governorLimits.saveError'), 'error')
+    },
+  })
+
+  const handleEdit = () => {
+    if (status) {
+      setEditLimits({ ...status.limits })
+      setIsEditing(true)
+    }
+  }
+
+  const handleCancel = () => {
+    setIsEditing(false)
+    setEditLimits(null)
+  }
+
+  const handleSave = () => {
+    if (editLimits) {
+      saveMutation.mutate(editLimits)
+    }
+  }
+
+  const updateField = (field: keyof GovernorLimits, value: string) => {
+    if (editLimits) {
+      const num = parseInt(value, 10)
+      if (!isNaN(num) && num >= 0) {
+        setEditLimits({ ...editLimits, [field]: num })
+      }
+    }
+  }
+
   if (isLoading) return <LoadingSpinner />
-  if (error) return <ErrorMessage message={t('governorLimits.loadError')} />
+  if (error) return <ErrorMessage error={t('governorLimits.loadError')} />
 
   if (!status)
     return (
@@ -49,10 +119,45 @@ export function GovernorLimitsPage({ className }: GovernorLimitsPageProps): Reac
     },
   ]
 
+  const limitRows: { key: keyof GovernorLimits; labelKey: string; suffix?: string }[] = [
+    { key: 'apiCallsPerDay', labelKey: 'governorLimits.apiCallsPerDay' },
+    { key: 'storageGb', labelKey: 'governorLimits.storageGb', suffix: ' GB' },
+    { key: 'maxUsers', labelKey: 'governorLimits.maxUsers' },
+    { key: 'maxCollections', labelKey: 'governorLimits.maxCollections' },
+    { key: 'maxFieldsPerCollection', labelKey: 'governorLimits.maxFieldsPerCollection' },
+    { key: 'maxWorkflows', labelKey: 'governorLimits.maxWorkflows' },
+    { key: 'maxReports', labelKey: 'governorLimits.maxReports' },
+  ]
+
   return (
     <div className={cn('mx-auto max-w-[1200px] p-6', className)}>
-      <div className="mb-6">
+      <div className="mb-6 flex items-center justify-between">
         <h1 className="m-0 text-2xl font-semibold text-foreground">{t('governorLimits.title')}</h1>
+        {isPlatformAdmin && !isEditing && (
+          <button
+            onClick={handleEdit}
+            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          >
+            {t('governorLimits.editLimits')}
+          </button>
+        )}
+        {isEditing && (
+          <div className="flex gap-2">
+            <button
+              onClick={handleCancel}
+              className="rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
+            >
+              {t('common.cancel')}
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saveMutation.isPending}
+              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            >
+              {saveMutation.isPending ? t('common.saving') : t('common.save')}
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="mb-8 grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-6">
@@ -121,46 +226,33 @@ export function GovernorLimitsPage({ className }: GovernorLimitsPageProps): Reac
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td className="border-b border-border p-3">{t('governorLimits.apiCallsPerDay')}</td>
-                <td className="border-b border-border p-3">
-                  {status.limits.apiCallsPerDay.toLocaleString()}
-                </td>
-              </tr>
-              <tr>
-                <td className="border-b border-border p-3">{t('governorLimits.storageGb')}</td>
-                <td className="border-b border-border p-3">{status.limits.storageGb} GB</td>
-              </tr>
-              <tr>
-                <td className="border-b border-border p-3">{t('governorLimits.maxUsers')}</td>
-                <td className="border-b border-border p-3">
-                  {status.limits.maxUsers.toLocaleString()}
-                </td>
-              </tr>
-              <tr>
-                <td className="border-b border-border p-3">{t('governorLimits.maxCollections')}</td>
-                <td className="border-b border-border p-3">
-                  {status.limits.maxCollections.toLocaleString()}
-                </td>
-              </tr>
-              <tr>
-                <td className="border-b border-border p-3">
-                  {t('governorLimits.maxFieldsPerCollection')}
-                </td>
-                <td className="border-b border-border p-3">
-                  {status.limits.maxFieldsPerCollection.toLocaleString()}
-                </td>
-              </tr>
-              <tr>
-                <td className="border-b border-border p-3">{t('governorLimits.maxWorkflows')}</td>
-                <td className="border-b border-border p-3">
-                  {status.limits.maxWorkflows.toLocaleString()}
-                </td>
-              </tr>
-              <tr>
-                <td className="p-3">{t('governorLimits.maxReports')}</td>
-                <td className="p-3">{status.limits.maxReports.toLocaleString()}</td>
-              </tr>
+              {limitRows.map((row, index) => (
+                <tr key={row.key}>
+                  <td
+                    className={cn('p-3', index < limitRows.length - 1 && 'border-b border-border')}
+                  >
+                    {t(row.labelKey)}
+                  </td>
+                  <td
+                    className={cn('p-3', index < limitRows.length - 1 && 'border-b border-border')}
+                  >
+                    {isEditing && editLimits ? (
+                      <input
+                        type="number"
+                        min="0"
+                        value={editLimits[row.key]}
+                        onChange={(e) => updateField(row.key, e.target.value)}
+                        className="w-32 rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground"
+                      />
+                    ) : (
+                      <>
+                        {status.limits[row.key].toLocaleString()}
+                        {row.suffix ?? ''}
+                      </>
+                    )}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>

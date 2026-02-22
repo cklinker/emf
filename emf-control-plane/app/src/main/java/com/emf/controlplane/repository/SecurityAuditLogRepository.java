@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
@@ -64,6 +65,7 @@ public interface SecurityAuditLogRepository extends JpaRepository<SecurityAuditL
     long countByTenantIdAndCreatedAtAfter(String tenantId, Instant after);
 
     @Modifying
+    @Transactional
     @Query(value = "DELETE FROM security_audit_log WHERE id IN " +
            "(SELECT id FROM security_audit_log WHERE created_at < :cutoff ORDER BY created_at ASC LIMIT :batchSize)",
            nativeQuery = true)

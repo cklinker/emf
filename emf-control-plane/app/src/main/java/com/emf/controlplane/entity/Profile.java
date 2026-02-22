@@ -1,5 +1,6 @@
 package com.emf.controlplane.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 
 import java.util.ArrayList;
@@ -24,12 +25,15 @@ public class Profile extends TenantScopedEntity {
     @Column(name = "is_system", nullable = false)
     private boolean isSystem = false;
 
+    @JsonIgnore
     @OneToMany(mappedBy = "profileId", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ProfileSystemPermission> systemPermissions = new ArrayList<>();
 
+    @JsonIgnore
     @OneToMany(mappedBy = "profileId", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ProfileObjectPermission> objectPermissions = new ArrayList<>();
 
+    @JsonIgnore
     @OneToMany(mappedBy = "profileId", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ProfileFieldPermission> fieldPermissions = new ArrayList<>();
 

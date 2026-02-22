@@ -776,5 +776,16 @@
       "picklistRequired": "قائمة الاختيار العامة مطلوبة لحقول القوائم",
       "descriptionTooLong": "يجب ألا يتجاوز الوصف 500 حرف"
     }
+  },
+  "userMenu": {
+    "language": "اللغة",
+    "theme": "المظهر",
+    "profile": "الملف الشخصي",
+    "logout": "تسجيل الخروج",
+    "switchToSetup": "التبديل إلى الإعدادات",
+    "backToApp": "العودة إلى التطبيق",
+    "lightMode": "فاتح",
+    "darkMode": "داكن",
+    "systemMode": "النظام"
   }
 }

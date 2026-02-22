@@ -75,8 +75,6 @@ export function EndUserShell(): React.ReactElement {
   }
 
   const appName = config?.branding?.applicationName || 'EMF'
-  const userName = user?.name || user?.email || ''
-  const userEmail = user?.email || ''
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-background">
@@ -90,9 +88,7 @@ export function EndUserShell(): React.ReactElement {
       <TopNavBar
         appName={appName}
         tabs={tabs}
-        userName={userName}
-        userEmail={userEmail}
-        userRoles={user?.roles}
+        user={user}
         onLogout={handleLogout}
         onSearchOpen={() => setSearchOpen(true)}
         notificationCount={0}

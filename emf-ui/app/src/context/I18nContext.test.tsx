@@ -210,7 +210,7 @@ describe('I18nContext', () => {
         </I18nProvider>
       )
 
-      expect(screen.getByTestId('supported-locales')).toHaveTextContent('en,ar')
+      expect(screen.getByTestId('supported-locales')).toHaveTextContent('en,ar,fr,de,es,pt')
     })
   })
 
@@ -304,10 +304,10 @@ describe('I18nContext', () => {
       )
 
       act(() => {
-        capturedSetLocale?.('fr')
+        capturedSetLocale?.('zz')
       })
 
-      expect(consoleSpy).toHaveBeenCalledWith('[I18n] Unsupported locale: fr')
+      expect(consoleSpy).toHaveBeenCalledWith('[I18n] Unsupported locale: zz')
       consoleSpy.mockRestore()
     })
   })
@@ -617,6 +617,11 @@ describe('I18nContext', () => {
     it('should have correct supported locales', () => {
       expect(SUPPORTED_LOCALES).toContain('en')
       expect(SUPPORTED_LOCALES).toContain('ar')
+      expect(SUPPORTED_LOCALES).toContain('fr')
+      expect(SUPPORTED_LOCALES).toContain('de')
+      expect(SUPPORTED_LOCALES).toContain('es')
+      expect(SUPPORTED_LOCALES).toContain('pt')
+      expect(SUPPORTED_LOCALES).toHaveLength(6)
     })
 
     it('should have correct RTL locales', () => {

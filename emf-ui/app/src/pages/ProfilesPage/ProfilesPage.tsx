@@ -3,40 +3,26 @@
  *
  * Displays a list of security profiles with create, edit, clone, and delete
  * functionality. System profiles can only be cloned (not edited or deleted).
- * Uses TanStack Query for data fetching and modal forms for management.
+ * Clicking a row navigates to the detail page. Uses TanStack Query for data
+ * fetching and modal forms for management.
  */
 
-import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react'
+import React, { useState, useCallback, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import { useApi } from '../../context/ApiContext'
+import { useTenant } from '../../context/TenantContext'
 import { useI18n } from '../../context/I18nContext'
 import { useToast, ConfirmDialog } from '../../components'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { Lock, ChevronDown, ChevronRight, Plus, Shield, Pencil, Copy, Trash2 } from 'lucide-react'
-
-interface ObjectPermission {
-  objectName: string
-  canRead: boolean
-  canCreate: boolean
-  canEdit: boolean
-  canDelete: boolean
-}
-
-interface ProfileSystemPermission {
-  id: string
-  profileId: string
-  permissionName: string
-  granted: boolean
-}
+import { Lock, Plus, Pencil, Copy, Trash2 } from 'lucide-react'
 
 interface SecurityProfile {
   id: string
   name: string
   description: string | null
   system: boolean
-  systemPermissions?: ProfileSystemPermission[]
-  objectPermissions?: ObjectPermission[]
   createdAt: string
   updatedAt: string
 }
@@ -70,103 +56,6 @@ function SystemBadge() {
       <Lock size={12} />
       System
     </span>
-  )
-}
-
-function ProfileDetail({ profile }: { profile: SecurityProfile }) {
-  const grantedPermissions = useMemo(() => {
-    if (!profile.systemPermissions) return []
-    return profile.systemPermissions.filter((sp) => sp.granted).map((sp) => sp.permissionName)
-  }, [profile.systemPermissions])
-
-  return (
-    <div className="border-t border-border bg-muted/30 px-6 py-4">
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-        {/* System Permissions */}
-        <div>
-          <h4 className="mb-2 text-sm font-semibold text-foreground">System Permissions</h4>
-          {grantedPermissions.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No system permissions assigned</p>
-          ) : (
-            <ul className="space-y-1">
-              {grantedPermissions.map((perm) => (
-                <li key={perm} className="flex items-center gap-2 text-sm text-foreground">
-                  <Shield size={14} className="text-primary" />
-                  {perm}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        {/* Object Permissions */}
-        <div>
-          <h4 className="mb-2 text-sm font-semibold text-foreground">Object Permissions</h4>
-          {(profile.objectPermissions?.length ?? 0) === 0 ? (
-            <p className="text-sm text-muted-foreground">No object permissions assigned</p>
-          ) : (
-            <div className="overflow-x-auto rounded border border-border">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-muted">
-                    <th className="px-3 py-1.5 text-left text-xs font-medium text-muted-foreground">
-                      Object
-                    </th>
-                    <th className="px-3 py-1.5 text-center text-xs font-medium text-muted-foreground">
-                      Read
-                    </th>
-                    <th className="px-3 py-1.5 text-center text-xs font-medium text-muted-foreground">
-                      Create
-                    </th>
-                    <th className="px-3 py-1.5 text-center text-xs font-medium text-muted-foreground">
-                      Edit
-                    </th>
-                    <th className="px-3 py-1.5 text-center text-xs font-medium text-muted-foreground">
-                      Delete
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(profile.objectPermissions ?? []).map((op) => (
-                    <tr key={op.objectName} className="border-t border-border">
-                      <td className="px-3 py-1.5 font-medium text-foreground">{op.objectName}</td>
-                      <td className="px-3 py-1.5 text-center">
-                        {op.canRead ? (
-                          <span className="text-emerald-600">Yes</span>
-                        ) : (
-                          <span className="text-muted-foreground">No</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-1.5 text-center">
-                        {op.canCreate ? (
-                          <span className="text-emerald-600">Yes</span>
-                        ) : (
-                          <span className="text-muted-foreground">No</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-1.5 text-center">
-                        {op.canEdit ? (
-                          <span className="text-emerald-600">Yes</span>
-                        ) : (
-                          <span className="text-muted-foreground">No</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-1.5 text-center">
-                        {op.canDelete ? (
-                          <span className="text-emerald-600">Yes</span>
-                        ) : (
-                          <span className="text-muted-foreground">No</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
   )
 }
 
@@ -340,11 +229,12 @@ function ProfileFormModal({ profile, onSubmit, onCancel, isSubmitting }: Profile
 
 export function ProfilesPage({ testId = 'profiles-page' }: ProfilesPageProps): React.ReactElement {
   const { apiClient } = useApi()
+  const { tenantSlug } = useTenant()
   const { formatDate } = useI18n()
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { showToast } = useToast()
 
-  const [expandedId, setExpandedId] = useState<string | null>(null)
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingProfile, setEditingProfile] = useState<SecurityProfile | undefined>(undefined)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -396,9 +286,6 @@ export function ProfilesPage({ testId = 'profiles-page' }: ProfilesPageProps): R
       showToast('Profile deleted successfully', 'success')
       setDeleteDialogOpen(false)
       setProfileToDelete(null)
-      if (profileToDelete && expandedId === profileToDelete.id) {
-        setExpandedId(null)
-      }
     },
     onError: (error: Error) => {
       showToast(error.message || 'Failed to delete profile', 'error')
@@ -418,9 +305,12 @@ export function ProfilesPage({ testId = 'profiles-page' }: ProfilesPageProps): R
   })
 
   // Handlers
-  const handleToggleExpand = useCallback((id: string) => {
-    setExpandedId((prev) => (prev === id ? null : id))
-  }, [])
+  const handleRowClick = useCallback(
+    (profile: SecurityProfile) => {
+      navigate(`/${tenantSlug}/profiles/${profile.id}`)
+    },
+    [navigate, tenantSlug]
+  )
 
   const handleCreate = useCallback(() => {
     setEditingProfile(undefined)
@@ -524,13 +414,6 @@ export function ProfilesPage({ testId = 'profiles-page' }: ProfilesPageProps): R
                 <th
                   role="columnheader"
                   scope="col"
-                  className="w-8 border-b border-border px-4 py-3"
-                >
-                  <span className="sr-only">Expand</span>
-                </th>
-                <th
-                  role="columnheader"
-                  scope="col"
                   className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
                 >
                   Name
@@ -566,95 +449,78 @@ export function ProfilesPage({ testId = 'profiles-page' }: ProfilesPageProps): R
               </tr>
             </thead>
             <tbody>
-              {profileList.map((profile, index) => {
-                const isExpanded = expandedId === profile.id
-                return (
-                  <React.Fragment key={profile.id}>
-                    <tr
-                      role="row"
-                      className={cn(
-                        'cursor-pointer border-b border-border transition-colors hover:bg-muted/50',
-                        isExpanded && 'bg-muted/30'
-                      )}
-                      onClick={() => handleToggleExpand(profile.id)}
-                      data-testid={`profile-row-${index}`}
+              {profileList.map((profile, index) => (
+                <tr
+                  key={profile.id}
+                  role="row"
+                  className="cursor-pointer border-b border-border transition-colors hover:bg-muted/50"
+                  onClick={() => handleRowClick(profile)}
+                  data-testid={`profile-row-${index}`}
+                >
+                  <td role="gridcell" className="px-4 py-3 text-sm font-medium text-foreground">
+                    {profile.name}
+                  </td>
+                  <td
+                    role="gridcell"
+                    className="max-w-[300px] truncate px-4 py-3 text-sm text-muted-foreground"
+                  >
+                    {profile.description || '\u2014'}
+                  </td>
+                  <td role="gridcell" className="px-4 py-3 text-sm">
+                    {profile.system && <SystemBadge />}
+                  </td>
+                  <td role="gridcell" className="px-4 py-3 text-sm text-muted-foreground">
+                    {formatDate(new Date(profile.createdAt), {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric',
+                    })}
+                  </td>
+                  <td role="gridcell" className="w-[1%] whitespace-nowrap px-4 py-3">
+                    <div
+                      role="toolbar"
+                      className="flex justify-end gap-2"
+                      onClick={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => e.stopPropagation()}
                     >
-                      <td role="gridcell" className="px-4 py-3 text-muted-foreground">
-                        {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                      </td>
-                      <td role="gridcell" className="px-4 py-3 text-sm font-medium text-foreground">
-                        {profile.name}
-                      </td>
-                      <td
-                        role="gridcell"
-                        className="max-w-[300px] truncate px-4 py-3 text-sm text-muted-foreground"
-                      >
-                        {profile.description || '\u2014'}
-                      </td>
-                      <td role="gridcell" className="px-4 py-3 text-sm">
-                        {profile.system && <SystemBadge />}
-                      </td>
-                      <td role="gridcell" className="px-4 py-3 text-sm text-muted-foreground">
-                        {formatDate(new Date(profile.createdAt), {
-                          year: 'numeric',
-                          month: 'short',
-                          day: 'numeric',
-                        })}
-                      </td>
-                      <td role="gridcell" className="w-[1%] whitespace-nowrap px-4 py-3">
-                        <div
-                          role="toolbar"
-                          className="flex justify-end gap-2"
-                          onClick={(e) => e.stopPropagation()}
-                          onKeyDown={(e) => e.stopPropagation()}
+                      {!profile.system && (
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-xs font-medium text-primary hover:border-primary hover:bg-muted"
+                          onClick={() => handleEdit(profile)}
+                          data-testid={`edit-button-${index}`}
+                          title="Edit profile"
                         >
-                          {!profile.system && (
-                            <button
-                              type="button"
-                              className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-xs font-medium text-primary hover:border-primary hover:bg-muted"
-                              onClick={() => handleEdit(profile)}
-                              data-testid={`edit-button-${index}`}
-                              title="Edit profile"
-                            >
-                              <Pencil size={12} />
-                              Edit
-                            </button>
-                          )}
-                          <button
-                            type="button"
-                            className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-xs font-medium text-primary hover:border-primary hover:bg-muted"
-                            onClick={() => handleClone(profile)}
-                            data-testid={`clone-button-${index}`}
-                            title="Clone profile"
-                          >
-                            <Copy size={12} />
-                            Clone
-                          </button>
-                          {!profile.system && (
-                            <button
-                              type="button"
-                              className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-xs font-medium text-destructive hover:border-destructive hover:bg-destructive/10"
-                              onClick={() => handleDeleteClick(profile)}
-                              data-testid={`delete-button-${index}`}
-                              title="Delete profile"
-                            >
-                              <Trash2 size={12} />
-                              Delete
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                    {isExpanded && (
-                      <tr>
-                        <td colSpan={6} className="p-0">
-                          <ProfileDetail profile={profile} />
-                        </td>
-                      </tr>
-                    )}
-                  </React.Fragment>
-                )
-              })}
+                          <Pencil size={12} />
+                          Edit
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-xs font-medium text-primary hover:border-primary hover:bg-muted"
+                        onClick={() => handleClone(profile)}
+                        data-testid={`clone-button-${index}`}
+                        title="Clone profile"
+                      >
+                        <Copy size={12} />
+                        Clone
+                      </button>
+                      {!profile.system && (
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-xs font-medium text-destructive hover:border-destructive hover:bg-destructive/10"
+                          onClick={() => handleDeleteClick(profile)}
+                          data-testid={`delete-button-${index}`}
+                          title="Delete profile"
+                        >
+                          <Trash2 size={12} />
+                          Delete
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>

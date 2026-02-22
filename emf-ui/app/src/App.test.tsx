@@ -295,6 +295,7 @@ vi.mock('./pages', () => ({
   SetupAuditTrailPage: () => <div data-testid="audit-trail-page">Audit Trail Page</div>,
   GovernorLimitsPage: () => <div data-testid="governor-limits-page">Governor Limits Page</div>,
   ProfilesPage: () => <div data-testid="profiles-page">Profiles Page</div>,
+  ProfileDetailPage: () => <div data-testid="profile-detail-page">Profile Detail Page</div>,
   PermissionSetsPage: () => <div data-testid="permission-sets-page">Permission Sets Page</div>,
   PermissionSetDetailPage: () => (
     <div data-testid="permission-set-detail-page">Permission Set Detail Page</div>

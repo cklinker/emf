@@ -78,6 +78,9 @@ otel:
 
 # Test-specific EMF Configuration
 emf:
+  storage:
+    s3:
+      enabled: false
   control-plane:
     kafka:
       enabled: false

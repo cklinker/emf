@@ -90,6 +90,9 @@ server:
   port: ${SERVER_PORT:8080}
   servlet:
     context-path: /
+    multipart:
+      max-file-size: ${S3_MAX_FILE_SIZE:50MB}
+      max-request-size: ${S3_MAX_FILE_SIZE:50MB}
   compression:
     enabled: true
     mime-types: application/json,application/xml,text/html,text/xml,text/plain
@@ -180,6 +183,16 @@ otel:
 
 # Application-specific Configuration
 emf:
+  # S3-compatible Object Storage
+  storage:
+    s3:
+      enabled: ${S3_ENABLED:false}
+      endpoint: ${S3_ENDPOINT:}
+      region: ${S3_REGION:garage}
+      bucket: ${S3_BUCKET:emf-attachments}
+      access-key: ${S3_ACCESS_KEY:}
+      secret-key: ${S3_SECRET_KEY:}
+      max-file-size: ${S3_MAX_FILE_SIZE:52428800}
   control-plane:
     # Kafka Topics
     kafka:

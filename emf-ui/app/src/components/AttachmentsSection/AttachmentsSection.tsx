@@ -12,7 +12,7 @@
  * - Accessible with ARIA attributes and data-testid markers
  */
 
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Paperclip, Download, Trash2, Upload } from 'lucide-react'
 import { useI18n } from '../../context/I18nContext'
@@ -30,6 +30,7 @@ interface Attachment {
   contentType: string
   uploadedBy: string
   uploadedAt: string
+  downloadUrl?: string | null
 }
 
 /**
@@ -102,6 +103,7 @@ export function AttachmentsSection({
   const { t } = useI18n()
   const queryClient = useQueryClient()
   const [apiAvailable, setApiAvailable] = useState(true)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Fetch attachments for this record
   const { data: attachments, isLoading } = useQuery({
@@ -133,6 +135,23 @@ export function AttachmentsSection({
     },
   })
 
+  // Upload attachment mutation
+  const uploadMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData()
+      formData.append('file', file)
+      return apiClient.postFormData<Attachment>(
+        `/control/attachments/${collectionId}/${recordId}`,
+        formData
+      )
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['attachments', collectionId, recordId],
+      })
+    },
+  })
+
   const handleDelete = useCallback(
     (attachmentId: string) => {
       if (window.confirm(t('attachments.confirmDelete'))) {
@@ -140,6 +159,43 @@ export function AttachmentsSection({
       }
     },
     [deleteMutation, t]
+  )
+
+  const handleFileChange = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0]
+      if (file) {
+        uploadMutation.mutate(file)
+        // Reset input so the same file can be uploaded again
+        event.target.value = ''
+      }
+    },
+    [uploadMutation]
+  )
+
+  const handleUploadClick = useCallback(() => {
+    fileInputRef.current?.click()
+  }, [])
+
+  const handleDownload = useCallback(
+    async (attachment: Attachment) => {
+      if (attachment.downloadUrl) {
+        window.open(attachment.downloadUrl, '_blank')
+      } else {
+        try {
+          const response = await apiClient.get<{ url: string }>(
+            `/control/attachments/download/${attachment.id}`
+          )
+          if (response?.url) {
+            window.open(response.url, '_blank')
+          }
+        } catch {
+          // Fallback: attempt direct navigation
+          window.open(`/control/attachments/download/${attachment.id}`, '_blank')
+        }
+      }
+    },
+    [apiClient]
   )
 
   // Sort attachments by upload date (newest first)
@@ -174,6 +230,14 @@ export function AttachmentsSection({
       aria-labelledby="attachments-heading"
       data-testid="attachments-section"
     >
+      <input
+        ref={fileInputRef}
+        type="file"
+        className="hidden"
+        onChange={handleFileChange}
+        data-testid="attachments-file-input"
+      />
+
       {/* Header */}
       <div className="flex justify-between items-center p-4 border-b border-border bg-muted/50 max-md:flex-col max-md:items-start max-md:gap-2">
         <h3 id="attachments-heading" className="m-0 text-base font-semibold text-foreground">
@@ -182,11 +246,13 @@ export function AttachmentsSection({
         <Button
           variant="outline"
           size="xs"
+          onClick={handleUploadClick}
+          disabled={uploadMutation.isPending}
           data-testid="attachments-upload-button"
           title={t('attachments.upload')}
         >
           <Upload size={14} aria-hidden="true" />
-          {t('attachments.upload')}
+          {uploadMutation.isPending ? t('attachments.uploading') : t('attachments.upload')}
         </Button>
       </div>
 
@@ -240,6 +306,8 @@ export function AttachmentsSection({
                 <Button
                   variant="ghost"
                   size="icon-xs"
+                  onClick={() => handleDownload(attachment)}
+                  disabled={!attachment.downloadUrl}
                   aria-label={`${t('attachments.download')} ${attachment.fileName}`}
                   data-testid={`attachment-download-${attachment.id}`}
                   title={t('attachments.download')}

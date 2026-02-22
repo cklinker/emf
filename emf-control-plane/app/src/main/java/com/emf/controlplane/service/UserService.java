@@ -3,12 +3,15 @@ package com.emf.controlplane.service;
 import com.emf.controlplane.dto.CreateUserRequest;
 import com.emf.controlplane.dto.UpdateUserRequest;
 import com.emf.controlplane.entity.LoginHistory;
+import com.emf.controlplane.entity.PermissionSet;
 import com.emf.controlplane.entity.Profile;
 import com.emf.controlplane.entity.User;
 import com.emf.controlplane.exception.DuplicateResourceException;
 import com.emf.controlplane.exception.ResourceNotFoundException;
 import com.emf.controlplane.repository.LoginHistoryRepository;
+import com.emf.controlplane.repository.PermissionSetRepository;
 import com.emf.controlplane.repository.ProfileRepository;
+import com.emf.controlplane.repository.UserPermissionSetRepository;
 import com.emf.controlplane.repository.UserRepository;
 import com.emf.controlplane.tenant.TenantContextHolder;
 import org.slf4j.Logger;
@@ -35,15 +38,21 @@ public class UserService {
     private final UserRepository userRepository;
     private final LoginHistoryRepository loginHistoryRepository;
     private final ProfileRepository profileRepository;
+    private final PermissionSetRepository permissionSetRepository;
+    private final UserPermissionSetRepository userPermissionSetRepository;
     private final SecurityAuditService auditService;
 
     public UserService(UserRepository userRepository,
                        LoginHistoryRepository loginHistoryRepository,
                        @Nullable ProfileRepository profileRepository,
+                       @Nullable PermissionSetRepository permissionSetRepository,
+                       @Nullable UserPermissionSetRepository userPermissionSetRepository,
                        @Nullable SecurityAuditService auditService) {
         this.userRepository = userRepository;
         this.loginHistoryRepository = loginHistoryRepository;
         this.profileRepository = profileRepository;
+        this.permissionSetRepository = permissionSetRepository;
+        this.userPermissionSetRepository = userPermissionSetRepository;
         this.auditService = auditService;
     }
 
@@ -131,6 +140,15 @@ public class UserService {
                         .orElseThrow(() -> new ResourceNotFoundException("Manager", request.getManagerId()));
             }
             user.setManagerId(request.getManagerId());
+        }
+
+        if (request.getProfileId() != null && profileRepository != null) {
+            String tenantId = TenantContextHolder.getTenantId();
+            if (tenantId != null) {
+                profileRepository.findByIdAndTenantId(request.getProfileId(), tenantId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Profile", request.getProfileId()));
+            }
+            user.setProfileId(request.getProfileId());
         }
 
         user = userRepository.save(user);
@@ -235,6 +253,19 @@ public class UserService {
         log.info("JIT provisioned user {} ({}) in tenant {} with profile {}",
                 user.getId(), email, tenantId, profileName);
         return user;
+    }
+
+    @Transactional(readOnly = true)
+    public java.util.List<PermissionSet> getUserPermissionSets(String userId) {
+        getUser(userId); // verify user exists in tenant
+        if (userPermissionSetRepository == null || permissionSetRepository == null) {
+            return java.util.List.of();
+        }
+        java.util.List<String> permSetIds = userPermissionSetRepository.findPermissionSetIdsByUserId(userId);
+        if (permSetIds.isEmpty()) {
+            return java.util.List.of();
+        }
+        return permissionSetRepository.findAllById(permSetIds);
     }
 
     private void assignDefaultProfile(User user, String tenantId, String profileName) {

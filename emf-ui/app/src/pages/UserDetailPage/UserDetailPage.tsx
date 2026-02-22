@@ -1,11 +1,13 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useApi } from '../../context/ApiContext'
 import { useI18n } from '../../context/I18nContext'
 import { getTenantSlug } from '../../context/TenantContext'
 import { useToast } from '../../components/Toast'
 import { cn } from '@/lib/utils'
+import { Shield, X, Plus } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 
 interface PlatformUser {
   id: string
@@ -23,6 +25,20 @@ interface PlatformUser {
   mfaEnabled: boolean
   createdAt: string
   updatedAt: string
+}
+
+interface ProfileSummary {
+  id: string
+  name: string
+  description: string | null
+  system: boolean
+}
+
+interface PermissionSetSummary {
+  id: string
+  name: string
+  description: string | null
+  system: boolean
 }
 
 interface LoginHistoryEntry {
@@ -92,8 +108,9 @@ export function UserDetailPage({ testId = 'user-detail-page' }: UserDetailPagePr
   const { apiClient } = useApi()
   const { showToast } = useToast()
   const navigate = useNavigate()
+  const tenantSlug = getTenantSlug()
 
-  const [activeTab, setActiveTab] = useState<'details' | 'loginHistory'>('details')
+  const [activeTab, setActiveTab] = useState<'details' | 'security' | 'loginHistory'>('details')
   const [isEditing, setIsEditing] = useState(false)
   const [formData, setFormData] = useState<UpdateFormData>({
     firstName: '',
@@ -103,6 +120,7 @@ export function UserDetailPage({ testId = 'user-detail-page' }: UserDetailPagePr
     timezone: '',
   })
   const [historyPage, setHistoryPage] = useState(0)
+  const [showAssignModal, setShowAssignModal] = useState(false)
 
   const {
     data: user,
@@ -138,6 +156,38 @@ export function UserDetailPage({ testId = 'user-detail-page' }: UserDetailPagePr
     enabled: !!id && activeTab === 'loginHistory',
   })
 
+  // Security tab data
+  const { data: profiles } = useQuery({
+    queryKey: ['profiles'],
+    queryFn: () => apiClient.get<ProfileSummary[]>('/control/profiles'),
+    enabled: activeTab === 'security',
+  })
+
+  const { data: userPermissionSets } = useQuery({
+    queryKey: ['users', id, 'permission-sets'],
+    queryFn: () => apiClient.get<PermissionSetSummary[]>(`/control/users/${id}/permission-sets`),
+    enabled: !!id && activeTab === 'security',
+  })
+
+  const { data: allPermissionSets } = useQuery({
+    queryKey: ['permission-sets'],
+    queryFn: () => apiClient.get<PermissionSetSummary[]>('/control/permission-sets'),
+    enabled: activeTab === 'security' && showAssignModal,
+  })
+
+  // Available permission sets (not already assigned)
+  const availablePermissionSets = useMemo(() => {
+    if (!allPermissionSets || !userPermissionSets) return []
+    const assignedIds = new Set(userPermissionSets.map((ps) => ps.id))
+    return allPermissionSets.filter((ps) => !assignedIds.has(ps.id))
+  }, [allPermissionSets, userPermissionSets])
+
+  const profileId = user?.profileId
+  const currentProfile = useMemo(() => {
+    if (!profiles || !profileId) return null
+    return profiles.find((p) => p.id === profileId) ?? null
+  }, [profiles, profileId])
+
   const updateMutation = useMutation({
     mutationFn: (data: UpdateFormData) => apiClient.put<PlatformUser>(`/control/users/${id}`, data),
     onSuccess: () => {
@@ -161,6 +211,45 @@ export function UserDetailPage({ testId = 'user-detail-page' }: UserDetailPagePr
     },
     onError: (err: Error) => {
       showToast(err.message || t('errors.generic'), 'error')
+    },
+  })
+
+  const changeProfileMutation = useMutation({
+    mutationFn: (profileId: string) =>
+      apiClient.put<PlatformUser>(`/control/users/${id}`, { profileId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users', id] })
+      showToast('Profile updated successfully', 'success')
+    },
+    onError: (err: Error) => {
+      showToast(err.message || 'Failed to update profile', 'error')
+    },
+  })
+
+  const assignPermSetMutation = useMutation({
+    mutationFn: (permSetId: string) =>
+      apiClient.post(`/control/permission-sets/${permSetId}/assignments/users`, {
+        userIds: [id],
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users', id, 'permission-sets'] })
+      showToast('Permission set assigned successfully', 'success')
+      setShowAssignModal(false)
+    },
+    onError: (err: Error) => {
+      showToast(err.message || 'Failed to assign permission set', 'error')
+    },
+  })
+
+  const unassignPermSetMutation = useMutation({
+    mutationFn: (permSetId: string) =>
+      apiClient.delete(`/control/permission-sets/${permSetId}/assignments/users/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users', id, 'permission-sets'] })
+      showToast('Permission set removed successfully', 'success')
+    },
+    onError: (err: Error) => {
+      showToast(err.message || 'Failed to remove permission set', 'error')
     },
   })
 
@@ -216,7 +305,7 @@ export function UserDetailPage({ testId = 'user-detail-page' }: UserDetailPagePr
         <div className="flex items-center gap-4">
           <button
             className="rounded-md border border-border bg-transparent px-3 py-2 text-sm text-muted-foreground hover:bg-muted"
-            onClick={() => navigate(`/${getTenantSlug()}/users`)}
+            onClick={() => navigate(`/${tenantSlug}/users`)}
           >
             {t('common.back')}
           </button>
@@ -255,6 +344,15 @@ export function UserDetailPage({ testId = 'user-detail-page' }: UserDetailPagePr
           onClick={() => setActiveTab('details')}
         >
           {t('users.details')}
+        </button>
+        <button
+          className={cn(
+            '-mb-[2px] border-b-2 border-transparent bg-transparent px-6 py-3 text-sm font-medium text-muted-foreground hover:text-foreground',
+            activeTab === 'security' && 'border-primary text-primary'
+          )}
+          onClick={() => setActiveTab('security')}
+        >
+          Security
         </button>
         <button
           className={cn(
@@ -408,6 +506,109 @@ export function UserDetailPage({ testId = 'user-detail-page' }: UserDetailPagePr
         </div>
       )}
 
+      {activeTab === 'security' && (
+        <div className="space-y-6">
+          {/* Profile Section */}
+          <div className="rounded-lg border border-border bg-card p-6">
+            <h2 className="mb-4 text-lg font-semibold text-foreground">Profile</h2>
+            <div className="flex items-center gap-4">
+              <label htmlFor="profile-select" className="text-sm font-medium text-muted-foreground">
+                Assigned Profile
+              </label>
+              <select
+                id="profile-select"
+                value={user.profileId || ''}
+                onChange={(e) => {
+                  if (e.target.value) {
+                    changeProfileMutation.mutate(e.target.value)
+                  }
+                }}
+                disabled={changeProfileMutation.isPending}
+                className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
+                data-testid="profile-select"
+              >
+                <option value="" disabled>
+                  Select a profile
+                </option>
+                {(profiles ?? []).map((profile) => (
+                  <option key={profile.id} value={profile.id}>
+                    {profile.name}
+                    {profile.system ? ' (System)' : ''}
+                  </option>
+                ))}
+              </select>
+              {currentProfile && (
+                <Link
+                  to={`/${tenantSlug}/profiles/${currentProfile.id}`}
+                  className="text-sm text-primary hover:underline"
+                >
+                  View Profile
+                </Link>
+              )}
+            </div>
+          </div>
+
+          {/* Permission Sets Section */}
+          <div className="rounded-lg border border-border bg-card p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-foreground">Permission Sets</h2>
+              <Button
+                size="sm"
+                onClick={() => setShowAssignModal(true)}
+                data-testid="assign-permission-set-button"
+              >
+                <Plus size={14} className="mr-1" />
+                Assign Permission Set
+              </Button>
+            </div>
+
+            {!userPermissionSets || userPermissionSets.length === 0 ? (
+              <p className="text-sm text-muted-foreground" data-testid="no-permission-sets">
+                No permission sets assigned to this user.
+              </p>
+            ) : (
+              <div className="space-y-2" data-testid="permission-sets-list">
+                {userPermissionSets.map((ps) => (
+                  <div
+                    key={ps.id}
+                    className="flex items-center justify-between rounded-md border border-border px-4 py-3"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Shield size={16} className="text-muted-foreground" />
+                      <div>
+                        <Link
+                          to={`/${tenantSlug}/permission-sets/${ps.id}`}
+                          className="text-sm font-medium text-primary hover:underline"
+                        >
+                          {ps.name}
+                        </Link>
+                        {ps.description && (
+                          <p className="text-xs text-muted-foreground">{ps.description}</p>
+                        )}
+                      </div>
+                      {ps.system && (
+                        <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-950 dark:text-blue-300">
+                          System
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => unassignPermSetMutation.mutate(ps.id)}
+                      disabled={unassignPermSetMutation.isPending}
+                      className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-destructive"
+                      title="Remove permission set"
+                      data-testid={`remove-permset-${ps.id}`}
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {activeTab === 'loginHistory' && (
         <div className="rounded-lg border border-border bg-card p-6">
           {historyLoading ? (
@@ -482,6 +683,73 @@ export function UserDetailPage({ testId = 'user-detail-page' }: UserDetailPagePr
               )}
             </>
           )}
+        </div>
+      )}
+
+      {/* Assign Permission Set Modal */}
+      {showAssignModal && (
+        <div
+          className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="assign-permset-title"
+          data-testid="assign-permission-set-modal"
+        >
+          <div className="w-full max-w-[480px] rounded-lg border border-border bg-card shadow-xl">
+            <div className="flex items-center justify-between border-b border-border px-6 py-4">
+              <h2 id="assign-permset-title" className="text-lg font-semibold text-foreground">
+                Assign Permission Set
+              </h2>
+              <button
+                type="button"
+                className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                onClick={() => setShowAssignModal(false)}
+                aria-label="Close"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="max-h-[400px] overflow-y-auto px-6 py-4">
+              {availablePermissionSets.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  All permission sets are already assigned to this user.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {availablePermissionSets.map((ps) => (
+                    <button
+                      key={ps.id}
+                      type="button"
+                      className="flex w-full items-center gap-3 rounded-md border border-border px-4 py-3 text-left hover:bg-muted"
+                      onClick={() => assignPermSetMutation.mutate(ps.id)}
+                      disabled={assignPermSetMutation.isPending}
+                      data-testid={`assign-permset-${ps.id}`}
+                    >
+                      <Shield size={16} className="shrink-0 text-muted-foreground" />
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-foreground">{ps.name}</div>
+                        {ps.description && (
+                          <div className="truncate text-xs text-muted-foreground">
+                            {ps.description}
+                          </div>
+                        )}
+                      </div>
+                      {ps.system && (
+                        <span className="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-950 dark:text-blue-300">
+                          System
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end border-t border-border px-6 py-4">
+              <Button variant="outline" onClick={() => setShowAssignModal(false)}>
+                Close
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -18,6 +18,7 @@ public class UserDto {
     private String locale;
     private String timezone;
     private String managerId;
+    private String profileId;
     private Instant lastLoginAt;
     private Integer loginCount;
     private boolean mfaEnabled;
@@ -39,6 +40,7 @@ public class UserDto {
         dto.locale = user.getLocale();
         dto.timezone = user.getTimezone();
         dto.managerId = user.getManagerId();
+        dto.profileId = user.getProfileId();
         dto.lastLoginAt = user.getLastLoginAt();
         dto.loginCount = user.getLoginCount();
         dto.mfaEnabled = user.isMfaEnabled();
@@ -75,6 +77,9 @@ public class UserDto {
 
     public String getManagerId() { return managerId; }
     public void setManagerId(String managerId) { this.managerId = managerId; }
+
+    public String getProfileId() { return profileId; }
+    public void setProfileId(String profileId) { this.profileId = profileId; }
 
     public Instant getLastLoginAt() { return lastLoginAt; }
     public void setLastLoginAt(Instant lastLoginAt) { this.lastLoginAt = lastLoginAt; }

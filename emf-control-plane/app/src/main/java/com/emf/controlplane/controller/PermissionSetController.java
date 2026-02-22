@@ -216,4 +216,172 @@ public class PermissionSetController {
         permissionResolutionService.evictPermissionsCache();
         return ResponseEntity.noContent().build();
     }
+
+    // ── System Permissions ──────────────────────────────────────────────
+
+    @GetMapping("/{id}/system-permissions")
+    @Transactional(readOnly = true)
+    @Operation(summary = "Get system permissions", description = "Get system permissions for a permission set")
+    public ResponseEntity<List<PermsetSystemPermission>> getSystemPermissions(@PathVariable String id) {
+        String tenantId = TenantContextHolder.requireTenantId();
+        if (permissionSetRepository.findByIdAndTenantId(id, tenantId).isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(permsetSysPermRepo.findByPermissionSetId(id));
+    }
+
+    @PutMapping("/{id}/system-permissions")
+    @Transactional
+    @Operation(summary = "Set system permissions", description = "Batch set system permissions for a permission set")
+    public ResponseEntity<Void> setSystemPermissions(@PathVariable String id,
+                                                      @RequestBody Map<String, Boolean> permissions) {
+        String tenantId = TenantContextHolder.requireTenantId();
+        Optional<PermissionSet> opt = permissionSetRepository.findByIdAndTenantId(id, tenantId);
+        if (opt.isEmpty()) return ResponseEntity.notFound().build();
+
+        permsetSysPermRepo.deleteByPermissionSetId(id);
+        for (Map.Entry<String, Boolean> entry : permissions.entrySet()) {
+            permsetSysPermRepo.save(new PermsetSystemPermission(id, entry.getKey(), entry.getValue()));
+        }
+
+        auditService.logPermsetUpdated(id, opt.get().getName());
+        permissionResolutionService.evictPermissionsCache();
+        return ResponseEntity.ok().build();
+    }
+
+    // ── Object Permissions ──────────────────────────────────────────────
+
+    @GetMapping("/{id}/object-permissions")
+    @Transactional(readOnly = true)
+    @Operation(summary = "Get object permissions", description = "Get object permissions for a permission set")
+    public ResponseEntity<List<PermsetObjectPermission>> getObjectPermissions(@PathVariable String id) {
+        String tenantId = TenantContextHolder.requireTenantId();
+        if (permissionSetRepository.findByIdAndTenantId(id, tenantId).isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(permsetObjPermRepo.findByPermissionSetId(id));
+    }
+
+    @PutMapping("/{id}/object-permissions")
+    @Transactional
+    @Operation(summary = "Set object permissions", description = "Batch set object permissions for a permission set")
+    public ResponseEntity<Void> setObjectPermissions(@PathVariable String id,
+                                                      @RequestBody List<Map<String, Object>> permissions) {
+        String tenantId = TenantContextHolder.requireTenantId();
+        Optional<PermissionSet> opt = permissionSetRepository.findByIdAndTenantId(id, tenantId);
+        if (opt.isEmpty()) return ResponseEntity.notFound().build();
+
+        permsetObjPermRepo.deleteByPermissionSetId(id);
+        for (Map<String, Object> perm : permissions) {
+            PermsetObjectPermission pop = new PermsetObjectPermission();
+            pop.setPermissionSetId(id);
+            pop.setCollectionId((String) perm.get("collectionId"));
+            pop.setCanCreate(Boolean.TRUE.equals(perm.get("canCreate")));
+            pop.setCanRead(Boolean.TRUE.equals(perm.get("canRead")));
+            pop.setCanEdit(Boolean.TRUE.equals(perm.get("canEdit")));
+            pop.setCanDelete(Boolean.TRUE.equals(perm.get("canDelete")));
+            pop.setCanViewAll(Boolean.TRUE.equals(perm.get("canViewAll")));
+            pop.setCanModifyAll(Boolean.TRUE.equals(perm.get("canModifyAll")));
+            permsetObjPermRepo.save(pop);
+        }
+
+        auditService.logPermsetUpdated(id, opt.get().getName());
+        permissionResolutionService.evictPermissionsCache();
+        return ResponseEntity.ok().build();
+    }
+
+    // ── Field Permissions ───────────────────────────────────────────────
+
+    @GetMapping("/{id}/field-permissions/{collectionId}")
+    @Transactional(readOnly = true)
+    @Operation(summary = "Get field permissions", description = "Get field permissions for a permission set and collection")
+    public ResponseEntity<List<PermsetFieldPermission>> getFieldPermissions(
+            @PathVariable String id, @PathVariable String collectionId) {
+        String tenantId = TenantContextHolder.requireTenantId();
+        if (permissionSetRepository.findByIdAndTenantId(id, tenantId).isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(permsetFieldPermRepo.findByPermissionSetIdAndCollectionId(id, collectionId));
+    }
+
+    @PutMapping("/{id}/field-permissions/{collectionId}")
+    @Transactional
+    @Operation(summary = "Set field permissions", description = "Batch set field permissions for a permission set and collection")
+    public ResponseEntity<Void> setFieldPermissions(
+            @PathVariable String id, @PathVariable String collectionId,
+            @RequestBody List<Map<String, String>> permissions) {
+        String tenantId = TenantContextHolder.requireTenantId();
+        Optional<PermissionSet> opt = permissionSetRepository.findByIdAndTenantId(id, tenantId);
+        if (opt.isEmpty()) return ResponseEntity.notFound().build();
+
+        permsetFieldPermRepo.deleteByPermissionSetIdAndCollectionId(id, collectionId);
+        for (Map<String, String> perm : permissions) {
+            PermsetFieldPermission pfp = new PermsetFieldPermission();
+            pfp.setPermissionSetId(id);
+            pfp.setCollectionId(collectionId);
+            pfp.setFieldId(perm.get("fieldId"));
+            pfp.setVisibility(FieldVisibility.valueOf(perm.get("visibility")));
+            permsetFieldPermRepo.save(pfp);
+        }
+
+        auditService.logPermsetUpdated(id, opt.get().getName());
+        permissionResolutionService.evictPermissionsCache();
+        return ResponseEntity.ok().build();
+    }
+
+    // ── Clone ───────────────────────────────────────────────────────────
+
+    @PostMapping("/{id}/clone")
+    @Transactional
+    @Operation(summary = "Clone permission set", description = "Clone a permission set with all its permissions")
+    public ResponseEntity<PermissionSet> clonePermissionSet(@PathVariable String id,
+                                                             @RequestBody Map<String, String> body) {
+        String tenantId = TenantContextHolder.requireTenantId();
+        Optional<PermissionSet> opt = permissionSetRepository.findByIdAndTenantId(id, tenantId);
+        if (opt.isEmpty()) return ResponseEntity.notFound().build();
+
+        PermissionSet source = opt.get();
+        String newName = body.get("name");
+        if (newName == null || newName.isBlank()) {
+            newName = source.getName() + " (Copy)";
+        }
+        if (permissionSetRepository.existsByTenantIdAndName(tenantId, newName)) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        PermissionSet clone = new PermissionSet(tenantId, newName, source.getDescription(), false);
+        clone = permissionSetRepository.save(clone);
+
+        // Clone system permissions
+        for (PermsetSystemPermission sp : permsetSysPermRepo.findByPermissionSetId(source.getId())) {
+            permsetSysPermRepo.save(new PermsetSystemPermission(clone.getId(), sp.getPermissionName(), sp.isGranted()));
+        }
+
+        // Clone object permissions
+        for (PermsetObjectPermission op : permsetObjPermRepo.findByPermissionSetId(source.getId())) {
+            PermsetObjectPermission clonedOp = new PermsetObjectPermission();
+            clonedOp.setPermissionSetId(clone.getId());
+            clonedOp.setCollectionId(op.getCollectionId());
+            clonedOp.setCanCreate(op.isCanCreate());
+            clonedOp.setCanRead(op.isCanRead());
+            clonedOp.setCanEdit(op.isCanEdit());
+            clonedOp.setCanDelete(op.isCanDelete());
+            clonedOp.setCanViewAll(op.isCanViewAll());
+            clonedOp.setCanModifyAll(op.isCanModifyAll());
+            permsetObjPermRepo.save(clonedOp);
+        }
+
+        // Clone field permissions
+        for (PermsetFieldPermission fp : permsetFieldPermRepo.findByPermissionSetId(source.getId())) {
+            PermsetFieldPermission clonedFp = new PermsetFieldPermission();
+            clonedFp.setPermissionSetId(clone.getId());
+            clonedFp.setCollectionId(fp.getCollectionId());
+            clonedFp.setFieldId(fp.getFieldId());
+            clonedFp.setVisibility(fp.getVisibility());
+            permsetFieldPermRepo.save(clonedFp);
+        }
+
+        auditService.logPermsetCreated(clone.getId(), newName);
+        return ResponseEntity.ok(clone);
+    }
 }

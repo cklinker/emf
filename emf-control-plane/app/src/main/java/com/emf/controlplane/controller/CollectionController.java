@@ -1,6 +1,5 @@
 package com.emf.controlplane.controller;
 
-import com.emf.controlplane.config.CacheConfig;
 import com.emf.controlplane.dto.AddFieldRequest;
 import com.emf.controlplane.dto.CollectionDto;
 import com.emf.controlplane.dto.CollectionVersionDto;
@@ -25,7 +24,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
@@ -167,29 +165,9 @@ public class CollectionController {
 
         log.debug("REST request to get collection: {}", id);
 
-        CollectionDto dto = getCollectionDto(id);
+        CollectionDto dto = collectionService.getCollectionDto(id);
 
         return ResponseEntity.ok(dto);
-    }
-
-    /**
-     * Internal method to get and cache CollectionDto.
-     * Separated from the controller method to avoid caching ResponseEntity.
-     */
-    @Cacheable(value = CacheConfig.COLLECTIONS_CACHE, key = "#id", unless = "#result == null")
-    private CollectionDto getCollectionDto(String id) {
-        Collection collection = collectionService.getCollectionByIdOrName(id);
-
-        // Use the resolved collection ID for subsequent lookups
-        String collectionId = collection.getId();
-
-        // Fetch fields for this collection
-        List<Field> fields = fieldService.listFields(collectionId);
-        List<FieldDto> fieldDtos = fields.stream()
-                .map(FieldDto::fromEntity)
-                .collect(Collectors.toList());
-
-        return CollectionDto.fromEntityWithDetails(collection, fieldDtos);
     }
 
     /**

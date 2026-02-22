@@ -60,16 +60,59 @@ public class SecurityConfig {
 
     private static final Logger log = LoggerFactory.getLogger(SecurityConfig.class);
 
+    /** TTL for the in-memory OIDC provider cache (milliseconds). */
+    private static final long OIDC_PROVIDER_CACHE_TTL_MS = 60_000;
+
     private final JwksCache jwksCache;
     private final OidcProviderRepository oidcProviderRepository;
     private final ControlPlaneProperties properties;
 
-    public SecurityConfig(JwksCache jwksCache, 
+    // In-memory cache for active OIDC providers to avoid 2 DB queries per authenticated request
+    private volatile List<OidcProvider> cachedProviders;
+    private volatile long providerCacheExpiry;
+
+    public SecurityConfig(JwksCache jwksCache,
                          OidcProviderRepository oidcProviderRepository,
                          ControlPlaneProperties properties) {
         this.jwksCache = jwksCache;
         this.oidcProviderRepository = oidcProviderRepository;
         this.properties = properties;
+    }
+
+    /**
+     * Returns the list of active OIDC providers, using an in-memory cache with a 60-second TTL.
+     * This eliminates 2 DB queries per authenticated request (one in MultiProviderJwkSource,
+     * one in RoleExtractingConverter) which were adding ~670ms of pipeline overhead.
+     *
+     * @return list of active OIDC providers
+     */
+    private List<OidcProvider> getActiveProviders() {
+        long now = System.currentTimeMillis();
+        List<OidcProvider> providers = cachedProviders;
+        if (providers != null && now < providerCacheExpiry) {
+            return providers;
+        }
+        synchronized (this) {
+            // Double-check after acquiring lock
+            if (cachedProviders != null && System.currentTimeMillis() < providerCacheExpiry) {
+                return cachedProviders;
+            }
+            try {
+                providers = oidcProviderRepository.findByActiveTrue();
+                cachedProviders = providers;
+                providerCacheExpiry = System.currentTimeMillis() + OIDC_PROVIDER_CACHE_TTL_MS;
+                log.debug("Refreshed OIDC provider cache: {} active providers", providers.size());
+            } catch (Exception e) {
+                log.warn("Failed to refresh OIDC provider cache: {}", e.getMessage());
+                // Return stale data if available, otherwise empty list
+                if (cachedProviders != null) {
+                    providerCacheExpiry = System.currentTimeMillis() + 5_000; // Retry in 5s
+                    return cachedProviders;
+                }
+                return List.of();
+            }
+        }
+        return providers;
     }
 
     /**
@@ -291,7 +334,7 @@ public class SecurityConfig {
         private OidcProvider findProviderByIssuer(String issuer) {
             if (issuer == null) return null;
             try {
-                List<OidcProvider> providers = oidcProviderRepository.findByActiveTrue();
+                List<OidcProvider> providers = getActiveProviders();
                 for (OidcProvider provider : providers) {
                     if (issuer.equals(provider.getIssuer())) {
                         return provider;
@@ -402,8 +445,8 @@ public class SecurityConfig {
         public List<JWK> get(JWKSelector jwkSelector, SecurityContext context) {
             List<JWK> matchingKeys = new ArrayList<>();
 
-            // Get all active OIDC providers
-            List<OidcProvider> providers = oidcProviderRepository.findByActiveTrue();
+            // Get all active OIDC providers (cached for 60s)
+            List<OidcProvider> providers = getActiveProviders();
             
             if (providers.isEmpty()) {
                 log.warn("No active OIDC providers configured - JWT validation may fail");

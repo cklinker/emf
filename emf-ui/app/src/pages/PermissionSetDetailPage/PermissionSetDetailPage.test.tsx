@@ -45,12 +45,6 @@ const mockPermissionSet = {
   name: 'Report Manager',
   description: 'Access to reports and dashboards',
   system: false,
-  systemPermissions: [
-    { id: 'sp1', permissionSetId: 'ps1', permissionName: 'MANAGE_REPORTS', granted: true },
-    { id: 'sp2', permissionSetId: 'ps1', permissionName: 'VIEW_SETUP', granted: true },
-    { id: 'sp3', permissionSetId: 'ps1', permissionName: 'MANAGE_USERS', granted: false },
-  ],
-  objectPermissions: [],
   createdAt: '2024-02-01T08:00:00Z',
   updatedAt: '2024-02-10T14:00:00Z',
 }

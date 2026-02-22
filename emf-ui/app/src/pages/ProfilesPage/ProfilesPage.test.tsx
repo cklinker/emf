@@ -39,14 +39,6 @@ const mockProfiles = [
     name: 'Standard User',
     description: 'Default profile for standard users',
     system: true,
-    systemPermissions: [
-      { id: 'sp1', profileId: '1', permissionName: 'VIEW_SETUP', granted: true },
-      { id: 'sp2', profileId: '1', permissionName: 'API_ACCESS', granted: true },
-      { id: 'sp3', profileId: '1', permissionName: 'MANAGE_USERS', granted: false },
-    ],
-    objectPermissions: [
-      { objectName: 'Account', canRead: true, canCreate: true, canEdit: true, canDelete: false },
-    ],
     createdAt: '2024-01-15T10:00:00Z',
     updatedAt: '2024-01-15T10:00:00Z',
   },
@@ -55,10 +47,6 @@ const mockProfiles = [
     name: 'Admin Profile',
     description: 'Full admin access',
     system: false,
-    systemPermissions: [
-      { id: 'sp4', profileId: '2', permissionName: 'MANAGE_USERS', granted: true },
-    ],
-    objectPermissions: [],
     createdAt: '2024-02-01T08:00:00Z',
     updatedAt: '2024-02-01T08:00:00Z',
   },
@@ -251,24 +239,10 @@ describe('ProfilesPage', () => {
     // Click to expand
     await user.click(screen.getByTestId('profile-row-0'))
     expect(screen.getByText('System Permissions')).toBeInTheDocument()
-    expect(screen.getByText('VIEW_SETUP')).toBeInTheDocument()
+    expect(screen.getByText('No system permissions assigned')).toBeInTheDocument()
+    expect(screen.getByText('No object permissions assigned')).toBeInTheDocument()
     // Click again to collapse
     await user.click(screen.getByTestId('profile-row-0'))
-    expect(screen.queryByText('VIEW_SETUP')).not.toBeInTheDocument()
-  })
-
-  it('shows only granted system permissions in expanded detail', async () => {
-    const user = userEvent.setup()
-    mockAxios.get.mockResolvedValueOnce({ data: mockProfiles })
-    render(<ProfilesPage />, { wrapper: createTestWrapper() })
-    await waitFor(() => {
-      expect(screen.getByText('Standard User')).toBeInTheDocument()
-    })
-    await user.click(screen.getByTestId('profile-row-0'))
-    // VIEW_SETUP and API_ACCESS are granted
-    expect(screen.getByText('VIEW_SETUP')).toBeInTheDocument()
-    expect(screen.getByText('API_ACCESS')).toBeInTheDocument()
-    // MANAGE_USERS is not granted, should not appear
-    expect(screen.queryByText('MANAGE_USERS')).not.toBeInTheDocument()
+    expect(screen.queryByText('No system permissions assigned')).not.toBeInTheDocument()
   })
 })

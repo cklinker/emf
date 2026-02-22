@@ -13,6 +13,7 @@ import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
@@ -68,7 +69,10 @@ public class S3StorageService {
                 ? config.getPublicEndpoint()
                 : config.getEndpoint();
         if (presignerEndpoint != null && !presignerEndpoint.isBlank()) {
-            presignerBuilder.endpointOverride(URI.create(presignerEndpoint));
+            presignerBuilder.endpointOverride(URI.create(presignerEndpoint))
+                    .serviceConfiguration(S3Configuration.builder()
+                            .pathStyleAccessEnabled(true)
+                            .build());
         }
 
         this.s3Client = builder.build();

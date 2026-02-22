@@ -1291,6 +1291,12 @@
     "fileSize": "{{size}}",
     "uploadedBy": "Uploaded by {{user}}"
   },
+  "fileViewer": {
+    "preview": "Preview {{name}}",
+    "noPreview": "Preview is not available for this file type.",
+    "videoNotSupported": "Your browser does not support video playback.",
+    "audioNotSupported": "Your browser does not support audio playback."
+  },
   "wizard": {
     "steps": {
       "basics": "Basics",

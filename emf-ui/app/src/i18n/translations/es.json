@@ -1290,6 +1290,12 @@
     "fileSize": "{{size}}",
     "uploadedBy": "Subido por {{user}}"
   },
+  "fileViewer": {
+    "preview": "Vista previa de {{name}}",
+    "noPreview": "La vista previa no está disponible para este tipo de archivo.",
+    "videoNotSupported": "Su navegador no admite la reproducción de video.",
+    "audioNotSupported": "Su navegador no admite la reproducción de audio."
+  },
   "wizard": {
     "steps": {
       "basics": "Datos basicos",

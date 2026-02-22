@@ -18,6 +18,10 @@ vi.mock('../../context/I18nContext', () => ({
         'attachments.confirmDelete': 'Delete this attachment?',
         'attachments.empty': 'No attachments yet.',
         'attachments.comingSoon': 'Attachments feature coming soon.',
+        'fileViewer.preview': 'Preview {{name}}',
+        'fileViewer.noPreview': 'Preview is not available for this file type.',
+        'fileViewer.videoNotSupported': 'Your browser does not support video playback.',
+        'fileViewer.audioNotSupported': 'Your browser does not support audio playback.',
       }
       return translations[key] || key
     },
@@ -50,6 +54,16 @@ const sampleAttachment = {
   uploadedBy: 'user@example.com',
   uploadedAt: new Date().toISOString(),
   downloadUrl: 'https://s3.example.com/report.pdf',
+}
+
+const imageAttachment = {
+  id: 'att-2',
+  fileName: 'photo.jpg',
+  fileSize: 204800,
+  contentType: 'image/jpeg',
+  uploadedBy: 'user@example.com',
+  uploadedAt: new Date().toISOString(),
+  downloadUrl: 'https://s3.example.com/photo.jpg',
 }
 
 describe('AttachmentsSection', () => {
@@ -268,6 +282,96 @@ describe('AttachmentsSection', () => {
     await waitFor(() => {
       expect(screen.getByTestId('attachments-coming-soon')).toBeDefined()
       expect(screen.getByText('Attachments feature coming soon.')).toBeDefined()
+    })
+  })
+
+  it('renders image thumbnail for image attachments', async () => {
+    mockApiClient.get.mockResolvedValue([imageAttachment])
+
+    render(
+      <TestWrapper>
+        <AttachmentsSection
+          collectionId="col-1"
+          recordId="rec-1"
+          apiClient={mockApiClient as never}
+        />
+      </TestWrapper>
+    )
+
+    await waitFor(() => {
+      const thumbnail = screen.getByTestId('attachment-thumbnail-att-2')
+      expect(thumbnail).toBeDefined()
+      expect(thumbnail.getAttribute('src')).toBe('https://s3.example.com/photo.jpg')
+    })
+  })
+
+  it('renders file-type icon for non-image attachments', async () => {
+    mockApiClient.get.mockResolvedValue([sampleAttachment])
+
+    render(
+      <TestWrapper>
+        <AttachmentsSection
+          collectionId="col-1"
+          recordId="rec-1"
+          apiClient={mockApiClient as never}
+        />
+      </TestWrapper>
+    )
+
+    await waitFor(() => {
+      // PDF attachment should show an icon, not a thumbnail
+      expect(screen.getByTestId('attachment-icon-att-1')).toBeDefined()
+    })
+  })
+
+  it('falls back to icon when image thumbnail fails to load', async () => {
+    mockApiClient.get.mockResolvedValue([imageAttachment])
+
+    render(
+      <TestWrapper>
+        <AttachmentsSection
+          collectionId="col-1"
+          recordId="rec-1"
+          apiClient={mockApiClient as never}
+        />
+      </TestWrapper>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('attachment-thumbnail-att-2')).toBeDefined()
+    })
+
+    // Simulate image load error
+    const img = screen.getByTestId('attachment-thumbnail-att-2')
+    fireEvent.error(img)
+
+    await waitFor(() => {
+      // After error, should show the icon fallback
+      expect(screen.getByTestId('attachment-icon-att-2')).toBeDefined()
+    })
+  })
+
+  it('opens file viewer when attachment is clicked', async () => {
+    mockApiClient.get.mockResolvedValue([sampleAttachment])
+
+    render(
+      <TestWrapper>
+        <AttachmentsSection
+          collectionId="col-1"
+          recordId="rec-1"
+          apiClient={mockApiClient as never}
+        />
+      </TestWrapper>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('attachment-preview-att-1')).toBeDefined()
+    })
+
+    fireEvent.click(screen.getByTestId('attachment-preview-att-1'))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('file-viewer-dialog')).toBeDefined()
     })
   })
 })

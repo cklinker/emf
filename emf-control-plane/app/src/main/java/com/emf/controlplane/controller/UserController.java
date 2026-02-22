@@ -4,9 +4,11 @@ import com.emf.controlplane.dto.CreateUserRequest;
 import com.emf.controlplane.dto.LoginHistoryDto;
 import com.emf.controlplane.dto.UpdateUserRequest;
 import com.emf.controlplane.dto.UserDto;
+import com.emf.controlplane.entity.PermissionSet;
 import com.emf.controlplane.entity.User;
 import com.emf.controlplane.service.UserService;
 import jakarta.validation.Valid;
+import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
@@ -79,5 +81,10 @@ public class UserController {
         var history = userService.getLoginHistory(id, pageable);
         var dtos = history.map(LoginHistoryDto::fromEntity);
         return ResponseEntity.ok(dtos);
+    }
+
+    @GetMapping("/{id}/permission-sets")
+    public ResponseEntity<List<PermissionSet>> getUserPermissionSets(@PathVariable String id) {
+        return ResponseEntity.ok(userService.getUserPermissionSets(id));
     }
 }

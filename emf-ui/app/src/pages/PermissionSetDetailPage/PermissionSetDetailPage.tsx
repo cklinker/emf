@@ -2,19 +2,22 @@
  * PermissionSetDetailPage Component
  *
  * Displays detailed information about a permission set including basic info,
- * system permissions (read-only), and user/group assignments.
- * Provides edit and delete functionality for non-system permission sets.
+ * system permissions (editable for non-system permission sets), object permissions,
+ * and user/group assignments.
+ * Provides edit, clone, and delete functionality for non-system permission sets.
  */
 
 import React, { useState, useCallback, useMemo } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Shield, Lock, ArrowLeft, Trash2, Users, UserCircle } from 'lucide-react'
+import { Shield, Lock, ArrowLeft, Trash2, Users, UserCircle, Pencil, Save, X } from 'lucide-react'
 import { useApi } from '../../context/ApiContext'
 import { useTenant } from '../../context/TenantContext'
 import { useI18n } from '../../context/I18nContext'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
 import { SystemPermissionChecklist } from '@/components/SecurityEditor'
+import { ObjectPermissionMatrix } from '@/components/SecurityEditor'
+import type { ObjectPermission } from '@/components/SecurityEditor'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 
@@ -42,8 +45,6 @@ interface PermissionSetDetail {
   name: string
   description: string | null
   system: boolean
-  systemPermissions?: PermsetSystemPermission[]
-  objectPermissions?: PermsetObjectPermission[]
   createdAt: string
   updatedAt: string
 }
@@ -67,6 +68,20 @@ interface Assignments {
   groups: GroupAssignment[]
 }
 
+interface CollectionSummary {
+  id: string
+  name: string
+  displayName?: string
+}
+
+interface PageResponse<T> {
+  content: T[]
+  totalElements: number
+  totalPages: number
+  size: number
+  number: number
+}
+
 export interface PermissionSetDetailPageProps {
   testId?: string
 }
@@ -83,12 +98,14 @@ export function PermissionSetDetailPage({
   const { showToast } = useToast()
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [isEditingPermissions, setIsEditingPermissions] = useState(false)
+  const [localPermissions, setLocalPermissions] = useState<Record<string, boolean>>({})
 
   // Fetch permission set detail
   const {
     data: permissionSet,
-    isLoading,
-    error,
+    isLoading: isLoadingPermSet,
+    error: permSetError,
     refetch,
   } = useQuery({
     queryKey: ['permission-set', id],
@@ -96,11 +113,93 @@ export function PermissionSetDetailPage({
     enabled: !!id,
   })
 
+  // Fetch system permissions
+  const {
+    data: systemPermissions,
+    isLoading: isLoadingSysPerms,
+    error: sysPermsError,
+  } = useQuery({
+    queryKey: ['permission-set-system-permissions', id],
+    queryFn: () =>
+      apiClient.get<PermsetSystemPermission[]>(`/control/permission-sets/${id}/system-permissions`),
+    enabled: !!id,
+  })
+
+  // Fetch object permissions
+  const { data: objectPermissions } = useQuery({
+    queryKey: ['permission-set-object-permissions', id],
+    queryFn: () =>
+      apiClient.get<PermsetObjectPermission[]>(`/control/permission-sets/${id}/object-permissions`),
+    enabled: !!id,
+  })
+
+  // Fetch collections for name resolution
+  const { data: collectionsData } = useQuery({
+    queryKey: ['collections-summary'],
+    queryFn: () => apiClient.get<PageResponse<CollectionSummary>>('/control/collections?size=1000'),
+  })
+
   // Fetch assignments
   const { data: assignments } = useQuery({
     queryKey: ['permission-set-assignments', id],
     queryFn: () => apiClient.get<Assignments>(`/control/permission-sets/${id}/assignments`),
     enabled: !!id,
+  })
+
+  // Convert system permissions array → Record<string, boolean> for checklist
+  const permissionsMap = useMemo(() => {
+    const map: Record<string, boolean> = {}
+    if (systemPermissions) {
+      systemPermissions.forEach((sp) => {
+        map[sp.permissionName] = sp.granted
+      })
+    }
+    return map
+  }, [systemPermissions])
+
+  // The displayed permissions: use localPermissions when editing, permissionsMap when not
+  const displayedPermissions = isEditingPermissions ? localPermissions : permissionsMap
+
+  // Merge object permissions with collection names
+  const objectPermissionsWithNames: ObjectPermission[] = useMemo(() => {
+    if (!objectPermissions) return []
+    const collections = collectionsData?.content ?? []
+    const collectionMap = new Map(collections.map((c) => [c.id, c.displayName || c.name]))
+    return objectPermissions.map((op) => ({
+      collectionId: op.collectionId,
+      collectionName: collectionMap.get(op.collectionId) ?? op.collectionId,
+      canCreate: op.canCreate,
+      canRead: op.canRead,
+      canEdit: op.canEdit,
+      canDelete: op.canDelete,
+      canViewAll: op.canViewAll,
+      canModifyAll: op.canModifyAll,
+    }))
+  }, [objectPermissions, collectionsData])
+
+  // Check if permissions have been modified
+  const hasPermissionChanges = useMemo(() => {
+    const keys = new Set([...Object.keys(permissionsMap), ...Object.keys(localPermissions)])
+    for (const key of keys) {
+      if ((permissionsMap[key] ?? false) !== (localPermissions[key] ?? false)) {
+        return true
+      }
+    }
+    return false
+  }, [permissionsMap, localPermissions])
+
+  // Save system permissions mutation
+  const savePermissionsMutation = useMutation({
+    mutationFn: (permissions: Record<string, boolean>) =>
+      apiClient.put(`/control/permission-sets/${id}/system-permissions`, permissions),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['permission-set-system-permissions', id] })
+      showToast('System permissions saved successfully', 'success')
+      setIsEditingPermissions(false)
+    },
+    onError: (error: Error) => {
+      showToast(error.message || 'Failed to save permissions', 'error')
+    },
   })
 
   // Delete mutation
@@ -116,16 +215,24 @@ export function PermissionSetDetailPage({
     },
   })
 
-  // Convert system permissions to Record<string, boolean> for SystemPermissionChecklist
-  const permissionsMap = useMemo(() => {
-    const map: Record<string, boolean> = {}
-    if (permissionSet?.systemPermissions) {
-      permissionSet.systemPermissions.forEach((sp) => {
-        map[sp.permissionName] = sp.granted
-      })
-    }
-    return map
-  }, [permissionSet])
+  // Handlers
+  const handlePermissionChange = useCallback((name: string, granted: boolean) => {
+    setLocalPermissions((prev) => ({ ...prev, [name]: granted }))
+  }, [])
+
+  const handleEditPermissions = useCallback(() => {
+    setLocalPermissions(permissionsMap)
+    setIsEditingPermissions(true)
+  }, [permissionsMap])
+
+  const handleCancelEdit = useCallback(() => {
+    setLocalPermissions(permissionsMap)
+    setIsEditingPermissions(false)
+  }, [permissionsMap])
+
+  const handleSavePermissions = useCallback(() => {
+    savePermissionsMutation.mutate(localPermissions)
+  }, [savePermissionsMutation, localPermissions])
 
   const handleDeleteClick = useCallback(() => {
     setDeleteDialogOpen(true)
@@ -138,6 +245,10 @@ export function PermissionSetDetailPage({
   const handleDeleteCancel = useCallback(() => {
     setDeleteDialogOpen(false)
   }, [])
+
+  // Loading state
+  const isLoading = isLoadingPermSet || isLoadingSysPerms
+  const error = permSetError || sysPermsError
 
   if (isLoading) {
     return (
@@ -242,14 +353,66 @@ export function PermissionSetDetailPage({
 
       {/* System Permissions */}
       <section data-testid="system-permissions-section">
-        <h2 className="mb-4 text-lg font-semibold text-foreground">System Permissions</h2>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-foreground">System Permissions</h2>
+          {!permissionSet.system && (
+            <div className="flex gap-2">
+              {isEditingPermissions ? (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCancelEdit}
+                    disabled={savePermissionsMutation.isPending}
+                    data-testid="cancel-edit-button"
+                  >
+                    <X size={14} className="mr-1" />
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleSavePermissions}
+                    disabled={!hasPermissionChanges || savePermissionsMutation.isPending}
+                    data-testid="save-permissions-button"
+                  >
+                    <Save size={14} className="mr-1" />
+                    {savePermissionsMutation.isPending ? 'Saving...' : 'Save'}
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleEditPermissions}
+                  data-testid="edit-permissions-button"
+                >
+                  <Pencil size={14} className="mr-1" />
+                  Edit Permissions
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
         <SystemPermissionChecklist
-          permissions={permissionsMap}
-          onChange={() => {}}
-          readOnly={true}
+          permissions={displayedPermissions}
+          onChange={handlePermissionChange}
+          readOnly={permissionSet.system || !isEditingPermissions}
           testId="system-permissions"
         />
       </section>
+
+      {/* Object Permissions */}
+      {objectPermissionsWithNames.length > 0 && (
+        <section data-testid="object-permissions-section">
+          <h2 className="mb-4 text-lg font-semibold text-foreground">Object Permissions</h2>
+          <ObjectPermissionMatrix
+            permissions={objectPermissionsWithNames}
+            onChange={() => {}}
+            readOnly={true}
+            testId="object-permissions"
+          />
+        </section>
+      )}
 
       {/* Assignments */}
       <section data-testid="assignments-section">

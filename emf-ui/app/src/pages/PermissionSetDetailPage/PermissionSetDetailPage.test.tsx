@@ -4,7 +4,8 @@
  * Unit tests for the PermissionSetDetailPage component.
  * Tests cover:
  * - Rendering permission set detail with basic info
- * - System permissions display (read-only)
+ * - System permissions display (editable for non-system)
+ * - Object permissions display
  * - Assignments display (users and groups)
  * - Delete functionality
  * - System permission set protection
@@ -56,6 +57,11 @@ const mockSystemPermissionSet = {
   system: true,
 }
 
+const mockSystemPermissions = [
+  { id: 'sp1', permissionSetId: 'ps1', permissionName: 'MANAGE_USERS', granted: true },
+  { id: 'sp2', permissionSetId: 'ps1', permissionName: 'VIEW_SETUP', granted: false },
+]
+
 const mockAssignments = {
   users: [
     { id: 'ua1', userId: 'user-1', permissionSetId: 'ps1', createdAt: '2024-03-01T10:00:00Z' },
@@ -74,6 +80,42 @@ const mockAssignments = {
 const emptyAssignments = {
   users: [],
   groups: [],
+}
+
+function setupMocks(permSet = mockPermissionSet) {
+  mockAxios.get.mockImplementation((url: string) => {
+    if (url.includes('/system-permissions')) {
+      return Promise.resolve({ data: mockSystemPermissions })
+    }
+    if (url.includes('/object-permissions')) {
+      return Promise.resolve({ data: [] })
+    }
+    if (url.includes('/assignments')) {
+      return Promise.resolve({ data: mockAssignments })
+    }
+    if (url.includes('/collections')) {
+      return Promise.resolve({ data: { content: [], totalElements: 0, totalPages: 0 } })
+    }
+    return Promise.resolve({ data: permSet })
+  })
+}
+
+function setupMocksWithEmptyAssignments(permSet = mockPermissionSet) {
+  mockAxios.get.mockImplementation((url: string) => {
+    if (url.includes('/system-permissions')) {
+      return Promise.resolve({ data: [] })
+    }
+    if (url.includes('/object-permissions')) {
+      return Promise.resolve({ data: [] })
+    }
+    if (url.includes('/assignments')) {
+      return Promise.resolve({ data: emptyAssignments })
+    }
+    if (url.includes('/collections')) {
+      return Promise.resolve({ data: { content: [], totalElements: 0, totalPages: 0 } })
+    }
+    return Promise.resolve({ data: permSet })
+  })
 }
 
 describe('PermissionSetDetailPage', () => {
@@ -105,12 +147,7 @@ describe('PermissionSetDetailPage', () => {
   })
 
   it('renders permission set detail with basic info', async () => {
-    mockAxios.get.mockImplementation((url: string) => {
-      if (url.includes('/assignments')) {
-        return Promise.resolve({ data: mockAssignments })
-      }
-      return Promise.resolve({ data: mockPermissionSet })
-    })
+    setupMocks()
     render(<PermissionSetDetailPage />, { wrapper: createTestWrapper() })
     await waitFor(() => {
       expect(screen.getByText('Report Manager')).toBeInTheDocument()
@@ -119,12 +156,7 @@ describe('PermissionSetDetailPage', () => {
   })
 
   it('renders system permissions section', async () => {
-    mockAxios.get.mockImplementation((url: string) => {
-      if (url.includes('/assignments')) {
-        return Promise.resolve({ data: mockAssignments })
-      }
-      return Promise.resolve({ data: mockPermissionSet })
-    })
+    setupMocks()
     render(<PermissionSetDetailPage />, { wrapper: createTestWrapper() })
     await waitFor(() => {
       expect(screen.getByText('System Permissions')).toBeInTheDocument()
@@ -132,13 +164,26 @@ describe('PermissionSetDetailPage', () => {
     expect(screen.getByTestId('system-permissions-section')).toBeInTheDocument()
   })
 
-  it('renders user and group assignments', async () => {
-    mockAxios.get.mockImplementation((url: string) => {
-      if (url.includes('/assignments')) {
-        return Promise.resolve({ data: mockAssignments })
-      }
-      return Promise.resolve({ data: mockPermissionSet })
+  it('shows edit permissions button for non-system permission sets', async () => {
+    setupMocks()
+    render(<PermissionSetDetailPage />, { wrapper: createTestWrapper() })
+    await waitFor(() => {
+      expect(screen.getByText('Report Manager')).toBeInTheDocument()
     })
+    expect(screen.getByTestId('edit-permissions-button')).toBeInTheDocument()
+  })
+
+  it('does not show edit permissions button for system permission sets', async () => {
+    setupMocks(mockSystemPermissionSet)
+    render(<PermissionSetDetailPage />, { wrapper: createTestWrapper() })
+    await waitFor(() => {
+      expect(screen.getByText('System Admin')).toBeInTheDocument()
+    })
+    expect(screen.queryByTestId('edit-permissions-button')).not.toBeInTheDocument()
+  })
+
+  it('renders user and group assignments', async () => {
+    setupMocks()
     render(<PermissionSetDetailPage />, { wrapper: createTestWrapper() })
     await waitFor(() => {
       expect(screen.getByText('Assigned Users (2)')).toBeInTheDocument()
@@ -150,12 +195,7 @@ describe('PermissionSetDetailPage', () => {
   })
 
   it('renders empty assignment messages', async () => {
-    mockAxios.get.mockImplementation((url: string) => {
-      if (url.includes('/assignments')) {
-        return Promise.resolve({ data: emptyAssignments })
-      }
-      return Promise.resolve({ data: mockPermissionSet })
-    })
+    setupMocksWithEmptyAssignments()
     render(<PermissionSetDetailPage />, { wrapper: createTestWrapper() })
     await waitFor(() => {
       expect(screen.getByTestId('no-user-assignments')).toBeInTheDocument()
@@ -164,12 +204,7 @@ describe('PermissionSetDetailPage', () => {
   })
 
   it('shows delete button for non-system permission sets', async () => {
-    mockAxios.get.mockImplementation((url: string) => {
-      if (url.includes('/assignments')) {
-        return Promise.resolve({ data: emptyAssignments })
-      }
-      return Promise.resolve({ data: mockPermissionSet })
-    })
+    setupMocksWithEmptyAssignments()
     render(<PermissionSetDetailPage />, { wrapper: createTestWrapper() })
     await waitFor(() => {
       expect(screen.getByText('Report Manager')).toBeInTheDocument()
@@ -178,12 +213,7 @@ describe('PermissionSetDetailPage', () => {
   })
 
   it('does not show delete button for system permission sets', async () => {
-    mockAxios.get.mockImplementation((url: string) => {
-      if (url.includes('/assignments')) {
-        return Promise.resolve({ data: emptyAssignments })
-      }
-      return Promise.resolve({ data: mockSystemPermissionSet })
-    })
+    setupMocksWithEmptyAssignments(mockSystemPermissionSet)
     render(<PermissionSetDetailPage />, { wrapper: createTestWrapper() })
     await waitFor(() => {
       expect(screen.getByText('System Admin')).toBeInTheDocument()
@@ -193,12 +223,7 @@ describe('PermissionSetDetailPage', () => {
 
   it('opens delete confirmation dialog', async () => {
     const user = userEvent.setup()
-    mockAxios.get.mockImplementation((url: string) => {
-      if (url.includes('/assignments')) {
-        return Promise.resolve({ data: emptyAssignments })
-      }
-      return Promise.resolve({ data: mockPermissionSet })
-    })
+    setupMocksWithEmptyAssignments()
     render(<PermissionSetDetailPage />, { wrapper: createTestWrapper() })
     await waitFor(() => {
       expect(screen.getByText('Report Manager')).toBeInTheDocument()
@@ -210,12 +235,7 @@ describe('PermissionSetDetailPage', () => {
   })
 
   it('has back link to permission sets list', async () => {
-    mockAxios.get.mockImplementation((url: string) => {
-      if (url.includes('/assignments')) {
-        return Promise.resolve({ data: emptyAssignments })
-      }
-      return Promise.resolve({ data: mockPermissionSet })
-    })
+    setupMocksWithEmptyAssignments()
     render(<PermissionSetDetailPage />, { wrapper: createTestWrapper() })
     await waitFor(() => {
       expect(screen.getByText('Report Manager')).toBeInTheDocument()

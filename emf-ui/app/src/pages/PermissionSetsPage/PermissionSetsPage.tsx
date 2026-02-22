@@ -9,7 +9,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { Shield, Plus, Lock, Pencil, Trash2 } from 'lucide-react'
+import { Shield, Plus, Lock, Pencil, Copy, Trash2 } from 'lucide-react'
 import { useApi } from '../../context/ApiContext'
 import { useTenant } from '../../context/TenantContext'
 import { useI18n } from '../../context/I18nContext'
@@ -300,6 +300,18 @@ export function PermissionSetsPage({
     },
   })
 
+  const cloneMutation = useMutation({
+    mutationFn: (id: string) =>
+      apiClient.post<PermissionSet>(`/control/permission-sets/${id}/clone`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['permission-sets'] })
+      showToast('Permission set cloned successfully', 'success')
+    },
+    onError: (error: Error) => {
+      showToast(error.message || 'Failed to clone permission set', 'error')
+    },
+  })
+
   // Handlers
   const handleCreate = useCallback(() => {
     setEditingPermissionSet(undefined)
@@ -342,6 +354,13 @@ export function PermissionSetsPage({
     setDeleteDialogOpen(false)
     setPermissionSetToDelete(null)
   }, [])
+
+  const handleClone = useCallback(
+    (ps: PermissionSet) => {
+      cloneMutation.mutate(ps.id)
+    },
+    [cloneMutation]
+  )
 
   const handleRowClick = useCallback(
     (ps: PermissionSet) => {
@@ -505,6 +524,16 @@ export function PermissionSetsPage({
                           Edit
                         </button>
                       )}
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-xs font-medium text-primary hover:border-primary hover:bg-muted"
+                        onClick={() => handleClone(ps)}
+                        data-testid={`clone-button-${index}`}
+                        title="Clone permission set"
+                      >
+                        <Copy size={12} />
+                        Clone
+                      </button>
                       {!ps.system && (
                         <button
                           type="button"

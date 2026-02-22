@@ -15,5 +15,7 @@ public interface PermsetFieldPermissionRepository extends JpaRepository<PermsetF
 
     void deleteByPermissionSetId(String permissionSetId);
 
+    void deleteByPermissionSetIdAndCollectionId(String permissionSetId, String collectionId);
+
     void deleteByFieldId(String fieldId);
 }

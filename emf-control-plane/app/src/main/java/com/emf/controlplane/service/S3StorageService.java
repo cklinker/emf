@@ -56,15 +56,25 @@ public class S3StorageService {
                 .credentialsProvider(credentials)
                 .region(Region.of(config.getRegion()));
 
+        // S3Client uses the (internal) endpoint for uploads/deletes
         if (config.getEndpoint() != null && !config.getEndpoint().isBlank()) {
             URI endpoint = URI.create(config.getEndpoint());
             builder.endpointOverride(endpoint).forcePathStyle(true);
-            presignerBuilder.endpointOverride(endpoint);
+        }
+
+        // S3Presigner uses the public endpoint for browser-accessible download URLs,
+        // falling back to the internal endpoint if not configured
+        String presignerEndpoint = config.getPublicEndpoint() != null && !config.getPublicEndpoint().isBlank()
+                ? config.getPublicEndpoint()
+                : config.getEndpoint();
+        if (presignerEndpoint != null && !presignerEndpoint.isBlank()) {
+            presignerBuilder.endpointOverride(URI.create(presignerEndpoint));
         }
 
         this.s3Client = builder.build();
         this.s3Presigner = presignerBuilder.build();
-        log.info("S3 storage initialized: bucket={}, endpoint={}", config.getBucket(), config.getEndpoint());
+        log.info("S3 storage initialized: bucket={}, endpoint={}, publicEndpoint={}",
+                config.getBucket(), config.getEndpoint(), config.getPublicEndpoint());
     }
 
     @PreDestroy

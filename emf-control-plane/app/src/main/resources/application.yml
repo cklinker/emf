@@ -189,6 +189,7 @@ emf:
     s3:
       enabled: ${S3_ENABLED:false}
       endpoint: ${S3_ENDPOINT:}
+      public-endpoint: ${S3_PUBLIC_ENDPOINT:}
       region: ${S3_REGION:garage}
       bucket: ${S3_BUCKET:emf-attachments}
       access-key: ${S3_ACCESS_KEY:}

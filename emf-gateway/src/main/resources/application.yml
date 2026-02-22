@@ -47,7 +47,7 @@ spring:
             maxSize: 10MB          # Default 10 MB request body limit
       httpclient:
         connect-timeout: 5000
-        response-timeout: 30s
+        response-timeout: 120s
         max-header-size: 16384     # 16 KB max header size to prevent header-based attacks
         pool:
           max-connections: 500

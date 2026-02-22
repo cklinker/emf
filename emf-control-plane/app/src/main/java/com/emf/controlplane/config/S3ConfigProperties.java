@@ -16,6 +16,7 @@ public class S3ConfigProperties {
 
     private boolean enabled = false;
     private String endpoint = "";
+    private String publicEndpoint = "";
     private String region = "garage";
     private String bucket = "emf-attachments";
     private String accessKey = "";
@@ -36,6 +37,14 @@ public class S3ConfigProperties {
 
     public void setEndpoint(String endpoint) {
         this.endpoint = endpoint;
+    }
+
+    public String getPublicEndpoint() {
+        return publicEndpoint;
+    }
+
+    public void setPublicEndpoint(String publicEndpoint) {
+        this.publicEndpoint = publicEndpoint;
     }
 
     public String getRegion() {

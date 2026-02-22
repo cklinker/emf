@@ -240,6 +240,22 @@ public class PermissionResolutionService {
     }
 
     /**
+     * Resolves the platform user ID from an email address within a tenant.
+     * Results are cached for 5 minutes since the email→userId mapping rarely changes.
+     * This eliminates a database query on every @PreAuthorize check.
+     *
+     * @param tenantId the tenant UUID
+     * @param email    the user's email address
+     * @return the user ID, or null if not found
+     */
+    @Cacheable(value = CacheConfig.USER_ID_CACHE, key = "'userId:' + #tenantId + ':' + #email")
+    public String resolveUserId(String tenantId, String email) {
+        return userRepository.findByTenantIdAndEmail(tenantId, email)
+                .map(User::getId)
+                .orElse(null);
+    }
+
+    /**
      * Evicts all entries from the permissions cache.
      * Call this when profiles, permission sets, or user/group assignments change.
      */

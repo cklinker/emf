@@ -1,8 +1,6 @@
 package com.emf.controlplane.service;
 
 import com.emf.controlplane.dto.ObjectPermissions;
-import com.emf.controlplane.entity.FieldVisibility;
-import com.emf.controlplane.entity.User;
 import com.emf.controlplane.repository.FileAttachmentRepository;
 import com.emf.controlplane.repository.NoteRepository;
 import com.emf.controlplane.repository.UserRepository;
@@ -13,8 +11,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.access.expression.method.MethodSecurityExpressionOperations;
 import org.springframework.stereotype.Service;
-
-import java.util.Map;
 
 /**
  * Central authorization service used by @PreAuthorize annotations.
@@ -152,11 +148,10 @@ public class SecurityService {
     /**
      * Resolves the platform_user ID from the JWT authentication.
      * The JWT principal name is the email address; we look up the user by email in the tenant.
+     * Delegates to PermissionResolutionService for cached email→userId resolution.
      */
     private String resolveUserId(Authentication auth, String tenantId) {
         String email = auth.getName();
-        return userRepository.findByTenantIdAndEmail(tenantId, email)
-                .map(User::getId)
-                .orElse(null);
+        return permissionService.resolveUserId(tenantId, email);
     }
 }

@@ -27,6 +27,7 @@ import { RelatedRecordsSection } from '../../components/RelatedRecordsSection/Re
 import { ActivityTimeline } from '../../components/ActivityTimeline/ActivityTimeline'
 import { NotesSection } from '../../components/NotesSection/NotesSection'
 import { AttachmentsSection } from '../../components/AttachmentsSection/AttachmentsSection'
+import { useRecordContext } from '../../hooks/useRecordContext'
 import { usePageLayout } from '../../hooks/usePageLayout'
 import { useLookupDisplayMap } from '../../hooks/useLookupDisplayMap'
 import { LayoutFieldSections } from '../../components/LayoutFieldSections/LayoutFieldSections'
@@ -352,6 +353,13 @@ export function ResourceDetailPage({
     queryFn: () => fetchResource(apiClient, collectionName, resourceId),
     enabled: !!collectionName && !!resourceId,
   })
+
+  // Fetch notes and attachments in a single API call
+  const {
+    notes,
+    attachments,
+    invalidate: invalidateRecordContext,
+  } = useRecordContext(schema?.id, resourceId)
 
   // Delete mutation
   const deleteMutation = useMutation({
@@ -1019,10 +1027,22 @@ export function ResourceDetailPage({
       )}
 
       {/* Notes Section (T20) */}
-      <NotesSection collectionId={schema.id} recordId={resourceId} apiClient={apiClient} />
+      <NotesSection
+        collectionId={schema.id}
+        recordId={resourceId}
+        apiClient={apiClient}
+        notes={notes}
+        onMutate={invalidateRecordContext}
+      />
 
       {/* Attachments Section (T20) */}
-      <AttachmentsSection collectionId={schema.id} recordId={resourceId} apiClient={apiClient} />
+      <AttachmentsSection
+        collectionId={schema.id}
+        recordId={resourceId}
+        apiClient={apiClient}
+        attachments={attachments}
+        onMutate={invalidateRecordContext}
+      />
 
       {/* Activity Timeline (T7) */}
       <ActivityTimeline

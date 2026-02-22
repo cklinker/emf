@@ -63,6 +63,7 @@ import { useAuth } from '@/context/AuthContext'
 import { useApi } from '@/context/ApiContext'
 import { usePageLayout } from '@/hooks/usePageLayout'
 import { useLookupDisplayMap } from '@/hooks/useLookupDisplayMap'
+import { useRecordContext } from '@/hooks/useRecordContext'
 import type { FieldDefinition } from '@/hooks/useCollectionSchema'
 import type { QuickActionExecutionContext } from '@/types/quickActions'
 
@@ -181,6 +182,13 @@ export function ObjectDetailPage(): React.ReactElement {
     isFieldVisible,
     isLoading: permissionsLoading,
   } = useCollectionPermissions(collectionName)
+
+  // Fetch notes and attachments in a single API call
+  const {
+    notes,
+    attachments,
+    invalidate: invalidateRecordContext,
+  } = useRecordContext(schema?.id, recordId)
 
   // Screen reader announcements
   const { announce } = useAnnounce()
@@ -544,8 +552,20 @@ export function ObjectDetailPage(): React.ReactElement {
       {schema && recordId && (
         <div className="space-y-4">
           <Separator />
-          <NotesSection collectionId={schema.id} recordId={recordId} apiClient={apiClient} />
-          <AttachmentsSection collectionId={schema.id} recordId={recordId} apiClient={apiClient} />
+          <NotesSection
+            collectionId={schema.id}
+            recordId={recordId}
+            apiClient={apiClient}
+            notes={notes}
+            onMutate={invalidateRecordContext}
+          />
+          <AttachmentsSection
+            collectionId={schema.id}
+            recordId={recordId}
+            apiClient={apiClient}
+            attachments={attachments}
+            onMutate={invalidateRecordContext}
+          />
         </div>
       )}
 

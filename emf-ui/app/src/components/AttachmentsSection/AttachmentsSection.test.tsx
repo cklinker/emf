@@ -74,103 +74,87 @@ describe('AttachmentsSection', () => {
     mockApiClient = createMockApiClient()
   })
 
-  it('renders attachment section with title', async () => {
-    mockApiClient.get.mockResolvedValue([])
-
+  it('renders attachment section with title', () => {
     render(
       <TestWrapper>
         <AttachmentsSection
           collectionId="col-1"
           recordId="rec-1"
           apiClient={mockApiClient as never}
+          attachments={[]}
         />
       </TestWrapper>
     )
 
-    await waitFor(() => {
-      expect(screen.getByTestId('attachments-section')).toBeDefined()
-      expect(screen.getByText('Attachments')).toBeDefined()
-    })
+    expect(screen.getByTestId('attachments-section')).toBeDefined()
+    expect(screen.getByText('Attachments')).toBeDefined()
   })
 
-  it('shows empty state when no attachments', async () => {
-    mockApiClient.get.mockResolvedValue([])
-
+  it('shows empty state when no attachments', () => {
     render(
       <TestWrapper>
         <AttachmentsSection
           collectionId="col-1"
           recordId="rec-1"
           apiClient={mockApiClient as never}
+          attachments={[]}
         />
       </TestWrapper>
     )
 
-    await waitFor(() => {
-      expect(screen.getByTestId('attachments-empty')).toBeDefined()
-      expect(screen.getByText('No attachments yet.')).toBeDefined()
-    })
+    expect(screen.getByTestId('attachments-empty')).toBeDefined()
+    expect(screen.getByText('No attachments yet.')).toBeDefined()
   })
 
-  it('renders attachments list when data exists', async () => {
-    mockApiClient.get.mockResolvedValue([sampleAttachment])
-
+  it('renders attachments list when data exists', () => {
     render(
       <TestWrapper>
         <AttachmentsSection
           collectionId="col-1"
           recordId="rec-1"
           apiClient={mockApiClient as never}
+          attachments={[sampleAttachment]}
         />
       </TestWrapper>
     )
 
-    await waitFor(() => {
-      expect(screen.getByText('report.pdf')).toBeDefined()
-      expect(screen.getByTestId('attachment-att-1')).toBeDefined()
-    })
+    expect(screen.getByText('report.pdf')).toBeDefined()
+    expect(screen.getByTestId('attachment-att-1')).toBeDefined()
   })
 
-  it('renders upload button', async () => {
-    mockApiClient.get.mockResolvedValue([])
-
+  it('renders upload button', () => {
     render(
       <TestWrapper>
         <AttachmentsSection
           collectionId="col-1"
           recordId="rec-1"
           apiClient={mockApiClient as never}
+          attachments={[]}
         />
       </TestWrapper>
     )
 
-    await waitFor(() => {
-      expect(screen.getByTestId('attachments-upload-button')).toBeDefined()
-    })
+    expect(screen.getByTestId('attachments-upload-button')).toBeDefined()
   })
 
-  it('has a hidden file input for uploads', async () => {
-    mockApiClient.get.mockResolvedValue([])
-
+  it('has a hidden file input for uploads', () => {
     render(
       <TestWrapper>
         <AttachmentsSection
           collectionId="col-1"
           recordId="rec-1"
           apiClient={mockApiClient as never}
+          attachments={[]}
         />
       </TestWrapper>
     )
 
-    await waitFor(() => {
-      const fileInput = screen.getByTestId('attachments-file-input')
-      expect(fileInput).toBeDefined()
-      expect(fileInput.getAttribute('type')).toBe('file')
-    })
+    const fileInput = screen.getByTestId('attachments-file-input')
+    expect(fileInput).toBeDefined()
+    expect(fileInput.getAttribute('type')).toBe('file')
   })
 
   it('triggers file upload when file is selected', async () => {
-    mockApiClient.get.mockResolvedValue([])
     mockApiClient.postFormData.mockResolvedValue(sampleAttachment)
 
     render(
@@ -179,13 +163,10 @@ describe('AttachmentsSection', () => {
           collectionId="col-1"
           recordId="rec-1"
           apiClient={mockApiClient as never}
+          attachments={[]}
         />
       </TestWrapper>
     )
-
-    await waitFor(() => {
-      expect(screen.getByTestId('attachments-file-input')).toBeDefined()
-    })
 
     const fileInput = screen.getByTestId('attachments-file-input')
     const file = new File(['test content'], 'test.txt', { type: 'text/plain' })
@@ -200,28 +181,24 @@ describe('AttachmentsSection', () => {
     })
   })
 
-  it('renders download button for each attachment', async () => {
-    mockApiClient.get.mockResolvedValue([sampleAttachment])
-
+  it('renders download button for each attachment', () => {
     render(
       <TestWrapper>
         <AttachmentsSection
           collectionId="col-1"
           recordId="rec-1"
           apiClient={mockApiClient as never}
+          attachments={[sampleAttachment]}
         />
       </TestWrapper>
     )
 
-    await waitFor(() => {
-      const downloadButton = screen.getByTestId('attachment-download-att-1')
-      expect(downloadButton).toBeDefined()
-    })
+    const downloadButton = screen.getByTestId('attachment-download-att-1')
+    expect(downloadButton).toBeDefined()
   })
 
   it('opens download URL when download button is clicked with downloadUrl', async () => {
     const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null)
-    mockApiClient.get.mockResolvedValue([sampleAttachment])
 
     render(
       <TestWrapper>
@@ -229,13 +206,10 @@ describe('AttachmentsSection', () => {
           collectionId="col-1"
           recordId="rec-1"
           apiClient={mockApiClient as never}
+          attachments={[sampleAttachment]}
         />
       </TestWrapper>
     )
-
-    await waitFor(() => {
-      expect(screen.getByTestId('attachment-download-att-1')).toBeDefined()
-    })
 
     fireEvent.click(screen.getByTestId('attachment-download-att-1'))
 
@@ -246,9 +220,8 @@ describe('AttachmentsSection', () => {
     openSpy.mockRestore()
   })
 
-  it('disables download button when downloadUrl is not present', async () => {
+  it('disables download button when downloadUrl is not present', () => {
     const attachmentWithoutUrl = { ...sampleAttachment, downloadUrl: null }
-    mockApiClient.get.mockResolvedValue([attachmentWithoutUrl])
 
     render(
       <TestWrapper>
@@ -256,19 +229,16 @@ describe('AttachmentsSection', () => {
           collectionId="col-1"
           recordId="rec-1"
           apiClient={mockApiClient as never}
+          attachments={[attachmentWithoutUrl]}
         />
       </TestWrapper>
     )
 
-    await waitFor(() => {
-      const downloadButton = screen.getByTestId('attachment-download-att-1')
-      expect(downloadButton.hasAttribute('disabled')).toBe(true)
-    })
+    const downloadButton = screen.getByTestId('attachment-download-att-1')
+    expect(downloadButton.hasAttribute('disabled')).toBe(true)
   })
 
-  it('shows coming soon when API returns 404', async () => {
-    mockApiClient.get.mockRejectedValue(new Error('Not Found'))
-
+  it('shows empty state when attachments prop is undefined', () => {
     render(
       <TestWrapper>
         <AttachmentsSection
@@ -279,67 +249,55 @@ describe('AttachmentsSection', () => {
       </TestWrapper>
     )
 
-    await waitFor(() => {
-      expect(screen.getByTestId('attachments-coming-soon')).toBeDefined()
-      expect(screen.getByText('Attachments feature coming soon.')).toBeDefined()
-    })
+    expect(screen.getByTestId('attachments-empty')).toBeDefined()
   })
 
-  it('renders image thumbnail for image attachments', async () => {
-    mockApiClient.get.mockResolvedValue([imageAttachment])
-
+  it('renders image thumbnail for image attachments', () => {
     render(
       <TestWrapper>
         <AttachmentsSection
           collectionId="col-1"
           recordId="rec-1"
           apiClient={mockApiClient as never}
+          attachments={[imageAttachment]}
         />
       </TestWrapper>
     )
 
-    await waitFor(() => {
-      const thumbnail = screen.getByTestId('attachment-thumbnail-att-2')
-      expect(thumbnail).toBeDefined()
-      expect(thumbnail.getAttribute('src')).toBe('https://s3.example.com/photo.jpg')
-    })
+    const thumbnail = screen.getByTestId('attachment-thumbnail-att-2')
+    expect(thumbnail).toBeDefined()
+    expect(thumbnail.getAttribute('src')).toBe('https://s3.example.com/photo.jpg')
   })
 
-  it('renders file-type icon for non-image attachments', async () => {
-    mockApiClient.get.mockResolvedValue([sampleAttachment])
-
+  it('renders file-type icon for non-image attachments', () => {
     render(
       <TestWrapper>
         <AttachmentsSection
           collectionId="col-1"
           recordId="rec-1"
           apiClient={mockApiClient as never}
+          attachments={[sampleAttachment]}
         />
       </TestWrapper>
     )
 
-    await waitFor(() => {
-      // PDF attachment should show an icon, not a thumbnail
-      expect(screen.getByTestId('attachment-icon-att-1')).toBeDefined()
-    })
+    // PDF attachment should show an icon, not a thumbnail
+    expect(screen.getByTestId('attachment-icon-att-1')).toBeDefined()
   })
 
   it('falls back to icon when image thumbnail fails to load', async () => {
-    mockApiClient.get.mockResolvedValue([imageAttachment])
-
     render(
       <TestWrapper>
         <AttachmentsSection
           collectionId="col-1"
           recordId="rec-1"
           apiClient={mockApiClient as never}
+          attachments={[imageAttachment]}
         />
       </TestWrapper>
     )
 
-    await waitFor(() => {
-      expect(screen.getByTestId('attachment-thumbnail-att-2')).toBeDefined()
-    })
+    expect(screen.getByTestId('attachment-thumbnail-att-2')).toBeDefined()
 
     // Simulate image load error
     const img = screen.getByTestId('attachment-thumbnail-att-2')
@@ -352,21 +310,18 @@ describe('AttachmentsSection', () => {
   })
 
   it('opens file viewer when attachment is clicked', async () => {
-    mockApiClient.get.mockResolvedValue([sampleAttachment])
-
     render(
       <TestWrapper>
         <AttachmentsSection
           collectionId="col-1"
           recordId="rec-1"
           apiClient={mockApiClient as never}
+          attachments={[sampleAttachment]}
         />
       </TestWrapper>
     )
 
-    await waitFor(() => {
-      expect(screen.getByTestId('attachment-preview-att-1')).toBeDefined()
-    })
+    expect(screen.getByTestId('attachment-preview-att-1')).toBeDefined()
 
     fireEvent.click(screen.getByTestId('attachment-preview-att-1'))
 

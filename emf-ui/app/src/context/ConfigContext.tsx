@@ -76,10 +76,6 @@ function validateBootstrapConfig(config: unknown): config is BootstrapConfig {
   if (!c.branding || typeof c.branding !== 'object') {
     return false
   }
-  if (!c.features || typeof c.features !== 'object') {
-    return false
-  }
-
   // Validate theme has required fields
   const theme = c.theme as Record<string, unknown>
   if (typeof theme.primaryColor !== 'string') {
@@ -104,24 +100,6 @@ function validateBootstrapConfig(config: unknown): config is BootstrapConfig {
     return false
   }
   if (typeof branding.faviconUrl !== 'string') {
-    return false
-  }
-
-  // Validate features has required fields
-  const features = c.features as Record<string, unknown>
-  if (typeof features.enableBuilder !== 'boolean') {
-    return false
-  }
-  if (typeof features.enableResourceBrowser !== 'boolean') {
-    return false
-  }
-  if (typeof features.enablePackages !== 'boolean') {
-    return false
-  }
-  if (typeof features.enableMigrations !== 'boolean') {
-    return false
-  }
-  if (typeof features.enableDashboard !== 'boolean') {
     return false
   }
 
@@ -150,9 +128,6 @@ function createValidationError(config: unknown): Error {
     }
     if (!c.branding || typeof c.branding !== 'object') {
       diagnostics.push('Missing or invalid "branding" object')
-    }
-    if (!c.features || typeof c.features !== 'object') {
-      diagnostics.push('Missing or invalid "features" object')
     }
   }
 

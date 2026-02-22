@@ -5,25 +5,29 @@
  *
  * Features:
  * - Fetches attachments from the API with graceful 404 fallback ("coming soon")
- * - Compact list view with file icon, name, size, and date
+ * - Compact list view with file-type icon or image thumbnail, name, size, and date
+ * - Click-to-preview dialog for browser-renderable file types
  * - Download link per attachment
  * - Delete action per attachment
- * - Upload button placeholder (pending backend support)
+ * - Upload button
  * - Accessible with ARIA attributes and data-testid markers
  */
 
 import React, { useState, useCallback, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Paperclip, Download, Trash2, Upload } from 'lucide-react'
+import { Download, Trash2, Upload } from 'lucide-react'
 import { useI18n } from '../../context/I18nContext'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import type { ApiClient } from '../../services/apiClient'
+import { getFileTypeInfo, isImageType, formatFileSize } from './fileTypeUtils'
+import { FileViewer } from './FileViewer'
+import type { FileViewerAttachment } from './FileViewer'
 
 /**
  * An attachment associated with a record
  */
-interface Attachment {
+export interface Attachment {
   id: string
   fileName: string
   fileSize: number
@@ -46,18 +50,6 @@ export interface AttachmentsSectionProps {
 }
 
 /**
- * Format a file size in bytes to a human-readable string.
- */
-function formatFileSize(bytes: number): string {
-  if (bytes === 0) return '0 B'
-  const units = ['B', 'KB', 'MB', 'GB']
-  const k = 1024
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  const size = (bytes / Math.pow(k, i)).toFixed(i > 0 ? 1 : 0)
-  return `${size} ${units[i]}`
-}
-
-/**
  * Format a date string as a relative time (e.g., "3 hours ago", "2 days ago").
  */
 function formatRelativeTime(dateStr: string): string {
@@ -77,6 +69,49 @@ function formatRelativeTime(dateStr: string): string {
   if (diffDays < 7) return diffDays === 1 ? '1 day ago' : `${diffDays} days ago`
 
   return date.toLocaleDateString()
+}
+
+/**
+ * Renders the file icon area: an image thumbnail for image types, or
+ * a colored file-type icon for other types.
+ */
+function AttachmentIcon({ attachment }: { attachment: Attachment }) {
+  const [imgError, setImgError] = useState(false)
+  const info = getFileTypeInfo(attachment.contentType)
+  const Icon = info.icon
+
+  // For images with a valid download URL, show a thumbnail
+  if (isImageType(attachment.contentType) && attachment.downloadUrl && !imgError) {
+    return (
+      <div
+        className="flex items-center justify-center w-8 h-8 shrink-0 rounded overflow-hidden bg-muted"
+        aria-hidden="true"
+      >
+        <img
+          src={attachment.downloadUrl}
+          alt=""
+          className="w-8 h-8 object-cover"
+          loading="lazy"
+          onError={() => setImgError(true)}
+          data-testid={`attachment-thumbnail-${attachment.id}`}
+        />
+      </div>
+    )
+  }
+
+  // For non-image types or image load failures, show a colored icon
+  return (
+    <div
+      className={cn(
+        'flex items-center justify-center w-8 h-8 shrink-0 rounded bg-muted',
+        info.color
+      )}
+      aria-hidden="true"
+      data-testid={`attachment-icon-${attachment.id}`}
+    >
+      <Icon size={16} />
+    </div>
+  )
 }
 
 /**
@@ -104,6 +139,7 @@ export function AttachmentsSection({
   const queryClient = useQueryClient()
   const [apiAvailable, setApiAvailable] = useState(true)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [viewerAttachment, setViewerAttachment] = useState<FileViewerAttachment | null>(null)
 
   // Fetch attachments for this record
   const { data: attachments, isLoading } = useQuery({
@@ -178,7 +214,7 @@ export function AttachmentsSection({
   }, [])
 
   const handleDownload = useCallback(
-    async (attachment: Attachment) => {
+    async (attachment: Attachment | FileViewerAttachment) => {
       if (attachment.downloadUrl) {
         window.open(attachment.downloadUrl, '_blank')
       } else {
@@ -197,6 +233,14 @@ export function AttachmentsSection({
     },
     [apiClient]
   )
+
+  const handlePreview = useCallback((attachment: Attachment) => {
+    setViewerAttachment(attachment)
+  }, [])
+
+  const handleCloseViewer = useCallback(() => {
+    setViewerAttachment(null)
+  }, [])
 
   // Sort attachments by upload date (newest first)
   const attachmentsList = Array.isArray(attachments) ? attachments : []
@@ -277,29 +321,31 @@ export function AttachmentsSection({
               role="listitem"
               data-testid={`attachment-${attachment.id}`}
             >
-              {/* File Icon */}
-              <div
-                className="flex items-center justify-center w-8 h-8 shrink-0 rounded bg-muted text-muted-foreground"
-                aria-hidden="true"
+              {/* File Icon / Thumbnail — clickable to preview */}
+              <button
+                type="button"
+                className="flex items-center gap-2 min-w-0 flex-1 bg-transparent border-0 p-0 cursor-pointer text-left"
+                onClick={() => handlePreview(attachment)}
+                data-testid={`attachment-preview-${attachment.id}`}
               >
-                <Paperclip size={16} />
-              </div>
+                <AttachmentIcon attachment={attachment} />
 
-              {/* File Info */}
-              <div className="flex flex-col gap-0.5 min-w-0 flex-1">
-                <span className="text-sm font-medium text-foreground whitespace-nowrap overflow-hidden text-ellipsis">
-                  {attachment.fileName}
-                </span>
-                <span className="flex items-center gap-1 text-xs text-muted-foreground max-md:flex-wrap">
-                  {formatFileSize(attachment.fileSize)}
-                  <span>&middot;</span>
-                  <time dateTime={attachment.uploadedAt}>
-                    {formatRelativeTime(attachment.uploadedAt)}
-                  </time>
-                  <span>&middot;</span>
-                  <span>{attachment.uploadedBy}</span>
-                </span>
-              </div>
+                {/* File Info */}
+                <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+                  <span className="text-sm font-medium text-foreground whitespace-nowrap overflow-hidden text-ellipsis">
+                    {attachment.fileName}
+                  </span>
+                  <span className="flex items-center gap-1 text-xs text-muted-foreground max-md:flex-wrap">
+                    {formatFileSize(attachment.fileSize)}
+                    <span>&middot;</span>
+                    <time dateTime={attachment.uploadedAt}>
+                      {formatRelativeTime(attachment.uploadedAt)}
+                    </time>
+                    <span>&middot;</span>
+                    <span>{attachment.uploadedBy}</span>
+                  </span>
+                </div>
+              </button>
 
               {/* Actions */}
               <div className="flex gap-1 shrink-0">
@@ -330,6 +376,13 @@ export function AttachmentsSection({
           ))}
         </div>
       )}
+
+      {/* File Viewer Dialog */}
+      <FileViewer
+        attachment={viewerAttachment}
+        onClose={handleCloseViewer}
+        onDownload={handleDownload}
+      />
     </section>
   )
 }

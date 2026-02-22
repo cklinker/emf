@@ -1290,6 +1290,12 @@
     "fileSize": "{{size}}",
     "uploadedBy": "Hochgeladen von {{user}}"
   },
+  "fileViewer": {
+    "preview": "Vorschau {{name}}",
+    "noPreview": "Vorschau ist für diesen Dateityp nicht verfügbar.",
+    "videoNotSupported": "Ihr Browser unterstützt keine Videowiedergabe.",
+    "audioNotSupported": "Ihr Browser unterstützt keine Audiowiedergabe."
+  },
   "wizard": {
     "steps": {
       "basics": "Grundlagen",

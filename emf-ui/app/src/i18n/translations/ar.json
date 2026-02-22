@@ -777,6 +777,36 @@
       "descriptionTooLong": "يجب ألا يتجاوز الوصف 500 حرف"
     }
   },
+  "attachments": {
+    "title": "المرفقات",
+    "upload": "رفع",
+    "uploading": "جارٍ الرفع...",
+    "download": "تحميل",
+    "delete": "حذف",
+    "confirmDelete": "حذف هذا المرفق؟",
+    "empty": "لا توجد مرفقات بعد.",
+    "comingSoon": "ميزة المرفقات قادمة قريباً.",
+    "fileSize": "{{size}}",
+    "uploadedBy": "رفع بواسطة {{user}}"
+  },
+  "fileViewer": {
+    "preview": "معاينة {{name}}",
+    "noPreview": "المعاينة غير متاحة لهذا النوع من الملفات.",
+    "videoNotSupported": "متصفحك لا يدعم تشغيل الفيديو.",
+    "audioNotSupported": "متصفحك لا يدعم تشغيل الصوت."
+  },
+  "notes": {
+    "title": "الملاحظات",
+    "addNote": "إضافة ملاحظة",
+    "save": "حفظ",
+    "cancel": "إلغاء",
+    "edit": "تعديل",
+    "delete": "حذف",
+    "confirmDelete": "حذف هذه الملاحظة؟",
+    "empty": "لا توجد ملاحظات بعد. انقر على \"إضافة ملاحظة\" للبدء.",
+    "comingSoon": "ميزة الملاحظات قادمة قريباً.",
+    "placeholder": "اكتب ملاحظة..."
+  },
   "userMenu": {
     "language": "اللغة",
     "theme": "المظهر",

@@ -1290,6 +1290,12 @@
     "fileSize": "{{size}}",
     "uploadedBy": "Téléchargé par {{user}}"
   },
+  "fileViewer": {
+    "preview": "Aperçu de {{name}}",
+    "noPreview": "L'aperçu n'est pas disponible pour ce type de fichier.",
+    "videoNotSupported": "Votre navigateur ne prend pas en charge la lecture vidéo.",
+    "audioNotSupported": "Votre navigateur ne prend pas en charge la lecture audio."
+  },
   "wizard": {
     "steps": {
       "basics": "Bases",

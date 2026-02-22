@@ -54,13 +54,6 @@ const mockBootstrapConfig: BootstrapConfig = {
     applicationName: 'EMF Admin',
     faviconUrl: '/favicon.ico',
   },
-  features: {
-    enableBuilder: true,
-    enableResourceBrowser: true,
-    enablePackages: true,
-    enableMigrations: true,
-    enableDashboard: true,
-  },
   oidcProviders: [
     {
       id: 'provider-1',
@@ -455,7 +448,6 @@ describe('ConfigContext', () => {
           menus: [],
           theme: mockBootstrapConfig.theme,
           branding: mockBootstrapConfig.branding,
-          features: mockBootstrapConfig.features,
         } as unknown as BootstrapConfig,
       })
 
@@ -475,7 +467,6 @@ describe('ConfigContext', () => {
           pages: [],
           menus: [],
           branding: mockBootstrapConfig.branding,
-          features: mockBootstrapConfig.features,
         } as unknown as BootstrapConfig,
       })
 
@@ -495,7 +486,6 @@ describe('ConfigContext', () => {
           pages: [],
           menus: [],
           theme: mockBootstrapConfig.theme,
-          features: mockBootstrapConfig.features,
         } as unknown as BootstrapConfig,
       })
 
@@ -507,26 +497,6 @@ describe('ConfigContext', () => {
 
       expect(screen.getByTestId('error')).toHaveTextContent('Invalid bootstrap configuration')
       expect(screen.getByTestId('error')).toHaveTextContent('branding')
-    })
-
-    it('should set error when config is missing features', async () => {
-      global.fetch = createMockFetch({
-        config: {
-          pages: [],
-          menus: [],
-          theme: mockBootstrapConfig.theme,
-          branding: mockBootstrapConfig.branding,
-        } as unknown as BootstrapConfig,
-      })
-
-      renderWithConfig()
-
-      await waitFor(() => {
-        expect(screen.getByTestId('loading')).toHaveTextContent('not-loading')
-      })
-
-      expect(screen.getByTestId('error')).toHaveTextContent('Invalid bootstrap configuration')
-      expect(screen.getByTestId('error')).toHaveTextContent('features')
     })
 
     it('should provide diagnostic information in error message', async () => {
@@ -547,7 +517,6 @@ describe('ConfigContext', () => {
       expect(errorText).toContain('menus')
       expect(errorText).toContain('theme')
       expect(errorText).toContain('branding')
-      expect(errorText).toContain('features')
     })
   })
 
@@ -676,64 +645,6 @@ describe('ConfigContext', () => {
       expect(configValue?.config).not.toBeNull()
       expect(configValue?.error).toBeNull()
       expect(typeof configValue?.reload).toBe('function')
-    })
-  })
-
-  describe('Feature Flags', () => {
-    it('should provide feature flags in config', async () => {
-      let configValue: ReturnType<typeof useConfig> | undefined
-
-      renderWithConfig(
-        <TestComponent
-          onRender={(config) => {
-            configValue = config
-          }}
-        />
-      )
-
-      await waitFor(() => {
-        expect(configValue?.isLoading).toBe(false)
-      })
-
-      const features = configValue?.config?.features
-      expect(features).toBeDefined()
-      expect(features?.enableBuilder).toBe(true)
-      expect(features?.enableResourceBrowser).toBe(true)
-      expect(features?.enablePackages).toBe(true)
-      expect(features?.enableMigrations).toBe(true)
-      expect(features?.enableDashboard).toBe(true)
-    })
-
-    it('should handle disabled features', async () => {
-      const configWithDisabledFeatures: BootstrapConfig = {
-        ...mockBootstrapConfig,
-        features: {
-          enableBuilder: false,
-          enableResourceBrowser: false,
-          enablePackages: false,
-          enableMigrations: false,
-          enableDashboard: false,
-        },
-      }
-      global.fetch = createMockFetch({ config: configWithDisabledFeatures })
-
-      let configValue: ReturnType<typeof useConfig> | undefined
-
-      renderWithConfig(
-        <TestComponent
-          onRender={(config) => {
-            configValue = config
-          }}
-        />
-      )
-
-      await waitFor(() => {
-        expect(configValue?.isLoading).toBe(false)
-      })
-
-      const features = configValue?.config?.features
-      expect(features?.enableBuilder).toBe(false)
-      expect(features?.enableResourceBrowser).toBe(false)
     })
   })
 

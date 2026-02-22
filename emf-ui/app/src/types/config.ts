@@ -12,7 +12,6 @@ export interface BootstrapConfig {
   menus: MenuConfig[]
   theme: ThemeConfig
   branding: BrandingConfig
-  features: FeatureFlags
   oidcProviders: OIDCProviderSummary[]
 }
 
@@ -66,17 +65,6 @@ export interface BrandingConfig {
   logoUrl: string
   applicationName: string
   faviconUrl: string
-}
-
-/**
- * Feature flags for enabling/disabling features
- */
-export interface FeatureFlags {
-  enableBuilder: boolean
-  enableResourceBrowser: boolean
-  enablePackages: boolean
-  enableMigrations: boolean
-  enableDashboard: boolean
 }
 
 /**

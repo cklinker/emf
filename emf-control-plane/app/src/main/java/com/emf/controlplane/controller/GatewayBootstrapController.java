@@ -76,7 +76,7 @@ public class GatewayBootstrapController {
 
     /**
      * Gets the bootstrap configuration for the Admin UI.
-     * Returns all active pages, menus, theme settings, branding, features, and OIDC providers.
+     * Returns all active pages, menus, theme settings, branding, and OIDC providers.
      * This endpoint is accessible without authentication.
      *
      * @return Bootstrap configuration for the UI
@@ -85,7 +85,7 @@ public class GatewayBootstrapController {
     @Operation(
             summary = "Get UI bootstrap configuration",
             description = "Returns the initial configuration needed by the Admin UI on startup, " +
-                    "including pages, menus, theme, branding, features, and OIDC providers. " +
+                    "including pages, menus, theme, branding, and OIDC providers. " +
                     "This endpoint is public (no authentication required)."
     )
     @ApiResponses(value = {
@@ -112,10 +112,6 @@ public class GatewayBootstrapController {
                 "/logo.svg", "EMF Control Plane", "/favicon.ico"
         );
 
-        BootstrapConfigDto.FeatureFlags features = new BootstrapConfigDto.FeatureFlags(
-                true, true, true, true, true
-        );
-
         // Return tenant-scoped OIDC providers when tenant context is set (slug-based request),
         // otherwise return all active providers (gateway internal bootstrap)
         String tenantId = TenantContextHolder.getTenantId();
@@ -138,7 +134,7 @@ public class GatewayBootstrapController {
 
         String tenantSlug = TenantContextHolder.getTenantSlug();
         BootstrapConfigDto bootstrapDto = new BootstrapConfigDto(
-                pageDtos, menuDtos, theme, branding, features, oidcProviders, tenantId, tenantSlug
+                pageDtos, menuDtos, theme, branding, oidcProviders, tenantId, tenantSlug
         );
 
         return ResponseEntity.ok(bootstrapDto);

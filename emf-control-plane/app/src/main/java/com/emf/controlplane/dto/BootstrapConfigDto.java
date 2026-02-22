@@ -14,7 +14,6 @@ public class BootstrapConfigDto {
     private List<UiMenuDto> menus;
     private ThemeConfig theme;
     private BrandingConfig branding;
-    private FeatureFlags features;
     private List<OidcProviderSummary> oidcProviders;
     private String tenantId;
     private String tenantSlug;
@@ -24,20 +23,19 @@ public class BootstrapConfigDto {
 
     public BootstrapConfigDto(List<UiPageDto> pages, List<UiMenuDto> menus,
                               ThemeConfig theme, BrandingConfig branding,
-                              FeatureFlags features, List<OidcProviderSummary> oidcProviders) {
+                              List<OidcProviderSummary> oidcProviders) {
         this.pages = pages;
         this.menus = menus;
         this.theme = theme;
         this.branding = branding;
-        this.features = features;
         this.oidcProviders = oidcProviders;
     }
 
     public BootstrapConfigDto(List<UiPageDto> pages, List<UiMenuDto> menus,
                               ThemeConfig theme, BrandingConfig branding,
-                              FeatureFlags features, List<OidcProviderSummary> oidcProviders,
+                              List<OidcProviderSummary> oidcProviders,
                               String tenantId, String tenantSlug) {
-        this(pages, menus, theme, branding, features, oidcProviders);
+        this(pages, menus, theme, branding, oidcProviders);
         this.tenantId = tenantId;
         this.tenantSlug = tenantSlug;
     }
@@ -74,14 +72,6 @@ public class BootstrapConfigDto {
         this.branding = branding;
     }
 
-    public FeatureFlags getFeatures() {
-        return features;
-    }
-
-    public void setFeatures(FeatureFlags features) {
-        this.features = features;
-    }
-
     public List<OidcProviderSummary> getOidcProviders() {
         return oidcProviders;
     }
@@ -113,7 +103,6 @@ public class BootstrapConfigDto {
                 ", menus=" + menus +
                 ", theme=" + theme +
                 ", branding=" + branding +
-                ", features=" + features +
                 ", oidcProviders=" + oidcProviders +
                 '}';
     }
@@ -127,13 +116,12 @@ public class BootstrapConfigDto {
                 Objects.equals(menus, that.menus) &&
                 Objects.equals(theme, that.theme) &&
                 Objects.equals(branding, that.branding) &&
-                Objects.equals(features, that.features) &&
                 Objects.equals(oidcProviders, that.oidcProviders);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(pages, menus, theme, branding, features, oidcProviders);
+        return Objects.hash(pages, menus, theme, branding, oidcProviders);
     }
 
     /**
@@ -188,40 +176,6 @@ public class BootstrapConfigDto {
         public void setApplicationName(String applicationName) { this.applicationName = applicationName; }
         public String getFaviconUrl() { return faviconUrl; }
         public void setFaviconUrl(String faviconUrl) { this.faviconUrl = faviconUrl; }
-    }
-
-    /**
-     * Feature flags
-     */
-    public static class FeatureFlags {
-        private boolean enableBuilder;
-        private boolean enableResourceBrowser;
-        private boolean enablePackages;
-        private boolean enableMigrations;
-        private boolean enableDashboard;
-
-        public FeatureFlags() {
-        }
-
-        public FeatureFlags(boolean enableBuilder, boolean enableResourceBrowser, 
-                           boolean enablePackages, boolean enableMigrations, boolean enableDashboard) {
-            this.enableBuilder = enableBuilder;
-            this.enableResourceBrowser = enableResourceBrowser;
-            this.enablePackages = enablePackages;
-            this.enableMigrations = enableMigrations;
-            this.enableDashboard = enableDashboard;
-        }
-
-        public boolean isEnableBuilder() { return enableBuilder; }
-        public void setEnableBuilder(boolean enableBuilder) { this.enableBuilder = enableBuilder; }
-        public boolean isEnableResourceBrowser() { return enableResourceBrowser; }
-        public void setEnableResourceBrowser(boolean enableResourceBrowser) { this.enableResourceBrowser = enableResourceBrowser; }
-        public boolean isEnablePackages() { return enablePackages; }
-        public void setEnablePackages(boolean enablePackages) { this.enablePackages = enablePackages; }
-        public boolean isEnableMigrations() { return enableMigrations; }
-        public void setEnableMigrations(boolean enableMigrations) { this.enableMigrations = enableMigrations; }
-        public boolean isEnableDashboard() { return enableDashboard; }
-        public void setEnableDashboard(boolean enableDashboard) { this.enableDashboard = enableDashboard; }
     }
 
     /**

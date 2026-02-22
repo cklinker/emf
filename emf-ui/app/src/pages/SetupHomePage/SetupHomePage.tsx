@@ -120,18 +120,6 @@ const CATEGORIES: SetupCategory[] = [
     icon: <Shield size={20} />,
     items: [
       {
-        name: 'Profiles',
-        path: '/profiles',
-        description: 'Configure profile-based permissions',
-        permission: 'MANAGE_USERS',
-      },
-      {
-        name: 'Permission Sets',
-        path: '/permission-sets',
-        description: 'Create additional permission grants',
-        permission: 'MANAGE_USERS',
-      },
-      {
         name: 'Login History',
         path: '/login-history',
         description: 'View user login activity',
@@ -142,6 +130,12 @@ const CATEGORIES: SetupCategory[] = [
         path: '/security-audit',
         description: 'Review security event trail',
         permission: 'MANAGE_USERS',
+      },
+      {
+        name: 'Audit Trail',
+        path: '/audit-trail',
+        description: 'View configuration change history',
+        permission: 'VIEW_SETUP',
       },
     ],
   },
@@ -208,35 +202,10 @@ const CATEGORIES: SetupCategory[] = [
     ],
   },
   {
-    key: 'analytics',
-    titleKey: 'setup.categories.analytics',
-    icon: <BarChart3 size={20} />,
-    items: [
-      {
-        name: 'Reports',
-        path: '/reports',
-        description: 'Build and manage reports',
-        permission: 'MANAGE_REPORTS',
-      },
-      {
-        name: 'Dashboards',
-        path: '/dashboards',
-        description: 'Create visual dashboards',
-        permission: 'MANAGE_REPORTS',
-      },
-    ],
-  },
-  {
     key: 'uiCustomization',
     titleKey: 'setup.categories.uiCustomization',
     icon: <Palette size={20} />,
     items: [
-      {
-        name: 'Layouts',
-        path: '/layouts',
-        description: 'Configure record page layouts',
-        permission: 'CUSTOMIZE_APPLICATION',
-      },
       {
         name: 'Pages',
         path: '/pages',
@@ -254,6 +223,25 @@ const CATEGORIES: SetupCategory[] = [
         path: '/plugins',
         description: 'Manage installed plugins',
         permission: 'CUSTOMIZE_APPLICATION',
+      },
+    ],
+  },
+  {
+    key: 'analytics',
+    titleKey: 'setup.categories.analytics',
+    icon: <BarChart3 size={20} />,
+    items: [
+      {
+        name: 'Reports',
+        path: '/reports',
+        description: 'Build and manage reports',
+        permission: 'MANAGE_REPORTS',
+      },
+      {
+        name: 'Dashboards',
+        path: '/dashboards',
+        description: 'Create visual dashboards',
+        permission: 'MANAGE_REPORTS',
       },
     ],
   },
@@ -278,12 +266,6 @@ const CATEGORIES: SetupCategory[] = [
         name: 'Governor Limits',
         path: '/governor-limits',
         description: 'Monitor usage limits',
-        permission: 'VIEW_SETUP',
-      },
-      {
-        name: 'Audit Trail',
-        path: '/audit-trail',
-        description: 'View configuration changes',
         permission: 'VIEW_SETUP',
       },
       {

@@ -1,7 +1,9 @@
 package com.emf.controlplane.config;
 
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,7 +41,7 @@ public class CacheConfig {
 
     private static final Logger log = LoggerFactory.getLogger(CacheConfig.class);
 
-    public static final String COLLECTIONS_CACHE = "collections";
+    public static final String COLLECTIONS_CACHE = "collections-v2";
     public static final String COLLECTIONS_LIST_CACHE = "collections-list";
     public static final String JWKS_CACHE = "jwks";
     public static final String PERMISSIONS_CACHE = "permissions";
@@ -68,6 +70,17 @@ public class CacheConfig {
         ObjectMapper objectMapper = new ObjectMapper();
         objectMapper.registerModule(new JavaTimeModule());
         objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+
+        // Enable default typing so @class type info is included in serialized JSON.
+        // Without this, GenericJackson2JsonRedisSerializer deserializes to LinkedHashMap
+        // instead of the original type, causing ClassCastException on cache hits.
+        objectMapper.activateDefaultTyping(
+                BasicPolymorphicTypeValidator.builder()
+                        .allowIfBaseType(Object.class)
+                        .build(),
+                ObjectMapper.DefaultTyping.NON_FINAL,
+                JsonTypeInfo.As.PROPERTY
+        );
 
         // Default cache configuration with custom ObjectMapper
         RedisCacheConfiguration defaultConfig = RedisCacheConfiguration.defaultCacheConfig()

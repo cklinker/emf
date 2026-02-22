@@ -22,7 +22,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.lang.Nullable;
@@ -87,10 +86,6 @@ public class CollectionService {
      *
      * Validates: Requirement 1.1
      */
-    @Cacheable(value = CacheConfig.COLLECTIONS_LIST_CACHE,
-            key = "T(com.emf.controlplane.tenant.TenantContextHolder).getTenantId()"
-                + " + ':' + #filter + ':' + #sort + ':' + #includeSystem"
-                + " + ':' + #pageable.pageNumber + ':' + #pageable.pageSize")
     @Transactional(readOnly = true)
     public Page<Collection> listCollections(String filter, String sort, Pageable pageable, boolean includeSystem) {
         String tenantId = TenantContextHolder.getTenantId();
@@ -128,7 +123,6 @@ public class CollectionService {
      * 
      * Validates: Requirements 1.2, 15.1
      */
-    @CacheEvict(value = CacheConfig.COLLECTIONS_LIST_CACHE, allEntries = true)
     @Transactional
     public Collection createCollection(CreateCollectionRequest request) {
         String tenantId = TenantContextHolder.getTenantId();
@@ -227,7 +221,6 @@ public class CollectionService {
      * @return The collection entity
      * @throws ResourceNotFoundException if collection not found by either ID or name
      */
-    @Cacheable(value = CacheConfig.COLLECTIONS_CACHE, key = "'lookup:' + #idOrName")
     @Transactional(readOnly = true)
     public Collection getCollectionByIdOrName(String idOrName) {
         String tenantId = TenantContextHolder.getTenantId();
@@ -291,10 +284,7 @@ public class CollectionService {
      * Validates: Requirements 1.6, 14.3, 15.2
      */
     @Transactional
-    @Caching(evict = {
-        @CacheEvict(value = CacheConfig.COLLECTIONS_CACHE, allEntries = true),
-        @CacheEvict(value = CacheConfig.COLLECTIONS_LIST_CACHE, allEntries = true)
-    })
+    @CacheEvict(value = CacheConfig.COLLECTIONS_CACHE, allEntries = true)
     public Collection updateCollection(String id, UpdateCollectionRequest request) {
         String tenantId = TenantContextHolder.getTenantId();
         log.info("Updating collection with id: {} for tenant: {}", id, tenantId);
@@ -363,10 +353,7 @@ public class CollectionService {
      * Validates: Requirements 1.7, 14.3
      */
     @Transactional
-    @Caching(evict = {
-        @CacheEvict(value = CacheConfig.COLLECTIONS_CACHE, allEntries = true),
-        @CacheEvict(value = CacheConfig.COLLECTIONS_LIST_CACHE, allEntries = true)
-    })
+    @CacheEvict(value = CacheConfig.COLLECTIONS_CACHE, allEntries = true)
     public void deleteCollection(String id) {
         String tenantId = TenantContextHolder.getTenantId();
         log.info("Deleting collection with id: {} for tenant: {}", id, tenantId);
@@ -494,10 +481,7 @@ public class CollectionService {
      * 
      * Validates: Requirement 14.3
      */
-    @Caching(evict = {
-        @CacheEvict(value = CacheConfig.COLLECTIONS_CACHE, allEntries = true),
-        @CacheEvict(value = CacheConfig.COLLECTIONS_LIST_CACHE, allEntries = true)
-    })
+    @CacheEvict(value = CacheConfig.COLLECTIONS_CACHE, allEntries = true)
     public void evictFromCache(String collectionId) {
         log.debug("Evicting collection from cache: {}", collectionId);
     }

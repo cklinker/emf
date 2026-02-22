@@ -12,6 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
@@ -53,6 +54,7 @@ public class ProfileController {
     }
 
     @GetMapping
+    @Transactional(readOnly = true)
     @Operation(summary = "List profiles", description = "List all profiles for the current tenant")
     public ResponseEntity<List<Profile>> listProfiles() {
         String tenantId = TenantContextHolder.requireTenantId();
@@ -60,6 +62,7 @@ public class ProfileController {
     }
 
     @GetMapping("/{id}")
+    @Transactional(readOnly = true)
     @Operation(summary = "Get profile", description = "Get profile detail with all permissions")
     public ResponseEntity<Profile> getProfile(@PathVariable String id) {
         String tenantId = TenantContextHolder.requireTenantId();
@@ -69,6 +72,7 @@ public class ProfileController {
     }
 
     @PostMapping
+    @Transactional
     @Operation(summary = "Create profile", description = "Create a new profile")
     public ResponseEntity<Profile> createProfile(@RequestBody Map<String, Object> body) {
         String tenantId = TenantContextHolder.requireTenantId();
@@ -86,6 +90,7 @@ public class ProfileController {
     }
 
     @PutMapping("/{id}")
+    @Transactional
     @Operation(summary = "Update profile", description = "Update profile (not system profiles)")
     public ResponseEntity<Profile> updateProfile(@PathVariable String id, @RequestBody Map<String, Object> body) {
         String tenantId = TenantContextHolder.requireTenantId();
@@ -101,6 +106,7 @@ public class ProfileController {
     }
 
     @DeleteMapping("/{id}")
+    @Transactional
     @Operation(summary = "Delete profile", description = "Delete a non-system profile")
     public ResponseEntity<Void> deleteProfile(@PathVariable String id) {
         String tenantId = TenantContextHolder.requireTenantId();
@@ -120,6 +126,7 @@ public class ProfileController {
     }
 
     @PostMapping("/{id}/clone")
+    @Transactional
     @Operation(summary = "Clone profile", description = "Clone a profile (including system profiles)")
     public ResponseEntity<Profile> cloneProfile(@PathVariable String id, @RequestBody Map<String, String> body) {
         String tenantId = TenantContextHolder.requireTenantId();
@@ -164,6 +171,7 @@ public class ProfileController {
     }
 
     @GetMapping("/{id}/system-permissions")
+    @Transactional(readOnly = true)
     @Operation(summary = "Get system permissions", description = "Get system permissions for a profile")
     public ResponseEntity<List<ProfileSystemPermission>> getSystemPermissions(@PathVariable String id) {
         String tenantId = TenantContextHolder.requireTenantId();
@@ -174,6 +182,7 @@ public class ProfileController {
     }
 
     @PutMapping("/{id}/system-permissions")
+    @Transactional
     @Operation(summary = "Set system permissions", description = "Batch set system permissions for a profile")
     public ResponseEntity<Void> setSystemPermissions(@PathVariable String id,
                                                       @RequestBody Map<String, Boolean> permissions) {
@@ -193,6 +202,7 @@ public class ProfileController {
     }
 
     @GetMapping("/{id}/object-permissions")
+    @Transactional(readOnly = true)
     @Operation(summary = "Get object permissions", description = "Get object permissions for a profile")
     public ResponseEntity<List<ProfileObjectPermission>> getObjectPermissions(@PathVariable String id) {
         String tenantId = TenantContextHolder.requireTenantId();
@@ -203,6 +213,7 @@ public class ProfileController {
     }
 
     @PutMapping("/{id}/object-permissions")
+    @Transactional
     @Operation(summary = "Set object permissions", description = "Batch set object permissions for a profile")
     public ResponseEntity<Void> setObjectPermissions(@PathVariable String id,
                                                       @RequestBody List<Map<String, Object>> permissions) {
@@ -231,6 +242,7 @@ public class ProfileController {
     }
 
     @GetMapping("/{id}/field-permissions/{collectionId}")
+    @Transactional(readOnly = true)
     @Operation(summary = "Get field permissions", description = "Get field permissions for a profile and collection")
     public ResponseEntity<List<ProfileFieldPermission>> getFieldPermissions(
             @PathVariable String id, @PathVariable String collectionId) {
@@ -242,6 +254,7 @@ public class ProfileController {
     }
 
     @PutMapping("/{id}/field-permissions/{collectionId}")
+    @Transactional
     @Operation(summary = "Set field permissions", description = "Batch set field permissions for a profile and collection")
     public ResponseEntity<Void> setFieldPermissions(
             @PathVariable String id, @PathVariable String collectionId,

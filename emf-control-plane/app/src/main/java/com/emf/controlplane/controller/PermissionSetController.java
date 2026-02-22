@@ -12,6 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
@@ -57,6 +58,7 @@ public class PermissionSetController {
     }
 
     @GetMapping
+    @Transactional(readOnly = true)
     @Operation(summary = "List permission sets", description = "List all permission sets for the current tenant")
     public ResponseEntity<List<PermissionSet>> listPermissionSets() {
         String tenantId = TenantContextHolder.requireTenantId();
@@ -64,6 +66,7 @@ public class PermissionSetController {
     }
 
     @GetMapping("/{id}")
+    @Transactional(readOnly = true)
     @Operation(summary = "Get permission set", description = "Get permission set detail")
     public ResponseEntity<PermissionSet> getPermissionSet(@PathVariable String id) {
         String tenantId = TenantContextHolder.requireTenantId();
@@ -73,6 +76,7 @@ public class PermissionSetController {
     }
 
     @PostMapping
+    @Transactional
     @Operation(summary = "Create permission set", description = "Create a new permission set")
     public ResponseEntity<PermissionSet> createPermissionSet(@RequestBody Map<String, Object> body) {
         String tenantId = TenantContextHolder.requireTenantId();
@@ -90,6 +94,7 @@ public class PermissionSetController {
     }
 
     @PutMapping("/{id}")
+    @Transactional
     @Operation(summary = "Update permission set", description = "Update a permission set")
     public ResponseEntity<PermissionSet> updatePermissionSet(@PathVariable String id,
                                                               @RequestBody Map<String, Object> body) {
@@ -106,6 +111,7 @@ public class PermissionSetController {
     }
 
     @DeleteMapping("/{id}")
+    @Transactional
     @Operation(summary = "Delete permission set", description = "Delete a permission set")
     public ResponseEntity<Void> deletePermissionSet(@PathVariable String id) {
         String tenantId = TenantContextHolder.requireTenantId();
@@ -125,6 +131,7 @@ public class PermissionSetController {
     }
 
     @GetMapping("/{id}/assignments")
+    @Transactional(readOnly = true)
     @Operation(summary = "List assignments", description = "List users and groups assigned to this permission set")
     public ResponseEntity<Map<String, Object>> getAssignments(@PathVariable String id) {
         String tenantId = TenantContextHolder.requireTenantId();
@@ -139,6 +146,7 @@ public class PermissionSetController {
     }
 
     @PostMapping("/{id}/assignments/users")
+    @Transactional
     @Operation(summary = "Assign to users", description = "Assign the permission set to users")
     public ResponseEntity<Void> assignToUsers(@PathVariable String id,
                                                @RequestBody Map<String, List<String>> body) {
@@ -160,6 +168,7 @@ public class PermissionSetController {
     }
 
     @DeleteMapping("/{id}/assignments/users/{userId}")
+    @Transactional
     @Operation(summary = "Unassign from user", description = "Remove the permission set from a user")
     public ResponseEntity<Void> unassignFromUser(@PathVariable String id, @PathVariable String userId) {
         String tenantId = TenantContextHolder.requireTenantId();
@@ -173,6 +182,7 @@ public class PermissionSetController {
     }
 
     @PostMapping("/{id}/assignments/groups")
+    @Transactional
     @Operation(summary = "Assign to groups", description = "Assign the permission set to groups")
     public ResponseEntity<Void> assignToGroups(@PathVariable String id,
                                                 @RequestBody Map<String, List<String>> body) {
@@ -194,6 +204,7 @@ public class PermissionSetController {
     }
 
     @DeleteMapping("/{id}/assignments/groups/{groupId}")
+    @Transactional
     @Operation(summary = "Unassign from group", description = "Remove the permission set from a group")
     public ResponseEntity<Void> unassignFromGroup(@PathVariable String id, @PathVariable String groupId) {
         String tenantId = TenantContextHolder.requireTenantId();

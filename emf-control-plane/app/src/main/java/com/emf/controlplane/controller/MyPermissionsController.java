@@ -148,6 +148,62 @@ public class MyPermissionsController {
         }
     }
 
+    @GetMapping("/collection/{collectionName}")
+    @Operation(
+            summary = "Get combined collection permissions",
+            description = "Returns both object-level CRUD permissions and field-level visibility for the current user on a collection in a single call"
+    )
+    @ApiResponse(responseCode = "200", description = "Combined permissions returned")
+    public ResponseEntity<Map<String, Object>> getCollectionPermissions(
+            @Parameter(description = "Collection API name") @PathVariable String collectionName) {
+        log.debug("Fetching combined permissions for collection: {}", collectionName);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+
+        if (isPlatformAdmin()) {
+            result.put("objectPermissions", allPermissiveObjectPermissions());
+            result.put("fieldPermissions", Collections.emptyMap());
+            return ResponseEntity.ok(result);
+        }
+
+        String tenantId = TenantContextHolder.getTenantId();
+        String userId = resolveUserId(tenantId);
+        if (userId == null) {
+            result.put("objectPermissions", noObjectPermissions());
+            result.put("fieldPermissions", Collections.emptyMap());
+            return ResponseEntity.ok(result);
+        }
+
+        try {
+            Collection collection = collectionService.getCollectionByIdOrName(collectionName);
+
+            // Object permissions
+            ObjectPermissions perms = permissionService.getObjectPermissions(tenantId, userId, collection.getId());
+            Map<String, Boolean> objectPerms = new LinkedHashMap<>();
+            objectPerms.put("canCreate", perms.canCreate());
+            objectPerms.put("canRead", perms.canRead());
+            objectPerms.put("canEdit", perms.canEdit());
+            objectPerms.put("canDelete", perms.canDelete());
+            objectPerms.put("canViewAll", perms.canViewAll());
+            objectPerms.put("canModifyAll", perms.canModifyAll());
+            result.put("objectPermissions", objectPerms);
+
+            // Field permissions
+            Map<String, FieldVisibility> fieldPerms =
+                    permissionService.getFieldPermissions(tenantId, userId, collection.getId());
+            Map<String, String> fieldResult = new LinkedHashMap<>();
+            fieldPerms.forEach((fieldId, visibility) -> fieldResult.put(fieldId, visibility.name()));
+            result.put("fieldPermissions", fieldResult);
+
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            log.debug("Collection not found for combined permissions: {}", collectionName);
+            result.put("objectPermissions", noObjectPermissions());
+            result.put("fieldPermissions", Collections.emptyMap());
+            return ResponseEntity.ok(result);
+        }
+    }
+
     @GetMapping("/effective")
     @Operation(
             summary = "Get all effective permissions",

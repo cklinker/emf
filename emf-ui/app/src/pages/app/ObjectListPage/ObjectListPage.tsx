@@ -42,8 +42,7 @@ import { Button } from '@/components/ui/button'
 import { useCollectionSchema } from '@/hooks/useCollectionSchema'
 import { useCollectionRecords } from '@/hooks/useCollectionRecords'
 import { useRecordMutation } from '@/hooks/useRecordMutation'
-import { useObjectPermissions } from '@/hooks/useObjectPermissions'
-import { useFieldPermissions } from '@/hooks/useFieldPermissions'
+import { useCollectionPermissions } from '@/hooks/useCollectionPermissions'
 import type { SortState, FilterCondition, CollectionRecord } from '@/hooks/useCollectionRecords'
 import { ObjectDataTable } from '@/components/ObjectDataTable/ObjectDataTable'
 import { DataTablePagination } from '@/components/ObjectDataTable/DataTablePagination'
@@ -172,11 +171,12 @@ export function ObjectListPage(): React.ReactElement {
     error: schemaError,
   } = useCollectionSchema(collectionName)
 
-  // Fetch object-level permissions (CRUD flags)
-  const { permissions, isLoading: permissionsLoading } = useObjectPermissions(collectionName)
-
-  // Fetch field-level permissions (visibility per field)
-  const { isFieldVisible } = useFieldPermissions(collectionName)
+  // Fetch permissions (combined object + field in one call)
+  const {
+    permissions,
+    isFieldVisible,
+    isLoading: permissionsLoading,
+  } = useCollectionPermissions(collectionName)
 
   // Determine visible fields (first 6 fields by default, excluding system and hidden fields)
   const visibleFields = useMemo(() => {

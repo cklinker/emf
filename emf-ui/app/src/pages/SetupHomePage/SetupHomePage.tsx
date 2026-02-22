@@ -26,6 +26,7 @@ import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
 import { useTenant } from '../../context/TenantContext'
 import { useSystemPermissions } from '../../hooks/useSystemPermissions'
+import { useCollectionSummaries } from '../../hooks/useCollectionSummaries'
 import { cn } from '@/lib/utils'
 
 export interface SetupHomePageProps {
@@ -309,11 +310,7 @@ export function SetupHomePage({ testId = 'setup-home-page' }: SetupHomePageProps
   const [searchQuery, setSearchQuery] = useState('')
 
   // Fetch stats
-  const { data: collectionsData } = useQuery({
-    queryKey: ['setup-stats-collections'],
-    queryFn: () => apiClient.get<unknown>('/control/collections?size=1'),
-    staleTime: 300000,
-  })
+  const { summaries: collectionSummaries } = useCollectionSummaries()
 
   const { data: usersData } = useQuery({
     queryKey: ['setup-stats-users'],
@@ -337,7 +334,7 @@ export function SetupHomePage({ testId = 'setup-home-page' }: SetupHomePageProps
     () => [
       {
         label: t('setup.stats.collections'),
-        value: extractCount(collectionsData),
+        value: collectionSummaries.length,
       },
       {
         label: t('setup.stats.users'),
@@ -352,7 +349,7 @@ export function SetupHomePage({ testId = 'setup-home-page' }: SetupHomePageProps
         value: extractCount(dashboardsData),
       },
     ],
-    [collectionsData, usersData, reportsData, dashboardsData, t]
+    [collectionSummaries, usersData, reportsData, dashboardsData, t]
   )
 
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {

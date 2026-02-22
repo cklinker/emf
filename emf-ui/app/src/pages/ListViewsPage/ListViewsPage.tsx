@@ -2,14 +2,9 @@ import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
+import { useCollectionSummaries, type CollectionSummary } from '../../hooks/useCollectionSummaries'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
 import { cn } from '@/lib/utils'
-
-interface CollectionSummary {
-  id: string
-  name: string
-  displayName: string
-}
 
 interface ListView {
   id: string
@@ -427,16 +422,7 @@ export function ListViewsPage({
     queryFn: () => apiClient.get<ListView[]>(`/control/listviews`),
   })
 
-  const { data: collectionsData } = useQuery({
-    queryKey: ['collections-for-listviews'],
-    queryFn: () =>
-      apiClient.get<{ content: CollectionSummary[] }>('/control/collections?size=1000'),
-  })
-
-  const collections = useMemo<CollectionSummary[]>(
-    () => collectionsData?.content ?? [],
-    [collectionsData]
-  )
+  const { summaries: collections } = useCollectionSummaries()
 
   const collectionMap = useMemo(() => {
     const map = new Map<string, CollectionSummary>()

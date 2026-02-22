@@ -18,6 +18,7 @@ import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../com
 import { SystemPermissionChecklist } from '@/components/SecurityEditor'
 import { ObjectPermissionMatrix } from '@/components/SecurityEditor'
 import type { ObjectPermission } from '@/components/SecurityEditor'
+import { useCollectionSummaries } from '@/hooks/useCollectionSummaries'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 
@@ -66,20 +67,6 @@ interface GroupAssignment {
 interface Assignments {
   users: UserAssignment[]
   groups: GroupAssignment[]
-}
-
-interface CollectionSummary {
-  id: string
-  name: string
-  displayName?: string
-}
-
-interface PageResponse<T> {
-  content: T[]
-  totalElements: number
-  totalPages: number
-  size: number
-  number: number
 }
 
 export interface PermissionSetDetailPageProps {
@@ -134,10 +121,7 @@ export function PermissionSetDetailPage({
   })
 
   // Fetch collections for name resolution
-  const { data: collectionsData } = useQuery({
-    queryKey: ['collections-summary'],
-    queryFn: () => apiClient.get<PageResponse<CollectionSummary>>('/control/collections?size=1000'),
-  })
+  const { summaryMap: collectionSummaryMap } = useCollectionSummaries()
 
   // Fetch assignments
   const { data: assignments } = useQuery({
@@ -163,11 +147,12 @@ export function PermissionSetDetailPage({
   // Merge object permissions with collection names
   const objectPermissionsWithNames: ObjectPermission[] = useMemo(() => {
     if (!objectPermissions) return []
-    const collections = collectionsData?.content ?? []
-    const collectionMap = new Map(collections.map((c) => [c.id, c.displayName || c.name]))
     return objectPermissions.map((op) => ({
       collectionId: op.collectionId,
-      collectionName: collectionMap.get(op.collectionId) ?? op.collectionId,
+      collectionName:
+        collectionSummaryMap[op.collectionId]?.displayName ??
+        collectionSummaryMap[op.collectionId]?.name ??
+        op.collectionId,
       canCreate: op.canCreate,
       canRead: op.canRead,
       canEdit: op.canEdit,
@@ -175,7 +160,7 @@ export function PermissionSetDetailPage({
       canViewAll: op.canViewAll,
       canModifyAll: op.canModifyAll,
     }))
-  }, [objectPermissions, collectionsData])
+  }, [objectPermissions, collectionSummaryMap])
 
   // Check if permissions have been modified
   const hasPermissionChanges = useMemo(() => {

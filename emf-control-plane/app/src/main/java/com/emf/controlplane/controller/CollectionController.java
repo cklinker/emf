@@ -2,6 +2,7 @@ package com.emf.controlplane.controller;
 
 import com.emf.controlplane.dto.AddFieldRequest;
 import com.emf.controlplane.dto.CollectionDto;
+import com.emf.controlplane.dto.CollectionSummaryDto;
 import com.emf.controlplane.dto.CollectionVersionDto;
 import com.emf.controlplane.dto.CreateCollectionRequest;
 import com.emf.controlplane.dto.FieldDto;
@@ -109,12 +110,39 @@ public class CollectionController {
     }
 
     /**
+     * Returns a lightweight summary of all active collections.
+     * Returns a flat list (no pagination) with only id, name, and displayName.
+     * Used by UI components that need collection references (sidebar, dropdowns, ID→name maps)
+     * without the overhead of full CollectionDto.
+     *
+     * @return List of collection summaries
+     */
+    @GetMapping("/summary")
+    @Operation(
+            summary = "List collection summaries",
+            description = "Returns a lightweight flat list of all active collections with only id, name, and displayName"
+    )
+    @ApiResponse(responseCode = "200", description = "Successfully retrieved collection summaries")
+    public ResponseEntity<List<CollectionSummaryDto>> listCollectionSummaries() {
+        log.debug("REST request to list collection summaries");
+
+        Page<Collection> collections = collectionService.listCollections(
+                null, null, Pageable.ofSize(10000), false);
+
+        List<CollectionSummaryDto> summaries = collections.getContent().stream()
+                .map(CollectionSummaryDto::fromEntity)
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(summaries);
+    }
+
+    /**
      * Creates a new collection.
      * Requires ADMIN role authorization.
-     * 
+     *
      * @param request The collection creation request with name and description
      * @return The created collection with generated ID
-     * 
+     *
      * Validates: Requirement 1.2
      */
     @PostMapping

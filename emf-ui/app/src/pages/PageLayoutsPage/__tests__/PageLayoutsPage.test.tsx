@@ -30,13 +30,12 @@ import { PageLayoutsPage } from '../PageLayoutsPage'
 // Mock data
 // ---------------------------------------------------------------------------
 
-const mockCollections = {
-  content: [
-    { id: 'col-1', name: 'accounts', displayName: 'Accounts' },
-    { id: 'col-2', name: 'contacts', displayName: 'Contacts' },
-    { id: 'col-3', name: 'opportunities', displayName: 'Opportunities' },
-  ],
-}
+// Collection summaries returned by /control/collections/summary (flat array)
+const mockCollectionSummaries = [
+  { id: 'col-1', name: 'accounts', displayName: 'Accounts' },
+  { id: 'col-2', name: 'contacts', displayName: 'Contacts' },
+  { id: 'col-3', name: 'opportunities', displayName: 'Opportunities' },
+]
 
 const mockLayouts = [
   {
@@ -84,8 +83,11 @@ function setupAxiosMocks(overrides: { layouts?: unknown; collections?: unknown }
     if (url.includes('/control/layouts')) {
       return Promise.resolve({ data: overrides.layouts ?? mockLayouts })
     }
+    if (url.includes('/control/collections/summary')) {
+      return Promise.resolve({ data: overrides.collections ?? mockCollectionSummaries })
+    }
     if (url.includes('/control/collections')) {
-      return Promise.resolve({ data: overrides.collections ?? mockCollections })
+      return Promise.resolve({ data: overrides.collections ?? mockCollectionSummaries })
     }
     return Promise.resolve({ data: {} })
   })
@@ -135,8 +137,11 @@ describe('PageLayoutsPage', () => {
         if (url.includes('/control/layouts')) {
           return Promise.reject(createAxiosError(500))
         }
+        if (url.includes('/control/collections/summary')) {
+          return Promise.resolve({ data: mockCollectionSummaries })
+        }
         if (url.includes('/control/collections')) {
-          return Promise.resolve({ data: mockCollections })
+          return Promise.resolve({ data: mockCollectionSummaries })
         }
         return Promise.resolve({ data: {} })
       })
@@ -153,8 +158,11 @@ describe('PageLayoutsPage', () => {
         if (url.includes('/control/layouts')) {
           return Promise.reject(createAxiosError(500))
         }
+        if (url.includes('/control/collections/summary')) {
+          return Promise.resolve({ data: mockCollectionSummaries })
+        }
         if (url.includes('/control/collections')) {
-          return Promise.resolve({ data: mockCollections })
+          return Promise.resolve({ data: mockCollectionSummaries })
         }
         return Promise.resolve({ data: {} })
       })

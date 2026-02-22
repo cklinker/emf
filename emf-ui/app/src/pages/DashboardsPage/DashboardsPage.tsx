@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
+import { useCollectionSummaries } from '../../hooks/useCollectionSummaries'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
 import {
   Plus,
@@ -1635,14 +1636,7 @@ function DashboardEditor({ dashboardId, onBack }: DashboardEditorProps): React.R
     enabled: !!dashboardId,
   })
 
-  const { data: collectionsData } = useQuery({
-    queryKey: ['collections-list'],
-    queryFn: () => apiClient.get<{ content: CollectionSummary[] }>('/control/collections'),
-  })
-
-  const collections: CollectionSummary[] = useMemo(() => {
-    return collectionsData?.content || []
-  }, [collectionsData])
+  const { summaries: collections } = useCollectionSummaries()
 
   if (dashboardLoading) {
     return (

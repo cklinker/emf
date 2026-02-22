@@ -15,6 +15,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
+import { useCollectionSummaries, type CollectionSummary } from '../../hooks/useCollectionSummaries'
 import { cn } from '@/lib/utils'
 
 import {
@@ -36,12 +37,6 @@ import type {
 // ---------------------------------------------------------------------------
 // Shared types
 // ---------------------------------------------------------------------------
-
-interface CollectionSummary {
-  id: string
-  name: string
-  displayName: string
-}
 
 interface CollectionDetail {
   id: string
@@ -721,16 +716,7 @@ export function PageLayoutsPage({
     enabled: viewMode === 'list',
   })
 
-  const { data: collectionsData } = useQuery({
-    queryKey: ['collections-for-layouts'],
-    queryFn: () =>
-      apiClient.get<{ content: CollectionSummary[] }>('/control/collections?size=1000'),
-  })
-
-  const collections = useMemo<CollectionSummary[]>(
-    () => collectionsData?.content ?? [],
-    [collectionsData]
-  )
+  const { summaries: collections } = useCollectionSummaries()
 
   const collectionMap = useMemo(() => {
     const map = new Map<string, CollectionSummary>()

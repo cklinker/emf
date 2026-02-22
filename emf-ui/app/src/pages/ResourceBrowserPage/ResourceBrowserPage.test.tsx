@@ -37,50 +37,13 @@ vi.mock('react-router-dom', async () => {
   }
 })
 
-// Mock collections data - format matches API response with fields array
-const mockCollections = [
-  {
-    id: '1',
-    name: 'users',
-    displayName: 'Users',
-    description: 'User accounts and profiles',
-    active: true,
-    fields: [{}, {}, {}, {}, {}], // 5 fields
-  },
-  {
-    id: '2',
-    name: 'products',
-    displayName: 'Products',
-    description: 'Product catalog',
-    active: true,
-    fields: [{}, {}, {}, {}, {}, {}, {}, {}], // 8 fields
-  },
-  {
-    id: '3',
-    name: 'orders',
-    displayName: 'Orders',
-    description: 'Customer orders',
-    active: true,
-    fields: [{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}], // 12 fields
-  },
-  {
-    id: '4',
-    name: 'archived_data',
-    displayName: 'Archived Data',
-    description: 'Old archived records',
-    active: false,
-    fields: [{}, {}, {}], // 3 fields
-  },
+// Mock collection summaries - format matches /control/collections/summary API response
+// The summary endpoint only returns active collections as a flat array
+const mockCollectionSummaries = [
+  { id: '1', name: 'users', displayName: 'Users' },
+  { id: '2', name: 'products', displayName: 'Products' },
+  { id: '3', name: 'orders', displayName: 'Orders' },
 ]
-
-// Mock data response helper
-const mockCollectionsResponse = {
-  content: mockCollections,
-  totalElements: mockCollections.length,
-  totalPages: 1,
-  size: 1000,
-  number: 0,
-}
 
 describe('ResourceBrowserPage', () => {
   let cleanupAuthMocks: () => void
@@ -102,7 +65,7 @@ describe('ResourceBrowserPage', () => {
       mockAxios.get.mockImplementation(
         () =>
           new Promise((resolve) =>
-            setTimeout(() => resolve({ data: mockCollectionsResponse }), 100)
+            setTimeout(() => resolve({ data: mockCollectionSummaries }), 100)
           )
       )
 
@@ -135,9 +98,14 @@ describe('ResourceBrowserPage', () => {
     })
 
     it('should retry fetch when clicking retry button', async () => {
-      mockAxios.get
-        .mockRejectedValueOnce(createAxiosError(500))
-        .mockResolvedValueOnce({ data: mockCollectionsResponse })
+      // The component calls window.location.reload() on retry
+      const reloadMock = vi.fn()
+      Object.defineProperty(window, 'location', {
+        configurable: true,
+        value: { ...window.location, reload: reloadMock },
+      })
+
+      mockAxios.get.mockRejectedValue(createAxiosError(500))
 
       const user = userEvent.setup()
       render(<ResourceBrowserPage />, { wrapper: createTestWrapper() })
@@ -148,15 +116,13 @@ describe('ResourceBrowserPage', () => {
 
       await user.click(screen.getByRole('button', { name: /retry/i }))
 
-      await waitFor(() => {
-        expect(screen.getByText('Users')).toBeInTheDocument()
-      })
+      expect(reloadMock).toHaveBeenCalled()
     })
   })
 
   describe('Collections Display', () => {
     beforeEach(() => {
-      mockAxios.get.mockResolvedValue({ data: mockCollectionsResponse })
+      mockAxios.get.mockResolvedValue({ data: mockCollectionSummaries })
     })
 
     it('should display page title', async () => {
@@ -167,15 +133,13 @@ describe('ResourceBrowserPage', () => {
       })
     })
 
-    it('should display only active collections', async () => {
+    it('should display all collections from summary endpoint', async () => {
       render(<ResourceBrowserPage />, { wrapper: createTestWrapper() })
 
       await waitFor(() => {
         expect(screen.getByText('Users')).toBeInTheDocument()
         expect(screen.getByText('Products')).toBeInTheDocument()
         expect(screen.getByText('Orders')).toBeInTheDocument()
-        // Inactive collection should not be displayed
-        expect(screen.queryByText('Archived Data')).not.toBeInTheDocument()
       })
     })
 
@@ -199,26 +163,6 @@ describe('ResourceBrowserPage', () => {
       })
     })
 
-    it('should display collection descriptions', async () => {
-      render(<ResourceBrowserPage />, { wrapper: createTestWrapper() })
-
-      await waitFor(() => {
-        expect(screen.getByText('User accounts and profiles')).toBeInTheDocument()
-        expect(screen.getByText('Product catalog')).toBeInTheDocument()
-        expect(screen.getByText('Customer orders')).toBeInTheDocument()
-      })
-    })
-
-    it('should display field counts', async () => {
-      render(<ResourceBrowserPage />, { wrapper: createTestWrapper() })
-
-      await waitFor(() => {
-        // Check that field count elements are present
-        const fieldCounts = screen.getAllByText(/fields/i)
-        expect(fieldCounts.length).toBeGreaterThan(0)
-      })
-    })
-
     it('should display results count', async () => {
       render(<ResourceBrowserPage />, { wrapper: createTestWrapper() })
 
@@ -230,7 +174,7 @@ describe('ResourceBrowserPage', () => {
 
   describe('Search Filtering', () => {
     beforeEach(() => {
-      mockAxios.get.mockResolvedValue({ data: mockCollectionsResponse })
+      mockAxios.get.mockResolvedValue({ data: mockCollectionSummaries })
     })
 
     it('should filter collections by name', async () => {
@@ -261,24 +205,6 @@ describe('ResourceBrowserPage', () => {
 
       const searchInput = screen.getByTestId('collection-search')
       await user.type(searchInput, 'Product')
-
-      await waitFor(() => {
-        expect(screen.queryByText('Users')).not.toBeInTheDocument()
-        expect(screen.getByText('Products')).toBeInTheDocument()
-        expect(screen.queryByText('Orders')).not.toBeInTheDocument()
-      })
-    })
-
-    it('should filter collections by description', async () => {
-      const user = userEvent.setup()
-      render(<ResourceBrowserPage />, { wrapper: createTestWrapper() })
-
-      await waitFor(() => {
-        expect(screen.getByText('Users')).toBeInTheDocument()
-      })
-
-      const searchInput = screen.getByTestId('collection-search')
-      await user.type(searchInput, 'catalog')
 
       await waitFor(() => {
         expect(screen.queryByText('Users')).not.toBeInTheDocument()
@@ -364,7 +290,7 @@ describe('ResourceBrowserPage', () => {
 
   describe('Navigation', () => {
     beforeEach(() => {
-      mockAxios.get.mockResolvedValue({ data: mockCollectionsResponse })
+      mockAxios.get.mockResolvedValue({ data: mockCollectionSummaries })
     })
 
     it('should navigate to collection data view when clicking a collection card', async () => {
@@ -421,17 +347,10 @@ describe('ResourceBrowserPage', () => {
       })
     })
 
-    it('should show empty state when all collections are inactive', async () => {
-      const inactiveCollections = mockCollections.map((c) => ({ ...c, active: false }))
-      mockAxios.get.mockResolvedValue({
-        data: {
-          content: inactiveCollections,
-          totalElements: inactiveCollections.length,
-          totalPages: 1,
-          size: 1000,
-          number: 0,
-        },
-      })
+    it('should show empty state when summary endpoint returns empty array', async () => {
+      // The summary endpoint only returns active collections,
+      // so an empty array means no active collections exist
+      mockAxios.get.mockResolvedValue({ data: [] })
 
       render(<ResourceBrowserPage />, { wrapper: createTestWrapper() })
 
@@ -443,7 +362,7 @@ describe('ResourceBrowserPage', () => {
 
   describe('Accessibility', () => {
     beforeEach(() => {
-      mockAxios.get.mockResolvedValue({ data: mockCollectionsResponse })
+      mockAxios.get.mockResolvedValue({ data: mockCollectionSummaries })
     })
 
     it('should have accessible search input', async () => {

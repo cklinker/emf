@@ -10,12 +10,13 @@
  * - 9.10: Display package history showing previous exports and imports
  */
 
-import React, { useState, useCallback, useRef } from 'react'
+import React, { useState, useCallback, useRef, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Package, FolderOpen } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
+import { useCollectionSummaries } from '../../hooks/useCollectionSummaries'
 import { useToast, LoadingSpinner, ErrorMessage } from '../../components'
 import type { ApiClient } from '../../services/apiClient'
 
@@ -113,18 +114,6 @@ export interface PackagesPageProps {
 // API functions using apiClient
 async function fetchPackageHistory(apiClient: ApiClient): Promise<Package[]> {
   return apiClient.get('/control/packages/history')
-}
-
-async function fetchCollections(apiClient: ApiClient): Promise<SelectableItem[]> {
-  const data = await apiClient.get<{ content?: Array<{ id: string; name: string }> }>(
-    '/control/collections?size=1000'
-  )
-  const collections = data.content || (data as unknown as Array<{ id: string; name: string }>)
-  return collections.map((c: { id: string; name: string }) => ({
-    id: c.id,
-    name: c.name,
-    type: 'collection',
-  }))
 }
 
 async function fetchRoles(apiClient: ApiClient): Promise<SelectableItem[]> {
@@ -377,10 +366,11 @@ function ExportPanel({ onExportComplete }: ExportPanelProps): React.ReactElement
   const [selectedPages, setSelectedPages] = useState<string[]>([])
   const [selectedMenus, setSelectedMenus] = useState<string[]>([])
 
-  const { data: collections = [], isLoading: collectionsLoading } = useQuery({
-    queryKey: ['export-collections'],
-    queryFn: () => fetchCollections(apiClient),
-  })
+  const { summaries, isLoading: collectionsLoading } = useCollectionSummaries()
+  const collections: SelectableItem[] = useMemo(
+    () => summaries.map((c) => ({ id: c.id, name: c.name, type: 'collection' })),
+    [summaries]
+  )
 
   const { data: roles = [], isLoading: rolesLoading } = useQuery({
     queryKey: ['export-roles'],

@@ -166,20 +166,29 @@ const mockMigrationDetails = {
   completedAt: '2024-01-15T10:30:10Z',
 }
 
-// Mock collections for migration planning
+// Mock collection summaries (returned by /control/collections/summary)
+const mockCollectionSummaries = [
+  { id: 'col-1', name: 'users', displayName: 'Users' },
+  { id: 'col-2', name: 'products', displayName: 'Products' },
+  { id: 'col-3', name: 'orders', displayName: 'Orders' },
+]
+
+// Mock collections with version info (built from summaries + version API calls)
+// NOTE: The component computes currentVersion = max(availableVersions), so for
+// col-1 with versions [1,2,3,4], currentVersion=4 and available targets=[1,2,3]
 const mockCollections = [
   {
     id: 'col-1',
     name: 'users',
     displayName: 'Users',
-    currentVersion: 2,
-    availableVersions: [1, 2, 3],
+    currentVersion: 4,
+    availableVersions: [1, 2, 3, 4],
   },
   {
     id: 'col-2',
     name: 'products',
     displayName: 'Products',
-    currentVersion: 4,
+    currentVersion: 5,
     availableVersions: [1, 2, 3, 4, 5],
   },
   {
@@ -265,16 +274,14 @@ function setupAxiosMocks(overrides: Record<string, unknown> = {}) {
       }
       return Promise.resolve({ data: [] })
     }
-    if (url.includes('/control/collections')) {
-      const collections = overrides.collections ?? mockCollections
+    if (url.includes('/control/collections/summary')) {
       return Promise.resolve({
-        data: {
-          content: collections,
-          totalElements: Array.isArray(collections) ? collections.length : 0,
-          totalPages: 1,
-          size: 1000,
-          number: 0,
-        },
+        data: overrides.collections ?? mockCollectionSummaries,
+      })
+    }
+    if (url.includes('/control/collections')) {
+      return Promise.resolve({
+        data: overrides.collections ?? mockCollectionSummaries,
       })
     }
     return Promise.resolve({ data: {} })
@@ -443,16 +450,11 @@ describe('MigrationsPage', () => {
         if (url.includes('/control/migrations')) {
           return Promise.resolve({ data: [] })
         }
+        if (url.includes('/control/collections/summary')) {
+          return Promise.resolve({ data: mockCollectionSummaries })
+        }
         if (url.includes('/control/collections')) {
-          return Promise.resolve({
-            data: {
-              content: mockCollections,
-              totalElements: mockCollections.length,
-              totalPages: 1,
-              size: 1000,
-              number: 0,
-            },
-          })
+          return Promise.resolve({ data: mockCollectionSummaries })
         }
         return Promise.resolve({ data: {} })
       })
@@ -628,16 +630,11 @@ describe('MigrationsPage', () => {
         if (url.includes('/control/migrations')) {
           return Promise.reject(createAxiosError(500))
         }
+        if (url.includes('/control/collections/summary')) {
+          return Promise.resolve({ data: mockCollectionSummaries })
+        }
         if (url.includes('/control/collections')) {
-          return Promise.resolve({
-            data: {
-              content: mockCollections,
-              totalElements: mockCollections.length,
-              totalPages: 1,
-              size: 1000,
-              number: 0,
-            },
-          })
+          return Promise.resolve({ data: mockCollectionSummaries })
         }
         return Promise.resolve({ data: {} })
       })
@@ -669,16 +666,11 @@ describe('MigrationsPage', () => {
           }
           return Promise.resolve({ data: [] })
         }
+        if (url.includes('/control/collections/summary')) {
+          return Promise.resolve({ data: mockCollectionSummaries })
+        }
         if (url.includes('/control/collections')) {
-          return Promise.resolve({
-            data: {
-              content: mockCollections,
-              totalElements: mockCollections.length,
-              totalPages: 1,
-              size: 1000,
-              number: 0,
-            },
-          })
+          return Promise.resolve({ data: mockCollectionSummaries })
         }
         return Promise.resolve({ data: {} })
       })
@@ -708,16 +700,11 @@ describe('MigrationsPage', () => {
         if (url.includes('/control/migrations')) {
           return Promise.reject(createAxiosError(500))
         }
+        if (url.includes('/control/collections/summary')) {
+          return Promise.resolve({ data: mockCollectionSummaries })
+        }
         if (url.includes('/control/collections')) {
-          return Promise.resolve({
-            data: {
-              content: mockCollections,
-              totalElements: mockCollections.length,
-              totalPages: 1,
-              size: 1000,
-              number: 0,
-            },
-          })
+          return Promise.resolve({ data: mockCollectionSummaries })
         }
         return Promise.resolve({ data: {} })
       })
@@ -886,9 +873,10 @@ describe('MigrationsPage', () => {
       // Select users collection (currentVersion: 2, availableVersions: [1, 2, 3])
       await user.selectOptions(screen.getByTestId('collection-select'), 'col-1')
 
-      // Should show versions 1 and 3 (not 2 which is current)
+      // Should show versions 1, 2, and 3 (not 4 which is current = max)
       const targetSelect = screen.getByTestId('target-version-select')
       expect(within(targetSelect).getByText('v1')).toBeInTheDocument()
+      expect(within(targetSelect).getByText('v2')).toBeInTheDocument()
       expect(within(targetSelect).getByText('v3')).toBeInTheDocument()
     })
 
@@ -938,7 +926,7 @@ describe('MigrationsPage', () => {
 
       // Should show the planned change in the summary
       const summary = screen.getByTestId('selection-summary')
-      expect(within(summary).getByText(/v2.*→.*v3/)).toBeInTheDocument()
+      expect(within(summary).getByText(/v4.*→.*v3/)).toBeInTheDocument()
     })
 
     it('closes planning form when cancel is clicked', async () => {
@@ -1325,6 +1313,9 @@ describe('MigrationsPage', () => {
 
     it('handles collections fetch error in planning form', async () => {
       mockAxios.get.mockImplementation((url: string) => {
+        if (url.includes('/control/collections/summary')) {
+          return Promise.reject(createAxiosError(500))
+        }
         if (url.includes('/control/collections')) {
           return Promise.reject(createAxiosError(500))
         }
@@ -1343,10 +1334,17 @@ describe('MigrationsPage', () => {
 
       await user.click(screen.getByTestId('plan-migration-button'))
 
+      // When the summary endpoint fails, the form loads but has an empty
+      // collection dropdown since no summaries are available
       await waitFor(() => {
-        const modal = screen.getByTestId('plan-migration-modal')
-        expect(within(modal).getByTestId('error-message')).toBeInTheDocument()
+        expect(screen.getByTestId('collection-select')).toBeInTheDocument()
       })
+
+      // The select should only have the placeholder option
+      const select = screen.getByTestId('collection-select') as HTMLSelectElement
+      // Only the placeholder "Select a collection..." option should be present
+      const options = within(select).getAllByRole('option')
+      expect(options.length).toBe(1)
     })
   })
 
@@ -1474,16 +1472,11 @@ describe('MigrationsPage', () => {
           }
           return Promise.resolve({ data: [] })
         }
+        if (url.includes('/control/collections/summary')) {
+          return Promise.resolve({ data: mockCollectionSummaries })
+        }
         if (url.includes('/control/collections')) {
-          return Promise.resolve({
-            data: {
-              content: mockCollections,
-              totalElements: mockCollections.length,
-              totalPages: 1,
-              size: 1000,
-              number: 0,
-            },
-          })
+          return Promise.resolve({ data: mockCollectionSummaries })
         }
         return Promise.resolve({ data: {} })
       })
@@ -1825,16 +1818,11 @@ describe('MigrationsPage', () => {
           }
           return Promise.resolve({ data: [] })
         }
+        if (url.includes('/control/collections/summary')) {
+          return Promise.resolve({ data: mockCollectionSummaries })
+        }
         if (url.includes('/control/collections')) {
-          return Promise.resolve({
-            data: {
-              content: mockCollections,
-              totalElements: mockCollections.length,
-              totalPages: 1,
-              size: 1000,
-              number: 0,
-            },
-          })
+          return Promise.resolve({ data: mockCollectionSummaries })
         }
         return Promise.resolve({ data: {} })
       })

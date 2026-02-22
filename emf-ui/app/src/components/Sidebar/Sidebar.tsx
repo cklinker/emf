@@ -9,14 +9,13 @@
  * - 17.4: Collapse navigation menu into hamburger menu on mobile
  */
 
-import { useState, useCallback, useMemo, useEffect } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
 import type { MenuConfig, MenuItemConfig } from '../../types/config'
 import { useI18n } from '../../context/I18nContext'
-import { useApi } from '../../context/ApiContext'
 import { useAuth } from '../../context/AuthContext'
 import { useFavorites } from '../../hooks/useFavorites'
+import { useCollectionSummaries } from '../../hooks/useCollectionSummaries'
 import { getTenantSlug } from '../../context/TenantContext'
 import { cn } from '@/lib/utils'
 import {
@@ -363,27 +362,8 @@ export function Sidebar({ menus, collapsed, onToggle, onItemClick }: SidebarProp
   const userId = user?.id ?? 'anonymous'
   const { favorites } = useFavorites(userId)
 
-  let apiClient: ReturnType<typeof useApi>['apiClient'] | null = null
-  try {
-    const api = useApi()
-    apiClient = api.apiClient
-  } catch {
-    // Not in ApiProvider
-  }
-
   // Fetch collections for dynamic sidebar links
-  const { data: collections } = useQuery({
-    queryKey: ['sidebar-collections'],
-    queryFn: () =>
-      apiClient!.get<Array<{ name: string; displayName: string }>>('/control/collections'),
-    enabled: !!apiClient,
-    staleTime: 300000,
-  })
-
-  const collectionsList = useMemo(
-    () => (Array.isArray(collections) ? collections : []),
-    [collections]
-  )
+  const { summaries: collectionsList } = useCollectionSummaries()
 
   // Favorited collections
   const favoriteCollections = useMemo(
@@ -392,7 +372,7 @@ export function Sidebar({ menus, collapsed, onToggle, onItemClick }: SidebarProp
   )
 
   // Setup section collapsed state (persisted)
-  const [setupExpanded, setSetupExpanded] = useState(() => {
+  const [setupExpandedState, setSetupExpanded] = useState(() => {
     try {
       return localStorage.getItem(SETUP_COLLAPSED_KEY) === 'true'
     } catch {
@@ -412,9 +392,9 @@ export function Sidebar({ menus, collapsed, onToggle, onItemClick }: SidebarProp
     })
   }, [])
 
-  // Check if any setup path is active to auto-expand
+  // Auto-expand setup section when navigating to a setup path
   const location = useLocation()
-  useEffect(() => {
+  const isOnSetupPath = useMemo(() => {
     const slug = getTenantSlug()
     const base = `/${slug}`
     const setupPaths = [
@@ -445,10 +425,10 @@ export function Sidebar({ menus, collapsed, onToggle, onItemClick }: SidebarProp
       `${base}/audit-trail`,
       `${base}/governor-limits`,
     ]
-    if (setupPaths.some((p) => location.pathname.startsWith(p))) {
-      setSetupExpanded(true)
-    }
+    return setupPaths.some((p) => location.pathname.startsWith(p))
   }, [location.pathname])
+
+  const setupExpanded = setupExpandedState || isOnSetupPath
 
   return (
     <nav

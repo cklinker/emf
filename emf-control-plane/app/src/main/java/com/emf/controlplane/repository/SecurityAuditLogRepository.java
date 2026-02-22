@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,9 +43,9 @@ public interface SecurityAuditLogRepository extends JpaRepository<SecurityAuditL
            "ORDER BY a.createdAt DESC")
     Page<SecurityAuditLog> findByFilters(
             @Param("tenantId") String tenantId,
-            @Param("category") String category,
-            @Param("eventType") String eventType,
-            @Param("actorId") String actorId,
+            @Nullable @Param("category") String category,
+            @Nullable @Param("eventType") String eventType,
+            @Nullable @Param("actorId") String actorId,
             Pageable pageable);
 
     @Query("SELECT a FROM SecurityAuditLog a WHERE a.tenantId = :tenantId " +
@@ -54,9 +55,9 @@ public interface SecurityAuditLogRepository extends JpaRepository<SecurityAuditL
            "ORDER BY a.createdAt DESC")
     List<SecurityAuditLog> findAllByFilters(
             @Param("tenantId") String tenantId,
-            @Param("category") String category,
-            @Param("eventType") String eventType,
-            @Param("actorId") String actorId);
+            @Nullable @Param("category") String category,
+            @Nullable @Param("eventType") String eventType,
+            @Nullable @Param("actorId") String actorId);
 
     long countByTenantIdAndEventCategory(String tenantId, String eventCategory);
 

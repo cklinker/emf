@@ -1,5 +1,6 @@
 package com.emf.controlplane.service;
 
+import com.emf.controlplane.config.CacheConfig;
 import com.emf.controlplane.dto.GovernorLimits;
 import com.emf.controlplane.exception.GovernorLimitExceededException;
 import com.emf.controlplane.repository.CollectionRepository;
@@ -7,6 +8,7 @@ import com.emf.controlplane.repository.FieldRepository;
 import com.emf.controlplane.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
@@ -87,6 +89,7 @@ public class GovernorLimitsService {
         }
     }
 
+    @Cacheable(value = CacheConfig.GOVERNOR_LIMITS_CACHE, key = "#tenantId")
     public GovernorLimitsStatus getStatus(String tenantId) {
         GovernorLimits limits = tenantService.getGovernorLimits(tenantId);
         long users = userRepository.countByTenantId(tenantId);

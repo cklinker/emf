@@ -61,7 +61,8 @@ public class LoggingFilter extends OncePerRequestFilter {
     ) throws ServletException, IOException {
         
         long startTime = System.currentTimeMillis();
-        
+        long preFilterTime = startTime;
+
         try {
             // Generate or extract request ID
             String requestId = extractOrGenerateRequestId(request);
@@ -86,19 +87,26 @@ public class LoggingFilter extends OncePerRequestFilter {
                         request.getRemoteAddr());
             }
 
+            // Record time before filter chain (including security filters) executes
+            preFilterTime = System.currentTimeMillis();
+
             // Continue with the filter chain
             filterChain.doFilter(request, response);
 
         } finally {
             // Log request completion with timing
             long duration = System.currentTimeMillis() - startTime;
-            
+            long pipelineDuration = System.currentTimeMillis() - preFilterTime;
+            long overhead = duration - pipelineDuration;
+
             if (log.isInfoEnabled()) {
-                log.info("Request completed: {} {} - Status: {} - Duration: {}ms",
+                log.info("Request completed: {} {} - Status: {} - Duration: {}ms (pipeline: {}ms, overhead: {}ms)",
                         request.getMethod(),
                         request.getRequestURI(),
                         response.getStatus(),
-                        duration);
+                        duration,
+                        pipelineDuration,
+                        overhead);
             }
 
             // Clear MDC to prevent memory leaks and context pollution

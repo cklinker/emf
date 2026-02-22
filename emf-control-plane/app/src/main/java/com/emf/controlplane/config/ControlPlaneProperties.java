@@ -124,7 +124,9 @@ public class ControlPlaneProperties {
      */
     public static class CacheConfig {
         private CacheEntry collections = new CacheEntry("collections", 3600);
+        private CacheEntry collectionsList = new CacheEntry("collections-list", 300);
         private CacheEntry jwks = new CacheEntry("jwks", 86400);
+        private CacheEntry governorLimits = new CacheEntry("governor-limits", 60);
 
         public CacheEntry getCollections() {
             return collections;
@@ -134,12 +136,28 @@ public class ControlPlaneProperties {
             this.collections = collections;
         }
 
+        public CacheEntry getCollectionsList() {
+            return collectionsList;
+        }
+
+        public void setCollectionsList(CacheEntry collectionsList) {
+            this.collectionsList = collectionsList;
+        }
+
         public CacheEntry getJwks() {
             return jwks;
         }
 
         public void setJwks(CacheEntry jwks) {
             this.jwks = jwks;
+        }
+
+        public CacheEntry getGovernorLimits() {
+            return governorLimits;
+        }
+
+        public void setGovernorLimits(CacheEntry governorLimits) {
+            this.governorLimits = governorLimits;
         }
 
         public static class CacheEntry {

@@ -1,5 +1,6 @@
 package com.emf.controlplane.service;
 
+import com.emf.controlplane.config.CacheConfig;
 import com.emf.controlplane.dto.CreateTenantRequest;
 import com.emf.controlplane.dto.GovernorLimits;
 import com.emf.controlplane.dto.UpdateTenantRequest;
@@ -14,6 +15,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -248,6 +250,7 @@ public class TenantService {
      * @return The updated governor limits
      * @throws ResourceNotFoundException if the tenant does not exist
      */
+    @CacheEvict(value = CacheConfig.GOVERNOR_LIMITS_CACHE, key = "#tenantId")
     @Transactional
     public GovernorLimits updateGovernorLimits(String tenantId, GovernorLimits limits) {
         log.info("Updating governor limits for tenant: {}", tenantId);

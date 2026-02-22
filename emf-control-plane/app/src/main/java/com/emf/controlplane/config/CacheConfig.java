@@ -40,8 +40,10 @@ public class CacheConfig {
     private static final Logger log = LoggerFactory.getLogger(CacheConfig.class);
 
     public static final String COLLECTIONS_CACHE = "collections";
+    public static final String COLLECTIONS_LIST_CACHE = "collections-list";
     public static final String JWKS_CACHE = "jwks";
     public static final String PERMISSIONS_CACHE = "permissions";
+    public static final String GOVERNOR_LIMITS_CACHE = "governor-limits";
 
     private final ControlPlaneProperties properties;
 
@@ -82,6 +84,12 @@ public class CacheConfig {
                 .entryTtl(Duration.ofSeconds(collectionsTtl)));
         log.info("Collections cache configured with TTL: {} seconds", collectionsTtl);
 
+        // Collections list cache configuration (5-minute TTL)
+        int collectionsListTtl = properties.getCache().getCollectionsList().getTtl();
+        cacheConfigurations.put(COLLECTIONS_LIST_CACHE, defaultConfig
+                .entryTtl(Duration.ofSeconds(collectionsListTtl)));
+        log.info("Collections list cache configured with TTL: {} seconds", collectionsListTtl);
+
         // JWKS cache configuration
         int jwksTtl = properties.getCache().getJwks().getTtl();
         cacheConfigurations.put(JWKS_CACHE, defaultConfig
@@ -92,6 +100,12 @@ public class CacheConfig {
         cacheConfigurations.put(PERMISSIONS_CACHE, defaultConfig
                 .entryTtl(Duration.ofMinutes(5)));
         log.info("Permissions cache configured with TTL: 5 minutes");
+
+        // Governor limits cache configuration (60-second TTL)
+        int governorLimitsTtl = properties.getCache().getGovernorLimits().getTtl();
+        cacheConfigurations.put(GOVERNOR_LIMITS_CACHE, defaultConfig
+                .entryTtl(Duration.ofSeconds(governorLimitsTtl)));
+        log.info("Governor limits cache configured with TTL: {} seconds", governorLimitsTtl);
 
         return RedisCacheManager.builder(connectionFactory)
                 .cacheDefaults(defaultConfig.entryTtl(Duration.ofSeconds(collectionsTtl)))
@@ -110,6 +124,6 @@ public class CacheConfig {
     @ConditionalOnProperty(name = "spring.cache.type", havingValue = "none", matchIfMissing = true)
     public CacheManager inMemoryCacheManager() {
         log.info("Configuring in-memory cache manager (Redis not available)");
-        return new ConcurrentMapCacheManager(COLLECTIONS_CACHE, JWKS_CACHE, PERMISSIONS_CACHE);
+        return new ConcurrentMapCacheManager(COLLECTIONS_CACHE, COLLECTIONS_LIST_CACHE, JWKS_CACHE, PERMISSIONS_CACHE, GOVERNOR_LIMITS_CACHE);
     }
 }

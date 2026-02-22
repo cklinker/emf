@@ -210,9 +210,15 @@ emf:
       collections:
         name: collections
         ttl: ${CACHE_COLLECTIONS_TTL:3600}
+      collections-list:
+        name: collections-list
+        ttl: ${CACHE_COLLECTIONS_LIST_TTL:300}
       jwks:
         name: jwks
         ttl: ${CACHE_JWKS_TTL:86400}
+      governor-limits:
+        name: governor-limits
+        ttl: ${CACHE_GOVERNOR_LIMITS_TTL:60}
     # Security
     security:
       enabled: ${SECURITY_ENABLED:true}

@@ -11,17 +11,12 @@ import React, { useState, useCallback, useMemo } from 'react'
 import { Pencil, X } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { useApi } from '../../../context/ApiContext'
+import { useCollectionSummaries } from '../../../hooks/useCollectionSummaries'
 import { useLayoutEditor, type EditorRelatedList } from './LayoutEditorContext'
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-
-interface CollectionSummary {
-  id: string
-  name: string
-  displayName: string
-}
 
 interface CollectionFieldDetail {
   id: string
@@ -85,18 +80,9 @@ export function RelatedListPanel(): React.ReactElement {
   const [formData, setFormData] = useState<RelatedListFormData>(INITIAL_FORM_DATA)
 
   // Fetch all collections for the dropdown
-  const { data: collectionsData } = useQuery({
-    queryKey: ['collections-for-related-lists'],
-    queryFn: () =>
-      apiClient.get<{ content: CollectionSummary[] }>('/control/collections?size=1000'),
-  })
+  const { summaries: collections } = useCollectionSummaries()
 
-  const collections = useMemo<CollectionSummary[]>(
-    () => collectionsData?.content ?? [],
-    [collectionsData]
-  )
-
-  // Build a map of collection id -> name for display
+  // Build a map of collection id -> display name for display
   const collectionNameMap = useMemo(() => {
     const map = new Map<string, string>()
     for (const col of collections) {

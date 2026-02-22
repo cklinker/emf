@@ -10,24 +10,10 @@
 
 import React, { useState, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
-
 import { useI18n } from '../../context/I18nContext'
-import { useApi } from '../../context/ApiContext'
 import { getTenantSlug } from '../../context/TenantContext'
+import { useCollectionSummaries, type CollectionSummary } from '../../hooks/useCollectionSummaries'
 import { LoadingSpinner, ErrorMessage } from '../../components'
-
-/**
- * Collection summary interface for the resource browser
- */
-export interface CollectionSummary {
-  id: string
-  name: string
-  displayName: string
-  description?: string
-  active: boolean
-  fieldCount: number
-}
 
 /**
  * Props for ResourceBrowserPage component
@@ -53,35 +39,11 @@ export function ResourceBrowserPage({
   // Search filter state
   const [searchQuery, setSearchQuery] = useState('')
 
-  const { apiClient } = useApi()
+  // Fetch collections via shared hook
+  const { summaries: collections, isLoading, error } = useCollectionSummaries()
 
-  // Fetch collections query
-  const {
-    data: collections = [],
-    isLoading,
-    error,
-    refetch,
-  } = useQuery<CollectionSummary[]>({
-    queryKey: ['collections-for-browser'],
-    queryFn: async () => {
-      const response = await apiClient.get<{ content: CollectionSummary[] }>('/control/collections')
-      console.log('[ResourceBrowserPage] API response:', response)
-      // Extract content array from paginated response
-      return Array.isArray(response?.content) ? response.content : []
-    },
-  })
-
-  // Filter to only show active collections
-  const activeCollections = useMemo(() => {
-    if (!Array.isArray(collections)) {
-      console.log('[ResourceBrowserPage] Collections is not an array:', collections)
-      return []
-    }
-    console.log('[ResourceBrowserPage] Total collections:', collections.length)
-    const filtered = collections.filter((collection) => collection?.active)
-    console.log('[ResourceBrowserPage] Active collections:', filtered.length, filtered)
-    return filtered
-  }, [collections])
+  // The summary endpoint returns only active collections, so no filtering needed
+  const activeCollections = collections
 
   // Filter collections by search query
   const filteredCollections = useMemo(() => {
@@ -92,8 +54,7 @@ export function ResourceBrowserPage({
     return activeCollections.filter(
       (collection) =>
         collection?.name?.toLowerCase().includes(query) ||
-        collection?.displayName?.toLowerCase().includes(query) ||
-        (collection?.description && collection.description.toLowerCase().includes(query))
+        collection?.displayName?.toLowerCase().includes(query)
     )
   }, [activeCollections, searchQuery])
 
@@ -144,7 +105,7 @@ export function ResourceBrowserPage({
       >
         <ErrorMessage
           error={error instanceof Error ? error : new Error(t('errors.generic'))}
-          onRetry={() => refetch()}
+          onRetry={() => window.location.reload()}
         />
       </div>
     )
@@ -219,7 +180,7 @@ export function ResourceBrowserPage({
               tabIndex={0}
               onClick={() => handleCollectionSelect(collection)}
               onKeyDown={(e) => handleKeyDown(e, collection)}
-              aria-label={`${collection.displayName}: ${collection.description || t('common.noData')}`}
+              aria-label={collection.displayName}
               data-testid={`collection-card-${index}`}
             >
               <div className="mb-2 flex flex-col gap-1">
@@ -228,16 +189,6 @@ export function ResourceBrowserPage({
                 </h2>
                 <span className="font-mono text-xs text-muted-foreground/60">
                   {collection.name}
-                </span>
-              </div>
-              {collection.description && (
-                <p className="m-0 line-clamp-2 flex-grow text-sm leading-relaxed text-muted-foreground">
-                  {collection.description}
-                </p>
-              )}
-              <div className="mt-4 flex items-center justify-between border-t border-border/60 pt-2">
-                <span className="text-xs text-muted-foreground/60">
-                  {collection.fieldCount} {collection.fieldCount === 1 ? 'field' : 'fields'}
                 </span>
               </div>
             </div>

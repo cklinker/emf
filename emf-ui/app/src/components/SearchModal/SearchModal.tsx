@@ -11,6 +11,7 @@ import { useNavigate } from 'react-router-dom'
 import { Search, Clock, FileText, ClipboardList } from 'lucide-react'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
+import { useCollectionSummaries } from '../../hooks/useCollectionSummaries'
 import { useAuth } from '../../context/AuthContext'
 import { useRecentRecords } from '../../hooks/useRecentRecords'
 import { formatRelativeTime } from '../../utils/formatRelativeTime'
@@ -167,6 +168,7 @@ export function SearchModal({ open, onClose }: SearchModalProps): JSX.Element | 
 
   const userId = user?.id ?? 'anonymous'
   const { recentRecords } = useRecentRecords(userId)
+  const { summaries: collectionSummaries } = useCollectionSummaries()
 
   // Focus input when opened
   useEffect(() => {
@@ -191,10 +193,8 @@ export function SearchModal({ open, onClose }: SearchModalProps): JSX.Element | 
 
     debounceRef.current = setTimeout(async () => {
       try {
-        // Search across collections - fetch collections first, then search each
-        const collections =
-          await apiClient.get<Array<{ name: string; displayName: string }>>('/control/collections')
-        const colList = Array.isArray(collections) ? collections.slice(0, 5) : []
+        // Search across collections using cached summaries
+        const colList = collectionSummaries.slice(0, 5)
 
         const results: SearchResult[] = []
         await Promise.all(
@@ -234,7 +234,7 @@ export function SearchModal({ open, onClose }: SearchModalProps): JSX.Element | 
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
     }
-  }, [query, apiClient])
+  }, [query, apiClient, collectionSummaries])
 
   // Build results list
   const results = useMemo((): SearchResult[] => {

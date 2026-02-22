@@ -21,6 +21,7 @@ import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
+import { useCollectionSummaries } from '../../hooks/useCollectionSummaries'
 import { LoadingSpinner, ErrorMessage } from '../../components'
 import type { ApiClient } from '../../services/apiClient'
 import { cn } from '@/lib/utils'
@@ -121,36 +122,28 @@ async function fetchMigrationDetails(apiClient: ApiClient, id: string): Promise<
   return apiClient.get(`/control/migrations/${id}`)
 }
 
-async function fetchCollectionsForMigration(apiClient: ApiClient): Promise<CollectionSummary[]> {
-  // The API returns a paginated response, so we need to extract the content array
-  const response = await apiClient.get<Record<string, unknown>>('/control/collections?size=1000')
+async function fetchCollectionVersions(
+  apiClient: ApiClient,
+  collectionSummaries: Array<{ id: string; name: string; displayName: string }>
+): Promise<CollectionSummary[]> {
+  return Promise.all(
+    collectionSummaries.map(async (collection) => {
+      const versions = await apiClient.get<Array<Record<string, unknown>>>(
+        `/control/collections/${collection.id}/versions`
+      )
+      const versionNumbers = Array.isArray(versions)
+        ? versions.map((v: Record<string, unknown>) => v.version as number)
+        : []
 
-  // Handle paginated response structure
-  if (response && response.content && Array.isArray(response.content)) {
-    // Map the collection DTOs to CollectionSummary format
-    return Promise.all(
-      response.content.map(async (collection: Record<string, unknown>) => {
-        // Fetch versions for each collection
-        const versions = await apiClient.get<Array<Record<string, unknown>>>(
-          `/control/collections/${collection.id}/versions`
-        )
-        const versionNumbers = Array.isArray(versions)
-          ? versions.map((v: Record<string, unknown>) => v.version as number)
-          : []
-
-        return {
-          id: collection.id as string,
-          name: collection.name as string,
-          displayName: (collection.displayName || collection.name) as string,
-          currentVersion: (collection.currentVersion as number) || 1,
-          availableVersions: versionNumbers.length > 0 ? versionNumbers : [1],
-        }
-      })
-    )
-  }
-
-  // Fallback to empty array if response structure is unexpected
-  return []
+      return {
+        id: collection.id,
+        name: collection.name,
+        displayName: collection.displayName || collection.name,
+        currentVersion: versionNumbers.length > 0 ? Math.max(...versionNumbers) : 1,
+        availableVersions: versionNumbers.length > 0 ? versionNumbers : [1],
+      }
+    })
+  )
 }
 
 interface CreateMigrationPlanRequest {
@@ -890,14 +883,19 @@ function MigrationPlanningForm({
   const [selectedCollectionId, setSelectedCollectionId] = useState<string>('')
   const [targetVersion, setTargetVersion] = useState<number | ''>('')
 
+  const { summaries: collectionSummaries, isLoading: summariesLoading } = useCollectionSummaries()
+
   const {
     data: collections = [],
-    isLoading: collectionsLoading,
+    isLoading: versionsLoading,
     error: collectionsError,
   } = useQuery({
-    queryKey: ['collections-for-migration'],
-    queryFn: () => fetchCollectionsForMigration(apiClient),
+    queryKey: ['collections-for-migration', collectionSummaries.length],
+    queryFn: () => fetchCollectionVersions(apiClient, collectionSummaries),
+    enabled: collectionSummaries.length > 0,
   })
+
+  const collectionsLoading = summariesLoading || versionsLoading
 
   const planMutation = useMutation({
     mutationFn: (request: CreateMigrationPlanRequest) => createMigrationPlan(apiClient, request),

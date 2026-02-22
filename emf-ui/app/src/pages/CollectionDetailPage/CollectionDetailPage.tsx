@@ -27,6 +27,7 @@ import { ValidationRuleEditor } from '../../components/ValidationRuleEditor'
 import { RecordTypeEditor } from '../../components/RecordTypeEditor'
 import { RecordTypePicklistEditor } from '../../components/RecordTypePicklistEditor'
 import { PicklistDependencyEditor } from '../../components/PicklistDependencyEditor'
+import { useCollectionSummaries } from '../../hooks/useCollectionSummaries'
 import { cn } from '@/lib/utils'
 import type {
   Collection,
@@ -315,18 +316,7 @@ export function CollectionDetailPage({
   })
 
   // Fetch all collections for reference field dropdown
-  const { data: collectionsPage } = useQuery({
-    queryKey: ['collections'],
-    queryFn: async () => {
-      const response = await apiClient.get<{ content: Collection[] }>(
-        '/control/collections?size=1000'
-      )
-      return response
-    },
-    enabled: fieldEditorOpen,
-  })
-
-  const allCollections = collectionsPage?.content || []
+  const { summaries: allCollectionSummaries } = useCollectionSummaries()
 
   // Fetch global picklists for picklist field dropdown
   const { data: globalPicklists = [] } = useQuery({
@@ -2230,7 +2220,7 @@ export function CollectionDetailPage({
             <FieldEditor
               collectionId={collectionId}
               field={editingField}
-              collections={allCollections.map((c) => ({
+              collections={allCollectionSummaries.map((c) => ({
                 id: c.id,
                 name: c.name,
                 displayName: c.displayName || c.name,

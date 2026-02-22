@@ -15,6 +15,7 @@ import { useApi } from '../../context/ApiContext'
 import { useAuth } from '../../context/AuthContext'
 import { useRecentRecords } from '../../hooks/useRecentRecords'
 import { useFavorites } from '../../hooks/useFavorites'
+import { useCollectionSummaries } from '../../hooks/useCollectionSummaries'
 import { formatRelativeTime } from '../../utils/formatRelativeTime'
 import { cn } from '@/lib/utils'
 
@@ -30,12 +31,6 @@ interface ApprovalInstance {
   submittedBy: string
   status: string
   submittedAt: string
-}
-
-interface CollectionSummary {
-  name: string
-  displayName: string
-  recordCount: number
 }
 
 export function HomePage({ testId = 'home-page' }: HomePageProps): JSX.Element {
@@ -62,16 +57,7 @@ export function HomePage({ testId = 'home-page' }: HomePageProps): JSX.Element {
   )
 
   // Fetch collections for quick-create
-  const { data: collections } = useQuery({
-    queryKey: ['collections-summary'],
-    queryFn: () => apiClient.get<CollectionSummary[]>('/control/collections'),
-    staleTime: 300000,
-  })
-
-  const collectionsList: CollectionSummary[] = useMemo(
-    () => (Array.isArray(collections) ? collections : []),
-    [collections]
-  )
+  const { summaries: collectionsList } = useCollectionSummaries()
 
   const topCollections = useMemo(() => collectionsList.slice(0, 5), [collectionsList])
 

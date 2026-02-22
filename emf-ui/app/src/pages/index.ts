@@ -216,6 +216,10 @@ export type { WorkersPageProps, Worker, WorkerAssignment, RebalanceResult } from
 // ProfilesPage - Security profiles management page
 export { ProfilesPage } from './ProfilesPage'
 
+// ProfileDetailPage - Profile detail view page
+export { ProfileDetailPage } from './ProfileDetailPage'
+export type { ProfileDetailPageProps } from './ProfileDetailPage'
+
 // PermissionSetsPage - Permission sets management page
 export { PermissionSetsPage } from './PermissionSetsPage'
 

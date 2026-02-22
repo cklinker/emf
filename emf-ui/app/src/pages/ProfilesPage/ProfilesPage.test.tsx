@@ -11,7 +11,7 @@
  * - System profile protection (no edit/delete)
  * - Loading and error states
  * - Empty state
- * - Expand/collapse rows
+ * - Row click navigation to detail page
  */
 
 import React from 'react'
@@ -21,7 +21,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { ProfilesPage } from './ProfilesPage'
 import { createTestWrapper, setupAuthMocks, mockAxios, resetMockAxios } from '../../test/testUtils'
 
-// Mock TenantContext (ProfilesPage may be rendered inside tenant-scoped routes)
+// Mock TenantContext
 vi.mock('../../context/TenantContext', () => ({
   TenantProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   useTenant: () => ({
@@ -32,6 +32,15 @@ vi.mock('../../context/TenantContext', () => ({
   setResolvedTenantId: vi.fn(),
   getResolvedTenantId: () => null,
 }))
+
+const mockNavigate = vi.fn()
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual('react-router-dom')
+  return {
+    ...actual,
+    useNavigate: () => mockNavigate,
+  }
+})
 
 const mockProfiles = [
   {
@@ -58,6 +67,7 @@ describe('ProfilesPage', () => {
   beforeEach(() => {
     cleanupAuthMocks = setupAuthMocks()
     resetMockAxios()
+    mockNavigate.mockReset()
   })
 
   afterEach(() => {
@@ -120,10 +130,8 @@ describe('ProfilesPage', () => {
     })
     // System profile row (index 0) should have Clone but NOT Edit/Delete
     const systemRow = screen.getByTestId('profile-row-0')
-    expect(within(systemRow.parentElement!).queryByTestId('edit-button-0')).not.toBeInTheDocument()
-    expect(
-      within(systemRow.parentElement!).queryByTestId('delete-button-0')
-    ).not.toBeInTheDocument()
+    expect(within(systemRow).queryByTestId('edit-button-0')).not.toBeInTheDocument()
+    expect(within(systemRow).queryByTestId('delete-button-0')).not.toBeInTheDocument()
     expect(screen.getByTestId('clone-button-0')).toBeInTheDocument()
   })
 
@@ -229,20 +237,14 @@ describe('ProfilesPage', () => {
     })
   })
 
-  it('expands and collapses profile detail on row click', async () => {
+  it('navigates to profile detail page on row click', async () => {
     const user = userEvent.setup()
     mockAxios.get.mockResolvedValueOnce({ data: mockProfiles })
     render(<ProfilesPage />, { wrapper: createTestWrapper() })
     await waitFor(() => {
       expect(screen.getByText('Standard User')).toBeInTheDocument()
     })
-    // Click to expand
     await user.click(screen.getByTestId('profile-row-0'))
-    expect(screen.getByText('System Permissions')).toBeInTheDocument()
-    expect(screen.getByText('No system permissions assigned')).toBeInTheDocument()
-    expect(screen.getByText('No object permissions assigned')).toBeInTheDocument()
-    // Click again to collapse
-    await user.click(screen.getByTestId('profile-row-0'))
-    expect(screen.queryByText('No system permissions assigned')).not.toBeInTheDocument()
+    expect(mockNavigate).toHaveBeenCalledWith('/test-tenant/profiles/1')
   })
 })

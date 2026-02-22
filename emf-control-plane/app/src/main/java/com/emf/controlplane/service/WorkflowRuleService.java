@@ -2,6 +2,7 @@ package com.emf.controlplane.service;
 
 import com.emf.controlplane.audit.SetupAudited;
 import com.emf.controlplane.dto.CreateWorkflowRuleRequest;
+import com.emf.controlplane.dto.WorkflowRuleDto;
 import com.emf.controlplane.entity.Collection;
 import com.emf.controlplane.entity.WorkflowAction;
 import com.emf.controlplane.entity.WorkflowExecutionLog;
@@ -34,8 +35,15 @@ public class WorkflowRuleService {
     }
 
     @Transactional(readOnly = true)
-    public List<WorkflowRule> listRules(String tenantId) {
-        return ruleRepository.findByTenantIdOrderByNameAsc(tenantId);
+    public List<WorkflowRuleDto> listRuleDtos(String tenantId) {
+        return ruleRepository.findByTenantIdOrderByNameAsc(tenantId).stream()
+                .map(WorkflowRuleDto::fromEntity).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public WorkflowRuleDto getRuleDto(String id) {
+        return WorkflowRuleDto.fromEntity(ruleRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("WorkflowRule", id)));
     }
 
     @Transactional(readOnly = true)
@@ -46,7 +54,7 @@ public class WorkflowRuleService {
 
     @Transactional
     @SetupAudited(section = "WorkflowRules", entityType = "WorkflowRule")
-    public WorkflowRule createRule(String tenantId, CreateWorkflowRuleRequest request) {
+    public WorkflowRuleDto createRule(String tenantId, CreateWorkflowRuleRequest request) {
         log.info("Creating workflow rule '{}' for tenant: {}", request.getName(), tenantId);
 
         Collection collection = collectionService.getCollection(request.getCollectionId());
@@ -74,12 +82,12 @@ public class WorkflowRuleService {
             }
         }
 
-        return ruleRepository.save(rule);
+        return WorkflowRuleDto.fromEntity(ruleRepository.save(rule));
     }
 
     @Transactional
     @SetupAudited(section = "WorkflowRules", entityType = "WorkflowRule")
-    public WorkflowRule updateRule(String id, CreateWorkflowRuleRequest request) {
+    public WorkflowRuleDto updateRule(String id, CreateWorkflowRuleRequest request) {
         log.info("Updating workflow rule: {}", id);
         WorkflowRule rule = getRule(id);
 
@@ -109,7 +117,7 @@ public class WorkflowRuleService {
             }
         }
 
-        return ruleRepository.save(rule);
+        return WorkflowRuleDto.fromEntity(ruleRepository.save(rule));
     }
 
     @Transactional

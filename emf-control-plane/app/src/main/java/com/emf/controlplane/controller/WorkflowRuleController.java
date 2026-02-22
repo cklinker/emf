@@ -26,28 +26,27 @@ public class WorkflowRuleController {
     @GetMapping
     public List<WorkflowRuleDto> listRules() {
         String tenantId = TenantContextHolder.requireTenantId();
-        return workflowRuleService.listRules(tenantId).stream()
-                .map(WorkflowRuleDto::fromEntity).toList();
+        return workflowRuleService.listRuleDtos(tenantId);
     }
 
     @GetMapping("/{id}")
     public WorkflowRuleDto getRule(@PathVariable String id) {
-        return WorkflowRuleDto.fromEntity(workflowRuleService.getRule(id));
+        return workflowRuleService.getRuleDto(id);
     }
 
     @PostMapping
     public ResponseEntity<WorkflowRuleDto> createRule(
             @RequestBody CreateWorkflowRuleRequest request) {
         String tenantId = TenantContextHolder.requireTenantId();
-        var rule = workflowRuleService.createRule(tenantId, request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(WorkflowRuleDto.fromEntity(rule));
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(workflowRuleService.createRule(tenantId, request));
     }
 
     @PutMapping("/{id}")
     public WorkflowRuleDto updateRule(
             @PathVariable String id,
             @RequestBody CreateWorkflowRuleRequest request) {
-        return WorkflowRuleDto.fromEntity(workflowRuleService.updateRule(id, request));
+        return workflowRuleService.updateRule(id, request);
     }
 
     @DeleteMapping("/{id}")

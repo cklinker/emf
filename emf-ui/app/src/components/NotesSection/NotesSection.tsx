@@ -14,23 +14,15 @@
  */
 
 import React, { useState, useCallback } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { MessageSquarePlus, Pencil, Trash2 } from 'lucide-react'
 import { useI18n } from '../../context/I18nContext'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import type { ApiClient } from '../../services/apiClient'
+import type { Note } from '../../hooks/useRecordContext'
 
-/**
- * A note associated with a record
- */
-interface Note {
-  id: string
-  content: string
-  createdBy: string
-  createdAt: string
-  updatedAt: string
-}
+export type { Note }
 
 /**
  * Props for the NotesSection component
@@ -42,6 +34,10 @@ export interface NotesSectionProps {
   recordId: string
   /** Authenticated API client instance */
   apiClient: ApiClient
+  /** Pre-fetched notes data (from useRecordContext) */
+  notes?: Note[]
+  /** Callback to invalidate the parent query cache */
+  onMutate?: () => void
 }
 
 /**
@@ -86,6 +82,8 @@ export function NotesSection({
   collectionId,
   recordId,
   apiClient,
+  notes: notesProp,
+  onMutate,
 }: NotesSectionProps): React.ReactElement {
   const { t } = useI18n()
   const queryClient = useQueryClient()
@@ -95,23 +93,16 @@ export function NotesSection({
   const [newContent, setNewContent] = useState('')
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
   const [editContent, setEditContent] = useState('')
-  const [apiAvailable, setApiAvailable] = useState(true)
 
-  // Fetch notes for this record
-  const { data: notes, isLoading } = useQuery({
-    queryKey: ['notes', collectionId, recordId],
-    queryFn: async () => {
-      try {
-        const result = await apiClient.get<Note[]>(`/control/notes/${collectionId}/${recordId}`)
-        setApiAvailable(true)
-        return result || []
-      } catch {
-        setApiAvailable(false)
-        return []
-      }
-    },
-    enabled: !!collectionId && !!recordId,
-  })
+  // Use pre-fetched data from props (via useRecordContext)
+  const notes = notesProp
+
+  const invalidateCache = useCallback(() => {
+    // Invalidate both the combined record-context and legacy notes queries
+    queryClient.invalidateQueries({ queryKey: ['record-context', collectionId, recordId] })
+    queryClient.invalidateQueries({ queryKey: ['notes', collectionId, recordId] })
+    onMutate?.()
+  }, [queryClient, collectionId, recordId, onMutate])
 
   // Create note mutation
   const createMutation = useMutation({
@@ -121,7 +112,7 @@ export function NotesSection({
       })
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notes', collectionId, recordId] })
+      invalidateCache()
       setNewContent('')
       setIsAdding(false)
     },
@@ -133,7 +124,7 @@ export function NotesSection({
       return apiClient.put<Note>(`/control/notes/${noteId}`, { content })
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notes', collectionId, recordId] })
+      invalidateCache()
       setEditingNoteId(null)
       setEditContent('')
     },
@@ -145,7 +136,7 @@ export function NotesSection({
       return apiClient.delete(`/control/notes/${noteId}`)
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notes', collectionId, recordId] })
+      invalidateCache()
     },
   })
 
@@ -197,26 +188,6 @@ export function NotesSection({
   const sortedNotes = [...notesList].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   )
-
-  // If API is not available, show coming soon placeholder
-  if (!apiAvailable && !isLoading) {
-    return (
-      <section
-        className="bg-background border border-border rounded-lg overflow-hidden"
-        aria-labelledby="notes-heading"
-        data-testid="notes-section"
-      >
-        <div className="flex justify-between items-center p-4 border-b border-border bg-muted/50">
-          <h3 id="notes-heading" className="m-0 text-base font-semibold text-foreground">
-            {t('notes.title')}
-          </h3>
-        </div>
-        <div className="text-center py-8" data-testid="notes-coming-soon">
-          <p className="m-0 text-sm text-muted-foreground">{t('notes.comingSoon')}</p>
-        </div>
-      </section>
-    )
-  }
 
   return (
     <section

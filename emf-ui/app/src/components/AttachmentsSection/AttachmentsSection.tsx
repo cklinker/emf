@@ -14,7 +14,7 @@
  */
 
 import React, { useState, useCallback, useRef } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Download, Trash2, Upload } from 'lucide-react'
 import { useI18n } from '../../context/I18nContext'
 import { cn } from '@/lib/utils'
@@ -23,19 +23,9 @@ import type { ApiClient } from '../../services/apiClient'
 import { getFileTypeInfo, isImageType, formatFileSize } from './fileTypeUtils'
 import { FileViewer } from './FileViewer'
 import type { FileViewerAttachment } from './FileViewer'
+import type { Attachment } from '../../hooks/useRecordContext'
 
-/**
- * An attachment associated with a record
- */
-export interface Attachment {
-  id: string
-  fileName: string
-  fileSize: number
-  contentType: string
-  uploadedBy: string
-  uploadedAt: string
-  downloadUrl?: string | null
-}
+export type { Attachment }
 
 /**
  * Props for the AttachmentsSection component
@@ -47,6 +37,10 @@ export interface AttachmentsSectionProps {
   recordId: string
   /** Authenticated API client instance */
   apiClient: ApiClient
+  /** Pre-fetched attachments data (from useRecordContext) */
+  attachments?: Attachment[]
+  /** Callback to invalidate the parent query cache */
+  onMutate?: () => void
 }
 
 /**
@@ -134,30 +128,23 @@ export function AttachmentsSection({
   collectionId,
   recordId,
   apiClient,
+  attachments: attachmentsProp,
+  onMutate,
 }: AttachmentsSectionProps): React.ReactElement {
   const { t } = useI18n()
   const queryClient = useQueryClient()
-  const [apiAvailable, setApiAvailable] = useState(true)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [viewerAttachment, setViewerAttachment] = useState<FileViewerAttachment | null>(null)
 
-  // Fetch attachments for this record
-  const { data: attachments, isLoading } = useQuery({
-    queryKey: ['attachments', collectionId, recordId],
-    queryFn: async () => {
-      try {
-        const result = await apiClient.get<Attachment[]>(
-          `/control/attachments/${collectionId}/${recordId}`
-        )
-        setApiAvailable(true)
-        return result || []
-      } catch {
-        setApiAvailable(false)
-        return []
-      }
-    },
-    enabled: !!collectionId && !!recordId,
-  })
+  // Use pre-fetched data from props (via useRecordContext)
+  const attachments = attachmentsProp
+
+  const invalidateCache = useCallback(() => {
+    // Invalidate both the combined record-context and legacy attachments queries
+    queryClient.invalidateQueries({ queryKey: ['record-context', collectionId, recordId] })
+    queryClient.invalidateQueries({ queryKey: ['attachments', collectionId, recordId] })
+    onMutate?.()
+  }, [queryClient, collectionId, recordId, onMutate])
 
   // Delete attachment mutation
   const deleteMutation = useMutation({
@@ -165,9 +152,7 @@ export function AttachmentsSection({
       return apiClient.delete(`/control/attachments/${attachmentId}`)
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ['attachments', collectionId, recordId],
-      })
+      invalidateCache()
     },
   })
 
@@ -182,9 +167,7 @@ export function AttachmentsSection({
       )
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ['attachments', collectionId, recordId],
-      })
+      invalidateCache()
     },
   })
 
@@ -247,26 +230,6 @@ export function AttachmentsSection({
   const sortedAttachments = [...attachmentsList].sort(
     (a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
   )
-
-  // If API is not available, show coming soon placeholder
-  if (!apiAvailable && !isLoading) {
-    return (
-      <section
-        className="bg-background border border-border rounded-lg overflow-hidden"
-        aria-labelledby="attachments-heading"
-        data-testid="attachments-section"
-      >
-        <div className="flex justify-between items-center p-4 border-b border-border bg-muted/50">
-          <h3 id="attachments-heading" className="m-0 text-base font-semibold text-foreground">
-            {t('attachments.title')}
-          </h3>
-        </div>
-        <div className="text-center py-8" data-testid="attachments-coming-soon">
-          <p className="m-0 text-sm text-muted-foreground">{t('attachments.comingSoon')}</p>
-        </div>
-      </section>
-    )
-  }
 
   return (
     <section

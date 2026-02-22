@@ -46,6 +46,7 @@ public class CacheConfig {
     public static final String JWKS_CACHE = "jwks";
     public static final String PERMISSIONS_CACHE = "permissions";
     public static final String GOVERNOR_LIMITS_CACHE = "governor-limits";
+    public static final String USER_ID_CACHE = "user-id";
 
     private final ControlPlaneProperties properties;
 
@@ -120,6 +121,11 @@ public class CacheConfig {
                 .entryTtl(Duration.ofSeconds(governorLimitsTtl)));
         log.info("Governor limits cache configured with TTL: {} seconds", governorLimitsTtl);
 
+        // User ID cache configuration (5-minute TTL, email → userId mapping)
+        cacheConfigurations.put(USER_ID_CACHE, defaultConfig
+                .entryTtl(Duration.ofMinutes(5)));
+        log.info("User ID cache configured with TTL: 5 minutes");
+
         return RedisCacheManager.builder(connectionFactory)
                 .cacheDefaults(defaultConfig.entryTtl(Duration.ofSeconds(collectionsTtl)))
                 .withInitialCacheConfigurations(cacheConfigurations)
@@ -137,6 +143,6 @@ public class CacheConfig {
     @ConditionalOnProperty(name = "spring.cache.type", havingValue = "none", matchIfMissing = true)
     public CacheManager inMemoryCacheManager() {
         log.info("Configuring in-memory cache manager (Redis not available)");
-        return new ConcurrentMapCacheManager(COLLECTIONS_CACHE, COLLECTIONS_LIST_CACHE, JWKS_CACHE, PERMISSIONS_CACHE, GOVERNOR_LIMITS_CACHE);
+        return new ConcurrentMapCacheManager(COLLECTIONS_CACHE, COLLECTIONS_LIST_CACHE, JWKS_CACHE, PERMISSIONS_CACHE, GOVERNOR_LIMITS_CACHE, USER_ID_CACHE);
     }
 }

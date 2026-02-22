@@ -1,6 +1,10 @@
 spring:
   application:
     name: emf-control-plane
+  servlet:
+    multipart:
+      max-file-size: ${S3_MAX_FILE_SIZE:50MB}
+      max-request-size: ${S3_MAX_FILE_SIZE:50MB}
 
   # Database Configuration
   datasource:
@@ -90,9 +94,6 @@ server:
   port: ${SERVER_PORT:8080}
   servlet:
     context-path: /
-    multipart:
-      max-file-size: ${S3_MAX_FILE_SIZE:50MB}
-      max-request-size: ${S3_MAX_FILE_SIZE:50MB}
   compression:
     enabled: true
     mime-types: application/json,application/xml,text/html,text/xml,text/plain

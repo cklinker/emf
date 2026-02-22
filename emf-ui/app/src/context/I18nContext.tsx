@@ -19,6 +19,10 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 // Import translation files
 import enTranslations from '../i18n/translations/en.json'
 import arTranslations from '../i18n/translations/ar.json'
+import frTranslations from '../i18n/translations/fr.json'
+import deTranslations from '../i18n/translations/de.json'
+import esTranslations from '../i18n/translations/es.json'
+import ptTranslations from '../i18n/translations/pt.json'
 
 /**
  * Text direction type
@@ -28,7 +32,7 @@ export type TextDirection = 'ltr' | 'rtl'
 /**
  * Supported locale codes
  */
-export type SupportedLocale = 'en' | 'ar'
+export type SupportedLocale = 'en' | 'ar' | 'fr' | 'de' | 'es' | 'pt'
 
 /**
  * Translation dictionary type (nested object with string values)
@@ -83,7 +87,7 @@ const DEFAULT_LOCALE: SupportedLocale = 'en'
 const DEFAULT_CURRENCY = 'USD'
 
 // Supported locales configuration
-const SUPPORTED_LOCALES: SupportedLocale[] = ['en', 'ar']
+const SUPPORTED_LOCALES: SupportedLocale[] = ['en', 'ar', 'fr', 'de', 'es', 'pt']
 
 // RTL languages
 const RTL_LOCALES: Set<string> = new Set(['ar', 'he', 'fa', 'ur'])
@@ -92,6 +96,10 @@ const RTL_LOCALES: Set<string> = new Set(['ar', 'he', 'fa', 'ur'])
 const LOCALE_DISPLAY_NAMES: Record<string, string> = {
   en: 'English',
   ar: 'العربية',
+  fr: 'Français',
+  de: 'Deutsch',
+  es: 'Español',
+  pt: 'Português',
   he: 'עברית',
   fa: 'فارسی',
   ur: 'اردو',
@@ -101,6 +109,10 @@ const LOCALE_DISPLAY_NAMES: Record<string, string> = {
 const TRANSLATIONS: Record<string, TranslationDictionary> = {
   en: enTranslations as TranslationDictionary,
   ar: arTranslations as TranslationDictionary,
+  fr: frTranslations as TranslationDictionary,
+  de: deTranslations as TranslationDictionary,
+  es: esTranslations as TranslationDictionary,
+  pt: ptTranslations as TranslationDictionary,
 }
 
 /**
@@ -223,7 +235,6 @@ function applyTextDirection(direction: TextDirection): void {
 
   const root = document.documentElement
   root.setAttribute('dir', direction)
-  root.setAttribute('lang', direction === 'rtl' ? 'ar' : 'en')
 
   // Also set data attribute for CSS selectors
   root.setAttribute('data-direction', direction)

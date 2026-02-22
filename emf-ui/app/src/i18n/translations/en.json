@@ -1312,5 +1312,16 @@
     "templateAccount": "Account",
     "templateTask": "Task",
     "templateCustom": "Custom"
+  },
+  "userMenu": {
+    "language": "Language",
+    "theme": "Theme",
+    "profile": "Profile",
+    "logout": "Log Out",
+    "switchToSetup": "Switch to Setup",
+    "backToApp": "Back to App",
+    "lightMode": "Light",
+    "darkMode": "Dark",
+    "systemMode": "System"
   }
 }

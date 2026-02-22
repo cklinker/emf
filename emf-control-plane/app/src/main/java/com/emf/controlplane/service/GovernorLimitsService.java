@@ -114,6 +114,7 @@ public class GovernorLimitsService {
         return API_CALL_KEY_PREFIX + tenantId + ":" + date;
     }
 
+    @com.fasterxml.jackson.annotation.JsonTypeInfo(use = com.fasterxml.jackson.annotation.JsonTypeInfo.Id.CLASS)
     public record GovernorLimitsStatus(
             GovernorLimits limits,
             long apiCallsUsed, int apiCallsLimit,

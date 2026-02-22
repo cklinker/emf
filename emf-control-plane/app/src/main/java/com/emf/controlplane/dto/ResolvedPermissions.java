@@ -1,6 +1,7 @@
 package com.emf.controlplane.dto;
 
 import com.emf.controlplane.entity.FieldVisibility;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
 import java.util.Map;
 
@@ -8,6 +9,7 @@ import java.util.Map;
  * DTO representing the fully resolved permissions for a user.
  * Combines Profile + direct Permission Sets + group-inherited Permission Sets.
  */
+@JsonTypeInfo(use = JsonTypeInfo.Id.CLASS)
 public record ResolvedPermissions(
         Map<String, Boolean> systemPermissions,
         Map<String, ObjectPermissions> objectPermissions,

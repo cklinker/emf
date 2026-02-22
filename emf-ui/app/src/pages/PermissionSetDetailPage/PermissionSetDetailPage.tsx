@@ -42,8 +42,8 @@ interface PermissionSetDetail {
   name: string
   description: string | null
   system: boolean
-  systemPermissions: PermsetSystemPermission[]
-  objectPermissions: PermsetObjectPermission[]
+  systemPermissions?: PermsetSystemPermission[]
+  objectPermissions?: PermsetObjectPermission[]
   createdAt: string
   updatedAt: string
 }

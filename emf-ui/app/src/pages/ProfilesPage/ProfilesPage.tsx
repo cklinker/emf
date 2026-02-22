@@ -35,8 +35,8 @@ interface SecurityProfile {
   name: string
   description: string | null
   system: boolean
-  systemPermissions: ProfileSystemPermission[]
-  objectPermissions: ObjectPermission[]
+  systemPermissions?: ProfileSystemPermission[]
+  objectPermissions?: ObjectPermission[]
   createdAt: string
   updatedAt: string
 }
@@ -102,7 +102,7 @@ function ProfileDetail({ profile }: { profile: SecurityProfile }) {
         {/* Object Permissions */}
         <div>
           <h4 className="mb-2 text-sm font-semibold text-foreground">Object Permissions</h4>
-          {profile.objectPermissions.length === 0 ? (
+          {(profile.objectPermissions?.length ?? 0) === 0 ? (
             <p className="text-sm text-muted-foreground">No object permissions assigned</p>
           ) : (
             <div className="overflow-x-auto rounded border border-border">
@@ -127,7 +127,7 @@ function ProfileDetail({ profile }: { profile: SecurityProfile }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {profile.objectPermissions.map((op) => (
+                  {(profile.objectPermissions ?? []).map((op) => (
                     <tr key={op.objectName} className="border-t border-border">
                       <td className="px-3 py-1.5 font-medium text-foreground">{op.objectName}</td>
                       <td className="px-3 py-1.5 text-center">

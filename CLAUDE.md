@@ -4,7 +4,9 @@
 
 This is the EMF Enterprise Platform monorepo. When working on tasks, follow this workflow exactly.
 
-**Autonomy:** When a task is listed in an EPIC document, proceed through the entire workflow without asking for confirmation. Execute all steps (mark in progress, branch, implement, build, test, PR, mark code review) end-to-end. Only stop to ask if there is a genuine ambiguity or blocker that cannot be resolved from the EPIC spec.
+**Autonomy:** When a task is listed in an EPIC document, proceed through the entire workflow without asking for confirmation. Execute all steps (mark in progress, branch, implement, build, test, PR, auto-merge, mark code review) end-to-end. Only stop to ask if there is a genuine ambiguity or blocker that cannot be resolved from the EPIC spec.
+
+**All changes require a PR.** Never commit directly to `main`. Always create a feature branch, open a PR, and auto-merge. This applies to EPIC tasks, bug fixes, hotfixes, and any other code changes.
 
 ## Project Structure
 
@@ -221,9 +223,9 @@ git push -u origin feature/<task-id>-<short-description>
 - `test(control-plane): add PicklistService unit tests`
 - `fix(gateway): handle lookup field resolution in IncludeResolver`
 
-### 7. Open a Pull Request
+### 7. Open a Pull Request and Auto-Merge
 
-Create a PR using the GitHub CLI:
+Create a PR using the GitHub CLI and enable auto-merge:
 
 ```bash
 gh pr create \
@@ -253,6 +255,9 @@ gh pr create \
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 EOF
 )"
+
+# Enable auto-merge — PR will merge automatically once CI passes
+gh pr merge --auto --squash
 ```
 
 ### 8. Mark Task as Code Review
@@ -306,11 +311,15 @@ print(json.dumps({'comment_html': comment}))
 
 Replace the placeholder values (PR_URL, BRANCH_NAME, SUMMARY_ITEM_*, FILE_*, TEST_*, REMAINING_ITEM, COMPLETION_DATE) with actual values.
 
-### 9. After Merge (User Merges the PR)
+### 9. After Auto-Merge
 
-Once the user confirms the PR is merged, mark the task as Done:
+After auto-merge is enabled, verify the PR has been merged (or wait for CI to pass), then mark the task as Done:
 
 ```bash
+# Check merge status
+gh pr status
+
+# Mark as Done once merged
 curl -sL -X PATCH \
   "https://plane.rzware.com/api/v1/workspaces/emf/projects/5e955d7a-4326-49ba-b384-e01d1ed76dea/issues/${ISSUE_ID}/" \
   -H "X-API-Key: ${PLANE_API_KEY}" \
@@ -346,3 +355,57 @@ As new phases are planned, their EPIC documents will follow the pattern `EPIC-PH
 - **PR checks** (`.github/workflows/ci.yml`): test-java (build runtime + test control-plane, gateway, worker) + test-frontend → quality-gate
 - **Deploy** (`.github/workflows/build-and-publish-containers.yml`): On main push, test-java + test-frontend → build-and-push (all 4 images) → deploy → smoke-test
 - All CI checks must pass before a PR can be merged
+
+## Kubernetes Access
+
+The platform runs in Kubernetes. Use `kubectl` for debugging and log access.
+
+| Resource | Value |
+|----------|-------|
+| Namespace | `emf` |
+| Control Plane | `deployment/emf-control-plane` |
+| Gateway | `deployment/emf-gateway` |
+| Worker | `deployment/emf-worker` |
+
+### Useful Commands
+
+```bash
+# View recent control plane logs
+kubectl logs -n emf deployment/emf-control-plane --tail=200
+
+# Search for errors in last hour
+kubectl logs -n emf deployment/emf-control-plane --since=1h | grep -i "ERROR\|exception"
+
+# View gateway logs
+kubectl logs -n emf deployment/emf-gateway --tail=200
+
+# View worker logs
+kubectl logs -n emf deployment/emf-worker --tail=200
+
+# Check pod status
+kubectl get pods -n emf
+
+# Describe a pod for events/restarts
+kubectl describe pod -n emf <pod-name>
+```
+
+## Branch and PR Policy
+
+**All changes must go through a pull request.** Never push directly to `main`.
+
+- **Every change** (features, bug fixes, hotfixes, config changes) must be made on a new branch.
+- Create a PR for the branch and ensure CI passes.
+- After CI passes, auto-merge the PR using `gh pr merge --auto --squash`.
+- Branch naming: `feature/<description>` for features, `fix/<description>` for bug fixes.
+
+### Auto-Merge Workflow
+
+After creating a PR, enable auto-merge so it merges as soon as CI passes:
+
+```bash
+# Create PR and enable auto-merge in one step
+gh pr create --title "<title>" --body "<body>"
+gh pr merge --auto --squash
+```
+
+This replaces the previous workflow of waiting for manual merge approval. PRs will merge automatically once all required checks pass.

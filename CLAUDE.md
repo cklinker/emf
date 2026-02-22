@@ -355,10 +355,13 @@ As new phases are planned, their EPIC documents will follow the pattern `EPIC-PH
 - **PR checks** (`.github/workflows/ci.yml`): test-java (build runtime + test control-plane, gateway, worker) + test-frontend → quality-gate
 - **Deploy** (`.github/workflows/build-and-publish-containers.yml`): On main push, test-java + test-frontend → build-and-push (all 4 images) → deploy → smoke-test
 - All CI checks must pass before a PR can be merged
+- **Deployment**: ArgoCD deploys to a local Kubernetes cluster. ArgoCD manifests are in a separate repo:
+  - GitHub: `https://github.com/cklinker/homelab-argo`
+  - Local path: `/Users/craigklinker/GitHub/homelab-argo`
 
 ## Kubernetes Access
 
-The platform runs in Kubernetes. Use `kubectl` for debugging and log access.
+The platform is deployed via ArgoCD to a local Kubernetes cluster. Use `kubectl` for debugging and log access.
 
 | Resource | Value |
 |----------|-------|

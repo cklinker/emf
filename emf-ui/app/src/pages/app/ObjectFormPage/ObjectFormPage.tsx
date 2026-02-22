@@ -41,10 +41,10 @@ import { useApi } from '@/context/ApiContext'
 import { useCollectionSchema } from '@/hooks/useCollectionSchema'
 import { useRecord } from '@/hooks/useRecord'
 import { useRecordMutation } from '@/hooks/useRecordMutation'
-import { useObjectPermissions } from '@/hooks/useObjectPermissions'
-import { useFieldPermissions } from '@/hooks/useFieldPermissions'
+import { useCollectionPermissions } from '@/hooks/useCollectionPermissions'
+import { useLookupDisplayMap } from '@/hooks/useLookupDisplayMap'
 import { InsufficientPrivileges } from '@/components/InsufficientPrivileges'
-import type { FieldDefinition, FieldType, CollectionSchema } from '@/hooks/useCollectionSchema'
+import type { FieldDefinition, FieldType } from '@/hooks/useCollectionSchema'
 import type { LookupOption } from '@/components/LookupSelect'
 
 /** Picklist value returned from the API */
@@ -488,9 +488,13 @@ export function ObjectFormPage(): React.ReactElement {
     enabled: !isNew,
   })
 
-  // Fetch permissions
-  const { permissions, isLoading: permissionsLoading } = useObjectPermissions(collectionName)
-  const { isFieldVisible, isFieldEditable } = useFieldPermissions(collectionName)
+  // Fetch permissions (combined object + field in one call)
+  const {
+    permissions,
+    isFieldVisible,
+    isFieldEditable,
+    isLoading: permissionsLoading,
+  } = useCollectionPermissions(collectionName)
 
   // Filter fields by field-level permissions (hidden fields excluded, read-only shown as disabled)
   const permissionFilteredFields = useMemo(() => {
@@ -531,7 +535,8 @@ export function ObjectFormPage(): React.ReactElement {
   })
 
   // ---------------------------------------------------------------
-  // Lookup options: fetch display labels for reference fields
+  // Lookup options: reuse shared useLookupDisplayMap cache to avoid
+  // re-fetching the same target collection data as the detail page.
   // ---------------------------------------------------------------
   const lookupFields = useMemo(() => {
     return permissionFilteredFields.filter(
@@ -539,79 +544,21 @@ export function ObjectFormPage(): React.ReactElement {
     )
   }, [permissionFilteredFields])
 
-  const { data: lookupOptionsMap } = useQuery({
-    queryKey: ['lookup-options-for-form', collectionName, lookupFields.map((f) => f.id)],
-    queryFn: async () => {
-      const optionsMap: Record<string, LookupOption[]> = {}
+  const { lookupDisplayMap } = useLookupDisplayMap(permissionFilteredFields)
 
-      // Group fields by referenceCollectionId to avoid duplicate requests
-      const targetMap = new Map<string, FieldDefinition[]>()
-      for (const field of lookupFields) {
-        const target = field.referenceCollectionId!
-        if (!targetMap.has(target)) {
-          targetMap.set(target, [])
-        }
-        targetMap.get(target)!.push(field)
+  // Transform the display map (fieldName → { recordId: label }) into
+  // the options map (fieldId → LookupOption[]) needed by the form fields.
+  const lookupOptionsMap = useMemo(() => {
+    if (!lookupDisplayMap) return undefined
+    const result: Record<string, LookupOption[]> = {}
+    for (const field of lookupFields) {
+      const idToLabel = lookupDisplayMap[field.name]
+      if (idToLabel) {
+        result[field.id] = Object.entries(idToLabel).map(([id, label]) => ({ id, label }))
       }
-
-      await Promise.all(
-        Array.from(targetMap.entries()).map(async ([targetCollectionId, targetFields]) => {
-          try {
-            // Fetch target collection schema by UUID
-            const targetSchema = await apiClient.get<CollectionSchema>(
-              `/control/collections/${targetCollectionId}`
-            )
-            const targetName = targetSchema.name
-
-            // Determine display field: displayFieldName → 'name' → first string → 'id'
-            let displayFieldName = 'id'
-            if (targetSchema.displayFieldName) {
-              displayFieldName = targetSchema.displayFieldName
-            } else if (targetSchema.fields) {
-              const nameField = targetSchema.fields.find((f) => f.name.toLowerCase() === 'name')
-              if (nameField) {
-                displayFieldName = nameField.name
-              } else {
-                const firstStringField = targetSchema.fields.find(
-                  (f) => f.type.toUpperCase() === 'STRING'
-                )
-                if (firstStringField) {
-                  displayFieldName = firstStringField.name
-                }
-              }
-            }
-
-            // Fetch records from target collection
-            const recordsResponse = await apiClient.get<Record<string, unknown>>(
-              `/api/${targetName}?page[size]=200`
-            )
-
-            const data = recordsResponse?.data
-            const records: Array<Record<string, unknown>> = Array.isArray(data) ? data : []
-
-            // Build options
-            const options: LookupOption[] = records.map((rec: Record<string, unknown>) => {
-              const attrs = (rec.attributes || rec) as Record<string, unknown>
-              const id = String(rec.id || attrs.id || '')
-              const label = attrs[displayFieldName] ? String(attrs[displayFieldName]) : id
-              return { id, label }
-            })
-
-            // Assign to all fields targeting this collection
-            for (const f of targetFields) {
-              optionsMap[f.id] = options
-            }
-          } catch {
-            for (const f of targetFields) {
-              optionsMap[f.id] = []
-            }
-          }
-        })
-      )
-      return optionsMap
-    },
-    enabled: lookupFields.length > 0,
-  })
+    }
+    return result
+  }, [lookupDisplayMap, lookupFields])
 
   // ---------------------------------------------------------------
   // Merge picklist values and lookup options into enriched fields

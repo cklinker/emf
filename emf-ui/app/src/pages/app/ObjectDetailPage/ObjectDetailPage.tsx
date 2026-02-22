@@ -48,8 +48,7 @@ import {
 import { useCollectionSchema } from '@/hooks/useCollectionSchema'
 import { useRecord } from '@/hooks/useRecord'
 import { useRecordMutation } from '@/hooks/useRecordMutation'
-import { useObjectPermissions } from '@/hooks/useObjectPermissions'
-import { useFieldPermissions } from '@/hooks/useFieldPermissions'
+import { useCollectionPermissions } from '@/hooks/useCollectionPermissions'
 import { FieldRenderer } from '@/components/FieldRenderer'
 import { DetailSection } from '@/components/DetailSection'
 import { RelatedList } from '@/components/RelatedList'
@@ -176,9 +175,12 @@ export function ObjectDetailPage(): React.ReactElement {
     recordId,
   })
 
-  // Fetch permissions
-  const { permissions, isLoading: permissionsLoading } = useObjectPermissions(collectionName)
-  const { isFieldVisible } = useFieldPermissions(collectionName)
+  // Fetch permissions (combined object + field in one call)
+  const {
+    permissions,
+    isFieldVisible,
+    isLoading: permissionsLoading,
+  } = useCollectionPermissions(collectionName)
 
   // Screen reader announcements
   const { announce } = useAnnounce()
@@ -250,10 +252,11 @@ export function ObjectDetailPage(): React.ReactElement {
   const hasLayoutRelatedLists = !!(layout && layout.relatedLists.length > 0)
 
   const { data: allCollections } = useQuery({
-    queryKey: ['all-collections-for-related', collectionName],
+    queryKey: ['all-collections-metadata'],
     queryFn: () =>
       apiClient.get<{ content: CollectionWithFields[] }>('/control/collections?size=1000'),
     enabled: !!collectionName && !hasLayoutRelatedLists && !layoutLoading,
+    staleTime: 5 * 60 * 1000, // 5 minutes — collection metadata rarely changes
   })
 
   const relatedCollections = useMemo<RelatedCollection[]>(() => {

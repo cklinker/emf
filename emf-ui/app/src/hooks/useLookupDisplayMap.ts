@@ -52,6 +52,7 @@ export function useLookupDisplayMap(
 
   const { data: lookupData, isLoading } = useQuery({
     queryKey: [queryKeyPrefix ?? 'lookup-display-map', fieldIds],
+    staleTime: 2 * 60 * 1000, // 2 minutes — lookup records change infrequently
     queryFn: async () => {
       const displayMap: Record<string, Record<string, string>> = {}
       const targetNameMap: Record<string, string> = {}

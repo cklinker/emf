@@ -89,24 +89,17 @@ function normalizeFieldType(backendType: string): FieldType {
 
 /**
  * Fetch a collection schema by name from the control plane.
- * First fetches all collections to find by name, then loads full schema by ID.
+ * The backend resolves by name or ID via getCollectionByIdOrName(),
+ * so a single call to /control/collections/{name} suffices.
  */
 async function fetchCollectionSchema(
   apiClient: ApiClient,
   collectionName: string
 ): Promise<CollectionSchema> {
-  // Fetch all collections to find the one matching the name
-  const response = await apiClient.get<{ content: CollectionSchema[] }>('/control/collections')
-  const collections = response?.content || []
-
-  const collection = collections.find((c: CollectionSchema) => c.name === collectionName)
-
-  if (!collection) {
-    throw new Error(`Collection '${collectionName}' not found`)
-  }
-
-  // Fetch full collection schema by ID
-  const schema = await apiClient.get<CollectionSchema>(`/control/collections/${collection.id}`)
+  // Backend resolves by name or ID — no need to fetch all collections first
+  const schema = await apiClient.get<CollectionSchema>(
+    `/control/collections/${encodeURIComponent(collectionName)}`
+  )
 
   // Normalize field types from backend canonical form to UI form
   if (schema.fields) {

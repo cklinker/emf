@@ -3,6 +3,8 @@ package com.emf.controlplane.service;
 import com.emf.controlplane.dto.ObjectPermissions;
 import com.emf.controlplane.entity.FieldVisibility;
 import com.emf.controlplane.entity.User;
+import com.emf.controlplane.repository.FileAttachmentRepository;
+import com.emf.controlplane.repository.NoteRepository;
 import com.emf.controlplane.repository.UserRepository;
 import com.emf.controlplane.tenant.TenantContextHolder;
 import org.slf4j.Logger;
@@ -26,13 +28,19 @@ public class SecurityService {
 
     private final PermissionResolutionService permissionService;
     private final UserRepository userRepository;
+    private final NoteRepository noteRepository;
+    private final FileAttachmentRepository attachmentRepository;
     private final SecurityAuditService auditService;
 
     public SecurityService(PermissionResolutionService permissionService,
                            UserRepository userRepository,
+                           NoteRepository noteRepository,
+                           FileAttachmentRepository attachmentRepository,
                            @org.springframework.lang.Nullable SecurityAuditService auditService) {
         this.permissionService = permissionService;
         this.userRepository = userRepository;
+        this.noteRepository = noteRepository;
+        this.attachmentRepository = attachmentRepository;
         this.auditService = auditService;
     }
 
@@ -88,6 +96,36 @@ public class SecurityService {
             auditService.logPermissionDenied(collectionId, action, "OBJECT_" + action.toUpperCase());
         }
         return granted;
+    }
+
+    /**
+     * Check if the current user has permission on a note's parent collection.
+     * Looks up the note to resolve its collectionId, then delegates to hasObjectPermission.
+     *
+     * @param root   the method security expression operations (injected by SpEL)
+     * @param noteId the note UUID
+     * @param action the permission action (e.g. "EDIT")
+     * @return true if the user has the requested permission on the note's collection
+     */
+    public boolean hasNotePermission(MethodSecurityExpressionOperations root, String noteId, String action) {
+        return noteRepository.findById(noteId)
+                .map(note -> hasObjectPermission(root, note.getCollectionId(), action))
+                .orElse(false);
+    }
+
+    /**
+     * Check if the current user has permission on an attachment's parent collection.
+     * Looks up the attachment to resolve its collectionId, then delegates to hasObjectPermission.
+     *
+     * @param root         the method security expression operations (injected by SpEL)
+     * @param attachmentId the attachment UUID
+     * @param action       the permission action (e.g. "EDIT")
+     * @return true if the user has the requested permission on the attachment's collection
+     */
+    public boolean hasAttachmentPermission(MethodSecurityExpressionOperations root, String attachmentId, String action) {
+        return attachmentRepository.findById(attachmentId)
+                .map(attachment -> hasObjectPermission(root, attachment.getCollectionId(), action))
+                .orElse(false);
     }
 
     /**

@@ -7,7 +7,7 @@ import java.time.Instant;
 /**
  * Response DTO for file attachment metadata.
  * Matches the UI AttachmentsSection expected shape:
- * { id, fileName, fileSize, contentType, uploadedBy, uploadedAt }.
+ * { id, fileName, fileSize, contentType, uploadedBy, uploadedAt, downloadUrl }.
  *
  * @since 1.0.0
  */
@@ -19,17 +19,29 @@ public class AttachmentDto {
     private String contentType;
     private String uploadedBy;
     private Instant uploadedAt;
+    private String downloadUrl;
 
     public AttachmentDto() {
     }
 
     /**
-     * Creates a DTO from a FileAttachment entity.
+     * Creates a DTO from a FileAttachment entity without a download URL.
      *
      * @param entity the FileAttachment entity
      * @return the DTO, or null if entity is null
      */
     public static AttachmentDto fromEntity(FileAttachment entity) {
+        return fromEntity(entity, null);
+    }
+
+    /**
+     * Creates a DTO from a FileAttachment entity with an optional download URL.
+     *
+     * @param entity      the FileAttachment entity
+     * @param downloadUrl the presigned download URL, or null
+     * @return the DTO, or null if entity is null
+     */
+    public static AttachmentDto fromEntity(FileAttachment entity, String downloadUrl) {
         if (entity == null) {
             return null;
         }
@@ -40,6 +52,7 @@ public class AttachmentDto {
         dto.setContentType(entity.getContentType());
         dto.setUploadedBy(entity.getUploadedBy());
         dto.setUploadedAt(entity.getUploadedAt());
+        dto.setDownloadUrl(downloadUrl);
         return dto;
     }
 
@@ -89,5 +102,13 @@ public class AttachmentDto {
 
     public void setUploadedAt(Instant uploadedAt) {
         this.uploadedAt = uploadedAt;
+    }
+
+    public String getDownloadUrl() {
+        return downloadUrl;
+    }
+
+    public void setDownloadUrl(String downloadUrl) {
+        this.downloadUrl = downloadUrl;
     }
 }

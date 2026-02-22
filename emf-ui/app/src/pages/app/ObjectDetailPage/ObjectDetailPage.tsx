@@ -55,6 +55,8 @@ import { DetailSection } from '@/components/DetailSection'
 import { RelatedList } from '@/components/RelatedList'
 import { LayoutRelatedLists } from '@/components/LayoutRelatedLists'
 import { InsufficientPrivileges } from '@/components/InsufficientPrivileges'
+import { NotesSection } from '@/components/NotesSection/NotesSection'
+import { AttachmentsSection } from '@/components/AttachmentsSection/AttachmentsSection'
 import { QuickActionsMenu } from '@/components/QuickActions'
 import { useAnnounce } from '@/components/LiveRegion'
 import { useAppContext } from '@/context/AppContext'
@@ -534,6 +536,15 @@ export function ObjectDetailPage(): React.ReactElement {
           ))}
         </div>
       ) : null}
+
+      {/* Notes & Attachments */}
+      {schema && recordId && (
+        <div className="space-y-4">
+          <Separator />
+          <NotesSection collectionId={schema.id} recordId={recordId} apiClient={apiClient} />
+          <AttachmentsSection collectionId={schema.id} recordId={recordId} apiClient={apiClient} />
+        </div>
+      )}
 
       {/* Delete confirmation */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>

@@ -92,6 +92,7 @@ public class NoteController {
      * @return the updated note
      */
     @PutMapping("/{noteId}")
+    @PreAuthorize("@securityService.hasNotePermission(#root, #noteId, 'EDIT')")
     public ResponseEntity<NoteDto> updateNote(
             @PathVariable String noteId,
             @Valid @RequestBody UpdateNoteRequest request) {
@@ -109,6 +110,7 @@ public class NoteController {
      * @return 204 No Content
      */
     @DeleteMapping("/{noteId}")
+    @PreAuthorize("@securityService.hasNotePermission(#root, #noteId, 'EDIT')")
     public ResponseEntity<Void> deleteNote(@PathVariable String noteId) {
         String username = getCurrentUsername();
         log.info("REST request to delete note {} by {}", noteId, username);

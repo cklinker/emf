@@ -124,6 +124,20 @@ export class ApiClient {
   }
 
   /**
+   * POST request with multipart form data (e.g. file uploads)
+   */
+  async postFormData<T = unknown>(url: string, formData: FormData): Promise<T> {
+    try {
+      const response = await this.axios.post<T>(url, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      return response.data
+    } catch (error) {
+      throw parseAxiosError(error)
+    }
+  }
+
+  /**
    * PUT request
    */
   async put<T = unknown>(url: string, data?: unknown): Promise<T> {

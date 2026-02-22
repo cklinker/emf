@@ -1282,6 +1282,7 @@
   "attachments": {
     "title": "Attachments",
     "upload": "Upload",
+    "uploading": "Uploading...",
     "download": "Download",
     "delete": "Delete",
     "confirmDelete": "Delete this attachment?",

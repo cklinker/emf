@@ -1,6 +1,7 @@
 package com.emf.controlplane.controller;
 
 import com.emf.controlplane.dto.CreateWorkflowRuleRequest;
+import com.emf.controlplane.dto.ExecuteWorkflowRequest;
 import com.emf.controlplane.dto.WorkflowActionLogDto;
 import com.emf.controlplane.dto.WorkflowRuleDto;
 import com.emf.controlplane.entity.WorkflowExecutionLog;
@@ -9,9 +10,11 @@ import com.emf.controlplane.tenant.TenantContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/control/workflow-rules")
@@ -54,6 +57,18 @@ public class WorkflowRuleController {
     public ResponseEntity<Void> deleteRule(@PathVariable String id) {
         workflowRuleService.deleteRule(id);
         return ResponseEntity.noContent().build();
+    }
+
+    // --- Manual Execution ---
+
+    @PostMapping("/{id}/execute")
+    public ResponseEntity<Map<String, Object>> executeRule(
+            @PathVariable String id,
+            @RequestBody ExecuteWorkflowRequest request,
+            Authentication authentication) {
+        String userId = authentication != null ? authentication.getName() : "system";
+        List<String> executionLogIds = workflowRuleService.executeManual(id, request, userId);
+        return ResponseEntity.ok(Map.of("executionLogIds", executionLogIds));
     }
 
     // --- Execution Logs ---

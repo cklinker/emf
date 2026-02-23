@@ -683,4 +683,113 @@ class WorkflowEngineTest {
             verify(handlerRegistry).getHandler("FIELD_UPDATE");
         }
     }
+
+    @Nested
+    @DisplayName("Scheduled Rule Execution (B2)")
+    class ScheduledRuleExecutionTests {
+
+        @Test
+        @DisplayName("Should execute actions for scheduled rule")
+        void shouldExecuteScheduledActions() {
+            WorkflowRule rule = createRule("Scheduled Rule", "SCHEDULED");
+            createAction(rule, "FIELD_UPDATE", 0);
+
+            ActionHandler handler = mockHandler("FIELD_UPDATE", ActionResult.success());
+            when(handlerRegistry.getHandler("FIELD_UPDATE")).thenReturn(Optional.of(handler));
+
+            engine.executeScheduledRule(rule);
+
+            verify(handlerRegistry).getHandler("FIELD_UPDATE");
+            verify(executionLogRepository, times(2)).save(any(WorkflowExecutionLog.class));
+        }
+
+        @Test
+        @DisplayName("Should skip when no active actions")
+        void shouldSkipWhenNoActiveActions() {
+            WorkflowRule rule = createRule("Empty Scheduled", "SCHEDULED");
+            // No actions added
+
+            engine.executeScheduledRule(rule);
+
+            verify(handlerRegistry, never()).getHandler(any());
+            verify(executionLogRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Should execute multiple actions in order")
+        void shouldExecuteMultipleActionsInOrder() {
+            WorkflowRule rule = createRule("Multi Action Scheduled", "SCHEDULED");
+            createAction(rule, "FIELD_UPDATE", 0);
+            createAction(rule, "EMAIL_ALERT", 1);
+
+            ActionHandler fieldUpdateHandler = mockHandler("FIELD_UPDATE", ActionResult.success());
+            ActionHandler emailAlertHandler = mockHandler("EMAIL_ALERT", ActionResult.success());
+            when(handlerRegistry.getHandler("FIELD_UPDATE")).thenReturn(Optional.of(fieldUpdateHandler));
+            when(handlerRegistry.getHandler("EMAIL_ALERT")).thenReturn(Optional.of(emailAlertHandler));
+
+            engine.executeScheduledRule(rule);
+
+            verify(handlerRegistry).getHandler("FIELD_UPDATE");
+            verify(handlerRegistry).getHandler("EMAIL_ALERT");
+            verify(actionLogRepository, times(2)).save(any());
+        }
+
+        @Test
+        @DisplayName("Should stop on error for scheduled rules")
+        void shouldStopOnErrorForScheduled() {
+            WorkflowRule rule = createRule("Stop Scheduled", "SCHEDULED");
+            rule.setErrorHandling("STOP_ON_ERROR");
+            createAction(rule, "FIELD_UPDATE", 0);
+            createAction(rule, "EMAIL_ALERT", 1);
+
+            ActionHandler failHandler = mockHandler("FIELD_UPDATE", ActionResult.failure("Failed"));
+            ActionHandler emailHandler = mockHandler("EMAIL_ALERT", ActionResult.success());
+            when(handlerRegistry.getHandler("FIELD_UPDATE")).thenReturn(Optional.of(failHandler));
+            when(handlerRegistry.getHandler("EMAIL_ALERT")).thenReturn(Optional.of(emailHandler));
+
+            engine.executeScheduledRule(rule);
+
+            verify(handlerRegistry).getHandler("FIELD_UPDATE");
+            verify(handlerRegistry, never()).getHandler("EMAIL_ALERT");
+        }
+
+        @Test
+        @DisplayName("Should continue on error for scheduled rules")
+        void shouldContinueOnErrorForScheduled() {
+            WorkflowRule rule = createRule("Continue Scheduled", "SCHEDULED");
+            rule.setErrorHandling("CONTINUE_ON_ERROR");
+            createAction(rule, "FIELD_UPDATE", 0);
+            createAction(rule, "EMAIL_ALERT", 1);
+
+            ActionHandler failHandler = mockHandler("FIELD_UPDATE", ActionResult.failure("Failed"));
+            ActionHandler emailHandler = mockHandler("EMAIL_ALERT", ActionResult.success());
+            when(handlerRegistry.getHandler("FIELD_UPDATE")).thenReturn(Optional.of(failHandler));
+            when(handlerRegistry.getHandler("EMAIL_ALERT")).thenReturn(Optional.of(emailHandler));
+
+            engine.executeScheduledRule(rule);
+
+            verify(handlerRegistry).getHandler("FIELD_UPDATE");
+            verify(handlerRegistry).getHandler("EMAIL_ALERT");
+        }
+
+        @Test
+        @DisplayName("Should log execution with SCHEDULED trigger type")
+        void shouldLogScheduledExecution() {
+            WorkflowRule rule = createRule("Log Scheduled", "SCHEDULED");
+            createAction(rule, "FIELD_UPDATE", 0);
+
+            ActionHandler handler = mockHandler("FIELD_UPDATE", ActionResult.success());
+            when(handlerRegistry.getHandler("FIELD_UPDATE")).thenReturn(Optional.of(handler));
+
+            engine.executeScheduledRule(rule);
+
+            // First save: initial EXECUTING, second save: final status
+            verify(executionLogRepository, times(2)).save(argThat(log -> {
+                if (log instanceof WorkflowExecutionLog execLog) {
+                    return "SCHEDULED".equals(execLog.getTriggerType());
+                }
+                return false;
+            }));
+        }
+    }
 }

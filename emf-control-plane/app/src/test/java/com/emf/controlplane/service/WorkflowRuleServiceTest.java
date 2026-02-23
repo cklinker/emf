@@ -1,14 +1,17 @@
 package com.emf.controlplane.service;
 
 import com.emf.controlplane.dto.CreateWorkflowRuleRequest;
+import com.emf.controlplane.dto.ExecuteWorkflowRequest;
 import com.emf.controlplane.dto.WorkflowActionLogDto;
 import com.emf.controlplane.entity.Collection;
+import com.emf.controlplane.entity.WorkflowAction;
 import com.emf.controlplane.entity.WorkflowActionLog;
 import com.emf.controlplane.entity.WorkflowRule;
 import com.emf.controlplane.event.ConfigEventPublisher;
 import com.emf.controlplane.repository.WorkflowActionLogRepository;
 import com.emf.controlplane.repository.WorkflowExecutionLogRepository;
 import com.emf.controlplane.repository.WorkflowRuleRepository;
+import com.emf.controlplane.service.workflow.WorkflowEngine;
 import com.emf.runtime.event.ChangeType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -31,6 +34,7 @@ class WorkflowRuleServiceTest {
     private WorkflowActionLogRepository actionLogRepository;
     private CollectionService collectionService;
     private ConfigEventPublisher configEventPublisher;
+    private WorkflowEngine workflowEngine;
     private WorkflowRuleService service;
 
     @BeforeEach
@@ -40,8 +44,9 @@ class WorkflowRuleServiceTest {
         actionLogRepository = mock(WorkflowActionLogRepository.class);
         collectionService = mock(CollectionService.class);
         configEventPublisher = mock(ConfigEventPublisher.class);
+        workflowEngine = mock(WorkflowEngine.class);
         service = new WorkflowRuleService(ruleRepository, executionLogRepository,
-            actionLogRepository, collectionService, configEventPublisher);
+            actionLogRepository, collectionService, configEventPublisher, workflowEngine);
     }
 
     @Nested
@@ -248,7 +253,7 @@ class WorkflowRuleServiceTest {
         void shouldWorkWithNullPublisher() {
             WorkflowRuleService serviceNoKafka = new WorkflowRuleService(
                 ruleRepository, executionLogRepository, actionLogRepository,
-                collectionService, null);
+                collectionService, null, null);
 
             Collection collection = new Collection();
             collection.setId("col-1");
@@ -263,6 +268,94 @@ class WorkflowRuleServiceTest {
 
             // Should not throw
             assertDoesNotThrow(() -> serviceNoKafka.createRule("tenant-1", request));
+        }
+    }
+
+    @Nested
+    @DisplayName("Manual Execution (B3)")
+    class ManualExecutionTests {
+
+        @Test
+        @DisplayName("Should execute for each record ID")
+        void shouldExecuteForEachRecordId() {
+            Collection collection = new Collection();
+            collection.setId("col-1");
+            collection.setName("orders");
+
+            WorkflowRule rule = new WorkflowRule();
+            rule.setTenantId("tenant-1");
+            rule.setCollection(collection);
+            rule.setName("Manual Rule");
+            rule.setTriggerType("MANUAL");
+
+            when(ruleRepository.findById("rule-1")).thenReturn(Optional.of(rule));
+            when(workflowEngine.executeManualRule(any(), any(), any())).thenReturn("log-1", "log-2");
+
+            ExecuteWorkflowRequest request = new ExecuteWorkflowRequest(List.of("rec-1", "rec-2"));
+            List<String> result = service.executeManual("rule-1", request, "user-1");
+
+            assertEquals(2, result.size());
+            verify(workflowEngine).executeManualRule(rule, "rec-1", "user-1");
+            verify(workflowEngine).executeManualRule(rule, "rec-2", "user-1");
+        }
+
+        @Test
+        @DisplayName("Should execute without record IDs")
+        void shouldExecuteWithoutRecordIds() {
+            Collection collection = new Collection();
+            collection.setId("col-1");
+            collection.setName("orders");
+
+            WorkflowRule rule = new WorkflowRule();
+            rule.setTenantId("tenant-1");
+            rule.setCollection(collection);
+            rule.setName("Manual Rule");
+            rule.setTriggerType("MANUAL");
+
+            when(ruleRepository.findById("rule-1")).thenReturn(Optional.of(rule));
+            when(workflowEngine.executeManualRule(any(), any(), any())).thenReturn("log-1");
+
+            ExecuteWorkflowRequest request = new ExecuteWorkflowRequest();
+            List<String> result = service.executeManual("rule-1", request, "user-1");
+
+            assertEquals(1, result.size());
+            verify(workflowEngine).executeManualRule(rule, null, "user-1");
+        }
+
+        @Test
+        @DisplayName("Should filter out null execution log IDs")
+        void shouldFilterNullLogIds() {
+            Collection collection = new Collection();
+            collection.setId("col-1");
+            collection.setName("orders");
+
+            WorkflowRule rule = new WorkflowRule();
+            rule.setTenantId("tenant-1");
+            rule.setCollection(collection);
+            rule.setName("Manual Rule");
+            rule.setTriggerType("MANUAL");
+
+            when(ruleRepository.findById("rule-1")).thenReturn(Optional.of(rule));
+            // First returns a log ID, second returns null (no active actions)
+            when(workflowEngine.executeManualRule(any(), eq("rec-1"), any())).thenReturn("log-1");
+            when(workflowEngine.executeManualRule(any(), eq("rec-2"), any())).thenReturn(null);
+
+            ExecuteWorkflowRequest request = new ExecuteWorkflowRequest(List.of("rec-1", "rec-2"));
+            List<String> result = service.executeManual("rule-1", request, "user-1");
+
+            assertEquals(1, result.size());
+            assertEquals("log-1", result.get(0));
+        }
+
+        @Test
+        @DisplayName("Should throw when rule not found")
+        void shouldThrowWhenRuleNotFound() {
+            when(ruleRepository.findById("nonexistent")).thenReturn(Optional.empty());
+
+            ExecuteWorkflowRequest request = new ExecuteWorkflowRequest(List.of("rec-1"));
+
+            assertThrows(Exception.class, () ->
+                service.executeManual("nonexistent", request, "user-1"));
         }
     }
 

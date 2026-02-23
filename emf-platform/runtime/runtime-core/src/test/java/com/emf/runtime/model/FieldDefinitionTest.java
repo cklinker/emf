@@ -338,4 +338,204 @@ class FieldDefinitionTest {
             assertNotEquals(field1, field2);
         }
     }
+
+    @Nested
+    @DisplayName("String With Max Length Factory Tests")
+    class StringWithMaxLengthTests {
+
+        @Test
+        @DisplayName("string(name, maxLength) should create nullable string with validation")
+        void stringShouldCreateNullableStringWithMaxLength() {
+            FieldDefinition field = FieldDefinition.string("name", 200);
+
+            assertEquals("name", field.name());
+            assertEquals(FieldType.STRING, field.type());
+            assertTrue(field.nullable());
+            assertNotNull(field.validationRules());
+            assertEquals(200, field.validationRules().maxLength());
+        }
+
+        @Test
+        @DisplayName("requiredString(name, maxLength) should create non-nullable string with validation")
+        void requiredStringShouldCreateNonNullableStringWithMaxLength() {
+            FieldDefinition field = FieldDefinition.requiredString("email", 320);
+
+            assertEquals("email", field.name());
+            assertEquals(FieldType.STRING, field.type());
+            assertFalse(field.nullable());
+            assertNotNull(field.validationRules());
+            assertEquals(320, field.validationRules().maxLength());
+        }
+
+        @Test
+        @DisplayName("requiredJson() should create non-nullable JSON field")
+        void requiredJsonShouldCreateNonNullableJson() {
+            FieldDefinition field = FieldDefinition.requiredJson("columns");
+
+            assertEquals("columns", field.name());
+            assertEquals(FieldType.JSON, field.type());
+            assertFalse(field.nullable());
+        }
+
+        @Test
+        @DisplayName("text() should create nullable string without max length")
+        void textShouldCreateNullableStringWithoutMaxLength() {
+            FieldDefinition field = FieldDefinition.text("content");
+
+            assertEquals("content", field.name());
+            assertEquals(FieldType.STRING, field.type());
+            assertTrue(field.nullable());
+            assertNull(field.validationRules());
+        }
+
+        @Test
+        @DisplayName("requiredText() should create non-nullable string without max length")
+        void requiredTextShouldCreateNonNullableStringWithoutMaxLength() {
+            FieldDefinition field = FieldDefinition.requiredText("body");
+
+            assertEquals("body", field.name());
+            assertEquals(FieldType.STRING, field.type());
+            assertFalse(field.nullable());
+            assertNull(field.validationRules());
+        }
+    }
+
+    @Nested
+    @DisplayName("With-er Method Tests")
+    class WithMethodTests {
+
+        @Test
+        @DisplayName("withNullable should return new field with changed nullable")
+        void withNullableShouldReturnNewField() {
+            FieldDefinition original = FieldDefinition.string("name");
+            FieldDefinition modified = original.withNullable(false);
+
+            assertTrue(original.nullable());
+            assertFalse(modified.nullable());
+            assertEquals("name", modified.name());
+        }
+
+        @Test
+        @DisplayName("withUnique should return new field with changed unique flag")
+        void withUniqueShouldReturnNewField() {
+            FieldDefinition original = FieldDefinition.string("email");
+            FieldDefinition modified = original.withUnique(true);
+
+            assertFalse(original.unique());
+            assertTrue(modified.unique());
+        }
+
+        @Test
+        @DisplayName("withDefault should return new field with default value")
+        void withDefaultShouldReturnNewField() {
+            FieldDefinition original = FieldDefinition.string("status");
+            FieldDefinition modified = original.withDefault("ACTIVE");
+
+            assertNull(original.defaultValue());
+            assertEquals("ACTIVE", modified.defaultValue());
+        }
+
+        @Test
+        @DisplayName("withValidation should return new field with validation rules")
+        void withValidationShouldReturnNewField() {
+            ValidationRules rules = ValidationRules.forString(1, 100);
+            FieldDefinition original = FieldDefinition.string("name");
+            FieldDefinition modified = original.withValidation(rules);
+
+            assertNull(original.validationRules());
+            assertEquals(rules, modified.validationRules());
+        }
+
+        @Test
+        @DisplayName("withImmutable should return new field with immutable flag")
+        void withImmutableShouldReturnNewField() {
+            FieldDefinition original = FieldDefinition.string("id");
+            FieldDefinition modified = original.withImmutable(true);
+
+            assertFalse(original.immutable());
+            assertTrue(modified.immutable());
+        }
+
+        @Test
+        @DisplayName("withEnumValues should return new field with enum values")
+        void withEnumValuesShouldReturnNewField() {
+            List<String> values = List.of("A", "B", "C");
+            FieldDefinition original = FieldDefinition.string("status");
+            FieldDefinition modified = original.withEnumValues(values);
+
+            assertNull(original.enumValues());
+            assertEquals(values, modified.enumValues());
+        }
+
+        @Test
+        @DisplayName("withReferenceConfig should return new field with reference")
+        void withReferenceConfigShouldReturnNewField() {
+            ReferenceConfig ref = ReferenceConfig.toCollection("users");
+            FieldDefinition original = FieldDefinition.string("userId");
+            FieldDefinition modified = original.withReferenceConfig(ref);
+
+            assertNull(original.referenceConfig());
+            assertEquals(ref, modified.referenceConfig());
+        }
+
+        @Test
+        @DisplayName("chaining with-ers should compose correctly")
+        void chainingWithersShouldCompose() {
+            FieldDefinition field = FieldDefinition.string("status")
+                .withDefault("ACTIVE")
+                .withEnumValues(List.of("ACTIVE", "INACTIVE"))
+                .withNullable(false)
+                .withColumnName("status_code");
+
+            assertEquals("status", field.name());
+            assertEquals("ACTIVE", field.defaultValue());
+            assertEquals(List.of("ACTIVE", "INACTIVE"), field.enumValues());
+            assertFalse(field.nullable());
+            assertEquals("status_code", field.columnName());
+        }
+    }
+
+    @Nested
+    @DisplayName("Relationship Factory Tests")
+    class RelationshipFactoryTests {
+
+        @Test
+        @DisplayName("lookup should create LOOKUP type with reference config")
+        void lookupShouldCreateLookupType() {
+            FieldDefinition field = FieldDefinition.lookup("profileId", "profiles", "Profile");
+
+            assertEquals("profileId", field.name());
+            assertEquals(FieldType.LOOKUP, field.type());
+            assertTrue(field.nullable());
+            assertNotNull(field.referenceConfig());
+            assertEquals("profiles", field.referenceConfig().targetCollection());
+            assertTrue(field.referenceConfig().isLookup());
+            assertFalse(field.referenceConfig().cascadeDelete());
+        }
+
+        @Test
+        @DisplayName("masterDetail should create MASTER_DETAIL type with cascade")
+        void masterDetailShouldCreateMasterDetailType() {
+            FieldDefinition field = FieldDefinition.masterDetail("collectionId", "collections", "Collection");
+
+            assertEquals("collectionId", field.name());
+            assertEquals(FieldType.MASTER_DETAIL, field.type());
+            assertFalse(field.nullable());
+            assertNotNull(field.referenceConfig());
+            assertEquals("collections", field.referenceConfig().targetCollection());
+            assertTrue(field.referenceConfig().isMasterDetail());
+            assertTrue(field.referenceConfig().cascadeDelete());
+        }
+
+        @Test
+        @DisplayName("relationship fields should support withColumnName")
+        void relationshipFieldsShouldSupportWithColumnName() {
+            FieldDefinition field = FieldDefinition.lookup("profileId", "profiles", "Profile")
+                .withColumnName("profile_id");
+
+            assertEquals("profile_id", field.columnName());
+            assertEquals(FieldType.LOOKUP, field.type());
+            assertEquals("profiles", field.referenceConfig().targetCollection());
+        }
+    }
 }

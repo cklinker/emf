@@ -258,4 +258,150 @@ public record FieldDefinition(
         return new FieldDefinition(name, FieldType.MASTER_DETAIL, false, false, false, null, null, null,
             ReferenceConfig.masterDetail(targetCollection, relationshipName), null);
     }
+
+    // =========================================================================
+    // Convenience Factory Methods
+    // =========================================================================
+
+    /**
+     * Creates a nullable string field with a maximum length constraint.
+     *
+     * @param name the field name
+     * @param maxLength the maximum string length
+     * @return a nullable string field with maxLength validation
+     */
+    public static FieldDefinition string(String name, int maxLength) {
+        return new FieldDefinition(name, FieldType.STRING, true, false, false, null,
+                ValidationRules.forString(null, maxLength), null, null, null);
+    }
+
+    /**
+     * Creates a required string field with a maximum length constraint.
+     *
+     * @param name the field name
+     * @param maxLength the maximum string length
+     * @return a non-nullable string field with maxLength validation
+     */
+    public static FieldDefinition requiredString(String name, int maxLength) {
+        return new FieldDefinition(name, FieldType.STRING, false, false, false, null,
+                ValidationRules.forString(null, maxLength), null, null, null);
+    }
+
+    /**
+     * Creates a required JSON field.
+     *
+     * @param name the field name
+     * @return a non-nullable JSON field definition
+     */
+    public static FieldDefinition requiredJson(String name) {
+        return new FieldDefinition(name, FieldType.JSON, false, false, false, null, null, null, null, null);
+    }
+
+    /**
+     * Creates a nullable text field (unbounded string).
+     *
+     * @param name the field name
+     * @return a nullable string field with no length constraint
+     */
+    public static FieldDefinition text(String name) {
+        return new FieldDefinition(name, FieldType.STRING, true, false, false, null, null, null, null, null);
+    }
+
+    /**
+     * Creates a required text field (unbounded string).
+     *
+     * @param name the field name
+     * @return a non-nullable string field with no length constraint
+     */
+    public static FieldDefinition requiredText(String name) {
+        return new FieldDefinition(name, FieldType.STRING, false, false, false, null, null, null, null, null);
+    }
+
+    // =========================================================================
+    // With-er (copy) Methods
+    // =========================================================================
+
+    /**
+     * Returns a copy of this field with the nullable flag changed.
+     *
+     * @param nullable whether the field accepts null values
+     * @return a new field definition with the specified nullable flag
+     */
+    public FieldDefinition withNullable(boolean nullable) {
+        return new FieldDefinition(name, type, nullable, immutable, unique,
+                defaultValue, validationRules, enumValues, referenceConfig,
+                fieldTypeConfig, columnName);
+    }
+
+    /**
+     * Returns a copy of this field with the unique flag changed.
+     *
+     * @param unique whether the field value must be unique
+     * @return a new field definition with the specified unique flag
+     */
+    public FieldDefinition withUnique(boolean unique) {
+        return new FieldDefinition(name, type, nullable, immutable, unique,
+                defaultValue, validationRules, enumValues, referenceConfig,
+                fieldTypeConfig, columnName);
+    }
+
+    /**
+     * Returns a copy of this field with a default value set.
+     *
+     * @param defaultValue the default value
+     * @return a new field definition with the specified default value
+     */
+    public FieldDefinition withDefault(Object defaultValue) {
+        return new FieldDefinition(name, type, nullable, immutable, unique,
+                defaultValue, validationRules, enumValues, referenceConfig,
+                fieldTypeConfig, columnName);
+    }
+
+    /**
+     * Returns a copy of this field with validation rules set.
+     *
+     * @param validationRules the validation rules
+     * @return a new field definition with the specified validation rules
+     */
+    public FieldDefinition withValidation(ValidationRules validationRules) {
+        return new FieldDefinition(name, type, nullable, immutable, unique,
+                defaultValue, validationRules, enumValues, referenceConfig,
+                fieldTypeConfig, columnName);
+    }
+
+    /**
+     * Returns a copy of this field with the immutable flag changed.
+     *
+     * @param immutable whether the field can be updated after creation
+     * @return a new field definition with the specified immutable flag
+     */
+    public FieldDefinition withImmutable(boolean immutable) {
+        return new FieldDefinition(name, type, nullable, immutable, unique,
+                defaultValue, validationRules, enumValues, referenceConfig,
+                fieldTypeConfig, columnName);
+    }
+
+    /**
+     * Returns a copy of this field with enum values set.
+     *
+     * @param enumValues the allowed enum values
+     * @return a new field definition with the specified enum values
+     */
+    public FieldDefinition withEnumValues(java.util.List<String> enumValues) {
+        return new FieldDefinition(name, type, nullable, immutable, unique,
+                defaultValue, validationRules, enumValues, referenceConfig,
+                fieldTypeConfig, columnName);
+    }
+
+    /**
+     * Returns a copy of this field with reference config set.
+     *
+     * @param referenceConfig the reference configuration
+     * @return a new field definition with the specified reference config
+     */
+    public FieldDefinition withReferenceConfig(ReferenceConfig referenceConfig) {
+        return new FieldDefinition(name, type, nullable, immutable, unique,
+                defaultValue, validationRules, enumValues, referenceConfig,
+                fieldTypeConfig, columnName);
+    }
 }

@@ -181,14 +181,72 @@ class DefaultQueryEngineTest {
             
             assertEquals(expectedResult, result);
         }
-        
+
+        @Test
+        @DisplayName("Should allow tenantId filter on tenant-scoped collections")
+        void shouldAllowTenantIdFilterOnTenantScopedCollections() {
+            CollectionDefinition tenantScopedCollection = new CollectionDefinitionBuilder()
+                .name("reports")
+                .displayName("Reports")
+                .systemCollection(true)
+                .tenantScoped(true)
+                .addField(new FieldDefinitionBuilder()
+                    .name("name")
+                    .type(FieldType.STRING)
+                    .nullable(false)
+                    .build())
+                .build();
+
+            QueryRequest request = new QueryRequest(
+                Pagination.defaults(),
+                List.of(),
+                List.of(),
+                List.of(new FilterCondition("tenantId", FilterOperator.EQ, "tenant-123"))
+            );
+            QueryResult expectedResult = QueryResult.empty(request.pagination());
+
+            when(storageAdapter.query(tenantScopedCollection, request)).thenReturn(expectedResult);
+
+            QueryResult result = queryEngine.executeQuery(tenantScopedCollection, request);
+
+            assertEquals(expectedResult, result);
+        }
+
+        @Test
+        @DisplayName("Should reject tenantId filter on non-tenant-scoped collections")
+        void shouldRejectTenantIdFilterOnNonTenantScopedCollections() {
+            CollectionDefinition nonTenantCollection = new CollectionDefinitionBuilder()
+                .name("action-types")
+                .displayName("Action Types")
+                .systemCollection(true)
+                .tenantScoped(false)
+                .addField(new FieldDefinitionBuilder()
+                    .name("name")
+                    .type(FieldType.STRING)
+                    .nullable(false)
+                    .build())
+                .build();
+
+            QueryRequest request = new QueryRequest(
+                Pagination.defaults(),
+                List.of(),
+                List.of(),
+                List.of(new FilterCondition("tenantId", FilterOperator.EQ, "tenant-123"))
+            );
+
+            InvalidQueryException ex = assertThrows(InvalidQueryException.class, () ->
+                queryEngine.executeQuery(nonTenantCollection, request));
+
+            assertEquals("tenantId", ex.getFieldName());
+        }
+
         @Test
         @DisplayName("Should throw on null definition")
         void shouldThrowOnNullDefinition() {
             assertThrows(NullPointerException.class, () ->
                 queryEngine.executeQuery(null, QueryRequest.defaults()));
         }
-        
+
         @Test
         @DisplayName("Should throw on null request")
         void shouldThrowOnNullRequest() {

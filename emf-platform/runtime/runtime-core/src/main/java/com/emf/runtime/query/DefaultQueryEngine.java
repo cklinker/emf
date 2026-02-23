@@ -381,9 +381,13 @@ public class DefaultQueryEngine implements QueryEngine {
     /**
      * Checks if a field name is valid for the collection.
      * System fields (id, createdAt, updatedAt, createdBy, updatedBy) are always valid.
+     * tenantId is valid for tenant-scoped collections (injected by DynamicCollectionRouter).
      */
     private boolean isValidField(CollectionDefinition definition, String fieldName) {
         if (SYSTEM_FIELDS.contains(fieldName)) {
+            return true;
+        }
+        if ("tenantId".equals(fieldName) && definition.tenantScoped()) {
             return true;
         }
         return definition.getField(fieldName) != null;

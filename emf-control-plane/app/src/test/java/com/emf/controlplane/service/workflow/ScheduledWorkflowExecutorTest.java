@@ -172,8 +172,8 @@ class ScheduledWorkflowExecutorTest {
         @Test
         @DisplayName("Should not be due when last run was recent")
         void shouldNotBeDueWhenRecentlyRun() {
-            // Every hour — last run was 5 minutes ago
-            WorkflowRule rule = createScheduledRule("Hourly", "0 0 * * * *");
+            // Every 12 hours — last run was 5 minutes ago, so next fire is ~12 hours away
+            WorkflowRule rule = createScheduledRule("Twice Daily", "0 0 */12 * * *");
             rule.setLastScheduledRun(Instant.now().minus(5, ChronoUnit.MINUTES));
 
             assertFalse(executor.isDue(rule));

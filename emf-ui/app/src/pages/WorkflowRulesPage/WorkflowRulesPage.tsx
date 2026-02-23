@@ -69,6 +69,17 @@ const TRIGGER_FIELDS_TYPES: TriggerType[] = ['ON_UPDATE', 'ON_CREATE_OR_UPDATE',
 /** Trigger types that run synchronously (before save) */
 const BEFORE_SAVE_TYPES: TriggerType[] = ['BEFORE_CREATE', 'BEFORE_UPDATE']
 
+/** Action type categories for grouping in the dropdown */
+const ACTION_TYPE_CATEGORY_LABELS: Record<string, string> = {
+  DATA: 'Data',
+  COMMUNICATION: 'Communication',
+  INTEGRATION: 'Integration',
+  FLOW_CONTROL: 'Flow Control',
+}
+
+/** Action type category ordering */
+const ACTION_TYPE_CATEGORY_ORDER = ['DATA', 'COMMUNICATION', 'INTEGRATION', 'FLOW_CONTROL']
+
 interface WorkflowRule {
   id: string
   name: string
@@ -784,10 +795,21 @@ function WorkflowRuleForm({
                               data-testid={`action-type-${index}`}
                             >
                               {actionTypes && actionTypes.length > 0 ? (
-                                actionTypes.map((at) => (
-                                  <option key={at.key} value={at.key}>
-                                    {at.name} ({at.key})
-                                  </option>
+                                ACTION_TYPE_CATEGORY_ORDER.filter((cat) =>
+                                  actionTypes.some((at) => at.category === cat)
+                                ).map((cat) => (
+                                  <optgroup
+                                    key={cat}
+                                    label={ACTION_TYPE_CATEGORY_LABELS[cat] ?? cat}
+                                  >
+                                    {actionTypes
+                                      .filter((at) => at.category === cat)
+                                      .map((at) => (
+                                        <option key={at.key} value={at.key}>
+                                          {at.name}
+                                        </option>
+                                      ))}
+                                  </optgroup>
                                 ))
                               ) : (
                                 <>
@@ -1444,9 +1466,22 @@ export function WorkflowRulesPage({
                     )}
                   </td>
                   <td role="gridcell" className="px-4 py-3 text-sm text-foreground">
-                    <span className="text-muted-foreground">
-                      {workflowRule.actions?.length ?? 0}
-                    </span>
+                    <div className="flex flex-wrap items-center gap-1">
+                      <span className="text-muted-foreground">
+                        {workflowRule.actions?.length ?? 0}
+                      </span>
+                      {workflowRule.actions &&
+                        workflowRule.actions.length > 0 &&
+                        workflowRule.actions.length <= 3 &&
+                        workflowRule.actions.map((a, ai) => (
+                          <span
+                            key={ai}
+                            className="inline-block rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
+                          >
+                            {a.actionType}
+                          </span>
+                        ))}
+                    </div>
                   </td>
                   <td role="gridcell" className="px-4 py-3 text-sm text-foreground">
                     <span

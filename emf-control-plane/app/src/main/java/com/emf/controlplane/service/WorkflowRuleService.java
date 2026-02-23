@@ -81,6 +81,9 @@ public class WorkflowRuleService {
         rule.setReEvaluateOnUpdate(request.getReEvaluateOnUpdate() != null ? request.getReEvaluateOnUpdate() : false);
         rule.setExecutionOrder(request.getExecutionOrder() != null ? request.getExecutionOrder() : 0);
         rule.setErrorHandling(request.getErrorHandling() != null ? request.getErrorHandling() : "STOP_ON_ERROR");
+        rule.setTriggerFields(WorkflowRuleDto.serializeTriggerFields(request.getTriggerFields()));
+        rule.setCronExpression(request.getCronExpression());
+        rule.setTimezone(request.getTimezone());
 
         if (request.getActions() != null) {
             for (CreateWorkflowRuleRequest.ActionRequest actionReq : request.getActions()) {
@@ -113,6 +116,9 @@ public class WorkflowRuleService {
         if (request.getReEvaluateOnUpdate() != null) rule.setReEvaluateOnUpdate(request.getReEvaluateOnUpdate());
         if (request.getExecutionOrder() != null) rule.setExecutionOrder(request.getExecutionOrder());
         if (request.getErrorHandling() != null) rule.setErrorHandling(request.getErrorHandling());
+        if (request.getTriggerFields() != null) rule.setTriggerFields(WorkflowRuleDto.serializeTriggerFields(request.getTriggerFields()));
+        if (request.getCronExpression() != null) rule.setCronExpression(request.getCronExpression());
+        if (request.getTimezone() != null) rule.setTimezone(request.getTimezone());
 
         if (request.getCollectionId() != null) {
             Collection collection = collectionService.getCollection(request.getCollectionId());

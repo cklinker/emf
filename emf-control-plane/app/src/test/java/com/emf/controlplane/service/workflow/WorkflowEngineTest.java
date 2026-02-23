@@ -67,6 +67,13 @@ class WorkflowEngineTest {
             Map.of("id", "rec-1", "total", 150.0, "status", "Pending"), "user-1");
     }
 
+    private RecordChangeEvent createUpdateEvent(List<String> changedFields) {
+        return RecordChangeEvent.updated("tenant-1", "orders", "rec-1",
+            Map.of("id", "rec-1", "total", 200.0, "status", "Approved"),
+            Map.of("id", "rec-1", "total", 150.0, "status", "Pending"),
+            changedFields, "user-1");
+    }
+
     private WorkflowRule createRule(String name, String triggerType) {
         WorkflowRule rule = new WorkflowRule();
         rule.setTenantId("tenant-1");
@@ -506,6 +513,174 @@ class WorkflowEngineTest {
             // Should NOT query for ON_CREATE_OR_UPDATE
             verify(ruleRepository, never()).findByTenantIdAndCollectionIdAndTriggerTypeAndActiveTrueOrderByExecutionOrderAsc(
                 "tenant-1", "col-1", "ON_CREATE_OR_UPDATE");
+        }
+    }
+
+    @Nested
+    @DisplayName("Trigger Fields Filtering (B1)")
+    class TriggerFieldsTests {
+
+        @Test
+        @DisplayName("Should match when no trigger fields configured (null)")
+        void shouldMatchWhenNoTriggerFields() {
+            WorkflowRule rule = createRule("No Trigger Fields", "ON_UPDATE");
+            // triggerFields is null by default
+            createAction(rule, "FIELD_UPDATE", 0);
+
+            stubRules("ON_UPDATE", List.of(rule));
+            stubNoMatchingRules("ON_CREATE_OR_UPDATE");
+
+            ActionHandler handler = mockHandler("FIELD_UPDATE", ActionResult.success());
+            when(handlerRegistry.getHandler("FIELD_UPDATE")).thenReturn(Optional.of(handler));
+
+            engine.evaluate(createUpdateEvent(List.of("status")));
+
+            verify(handlerRegistry).getHandler("FIELD_UPDATE");
+        }
+
+        @Test
+        @DisplayName("Should match when trigger fields is empty JSON array")
+        void shouldMatchWhenTriggerFieldsEmpty() {
+            WorkflowRule rule = createRule("Empty Trigger Fields", "ON_UPDATE");
+            rule.setTriggerFields("[]");
+            createAction(rule, "FIELD_UPDATE", 0);
+
+            stubRules("ON_UPDATE", List.of(rule));
+            stubNoMatchingRules("ON_CREATE_OR_UPDATE");
+
+            ActionHandler handler = mockHandler("FIELD_UPDATE", ActionResult.success());
+            when(handlerRegistry.getHandler("FIELD_UPDATE")).thenReturn(Optional.of(handler));
+
+            engine.evaluate(createUpdateEvent(List.of("status")));
+
+            verify(handlerRegistry).getHandler("FIELD_UPDATE");
+        }
+
+        @Test
+        @DisplayName("Should match when a trigger field is in changed fields")
+        void shouldMatchWhenTriggerFieldChanged() {
+            WorkflowRule rule = createRule("Status Trigger", "ON_UPDATE");
+            rule.setTriggerFields("[\"status\",\"priority\"]");
+            createAction(rule, "FIELD_UPDATE", 0);
+
+            stubRules("ON_UPDATE", List.of(rule));
+            stubNoMatchingRules("ON_CREATE_OR_UPDATE");
+
+            ActionHandler handler = mockHandler("FIELD_UPDATE", ActionResult.success());
+            when(handlerRegistry.getHandler("FIELD_UPDATE")).thenReturn(Optional.of(handler));
+
+            engine.evaluate(createUpdateEvent(List.of("status", "total")));
+
+            verify(handlerRegistry).getHandler("FIELD_UPDATE");
+        }
+
+        @Test
+        @DisplayName("Should skip when no trigger field is in changed fields")
+        void shouldSkipWhenNoTriggerFieldChanged() {
+            WorkflowRule rule = createRule("Status Trigger", "ON_UPDATE");
+            rule.setTriggerFields("[\"status\",\"priority\"]");
+            createAction(rule, "FIELD_UPDATE", 0);
+
+            stubRules("ON_UPDATE", List.of(rule));
+            stubNoMatchingRules("ON_CREATE_OR_UPDATE");
+
+            engine.evaluate(createUpdateEvent(List.of("total", "description")));
+
+            // Handler should never be called
+            verify(handlerRegistry, never()).getHandler(any());
+            // No execution log saved (trigger fields rejected)
+            verify(executionLogRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Should skip when changed fields is empty and trigger fields are set")
+        void shouldSkipWhenChangedFieldsEmpty() {
+            WorkflowRule rule = createRule("Status Trigger", "ON_UPDATE");
+            rule.setTriggerFields("[\"status\"]");
+            createAction(rule, "FIELD_UPDATE", 0);
+
+            stubRules("ON_UPDATE", List.of(rule));
+            stubNoMatchingRules("ON_CREATE_OR_UPDATE");
+
+            engine.evaluate(createUpdateEvent(List.of()));
+
+            verify(handlerRegistry, never()).getHandler(any());
+        }
+
+        @Test
+        @DisplayName("Should always match trigger fields for CREATE events")
+        void shouldAlwaysMatchForCreateEvents() {
+            WorkflowRule rule = createRule("Create Rule", "ON_CREATE");
+            rule.setTriggerFields("[\"status\"]");
+            createAction(rule, "FIELD_UPDATE", 0);
+
+            stubRules("ON_CREATE", List.of(rule));
+            stubNoMatchingRules("ON_CREATE_OR_UPDATE");
+
+            ActionHandler handler = mockHandler("FIELD_UPDATE", ActionResult.success());
+            when(handlerRegistry.getHandler("FIELD_UPDATE")).thenReturn(Optional.of(handler));
+
+            // CREATE events have empty changedFields but should still fire
+            engine.evaluate(createEvent());
+
+            verify(handlerRegistry).getHandler("FIELD_UPDATE");
+        }
+
+        @Test
+        @DisplayName("Should always match trigger fields for DELETE events")
+        void shouldAlwaysMatchForDeleteEvents() {
+            WorkflowRule rule = createRule("Delete Rule", "ON_DELETE");
+            rule.setTriggerFields("[\"status\"]");
+            createAction(rule, "FIELD_UPDATE", 0);
+
+            stubRules("ON_DELETE", List.of(rule));
+
+            ActionHandler handler = mockHandler("FIELD_UPDATE", ActionResult.success());
+            when(handlerRegistry.getHandler("FIELD_UPDATE")).thenReturn(Optional.of(handler));
+
+            RecordChangeEvent deleteEvent = RecordChangeEvent.deleted(
+                "tenant-1", "orders", "rec-1", Map.of("id", "rec-1"), "user-1");
+
+            engine.evaluate(deleteEvent);
+
+            verify(handlerRegistry).getHandler("FIELD_UPDATE");
+        }
+
+        @Test
+        @DisplayName("Should match when multiple trigger fields overlap with changed fields")
+        void shouldMatchOnMultipleOverlap() {
+            WorkflowRule rule = createRule("Multi Field Trigger", "ON_UPDATE");
+            rule.setTriggerFields("[\"status\",\"priority\",\"assignee\"]");
+            createAction(rule, "EMAIL_ALERT", 0);
+
+            stubRules("ON_UPDATE", List.of(rule));
+            stubNoMatchingRules("ON_CREATE_OR_UPDATE");
+
+            ActionHandler handler = mockHandler("EMAIL_ALERT", ActionResult.success());
+            when(handlerRegistry.getHandler("EMAIL_ALERT")).thenReturn(Optional.of(handler));
+
+            engine.evaluate(createUpdateEvent(List.of("priority", "assignee")));
+
+            verify(handlerRegistry).getHandler("EMAIL_ALERT");
+        }
+
+        @Test
+        @DisplayName("Should handle invalid trigger fields JSON gracefully")
+        void shouldHandleInvalidTriggerFieldsJson() {
+            WorkflowRule rule = createRule("Invalid JSON", "ON_UPDATE");
+            rule.setTriggerFields("not-valid-json");
+            createAction(rule, "FIELD_UPDATE", 0);
+
+            stubRules("ON_UPDATE", List.of(rule));
+            stubNoMatchingRules("ON_CREATE_OR_UPDATE");
+
+            ActionHandler handler = mockHandler("FIELD_UPDATE", ActionResult.success());
+            when(handlerRegistry.getHandler("FIELD_UPDATE")).thenReturn(Optional.of(handler));
+
+            // Invalid JSON should be treated as no trigger fields (match any)
+            engine.evaluate(createUpdateEvent(List.of("total")));
+
+            verify(handlerRegistry).getHandler("FIELD_UPDATE");
         }
     }
 }

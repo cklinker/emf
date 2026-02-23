@@ -1,7 +1,10 @@
 package com.emf.controlplane.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -37,6 +40,19 @@ public class WorkflowRule extends TenantScopedEntity {
     @Column(name = "error_handling", length = 30)
     private String errorHandling = "STOP_ON_ERROR";
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "trigger_fields", columnDefinition = "jsonb")
+    private String triggerFields;
+
+    @Column(name = "cron_expression", length = 100)
+    private String cronExpression;
+
+    @Column(name = "timezone", length = 50)
+    private String timezone;
+
+    @Column(name = "last_scheduled_run")
+    private Instant lastScheduledRun;
+
     @OneToMany(mappedBy = "workflowRule", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("executionOrder ASC")
     private List<WorkflowAction> actions = new ArrayList<>();
@@ -61,6 +77,14 @@ public class WorkflowRule extends TenantScopedEntity {
     public void setExecutionOrder(int executionOrder) { this.executionOrder = executionOrder; }
     public String getErrorHandling() { return errorHandling; }
     public void setErrorHandling(String errorHandling) { this.errorHandling = errorHandling; }
+    public String getTriggerFields() { return triggerFields; }
+    public void setTriggerFields(String triggerFields) { this.triggerFields = triggerFields; }
+    public String getCronExpression() { return cronExpression; }
+    public void setCronExpression(String cronExpression) { this.cronExpression = cronExpression; }
+    public String getTimezone() { return timezone; }
+    public void setTimezone(String timezone) { this.timezone = timezone; }
+    public Instant getLastScheduledRun() { return lastScheduledRun; }
+    public void setLastScheduledRun(Instant lastScheduledRun) { this.lastScheduledRun = lastScheduledRun; }
     public List<WorkflowAction> getActions() { return actions; }
     public void setActions(List<WorkflowAction> actions) { this.actions = actions; }
 }

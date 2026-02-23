@@ -106,6 +106,78 @@ class WorkflowRuleServiceTest {
     }
 
     @Nested
+    @DisplayName("Trigger Fields Handling")
+    class TriggerFieldsTests {
+
+        @Test
+        @DisplayName("Should store trigger fields as JSON when creating rule")
+        void shouldStoreTriggerFieldsOnCreate() {
+            Collection collection = new Collection();
+            collection.setId("col-1");
+            collection.setName("orders");
+            when(collectionService.getCollection("col-1")).thenReturn(collection);
+            when(ruleRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            CreateWorkflowRuleRequest request = new CreateWorkflowRuleRequest();
+            request.setName("Status Trigger");
+            request.setCollectionId("col-1");
+            request.setTriggerType("ON_UPDATE");
+            request.setTriggerFields(List.of("status", "priority"));
+
+            var dto = service.createRule("tenant-1", request);
+
+            assertNotNull(dto.getTriggerFields());
+            assertEquals(2, dto.getTriggerFields().size());
+            assertTrue(dto.getTriggerFields().contains("status"));
+            assertTrue(dto.getTriggerFields().contains("priority"));
+        }
+
+        @Test
+        @DisplayName("Should handle null trigger fields on create")
+        void shouldHandleNullTriggerFieldsOnCreate() {
+            Collection collection = new Collection();
+            collection.setId("col-1");
+            collection.setName("orders");
+            when(collectionService.getCollection("col-1")).thenReturn(collection);
+            when(ruleRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            CreateWorkflowRuleRequest request = new CreateWorkflowRuleRequest();
+            request.setName("No Trigger Fields");
+            request.setCollectionId("col-1");
+            request.setTriggerType("ON_UPDATE");
+
+            var dto = service.createRule("tenant-1", request);
+
+            assertNull(dto.getTriggerFields());
+        }
+
+        @Test
+        @DisplayName("Should update trigger fields")
+        void shouldUpdateTriggerFields() {
+            Collection collection = new Collection();
+            collection.setId("col-1");
+
+            WorkflowRule existingRule = new WorkflowRule();
+            existingRule.setTenantId("tenant-1");
+            existingRule.setCollection(collection);
+            existingRule.setName("Test Rule");
+            existingRule.setTriggerType("ON_UPDATE");
+
+            when(ruleRepository.findById("rule-1")).thenReturn(Optional.of(existingRule));
+            when(ruleRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            CreateWorkflowRuleRequest request = new CreateWorkflowRuleRequest();
+            request.setTriggerFields(List.of("status"));
+
+            var dto = service.updateRule("rule-1", request);
+
+            assertNotNull(dto.getTriggerFields());
+            assertEquals(1, dto.getTriggerFields().size());
+            assertEquals("status", dto.getTriggerFields().get(0));
+        }
+    }
+
+    @Nested
     @DisplayName("Event Publishing")
     class EventPublishingTests {
 

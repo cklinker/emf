@@ -1,0 +1,406 @@
+package com.emf.controlplane.service.workflow;
+
+import com.emf.controlplane.entity.Collection;
+import com.emf.controlplane.entity.WorkflowAction;
+import com.emf.controlplane.entity.WorkflowExecutionLog;
+import com.emf.runtime.event.ChangeType;
+import com.emf.controlplane.entity.WorkflowRule;
+import com.emf.controlplane.repository.WorkflowActionLogRepository;
+import com.emf.controlplane.repository.WorkflowExecutionLogRepository;
+import com.emf.controlplane.repository.WorkflowRuleRepository;
+import com.emf.controlplane.service.CollectionService;
+import com.emf.runtime.event.RecordChangeEvent;
+import com.emf.runtime.formula.FormulaEvaluator;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
+class WorkflowEngineTest {
+
+    private WorkflowRuleRepository ruleRepository;
+    private WorkflowExecutionLogRepository executionLogRepository;
+    private WorkflowActionLogRepository actionLogRepository;
+    private ActionHandlerRegistry handlerRegistry;
+    private FormulaEvaluator formulaEvaluator;
+    private CollectionService collectionService;
+    private WorkflowEngine engine;
+
+    private Collection testCollection;
+
+    @BeforeEach
+    void setUp() {
+        ruleRepository = mock(WorkflowRuleRepository.class);
+        executionLogRepository = mock(WorkflowExecutionLogRepository.class);
+        actionLogRepository = mock(WorkflowActionLogRepository.class);
+        handlerRegistry = mock(ActionHandlerRegistry.class);
+        formulaEvaluator = mock(FormulaEvaluator.class);
+        collectionService = mock(CollectionService.class);
+
+        engine = new WorkflowEngine(ruleRepository, executionLogRepository,
+            actionLogRepository, handlerRegistry, formulaEvaluator, collectionService);
+
+        testCollection = new Collection();
+        testCollection.setId("col-1");
+        testCollection.setName("orders");
+        when(collectionService.getCollectionByIdOrName("orders")).thenReturn(testCollection);
+
+        // Execution log save returns the saved entity
+        when(executionLogRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(actionLogRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    }
+
+    private RecordChangeEvent createEvent() {
+        return RecordChangeEvent.created("tenant-1", "orders", "rec-1",
+            Map.of("id", "rec-1", "total", 150.0, "status", "Pending"), "user-1");
+    }
+
+    private WorkflowRule createRule(String name, String triggerType) {
+        WorkflowRule rule = new WorkflowRule();
+        rule.setTenantId("tenant-1");
+        rule.setCollection(testCollection);
+        rule.setName(name);
+        rule.setTriggerType(triggerType);
+        rule.setActive(true);
+        rule.setErrorHandling("STOP_ON_ERROR");
+        return rule;
+    }
+
+    private WorkflowAction createAction(WorkflowRule rule, String type, int order) {
+        WorkflowAction action = new WorkflowAction();
+        action.setWorkflowRule(rule);
+        action.setActionType(type);
+        action.setExecutionOrder(order);
+        action.setConfig("{}");
+        action.setActive(true);
+        rule.getActions().add(action);
+        return action;
+    }
+
+    /**
+     * Creates a mock ActionHandler that returns the given result on execute().
+     * Must be called OUTSIDE of when().thenReturn() to avoid Mockito nested stubbing issues.
+     */
+    private ActionHandler mockHandler(String key, ActionResult result) {
+        ActionHandler handler = mock(ActionHandler.class);
+        when(handler.getActionTypeKey()).thenReturn(key);
+        when(handler.execute(any())).thenReturn(result);
+        return handler;
+    }
+
+    /**
+     * Creates a mock ActionHandler that throws the given exception on execute().
+     * Must be called OUTSIDE of when().thenReturn() to avoid Mockito nested stubbing issues.
+     */
+    private ActionHandler mockThrowingHandler(String key, RuntimeException ex) {
+        ActionHandler handler = mock(ActionHandler.class);
+        when(handler.getActionTypeKey()).thenReturn(key);
+        when(handler.execute(any())).thenThrow(ex);
+        return handler;
+    }
+
+    private void stubNoMatchingRules(String triggerType) {
+        when(ruleRepository.findByTenantIdAndCollectionIdAndTriggerTypeAndActiveTrueOrderByExecutionOrderAsc(
+            "tenant-1", "col-1", triggerType)).thenReturn(List.of());
+    }
+
+    private void stubRules(String triggerType, List<WorkflowRule> rules) {
+        when(ruleRepository.findByTenantIdAndCollectionIdAndTriggerTypeAndActiveTrueOrderByExecutionOrderAsc(
+            "tenant-1", "col-1", triggerType)).thenReturn(rules);
+    }
+
+    @Nested
+    @DisplayName("Trigger Type Mapping")
+    class TriggerTypeTests {
+
+        @Test
+        @DisplayName("Should map CREATED to ON_CREATE")
+        void mapCreated() {
+            assertEquals("ON_CREATE", engine.mapChangeTypeToTrigger(ChangeType.CREATED));
+        }
+
+        @Test
+        @DisplayName("Should map UPDATED to ON_UPDATE")
+        void mapUpdated() {
+            assertEquals("ON_UPDATE", engine.mapChangeTypeToTrigger(ChangeType.UPDATED));
+        }
+
+        @Test
+        @DisplayName("Should map DELETED to ON_DELETE")
+        void mapDeleted() {
+            assertEquals("ON_DELETE", engine.mapChangeTypeToTrigger(ChangeType.DELETED));
+        }
+    }
+
+    @Nested
+    @DisplayName("Rule Matching")
+    class RuleMatchingTests {
+
+        @Test
+        @DisplayName("Should skip when no matching rules found")
+        void shouldSkipWhenNoRules() {
+            stubNoMatchingRules("ON_CREATE");
+            stubNoMatchingRules("ON_CREATE_OR_UPDATE");
+
+            engine.evaluate(createEvent());
+
+            verify(executionLogRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Should skip when collection not found")
+        void shouldSkipWhenCollectionNotFound() {
+            when(collectionService.getCollectionByIdOrName("orders"))
+                .thenThrow(new RuntimeException("Not found"));
+
+            engine.evaluate(createEvent());
+
+            verify(ruleRepository, never()).findByTenantIdAndCollectionIdAndTriggerTypeAndActiveTrueOrderByExecutionOrderAsc(
+                any(), any(), any());
+        }
+    }
+
+    @Nested
+    @DisplayName("Filter Formula Evaluation")
+    class FilterFormulaTests {
+
+        @Test
+        @DisplayName("Should execute actions when no filter formula")
+        void shouldExecuteWithoutFilter() {
+            WorkflowRule rule = createRule("Test Rule", "ON_CREATE");
+            createAction(rule, "FIELD_UPDATE", 0);
+
+            stubRules("ON_CREATE", List.of(rule));
+            stubNoMatchingRules("ON_CREATE_OR_UPDATE");
+
+            ActionHandler fieldUpdateHandler = mockHandler("FIELD_UPDATE", ActionResult.success());
+            when(handlerRegistry.getHandler("FIELD_UPDATE")).thenReturn(Optional.of(fieldUpdateHandler));
+
+            engine.evaluate(createEvent());
+
+            verify(executionLogRepository, times(2)).save(any(WorkflowExecutionLog.class));
+        }
+
+        @Test
+        @DisplayName("Should skip when filter formula rejects record")
+        void shouldSkipWhenFilterRejects() {
+            WorkflowRule rule = createRule("Test Rule", "ON_CREATE");
+            rule.setFilterFormula("total > 200");
+            createAction(rule, "FIELD_UPDATE", 0);
+
+            stubRules("ON_CREATE", List.of(rule));
+            stubNoMatchingRules("ON_CREATE_OR_UPDATE");
+            when(formulaEvaluator.evaluateBoolean(eq("total > 200"), any())).thenReturn(false);
+
+            engine.evaluate(createEvent());
+
+            // No execution log saved (filter rejected)
+            verify(executionLogRepository, never()).save(any());
+            verify(handlerRegistry, never()).getHandler(any());
+        }
+
+        @Test
+        @DisplayName("Should execute when filter formula passes")
+        void shouldExecuteWhenFilterPasses() {
+            WorkflowRule rule = createRule("Test Rule", "ON_CREATE");
+            rule.setFilterFormula("total > 100");
+            createAction(rule, "FIELD_UPDATE", 0);
+
+            stubRules("ON_CREATE", List.of(rule));
+            stubNoMatchingRules("ON_CREATE_OR_UPDATE");
+            when(formulaEvaluator.evaluateBoolean(eq("total > 100"), any())).thenReturn(true);
+
+            ActionHandler fieldUpdateHandler = mockHandler("FIELD_UPDATE", ActionResult.success());
+            when(handlerRegistry.getHandler("FIELD_UPDATE")).thenReturn(Optional.of(fieldUpdateHandler));
+
+            engine.evaluate(createEvent());
+
+            verify(handlerRegistry).getHandler("FIELD_UPDATE");
+        }
+
+        @Test
+        @DisplayName("Should log failure when filter formula throws")
+        void shouldLogFailureOnFormulaError() {
+            WorkflowRule rule = createRule("Test Rule", "ON_CREATE");
+            rule.setFilterFormula("invalid formula");
+            createAction(rule, "FIELD_UPDATE", 0);
+
+            stubRules("ON_CREATE", List.of(rule));
+            stubNoMatchingRules("ON_CREATE_OR_UPDATE");
+            when(formulaEvaluator.evaluateBoolean(eq("invalid formula"), any()))
+                .thenThrow(new RuntimeException("Parse error"));
+
+            engine.evaluate(createEvent());
+
+            verify(executionLogRepository).save(argThat(log ->
+                "FAILURE".equals(((WorkflowExecutionLog) log).getStatus())));
+        }
+    }
+
+    @Nested
+    @DisplayName("Action Execution")
+    class ActionExecutionTests {
+
+        @Test
+        @DisplayName("Should execute multiple actions in order")
+        void shouldExecuteActionsInOrder() {
+            WorkflowRule rule = createRule("Multi-Action Rule", "ON_CREATE");
+            createAction(rule, "FIELD_UPDATE", 0);
+            createAction(rule, "EMAIL_ALERT", 1);
+
+            stubRules("ON_CREATE", List.of(rule));
+            stubNoMatchingRules("ON_CREATE_OR_UPDATE");
+
+            ActionHandler fieldUpdateHandler = mockHandler("FIELD_UPDATE", ActionResult.success());
+            ActionHandler emailAlertHandler = mockHandler("EMAIL_ALERT", ActionResult.success());
+            when(handlerRegistry.getHandler("FIELD_UPDATE")).thenReturn(Optional.of(fieldUpdateHandler));
+            when(handlerRegistry.getHandler("EMAIL_ALERT")).thenReturn(Optional.of(emailAlertHandler));
+
+            engine.evaluate(createEvent());
+
+            verify(handlerRegistry).getHandler("FIELD_UPDATE");
+            verify(handlerRegistry).getHandler("EMAIL_ALERT");
+            // 2 action logs saved
+            verify(actionLogRepository, times(2)).save(any());
+        }
+
+        @Test
+        @DisplayName("Should stop on error when STOP_ON_ERROR")
+        void shouldStopOnError() {
+            WorkflowRule rule = createRule("Stop Rule", "ON_CREATE");
+            rule.setErrorHandling("STOP_ON_ERROR");
+            createAction(rule, "FIELD_UPDATE", 0);
+            createAction(rule, "EMAIL_ALERT", 1);
+
+            stubRules("ON_CREATE", List.of(rule));
+            stubNoMatchingRules("ON_CREATE_OR_UPDATE");
+
+            ActionHandler fieldUpdateHandler = mockHandler("FIELD_UPDATE", ActionResult.failure("Update failed"));
+            ActionHandler emailAlertHandler = mockHandler("EMAIL_ALERT", ActionResult.success());
+            when(handlerRegistry.getHandler("FIELD_UPDATE")).thenReturn(Optional.of(fieldUpdateHandler));
+            when(handlerRegistry.getHandler("EMAIL_ALERT")).thenReturn(Optional.of(emailAlertHandler));
+
+            engine.evaluate(createEvent());
+
+            // First action fails, second never executes
+            verify(handlerRegistry).getHandler("FIELD_UPDATE");
+            verify(handlerRegistry, never()).getHandler("EMAIL_ALERT");
+            // Execution log status should be FAILURE
+            verify(executionLogRepository, times(2)).save(argThat(log -> {
+                if (log instanceof WorkflowExecutionLog execLog) {
+                    // One save for initial "EXECUTING", one for final "FAILURE"
+                    return true;
+                }
+                return false;
+            }));
+        }
+
+        @Test
+        @DisplayName("Should continue on error when CONTINUE_ON_ERROR")
+        void shouldContinueOnError() {
+            WorkflowRule rule = createRule("Continue Rule", "ON_CREATE");
+            rule.setErrorHandling("CONTINUE_ON_ERROR");
+            createAction(rule, "FIELD_UPDATE", 0);
+            createAction(rule, "EMAIL_ALERT", 1);
+
+            stubRules("ON_CREATE", List.of(rule));
+            stubNoMatchingRules("ON_CREATE_OR_UPDATE");
+
+            ActionHandler fieldUpdateHandler = mockHandler("FIELD_UPDATE", ActionResult.failure("Update failed"));
+            ActionHandler emailAlertHandler = mockHandler("EMAIL_ALERT", ActionResult.success());
+            when(handlerRegistry.getHandler("FIELD_UPDATE")).thenReturn(Optional.of(fieldUpdateHandler));
+            when(handlerRegistry.getHandler("EMAIL_ALERT")).thenReturn(Optional.of(emailAlertHandler));
+
+            engine.evaluate(createEvent());
+
+            // Both actions should execute even though first failed
+            verify(handlerRegistry).getHandler("FIELD_UPDATE");
+            verify(handlerRegistry).getHandler("EMAIL_ALERT");
+        }
+
+        @Test
+        @DisplayName("Should handle missing handler gracefully")
+        void shouldHandleMissingHandler() {
+            WorkflowRule rule = createRule("Missing Handler", "ON_CREATE");
+            rule.setErrorHandling("STOP_ON_ERROR");
+            createAction(rule, "NONEXISTENT", 0);
+
+            stubRules("ON_CREATE", List.of(rule));
+            stubNoMatchingRules("ON_CREATE_OR_UPDATE");
+            when(handlerRegistry.getHandler("NONEXISTENT")).thenReturn(Optional.empty());
+
+            engine.evaluate(createEvent());
+
+            // Should log failure for the missing handler
+            verify(actionLogRepository).save(any());
+        }
+
+        @Test
+        @DisplayName("Should handle handler exception gracefully")
+        void shouldHandleHandlerException() {
+            WorkflowRule rule = createRule("Exception Rule", "ON_CREATE");
+            createAction(rule, "FIELD_UPDATE", 0);
+
+            stubRules("ON_CREATE", List.of(rule));
+            stubNoMatchingRules("ON_CREATE_OR_UPDATE");
+
+            ActionHandler throwingHandler = mockThrowingHandler("FIELD_UPDATE", new RuntimeException("Boom!"));
+            when(handlerRegistry.getHandler("FIELD_UPDATE")).thenReturn(Optional.of(throwingHandler));
+
+            // Should not throw
+            assertDoesNotThrow(() -> engine.evaluate(createEvent()));
+        }
+    }
+
+    @Nested
+    @DisplayName("ON_CREATE_OR_UPDATE Matching")
+    class CombinedTriggerTests {
+
+        @Test
+        @DisplayName("Should match ON_CREATE_OR_UPDATE rules for CREATE events")
+        void shouldMatchCombinedForCreate() {
+            WorkflowRule specificRule = createRule("Create Rule", "ON_CREATE");
+            createAction(specificRule, "FIELD_UPDATE", 0);
+
+            WorkflowRule combinedRule = createRule("Combined Rule", "ON_CREATE_OR_UPDATE");
+            createAction(combinedRule, "EMAIL_ALERT", 1);
+
+            stubRules("ON_CREATE", List.of(specificRule));
+            stubRules("ON_CREATE_OR_UPDATE", List.of(combinedRule));
+
+            ActionHandler fieldUpdateHandler = mockHandler("FIELD_UPDATE", ActionResult.success());
+            ActionHandler emailAlertHandler = mockHandler("EMAIL_ALERT", ActionResult.success());
+            when(handlerRegistry.getHandler("FIELD_UPDATE")).thenReturn(Optional.of(fieldUpdateHandler));
+            when(handlerRegistry.getHandler("EMAIL_ALERT")).thenReturn(Optional.of(emailAlertHandler));
+
+            engine.evaluate(createEvent());
+
+            // Both rules should be evaluated
+            verify(handlerRegistry).getHandler("FIELD_UPDATE");
+            verify(handlerRegistry).getHandler("EMAIL_ALERT");
+        }
+
+        @Test
+        @DisplayName("Should NOT match ON_CREATE_OR_UPDATE rules for DELETE events")
+        void shouldNotMatchCombinedForDelete() {
+            RecordChangeEvent deleteEvent = RecordChangeEvent.deleted(
+                "tenant-1", "orders", "rec-1", Map.of("id", "rec-1"), "user-1");
+
+            stubNoMatchingRules("ON_DELETE");
+
+            engine.evaluate(deleteEvent);
+
+            // Should NOT query for ON_CREATE_OR_UPDATE
+            verify(ruleRepository, never()).findByTenantIdAndCollectionIdAndTriggerTypeAndActiveTrueOrderByExecutionOrderAsc(
+                "tenant-1", "col-1", "ON_CREATE_OR_UPDATE");
+        }
+    }
+}

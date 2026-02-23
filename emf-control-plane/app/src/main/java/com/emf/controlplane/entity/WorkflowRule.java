@@ -53,6 +53,9 @@ public class WorkflowRule extends TenantScopedEntity {
     @Column(name = "last_scheduled_run")
     private Instant lastScheduledRun;
 
+    @Column(name = "execution_mode", length = 20)
+    private String executionMode = "SEQUENTIAL";
+
     @OneToMany(mappedBy = "workflowRule", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("executionOrder ASC")
     private List<WorkflowAction> actions = new ArrayList<>();
@@ -85,6 +88,8 @@ public class WorkflowRule extends TenantScopedEntity {
     public void setTimezone(String timezone) { this.timezone = timezone; }
     public Instant getLastScheduledRun() { return lastScheduledRun; }
     public void setLastScheduledRun(Instant lastScheduledRun) { this.lastScheduledRun = lastScheduledRun; }
+    public String getExecutionMode() { return executionMode; }
+    public void setExecutionMode(String executionMode) { this.executionMode = executionMode; }
     public List<WorkflowAction> getActions() { return actions; }
     public void setActions(List<WorkflowAction> actions) { this.actions = actions; }
 }

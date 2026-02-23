@@ -164,12 +164,9 @@ public class WorkflowEngine {
 
         for (WorkflowAction action : activeActions) {
             long actionStartTime = System.currentTimeMillis();
-            ActionResult result = executeAction(action, rule, event, executionLog.getId());
+            ActionResult result = executeActionWithRetry(action, rule, event, executionLog.getId());
             int actionDurationMs = (int) (System.currentTimeMillis() - actionStartTime);
             actionsExecuted++;
-
-            // Log per-action result with input snapshot and duration
-            logActionExecution(executionLog.getId(), action, result, event, actionDurationMs);
 
             if (!result.successful()) {
                 if (stopOnError) {
@@ -250,7 +247,7 @@ public class WorkflowEngine {
             int actionDurationMs = (int) (System.currentTimeMillis() - actionStartTime);
             actionsExecuted++;
 
-            logActionExecution(executionLog.getId(), action, result, syntheticEvent, actionDurationMs);
+            logActionExecution(executionLog.getId(), action, result, syntheticEvent, actionDurationMs, 1);
 
             if (!result.successful()) {
                 if (stopOnError) {
@@ -339,7 +336,7 @@ public class WorkflowEngine {
             int actionDurationMs = (int) (System.currentTimeMillis() - actionStartTime);
             actionsExecuted++;
 
-            logActionExecution(executionLog.getId(), action, result, syntheticEvent, actionDurationMs);
+            logActionExecution(executionLog.getId(), action, result, syntheticEvent, actionDurationMs, 1);
 
             if (!result.successful()) {
                 if (stopOnError) {
@@ -563,6 +560,64 @@ public class WorkflowEngine {
     }
 
     /**
+     * Executes an action with retry logic.
+     * <p>
+     * If the action has retry configured (retryCount > 0), failed executions are retried
+     * with the configured delay and backoff strategy. Each attempt is logged individually.
+     */
+    ActionResult executeActionWithRetry(WorkflowAction action, WorkflowRule rule,
+                                               RecordChangeEvent event, String executionLogId) {
+        int maxAttempts = 1 + Math.max(0, action.getRetryCount());
+        int delaySeconds = Math.max(1, action.getRetryDelaySeconds());
+        boolean exponentialBackoff = "EXPONENTIAL".equals(action.getRetryBackoff());
+
+        ActionResult lastResult = null;
+
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            long attemptStartTime = System.currentTimeMillis();
+            lastResult = executeAction(action, rule, event, executionLogId);
+            int attemptDurationMs = (int) (System.currentTimeMillis() - attemptStartTime);
+
+            // Log this attempt
+            logActionExecution(executionLogId, action, lastResult, event, attemptDurationMs, attempt);
+
+            if (lastResult.successful()) {
+                if (attempt > 1) {
+                    log.info("Action '{}' in rule '{}' succeeded on attempt {}",
+                        action.getActionType(), rule.getName(), attempt);
+                }
+                return lastResult;
+            }
+
+            // If there are more retries, wait before the next attempt
+            if (attempt < maxAttempts) {
+                int waitSeconds = exponentialBackoff
+                    ? delaySeconds * (int) Math.pow(2, attempt - 1)
+                    : delaySeconds;
+                log.info("Action '{}' in rule '{}' failed on attempt {}/{}, retrying in {}s: {}",
+                    action.getActionType(), rule.getName(), attempt, maxAttempts,
+                    waitSeconds, lastResult.errorMessage());
+                try {
+                    Thread.sleep(waitSeconds * 1000L);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    log.warn("Retry wait interrupted for action '{}' in rule '{}'",
+                        action.getActionType(), rule.getName());
+                    return lastResult;
+                }
+            }
+        }
+
+        if (maxAttempts > 1) {
+            log.error("Action '{}' in rule '{}' failed after {} attempts: {}",
+                action.getActionType(), rule.getName(), maxAttempts,
+                lastResult != null ? lastResult.errorMessage() : "unknown");
+        }
+
+        return lastResult;
+    }
+
+    /**
      * Executes a single action within a workflow rule.
      */
     private ActionResult executeAction(WorkflowAction action, WorkflowRule rule,
@@ -655,10 +710,11 @@ public class WorkflowEngine {
     }
 
     /**
-     * Logs individual action execution result with input snapshot and duration.
+     * Logs individual action execution result with input snapshot, duration, and attempt number.
      */
     private void logActionExecution(String executionLogId, WorkflowAction action,
-                                      ActionResult result, RecordChangeEvent event, int durationMs) {
+                                      ActionResult result, RecordChangeEvent event,
+                                      int durationMs, int attemptNumber) {
         WorkflowActionLog actionLog = new WorkflowActionLog();
         actionLog.setExecutionLogId(executionLogId);
         actionLog.setActionId(action.getId());
@@ -666,6 +722,7 @@ public class WorkflowEngine {
         actionLog.setStatus(result.successful() ? "SUCCESS" : "FAILURE");
         actionLog.setErrorMessage(result.errorMessage());
         actionLog.setDurationMs(durationMs);
+        actionLog.setAttemptNumber(attemptNumber);
         actionLog.setExecutedAt(Instant.now());
 
         // Capture input snapshot (action config + record data summary)

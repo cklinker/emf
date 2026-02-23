@@ -3,7 +3,9 @@ package com.emf.controlplane.controller;
 import com.emf.controlplane.dto.CreateWorkflowRuleRequest;
 import com.emf.controlplane.dto.ExecuteWorkflowRequest;
 import com.emf.controlplane.dto.WorkflowActionLogDto;
+import com.emf.controlplane.dto.WorkflowAnalyticsDto;
 import com.emf.controlplane.dto.WorkflowRuleDto;
+import com.emf.controlplane.dto.WorkflowRuleVersionDto;
 import com.emf.controlplane.entity.WorkflowExecutionLog;
 import com.emf.controlplane.service.WorkflowRuleService;
 import com.emf.controlplane.tenant.TenantContextHolder;
@@ -13,6 +15,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
@@ -89,5 +92,40 @@ public class WorkflowRuleController {
     @GetMapping("/logs/{executionLogId}/actions")
     public List<WorkflowActionLogDto> listActionLogs(@PathVariable String executionLogId) {
         return workflowRuleService.listActionLogsByExecution(executionLogId);
+    }
+
+    // --- Version History ---
+
+    @GetMapping("/{id}/versions")
+    public List<WorkflowRuleVersionDto> listVersions(@PathVariable String id) {
+        return workflowRuleService.listVersions(id);
+    }
+
+    @GetMapping("/{id}/versions/{versionNumber}")
+    public WorkflowRuleVersionDto getVersion(@PathVariable String id,
+                                              @PathVariable int versionNumber) {
+        return workflowRuleService.getVersion(id, versionNumber);
+    }
+
+    // --- Analytics ---
+
+    @GetMapping("/analytics")
+    public WorkflowAnalyticsDto getAnalytics(
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate) {
+        String tenantId = TenantContextHolder.requireTenantId();
+        Instant start = startDate != null ? Instant.parse(startDate) : null;
+        Instant end = endDate != null ? Instant.parse(endDate) : null;
+        return workflowRuleService.getAnalytics(tenantId, start, end);
+    }
+
+    @GetMapping("/{id}/analytics")
+    public WorkflowAnalyticsDto getRuleAnalytics(
+            @PathVariable String id,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate) {
+        Instant start = startDate != null ? Instant.parse(startDate) : null;
+        Instant end = endDate != null ? Instant.parse(endDate) : null;
+        return workflowRuleService.getRuleAnalytics(id, start, end);
     }
 }

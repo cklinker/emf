@@ -32,6 +32,9 @@ public class WorkflowExecutionLog extends TenantScopedEntity {
     @Column(name = "duration_ms")
     private Integer durationMs;
 
+    @Column(name = "rule_version")
+    private Integer ruleVersion;
+
     public WorkflowExecutionLog() { super(); }
 
     public WorkflowRule getWorkflowRule() { return workflowRule; }
@@ -50,4 +53,6 @@ public class WorkflowExecutionLog extends TenantScopedEntity {
     public void setExecutedAt(Instant executedAt) { this.executedAt = executedAt; }
     public Integer getDurationMs() { return durationMs; }
     public void setDurationMs(Integer durationMs) { this.durationMs = durationMs; }
+    public Integer getRuleVersion() { return ruleVersion; }
+    public void setRuleVersion(Integer ruleVersion) { this.ruleVersion = ruleVersion; }
 }

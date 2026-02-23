@@ -16,6 +16,7 @@ public class CreateWorkflowRuleRequest {
     private List<String> triggerFields;
     private String cronExpression;
     private String timezone;
+    private String executionMode;
     private List<ActionRequest> actions;
 
     public static class ActionRequest {
@@ -23,6 +24,9 @@ public class CreateWorkflowRuleRequest {
         private Integer executionOrder;
         private String config;
         private Boolean active;
+        private Integer retryCount;
+        private Integer retryDelaySeconds;
+        private String retryBackoff;
 
         public String getActionType() { return actionType; }
         public void setActionType(String actionType) { this.actionType = actionType; }
@@ -32,6 +36,12 @@ public class CreateWorkflowRuleRequest {
         public void setConfig(String config) { this.config = config; }
         public Boolean getActive() { return active; }
         public void setActive(Boolean active) { this.active = active; }
+        public Integer getRetryCount() { return retryCount; }
+        public void setRetryCount(Integer retryCount) { this.retryCount = retryCount; }
+        public Integer getRetryDelaySeconds() { return retryDelaySeconds; }
+        public void setRetryDelaySeconds(Integer retryDelaySeconds) { this.retryDelaySeconds = retryDelaySeconds; }
+        public String getRetryBackoff() { return retryBackoff; }
+        public void setRetryBackoff(String retryBackoff) { this.retryBackoff = retryBackoff; }
     }
 
     public String getCollectionId() { return collectionId; }
@@ -58,6 +68,8 @@ public class CreateWorkflowRuleRequest {
     public void setCronExpression(String cronExpression) { this.cronExpression = cronExpression; }
     public String getTimezone() { return timezone; }
     public void setTimezone(String timezone) { this.timezone = timezone; }
+    public String getExecutionMode() { return executionMode; }
+    public void setExecutionMode(String executionMode) { this.executionMode = executionMode; }
     public List<ActionRequest> getActions() { return actions; }
     public void setActions(List<ActionRequest> actions) { this.actions = actions; }
 }

@@ -39,6 +39,9 @@ public class WorkflowActionLog extends BaseEntity {
     @Column(name = "executed_at", nullable = false)
     private Instant executedAt;
 
+    @Column(name = "attempt_number")
+    private int attemptNumber = 1;
+
     public WorkflowActionLog() {
         super();
         this.executedAt = Instant.now();
@@ -62,4 +65,6 @@ public class WorkflowActionLog extends BaseEntity {
     public void setDurationMs(Integer durationMs) { this.durationMs = durationMs; }
     public Instant getExecutedAt() { return executedAt; }
     public void setExecutedAt(Instant executedAt) { this.executedAt = executedAt; }
+    public int getAttemptNumber() { return attemptNumber; }
+    public void setAttemptNumber(int attemptNumber) { this.attemptNumber = attemptNumber; }
 }

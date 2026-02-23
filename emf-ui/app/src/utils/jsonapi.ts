@@ -25,6 +25,7 @@ export interface JsonApiResource {
  */
 export interface JsonApiResponse {
   data: JsonApiResource
+  included?: JsonApiResource[]
 }
 
 /**
@@ -32,6 +33,7 @@ export interface JsonApiResponse {
  */
 export interface JsonApiCollectionResponse {
   data: JsonApiResource[]
+  included?: JsonApiResource[]
   total?: number
   page?: number
   pageSize?: number
@@ -233,4 +235,72 @@ export function unwrapCollection<T extends Record<string, unknown> = Record<stri
 
   // Already in expected format
   return response as { data: T[]; total: number; page: number; pageSize: number }
+}
+
+/**
+ * Extract included resources from a JSON:API response, filtered by type.
+ *
+ * When using `?include=profile,permissionSets`, the response contains an
+ * `included` array with all sideloaded resources. This function extracts
+ * and flattens only the resources matching the requested type.
+ *
+ * Input:  extractIncluded(response, "profiles")
+ * Output: [{ id: "p1", name: "Admin", ... }, { id: "p2", name: "User", ... }]
+ */
+export function extractIncluded<T extends Record<string, unknown> = Record<string, unknown>>(
+  response: unknown,
+  type: string
+): T[] {
+  if (!response || typeof response !== 'object') {
+    return []
+  }
+
+  const included = (response as { included?: JsonApiResource[] }).included
+  if (!Array.isArray(included)) {
+    return []
+  }
+
+  return included
+    .filter((resource) => resource.type === type)
+    .map((resource) => flattenResource<T>(resource))
+}
+
+/**
+ * Build a lookup map from included resources: record ID → display value.
+ *
+ * This replaces `useLookupDisplayMap` — instead of making separate API calls
+ * per reference field, the gateway includes related resources in a single
+ * response via `?include=owner,category`. This function builds the display
+ * map from those included resources.
+ *
+ * Input:  buildIncludedDisplayMap(response, "users", "name")
+ * Output: { "user-1": "Alice", "user-2": "Bob" }
+ *
+ * Input:  buildIncludedDisplayMap(response, "categories", ["name", "code"])
+ * Output: { "cat-1": "Electronics (ELEC)", "cat-2": "Books (BOOK)" }
+ */
+export function buildIncludedDisplayMap(
+  response: unknown,
+  type: string,
+  displayField: string | string[]
+): Record<string, string> {
+  const resources = extractIncluded(response, type)
+  const map: Record<string, string> = {}
+
+  for (const resource of resources) {
+    const id = resource.id as string
+    if (!id) continue
+
+    if (Array.isArray(displayField)) {
+      // Combine multiple fields: "Alice (ADMIN)"
+      const parts = displayField.map((f) => resource[f]).filter((v) => v != null && v !== '')
+      map[id] =
+        parts.length > 1 ? `${parts[0]} (${parts.slice(1).join(', ')})` : String(parts[0] ?? id)
+    } else {
+      const value = resource[displayField]
+      map[id] = value != null ? String(value) : id
+    }
+  }
+
+  return map
 }

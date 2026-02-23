@@ -114,3 +114,42 @@ export {
   type SystemPermissions,
   type UseSystemPermissionsReturn,
 } from './useSystemPermissions'
+
+// Generic resource hooks — unified API for all collections (system + user-defined)
+export { useResources, type UseResourcesOptions, type UseResourcesReturn } from './useResources'
+
+export { useResource, type UseResourceOptions, type UseResourceReturn } from './useResource'
+
+export {
+  useCreateResource,
+  type UseCreateResourceOptions,
+  type UseCreateResourceReturn,
+} from './useCreateResource'
+
+export {
+  useUpdateResource,
+  type UseUpdateResourceOptions,
+  type UpdateParams,
+  type UseUpdateResourceReturn,
+} from './useUpdateResource'
+
+export {
+  useDeleteResource,
+  type UseDeleteResourceOptions,
+  type UseDeleteResourceReturn,
+} from './useDeleteResource'
+
+export {
+  useResourceAction,
+  type UseResourceActionOptions,
+  type ActionParams,
+  type UseResourceActionReturn,
+} from './useResourceAction'
+
+// Included resources hook — extract display maps from JSON:API includes
+export {
+  useIncludedResources,
+  useExtractIncluded,
+  type IncludedResourceConfig,
+  type UseIncludedResourcesReturn,
+} from './useIncludedResources'

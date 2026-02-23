@@ -1,5 +1,7 @@
 package com.emf.runtime.query;
 
+import com.emf.runtime.event.RecordChangeEvent;
+import com.emf.runtime.events.RecordEventPublisher;
 import com.emf.runtime.model.CollectionDefinition;
 import com.emf.runtime.model.FieldDefinition;
 import com.emf.runtime.model.FieldType;
@@ -32,6 +34,7 @@ import java.util.*;
  *   <li>Integrates with RollupSummaryService for ROLLUP_SUMMARY computation</li>
  *   <li>Integrates with FieldEncryptionService for ENCRYPTED field handling</li>
  *   <li>Integrates with AutoNumberService for AUTO_NUMBER generation</li>
+ *   <li>Integrates with RecordEventPublisher for publishing record change events</li>
  *   <li>Adds system fields (id, createdAt, updatedAt, createdBy, updatedBy) automatically</li>
  *   <li>Logs query performance metrics</li>
  * </ul>
@@ -54,14 +57,25 @@ public class DefaultQueryEngine implements QueryEngine {
     private final FormulaEvaluator formulaEvaluator;
     private final RollupSummaryService rollupSummaryService;
     private final CustomValidationRuleEngine customValidationRuleEngine;
+    private final RecordEventPublisher recordEventPublisher;
 
     /**
-     * Creates a new DefaultQueryEngine with all services.
+     * Creates a new DefaultQueryEngine with all services including record event publisher.
+     *
+     * @param storageAdapter the storage adapter for persistence
+     * @param validationEngine the validation engine for data validation (may be null)
+     * @param encryptionService the encryption service for ENCRYPTED fields (may be null)
+     * @param autoNumberService the auto-number service for AUTO_NUMBER fields (may be null)
+     * @param formulaEvaluator the formula evaluator for FORMULA fields (may be null)
+     * @param rollupSummaryService the rollup summary service for ROLLUP_SUMMARY fields (may be null)
+     * @param customValidationRuleEngine the custom validation rule engine (may be null)
+     * @param recordEventPublisher the publisher for record change events (may be null)
      */
     public DefaultQueryEngine(StorageAdapter storageAdapter, ValidationEngine validationEngine,
                               FieldEncryptionService encryptionService, AutoNumberService autoNumberService,
                               FormulaEvaluator formulaEvaluator, RollupSummaryService rollupSummaryService,
-                              CustomValidationRuleEngine customValidationRuleEngine) {
+                              CustomValidationRuleEngine customValidationRuleEngine,
+                              RecordEventPublisher recordEventPublisher) {
         this.storageAdapter = Objects.requireNonNull(storageAdapter, "storageAdapter cannot be null");
         this.validationEngine = validationEngine;
         this.encryptionService = encryptionService;
@@ -69,6 +83,18 @@ public class DefaultQueryEngine implements QueryEngine {
         this.formulaEvaluator = formulaEvaluator;
         this.rollupSummaryService = rollupSummaryService;
         this.customValidationRuleEngine = customValidationRuleEngine;
+        this.recordEventPublisher = recordEventPublisher;
+    }
+
+    /**
+     * Creates a new DefaultQueryEngine with all services (backward compatible, no event publisher).
+     */
+    public DefaultQueryEngine(StorageAdapter storageAdapter, ValidationEngine validationEngine,
+                              FieldEncryptionService encryptionService, AutoNumberService autoNumberService,
+                              FormulaEvaluator formulaEvaluator, RollupSummaryService rollupSummaryService,
+                              CustomValidationRuleEngine customValidationRuleEngine) {
+        this(storageAdapter, validationEngine, encryptionService, autoNumberService,
+             formulaEvaluator, rollupSummaryService, customValidationRuleEngine, null);
     }
 
     /**
@@ -78,7 +104,7 @@ public class DefaultQueryEngine implements QueryEngine {
                               FieldEncryptionService encryptionService, AutoNumberService autoNumberService,
                               FormulaEvaluator formulaEvaluator, RollupSummaryService rollupSummaryService) {
         this(storageAdapter, validationEngine, encryptionService, autoNumberService,
-             formulaEvaluator, rollupSummaryService, null);
+             formulaEvaluator, rollupSummaryService, null, null);
     }
 
     /**
@@ -88,7 +114,7 @@ public class DefaultQueryEngine implements QueryEngine {
      * @param validationEngine the validation engine for data validation (may be null)
      */
     public DefaultQueryEngine(StorageAdapter storageAdapter, ValidationEngine validationEngine) {
-        this(storageAdapter, validationEngine, null, null, null, null, null);
+        this(storageAdapter, validationEngine, null, null, null, null, null, null);
     }
 
     /**
@@ -188,6 +214,11 @@ public class DefaultQueryEngine implements QueryEngine {
 
         logger.debug("Created record '{}' in collection '{}'", id, definition.name());
 
+        // Publish record change event
+        publishRecordEvent(RecordChangeEvent.created(
+                extractTenantId(recordData), definition.name(), id, created,
+                extractUserId(recordData)));
+
         return created;
     }
 
@@ -237,11 +268,23 @@ public class DefaultQueryEngine implements QueryEngine {
             customValidationRuleEngine.evaluate(definition.name(), mergedData, OperationType.UPDATE);
         }
 
+        // Capture previous data for event publishing (before persist overwrites)
+        Map<String, Object> previousData = new HashMap<>(existing.get());
+
         // Persist via storage adapter
         Optional<Map<String, Object>> updated = storageAdapter.update(definition, id, recordData);
 
-        updated.ifPresent(record ->
-            logger.debug("Updated record '{}' in collection '{}'", id, definition.name()));
+        updated.ifPresent(record -> {
+            logger.debug("Updated record '{}' in collection '{}'", id, definition.name());
+
+            // Compute changed fields by comparing previous data with the update data
+            List<String> changedFields = computeChangedFields(previousData, recordData);
+
+            // Publish record change event
+            publishRecordEvent(RecordChangeEvent.updated(
+                    extractTenantId(mergedData), definition.name(), id, mergedData,
+                    previousData, changedFields, extractUserId(mergedData)));
+        });
 
         return updated;
     }
@@ -250,13 +293,26 @@ public class DefaultQueryEngine implements QueryEngine {
     public boolean delete(CollectionDefinition definition, String id) {
         Objects.requireNonNull(definition, "definition cannot be null");
         Objects.requireNonNull(id, "id cannot be null");
-        
+
+        // Pre-fetch record data for the delete event (only when publisher is wired)
+        Map<String, Object> recordData = null;
+        if (recordEventPublisher != null) {
+            recordData = storageAdapter.getById(definition, id).orElse(null);
+        }
+
         boolean deleted = storageAdapter.delete(definition, id);
-        
+
         if (deleted) {
             logger.debug("Deleted record '{}' from collection '{}'", id, definition.name());
+
+            // Publish record change event with the pre-fetched data
+            if (recordData != null) {
+                publishRecordEvent(RecordChangeEvent.deleted(
+                        extractTenantId(recordData), definition.name(), id, recordData,
+                        extractUserId(recordData)));
+            }
         }
-        
+
         return deleted;
     }
     
@@ -380,6 +436,64 @@ public class DefaultQueryEngine implements QueryEngine {
                 }
             }
         }
+    }
+
+    /**
+     * Publishes a record change event if a publisher is configured.
+     * Failures are handled gracefully — they are logged but do not cause the
+     * main CRUD operation to fail.
+     */
+    private void publishRecordEvent(RecordChangeEvent event) {
+        if (recordEventPublisher == null) {
+            return;
+        }
+        try {
+            recordEventPublisher.publish(event);
+        } catch (Exception e) {
+            logger.error("Failed to publish record change event for record '{}' in collection '{}': {}",
+                event.getRecordId(), event.getCollectionName(), e.getMessage());
+        }
+    }
+
+    /**
+     * Computes the list of field names that changed between the previous record
+     * and the update data. Only includes fields present in the update data
+     * whose values differ from the previous record.
+     */
+    private List<String> computeChangedFields(Map<String, Object> previousData, Map<String, Object> updateData) {
+        List<String> changedFields = new ArrayList<>();
+        for (Map.Entry<String, Object> entry : updateData.entrySet()) {
+            String fieldName = entry.getKey();
+            // Skip system fields that are always updated
+            if ("updatedAt".equals(fieldName)) {
+                continue;
+            }
+            Object newValue = entry.getValue();
+            Object oldValue = previousData.get(fieldName);
+            if (!Objects.equals(newValue, oldValue)) {
+                changedFields.add(fieldName);
+            }
+        }
+        return changedFields;
+    }
+
+    /**
+     * Extracts the tenant ID from record data, defaulting to "default".
+     */
+    private String extractTenantId(Map<String, Object> data) {
+        Object tenantId = data.get("tenantId");
+        return tenantId != null ? tenantId.toString() : "default";
+    }
+
+    /**
+     * Extracts the user ID from record data, defaulting to "system".
+     */
+    private String extractUserId(Map<String, Object> data) {
+        Object userId = data.get("createdBy");
+        if (userId == null) {
+            userId = data.get("updatedBy");
+        }
+        return userId != null ? userId.toString() : "system";
     }
 
     /**

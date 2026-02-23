@@ -17,6 +17,13 @@
     <description>Core runtime library for EMF Platform - provides collection definitions, registry, routing, query engine, validation, storage adapters, and event publishing</description>
 
     <dependencies>
+        <!-- EMF Runtime Events (shared event DTOs) -->
+        <dependency>
+            <groupId>com.emf</groupId>
+            <artifactId>runtime-events</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <!-- Spring Boot Starters -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

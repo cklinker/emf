@@ -1,5 +1,8 @@
 package com.emf.runtime.query;
 
+import com.emf.runtime.event.ChangeType;
+import com.emf.runtime.event.RecordChangeEvent;
+import com.emf.runtime.events.RecordEventPublisher;
 import com.emf.runtime.model.*;
 import com.emf.runtime.storage.StorageAdapter;
 import com.emf.runtime.validation.CustomValidationRuleEngine;
@@ -13,6 +16,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.time.Instant;
 import java.util.*;
@@ -531,6 +535,252 @@ class DefaultQueryEngineTest {
 
             assertDoesNotThrow(() ->
                     queryEngine.create(testCollection, inputData));
+        }
+    }
+
+    @Nested
+    @DisplayName("Record Event Publishing Tests")
+    class RecordEventPublishingTests {
+
+        private RecordEventPublisher recordEventPublisher;
+        private DefaultQueryEngine engineWithPublisher;
+
+        @BeforeEach
+        void setUp() {
+            recordEventPublisher = mock(RecordEventPublisher.class);
+            engineWithPublisher = new DefaultQueryEngine(
+                    storageAdapter, validationEngine, null, null, null, null, null,
+                    recordEventPublisher);
+        }
+
+        @Test
+        @DisplayName("Should publish CREATED event after successful create")
+        void shouldPublishCreatedEventAfterCreate() {
+            Map<String, Object> inputData = new HashMap<>();
+            inputData.put("name", "Test Product");
+            inputData.put("price", 99.99);
+
+            when(validationEngine.validate(eq(testCollection), any(), any()))
+                    .thenReturn(com.emf.runtime.validation.ValidationResult.success());
+            when(storageAdapter.create(eq(testCollection), any()))
+                    .thenAnswer(invocation -> invocation.getArgument(1));
+
+            engineWithPublisher.create(testCollection, inputData);
+
+            ArgumentCaptor<RecordChangeEvent> eventCaptor = ArgumentCaptor.forClass(RecordChangeEvent.class);
+            verify(recordEventPublisher).publish(eventCaptor.capture());
+
+            RecordChangeEvent event = eventCaptor.getValue();
+            assertNotNull(event.getEventId());
+            assertEquals(ChangeType.CREATED, event.getChangeType());
+            assertEquals("products", event.getCollectionName());
+            assertNotNull(event.getRecordId());
+            assertNotNull(event.getData());
+            assertEquals("Test Product", event.getData().get("name"));
+            assertNull(event.getPreviousData());
+            assertTrue(event.getChangedFields().isEmpty());
+        }
+
+        @Test
+        @DisplayName("Should not publish event when publisher is null")
+        void shouldNotPublishEventWhenPublisherIsNull() {
+            // The default queryEngine has no publisher
+            Map<String, Object> inputData = new HashMap<>();
+            inputData.put("name", "Test");
+            inputData.put("price", 10.0);
+
+            when(validationEngine.validate(eq(testCollection), any(), any()))
+                    .thenReturn(com.emf.runtime.validation.ValidationResult.success());
+            when(storageAdapter.create(eq(testCollection), any()))
+                    .thenAnswer(invocation -> invocation.getArgument(1));
+
+            assertDoesNotThrow(() ->
+                    queryEngine.create(testCollection, inputData));
+            // No publisher to verify — just ensuring no NPE
+        }
+
+        @Test
+        @DisplayName("Should publish UPDATED event with changed fields after successful update")
+        void shouldPublishUpdatedEventAfterUpdate() {
+            String id = "test-id";
+            Map<String, Object> existingRecord = new HashMap<>();
+            existingRecord.put("id", id);
+            existingRecord.put("name", "Old Name");
+            existingRecord.put("price", 50.0);
+            existingRecord.put("createdAt", Instant.now().minusSeconds(3600));
+
+            Map<String, Object> updateData = new HashMap<>();
+            updateData.put("name", "New Name");
+
+            when(storageAdapter.getById(testCollection, id)).thenReturn(Optional.of(existingRecord));
+            when(validationEngine.validate(eq(testCollection), any(), any(), eq(id)))
+                    .thenReturn(com.emf.runtime.validation.ValidationResult.success());
+            when(storageAdapter.update(eq(testCollection), eq(id), any()))
+                    .thenAnswer(invocation -> {
+                        Map<String, Object> data = invocation.getArgument(2);
+                        Map<String, Object> result = new HashMap<>(existingRecord);
+                        result.putAll(data);
+                        return Optional.of(result);
+                    });
+
+            engineWithPublisher.update(testCollection, id, updateData);
+
+            ArgumentCaptor<RecordChangeEvent> eventCaptor = ArgumentCaptor.forClass(RecordChangeEvent.class);
+            verify(recordEventPublisher).publish(eventCaptor.capture());
+
+            RecordChangeEvent event = eventCaptor.getValue();
+            assertEquals(ChangeType.UPDATED, event.getChangeType());
+            assertEquals("products", event.getCollectionName());
+            assertEquals(id, event.getRecordId());
+            assertNotNull(event.getData());
+            assertNotNull(event.getPreviousData());
+            assertEquals("Old Name", event.getPreviousData().get("name"));
+            assertTrue(event.getChangedFields().contains("name"));
+        }
+
+        @Test
+        @DisplayName("Should not publish event when update record not found")
+        void shouldNotPublishEventWhenUpdateRecordNotFound() {
+            String id = "nonexistent";
+            Map<String, Object> updateData = Map.of("name", "New Name");
+
+            when(storageAdapter.getById(testCollection, id)).thenReturn(Optional.empty());
+
+            Optional<Map<String, Object>> result = engineWithPublisher.update(testCollection, id, updateData);
+
+            assertTrue(result.isEmpty());
+            verify(recordEventPublisher, never()).publish(any());
+        }
+
+        @Test
+        @DisplayName("Should publish DELETED event after successful delete")
+        void shouldPublishDeletedEventAfterDelete() {
+            String id = "test-id";
+            Map<String, Object> existingRecord = new HashMap<>();
+            existingRecord.put("id", id);
+            existingRecord.put("name", "Test Product");
+
+            when(storageAdapter.getById(testCollection, id)).thenReturn(Optional.of(existingRecord));
+            when(storageAdapter.delete(testCollection, id)).thenReturn(true);
+
+            boolean result = engineWithPublisher.delete(testCollection, id);
+
+            assertTrue(result);
+
+            ArgumentCaptor<RecordChangeEvent> eventCaptor = ArgumentCaptor.forClass(RecordChangeEvent.class);
+            verify(recordEventPublisher).publish(eventCaptor.capture());
+
+            RecordChangeEvent event = eventCaptor.getValue();
+            assertEquals(ChangeType.DELETED, event.getChangeType());
+            assertEquals("products", event.getCollectionName());
+            assertEquals(id, event.getRecordId());
+            assertNotNull(event.getData());
+            assertEquals("Test Product", event.getData().get("name"));
+            assertNull(event.getPreviousData());
+        }
+
+        @Test
+        @DisplayName("Should not publish event when delete returns false")
+        void shouldNotPublishEventWhenDeleteReturnsFalse() {
+            String id = "nonexistent";
+
+            when(storageAdapter.getById(testCollection, id)).thenReturn(Optional.empty());
+            when(storageAdapter.delete(testCollection, id)).thenReturn(false);
+
+            boolean result = engineWithPublisher.delete(testCollection, id);
+
+            assertFalse(result);
+            verify(recordEventPublisher, never()).publish(any());
+        }
+
+        @Test
+        @DisplayName("Should not fail CRUD when event publishing throws exception")
+        void shouldNotFailCrudWhenPublishingThrows() {
+            Map<String, Object> inputData = new HashMap<>();
+            inputData.put("name", "Test");
+            inputData.put("price", 10.0);
+
+            when(validationEngine.validate(eq(testCollection), any(), any()))
+                    .thenReturn(com.emf.runtime.validation.ValidationResult.success());
+            when(storageAdapter.create(eq(testCollection), any()))
+                    .thenAnswer(invocation -> invocation.getArgument(1));
+            doThrow(new RuntimeException("Kafka is down"))
+                    .when(recordEventPublisher).publish(any());
+
+            // Should not throw despite publisher failure
+            Map<String, Object> result = assertDoesNotThrow(() ->
+                    engineWithPublisher.create(testCollection, inputData));
+            assertNotNull(result);
+        }
+
+        @Test
+        @DisplayName("Should not pre-fetch record on delete when publisher is null")
+        void shouldNotPreFetchOnDeleteWhenPublisherIsNull() {
+            String id = "test-id";
+
+            when(storageAdapter.delete(testCollection, id)).thenReturn(true);
+
+            queryEngine.delete(testCollection, id);
+
+            // Should not call getById when publisher is null (no pre-fetch needed)
+            verify(storageAdapter, never()).getById(any(), any());
+            verify(storageAdapter).delete(testCollection, id);
+        }
+
+        @Test
+        @DisplayName("Should include tenant ID from record data in event")
+        void shouldIncludeTenantIdInEvent() {
+            Map<String, Object> inputData = new HashMap<>();
+            inputData.put("name", "Test");
+            inputData.put("price", 10.0);
+            inputData.put("tenantId", "tenant-123");
+
+            when(validationEngine.validate(eq(testCollection), any(), any()))
+                    .thenReturn(com.emf.runtime.validation.ValidationResult.success());
+            when(storageAdapter.create(eq(testCollection), any()))
+                    .thenAnswer(invocation -> invocation.getArgument(1));
+
+            engineWithPublisher.create(testCollection, inputData);
+
+            ArgumentCaptor<RecordChangeEvent> eventCaptor = ArgumentCaptor.forClass(RecordChangeEvent.class);
+            verify(recordEventPublisher).publish(eventCaptor.capture());
+
+            assertEquals("tenant-123", eventCaptor.getValue().getTenantId());
+        }
+
+        @Test
+        @DisplayName("Should compute changed fields correctly for update")
+        void shouldComputeChangedFieldsCorrectly() {
+            String id = "test-id";
+            Map<String, Object> existingRecord = new HashMap<>();
+            existingRecord.put("id", id);
+            existingRecord.put("name", "Same Name");
+            existingRecord.put("price", 50.0);
+            existingRecord.put("category", "Electronics");
+
+            // Update only price and category; name stays the same
+            Map<String, Object> updateData = new HashMap<>();
+            updateData.put("name", "Same Name");
+            updateData.put("price", 99.0);
+            updateData.put("category", "Gadgets");
+
+            when(storageAdapter.getById(testCollection, id)).thenReturn(Optional.of(existingRecord));
+            when(validationEngine.validate(eq(testCollection), any(), any(), eq(id)))
+                    .thenReturn(com.emf.runtime.validation.ValidationResult.success());
+            when(storageAdapter.update(eq(testCollection), eq(id), any()))
+                    .thenAnswer(invocation -> Optional.of(new HashMap<>(existingRecord)));
+
+            engineWithPublisher.update(testCollection, id, updateData);
+
+            ArgumentCaptor<RecordChangeEvent> eventCaptor = ArgumentCaptor.forClass(RecordChangeEvent.class);
+            verify(recordEventPublisher).publish(eventCaptor.capture());
+
+            RecordChangeEvent event = eventCaptor.getValue();
+            List<String> changedFields = event.getChangedFields();
+            assertTrue(changedFields.contains("price"), "price should be in changedFields");
+            assertTrue(changedFields.contains("category"), "category should be in changedFields");
+            assertFalse(changedFields.contains("name"), "name should NOT be in changedFields (unchanged)");
+            assertFalse(changedFields.contains("updatedAt"), "updatedAt should NOT be in changedFields");
         }
     }
 }

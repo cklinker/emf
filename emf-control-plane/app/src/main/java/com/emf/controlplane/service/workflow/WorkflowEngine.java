@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -365,6 +366,147 @@ public class WorkflowEngine {
             rule.getName(), overallStatus, actionsExecuted, durationMs);
 
         return executionLog.getId();
+    }
+
+    /**
+     * Evaluates before-save workflow rules synchronously during record create/update.
+     * <p>
+     * Only FIELD_UPDATE actions are supported for before-save triggers (safe for
+     * synchronous context). Returns accumulated field updates to apply before persist.
+     * <p>
+     * Called by the worker via {@code POST /internal/workflow/before-save}.
+     *
+     * @param tenantId       the tenant ID
+     * @param collectionId   the collection ID
+     * @param collectionName the collection name
+     * @param recordId       the record ID (null for creates)
+     * @param data           the current record data
+     * @param previousData   the previous record data (null for creates)
+     * @param changedFields  the list of changed fields (empty for creates)
+     * @param userId         the user performing the save
+     * @param changeType     "CREATE" or "UPDATE"
+     * @return a map with keys: "fieldUpdates" (Map), "rulesEvaluated" (int), "actionsExecuted" (int)
+     */
+    @Transactional
+    public Map<String, Object> evaluateBeforeSave(String tenantId, String collectionId,
+                                                    String collectionName, String recordId,
+                                                    Map<String, Object> data,
+                                                    Map<String, Object> previousData,
+                                                    List<String> changedFields,
+                                                    String userId, String changeType) {
+        // Determine the trigger type to match
+        String triggerType = "CREATE".equals(changeType) ? "BEFORE_CREATE" : "BEFORE_UPDATE";
+
+        log.info("Evaluating before-save workflows: tenant={}, collection={}, trigger={}, record={}",
+            tenantId, collectionName, triggerType, recordId);
+
+        List<WorkflowRule> rules = ruleRepository
+            .findByTenantIdAndCollectionIdAndTriggerTypeAndActiveTrueOrderByExecutionOrderAsc(
+                tenantId, collectionId, triggerType);
+
+        Map<String, Object> accumulatedUpdates = new HashMap<>();
+        int rulesEvaluated = 0;
+        int actionsExecuted = 0;
+
+        for (WorkflowRule rule : rules) {
+            rulesEvaluated++;
+
+            // Check trigger fields for BEFORE_UPDATE
+            if ("BEFORE_UPDATE".equals(triggerType)) {
+                List<String> triggerFields = WorkflowRuleDto.parseTriggerFields(rule.getTriggerFields());
+                if (triggerFields != null && !triggerFields.isEmpty()) {
+                    if (changedFields == null || changedFields.isEmpty()
+                            || Collections.disjoint(triggerFields, changedFields)) {
+                        log.debug("Before-save trigger fields check rejected record {} for rule '{}'",
+                            recordId, rule.getName());
+                        continue;
+                    }
+                }
+            }
+
+            // Check filter formula
+            if (rule.getFilterFormula() != null && !rule.getFilterFormula().isBlank()) {
+                try {
+                    boolean filterPasses = formulaEvaluator.evaluateBoolean(
+                        rule.getFilterFormula(), data);
+                    if (!filterPasses) {
+                        log.debug("Before-save filter rejected record {} for rule '{}': {}",
+                            recordId, rule.getName(), rule.getFilterFormula());
+                        continue;
+                    }
+                } catch (Exception e) {
+                    log.warn("Error evaluating before-save filter for rule '{}': {}",
+                        rule.getName(), e.getMessage());
+                    continue;
+                }
+            }
+
+            // Execute only FIELD_UPDATE actions (safe for synchronous context)
+            List<WorkflowAction> fieldUpdateActions = rule.getActions().stream()
+                .filter(WorkflowAction::isActive)
+                .filter(a -> "FIELD_UPDATE".equals(a.getActionType()))
+                .sorted((a, b) -> Integer.compare(a.getExecutionOrder(), b.getExecutionOrder()))
+                .toList();
+
+            boolean stopOnError = "STOP_ON_ERROR".equals(rule.getErrorHandling());
+
+            for (WorkflowAction action : fieldUpdateActions) {
+                ActionContext context = ActionContext.builder()
+                    .tenantId(tenantId)
+                    .collectionId(collectionId)
+                    .collectionName(collectionName)
+                    .recordId(recordId)
+                    .data(data)
+                    .previousData(previousData)
+                    .changedFields(changedFields != null ? changedFields : List.of())
+                    .userId(userId != null ? userId : "system")
+                    .actionConfigJson(action.getConfig())
+                    .workflowRuleId(rule.getId())
+                    .executionLogId(null)
+                    .resolvedData(Map.of())
+                    .build();
+
+                Optional<ActionHandler> handlerOpt = handlerRegistry.getHandler("FIELD_UPDATE");
+                if (handlerOpt.isEmpty()) {
+                    log.error("No FIELD_UPDATE handler registered for before-save rule '{}'", rule.getName());
+                    continue;
+                }
+
+                try {
+                    ActionResult result = handlerOpt.get().execute(context);
+                    actionsExecuted++;
+
+                    if (result.successful() && result.outputData() != null) {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> updatedFields = (Map<String, Object>) result.outputData().get("updatedFields");
+                        if (updatedFields != null) {
+                            accumulatedUpdates.putAll(updatedFields);
+                        }
+                    } else if (!result.successful()) {
+                        log.warn("Before-save FIELD_UPDATE failed for rule '{}': {}",
+                            rule.getName(), result.errorMessage());
+                        if (stopOnError) {
+                            break;
+                        }
+                    }
+                } catch (Exception e) {
+                    log.error("Exception in before-save FIELD_UPDATE for rule '{}': {}",
+                        rule.getName(), e.getMessage(), e);
+                    if (stopOnError) {
+                        break;
+                    }
+                }
+            }
+        }
+
+        log.info("Before-save evaluation complete: {} rules evaluated, {} actions executed, {} field updates",
+            rulesEvaluated, actionsExecuted, accumulatedUpdates.size());
+
+        return Map.of(
+            "fieldUpdates", accumulatedUpdates,
+            "rulesEvaluated", rulesEvaluated,
+            "actionsExecuted", actionsExecuted
+        );
     }
 
     /**

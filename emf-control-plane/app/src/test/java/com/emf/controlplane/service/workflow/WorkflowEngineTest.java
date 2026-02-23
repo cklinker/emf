@@ -792,4 +792,378 @@ class WorkflowEngineTest {
             }));
         }
     }
+
+    @Nested
+    @DisplayName("Before-Save Evaluation (B4)")
+    class BeforeSaveTests {
+
+        @Test
+        @DisplayName("Should return field updates from FIELD_UPDATE actions")
+        void shouldReturnFieldUpdates() {
+            WorkflowRule rule = createRule("Before Create", "BEFORE_CREATE");
+            WorkflowAction action = createAction(rule, "FIELD_UPDATE", 0);
+            action.setConfig("{\"updates\":[{\"field\":\"status\",\"value\":\"Pending\"}]}");
+
+            stubRules("BEFORE_CREATE", List.of(rule));
+
+            ActionResult result = ActionResult.success(Map.of(
+                "updatedFields", Map.of("status", "Pending")));
+            ActionHandler handler = mockHandler("FIELD_UPDATE", result);
+            when(handlerRegistry.getHandler("FIELD_UPDATE")).thenReturn(Optional.of(handler));
+
+            Map<String, Object> response = engine.evaluateBeforeSave(
+                "tenant-1", "col-1", "orders", null,
+                Map.of("name", "Test"), null, List.of(),
+                "user-1", "CREATE");
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> fieldUpdates = (Map<String, Object>) response.get("fieldUpdates");
+            assertEquals("Pending", fieldUpdates.get("status"));
+            assertEquals(1, response.get("rulesEvaluated"));
+            assertEquals(1, response.get("actionsExecuted"));
+        }
+
+        @Test
+        @DisplayName("Should return empty updates when no matching rules")
+        void shouldReturnEmptyWhenNoRules() {
+            stubRules("BEFORE_CREATE", List.of());
+
+            Map<String, Object> response = engine.evaluateBeforeSave(
+                "tenant-1", "col-1", "orders", null,
+                Map.of("name", "Test"), null, List.of(),
+                "user-1", "CREATE");
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> fieldUpdates = (Map<String, Object>) response.get("fieldUpdates");
+            assertTrue(fieldUpdates.isEmpty());
+            assertEquals(0, response.get("rulesEvaluated"));
+            assertEquals(0, response.get("actionsExecuted"));
+        }
+
+        @Test
+        @DisplayName("Should only execute FIELD_UPDATE actions (ignore others)")
+        void shouldOnlyExecuteFieldUpdateActions() {
+            WorkflowRule rule = createRule("Before Create Mixed", "BEFORE_CREATE");
+            createAction(rule, "FIELD_UPDATE", 0);
+            createAction(rule, "EMAIL_ALERT", 1); // Should be ignored
+
+            stubRules("BEFORE_CREATE", List.of(rule));
+
+            ActionResult result = ActionResult.success(Map.of(
+                "updatedFields", Map.of("status", "Pending")));
+            ActionHandler handler = mockHandler("FIELD_UPDATE", result);
+            when(handlerRegistry.getHandler("FIELD_UPDATE")).thenReturn(Optional.of(handler));
+
+            Map<String, Object> response = engine.evaluateBeforeSave(
+                "tenant-1", "col-1", "orders", null,
+                Map.of("name", "Test"), null, List.of(),
+                "user-1", "CREATE");
+
+            // Only FIELD_UPDATE handler is invoked
+            verify(handlerRegistry).getHandler("FIELD_UPDATE");
+            verify(handlerRegistry, never()).getHandler("EMAIL_ALERT");
+            assertEquals(1, response.get("actionsExecuted"));
+        }
+
+        @Test
+        @DisplayName("Should accumulate updates from multiple rules")
+        void shouldAccumulateUpdatesFromMultipleRules() {
+            WorkflowRule rule1 = createRule("Rule 1", "BEFORE_CREATE");
+            createAction(rule1, "FIELD_UPDATE", 0);
+
+            WorkflowRule rule2 = createRule("Rule 2", "BEFORE_CREATE");
+            createAction(rule2, "FIELD_UPDATE", 0);
+
+            stubRules("BEFORE_CREATE", List.of(rule1, rule2));
+
+            ActionResult result1 = ActionResult.success(Map.of(
+                "updatedFields", Map.of("status", "Pending")));
+            ActionResult result2 = ActionResult.success(Map.of(
+                "updatedFields", Map.of("priority", "High")));
+
+            // Use different results for each call
+            ActionHandler handler = mock(ActionHandler.class);
+            when(handler.getActionTypeKey()).thenReturn("FIELD_UPDATE");
+            when(handler.execute(any())).thenReturn(result1, result2);
+            when(handlerRegistry.getHandler("FIELD_UPDATE")).thenReturn(Optional.of(handler));
+
+            Map<String, Object> response = engine.evaluateBeforeSave(
+                "tenant-1", "col-1", "orders", null,
+                Map.of("name", "Test"), null, List.of(),
+                "user-1", "CREATE");
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> fieldUpdates = (Map<String, Object>) response.get("fieldUpdates");
+            assertEquals("Pending", fieldUpdates.get("status"));
+            assertEquals("High", fieldUpdates.get("priority"));
+            assertEquals(2, response.get("rulesEvaluated"));
+            assertEquals(2, response.get("actionsExecuted"));
+        }
+
+        @Test
+        @DisplayName("Should use BEFORE_UPDATE trigger type for UPDATE changeType")
+        void shouldUseBeforeUpdateTrigger() {
+            WorkflowRule rule = createRule("Before Update", "BEFORE_UPDATE");
+            createAction(rule, "FIELD_UPDATE", 0);
+
+            stubRules("BEFORE_UPDATE", List.of(rule));
+
+            ActionResult result = ActionResult.success(Map.of(
+                "updatedFields", Map.of("modified_by", "system")));
+            ActionHandler handler = mockHandler("FIELD_UPDATE", result);
+            when(handlerRegistry.getHandler("FIELD_UPDATE")).thenReturn(Optional.of(handler));
+
+            Map<String, Object> response = engine.evaluateBeforeSave(
+                "tenant-1", "col-1", "orders", "rec-1",
+                Map.of("status", "Approved"),
+                Map.of("status", "Pending"),
+                List.of("status"),
+                "user-1", "UPDATE");
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> fieldUpdates = (Map<String, Object>) response.get("fieldUpdates");
+            assertEquals("system", fieldUpdates.get("modified_by"));
+        }
+
+        @Test
+        @DisplayName("Should respect trigger fields for BEFORE_UPDATE")
+        void shouldRespectTriggerFieldsForBeforeUpdate() {
+            WorkflowRule rule = createRule("Before Update Trigger", "BEFORE_UPDATE");
+            rule.setTriggerFields("[\"status\"]");
+            createAction(rule, "FIELD_UPDATE", 0);
+
+            stubRules("BEFORE_UPDATE", List.of(rule));
+
+            // Changed field is 'total', not 'status' — should not match
+            Map<String, Object> response = engine.evaluateBeforeSave(
+                "tenant-1", "col-1", "orders", "rec-1",
+                Map.of("total", 200.0),
+                Map.of("total", 150.0),
+                List.of("total"),
+                "user-1", "UPDATE");
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> fieldUpdates = (Map<String, Object>) response.get("fieldUpdates");
+            assertTrue(fieldUpdates.isEmpty());
+            assertEquals(1, response.get("rulesEvaluated"));
+            assertEquals(0, response.get("actionsExecuted"));
+        }
+
+        @Test
+        @DisplayName("Should match when trigger field is in changed fields for BEFORE_UPDATE")
+        void shouldMatchTriggerFieldsForBeforeUpdate() {
+            WorkflowRule rule = createRule("Before Update Match", "BEFORE_UPDATE");
+            rule.setTriggerFields("[\"status\"]");
+            createAction(rule, "FIELD_UPDATE", 0);
+
+            stubRules("BEFORE_UPDATE", List.of(rule));
+
+            ActionResult result = ActionResult.success(Map.of(
+                "updatedFields", Map.of("audit_status", "reviewed")));
+            ActionHandler handler = mockHandler("FIELD_UPDATE", result);
+            when(handlerRegistry.getHandler("FIELD_UPDATE")).thenReturn(Optional.of(handler));
+
+            Map<String, Object> response = engine.evaluateBeforeSave(
+                "tenant-1", "col-1", "orders", "rec-1",
+                Map.of("status", "Approved"),
+                Map.of("status", "Pending"),
+                List.of("status"),
+                "user-1", "UPDATE");
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> fieldUpdates = (Map<String, Object>) response.get("fieldUpdates");
+            assertEquals("reviewed", fieldUpdates.get("audit_status"));
+        }
+
+        @Test
+        @DisplayName("Should skip rule when filter formula rejects record")
+        void shouldSkipWhenFilterRejects() {
+            WorkflowRule rule = createRule("Filtered Before Save", "BEFORE_CREATE");
+            rule.setFilterFormula("total > 1000");
+            createAction(rule, "FIELD_UPDATE", 0);
+
+            stubRules("BEFORE_CREATE", List.of(rule));
+            when(formulaEvaluator.evaluateBoolean(eq("total > 1000"), any())).thenReturn(false);
+
+            Map<String, Object> response = engine.evaluateBeforeSave(
+                "tenant-1", "col-1", "orders", null,
+                Map.of("total", 50.0), null, List.of(),
+                "user-1", "CREATE");
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> fieldUpdates = (Map<String, Object>) response.get("fieldUpdates");
+            assertTrue(fieldUpdates.isEmpty());
+            verify(handlerRegistry, never()).getHandler(any());
+        }
+
+        @Test
+        @DisplayName("Should handle action failure gracefully with STOP_ON_ERROR")
+        void shouldHandleFailureWithStopOnError() {
+            WorkflowRule rule = createRule("Fail Rule", "BEFORE_CREATE");
+            rule.setErrorHandling("STOP_ON_ERROR");
+            createAction(rule, "FIELD_UPDATE", 0);
+            createAction(rule, "FIELD_UPDATE", 1); // Second action — should not run
+
+            stubRules("BEFORE_CREATE", List.of(rule));
+
+            ActionHandler handler = mock(ActionHandler.class);
+            when(handler.getActionTypeKey()).thenReturn("FIELD_UPDATE");
+            when(handler.execute(any())).thenReturn(ActionResult.failure("Config error"));
+            when(handlerRegistry.getHandler("FIELD_UPDATE")).thenReturn(Optional.of(handler));
+
+            Map<String, Object> response = engine.evaluateBeforeSave(
+                "tenant-1", "col-1", "orders", null,
+                Map.of("name", "Test"), null, List.of(),
+                "user-1", "CREATE");
+
+            // Only 1 action executed (first failed, stopped)
+            assertEquals(1, response.get("actionsExecuted"));
+            verify(handler, times(1)).execute(any());
+        }
+
+        @Test
+        @DisplayName("Should continue on error with CONTINUE_ON_ERROR")
+        void shouldContinueOnError() {
+            WorkflowRule rule = createRule("Continue Rule", "BEFORE_CREATE");
+            rule.setErrorHandling("CONTINUE_ON_ERROR");
+            createAction(rule, "FIELD_UPDATE", 0);
+            createAction(rule, "FIELD_UPDATE", 1);
+
+            stubRules("BEFORE_CREATE", List.of(rule));
+
+            ActionResult failResult = ActionResult.failure("First failed");
+            ActionResult successResult = ActionResult.success(Map.of(
+                "updatedFields", Map.of("status", "Pending")));
+
+            ActionHandler handler = mock(ActionHandler.class);
+            when(handler.getActionTypeKey()).thenReturn("FIELD_UPDATE");
+            when(handler.execute(any())).thenReturn(failResult, successResult);
+            when(handlerRegistry.getHandler("FIELD_UPDATE")).thenReturn(Optional.of(handler));
+
+            Map<String, Object> response = engine.evaluateBeforeSave(
+                "tenant-1", "col-1", "orders", null,
+                Map.of("name", "Test"), null, List.of(),
+                "user-1", "CREATE");
+
+            // Both actions executed
+            assertEquals(2, response.get("actionsExecuted"));
+            @SuppressWarnings("unchecked")
+            Map<String, Object> fieldUpdates = (Map<String, Object>) response.get("fieldUpdates");
+            assertEquals("Pending", fieldUpdates.get("status"));
+        }
+
+        @Test
+        @DisplayName("Should skip inactive actions")
+        void shouldSkipInactiveActions() {
+            WorkflowRule rule = createRule("Inactive Action", "BEFORE_CREATE");
+            WorkflowAction activeAction = createAction(rule, "FIELD_UPDATE", 0);
+            WorkflowAction inactiveAction = createAction(rule, "FIELD_UPDATE", 1);
+            inactiveAction.setActive(false);
+
+            stubRules("BEFORE_CREATE", List.of(rule));
+
+            ActionResult result = ActionResult.success(Map.of(
+                "updatedFields", Map.of("status", "Pending")));
+            ActionHandler handler = mockHandler("FIELD_UPDATE", result);
+            when(handlerRegistry.getHandler("FIELD_UPDATE")).thenReturn(Optional.of(handler));
+
+            Map<String, Object> response = engine.evaluateBeforeSave(
+                "tenant-1", "col-1", "orders", null,
+                Map.of("name", "Test"), null, List.of(),
+                "user-1", "CREATE");
+
+            assertEquals(1, response.get("actionsExecuted"));
+        }
+
+        @Test
+        @DisplayName("Should handle missing FIELD_UPDATE handler gracefully")
+        void shouldHandleMissingHandler() {
+            WorkflowRule rule = createRule("Missing Handler", "BEFORE_CREATE");
+            createAction(rule, "FIELD_UPDATE", 0);
+
+            stubRules("BEFORE_CREATE", List.of(rule));
+            when(handlerRegistry.getHandler("FIELD_UPDATE")).thenReturn(Optional.empty());
+
+            Map<String, Object> response = engine.evaluateBeforeSave(
+                "tenant-1", "col-1", "orders", null,
+                Map.of("name", "Test"), null, List.of(),
+                "user-1", "CREATE");
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> fieldUpdates = (Map<String, Object>) response.get("fieldUpdates");
+            assertTrue(fieldUpdates.isEmpty());
+            assertEquals(0, response.get("actionsExecuted"));
+        }
+
+        @Test
+        @DisplayName("Should handle exception in action handler gracefully")
+        void shouldHandleHandlerException() {
+            WorkflowRule rule = createRule("Exception Rule", "BEFORE_CREATE");
+            rule.setErrorHandling("CONTINUE_ON_ERROR");
+            createAction(rule, "FIELD_UPDATE", 0);
+
+            stubRules("BEFORE_CREATE", List.of(rule));
+
+            ActionHandler handler = mockThrowingHandler("FIELD_UPDATE", new RuntimeException("Boom"));
+            when(handlerRegistry.getHandler("FIELD_UPDATE")).thenReturn(Optional.of(handler));
+
+            // Should not throw
+            Map<String, Object> response = assertDoesNotThrow(() ->
+                engine.evaluateBeforeSave(
+                    "tenant-1", "col-1", "orders", null,
+                    Map.of("name", "Test"), null, List.of(),
+                    "user-1", "CREATE"));
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> fieldUpdates = (Map<String, Object>) response.get("fieldUpdates");
+            assertTrue(fieldUpdates.isEmpty());
+        }
+
+        @Test
+        @DisplayName("Should handle formula evaluation error gracefully")
+        void shouldHandleFormulaError() {
+            WorkflowRule rule = createRule("Bad Formula", "BEFORE_CREATE");
+            rule.setFilterFormula("invalid()");
+            createAction(rule, "FIELD_UPDATE", 0);
+
+            stubRules("BEFORE_CREATE", List.of(rule));
+            when(formulaEvaluator.evaluateBoolean(eq("invalid()"), any()))
+                .thenThrow(new RuntimeException("Parse error"));
+
+            Map<String, Object> response = engine.evaluateBeforeSave(
+                "tenant-1", "col-1", "orders", null,
+                Map.of("name", "Test"), null, List.of(),
+                "user-1", "CREATE");
+
+            // Rule is counted but action is not executed due to formula error
+            assertEquals(1, response.get("rulesEvaluated"));
+            assertEquals(0, response.get("actionsExecuted"));
+        }
+
+        @Test
+        @DisplayName("Should not check trigger fields for BEFORE_CREATE")
+        void shouldNotCheckTriggerFieldsForBeforeCreate() {
+            WorkflowRule rule = createRule("Before Create", "BEFORE_CREATE");
+            rule.setTriggerFields("[\"status\"]");
+            createAction(rule, "FIELD_UPDATE", 0);
+
+            stubRules("BEFORE_CREATE", List.of(rule));
+
+            ActionResult result = ActionResult.success(Map.of(
+                "updatedFields", Map.of("status", "New")));
+            ActionHandler handler = mockHandler("FIELD_UPDATE", result);
+            when(handlerRegistry.getHandler("FIELD_UPDATE")).thenReturn(Optional.of(handler));
+
+            // BEFORE_CREATE should not check trigger fields — they're only for BEFORE_UPDATE
+            Map<String, Object> response = engine.evaluateBeforeSave(
+                "tenant-1", "col-1", "orders", null,
+                Map.of("name", "Test"), null, List.of(),
+                "user-1", "CREATE");
+
+            assertEquals(1, response.get("actionsExecuted"));
+            @SuppressWarnings("unchecked")
+            Map<String, Object> fieldUpdates = (Map<String, Object>) response.get("fieldUpdates");
+            assertEquals("New", fieldUpdates.get("status"));
+        }
+    }
 }

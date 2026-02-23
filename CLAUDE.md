@@ -4,7 +4,7 @@
 
 This is the EMF Enterprise Platform monorepo. When working on tasks, follow this workflow exactly.
 
-**Autonomy:** When a task is listed in an EPIC document, proceed through the entire workflow without asking for confirmation. Execute all steps (mark in progress, branch, implement, build, test, PR, auto-merge, mark code review) end-to-end. Only stop to ask if there is a genuine ambiguity or blocker that cannot be resolved from the EPIC spec.
+**Autonomy:** When a task is listed in an EPIC document, proceed through the entire workflow without asking for confirmation. Execute all steps (branch, implement, build, test, PR, auto-merge) end-to-end. Only stop to ask if there is a genuine ambiguity or blocker that cannot be resolved from the EPIC spec.
 
 **All changes require a PR.** Never commit directly to `main`. Always create a feature branch, open a PR, and auto-merge. This applies to EPIC tasks, bug fixes, hotfixes, and any other code changes.
 
@@ -25,71 +25,6 @@ emf-ui/app                          # Admin/builder UI (TypeScript/React/Vite)
 - **Messaging**: Kafka
 - **Cache**: Redis
 
-## Plane Project Management
-
-All task tracking is in Plane at https://plane.rzware.com.
-
-### API Configuration
-
-| Key | Value |
-|-----|-------|
-| API Base | `https://plane.rzware.com/api/v1/workspaces/emf` |
-| API Key env var | `PLANE_API_KEY` |
-| Project ID | `5e955d7a-4326-49ba-b384-e01d1ed76dea` |
-| Auth header | `X-API-Key: <key>` |
-| Rate limit | ~60 req/min, use 1s delay between calls |
-| Redirects | Always use `-L` flag with curl |
-
-### Plane States
-
-| State | ID | Use When |
-|-------|----|----------|
-| Backlog | `80f2f9fa-57d6-488f-ad41-d037bc596562` | Default for new tasks |
-| Todo | `197ada13-55a0-4e6a-ae1b-ac9a6c6ea228` | Planned but not started |
-| In Progress | `40b07ee5-a419-433e-8ba9-f816c78926b4` | Work has begun |
-| Code Review | `86edbb37-b817-4c10-9649-f3f6a28e5b2f` | PR opened, awaiting review |
-| Done | `aa1c9c97-013d-4821-ad41-d037bc596562` | Merged and complete |
-| Cancelled | `c794c6c0-374d-4d89-8e5f-0803142476f7` | Will not be done |
-
-### Phase Labels
-
-| Label | ID |
-|-------|----|
-| Phase 1 | `af0e5430-...` |
-| Phase 2 | `ee15d1b7-b3c0-46ab-995a-2f1443d700c7` |
-| Phase 3 | `36a15557-...` |
-| Phase 4 | `cb10be47-...` |
-| Phase 5 | `f639686d-...` |
-| Phase 6 | `d5df2bdb-...` |
-
-### Phase 2 Stream Labels
-
-| Label | ID |
-|-------|----|
-| Field Types | `e08879e2-9409-4825-9f5e-b10aa3a1ea43` |
-| Picklists | `953a2eae-92c8-4220-b349-12f89de5e883` |
-| Relationships | `1e6c472f-c9cf-49a4-b31f-eaa8feaeb308` |
-| Validation & Record Types | `0a33a8aa-b97a-4d24-804e-1bb1e8c1aa21` |
-| Audit & History | `bf897318-a815-45a4-a65f-2c76d3d8b232` |
-
-### Task ID → Plane Issue ID Mapping
-
-Query the issue list from Plane to find the Plane issue ID for a given task ID:
-```bash
-curl -sL "https://plane.rzware.com/api/v1/workspaces/emf/projects/5e955d7a-4326-49ba-b384-e01d1ed76dea/issues/" \
-  -H "X-API-Key: ${PLANE_API_KEY}" | python3 -c "
-import sys, json
-data = json.load(sys.stdin)
-results = data.get('results', data) if isinstance(data, dict) else data
-for issue in results:
-    name = issue.get('name', '')
-    if name.startswith('['):
-        task_id = name.split(']')[0][1:]
-        print(f'{task_id}: {issue[\"id\"]}')"
-```
-
----
-
 ## Task Workflow
 
 When assigned a task (e.g., "implement task A1"), follow these steps **in order**:
@@ -101,32 +36,8 @@ When assigned a task (e.g., "implement task A1"), follow these steps **in order*
   - Phase 1 tasks → `EPIC-PHASE1.md`
   - Phase 2 tasks → `EPIC-PHASE2.md`
   - Future phases → `EPIC-PHASE<N>.md`
-- Look up the Plane issue ID from the API (see "Task ID → Plane Issue ID Mapping" above).
 
-### 2. Mark Task as In Progress
-
-Set the Plane issue state to **In Progress** and record the start date:
-
-```bash
-ISSUE_ID="<plane-issue-id>"
-START_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-
-# Update state to In Progress
-curl -sL -X PATCH \
-  "https://plane.rzware.com/api/v1/workspaces/emf/projects/5e955d7a-4326-49ba-b384-e01d1ed76dea/issues/${ISSUE_ID}/" \
-  -H "X-API-Key: ${PLANE_API_KEY}" \
-  -H "Content-Type: application/json" \
-  -d "{\"state\": \"40b07ee5-a419-433e-8ba9-f816c78926b4\", \"start_date\": \"$(date -u +%Y-%m-%d)\"}"
-
-# Add start comment
-curl -sL -X POST \
-  "https://plane.rzware.com/api/v1/workspaces/emf/projects/5e955d7a-4326-49ba-b384-e01d1ed76dea/issues/${ISSUE_ID}/comments/" \
-  -H "X-API-Key: ${PLANE_API_KEY}" \
-  -H "Content-Type: application/json" \
-  -d "{\"comment_html\": \"<p><strong>Work started:</strong> ${START_DATE}</p>\"}"
-```
-
-### 3. Create a Feature Branch
+### 2. Create a Feature Branch
 
 Branch from `main` using the task ID in the branch name:
 
@@ -142,7 +53,7 @@ Examples:
 - `feature/b5-picklist-service`
 - `feature/d3-formula-evaluator`
 
-### 4. Implement the Feature
+### 3. Implement the Feature
 
 Read the full task specification from the relevant `EPIC-PHASE<N>.md` and implement:
 
@@ -161,7 +72,7 @@ Read the full task specification from the relevant `EPIC-PHASE<N>.md` and implem
 - Flyway migrations are numbered sequentially (see migration ranges below).
 - Kafka events use `ConfigEventPublisher` pattern.
 
-### 5. Build and Verify
+### 4. Build and Verify
 
 Run the full build pipeline locally. **All steps must pass with zero errors.**
 
@@ -209,7 +120,7 @@ npm run test:run
 - [ ] Flyway migration numbering is correct and sequential
 - [ ] New tests cover the feature adequately
 
-### 6. Commit and Push
+### 5. Commit and Push
 
 ```bash
 git add <specific-files>
@@ -223,7 +134,7 @@ git push -u origin feature/<task-id>-<short-description>
 - `test(control-plane): add PicklistService unit tests`
 - `fix(gateway): handle lookup field resolution in IncludeResolver`
 
-### 7. Open a Pull Request and Auto-Merge
+### 6. Open a Pull Request and Auto-Merge
 
 Create a PR using the GitHub CLI and enable auto-merge:
 
@@ -235,7 +146,6 @@ gh pr create \
 - <bullet points describing what was implemented>
 
 ## Task
-- Plane task: [<TASK-ID>] <task name>
 - EPIC reference: EPIC-PHASE<N>.md, section <stream>
 
 ## Changes
@@ -258,73 +168,6 @@ EOF
 
 # Enable auto-merge — PR will merge automatically once CI passes
 gh pr merge --auto --squash
-```
-
-### 8. Mark Task as Code Review
-
-After the PR is created, update the Plane issue:
-
-```bash
-ISSUE_ID="<plane-issue-id>"
-PR_URL="<github-pr-url>"
-
-# Update state to Code Review
-curl -sL -X PATCH \
-  "https://plane.rzware.com/api/v1/workspaces/emf/projects/5e955d7a-4326-49ba-b384-e01d1ed76dea/issues/${ISSUE_ID}/" \
-  -H "X-API-Key: ${PLANE_API_KEY}" \
-  -H "Content-Type: application/json" \
-  -d "{\"state\": \"86edbb37-b817-4c10-9649-f3f6a28e5b2f\"}"
-
-# Add implementation comment with PR link and details
-curl -sL -X POST \
-  "https://plane.rzware.com/api/v1/workspaces/emf/projects/5e955d7a-4326-49ba-b384-e01d1ed76dea/issues/${ISSUE_ID}/comments/" \
-  -H "X-API-Key: ${PLANE_API_KEY}" \
-  -H "Content-Type: application/json" \
-  -d "$(python3 -c "
-import json
-comment = '''<h3>Implementation Complete</h3>
-<p><strong>PR:</strong> <a href=\"PR_URL\">PR_URL</a></p>
-<p><strong>Branch:</strong> BRANCH_NAME</p>
-<h4>What was implemented</h4>
-<ul>
-<li>SUMMARY_ITEM_1</li>
-<li>SUMMARY_ITEM_2</li>
-</ul>
-<h4>Files changed</h4>
-<ul>
-<li>FILE_1</li>
-<li>FILE_2</li>
-</ul>
-<h4>Tests added</h4>
-<ul>
-<li>TEST_1</li>
-<li>TEST_2</li>
-</ul>
-<h4>Remaining work</h4>
-<ul>
-<li>REMAINING_ITEM (or 'None — feature is complete')</li>
-</ul>
-<p><strong>Completion date:</strong> COMPLETION_DATE</p>'''
-print(json.dumps({'comment_html': comment}))
-")"
-```
-
-Replace the placeholder values (PR_URL, BRANCH_NAME, SUMMARY_ITEM_*, FILE_*, TEST_*, REMAINING_ITEM, COMPLETION_DATE) with actual values.
-
-### 9. After Auto-Merge
-
-After auto-merge is enabled, verify the PR has been merged (or wait for CI to pass), then mark the task as Done:
-
-```bash
-# Check merge status
-gh pr status
-
-# Mark as Done once merged
-curl -sL -X PATCH \
-  "https://plane.rzware.com/api/v1/workspaces/emf/projects/5e955d7a-4326-49ba-b384-e01d1ed76dea/issues/${ISSUE_ID}/" \
-  -H "X-API-Key: ${PLANE_API_KEY}" \
-  -H "Content-Type: application/json" \
-  -d "{\"state\": \"aa1c9c97-013d-4821-90e3-51b71050de5f\"}"
 ```
 
 ---

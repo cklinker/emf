@@ -14,6 +14,34 @@ import type { LogColumn } from '../../components'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 
+interface WorkflowActionType {
+  id: string
+  key: string
+  name: string
+  description: string | null
+  category: string
+  configSchema: string | null
+  icon: string | null
+  active: boolean
+  builtIn: boolean
+  handlerAvailable: boolean
+}
+
+interface ActionFormData {
+  actionType: string
+  executionOrder: number
+  config: string
+  active: boolean
+}
+
+interface ActionDto {
+  id: string
+  actionType: string
+  executionOrder: number
+  config: string
+  active: boolean
+}
+
 interface WorkflowRule {
   id: string
   name: string
@@ -23,7 +51,8 @@ interface WorkflowRule {
   active: boolean
   filterFormula: string | null
   executionOrder: number
-  createdBy: string
+  errorHandling: string | null
+  actions: ActionDto[]
   createdAt: string
   updatedAt: string
 }
@@ -36,6 +65,8 @@ interface WorkflowRuleFormData {
   active: boolean
   filterFormula: string
   executionOrder: number
+  errorHandling: string
+  actions: ActionFormData[]
 }
 
 interface FormErrors {
@@ -46,6 +77,7 @@ interface FormErrors {
 }
 
 interface WorkflowExecutionLog {
+  [key: string]: unknown
   id: string
   recordId: string
   triggerType: string
@@ -54,6 +86,19 @@ interface WorkflowExecutionLog {
   errorMessage: string | null
   executedAt: string
   durationMs: number | null
+}
+
+interface WorkflowActionLog {
+  id: string
+  executionLogId: string
+  actionId: string | null
+  actionType: string
+  status: string
+  errorMessage: string | null
+  inputSnapshot: string | null
+  outputSnapshot: string | null
+  durationMs: number | null
+  executedAt: string
 }
 
 export interface WorkflowRulesPageProps {
@@ -92,6 +137,7 @@ function WorkflowRuleForm({
   onCancel,
   isSubmitting,
 }: WorkflowRuleFormProps): React.ReactElement {
+  const { apiClient } = useApi()
   const isEditing = !!workflowRule
   const [formData, setFormData] = useState<WorkflowRuleFormData>({
     name: workflowRule?.name ?? '',
@@ -101,10 +147,24 @@ function WorkflowRuleForm({
     active: workflowRule?.active ?? true,
     filterFormula: workflowRule?.filterFormula ?? '',
     executionOrder: workflowRule?.executionOrder ?? 0,
+    errorHandling: workflowRule?.errorHandling ?? 'STOP_ON_ERROR',
+    actions:
+      workflowRule?.actions?.map((a) => ({
+        actionType: a.actionType,
+        executionOrder: a.executionOrder,
+        config: a.config ?? '{}',
+        active: a.active,
+      })) ?? [],
   })
   const [errors, setErrors] = useState<FormErrors>({})
   const [touched, setTouched] = useState<Record<string, boolean>>({})
   const nameInputRef = useRef<HTMLInputElement>(null)
+
+  const { data: actionTypes } = useQuery({
+    queryKey: ['workflow-action-types-active'],
+    queryFn: () =>
+      apiClient.get<WorkflowActionType[]>('/control/workflow-action-types?activeOnly=true'),
+  })
 
   useEffect(() => {
     nameInputRef.current?.focus()
@@ -129,6 +189,41 @@ function WorkflowRuleForm({
       }
     },
     [formData]
+  )
+
+  const handleAddAction = useCallback(() => {
+    const defaultType = actionTypes && actionTypes.length > 0 ? actionTypes[0].key : 'FIELD_UPDATE'
+    setFormData((prev) => ({
+      ...prev,
+      actions: [
+        ...prev.actions,
+        {
+          actionType: defaultType,
+          executionOrder: prev.actions.length,
+          config: '{}',
+          active: true,
+        },
+      ],
+    }))
+  }, [actionTypes])
+
+  const handleRemoveAction = useCallback((index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      actions: prev.actions.filter((_, i) => i !== index),
+    }))
+  }, [])
+
+  const handleActionChange = useCallback(
+    (index: number, field: keyof ActionFormData, value: string | number | boolean) => {
+      setFormData((prev) => ({
+        ...prev,
+        actions: prev.actions.map((action, i) =>
+          i === index ? { ...action, [field]: value } : action
+        ),
+      }))
+    },
+    []
   )
 
   const handleSubmit = useCallback(
@@ -164,7 +259,7 @@ function WorkflowRuleForm({
       role="presentation"
     >
       <div
-        className="w-full max-w-[600px] max-h-[90vh] overflow-y-auto rounded-lg bg-background shadow-xl"
+        className="w-full max-w-[700px] max-h-[90vh] overflow-y-auto rounded-lg bg-background shadow-xl"
         role="dialog"
         aria-modal="true"
         aria-labelledby="workflow-rule-form-title"
@@ -319,6 +414,30 @@ function WorkflowRuleForm({
 
             <div className="flex flex-col gap-2">
               <label
+                htmlFor="workflow-rule-error-handling"
+                className="text-sm font-medium text-foreground"
+              >
+                Error Handling
+              </label>
+              <select
+                id="workflow-rule-error-handling"
+                className={cn(
+                  'rounded-md border border-border bg-background px-3 py-2.5 text-sm text-foreground transition-colors',
+                  'focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20',
+                  'disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground'
+                )}
+                value={formData.errorHandling}
+                onChange={(e) => handleChange('errorHandling', e.target.value)}
+                disabled={isSubmitting}
+                data-testid="workflow-rule-error-handling-input"
+              >
+                <option value="STOP_ON_ERROR">Stop on Error</option>
+                <option value="CONTINUE_ON_ERROR">Continue on Error</option>
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label
                 htmlFor="workflow-rule-filter-formula"
                 className="text-sm font-medium text-foreground"
               >
@@ -388,6 +507,163 @@ function WorkflowRuleForm({
               </label>
             </div>
 
+            {/* Actions Section */}
+            <div className="flex flex-col gap-3 border-t border-border pt-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-foreground">Actions</h3>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAddAction}
+                  disabled={isSubmitting}
+                  data-testid="add-action-button"
+                >
+                  Add Action
+                </Button>
+              </div>
+
+              {formData.actions.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No actions configured. Add an action to define what happens when this rule
+                  triggers.
+                </p>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  {formData.actions.map((action, index) => (
+                    <div
+                      key={index}
+                      className="rounded-md border border-border bg-muted/30 p-4"
+                      data-testid={`action-item-${index}`}
+                    >
+                      <div className="mb-3 flex items-center justify-between">
+                        <span className="text-xs font-semibold uppercase text-muted-foreground">
+                          Action {index + 1}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <input
+                              type="checkbox"
+                              className="h-3.5 w-3.5 accent-primary"
+                              checked={action.active}
+                              onChange={(e) =>
+                                handleActionChange(index, 'active', e.target.checked)
+                              }
+                              disabled={isSubmitting}
+                              data-testid={`action-active-${index}`}
+                            />
+                            Active
+                          </label>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-7 border-destructive/30 px-2 text-xs text-destructive hover:bg-destructive/10"
+                            onClick={() => handleRemoveAction(index)}
+                            disabled={isSubmitting}
+                            data-testid={`remove-action-${index}`}
+                          >
+                            Remove
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <div className="flex gap-3">
+                          <div className="flex-1">
+                            <label
+                              htmlFor={`action-type-select-${index}`}
+                              className="mb-1 block text-xs font-medium text-muted-foreground"
+                            >
+                              Action Type
+                            </label>
+                            <select
+                              id={`action-type-select-${index}`}
+                              className={cn(
+                                'w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground transition-colors',
+                                'focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20'
+                              )}
+                              value={action.actionType}
+                              onChange={(e) =>
+                                handleActionChange(index, 'actionType', e.target.value)
+                              }
+                              disabled={isSubmitting}
+                              data-testid={`action-type-${index}`}
+                            >
+                              {actionTypes && actionTypes.length > 0 ? (
+                                actionTypes.map((at) => (
+                                  <option key={at.key} value={at.key}>
+                                    {at.name} ({at.key})
+                                  </option>
+                                ))
+                              ) : (
+                                <>
+                                  <option value="FIELD_UPDATE">Field Update</option>
+                                  <option value="EMAIL_ALERT">Email Alert</option>
+                                  <option value="CREATE_RECORD">Create Record</option>
+                                  <option value="INVOKE_SCRIPT">Invoke Script</option>
+                                  <option value="OUTBOUND_MESSAGE">Outbound Message</option>
+                                  <option value="CREATE_TASK">Create Task</option>
+                                  <option value="PUBLISH_EVENT">Publish Event</option>
+                                </>
+                              )}
+                            </select>
+                          </div>
+                          <div className="w-24">
+                            <label
+                              htmlFor={`action-order-input-${index}`}
+                              className="mb-1 block text-xs font-medium text-muted-foreground"
+                            >
+                              Order
+                            </label>
+                            <input
+                              id={`action-order-input-${index}`}
+                              type="number"
+                              className={cn(
+                                'w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground transition-colors',
+                                'focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20'
+                              )}
+                              value={action.executionOrder}
+                              onChange={(e) =>
+                                handleActionChange(
+                                  index,
+                                  'executionOrder',
+                                  parseInt(e.target.value, 10) || 0
+                                )
+                              }
+                              min={0}
+                              disabled={isSubmitting}
+                              data-testid={`action-order-${index}`}
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label
+                            htmlFor={`action-config-input-${index}`}
+                            className="mb-1 block text-xs font-medium text-muted-foreground"
+                          >
+                            Configuration (JSON)
+                          </label>
+                          <textarea
+                            id={`action-config-input-${index}`}
+                            className={cn(
+                              'min-h-[60px] w-full resize-y rounded-md border border-border bg-background px-3 py-2 font-mono text-xs text-foreground transition-colors',
+                              'focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20'
+                            )}
+                            value={action.config}
+                            onChange={(e) => handleActionChange(index, 'config', e.target.value)}
+                            placeholder='{"key": "value"}'
+                            disabled={isSubmitting}
+                            rows={3}
+                            data-testid={`action-config-${index}`}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <div className="mt-2 flex justify-end gap-3 border-t border-border pt-4">
               <Button
                 type="button"
@@ -409,6 +685,232 @@ function WorkflowRuleForm({
   )
 }
 
+// ---- Action Logs Detail Modal ----
+
+interface ActionLogDetailModalProps {
+  executionLogId: string
+  executionStatus: string
+  onClose: () => void
+}
+
+function ActionLogDetailModal({
+  executionLogId,
+  executionStatus,
+  onClose,
+}: ActionLogDetailModalProps): React.ReactElement {
+  const { apiClient } = useApi()
+  const { formatDate } = useI18n()
+
+  const {
+    data: actionLogs,
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ['workflow-action-logs', executionLogId],
+    queryFn: () =>
+      apiClient.get<WorkflowActionLog[]>(`/control/workflow-rules/logs/${executionLogId}/actions`),
+  })
+
+  const [expandedRow, setExpandedRow] = useState<string | null>(null)
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+      role="presentation"
+      data-testid="action-log-detail-overlay"
+    >
+      <div
+        className="w-full max-w-[900px] max-h-[80vh] overflow-y-auto rounded-lg bg-background shadow-xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="action-log-detail-title"
+        data-testid="action-log-detail-modal"
+      >
+        <div className="flex items-center justify-between border-b border-border p-6">
+          <div>
+            <h2 id="action-log-detail-title" className="text-lg font-semibold text-foreground">
+              Action Execution Details
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Execution: {executionLogId.substring(0, 8)}... &mdash;{' '}
+              <span
+                className={cn(
+                  'font-semibold',
+                  executionStatus === 'SUCCESS' ? 'text-emerald-600' : 'text-destructive'
+                )}
+              >
+                {executionStatus}
+              </span>
+            </p>
+          </div>
+          <button
+            type="button"
+            className="rounded p-2 text-2xl leading-none text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            onClick={onClose}
+            aria-label="Close"
+            data-testid="action-log-detail-close"
+          >
+            &times;
+          </button>
+        </div>
+        <div className="p-6">
+          {isLoading ? (
+            <div className="flex items-center justify-center p-8">
+              <LoadingSpinner size="medium" label="Loading action logs..." />
+            </div>
+          ) : error ? (
+            <ErrorMessage error={error instanceof Error ? error : new Error('An error occurred')} />
+          ) : !actionLogs || actionLogs.length === 0 ? (
+            <p className="text-center text-sm text-muted-foreground">
+              No action logs found for this execution.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table
+                className="w-full border-collapse text-[0.8125rem]"
+                role="grid"
+                aria-label="Action Execution Logs"
+                data-testid="action-logs-table"
+              >
+                <thead>
+                  <tr>
+                    <th className="px-3 py-2 text-left text-xs font-semibold uppercase text-muted-foreground border-b whitespace-nowrap">
+                      Action Type
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold uppercase text-muted-foreground border-b whitespace-nowrap">
+                      Status
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold uppercase text-muted-foreground border-b whitespace-nowrap">
+                      Duration
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold uppercase text-muted-foreground border-b whitespace-nowrap">
+                      Error
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold uppercase text-muted-foreground border-b whitespace-nowrap">
+                      Executed At
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold uppercase text-muted-foreground border-b whitespace-nowrap">
+                      Details
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {actionLogs.map((log) => (
+                    <React.Fragment key={log.id}>
+                      <tr className="hover:bg-muted/50 transition-colors">
+                        <td className="px-3 py-2 border-b whitespace-nowrap">
+                          <span className="inline-block rounded bg-muted px-2 py-0.5 text-xs font-semibold text-primary">
+                            {log.actionType}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 border-b whitespace-nowrap">
+                          <span
+                            className={cn(
+                              'inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold',
+                              log.status === 'SUCCESS'
+                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                                : log.status === 'SKIPPED'
+                                  ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                                  : 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300'
+                            )}
+                          >
+                            {log.status}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 border-b whitespace-nowrap text-muted-foreground">
+                          {log.durationMs != null ? `${log.durationMs}ms` : '-'}
+                        </td>
+                        <td className="px-3 py-2 border-b max-w-[200px] truncate text-muted-foreground">
+                          {log.errorMessage || '-'}
+                        </td>
+                        <td className="px-3 py-2 border-b whitespace-nowrap text-muted-foreground">
+                          {log.executedAt
+                            ? formatDate(new Date(log.executedAt), {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                second: '2-digit',
+                              })
+                            : '-'}
+                        </td>
+                        <td className="px-3 py-2 border-b whitespace-nowrap">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-6 px-2 text-xs"
+                            onClick={() => setExpandedRow(expandedRow === log.id ? null : log.id)}
+                            data-testid={`expand-action-log-${log.id}`}
+                          >
+                            {expandedRow === log.id ? 'Hide' : 'Show'}
+                          </Button>
+                        </td>
+                      </tr>
+                      {expandedRow === log.id && (
+                        <tr>
+                          <td colSpan={6} className="border-b bg-muted/20 px-3 py-3">
+                            <div className="flex flex-col gap-2">
+                              {log.inputSnapshot && (
+                                <div>
+                                  <span className="text-xs font-semibold text-muted-foreground">
+                                    Input:
+                                  </span>
+                                  <pre className="mt-1 overflow-x-auto rounded bg-muted p-2 text-xs text-foreground">
+                                    {formatJson(log.inputSnapshot)}
+                                  </pre>
+                                </div>
+                              )}
+                              {log.outputSnapshot && (
+                                <div>
+                                  <span className="text-xs font-semibold text-muted-foreground">
+                                    Output:
+                                  </span>
+                                  <pre className="mt-1 overflow-x-auto rounded bg-muted p-2 text-xs text-foreground">
+                                    {formatJson(log.outputSnapshot)}
+                                  </pre>
+                                </div>
+                              )}
+                              {log.errorMessage && (
+                                <div>
+                                  <span className="text-xs font-semibold text-muted-foreground">
+                                    Error Details:
+                                  </span>
+                                  <pre className="mt-1 overflow-x-auto rounded bg-red-50 p-2 text-xs text-red-800 dark:bg-red-950 dark:text-red-300">
+                                    {log.errorMessage}
+                                  </pre>
+                                </div>
+                              )}
+                              {!log.inputSnapshot && !log.outputSnapshot && !log.errorMessage && (
+                                <p className="text-xs text-muted-foreground">
+                                  No additional details available.
+                                </p>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function formatJson(str: string): string {
+  try {
+    return JSON.stringify(JSON.parse(str), null, 2)
+  } catch {
+    return str
+  }
+}
+
+// ---- Main Page ----
+
 export function WorkflowRulesPage({
   testId = 'workflow-rules-page',
 }: WorkflowRulesPageProps): React.ReactElement {
@@ -425,6 +927,10 @@ export function WorkflowRulesPage({
   const [workflowRuleToDelete, setWorkflowRuleToDelete] = useState<WorkflowRule | null>(null)
   const [logsItemId, setLogsItemId] = useState<string | null>(null)
   const [logsItemName, setLogsItemName] = useState('')
+  const [actionLogDetail, setActionLogDetail] = useState<{
+    executionLogId: string
+    status: string
+  } | null>(null)
 
   const {
     data: logs,
@@ -461,6 +967,28 @@ export function WorkflowRulesPage({
               minute: '2-digit',
             })
           : '-',
+    },
+    {
+      key: 'id',
+      header: 'Actions Detail',
+      render: (_v, row) => (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-6 px-2 text-xs"
+          onClick={(e) => {
+            e.stopPropagation()
+            setActionLogDetail({
+              executionLogId: row.id as string,
+              status: row.status as string,
+            })
+          }}
+          data-testid={`view-action-logs-${row.id}`}
+        >
+          View Actions
+        </Button>
+      ),
     },
   ]
 
@@ -637,7 +1165,14 @@ export function WorkflowRulesPage({
                   scope="col"
                   className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
                 >
-                  Execution Order
+                  Actions
+                </th>
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
+                  Error Handling
                 </th>
                 <th
                   role="columnheader"
@@ -658,7 +1193,7 @@ export function WorkflowRulesPage({
                   scope="col"
                   className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
                 >
-                  Actions
+                  &nbsp;
                 </th>
               </tr>
             </thead>
@@ -684,7 +1219,21 @@ export function WorkflowRulesPage({
                     </span>
                   </td>
                   <td role="gridcell" className="px-4 py-3 text-sm text-foreground">
-                    {workflowRule.executionOrder}
+                    <span className="text-muted-foreground">
+                      {workflowRule.actions?.length ?? 0}
+                    </span>
+                  </td>
+                  <td role="gridcell" className="px-4 py-3 text-sm text-foreground">
+                    <span
+                      className={cn(
+                        'inline-block rounded-full px-2.5 py-0.5 text-xs font-medium',
+                        workflowRule.errorHandling === 'CONTINUE_ON_ERROR'
+                          ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                          : 'bg-muted text-muted-foreground'
+                      )}
+                    >
+                      {workflowRule.errorHandling === 'CONTINUE_ON_ERROR' ? 'Continue' : 'Stop'}
+                    </span>
                   </td>
                   <td role="gridcell" className="px-4 py-3 text-sm text-foreground">
                     <span
@@ -760,6 +1309,14 @@ export function WorkflowRulesPage({
           error={logsError instanceof Error ? logsError : null}
           onClose={() => setLogsItemId(null)}
           emptyMessage="No execution logs found."
+        />
+      )}
+
+      {actionLogDetail && (
+        <ActionLogDetailModal
+          executionLogId={actionLogDetail.executionLogId}
+          executionStatus={actionLogDetail.status}
+          onClose={() => setActionLogDetail(null)}
         />
       )}
 

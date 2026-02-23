@@ -277,6 +277,9 @@ vi.mock('./pages', () => ({
   ReportsPage: () => <div data-testid="reports-page">Reports Page</div>,
   DashboardsPage: () => <div data-testid="dashboards-page">Dashboards Page</div>,
   WorkflowRulesPage: () => <div data-testid="workflow-rules-page">Workflow Rules Page</div>,
+  WorkflowActionTypesPage: () => (
+    <div data-testid="workflow-action-types-page">Workflow Action Types Page</div>
+  ),
   ApprovalProcessesPage: () => (
     <div data-testid="approval-processes-page">Approval Processes Page</div>
   ),

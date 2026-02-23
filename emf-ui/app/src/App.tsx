@@ -84,6 +84,7 @@ import {
   ReportsPage,
   DashboardsPage,
   WorkflowRulesPage,
+  WorkflowActionTypesPage,
   ApprovalProcessesPage,
   FlowsPage,
   ScheduledJobsPage,
@@ -691,6 +692,18 @@ function TenantRoutes(): React.ReactElement {
           <AdminPageRoute>
             <RequirePermission permission="MANAGE_WORKFLOWS">
               <WorkflowRulesPage />
+            </RequirePermission>
+          </AdminPageRoute>
+        }
+      />
+
+      {/* Workflow Action Types route */}
+      <Route
+        path="workflow-action-types"
+        element={
+          <AdminPageRoute>
+            <RequirePermission permission="MANAGE_WORKFLOWS">
+              <WorkflowActionTypesPage />
             </RequirePermission>
           </AdminPageRoute>
         }

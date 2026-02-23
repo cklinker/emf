@@ -24,6 +24,7 @@ public class WorkflowRuleDto {
     private String cronExpression;
     private String timezone;
     private Instant lastScheduledRun;
+    private String executionMode;
     private List<ActionDto> actions;
     private Instant createdAt;
     private Instant updatedAt;
@@ -46,6 +47,7 @@ public class WorkflowRuleDto {
         dto.setCronExpression(entity.getCronExpression());
         dto.setTimezone(entity.getTimezone());
         dto.setLastScheduledRun(entity.getLastScheduledRun());
+        dto.setExecutionMode(entity.getExecutionMode());
         dto.setActions(entity.getActions().stream().map(ActionDto::fromEntity).toList());
         dto.setCreatedAt(entity.getCreatedAt());
         dto.setUpdatedAt(entity.getUpdatedAt());
@@ -58,6 +60,9 @@ public class WorkflowRuleDto {
         private int executionOrder;
         private String config;
         private boolean active;
+        private int retryCount;
+        private int retryDelaySeconds;
+        private String retryBackoff;
 
         public static ActionDto fromEntity(WorkflowAction entity) {
             ActionDto dto = new ActionDto();
@@ -66,6 +71,9 @@ public class WorkflowRuleDto {
             dto.setExecutionOrder(entity.getExecutionOrder());
             dto.setConfig(entity.getConfig());
             dto.setActive(entity.isActive());
+            dto.setRetryCount(entity.getRetryCount());
+            dto.setRetryDelaySeconds(entity.getRetryDelaySeconds());
+            dto.setRetryBackoff(entity.getRetryBackoff());
             return dto;
         }
 
@@ -79,6 +87,12 @@ public class WorkflowRuleDto {
         public void setConfig(String config) { this.config = config; }
         public boolean isActive() { return active; }
         public void setActive(boolean active) { this.active = active; }
+        public int getRetryCount() { return retryCount; }
+        public void setRetryCount(int retryCount) { this.retryCount = retryCount; }
+        public int getRetryDelaySeconds() { return retryDelaySeconds; }
+        public void setRetryDelaySeconds(int retryDelaySeconds) { this.retryDelaySeconds = retryDelaySeconds; }
+        public String getRetryBackoff() { return retryBackoff; }
+        public void setRetryBackoff(String retryBackoff) { this.retryBackoff = retryBackoff; }
     }
 
     public String getId() { return id; }
@@ -109,6 +123,8 @@ public class WorkflowRuleDto {
     public void setTimezone(String timezone) { this.timezone = timezone; }
     public Instant getLastScheduledRun() { return lastScheduledRun; }
     public void setLastScheduledRun(Instant lastScheduledRun) { this.lastScheduledRun = lastScheduledRun; }
+    public String getExecutionMode() { return executionMode; }
+    public void setExecutionMode(String executionMode) { this.executionMode = executionMode; }
     public List<ActionDto> getActions() { return actions; }
     public void setActions(List<ActionDto> actions) { this.actions = actions; }
     public Instant getCreatedAt() { return createdAt; }

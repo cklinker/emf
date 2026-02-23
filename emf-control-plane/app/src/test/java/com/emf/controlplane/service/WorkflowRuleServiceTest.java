@@ -11,8 +11,10 @@ import com.emf.controlplane.event.ConfigEventPublisher;
 import com.emf.controlplane.repository.WorkflowActionLogRepository;
 import com.emf.controlplane.repository.WorkflowExecutionLogRepository;
 import com.emf.controlplane.repository.WorkflowRuleRepository;
+import com.emf.controlplane.repository.WorkflowRuleVersionRepository;
 import com.emf.controlplane.service.workflow.WorkflowEngine;
 import com.emf.runtime.event.ChangeType;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -32,9 +34,11 @@ class WorkflowRuleServiceTest {
     private WorkflowRuleRepository ruleRepository;
     private WorkflowExecutionLogRepository executionLogRepository;
     private WorkflowActionLogRepository actionLogRepository;
+    private WorkflowRuleVersionRepository versionRepository;
     private CollectionService collectionService;
     private ConfigEventPublisher configEventPublisher;
     private WorkflowEngine workflowEngine;
+    private ObjectMapper objectMapper;
     private WorkflowRuleService service;
 
     @BeforeEach
@@ -42,11 +46,14 @@ class WorkflowRuleServiceTest {
         ruleRepository = mock(WorkflowRuleRepository.class);
         executionLogRepository = mock(WorkflowExecutionLogRepository.class);
         actionLogRepository = mock(WorkflowActionLogRepository.class);
+        versionRepository = mock(WorkflowRuleVersionRepository.class);
         collectionService = mock(CollectionService.class);
         configEventPublisher = mock(ConfigEventPublisher.class);
         workflowEngine = mock(WorkflowEngine.class);
+        objectMapper = new ObjectMapper();
         service = new WorkflowRuleService(ruleRepository, executionLogRepository,
-            actionLogRepository, collectionService, configEventPublisher, workflowEngine);
+            actionLogRepository, versionRepository, collectionService,
+            configEventPublisher, workflowEngine, objectMapper);
     }
 
     @Nested
@@ -253,7 +260,7 @@ class WorkflowRuleServiceTest {
         void shouldWorkWithNullPublisher() {
             WorkflowRuleService serviceNoKafka = new WorkflowRuleService(
                 ruleRepository, executionLogRepository, actionLogRepository,
-                collectionService, null, null);
+                versionRepository, collectionService, null, null, objectMapper);
 
             Collection collection = new Collection();
             collection.setId("col-1");

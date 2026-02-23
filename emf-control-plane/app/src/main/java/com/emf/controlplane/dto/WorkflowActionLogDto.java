@@ -16,6 +16,7 @@ public class WorkflowActionLogDto {
     private String outputSnapshot;
     private Integer durationMs;
     private Instant executedAt;
+    private int attemptNumber;
 
     public static WorkflowActionLogDto fromEntity(WorkflowActionLog entity) {
         WorkflowActionLogDto dto = new WorkflowActionLogDto();
@@ -29,6 +30,7 @@ public class WorkflowActionLogDto {
         dto.setOutputSnapshot(entity.getOutputSnapshot());
         dto.setDurationMs(entity.getDurationMs());
         dto.setExecutedAt(entity.getExecutedAt());
+        dto.setAttemptNumber(entity.getAttemptNumber());
         return dto;
     }
 
@@ -52,4 +54,6 @@ public class WorkflowActionLogDto {
     public void setDurationMs(Integer durationMs) { this.durationMs = durationMs; }
     public Instant getExecutedAt() { return executedAt; }
     public void setExecutedAt(Instant executedAt) { this.executedAt = executedAt; }
+    public int getAttemptNumber() { return attemptNumber; }
+    public void setAttemptNumber(int attemptNumber) { this.attemptNumber = attemptNumber; }
 }

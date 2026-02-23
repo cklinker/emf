@@ -32,6 +32,9 @@ interface ActionFormData {
   executionOrder: number
   config: string
   active: boolean
+  retryCount: number
+  retryDelaySeconds: number
+  retryBackoff: string
 }
 
 interface ActionDto {
@@ -40,6 +43,9 @@ interface ActionDto {
   executionOrder: number
   config: string
   active: boolean
+  retryCount: number
+  retryDelaySeconds: number
+  retryBackoff: string
 }
 
 type TriggerType =
@@ -94,6 +100,7 @@ interface WorkflowRule {
   cronExpression: string | null
   timezone: string | null
   lastScheduledRun: string | null
+  executionMode: string | null
   actions: ActionDto[]
   createdAt: string
   updatedAt: string
@@ -111,6 +118,7 @@ interface WorkflowRuleFormData {
   triggerFields: string[]
   cronExpression: string
   timezone: string
+  executionMode: string
   actions: ActionFormData[]
 }
 
@@ -144,6 +152,7 @@ interface WorkflowActionLog {
   outputSnapshot: string | null
   durationMs: number | null
   executedAt: string
+  attemptNumber: number
 }
 
 export interface WorkflowRulesPageProps {
@@ -196,12 +205,16 @@ function WorkflowRuleForm({
     triggerFields: workflowRule?.triggerFields ?? [],
     cronExpression: workflowRule?.cronExpression ?? '',
     timezone: workflowRule?.timezone ?? '',
+    executionMode: workflowRule?.executionMode ?? 'SEQUENTIAL',
     actions:
       workflowRule?.actions?.map((a) => ({
         actionType: a.actionType,
         executionOrder: a.executionOrder,
         config: a.config ?? '{}',
         active: a.active,
+        retryCount: a.retryCount ?? 0,
+        retryDelaySeconds: a.retryDelaySeconds ?? 60,
+        retryBackoff: a.retryBackoff ?? 'FIXED',
       })) ?? [],
   })
   const [triggerFieldInput, setTriggerFieldInput] = useState('')
@@ -251,6 +264,9 @@ function WorkflowRuleForm({
           executionOrder: prev.actions.length,
           config: '{}',
           active: true,
+          retryCount: 0,
+          retryDelaySeconds: 60,
+          retryBackoff: 'FIXED',
         },
       ],
     }))
@@ -643,6 +659,35 @@ function WorkflowRuleForm({
 
             <div className="flex flex-col gap-2">
               <label
+                htmlFor="workflow-rule-execution-mode"
+                className="text-sm font-medium text-foreground"
+              >
+                Execution Mode
+              </label>
+              <select
+                id="workflow-rule-execution-mode"
+                className={cn(
+                  'rounded-md border border-border bg-background px-3 py-2.5 text-sm text-foreground transition-colors',
+                  'focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20',
+                  'disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground'
+                )}
+                value={formData.executionMode}
+                onChange={(e) => handleChange('executionMode', e.target.value)}
+                disabled={isSubmitting}
+                data-testid="workflow-rule-execution-mode-input"
+              >
+                <option value="SEQUENTIAL">Sequential</option>
+                <option value="PARALLEL">Parallel</option>
+              </select>
+              <p className="text-xs text-muted-foreground">
+                {formData.executionMode === 'PARALLEL'
+                  ? 'Actions run concurrently for better performance.'
+                  : 'Actions run one after another in order.'}
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label
                 htmlFor="workflow-rule-filter-formula"
                 className="text-sm font-medium text-foreground"
               >
@@ -873,6 +918,88 @@ function WorkflowRuleForm({
                             data-testid={`action-config-${index}`}
                           />
                         </div>
+                        {/* Retry Configuration */}
+                        <div className="flex gap-3">
+                          <div className="w-24">
+                            <label
+                              htmlFor={`action-retry-count-${index}`}
+                              className="mb-1 block text-xs font-medium text-muted-foreground"
+                            >
+                              Retries
+                            </label>
+                            <input
+                              id={`action-retry-count-${index}`}
+                              type="number"
+                              className={cn(
+                                'w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground transition-colors',
+                                'focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20'
+                              )}
+                              value={action.retryCount}
+                              onChange={(e) =>
+                                handleActionChange(
+                                  index,
+                                  'retryCount',
+                                  parseInt(e.target.value, 10) || 0
+                                )
+                              }
+                              min={0}
+                              max={10}
+                              disabled={isSubmitting}
+                              data-testid={`action-retry-count-${index}`}
+                            />
+                          </div>
+                          <div className="w-28">
+                            <label
+                              htmlFor={`action-retry-delay-${index}`}
+                              className="mb-1 block text-xs font-medium text-muted-foreground"
+                            >
+                              Delay (sec)
+                            </label>
+                            <input
+                              id={`action-retry-delay-${index}`}
+                              type="number"
+                              className={cn(
+                                'w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground transition-colors',
+                                'focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20'
+                              )}
+                              value={action.retryDelaySeconds}
+                              onChange={(e) =>
+                                handleActionChange(
+                                  index,
+                                  'retryDelaySeconds',
+                                  parseInt(e.target.value, 10) || 60
+                                )
+                              }
+                              min={1}
+                              disabled={isSubmitting || action.retryCount === 0}
+                              data-testid={`action-retry-delay-${index}`}
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <label
+                              htmlFor={`action-retry-backoff-${index}`}
+                              className="mb-1 block text-xs font-medium text-muted-foreground"
+                            >
+                              Backoff
+                            </label>
+                            <select
+                              id={`action-retry-backoff-${index}`}
+                              className={cn(
+                                'w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground transition-colors',
+                                'focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20'
+                              )}
+                              value={action.retryBackoff}
+                              onChange={(e) =>
+                                handleActionChange(index, 'retryBackoff', e.target.value)
+                              }
+                              disabled={isSubmitting || action.retryCount === 0}
+                              data-testid={`action-retry-backoff-${index}`}
+                            >
+                              <option value="FIXED">Fixed</option>
+                              <option value="EXPONENTIAL">Exponential</option>
+                            </select>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -998,6 +1125,9 @@ function ActionLogDetailModal({
                       Status
                     </th>
                     <th className="px-3 py-2 text-left text-xs font-semibold uppercase text-muted-foreground border-b whitespace-nowrap">
+                      Attempt
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold uppercase text-muted-foreground border-b whitespace-nowrap">
                       Duration
                     </th>
                     <th className="px-3 py-2 text-left text-xs font-semibold uppercase text-muted-foreground border-b whitespace-nowrap">
@@ -1035,6 +1165,15 @@ function ActionLogDetailModal({
                           </span>
                         </td>
                         <td className="px-3 py-2 border-b whitespace-nowrap text-muted-foreground">
+                          {log.attemptNumber > 1 ? (
+                            <span className="inline-block rounded bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                              #{log.attemptNumber}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">1</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 border-b whitespace-nowrap text-muted-foreground">
                           {log.durationMs != null ? `${log.durationMs}ms` : '-'}
                         </td>
                         <td className="px-3 py-2 border-b max-w-[200px] truncate text-muted-foreground">
@@ -1064,7 +1203,7 @@ function ActionLogDetailModal({
                       </tr>
                       {expandedRow === log.id && (
                         <tr>
-                          <td colSpan={6} className="border-b bg-muted/20 px-3 py-3">
+                          <td colSpan={7} className="border-b bg-muted/20 px-3 py-3">
                             <div className="flex flex-col gap-2">
                               {log.inputSnapshot && (
                                 <div>
@@ -1403,6 +1542,13 @@ export function WorkflowRulesPage({
                   scope="col"
                   className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
                 >
+                  Mode
+                </th>
+                <th
+                  role="columnheader"
+                  scope="col"
+                  className="border-b border-border px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
                   Error Handling
                 </th>
                 <th
@@ -1482,6 +1628,18 @@ export function WorkflowRulesPage({
                           </span>
                         ))}
                     </div>
+                  </td>
+                  <td role="gridcell" className="px-4 py-3 text-sm text-foreground">
+                    <span
+                      className={cn(
+                        'inline-block rounded-full px-2.5 py-0.5 text-xs font-medium',
+                        workflowRule.executionMode === 'PARALLEL'
+                          ? 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300'
+                          : 'bg-muted text-muted-foreground'
+                      )}
+                    >
+                      {workflowRule.executionMode === 'PARALLEL' ? 'Parallel' : 'Sequential'}
+                    </span>
                   </td>
                   <td role="gridcell" className="px-4 py-3 text-sm text-foreground">
                     <span

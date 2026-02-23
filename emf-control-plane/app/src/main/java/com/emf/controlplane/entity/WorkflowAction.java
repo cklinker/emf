@@ -25,6 +25,15 @@ public class WorkflowAction extends BaseEntity {
     @Column(name = "active")
     private boolean active = true;
 
+    @Column(name = "retry_count")
+    private int retryCount = 0;
+
+    @Column(name = "retry_delay_seconds")
+    private int retryDelaySeconds = 60;
+
+    @Column(name = "retry_backoff", length = 20)
+    private String retryBackoff = "FIXED";
+
     public WorkflowAction() { super(); }
 
     public WorkflowRule getWorkflowRule() { return workflowRule; }
@@ -37,4 +46,10 @@ public class WorkflowAction extends BaseEntity {
     public void setConfig(String config) { this.config = config; }
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }
+    public int getRetryCount() { return retryCount; }
+    public void setRetryCount(int retryCount) { this.retryCount = retryCount; }
+    public int getRetryDelaySeconds() { return retryDelaySeconds; }
+    public void setRetryDelaySeconds(int retryDelaySeconds) { this.retryDelaySeconds = retryDelaySeconds; }
+    public String getRetryBackoff() { return retryBackoff; }
+    public void setRetryBackoff(String retryBackoff) { this.retryBackoff = retryBackoff; }
 }

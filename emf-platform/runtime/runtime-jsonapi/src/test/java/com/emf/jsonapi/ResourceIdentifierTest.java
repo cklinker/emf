@@ -1,4 +1,4 @@
-package com.emf.gateway.jsonapi;
+package com.emf.jsonapi;
 
 import org.junit.jupiter.api.Test;
 
@@ -9,7 +9,7 @@ class ResourceIdentifierTest {
     @Test
     void shouldCreateResourceIdentifierWithTypeAndId() {
         ResourceIdentifier identifier = new ResourceIdentifier("users", "123");
-        
+
         assertEquals("users", identifier.getType());
         assertEquals("123", identifier.getId());
     }
@@ -17,7 +17,7 @@ class ResourceIdentifierTest {
     @Test
     void shouldSupportDefaultConstructor() {
         ResourceIdentifier identifier = new ResourceIdentifier();
-        
+
         assertNull(identifier.getType());
         assertNull(identifier.getId());
     }
@@ -27,7 +27,7 @@ class ResourceIdentifierTest {
         ResourceIdentifier identifier = new ResourceIdentifier();
         identifier.setType("posts");
         identifier.setId("456");
-        
+
         assertEquals("posts", identifier.getType());
         assertEquals("456", identifier.getId());
     }
@@ -38,7 +38,7 @@ class ResourceIdentifierTest {
         ResourceIdentifier id2 = new ResourceIdentifier("users", "123");
         ResourceIdentifier id3 = new ResourceIdentifier("users", "456");
         ResourceIdentifier id4 = new ResourceIdentifier("posts", "123");
-        
+
         assertEquals(id1, id2);
         assertNotEquals(id1, id3);
         assertNotEquals(id1, id4);
@@ -50,7 +50,7 @@ class ResourceIdentifierTest {
     void shouldImplementHashCodeCorrectly() {
         ResourceIdentifier id1 = new ResourceIdentifier("users", "123");
         ResourceIdentifier id2 = new ResourceIdentifier("users", "123");
-        
+
         assertEquals(id1.hashCode(), id2.hashCode());
     }
 
@@ -58,7 +58,7 @@ class ResourceIdentifierTest {
     void shouldHandleNullInEquals() {
         ResourceIdentifier id1 = new ResourceIdentifier(null, null);
         ResourceIdentifier id2 = new ResourceIdentifier(null, null);
-        
+
         // Should not throw exception
         assertNotEquals(id1, id2);
     }
@@ -67,7 +67,7 @@ class ResourceIdentifierTest {
     void shouldProvideToString() {
         ResourceIdentifier identifier = new ResourceIdentifier("users", "123");
         String str = identifier.toString();
-        
+
         assertTrue(str.contains("users"));
         assertTrue(str.contains("123"));
     }

@@ -1,4 +1,4 @@
-package com.emf.gateway.jsonapi;
+package com.emf.jsonapi;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -28,7 +28,7 @@ public class JsonApiParser {
 
     /**
      * Parse a JSON:API response body into a JsonApiDocument.
-     * 
+     *
      * @param responseBody the JSON:API formatted string
      * @return JsonApiDocument containing the parsed data
      * @throws JsonApiParseException if the response body cannot be parsed
@@ -184,7 +184,7 @@ public class JsonApiParser {
         // Parse data (can be single ResourceIdentifier, array, or null)
         if (relationshipNode.has("data")) {
             JsonNode dataNode = relationshipNode.get("data");
-            
+
             if (dataNode.isNull()) {
                 relationship.setData(null);
             } else if (dataNode.isArray()) {
@@ -205,7 +205,7 @@ public class JsonApiParser {
         // Parse links
         if (relationshipNode.has("links")) {
             Map<String, String> links = objectMapper.convertValue(
-                relationshipNode.get("links"), 
+                relationshipNode.get("links"),
                 new TypeReference<Map<String, String>>() {}
             );
             relationship.setLinks(links);
@@ -219,14 +219,14 @@ public class JsonApiParser {
      */
     private ResourceIdentifier parseResourceIdentifier(JsonNode idNode) {
         ResourceIdentifier identifier = new ResourceIdentifier();
-        
+
         if (idNode.has("type")) {
             identifier.setType(idNode.get("type").asText());
         }
         if (idNode.has("id")) {
             identifier.setId(idNode.get("id").asText());
         }
-        
+
         return identifier;
     }
 
@@ -295,7 +295,7 @@ public class JsonApiParser {
     /**
      * Static method to parse a JSON string into a ResourceObject.
      * Used by IncludeResolver to deserialize cached resources from Redis.
-     * 
+     *
      * @param json JSON string representation of a resource object
      * @return ResourceObject parsed from the JSON
      * @throws JsonApiParseException if parsing fails
@@ -308,7 +308,7 @@ public class JsonApiParser {
         try {
             ObjectMapper mapper = new ObjectMapper();
             JsonNode resourceNode = mapper.readTree(json);
-            
+
             ResourceObject resource = new ResourceObject();
 
             // Parse type and id (required fields)
@@ -322,7 +322,7 @@ public class JsonApiParser {
             // Parse attributes
             if (resourceNode.has("attributes")) {
                 Map<String, Object> attributes = mapper.convertValue(
-                    resourceNode.get("attributes"), 
+                    resourceNode.get("attributes"),
                     new TypeReference<Map<String, Object>>() {}
                 );
                 resource.setAttributes(attributes);
@@ -371,7 +371,7 @@ public class JsonApiParser {
         // Parse data (can be single ResourceIdentifier, array, or null)
         if (relationshipNode.has("data")) {
             JsonNode dataNode = relationshipNode.get("data");
-            
+
             if (dataNode.isNull()) {
                 relationship.setData(null);
             } else if (dataNode.isArray()) {
@@ -392,7 +392,7 @@ public class JsonApiParser {
         // Parse links
         if (relationshipNode.has("links")) {
             Map<String, String> links = mapper.convertValue(
-                relationshipNode.get("links"), 
+                relationshipNode.get("links"),
                 new TypeReference<Map<String, String>>() {}
             );
             relationship.setLinks(links);
@@ -406,14 +406,14 @@ public class JsonApiParser {
      */
     private static ResourceIdentifier parseResourceIdentifierStatic(JsonNode idNode) {
         ResourceIdentifier identifier = new ResourceIdentifier();
-        
+
         if (idNode.has("type")) {
             identifier.setType(idNode.get("type").asText());
         }
         if (idNode.has("id")) {
             identifier.setId(idNode.get("id").asText());
         }
-        
+
         return identifier;
     }
 
@@ -429,11 +429,11 @@ public class JsonApiParser {
             super(message, cause);
         }
     }
-    
+
     /**
      * Serializes a ResourceObject to JSON string.
      * Used by IncludeResolver to cache resources in Redis.
-     * 
+     *
      * @param resource The ResourceObject to serialize
      * @return JSON string representation of the resource
      * @throws JsonApiParseException if serialization fails

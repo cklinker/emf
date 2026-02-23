@@ -1,9 +1,9 @@
 package com.emf.gateway.integration;
 
 import com.emf.gateway.jsonapi.IncludeResolver;
-import com.emf.gateway.jsonapi.Relationship;
-import com.emf.gateway.jsonapi.ResourceIdentifier;
-import com.emf.gateway.jsonapi.ResourceObject;
+import com.emf.jsonapi.Relationship;
+import com.emf.jsonapi.ResourceIdentifier;
+import com.emf.jsonapi.ResourceObject;
 import com.emf.gateway.route.RateLimitConfig;
 import com.emf.gateway.ratelimit.RateLimitResult;
 import com.emf.gateway.ratelimit.RedisRateLimiter;

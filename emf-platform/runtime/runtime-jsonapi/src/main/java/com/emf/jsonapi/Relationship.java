@@ -1,4 +1,4 @@
-package com.emf.gateway.jsonapi;
+package com.emf.jsonapi;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;

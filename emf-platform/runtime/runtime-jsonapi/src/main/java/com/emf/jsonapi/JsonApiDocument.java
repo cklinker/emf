@@ -1,4 +1,4 @@
-package com.emf.gateway.jsonapi;
+package com.emf.jsonapi;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -18,7 +18,7 @@ public class JsonApiDocument {
     private List<ResourceObject> included;
     private Map<String, Object> meta;
     private List<JsonApiError> errors;
-    
+
     // Track whether the original data was a single resource (not an array)
     // This is needed for correct serialization
     @JsonIgnore
@@ -123,14 +123,14 @@ public class JsonApiDocument {
     public boolean hasIncluded() {
         return included != null && !included.isEmpty();
     }
-    
+
     /**
      * Check if the original data was a single resource (not an array).
      */
     public boolean isSingleResource() {
         return singleResource;
     }
-    
+
     /**
      * Set whether the original data was a single resource.
      */

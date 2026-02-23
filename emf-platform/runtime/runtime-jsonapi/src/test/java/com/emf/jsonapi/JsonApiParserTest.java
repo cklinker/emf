@@ -1,4 +1,4 @@
-package com.emf.gateway.jsonapi;
+package com.emf.jsonapi;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -45,7 +45,7 @@ class JsonApiParserTest {
         assertNotNull(document);
         assertTrue(document.hasData());
         assertEquals(1, document.getData().size());
-        
+
         ResourceObject user = document.getData().get(0);
         assertEquals("users", user.getType());
         assertEquals("123", user.getId());
@@ -81,11 +81,11 @@ class JsonApiParserTest {
         assertNotNull(document);
         assertTrue(document.hasData());
         assertEquals(2, document.getData().size());
-        
+
         assertEquals("users", document.getData().get(0).getType());
         assertEquals("1", document.getData().get(0).getId());
         assertEquals("Alice", document.getData().get(0).getAttributes().get("name"));
-        
+
         assertEquals("users", document.getData().get(1).getType());
         assertEquals("2", document.getData().get(1).getId());
         assertEquals("Bob", document.getData().get(1).getAttributes().get("name"));
@@ -117,13 +117,13 @@ class JsonApiParserTest {
 
         assertNotNull(document);
         ResourceObject post = document.getData().get(0);
-        
+
         assertNotNull(post.getRelationships());
         assertTrue(post.getRelationships().containsKey("author"));
-        
+
         Relationship authorRel = post.getRelationships().get("author");
         assertTrue(authorRel.isSingleResource());
-        
+
         ResourceIdentifier author = authorRel.getDataAsSingle();
         assertEquals("users", author.getType());
         assertEquals("123", author.getId());
@@ -161,10 +161,10 @@ class JsonApiParserTest {
 
         assertNotNull(document);
         ResourceObject post = document.getData().get(0);
-        
+
         Relationship commentsRel = post.getRelationships().get("comments");
         assertTrue(commentsRel.isResourceCollection());
-        
+
         List<ResourceIdentifier> comments = commentsRel.getDataAsCollection();
         assertEquals(2, comments.size());
         assertEquals("comments", comments.get(0).getType());
@@ -210,7 +210,7 @@ class JsonApiParserTest {
         assertNotNull(document);
         assertTrue(document.hasData());
         assertTrue(document.hasIncluded());
-        
+
         assertEquals(1, document.getIncluded().size());
         ResourceObject author = document.getIncluded().get(0);
         assertEquals("users", author.getType());
@@ -261,7 +261,7 @@ class JsonApiParserTest {
         assertNotNull(document);
         assertTrue(document.hasErrors());
         assertEquals(1, document.getErrors().size());
-        
+
         JsonApiError error = document.getErrors().get(0);
         assertEquals("400", error.getStatus());
         assertEquals("BAD_REQUEST", error.getCode());
@@ -301,12 +301,12 @@ class JsonApiParserTest {
         assertNotNull(document);
         assertTrue(document.hasErrors());
         assertEquals(2, document.getErrors().size());
-        
+
         JsonApiError error1 = document.getErrors().get(0);
         assertEquals("Name is required", error1.getDetail());
         assertNotNull(error1.getSource());
         assertEquals("/data/attributes/name", error1.getSource().get("pointer"));
-        
+
         JsonApiError error2 = document.getErrors().get(1);
         assertEquals("Email is invalid", error2.getDetail());
         assertEquals("/data/attributes/email", error2.getSource().get("pointer"));
@@ -413,7 +413,7 @@ class JsonApiParserTest {
         assertNotNull(document);
         ResourceObject post = document.getData().get(0);
         Relationship authorRel = post.getRelationships().get("author");
-        
+
         assertNotNull(authorRel.getLinks());
         assertEquals("/posts/1/relationships/author", authorRel.getLinks().get("self"));
         assertEquals("/posts/1/author", authorRel.getLinks().get("related"));
@@ -440,7 +440,7 @@ class JsonApiParserTest {
         assertNotNull(document);
         ResourceObject post = document.getData().get(0);
         Relationship authorRel = post.getRelationships().get("author");
-        
+
         assertNotNull(authorRel);
         assertNull(authorRel.getData());
     }
@@ -471,16 +471,16 @@ class JsonApiParserTest {
 
         assertNotNull(document);
         ResourceObject user = document.getData().get(0);
-        
+
         assertEquals("John Doe", user.getAttributes().get("name"));
         assertEquals(30, user.getAttributes().get("age"));
         assertEquals(true, user.getAttributes().get("active"));
-        
+
         @SuppressWarnings("unchecked")
         Map<String, Object> address = (Map<String, Object>) user.getAttributes().get("address");
         assertEquals("123 Main St", address.get("street"));
         assertEquals("Springfield", address.get("city"));
-        
+
         @SuppressWarnings("unchecked")
         List<String> tags = (List<String>) user.getAttributes().get("tags");
         assertEquals(3, tags.size());
@@ -504,7 +504,7 @@ class JsonApiParserTest {
     @Test
     void shouldThrowExceptionForInvalidJson() {
         String invalidJson = "{ this is not valid json }";
-        
+
         assertThrows(JsonApiParser.JsonApiParseException.class, () -> {
             parser.parse(invalidJson);
         });
@@ -513,7 +513,7 @@ class JsonApiParserTest {
     @Test
     void shouldThrowExceptionForMalformedJson() {
         String malformedJson = "{ \"data\": { \"type\": \"users\" ";
-        
+
         assertThrows(JsonApiParser.JsonApiParseException.class, () -> {
             parser.parse(malformedJson);
         });
@@ -546,7 +546,7 @@ class JsonApiParserTest {
 
         assertNotNull(document);
         assertTrue(document.hasErrors());
-        
+
         JsonApiError error = document.getErrors().get(0);
         assertEquals("error-123", error.getId());
         assertEquals("422", error.getStatus());
@@ -598,17 +598,17 @@ class JsonApiParserTest {
         assertNotNull(document);
         assertTrue(document.hasData());
         assertTrue(document.hasIncluded());
-        
+
         ResourceObject article = document.getData().get(0);
         assertEquals("articles", article.getType());
         assertEquals("1", article.getId());
         assertEquals("JSON:API paints my bikeshed!", article.getAttributes().get("title"));
-        
+
         Relationship authorRel = article.getRelationships().get("author");
         ResourceIdentifier authorId = authorRel.getDataAsSingle();
         assertEquals("people", authorId.getType());
         assertEquals("42", authorId.getId());
-        
+
         ResourceObject author = document.getIncluded().get(0);
         assertEquals("people", author.getType());
         assertEquals("42", author.getId());

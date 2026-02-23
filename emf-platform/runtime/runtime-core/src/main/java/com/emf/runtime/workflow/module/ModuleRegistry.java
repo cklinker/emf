@@ -15,10 +15,14 @@ import java.util.*;
  * <p>On initialization, the registry:
  * <ol>
  *   <li>Collects all discovered EmfModule beans</li>
+ *   <li>Calls {@link EmfModule#onStartup(ModuleContext)} on each module (allows lazy handler construction)</li>
  *   <li>Registers each module's action handlers with the {@link ActionHandlerRegistry}</li>
  *   <li>Registers each module's before-save hooks with the {@link BeforeSaveHookRegistry}</li>
- *   <li>Calls {@link EmfModule#onStartup(ModuleContext)} on each module</li>
  * </ol>
+ *
+ * <p><strong>Important:</strong> {@code onStartup()} is called <em>before</em> handler/hook registration.
+ * This allows modules to construct handlers lazily in {@code onStartup()} using services from
+ * {@link ModuleContext} (e.g., FormulaEvaluator, CollectionRegistry).
  *
  * @since 1.0.0
  */
@@ -43,7 +47,14 @@ public class ModuleRegistry {
     }
 
     /**
-     * Initializes all modules: registers their handlers/hooks and calls onStartup.
+     * Initializes all modules: calls onStartup first, then registers their handlers/hooks.
+     *
+     * <p>The initialization order is:
+     * <ol>
+     *   <li>Add all modules to the internal map</li>
+     *   <li>Call {@code onStartup(context)} on each module (allows lazy handler construction)</li>
+     *   <li>Register action handlers and before-save hooks from each module</li>
+     * </ol>
      *
      * @param discoveredModules the list of modules discovered by Spring
      * @param context the module context for startup callbacks
@@ -51,11 +62,17 @@ public class ModuleRegistry {
     public void initialize(List<EmfModule> discoveredModules, ModuleContext context) {
         log.info("Initializing ModuleRegistry with {} discovered modules", discoveredModules.size());
 
+        // Phase 1: Add all modules to the map (handles duplicates)
         for (EmfModule module : discoveredModules) {
-            registerModule(module);
+            String id = module.getId();
+            if (modules.containsKey(id)) {
+                log.warn("Duplicate module ID '{}': {} replaced by {}",
+                    id, modules.get(id).getName(), module.getName());
+            }
+            modules.put(id, module);
         }
 
-        // Call onStartup after all modules are registered
+        // Phase 2: Call onStartup on each module (allows lazy handler construction)
         for (EmfModule module : modules.values()) {
             try {
                 module.onStartup(context);
@@ -65,12 +82,21 @@ public class ModuleRegistry {
             }
         }
 
+        // Phase 3: Register action handlers and before-save hooks
+        for (EmfModule module : modules.values()) {
+            registerHandlersAndHooks(module);
+        }
+
         log.info("ModuleRegistry initialized: {} modules, {} action handlers, {} before-save hooks",
             modules.size(), actionHandlerRegistry.size(), beforeSaveHookRegistry.getHookCount());
     }
 
     /**
      * Registers a single module, adding its handlers and hooks to the registries.
+     *
+     * <p>Note: When using {@link #initialize(List, ModuleContext)}, prefer that method
+     * since it calls {@code onStartup()} before registering handlers. This method is
+     * useful for registering modules that have pre-built handlers.
      *
      * @param module the module to register
      */
@@ -81,20 +107,7 @@ public class ModuleRegistry {
                 id, modules.get(id).getName(), module.getName());
         }
         modules.put(id, module);
-
-        // Register action handlers
-        for (ActionHandler handler : module.getActionHandlers()) {
-            actionHandlerRegistry.register(handler);
-        }
-
-        // Register before-save hooks
-        for (BeforeSaveHook hook : module.getBeforeSaveHooks()) {
-            beforeSaveHookRegistry.register(hook);
-        }
-
-        log.info("Registered module '{}' v{} with {} action handlers and {} before-save hooks",
-            module.getName(), module.getVersion(),
-            module.getActionHandlers().size(), module.getBeforeSaveHooks().size());
+        registerHandlersAndHooks(module);
     }
 
     /**
@@ -121,5 +134,21 @@ public class ModuleRegistry {
      */
     public int size() {
         return modules.size();
+    }
+
+    private void registerHandlersAndHooks(EmfModule module) {
+        // Register action handlers
+        for (ActionHandler handler : module.getActionHandlers()) {
+            actionHandlerRegistry.register(handler);
+        }
+
+        // Register before-save hooks
+        for (BeforeSaveHook hook : module.getBeforeSaveHooks()) {
+            beforeSaveHookRegistry.register(hook);
+        }
+
+        log.info("Registered module '{}' v{} with {} action handlers and {} before-save hooks",
+            module.getName(), module.getVersion(),
+            module.getActionHandlers().size(), module.getBeforeSaveHooks().size());
     }
 }

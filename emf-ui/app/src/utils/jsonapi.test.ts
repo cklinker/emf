@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { flattenResource, unwrapResource, unwrapCollection, wrapResource } from './jsonapi'
+import {
+  flattenResource,
+  unwrapResource,
+  unwrapCollection,
+  wrapResource,
+  extractIncluded,
+  buildIncludedDisplayMap,
+} from './jsonapi'
 
 describe('jsonapi utilities', () => {
   describe('flattenResource', () => {
@@ -294,6 +301,196 @@ describe('jsonapi utilities', () => {
         page: 1,
         pageSize: 20,
       })
+    })
+  })
+
+  describe('extractIncluded', () => {
+    const responseWithIncludes = {
+      data: {
+        id: 'u1',
+        type: 'users',
+        attributes: { name: 'Alice', email: 'alice@example.com' },
+        relationships: {
+          profile: { data: { id: 'p1', type: 'profiles' } },
+          manager: { data: { id: 'u2', type: 'users' } },
+        },
+      },
+      included: [
+        {
+          id: 'p1',
+          type: 'profiles',
+          attributes: { name: 'Admin', description: 'Administrator profile' },
+        },
+        {
+          id: 'p2',
+          type: 'profiles',
+          attributes: { name: 'User', description: 'Standard user profile' },
+        },
+        {
+          id: 'u2',
+          type: 'users',
+          attributes: { name: 'Bob', email: 'bob@example.com' },
+        },
+      ],
+    }
+
+    it('should extract included resources by type', () => {
+      const profiles = extractIncluded(responseWithIncludes, 'profiles')
+
+      expect(profiles).toEqual([
+        { id: 'p1', name: 'Admin', description: 'Administrator profile' },
+        { id: 'p2', name: 'User', description: 'Standard user profile' },
+      ])
+    })
+
+    it('should extract a different type from the same response', () => {
+      const users = extractIncluded(responseWithIncludes, 'users')
+
+      expect(users).toEqual([{ id: 'u2', name: 'Bob', email: 'bob@example.com' }])
+    })
+
+    it('should return empty array when type not found in includes', () => {
+      const result = extractIncluded(responseWithIncludes, 'categories')
+
+      expect(result).toEqual([])
+    })
+
+    it('should return empty array when response has no included', () => {
+      const response = {
+        data: { id: 'u1', type: 'users', attributes: { name: 'Alice' } },
+      }
+
+      const result = extractIncluded(response, 'profiles')
+
+      expect(result).toEqual([])
+    })
+
+    it('should return empty array for null/undefined response', () => {
+      expect(extractIncluded(null, 'profiles')).toEqual([])
+      expect(extractIncluded(undefined, 'profiles')).toEqual([])
+    })
+
+    it('should flatten relationships in included resources', () => {
+      const response = {
+        data: { id: 'u1', type: 'users', attributes: { name: 'Alice' } },
+        included: [
+          {
+            id: 'p1',
+            type: 'profiles',
+            attributes: { name: 'Admin' },
+            relationships: {
+              owner: { data: { id: 'u1', type: 'users' } },
+            },
+          },
+        ],
+      }
+
+      const profiles = extractIncluded(response, 'profiles')
+
+      expect(profiles).toEqual([
+        {
+          id: 'p1',
+          name: 'Admin',
+          owner: 'u1',
+          _rel_owner: { id: 'u1', type: 'users' },
+        },
+      ])
+    })
+  })
+
+  describe('buildIncludedDisplayMap', () => {
+    const responseWithIncludes = {
+      data: [
+        {
+          id: 'u1',
+          type: 'users',
+          attributes: { name: 'Alice', profileId: 'p1' },
+          relationships: {
+            profile: { data: { id: 'p1', type: 'profiles' } },
+          },
+        },
+      ],
+      included: [
+        {
+          id: 'p1',
+          type: 'profiles',
+          attributes: { name: 'Admin', code: 'ADM' },
+        },
+        {
+          id: 'p2',
+          type: 'profiles',
+          attributes: { name: 'User', code: 'USR' },
+        },
+        {
+          id: 'u2',
+          type: 'users',
+          attributes: { firstName: 'Bob', lastName: 'Smith' },
+        },
+      ],
+    }
+
+    it('should build a display map from a single field', () => {
+      const map = buildIncludedDisplayMap(responseWithIncludes, 'profiles', 'name')
+
+      expect(map).toEqual({
+        p1: 'Admin',
+        p2: 'User',
+      })
+    })
+
+    it('should build a composite display map from multiple fields', () => {
+      const map = buildIncludedDisplayMap(responseWithIncludes, 'profiles', ['name', 'code'])
+
+      expect(map).toEqual({
+        p1: 'Admin (ADM)',
+        p2: 'User (USR)',
+      })
+    })
+
+    it('should fall back to id when display field is missing', () => {
+      const response = {
+        data: [],
+        included: [
+          {
+            id: 'p1',
+            type: 'profiles',
+            attributes: {},
+          },
+        ],
+      }
+
+      const map = buildIncludedDisplayMap(response, 'profiles', 'name')
+
+      expect(map).toEqual({ p1: 'p1' })
+    })
+
+    it('should return empty map when no included resources of type', () => {
+      const map = buildIncludedDisplayMap(responseWithIncludes, 'categories', 'name')
+
+      expect(map).toEqual({})
+    })
+
+    it('should return empty map for null response', () => {
+      const map = buildIncludedDisplayMap(null, 'profiles', 'name')
+
+      expect(map).toEqual({})
+    })
+
+    it('should handle composite fields where some are missing', () => {
+      const response = {
+        data: [],
+        included: [
+          {
+            id: 'u1',
+            type: 'users',
+            attributes: { firstName: 'Alice' },
+          },
+        ],
+      }
+
+      const map = buildIncludedDisplayMap(response, 'users', ['firstName', 'lastName'])
+
+      expect(map).toEqual({ u1: 'Alice' })
     })
   })
 })

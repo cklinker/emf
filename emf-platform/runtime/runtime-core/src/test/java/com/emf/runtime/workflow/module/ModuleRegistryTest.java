@@ -5,8 +5,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -86,6 +88,85 @@ class ModuleRegistryTest {
     }
 
     @Test
+    @DisplayName("Should call onStartup BEFORE registering handlers (lazy init support)")
+    void shouldCallOnStartupBeforeRegisteringHandlers() {
+        // This test verifies that modules can construct handlers lazily in onStartup()
+        // using services from ModuleContext, and those handlers will be registered afterward.
+        List<ActionHandler> lazyHandlers = new ArrayList<>();
+
+        EmfModule lazyModule = new EmfModule() {
+            @Override public String getId() { return "lazy-mod"; }
+            @Override public String getName() { return "Lazy Module"; }
+            @Override public String getVersion() { return "1.0"; }
+
+            @Override public List<ActionHandler> getActionHandlers() {
+                return lazyHandlers;
+            }
+
+            @Override public void onStartup(ModuleContext context) {
+                // Construct handlers lazily during onStartup, using context services
+                assertNotNull(context, "Context should be provided to onStartup");
+                lazyHandlers.add(stubActionHandler("LAZY_ACTION"));
+            }
+        };
+
+        ModuleContext context = new ModuleContext(null, null, null, null);
+        moduleRegistry.initialize(List.of(lazyModule), context);
+
+        assertEquals(1, moduleRegistry.size());
+        assertTrue(actionHandlerRegistry.hasHandler("LAZY_ACTION"),
+            "Handler constructed in onStartup() should be registered");
+    }
+
+    @Test
+    @DisplayName("Should call onStartup BEFORE registering hooks (lazy init support)")
+    void shouldCallOnStartupBeforeRegisteringHooks() {
+        List<BeforeSaveHook> lazyHooks = new ArrayList<>();
+
+        EmfModule lazyModule = new EmfModule() {
+            @Override public String getId() { return "lazy-hook-mod"; }
+            @Override public String getName() { return "Lazy Hook Module"; }
+            @Override public String getVersion() { return "1.0"; }
+
+            @Override public List<BeforeSaveHook> getBeforeSaveHooks() {
+                return lazyHooks;
+            }
+
+            @Override public void onStartup(ModuleContext context) {
+                lazyHooks.add(stubBeforeSaveHook("tenants", 10));
+            }
+        };
+
+        ModuleContext context = new ModuleContext(null, null, null, null);
+        moduleRegistry.initialize(List.of(lazyModule), context);
+
+        assertTrue(beforeSaveHookRegistry.hasHooks("tenants"),
+            "Hook constructed in onStartup() should be registered");
+    }
+
+    @Test
+    @DisplayName("Should pass context with actionHandlerRegistry to onStartup")
+    void shouldPassContextWithActionHandlerRegistryToOnStartup() {
+        AtomicReference<ModuleContext> capturedContext = new AtomicReference<>();
+
+        EmfModule module = new EmfModule() {
+            @Override public String getId() { return "ctx-mod"; }
+            @Override public String getName() { return "Context Module"; }
+            @Override public String getVersion() { return "1.0"; }
+            @Override public void onStartup(ModuleContext context) {
+                capturedContext.set(context);
+            }
+        };
+
+        ActionHandlerRegistry registry = new ActionHandlerRegistry();
+        ModuleContext context = new ModuleContext(null, null, null, null, registry, null);
+        moduleRegistry.initialize(List.of(module), context);
+
+        assertNotNull(capturedContext.get());
+        assertSame(registry, capturedContext.get().actionHandlerRegistry());
+    }
+
+    @Test
     @DisplayName("Should handle onStartup exceptions gracefully")
     void shouldHandleStartupExceptions() {
         EmfModule failingModule = new EmfModule() {
@@ -102,6 +183,28 @@ class ModuleRegistryTest {
         // Should not throw even though onStartup throws
         assertDoesNotThrow(() -> moduleRegistry.initialize(List.of(failingModule), context));
         assertEquals(1, moduleRegistry.size());
+    }
+
+    @Test
+    @DisplayName("Should still register handlers from failing module")
+    void shouldStillRegisterHandlersFromFailingModule() {
+        EmfModule failingModule = new EmfModule() {
+            @Override public String getId() { return "failing-with-handlers"; }
+            @Override public String getName() { return "Failing Module"; }
+            @Override public String getVersion() { return "0.1"; }
+            @Override public List<ActionHandler> getActionHandlers() {
+                return List.of(stubActionHandler("FAIL_ACTION"));
+            }
+            @Override public void onStartup(ModuleContext context) {
+                throw new RuntimeException("Startup failure");
+            }
+        };
+
+        ModuleContext context = new ModuleContext(null, null, null, null);
+        moduleRegistry.initialize(List.of(failingModule), context);
+
+        // Even though onStartup failed, the module's pre-built handlers should still be registered
+        assertTrue(actionHandlerRegistry.hasHandler("FAIL_ACTION"));
     }
 
     @Test

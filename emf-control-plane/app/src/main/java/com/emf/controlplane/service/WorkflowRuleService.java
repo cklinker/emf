@@ -2,12 +2,14 @@ package com.emf.controlplane.service;
 
 import com.emf.controlplane.audit.SetupAudited;
 import com.emf.controlplane.dto.CreateWorkflowRuleRequest;
+import com.emf.controlplane.dto.WorkflowActionLogDto;
 import com.emf.controlplane.dto.WorkflowRuleDto;
 import com.emf.controlplane.entity.Collection;
 import com.emf.controlplane.entity.WorkflowAction;
 import com.emf.controlplane.entity.WorkflowExecutionLog;
 import com.emf.controlplane.entity.WorkflowRule;
 import com.emf.controlplane.exception.ResourceNotFoundException;
+import com.emf.controlplane.repository.WorkflowActionLogRepository;
 import com.emf.controlplane.repository.WorkflowExecutionLogRepository;
 import com.emf.controlplane.repository.WorkflowRuleRepository;
 import org.slf4j.Logger;
@@ -24,13 +26,16 @@ public class WorkflowRuleService {
 
     private final WorkflowRuleRepository ruleRepository;
     private final WorkflowExecutionLogRepository logRepository;
+    private final WorkflowActionLogRepository actionLogRepository;
     private final CollectionService collectionService;
 
     public WorkflowRuleService(WorkflowRuleRepository ruleRepository,
                                WorkflowExecutionLogRepository logRepository,
+                               WorkflowActionLogRepository actionLogRepository,
                                CollectionService collectionService) {
         this.ruleRepository = ruleRepository;
         this.logRepository = logRepository;
+        this.actionLogRepository = actionLogRepository;
         this.collectionService = collectionService;
     }
 
@@ -140,5 +145,13 @@ public class WorkflowRuleService {
     @Transactional(readOnly = true)
     public List<WorkflowExecutionLog> listExecutionLogsByRule(String ruleId) {
         return logRepository.findByWorkflowRuleIdOrderByExecutedAtDesc(ruleId);
+    }
+
+    // --- Action Logs ---
+
+    @Transactional(readOnly = true)
+    public List<WorkflowActionLogDto> listActionLogsByExecution(String executionLogId) {
+        return actionLogRepository.findByExecutionLogIdOrderByExecutedAtAsc(executionLogId)
+                .stream().map(WorkflowActionLogDto::fromEntity).toList();
     }
 }

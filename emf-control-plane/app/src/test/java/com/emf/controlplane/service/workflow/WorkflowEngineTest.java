@@ -2,6 +2,7 @@ package com.emf.controlplane.service.workflow;
 
 import com.emf.controlplane.entity.Collection;
 import com.emf.controlplane.entity.WorkflowAction;
+import com.emf.controlplane.entity.WorkflowActionLog;
 import com.emf.controlplane.entity.WorkflowExecutionLog;
 import com.emf.runtime.event.ChangeType;
 import com.emf.controlplane.entity.WorkflowRule;
@@ -11,10 +12,12 @@ import com.emf.controlplane.repository.WorkflowRuleRepository;
 import com.emf.controlplane.service.CollectionService;
 import com.emf.runtime.event.RecordChangeEvent;
 import com.emf.runtime.formula.FormulaEvaluator;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.util.List;
 import java.util.Map;
@@ -46,7 +49,8 @@ class WorkflowEngineTest {
         collectionService = mock(CollectionService.class);
 
         engine = new WorkflowEngine(ruleRepository, executionLogRepository,
-            actionLogRepository, handlerRegistry, formulaEvaluator, collectionService);
+            actionLogRepository, handlerRegistry, formulaEvaluator, collectionService,
+            new ObjectMapper());
 
         testCollection = new Collection();
         testCollection.setId("col-1");
@@ -357,6 +361,107 @@ class WorkflowEngineTest {
 
             // Should not throw
             assertDoesNotThrow(() -> engine.evaluate(createEvent()));
+        }
+    }
+
+    @Nested
+    @DisplayName("Enhanced Action Logging")
+    class ActionLoggingTests {
+
+        @Test
+        @DisplayName("Should capture input snapshot with action config and record info")
+        void shouldCaptureInputSnapshot() {
+            WorkflowRule rule = createRule("Logging Rule", "ON_CREATE");
+            WorkflowAction action = createAction(rule, "FIELD_UPDATE", 0);
+            action.setConfig("{\"updates\":[{\"field\":\"status\",\"value\":\"Done\"}]}");
+
+            stubRules("ON_CREATE", List.of(rule));
+            stubNoMatchingRules("ON_CREATE_OR_UPDATE");
+
+            ActionHandler fieldUpdateHandler = mockHandler("FIELD_UPDATE", ActionResult.success());
+            when(handlerRegistry.getHandler("FIELD_UPDATE")).thenReturn(Optional.of(fieldUpdateHandler));
+
+            engine.evaluate(createEvent());
+
+            ArgumentCaptor<WorkflowActionLog> captor = ArgumentCaptor.forClass(WorkflowActionLog.class);
+            verify(actionLogRepository).save(captor.capture());
+            WorkflowActionLog savedLog = captor.getValue();
+
+            assertEquals("SUCCESS", savedLog.getStatus());
+            assertEquals("FIELD_UPDATE", savedLog.getActionType());
+            assertNotNull(savedLog.getInputSnapshot());
+            // Input snapshot should contain action config, record ID, and collection name
+            assertTrue(savedLog.getInputSnapshot().contains("actionConfig"));
+            assertTrue(savedLog.getInputSnapshot().contains("rec-1"));
+            assertTrue(savedLog.getInputSnapshot().contains("orders"));
+        }
+
+        @Test
+        @DisplayName("Should capture output snapshot from action result")
+        void shouldCaptureOutputSnapshot() {
+            WorkflowRule rule = createRule("Output Rule", "ON_CREATE");
+            createAction(rule, "FIELD_UPDATE", 0);
+
+            stubRules("ON_CREATE", List.of(rule));
+            stubNoMatchingRules("ON_CREATE_OR_UPDATE");
+
+            ActionResult resultWithOutput = ActionResult.success(Map.of("updatedFields", Map.of("status", "Done")));
+            ActionHandler fieldUpdateHandler = mockHandler("FIELD_UPDATE", resultWithOutput);
+            when(handlerRegistry.getHandler("FIELD_UPDATE")).thenReturn(Optional.of(fieldUpdateHandler));
+
+            engine.evaluate(createEvent());
+
+            ArgumentCaptor<WorkflowActionLog> captor = ArgumentCaptor.forClass(WorkflowActionLog.class);
+            verify(actionLogRepository).save(captor.capture());
+            WorkflowActionLog savedLog = captor.getValue();
+
+            assertNotNull(savedLog.getOutputSnapshot());
+            assertTrue(savedLog.getOutputSnapshot().contains("updatedFields"));
+        }
+
+        @Test
+        @DisplayName("Should record duration for action execution")
+        void shouldRecordDuration() {
+            WorkflowRule rule = createRule("Duration Rule", "ON_CREATE");
+            createAction(rule, "FIELD_UPDATE", 0);
+
+            stubRules("ON_CREATE", List.of(rule));
+            stubNoMatchingRules("ON_CREATE_OR_UPDATE");
+
+            ActionHandler fieldUpdateHandler = mockHandler("FIELD_UPDATE", ActionResult.success());
+            when(handlerRegistry.getHandler("FIELD_UPDATE")).thenReturn(Optional.of(fieldUpdateHandler));
+
+            engine.evaluate(createEvent());
+
+            ArgumentCaptor<WorkflowActionLog> captor = ArgumentCaptor.forClass(WorkflowActionLog.class);
+            verify(actionLogRepository).save(captor.capture());
+            WorkflowActionLog savedLog = captor.getValue();
+
+            assertNotNull(savedLog.getDurationMs());
+            assertTrue(savedLog.getDurationMs() >= 0);
+        }
+
+        @Test
+        @DisplayName("Should capture error message on action failure")
+        void shouldCaptureErrorOnFailure() {
+            WorkflowRule rule = createRule("Error Rule", "ON_CREATE");
+            rule.setErrorHandling("CONTINUE_ON_ERROR");
+            createAction(rule, "FIELD_UPDATE", 0);
+
+            stubRules("ON_CREATE", List.of(rule));
+            stubNoMatchingRules("ON_CREATE_OR_UPDATE");
+
+            ActionHandler failHandler = mockHandler("FIELD_UPDATE", ActionResult.failure("Something went wrong"));
+            when(handlerRegistry.getHandler("FIELD_UPDATE")).thenReturn(Optional.of(failHandler));
+
+            engine.evaluate(createEvent());
+
+            ArgumentCaptor<WorkflowActionLog> captor = ArgumentCaptor.forClass(WorkflowActionLog.class);
+            verify(actionLogRepository).save(captor.capture());
+            WorkflowActionLog savedLog = captor.getValue();
+
+            assertEquals("FAILURE", savedLog.getStatus());
+            assertEquals("Something went wrong", savedLog.getErrorMessage());
         }
     }
 

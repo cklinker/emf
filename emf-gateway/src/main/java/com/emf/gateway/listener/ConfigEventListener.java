@@ -26,8 +26,10 @@ import java.util.Map;
  * All event processing is done asynchronously and handles malformed events gracefully
  * by logging errors and continuing to process subsequent events.
  *
- * System collections (e.g., __control-plane) are ignored because their routes are
- * managed statically by {@link com.emf.gateway.config.RouteInitializer}.
+ * The __control-plane system collection is ignored because its route is managed
+ * statically by {@link com.emf.gateway.config.RouteInitializer}. Other system
+ * collections (users, profiles, etc.) are handled normally since they are routed
+ * to the worker like any other collection.
  */
 @Component
 public class ConfigEventListener {
@@ -37,8 +39,8 @@ public class ConfigEventListener {
     /** Well-known UUID for the __control-plane system collection (see V43 migration). */
     private static final String CONTROL_PLANE_COLLECTION_ID = "00000000-0000-0000-0000-000000000100";
 
-    /** Prefix used to identify system collections by name. */
-    private static final String SYSTEM_COLLECTION_PREFIX = "__";
+    /** Name of the control-plane system collection whose route is managed statically. */
+    private static final String CONTROL_PLANE_COLLECTION_NAME = "__control-plane";
 
     private final RouteRegistry routeRegistry;
     private final ObjectMapper objectMapper;
@@ -56,15 +58,16 @@ public class ConfigEventListener {
     }
 
     /**
-     * Checks whether a collection is a system collection whose route is managed
-     * statically by {@link com.emf.gateway.config.RouteInitializer}.
-     * System collection events must be ignored to prevent overwriting static routes.
+     * Checks whether a collection is the __control-plane collection whose route
+     * is managed statically by {@link com.emf.gateway.config.RouteInitializer}.
+     * Only the __control-plane collection is skipped — other system collections
+     * (users, profiles, etc.) are routed to the worker like normal collections.
      */
-    private boolean isSystemCollection(String collectionId, String collectionName) {
+    private boolean isControlPlaneCollection(String collectionId, String collectionName) {
         if (CONTROL_PLANE_COLLECTION_ID.equals(collectionId)) {
             return true;
         }
-        return collectionName != null && collectionName.startsWith(SYSTEM_COLLECTION_PREFIX);
+        return CONTROL_PLANE_COLLECTION_NAME.equals(collectionName);
     }
 
     /**
@@ -91,8 +94,8 @@ public class ConfigEventListener {
                         payload.getId(), payload.getName(), payload.getChangeType());
 
             // Skip system collections — their routes are managed by RouteInitializer
-            if (isSystemCollection(payload.getId(), payload.getName())) {
-                logger.debug("Ignoring collection changed event for system collection: id={}, name={}",
+            if (isControlPlaneCollection(payload.getId(), payload.getName())) {
+                logger.debug("Ignoring collection changed event for __control-plane collection: id={}, name={}",
                             payload.getId(), payload.getName());
                 return;
             }
@@ -185,8 +188,8 @@ public class ConfigEventListener {
                         workerId, collectionId, collectionName, changeType);
 
             // Skip system collections — their routes are managed by RouteInitializer
-            if (isSystemCollection(collectionId, collectionName)) {
-                logger.debug("Ignoring worker assignment event for system collection: id={}, name={}",
+            if (isControlPlaneCollection(collectionId, collectionName)) {
+                logger.debug("Ignoring worker assignment event for __control-plane collection: id={}, name={}",
                             collectionId, collectionName);
                 return;
             }

@@ -29,7 +29,7 @@ class OutboundMessageActionHandlerTest {
     @BeforeEach
     void setUp() {
         restTemplate = mock(RestTemplate.class);
-        handler = new OutboundMessageActionHandler(objectMapper);
+        handler = new OutboundMessageActionHandler(objectMapper, null);
         handler.setRestTemplate(restTemplate);
     }
 

@@ -46,9 +46,11 @@ public class OutboundMessageActionHandler implements ActionHandler {
     private final ObjectMapper objectMapper;
     private RestTemplate restTemplate;
 
-    public OutboundMessageActionHandler(ObjectMapper objectMapper) {
+    public OutboundMessageActionHandler(ObjectMapper objectMapper,
+                                        @org.springframework.beans.factory.annotation.Qualifier("workflowRestTemplate")
+                                        @org.springframework.lang.Nullable RestTemplate workflowRestTemplate) {
         this.objectMapper = objectMapper;
-        this.restTemplate = new RestTemplate();
+        this.restTemplate = workflowRestTemplate != null ? workflowRestTemplate : new RestTemplate();
     }
 
     /**

@@ -2,6 +2,7 @@ package com.emf.controlplane.service;
 
 import com.emf.controlplane.audit.SetupAudited;
 import com.emf.controlplane.dto.CreateWorkflowRuleRequest;
+import com.emf.controlplane.dto.ExecuteWorkflowRequest;
 import com.emf.controlplane.dto.WorkflowActionLogDto;
 import com.emf.controlplane.dto.WorkflowRuleDto;
 import com.emf.controlplane.entity.Collection;
@@ -13,6 +14,7 @@ import com.emf.controlplane.exception.ResourceNotFoundException;
 import com.emf.controlplane.repository.WorkflowActionLogRepository;
 import com.emf.controlplane.repository.WorkflowExecutionLogRepository;
 import com.emf.controlplane.repository.WorkflowRuleRepository;
+import com.emf.controlplane.service.workflow.WorkflowEngine;
 import com.emf.runtime.event.ChangeType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,6 +22,7 @@ import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -32,17 +35,20 @@ public class WorkflowRuleService {
     private final WorkflowActionLogRepository actionLogRepository;
     private final CollectionService collectionService;
     private final ConfigEventPublisher configEventPublisher;
+    private final WorkflowEngine workflowEngine;
 
     public WorkflowRuleService(WorkflowRuleRepository ruleRepository,
                                WorkflowExecutionLogRepository logRepository,
                                WorkflowActionLogRepository actionLogRepository,
                                CollectionService collectionService,
-                               @Nullable ConfigEventPublisher configEventPublisher) {
+                               @Nullable ConfigEventPublisher configEventPublisher,
+                               @Nullable WorkflowEngine workflowEngine) {
         this.ruleRepository = ruleRepository;
         this.logRepository = logRepository;
         this.actionLogRepository = actionLogRepository;
         this.collectionService = collectionService;
         this.configEventPublisher = configEventPublisher;
+        this.workflowEngine = workflowEngine;
     }
 
     @Transactional(readOnly = true)
@@ -171,6 +177,48 @@ public class WorkflowRuleService {
     public List<WorkflowActionLogDto> listActionLogsByExecution(String executionLogId) {
         return actionLogRepository.findByExecutionLogIdOrderByExecutedAtAsc(executionLogId)
                 .stream().map(WorkflowActionLogDto::fromEntity).toList();
+    }
+
+    // --- Manual Execution ---
+
+    /**
+     * Manually executes a workflow rule for a list of record IDs.
+     *
+     * @param ruleId  the workflow rule ID
+     * @param request the execution request containing record IDs
+     * @param userId  the user triggering the execution
+     * @return list of execution log IDs
+     */
+    @Transactional
+    public List<String> executeManual(String ruleId, ExecuteWorkflowRequest request, String userId) {
+        WorkflowRule rule = getRule(ruleId);
+
+        if (workflowEngine == null) {
+            throw new IllegalStateException("Workflow engine not available");
+        }
+
+        List<String> executionLogIds = new ArrayList<>();
+
+        if (request.getRecordIds() != null && !request.getRecordIds().isEmpty()) {
+            // Execute for each specified record
+            for (String recordId : request.getRecordIds()) {
+                String logId = workflowEngine.executeManualRule(rule, recordId, userId);
+                if (logId != null) {
+                    executionLogIds.add(logId);
+                }
+            }
+        } else {
+            // Execute without a specific record context
+            String logId = workflowEngine.executeManualRule(rule, null, userId);
+            if (logId != null) {
+                executionLogIds.add(logId);
+            }
+        }
+
+        log.info("Manual execution of rule '{}' completed: {} execution logs created",
+            rule.getName(), executionLogIds.size());
+
+        return executionLogIds;
     }
 
     // --- Event Publishing ---

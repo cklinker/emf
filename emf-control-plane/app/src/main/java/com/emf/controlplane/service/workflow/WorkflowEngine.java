@@ -281,6 +281,93 @@ public class WorkflowEngine {
     }
 
     /**
+     * Executes a workflow rule manually for a specific record ID.
+     * <p>
+     * Creates a synthetic event and executes the rule's actions. Does not check
+     * trigger fields or filter formulas — the caller explicitly chose to run this rule.
+     *
+     * @param rule     the workflow rule to execute
+     * @param recordId the record ID to execute against (may be null)
+     * @param userId   the user who triggered the manual execution
+     * @return the execution log ID, or null if no active actions
+     */
+    @Transactional
+    public String executeManualRule(WorkflowRule rule, String recordId, String userId) {
+        long startTime = System.currentTimeMillis();
+        String tenantId = rule.getTenantId();
+        String collectionName = rule.getCollection().getName();
+
+        log.info("Manual execution of workflow rule '{}' for record={}, user={}",
+            rule.getName(), recordId, userId);
+
+        List<WorkflowAction> activeActions = rule.getActions().stream()
+            .filter(WorkflowAction::isActive)
+            .sorted((a, b) -> Integer.compare(a.getExecutionOrder(), b.getExecutionOrder()))
+            .toList();
+
+        if (activeActions.isEmpty()) {
+            log.debug("Rule '{}' has no active actions, skipping manual execution", rule.getName());
+            return null;
+        }
+
+        // Create a synthetic event for the action context
+        RecordChangeEvent syntheticEvent = new RecordChangeEvent(
+            java.util.UUID.randomUUID().toString(),
+            tenantId, collectionName, recordId, ChangeType.CREATED,
+            Map.of(), null, List.of(), userId != null ? userId : "system",
+            Instant.now());
+
+        // Create execution log with MANUAL trigger type
+        WorkflowExecutionLog executionLog = new WorkflowExecutionLog();
+        executionLog.setTenantId(tenantId);
+        executionLog.setWorkflowRule(rule);
+        executionLog.setRecordId(recordId);
+        executionLog.setTriggerType("MANUAL");
+        executionLog.setStatus("EXECUTING");
+        executionLog.setExecutedAt(Instant.now());
+        executionLog = executionLogRepository.save(executionLog);
+
+        boolean stopOnError = "STOP_ON_ERROR".equals(rule.getErrorHandling());
+        int actionsExecuted = 0;
+        String overallStatus = "SUCCESS";
+        String overallError = null;
+
+        for (WorkflowAction action : activeActions) {
+            long actionStartTime = System.currentTimeMillis();
+            ActionResult result = executeAction(action, rule, syntheticEvent, executionLog.getId());
+            int actionDurationMs = (int) (System.currentTimeMillis() - actionStartTime);
+            actionsExecuted++;
+
+            logActionExecution(executionLog.getId(), action, result, syntheticEvent, actionDurationMs);
+
+            if (!result.successful()) {
+                if (stopOnError) {
+                    overallStatus = "FAILURE";
+                    overallError = String.format("Action '%s' failed: %s",
+                        action.getActionType(), result.errorMessage());
+                    break;
+                } else {
+                    overallStatus = "PARTIAL_FAILURE";
+                    overallError = String.format("Action '%s' failed: %s",
+                        action.getActionType(), result.errorMessage());
+                }
+            }
+        }
+
+        long durationMs = System.currentTimeMillis() - startTime;
+        executionLog.setStatus(overallStatus);
+        executionLog.setActionsExecuted(actionsExecuted);
+        executionLog.setErrorMessage(overallError);
+        executionLog.setDurationMs((int) durationMs);
+        executionLogRepository.save(executionLog);
+
+        log.info("Manual execution of rule '{}' completed: status={}, actions={}, duration={}ms",
+            rule.getName(), overallStatus, actionsExecuted, durationMs);
+
+        return executionLog.getId();
+    }
+
+    /**
      * Executes a single action for a scheduled workflow rule.
      */
     private ActionResult executeScheduledAction(WorkflowAction action, WorkflowRule rule,

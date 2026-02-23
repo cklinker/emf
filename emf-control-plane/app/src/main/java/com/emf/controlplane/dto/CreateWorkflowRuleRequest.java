@@ -13,6 +13,9 @@ public class CreateWorkflowRuleRequest {
     private Boolean reEvaluateOnUpdate;
     private Integer executionOrder;
     private String errorHandling;
+    private List<String> triggerFields;
+    private String cronExpression;
+    private String timezone;
     private List<ActionRequest> actions;
 
     public static class ActionRequest {
@@ -49,6 +52,12 @@ public class CreateWorkflowRuleRequest {
     public void setExecutionOrder(Integer executionOrder) { this.executionOrder = executionOrder; }
     public String getErrorHandling() { return errorHandling; }
     public void setErrorHandling(String errorHandling) { this.errorHandling = errorHandling; }
+    public List<String> getTriggerFields() { return triggerFields; }
+    public void setTriggerFields(List<String> triggerFields) { this.triggerFields = triggerFields; }
+    public String getCronExpression() { return cronExpression; }
+    public void setCronExpression(String cronExpression) { this.cronExpression = cronExpression; }
+    public String getTimezone() { return timezone; }
+    public void setTimezone(String timezone) { this.timezone = timezone; }
     public List<ActionRequest> getActions() { return actions; }
     public void setActions(List<ActionRequest> actions) { this.actions = actions; }
 }

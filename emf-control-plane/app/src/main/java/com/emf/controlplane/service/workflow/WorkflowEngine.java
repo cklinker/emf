@@ -1,5 +1,6 @@
 package com.emf.controlplane.service.workflow;
 
+import com.emf.controlplane.dto.WorkflowRuleDto;
 import com.emf.controlplane.entity.WorkflowAction;
 import com.emf.controlplane.entity.WorkflowActionLog;
 import com.emf.controlplane.entity.WorkflowExecutionLog;
@@ -18,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -111,6 +113,16 @@ public class WorkflowEngine {
     @Transactional
     public void evaluateRule(WorkflowRule rule, RecordChangeEvent event) {
         long startTime = System.currentTimeMillis();
+
+        // Check trigger fields — if specified, only fire when at least one
+        // of the listed fields appears in the event's changedFields list
+        if (!matchesTriggerFields(rule, event)) {
+            log.debug("Trigger fields check rejected record {} for rule '{}': " +
+                    "none of {} were in changed fields {}",
+                event.getRecordId(), rule.getName(),
+                rule.getTriggerFields(), event.getChangedFields());
+            return;
+        }
 
         // Check filter formula
         if (rule.getFilterFormula() != null && !rule.getFilterFormula().isBlank()) {
@@ -335,5 +347,43 @@ public class WorkflowEngine {
         executionLog.setDurationMs((int) (System.currentTimeMillis() - startTime));
         executionLog.setExecutedAt(Instant.now());
         executionLogRepository.save(executionLog);
+    }
+
+    /**
+     * Checks whether the event's changed fields match the rule's trigger fields.
+     * <p>
+     * If the rule has no trigger fields configured (null or empty), the rule matches
+     * any change (backward compatible). If trigger fields are configured, at least one
+     * of the listed fields must appear in the event's changedFields list.
+     * <p>
+     * For CREATE and DELETE events (which have no changedFields), trigger fields are
+     * not applicable, so the rule always matches.
+     *
+     * @param rule  the workflow rule to check
+     * @param event the record change event
+     * @return true if the rule should fire, false if trigger fields filter it out
+     */
+    boolean matchesTriggerFields(WorkflowRule rule, RecordChangeEvent event) {
+        // Parse trigger fields from JSONB string
+        List<String> triggerFields = WorkflowRuleDto.parseTriggerFields(rule.getTriggerFields());
+
+        // No trigger fields configured — match any change
+        if (triggerFields == null || triggerFields.isEmpty()) {
+            return true;
+        }
+
+        // For non-update events (CREATE, DELETE), changedFields is empty/irrelevant
+        // Trigger fields filtering only applies to UPDATE events
+        if (event.getChangeType() != ChangeType.UPDATED) {
+            return true;
+        }
+
+        // Check if any of the trigger fields were changed
+        List<String> changedFields = event.getChangedFields();
+        if (changedFields == null || changedFields.isEmpty()) {
+            return false;
+        }
+
+        return !Collections.disjoint(triggerFields, changedFields);
     }
 }

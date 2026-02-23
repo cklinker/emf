@@ -2,6 +2,8 @@ package com.emf.controlplane.dto;
 
 import com.emf.controlplane.entity.WorkflowAction;
 import com.emf.controlplane.entity.WorkflowRule;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
 import java.util.List;
@@ -18,9 +20,15 @@ public class WorkflowRuleDto {
     private boolean reEvaluateOnUpdate;
     private int executionOrder;
     private String errorHandling;
+    private List<String> triggerFields;
+    private String cronExpression;
+    private String timezone;
+    private Instant lastScheduledRun;
     private List<ActionDto> actions;
     private Instant createdAt;
     private Instant updatedAt;
+
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     public static WorkflowRuleDto fromEntity(WorkflowRule entity) {
         WorkflowRuleDto dto = new WorkflowRuleDto();
@@ -34,6 +42,10 @@ public class WorkflowRuleDto {
         dto.setReEvaluateOnUpdate(entity.isReEvaluateOnUpdate());
         dto.setExecutionOrder(entity.getExecutionOrder());
         dto.setErrorHandling(entity.getErrorHandling());
+        dto.setTriggerFields(parseTriggerFields(entity.getTriggerFields()));
+        dto.setCronExpression(entity.getCronExpression());
+        dto.setTimezone(entity.getTimezone());
+        dto.setLastScheduledRun(entity.getLastScheduledRun());
         dto.setActions(entity.getActions().stream().map(ActionDto::fromEntity).toList());
         dto.setCreatedAt(entity.getCreatedAt());
         dto.setUpdatedAt(entity.getUpdatedAt());
@@ -89,10 +101,46 @@ public class WorkflowRuleDto {
     public void setExecutionOrder(int executionOrder) { this.executionOrder = executionOrder; }
     public String getErrorHandling() { return errorHandling; }
     public void setErrorHandling(String errorHandling) { this.errorHandling = errorHandling; }
+    public List<String> getTriggerFields() { return triggerFields; }
+    public void setTriggerFields(List<String> triggerFields) { this.triggerFields = triggerFields; }
+    public String getCronExpression() { return cronExpression; }
+    public void setCronExpression(String cronExpression) { this.cronExpression = cronExpression; }
+    public String getTimezone() { return timezone; }
+    public void setTimezone(String timezone) { this.timezone = timezone; }
+    public Instant getLastScheduledRun() { return lastScheduledRun; }
+    public void setLastScheduledRun(Instant lastScheduledRun) { this.lastScheduledRun = lastScheduledRun; }
     public List<ActionDto> getActions() { return actions; }
     public void setActions(List<ActionDto> actions) { this.actions = actions; }
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
+
+    /**
+     * Parses a JSONB trigger_fields string (e.g. '["status","priority"]') to a List.
+     */
+    public static List<String> parseTriggerFields(String json) {
+        if (json == null || json.isBlank()) {
+            return null;
+        }
+        try {
+            return MAPPER.readValue(json, new TypeReference<List<String>>() {});
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * Serializes a List of trigger fields to a JSONB string.
+     */
+    public static String serializeTriggerFields(List<String> fields) {
+        if (fields == null || fields.isEmpty()) {
+            return null;
+        }
+        try {
+            return MAPPER.writeValueAsString(fields);
+        } catch (Exception e) {
+            return null;
+        }
+    }
 }

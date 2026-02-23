@@ -63,7 +63,8 @@ class SystemCollectionSeederTest {
             seeder.run(new DefaultApplicationArguments());
 
             // Then: should have called save for each system collection
-            verify(collectionRepository, times(42)).save(any(Collection.class));
+            int expectedCount = SystemCollectionDefinitions.all().size();
+            verify(collectionRepository, times(expectedCount)).save(any(Collection.class));
         }
 
         @Test
@@ -408,6 +409,198 @@ class SystemCollectionSeederTest {
 
             assertEquals(expectedType, field.getType(),
                     "Field '" + fieldName + "' should have type '" + expectedType + "'");
+        }
+    }
+
+    @Nested
+    @DisplayName("Tenant ID and metadata persistence")
+    class MetadataPersistenceTests {
+
+        @Test
+        @DisplayName("should use default tenant UUID, not 'SYSTEM'")
+        void shouldUseDefaultTenantUuid() {
+            assertEquals("00000000-0000-0000-0000-000000000001",
+                    SystemCollectionSeeder.SYSTEM_TENANT_ID,
+                    "SYSTEM_TENANT_ID should be the default tenant UUID from V9 migration");
+        }
+
+        @Test
+        @DisplayName("created collection should use default tenant ID")
+        void createdCollectionShouldUseDefaultTenantId() {
+            when(collectionRepository.findByName("tenants")).thenReturn(Optional.empty());
+            when(collectionRepository.findByName(argThat(name -> !"tenants".equals(name))))
+                    .thenReturn(Optional.of(createStubCollection("stub")));
+            when(fieldRepository.findByCollectionId(any())).thenReturn(List.of());
+            when(collectionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            seeder.run(new DefaultApplicationArguments());
+
+            verify(collectionRepository, atLeast(1)).save(collectionCaptor.capture());
+            Collection saved = collectionCaptor.getAllValues().stream()
+                    .filter(c -> "tenants".equals(c.getName()))
+                    .findFirst()
+                    .orElseThrow();
+
+            assertEquals("00000000-0000-0000-0000-000000000001", saved.getTenantId());
+        }
+
+        @Test
+        @DisplayName("should persist columnName on fields that define it")
+        void shouldPersistColumnName() {
+            when(collectionRepository.findByName("users")).thenReturn(Optional.empty());
+            when(collectionRepository.findByName(argThat(name -> !"users".equals(name))))
+                    .thenReturn(Optional.of(createStubCollection("stub")));
+            when(fieldRepository.findByCollectionId(any())).thenReturn(List.of());
+            when(collectionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            seeder.run(new DefaultApplicationArguments());
+
+            verify(collectionRepository, atLeast(1)).save(collectionCaptor.capture());
+            Collection saved = collectionCaptor.getAllValues().stream()
+                    .filter(c -> "users".equals(c.getName()))
+                    .findFirst()
+                    .orElseThrow();
+
+            Field firstNameField = saved.getFields().stream()
+                    .filter(f -> "firstName".equals(f.getName()))
+                    .findFirst()
+                    .orElseThrow();
+            assertEquals("first_name", firstNameField.getColumnName(),
+                    "firstName field should have column_name = 'first_name'");
+        }
+
+        @Test
+        @DisplayName("should persist defaultValue on fields that define it")
+        void shouldPersistDefaultValue() {
+            when(collectionRepository.findByName("users")).thenReturn(Optional.empty());
+            when(collectionRepository.findByName(argThat(name -> !"users".equals(name))))
+                    .thenReturn(Optional.of(createStubCollection("stub")));
+            when(fieldRepository.findByCollectionId(any())).thenReturn(List.of());
+            when(collectionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            seeder.run(new DefaultApplicationArguments());
+
+            verify(collectionRepository, atLeast(1)).save(collectionCaptor.capture());
+            Collection saved = collectionCaptor.getAllValues().stream()
+                    .filter(c -> "users".equals(c.getName()))
+                    .findFirst()
+                    .orElseThrow();
+
+            Field loginCountField = saved.getFields().stream()
+                    .filter(f -> "loginCount".equals(f.getName()))
+                    .findFirst()
+                    .orElseThrow();
+            assertNotNull(loginCountField.getDefaultValue(),
+                    "loginCount field should have a default value set");
+        }
+
+        @Test
+        @DisplayName("should persist constraints with enum values")
+        void shouldPersistConstraintsWithEnumValues() {
+            when(collectionRepository.findByName("users")).thenReturn(Optional.empty());
+            when(collectionRepository.findByName(argThat(name -> !"users".equals(name))))
+                    .thenReturn(Optional.of(createStubCollection("stub")));
+            when(fieldRepository.findByCollectionId(any())).thenReturn(List.of());
+            when(collectionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            seeder.run(new DefaultApplicationArguments());
+
+            verify(collectionRepository, atLeast(1)).save(collectionCaptor.capture());
+            Collection saved = collectionCaptor.getAllValues().stream()
+                    .filter(c -> "users".equals(c.getName()))
+                    .findFirst()
+                    .orElseThrow();
+
+            Field statusField = saved.getFields().stream()
+                    .filter(f -> "status".equals(f.getName()))
+                    .findFirst()
+                    .orElseThrow();
+            assertNotNull(statusField.getConstraints(),
+                    "status field should have constraints with enum values");
+            assertTrue(statusField.getConstraints().contains("ACTIVE"),
+                    "status constraints should contain 'ACTIVE' enum value");
+        }
+
+        @Test
+        @DisplayName("should persist immutable flag on fields")
+        void shouldPersistImmutableFlag() {
+            when(collectionRepository.findByName("connected-apps")).thenReturn(Optional.empty());
+            when(collectionRepository.findByName(argThat(name -> !"connected-apps".equals(name))))
+                    .thenReturn(Optional.of(createStubCollection("stub")));
+            when(fieldRepository.findByCollectionId(any())).thenReturn(List.of());
+            when(collectionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            seeder.run(new DefaultApplicationArguments());
+
+            verify(collectionRepository, atLeast(1)).save(collectionCaptor.capture());
+            Collection saved = collectionCaptor.getAllValues().stream()
+                    .filter(c -> "connected-apps".equals(c.getName()))
+                    .findFirst()
+                    .orElseThrow();
+
+            Field clientSecretField = saved.getFields().stream()
+                    .filter(f -> "clientSecretHash".equals(f.getName()))
+                    .findFirst()
+                    .orElseThrow();
+            assertTrue(clientSecretField.isImmutable(),
+                    "clientSecretHash field should be marked as immutable");
+        }
+
+        @Test
+        @DisplayName("should persist reference config on lookup fields")
+        void shouldPersistReferenceConfig() {
+            when(collectionRepository.findByName("users")).thenReturn(Optional.empty());
+            when(collectionRepository.findByName(argThat(name -> !"users".equals(name))))
+                    .thenReturn(Optional.of(createStubCollection("stub")));
+            when(fieldRepository.findByCollectionId(any())).thenReturn(List.of());
+            when(collectionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            seeder.run(new DefaultApplicationArguments());
+
+            verify(collectionRepository, atLeast(1)).save(collectionCaptor.capture());
+            Collection saved = collectionCaptor.getAllValues().stream()
+                    .filter(c -> "users".equals(c.getName()))
+                    .findFirst()
+                    .orElseThrow();
+
+            Field profileIdField = saved.getFields().stream()
+                    .filter(f -> "profileId".equals(f.getName()))
+                    .findFirst()
+                    .orElseThrow();
+            assertEquals("profiles", profileIdField.getReferenceTarget(),
+                    "profileId field should reference 'profiles' collection");
+            assertEquals("LOOKUP", profileIdField.getRelationshipType(),
+                    "profileId field should be a LOOKUP relationship");
+        }
+    }
+
+    @Nested
+    @DisplayName("System collection definitions completeness")
+    class DefinitionsCompletenessTests {
+
+        @Test
+        @DisplayName("should have at least 76 system collection definitions")
+        void shouldHaveExpectedNumberOfDefinitions() {
+            assertTrue(SystemCollectionDefinitions.all().size() >= 76,
+                    "Expected at least 76 system collection definitions, got: "
+                    + SystemCollectionDefinitions.all().size());
+        }
+
+        @Test
+        @DisplayName("all definitions should have unique names")
+        void allDefinitionsShouldHaveUniqueNames() {
+            List<String> names = SystemCollectionDefinitions.all().stream()
+                    .map(CollectionDefinition::name)
+                    .toList();
+            assertEquals(names.size(), names.stream().distinct().count(),
+                    "All collection definition names should be unique");
+        }
+
+        @Test
+        @DisplayName("byName map should contain all definitions")
+        void byNameMapShouldContainAllDefinitions() {
+            assertEquals(SystemCollectionDefinitions.all().size(),
+                    SystemCollectionDefinitions.byName().size());
         }
     }
 

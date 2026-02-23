@@ -6,6 +6,9 @@ import com.emf.controlplane.repository.CollectionRepository;
 import com.emf.controlplane.repository.FieldRepository;
 import com.emf.runtime.model.CollectionDefinition;
 import com.emf.runtime.model.FieldDefinition;
+import com.emf.runtime.model.ValidationRules;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
@@ -14,7 +17,9 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -40,9 +45,10 @@ import java.util.stream.Collectors;
 public class SystemCollectionSeeder implements ApplicationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(SystemCollectionSeeder.class);
+    private static final ObjectMapper JSON_MAPPER = new ObjectMapper();
 
-    /** Sentinel tenant ID for system-owned collection definitions. */
-    static final String SYSTEM_TENANT_ID = "SYSTEM";
+    /** Default tenant ID from V9 migration — used for system-owned collection definitions. */
+    static final String SYSTEM_TENANT_ID = "00000000-0000-0000-0000-000000000001";
 
     private final CollectionRepository collectionRepository;
     private final FieldRepository fieldRepository;
@@ -173,7 +179,7 @@ public class SystemCollectionSeeder implements ApplicationRunner {
     }
 
     /**
-     * Creates a Field JPA entity from a FieldDefinition.
+     * Creates a Field JPA entity from a FieldDefinition, persisting all available metadata.
      */
     private Field createFieldEntity(FieldDefinition fieldDef, int order) {
         Field field = new Field();
@@ -185,7 +191,34 @@ public class SystemCollectionSeeder implements ApplicationRunner {
         field.setOrder(order);
         field.setActive(true);
 
-        // Set reference config if present
+        // Column name mapping (API name -> DB column)
+        if (fieldDef.columnName() != null) {
+            field.setColumnName(fieldDef.columnName());
+        }
+
+        // Immutable flag
+        field.setImmutable(fieldDef.immutable());
+
+        // Indexed: unique fields and reference fields should be indexed
+        field.setIndexed(fieldDef.unique() || fieldDef.referenceConfig() != null);
+
+        // Default value
+        if (fieldDef.defaultValue() != null) {
+            field.setDefaultValue(serializeToJson(fieldDef.defaultValue()));
+        }
+
+        // Constraints: combine validationRules + enumValues into structured JSON
+        String constraintsJson = serializeConstraints(fieldDef.validationRules(), fieldDef.enumValues());
+        if (constraintsJson != null) {
+            field.setConstraints(constraintsJson);
+        }
+
+        // Field type config
+        if (fieldDef.fieldTypeConfig() != null && !fieldDef.fieldTypeConfig().isEmpty()) {
+            field.setFieldTypeConfig(serializeToJson(fieldDef.fieldTypeConfig()));
+        }
+
+        // Reference config
         if (fieldDef.referenceConfig() != null) {
             field.setReferenceTarget(fieldDef.referenceConfig().targetCollection());
             field.setRelationshipType(fieldDef.referenceConfig().relationshipType());
@@ -228,6 +261,55 @@ public class SystemCollectionSeeder implements ApplicationRunner {
             case FORMULA -> "string";
             case ROLLUP_SUMMARY -> "string";
         };
+    }
+
+    /**
+     * Serializes a value to JSON string for JSONB columns.
+     */
+    private String serializeToJson(Object value) {
+        try {
+            return JSON_MAPPER.writeValueAsString(value);
+        } catch (JsonProcessingException e) {
+            log.warn("Failed to serialize value to JSON: {}", value, e);
+            return null;
+        }
+    }
+
+    /**
+     * Serializes validation rules and enum values into a structured JSON constraints object.
+     *
+     * @return JSON string or null if no constraints
+     */
+    private String serializeConstraints(ValidationRules rules, List<String> enumValues) {
+        Map<String, Object> constraints = new LinkedHashMap<>();
+
+        if (rules != null) {
+            if (rules.minLength() != null) {
+                constraints.put("minLength", rules.minLength());
+            }
+            if (rules.maxLength() != null) {
+                constraints.put("maxLength", rules.maxLength());
+            }
+            if (rules.pattern() != null) {
+                constraints.put("pattern", rules.pattern());
+            }
+            if (rules.minValue() != null) {
+                constraints.put("minValue", rules.minValue());
+            }
+            if (rules.maxValue() != null) {
+                constraints.put("maxValue", rules.maxValue());
+            }
+        }
+
+        if (enumValues != null && !enumValues.isEmpty()) {
+            constraints.put("enumValues", enumValues);
+        }
+
+        if (constraints.isEmpty()) {
+            return null;
+        }
+
+        return serializeToJson(constraints);
     }
 
     private enum SeedResult {

@@ -98,6 +98,8 @@
                             <include>**/*Tests.java</include>
                             <include>**/*Properties.java</include>
                         </includes>
+                        <!-- Java 21+ requires byte-buddy agent for Mockito inline mock maker -->
+                        <argLine>-javaagent:${settings.localRepository}/net/bytebuddy/byte-buddy-agent/${byte-buddy.version}/byte-buddy-agent-${byte-buddy.version}.jar</argLine>
                     </configuration>
                 </plugin>
             </plugins>

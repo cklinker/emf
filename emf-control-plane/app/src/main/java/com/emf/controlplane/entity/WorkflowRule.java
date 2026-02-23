@@ -34,6 +34,9 @@ public class WorkflowRule extends TenantScopedEntity {
     @Column(name = "execution_order")
     private int executionOrder = 0;
 
+    @Column(name = "error_handling", length = 30)
+    private String errorHandling = "STOP_ON_ERROR";
+
     @OneToMany(mappedBy = "workflowRule", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("executionOrder ASC")
     private List<WorkflowAction> actions = new ArrayList<>();
@@ -56,6 +59,8 @@ public class WorkflowRule extends TenantScopedEntity {
     public void setReEvaluateOnUpdate(boolean reEvaluateOnUpdate) { this.reEvaluateOnUpdate = reEvaluateOnUpdate; }
     public int getExecutionOrder() { return executionOrder; }
     public void setExecutionOrder(int executionOrder) { this.executionOrder = executionOrder; }
+    public String getErrorHandling() { return errorHandling; }
+    public void setErrorHandling(String errorHandling) { this.errorHandling = errorHandling; }
     public List<WorkflowAction> getActions() { return actions; }
     public void setActions(List<WorkflowAction> actions) { this.actions = actions; }
 }

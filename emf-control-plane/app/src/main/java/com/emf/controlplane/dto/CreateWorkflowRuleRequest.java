@@ -12,6 +12,7 @@ public class CreateWorkflowRuleRequest {
     private String filterFormula;
     private Boolean reEvaluateOnUpdate;
     private Integer executionOrder;
+    private String errorHandling;
     private List<ActionRequest> actions;
 
     public static class ActionRequest {
@@ -46,6 +47,8 @@ public class CreateWorkflowRuleRequest {
     public void setReEvaluateOnUpdate(Boolean reEvaluateOnUpdate) { this.reEvaluateOnUpdate = reEvaluateOnUpdate; }
     public Integer getExecutionOrder() { return executionOrder; }
     public void setExecutionOrder(Integer executionOrder) { this.executionOrder = executionOrder; }
+    public String getErrorHandling() { return errorHandling; }
+    public void setErrorHandling(String errorHandling) { this.errorHandling = errorHandling; }
     public List<ActionRequest> getActions() { return actions; }
     public void setActions(List<ActionRequest> actions) { this.actions = actions; }
 }

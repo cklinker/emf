@@ -23,11 +23,11 @@ import static org.junit.jupiter.api.Assertions.*;
 class SystemCollectionDefinitionsTest {
 
     @Test
-    @DisplayName("all() should return at least 76 system collection definitions")
+    @DisplayName("all() should return at least 74 system collection definitions")
     void allShouldReturnExpectedDefinitions() {
         List<CollectionDefinition> all = SystemCollectionDefinitions.all();
-        assertTrue(all.size() >= 76,
-                "Expected at least 76 system collection definitions, got: " + all.size());
+        assertTrue(all.size() >= 74,
+                "Expected at least 74 system collection definitions, got: " + all.size());
     }
 
     @Test
@@ -142,18 +142,6 @@ class SystemCollectionDefinitionsTest {
         @DisplayName("workflow-action-types should NOT be tenant-scoped")
         void workflowActionTypesShouldNotBeTenantScoped() {
             assertFalse(SystemCollectionDefinitions.workflowActionTypes().tenantScoped());
-        }
-
-        @Test
-        @DisplayName("workers should NOT be tenant-scoped")
-        void workersShouldNotBeTenantScoped() {
-            assertFalse(SystemCollectionDefinitions.workers().tenantScoped());
-        }
-
-        @Test
-        @DisplayName("collection-assignments should NOT be tenant-scoped")
-        void collectionAssignmentsShouldNotBeTenantScoped() {
-            assertFalse(SystemCollectionDefinitions.collectionAssignments().tenantScoped());
         }
 
         @Test
@@ -509,8 +497,6 @@ class SystemCollectionDefinitionsTest {
                     Map.entry("dashboards", "dashboard"),
                     Map.entry("notes", "note"),
                     Map.entry("attachments", "file_attachment"),
-                    Map.entry("workers", "worker"),
-                    Map.entry("collection-assignments", "collection_assignment"),
                     Map.entry("bulk-jobs", "bulk_job"),
                     Map.entry("packages", "package"),
                     Map.entry("migration-runs", "migration_run"),
@@ -675,14 +661,6 @@ class SystemCollectionDefinitionsTest {
             assertTrue(field.enumValues().contains("SCRIPT"));
         }
 
-        @Test
-        @DisplayName("workers should have correct defaults")
-        void workersShouldHaveCorrectDefaults() {
-            CollectionDefinition def = SystemCollectionDefinitions.workers();
-            assertEquals(8080, getField(def, "port").defaultValue());
-            assertEquals("default", getField(def, "pool").defaultValue());
-            assertEquals(50, getField(def, "capacity").defaultValue());
-        }
     }
 
     // =========================================================================
@@ -692,19 +670,6 @@ class SystemCollectionDefinitionsTest {
     @Nested
     @DisplayName("Corrected collection definitions")
     class CorrectedDefinitionTests {
-
-        @Test
-        @DisplayName("workers should have correct fields (host, port, baseUrl)")
-        void workersCollection() {
-            CollectionDefinition def = SystemCollectionDefinitions.workers();
-            assertFieldExists(def, "host");
-            assertFieldExists(def, "port");
-            assertFieldExists(def, "baseUrl");
-            assertFieldExists(def, "pool");
-            assertFieldExists(def, "capacity");
-            assertFieldExists(def, "currentLoad");
-            assertFieldExists(def, "podName");
-        }
 
         @Test
         @DisplayName("scheduled-jobs should have jobType (not jobClass)")

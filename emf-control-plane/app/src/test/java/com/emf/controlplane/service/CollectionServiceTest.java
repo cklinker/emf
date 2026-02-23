@@ -64,7 +64,6 @@ class CollectionServiceTest {
                 fieldRepository,
                 objectMapper,
                 null,  // ConfigEventPublisher is optional in tests
-                null,  // CollectionAssignmentService is optional in tests
                 null   // DefaultProfileSeeder is optional in tests
         );
     }

@@ -9,11 +9,14 @@ import com.emf.controlplane.dto.FieldDto;
 import com.emf.controlplane.dto.UpdateCollectionRequest;
 import com.emf.controlplane.dto.ReorderFieldsRequest;
 import com.emf.controlplane.dto.UpdateFieldRequest;
+import com.emf.controlplane.dto.ValidationRuleDto;
 import com.emf.controlplane.entity.Collection;
 import com.emf.controlplane.entity.CollectionVersion;
 import com.emf.controlplane.entity.Field;
+import com.emf.controlplane.entity.ValidationRule;
 import com.emf.controlplane.service.CollectionService;
 import com.emf.controlplane.service.FieldService;
+import com.emf.controlplane.service.ValidationRuleService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -66,10 +69,14 @@ public class CollectionController {
 
     private final CollectionService collectionService;
     private final FieldService fieldService;
+    private final ValidationRuleService validationRuleService;
 
-    public CollectionController(CollectionService collectionService, FieldService fieldService) {
+    public CollectionController(CollectionService collectionService,
+                                FieldService fieldService,
+                                ValidationRuleService validationRuleService) {
         this.collectionService = collectionService;
         this.fieldService = fieldService;
+        this.validationRuleService = validationRuleService;
     }
 
     /**
@@ -507,7 +514,39 @@ public class CollectionController {
         log.info("REST request to delete field '{}' from collection: {}", fieldId, id);
         
         fieldService.deleteField(id, fieldId);
-        
+
         return ResponseEntity.noContent().build();
+    }
+
+    // ==================== Validation Rules Endpoint ====================
+
+    /**
+     * Lists all validation rules for a collection.
+     * Used by workers during bootstrap to fetch validation rules for enforcement.
+     *
+     * @param id The collection ID
+     * @return List of validation rule DTOs
+     */
+    @GetMapping("/{id}/validation-rules")
+    @Operation(
+            summary = "List validation rules",
+            description = "Returns all validation rules for the specified collection"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Successfully retrieved validation rules"),
+            @ApiResponse(responseCode = "404", description = "Collection not found")
+    })
+    public ResponseEntity<List<ValidationRuleDto>> listValidationRules(
+            @Parameter(description = "Collection ID", required = true)
+            @PathVariable String id) {
+
+        log.debug("REST request to list validation rules for collection: {}", id);
+
+        List<ValidationRule> rules = validationRuleService.listRules(id);
+        List<ValidationRuleDto> dtos = rules.stream()
+                .map(ValidationRuleDto::fromEntity)
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(dtos);
     }
 }

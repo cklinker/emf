@@ -579,10 +579,10 @@ class SystemCollectionSeederTest {
     class DefinitionsCompletenessTests {
 
         @Test
-        @DisplayName("should have at least 76 system collection definitions")
+        @DisplayName("should have at least 74 system collection definitions")
         void shouldHaveExpectedNumberOfDefinitions() {
-            assertTrue(SystemCollectionDefinitions.all().size() >= 76,
-                    "Expected at least 76 system collection definitions, got: "
+            assertTrue(SystemCollectionDefinitions.all().size() >= 74,
+                    "Expected at least 74 system collection definitions, got: "
                     + SystemCollectionDefinitions.all().size());
         }
 

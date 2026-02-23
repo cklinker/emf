@@ -4,14 +4,10 @@ import com.emf.controlplane.config.ControlPlaneProperties;
 import com.emf.controlplane.dto.GovernorLimits;
 import com.emf.controlplane.dto.GatewayBootstrapConfigDto;
 import com.emf.controlplane.entity.Collection;
-import com.emf.controlplane.entity.CollectionAssignment;
 import com.emf.controlplane.entity.Field;
 import com.emf.controlplane.entity.Tenant;
-import com.emf.controlplane.entity.Worker;
-import com.emf.controlplane.repository.CollectionAssignmentRepository;
 import com.emf.controlplane.repository.CollectionRepository;
 import com.emf.controlplane.repository.TenantRepository;
-import com.emf.controlplane.repository.WorkerRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -32,7 +28,7 @@ import static org.mockito.Mockito.*;
  * - System collections are included in bootstrap config (not filtered out)
  * - __control-plane collection is excluded
  * - systemCollection flag is correctly set on DTOs
- * - Worker URL mapping works correctly
+ * - All collections use the configured worker service URL
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("GatewayBootstrapService Tests")
@@ -40,12 +36,6 @@ class GatewayBootstrapServiceTest {
 
     @Mock
     private CollectionRepository collectionRepository;
-
-    @Mock
-    private CollectionAssignmentRepository assignmentRepository;
-
-    @Mock
-    private WorkerRepository workerRepository;
 
     @Mock
     private TenantRepository tenantRepository;
@@ -62,8 +52,6 @@ class GatewayBootstrapServiceTest {
     void setUp() {
         service = new GatewayBootstrapService(
                 collectionRepository,
-                assignmentRepository,
-                workerRepository,
                 tenantRepository,
                 tenantService,
                 properties
@@ -83,8 +71,8 @@ class GatewayBootstrapServiceTest {
 
             when(collectionRepository.findAllActiveWithFields())
                     .thenReturn(List.of(usersCollection, productsCollection));
-            when(assignmentRepository.findByStatus("READY")).thenReturn(List.of());
             when(tenantRepository.findByStatus("ACTIVE")).thenReturn(List.of());
+            when(properties.getWorkerServiceUrl()).thenReturn("http://emf-worker:80");
 
             // Act
             GatewayBootstrapConfigDto config = service.getBootstrapConfig();
@@ -115,8 +103,8 @@ class GatewayBootstrapServiceTest {
 
             when(collectionRepository.findAllActiveWithFields())
                     .thenReturn(List.of(controlPlane, usersCollection));
-            when(assignmentRepository.findByStatus("READY")).thenReturn(List.of());
             when(tenantRepository.findByStatus("ACTIVE")).thenReturn(List.of());
+            when(properties.getWorkerServiceUrl()).thenReturn("http://emf-worker:80");
 
             // Act
             GatewayBootstrapConfigDto config = service.getBootstrapConfig();
@@ -137,8 +125,8 @@ class GatewayBootstrapServiceTest {
 
             when(collectionRepository.findAllActiveWithFields())
                     .thenReturn(List.of(users, profiles, permissions, products));
-            when(assignmentRepository.findByStatus("READY")).thenReturn(List.of());
             when(tenantRepository.findByStatus("ACTIVE")).thenReturn(List.of());
+            when(properties.getWorkerServiceUrl()).thenReturn("http://emf-worker:80");
 
             // Act
             GatewayBootstrapConfigDto config = service.getBootstrapConfig();
@@ -174,8 +162,8 @@ class GatewayBootstrapServiceTest {
 
             when(collectionRepository.findAllActiveWithFields())
                     .thenReturn(List.of(usersCollection));
-            when(assignmentRepository.findByStatus("READY")).thenReturn(List.of());
             when(tenantRepository.findByStatus("ACTIVE")).thenReturn(List.of());
+            when(properties.getWorkerServiceUrl()).thenReturn("http://emf-worker:80");
 
             // Act
             GatewayBootstrapConfigDto config = service.getBootstrapConfig();
@@ -198,8 +186,8 @@ class GatewayBootstrapServiceTest {
 
             when(collectionRepository.findAllActiveWithFields())
                     .thenReturn(List.of(collection));
-            when(assignmentRepository.findByStatus("READY")).thenReturn(List.of());
             when(tenantRepository.findByStatus("ACTIVE")).thenReturn(List.of());
+            when(properties.getWorkerServiceUrl()).thenReturn("http://emf-worker:80");
 
             // Act
             GatewayBootstrapConfigDto config = service.getBootstrapConfig();
@@ -209,33 +197,21 @@ class GatewayBootstrapServiceTest {
         }
 
         @Test
-        @DisplayName("Should include worker base URL when assignment exists")
-        void shouldIncludeWorkerBaseUrlWhenAssignmentExists() {
+        @DisplayName("Should use configured worker service URL for all collections")
+        void shouldUseConfiguredWorkerServiceUrl() {
             // Arrange
             Collection collection = createCollection("col-1", "products", "/api/products", false);
 
-            CollectionAssignment assignment = new CollectionAssignment();
-            assignment.setCollectionId("col-1");
-            assignment.setWorkerId("worker-1");
-            assignment.setStatus("READY");
-
-            Worker worker = new Worker();
-            worker.setId("worker-1");
-            worker.setBaseUrl("http://worker-1:8080");
-
             when(collectionRepository.findAllActiveWithFields())
                     .thenReturn(List.of(collection));
-            when(assignmentRepository.findByStatus("READY"))
-                    .thenReturn(List.of(assignment));
-            when(workerRepository.findAllById(List.of("worker-1")))
-                    .thenReturn(List.of(worker));
             when(tenantRepository.findByStatus("ACTIVE")).thenReturn(List.of());
+            when(properties.getWorkerServiceUrl()).thenReturn("http://emf-worker:80");
 
             // Act
             GatewayBootstrapConfigDto config = service.getBootstrapConfig();
 
-            // Assert
-            assertEquals("http://worker-1:8080", config.getCollections().get(0).getWorkerBaseUrl());
+            // Assert — all collections use the K8s worker service URL
+            assertEquals("http://emf-worker:80", config.getCollections().get(0).getWorkerBaseUrl());
         }
     }
 
@@ -252,10 +228,10 @@ class GatewayBootstrapServiceTest {
             tenant.setStatus("ACTIVE");
 
             when(collectionRepository.findAllActiveWithFields()).thenReturn(List.of());
-            when(assignmentRepository.findByStatus("READY")).thenReturn(List.of());
             when(tenantRepository.findByStatus("ACTIVE")).thenReturn(List.of(tenant));
             when(tenantService.getGovernorLimits("tenant-1"))
                     .thenReturn(new GovernorLimits(10000, 10, 100, 200, 500, 50, 200));
+            when(properties.getWorkerServiceUrl()).thenReturn("http://emf-worker:80");
 
             // Act
             GatewayBootstrapConfigDto config = service.getBootstrapConfig();

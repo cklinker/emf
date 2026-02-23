@@ -203,8 +203,6 @@ emf:
         collection-changed: emf.config.collection.changed
         ui-changed: emf.config.ui.changed
         oidc-changed: emf.config.oidc.changed
-        worker-assignment-changed: emf.worker.assignment.changed
-        worker-status-changed: emf.worker.status.changed
     # Cache Configuration
     cache:
       collections:

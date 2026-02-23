@@ -116,8 +116,6 @@ public final class SystemCollectionDefinitions {
         definitions.add(attachments());
 
         // Platform management
-        definitions.add(workers());
-        definitions.add(collectionAssignments());
         definitions.add(bulkJobs());
         definitions.add(packages());
         definitions.add(packageItems());
@@ -714,40 +712,6 @@ public final class SystemCollectionDefinitions {
     // =========================================================================
     // Platform Management Collections
     // =========================================================================
-
-    public static CollectionDefinition workers() {
-        return systemBuilder("workers", "Workers", "worker")
-            .tenantScoped(false)
-            .addField(FieldDefinition.string("podName", 253).withColumnName("pod_name"))
-            .addField(FieldDefinition.string("namespace", 63))
-            .addField(FieldDefinition.requiredString("host", 253))
-            .addField(FieldDefinition.requiredInteger("port").withDefault(8080))
-            .addField(FieldDefinition.requiredString("baseUrl", 500)
-                .withColumnName("base_url"))
-            .addField(FieldDefinition.requiredString("pool", 50).withDefault("default"))
-            .addField(FieldDefinition.requiredInteger("capacity").withDefault(50))
-            .addField(FieldDefinition.requiredInteger("currentLoad")
-                .withColumnName("current_load").withDefault(0))
-            .addField(FieldDefinition.requiredString("status", 20))
-            .addField(FieldDefinition.string("tenantAffinity", 36)
-                .withColumnName("tenant_affinity"))
-            .addField(FieldDefinition.json("labels"))
-            .addField(FieldDefinition.datetime("lastHeartbeat").withColumnName("last_heartbeat"))
-            .build();
-    }
-
-    public static CollectionDefinition collectionAssignments() {
-        return systemBuilder("collection-assignments", "Collection Assignments", "collection_assignment")
-            .tenantScoped(false)
-            .addField(FieldDefinition.masterDetail("collectionId", "collections", "Collection")
-                .withColumnName("collection_id"))
-            .addField(FieldDefinition.requiredString("workerId", 253)
-                .withColumnName("worker_id"))
-            .addField(FieldDefinition.requiredString("status", 20).withDefault("PENDING"))
-            .addField(FieldDefinition.datetime("assignedAt").withColumnName("assigned_at"))
-            .addField(FieldDefinition.datetime("readyAt").withColumnName("ready_at"))
-            .build();
-    }
 
     public static CollectionDefinition bulkJobs() {
         return systemBuilder("bulk-jobs", "Bulk Jobs", "bulk_job")

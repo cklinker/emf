@@ -170,6 +170,10 @@ export type { DashboardsPageProps } from './DashboardsPage'
 export { WorkflowRulesPage } from './WorkflowRulesPage'
 export type { WorkflowRulesPageProps } from './WorkflowRulesPage'
 
+// WorkflowActionTypesPage - Workflow action types management page
+export { WorkflowActionTypesPage } from './WorkflowActionTypesPage'
+export type { WorkflowActionTypesPageProps } from './WorkflowActionTypesPage'
+
 // ApprovalProcessesPage - Approval processes management page
 export { ApprovalProcessesPage } from './ApprovalProcessesPage'
 export type { ApprovalProcessesPageProps } from './ApprovalProcessesPage'

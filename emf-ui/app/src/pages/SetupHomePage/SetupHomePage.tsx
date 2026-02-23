@@ -152,6 +152,12 @@ const CATEGORIES: SetupCategory[] = [
         permission: 'MANAGE_WORKFLOWS',
       },
       {
+        name: 'Workflow Action Types',
+        path: '/workflow-action-types',
+        description: 'Manage available workflow action types',
+        permission: 'MANAGE_WORKFLOWS',
+      },
+      {
         name: 'Approval Processes',
         path: '/approvals',
         description: 'Configure approval workflows',

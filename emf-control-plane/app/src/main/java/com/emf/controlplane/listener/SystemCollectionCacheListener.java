@@ -23,11 +23,13 @@ import java.util.Set;
  *
  * <p>Cache invalidation mapping:
  * <ul>
- *   <li>{@code collections}, {@code fields}, {@code record-types} → collections cache</li>
+ *   <li>{@code collections}, {@code fields}, {@code record-types} → collections cache + bootstrap cache</li>
  *   <li>{@code profiles}, {@code permission-sets} → permissions cache</li>
- *   <li>{@code users} → user ID cache</li>
- *   <li>{@code workflow-rules} → workflow rules cache</li>
- *   <li>{@code tenants} → governor limits cache</li>
+ *   <li>{@code users} → user ID cache + permissions cache</li>
+ *   <li>{@code workflow-rules}, {@code validation-rules} → workflow rules cache</li>
+ *   <li>{@code tenants} → governor limits cache + bootstrap cache</li>
+ *   <li>{@code page-layouts}, {@code layout-assignments} → layouts cache</li>
+ *   <li>{@code workers}, {@code collection-assignments} → bootstrap cache</li>
  * </ul>
  *
  * @since 1.0.0
@@ -51,6 +53,17 @@ public class SystemCollectionCacheListener {
     /** Collections that affect the workflow rules cache. */
     private static final Set<String> WORKFLOW_CACHE_COLLECTIONS = Set.of(
             "workflow-rules", "validation-rules"
+    );
+
+    /** Collections that affect the page layouts cache. */
+    private static final Set<String> LAYOUT_CACHE_COLLECTIONS = Set.of(
+            "page-layouts", "layout-assignments"
+    );
+
+    /** Collections that affect the gateway bootstrap cache. */
+    private static final Set<String> BOOTSTRAP_CACHE_COLLECTIONS = Set.of(
+            "collections", "fields", "record-types", "tenants",
+            "workers", "collection-assignments"
     );
 
     private final CacheManager cacheManager;
@@ -123,6 +136,18 @@ public class SystemCollectionCacheListener {
             evictCache(CacheConfig.GOVERNOR_LIMITS_CACHE);
             log.info("Evicted governor limits cache due to tenant change: recordId={}, changeType={}",
                     event.getRecordId(), event.getChangeType());
+        }
+
+        if (LAYOUT_CACHE_COLLECTIONS.contains(collectionName)) {
+            evictCache(CacheConfig.LAYOUTS_CACHE);
+            log.info("Evicted layouts cache due to {} change: recordId={}, changeType={}",
+                    collectionName, event.getRecordId(), event.getChangeType());
+        }
+
+        if (BOOTSTRAP_CACHE_COLLECTIONS.contains(collectionName)) {
+            evictCache(CacheConfig.BOOTSTRAP_CACHE);
+            log.info("Evicted bootstrap cache due to {} change: recordId={}, changeType={}",
+                    collectionName, event.getRecordId(), event.getChangeType());
         }
     }
 

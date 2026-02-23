@@ -48,6 +48,12 @@ class SystemCollectionCacheListenerTest {
     @Mock
     private Cache governorLimitsCache;
 
+    @Mock
+    private Cache layoutsCache;
+
+    @Mock
+    private Cache bootstrapCache;
+
     private ObjectMapper objectMapper;
     private SystemCollectionCacheListener listener;
 
@@ -65,6 +71,8 @@ class SystemCollectionCacheListenerTest {
         lenient().when(cacheManager.getCache(CacheConfig.USER_ID_CACHE)).thenReturn(userIdCache);
         lenient().when(cacheManager.getCache(CacheConfig.WORKFLOW_RULES_CACHE)).thenReturn(workflowRulesCache);
         lenient().when(cacheManager.getCache(CacheConfig.GOVERNOR_LIMITS_CACHE)).thenReturn(governorLimitsCache);
+        lenient().when(cacheManager.getCache(CacheConfig.LAYOUTS_CACHE)).thenReturn(layoutsCache);
+        lenient().when(cacheManager.getCache(CacheConfig.BOOTSTRAP_CACHE)).thenReturn(bootstrapCache);
     }
 
     private String createEventMessage(String collectionName, String recordId, ChangeType changeType) throws Exception {
@@ -79,7 +87,7 @@ class SystemCollectionCacheListenerTest {
     class CollectionCacheTests {
 
         @Test
-        @DisplayName("Should evict collection caches when collections record changes")
+        @DisplayName("Should evict collection caches and bootstrap cache when collections record changes")
         void shouldEvictCollectionCachesOnCollectionChange() throws Exception {
             setupCacheMocks();
             String message = createEventMessage("collections", "col-1", ChangeType.UPDATED);
@@ -88,10 +96,11 @@ class SystemCollectionCacheListenerTest {
 
             verify(collectionsCache).clear();
             verify(collectionsListCache).clear();
+            verify(bootstrapCache).clear();
         }
 
         @Test
-        @DisplayName("Should evict collection caches when fields record changes")
+        @DisplayName("Should evict collection caches and bootstrap cache when fields record changes")
         void shouldEvictCollectionCachesOnFieldChange() throws Exception {
             setupCacheMocks();
             String message = createEventMessage("fields", "field-1", ChangeType.CREATED);
@@ -100,10 +109,11 @@ class SystemCollectionCacheListenerTest {
 
             verify(collectionsCache).clear();
             verify(collectionsListCache).clear();
+            verify(bootstrapCache).clear();
         }
 
         @Test
-        @DisplayName("Should evict collection caches when record-types record changes")
+        @DisplayName("Should evict collection caches and bootstrap cache when record-types record changes")
         void shouldEvictCollectionCachesOnRecordTypeChange() throws Exception {
             setupCacheMocks();
             String message = createEventMessage("record-types", "rt-1", ChangeType.DELETED);
@@ -112,6 +122,7 @@ class SystemCollectionCacheListenerTest {
 
             verify(collectionsCache).clear();
             verify(collectionsListCache).clear();
+            verify(bootstrapCache).clear();
         }
     }
 
@@ -191,7 +202,7 @@ class SystemCollectionCacheListenerTest {
     class GovernorLimitsCacheTests {
 
         @Test
-        @DisplayName("Should evict governor limits cache when tenants record changes")
+        @DisplayName("Should evict governor limits cache and bootstrap cache when tenants record changes")
         void shouldEvictGovernorLimitsCacheOnTenantChange() throws Exception {
             setupCacheMocks();
             String message = createEventMessage("tenants", "tenant-1", ChangeType.UPDATED);
@@ -199,6 +210,61 @@ class SystemCollectionCacheListenerTest {
             listener.onRecordChanged(message);
 
             verify(governorLimitsCache).clear();
+            verify(bootstrapCache).clear();
+        }
+    }
+
+    @Nested
+    @DisplayName("Layouts Cache Invalidation")
+    class LayoutsCacheTests {
+
+        @Test
+        @DisplayName("Should evict layouts cache when page-layouts record changes")
+        void shouldEvictLayoutsCacheOnPageLayoutChange() throws Exception {
+            setupCacheMocks();
+            String message = createEventMessage("page-layouts", "layout-1", ChangeType.UPDATED);
+
+            listener.onRecordChanged(message);
+
+            verify(layoutsCache).clear();
+        }
+
+        @Test
+        @DisplayName("Should evict layouts cache when layout-assignments record changes")
+        void shouldEvictLayoutsCacheOnLayoutAssignmentChange() throws Exception {
+            setupCacheMocks();
+            String message = createEventMessage("layout-assignments", "la-1", ChangeType.CREATED);
+
+            listener.onRecordChanged(message);
+
+            verify(layoutsCache).clear();
+        }
+    }
+
+    @Nested
+    @DisplayName("Bootstrap Cache Invalidation")
+    class BootstrapCacheTests {
+
+        @Test
+        @DisplayName("Should evict bootstrap cache when workers record changes")
+        void shouldEvictBootstrapCacheOnWorkerChange() throws Exception {
+            setupCacheMocks();
+            String message = createEventMessage("workers", "worker-1", ChangeType.UPDATED);
+
+            listener.onRecordChanged(message);
+
+            verify(bootstrapCache).clear();
+        }
+
+        @Test
+        @DisplayName("Should evict bootstrap cache when collection-assignments record changes")
+        void shouldEvictBootstrapCacheOnCollectionAssignmentChange() throws Exception {
+            setupCacheMocks();
+            String message = createEventMessage("collection-assignments", "ca-1", ChangeType.CREATED);
+
+            listener.onRecordChanged(message);
+
+            verify(bootstrapCache).clear();
         }
     }
 

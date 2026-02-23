@@ -219,6 +219,12 @@ emf:
       governor-limits:
         name: governor-limits
         ttl: ${CACHE_GOVERNOR_LIMITS_TTL:60}
+      layouts:
+        name: layouts
+        ttl: ${CACHE_LAYOUTS_TTL:300}
+      bootstrap:
+        name: bootstrap
+        ttl: ${CACHE_BOOTSTRAP_TTL:600}
     # Security
     security:
       enabled: ${SECURITY_ENABLED:true}

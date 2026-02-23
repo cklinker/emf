@@ -1,6 +1,7 @@
 package com.emf.controlplane.service;
 
 import com.emf.controlplane.audit.SetupAudited;
+import com.emf.controlplane.config.CacheConfig;
 import com.emf.controlplane.dto.CreatePageLayoutRequest;
 import com.emf.controlplane.dto.PageLayoutDto;
 import com.emf.controlplane.entity.*;
@@ -11,6 +12,8 @@ import com.emf.controlplane.repository.LayoutAssignmentRepository;
 import com.emf.controlplane.repository.PageLayoutRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,6 +39,7 @@ public class PageLayoutService {
         this.fieldRepository = fieldRepository;
     }
 
+    @Cacheable(value = CacheConfig.LAYOUTS_CACHE, key = "'list:' + #tenantId + ':' + (#collectionId ?: 'all')")
     @Transactional(readOnly = true)
     public List<PageLayoutDto> listLayoutDtos(String tenantId, String collectionId) {
         List<PageLayout> layouts;
@@ -47,6 +51,7 @@ public class PageLayoutService {
         return layouts.stream().map(PageLayoutDto::fromEntity).toList();
     }
 
+    @Cacheable(value = CacheConfig.LAYOUTS_CACHE, key = "'dto:' + #id", unless = "#result == null")
     @Transactional(readOnly = true)
     public PageLayoutDto getLayoutDto(String id) {
         PageLayout layout = layoutRepository.findById(id)
@@ -60,6 +65,7 @@ public class PageLayoutService {
                 .orElseThrow(() -> new ResourceNotFoundException("PageLayout", id));
     }
 
+    @CacheEvict(value = CacheConfig.LAYOUTS_CACHE, allEntries = true)
     @Transactional
     @SetupAudited(section = "Page Layouts", entityType = "PageLayout")
     public PageLayoutDto createLayout(String tenantId, String collectionId, CreatePageLayoutRequest request) {
@@ -102,6 +108,7 @@ public class PageLayoutService {
         return PageLayoutDto.fromEntity(layout);
     }
 
+    @CacheEvict(value = CacheConfig.LAYOUTS_CACHE, allEntries = true)
     @Transactional
     @SetupAudited(section = "Page Layouts", entityType = "PageLayout")
     public PageLayoutDto updateLayout(String id, CreatePageLayoutRequest request) {
@@ -146,6 +153,7 @@ public class PageLayoutService {
         return PageLayoutDto.fromEntity(layout);
     }
 
+    @CacheEvict(value = CacheConfig.LAYOUTS_CACHE, allEntries = true)
     @Transactional
     @SetupAudited(section = "Page Layouts", entityType = "PageLayout")
     public void deleteLayout(String id) {
@@ -162,6 +170,7 @@ public class PageLayoutService {
         return assignmentRepository.findByTenantIdAndCollectionId(tenantId, collectionId);
     }
 
+    @CacheEvict(value = CacheConfig.LAYOUTS_CACHE, allEntries = true)
     @Transactional
     public LayoutAssignment assignLayout(String tenantId, String collectionId,
                                           String profileId, String recordTypeId, String layoutId) {
@@ -194,6 +203,8 @@ public class PageLayoutService {
         return assignmentRepository.save(assignment);
     }
 
+    @Cacheable(value = CacheConfig.LAYOUTS_CACHE,
+            key = "'user:' + #tenantId + ':' + #collectionId + ':' + (#recordTypeId ?: 'none') + ':' + #profileId")
     @Transactional(readOnly = true)
     public PageLayoutDto getLayoutForUser(String tenantId, String collectionId,
                                         String recordTypeId, String profileId) {

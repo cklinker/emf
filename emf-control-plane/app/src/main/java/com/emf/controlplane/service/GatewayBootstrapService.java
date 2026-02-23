@@ -1,5 +1,6 @@
 package com.emf.controlplane.service;
 
+import com.emf.controlplane.config.CacheConfig;
 import com.emf.controlplane.config.ControlPlaneProperties;
 import com.emf.controlplane.dto.GovernorLimits;
 import com.emf.controlplane.dto.GatewayBootstrapConfigDto;
@@ -14,6 +15,7 @@ import com.emf.controlplane.repository.TenantRepository;
 import com.emf.controlplane.repository.WorkerRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashMap;
@@ -52,8 +54,10 @@ public class GatewayBootstrapService {
 
     /**
      * Gets the bootstrap configuration for the API Gateway.
-     * This method is transactional to ensure lazy-loaded relationships are accessible.
+     * Cached with event-driven invalidation via {@code SystemCollectionCacheListener}
+     * when collections, workers, or tenant records change.
      */
+    @Cacheable(value = CacheConfig.BOOTSTRAP_CACHE, key = "'gateway-bootstrap'")
     @Transactional(readOnly = true)
     public GatewayBootstrapConfigDto getBootstrapConfig() {
         log.debug("Generating gateway bootstrap configuration");

@@ -48,6 +48,8 @@ public class CacheConfig {
     public static final String GOVERNOR_LIMITS_CACHE = "governor-limits";
     public static final String USER_ID_CACHE = "user-id";
     public static final String WORKFLOW_RULES_CACHE = "workflow-rules";
+    public static final String LAYOUTS_CACHE = "layouts";
+    public static final String BOOTSTRAP_CACHE = "bootstrap";
 
     private final ControlPlaneProperties properties;
 
@@ -132,6 +134,18 @@ public class CacheConfig {
                 .entryTtl(Duration.ofMinutes(5)));
         log.info("Workflow rules cache configured with TTL: 5 minutes");
 
+        // Page layouts cache configuration (configurable TTL, evicted by Kafka events)
+        int layoutsTtl = properties.getCache().getLayouts().getTtl();
+        cacheConfigurations.put(LAYOUTS_CACHE, defaultConfig
+                .entryTtl(Duration.ofSeconds(layoutsTtl)));
+        log.info("Layouts cache configured with TTL: {} seconds", layoutsTtl);
+
+        // Gateway bootstrap cache configuration (configurable TTL, evicted by Kafka events)
+        int bootstrapTtl = properties.getCache().getBootstrap().getTtl();
+        cacheConfigurations.put(BOOTSTRAP_CACHE, defaultConfig
+                .entryTtl(Duration.ofSeconds(bootstrapTtl)));
+        log.info("Bootstrap cache configured with TTL: {} seconds", bootstrapTtl);
+
         return RedisCacheManager.builder(connectionFactory)
                 .cacheDefaults(defaultConfig.entryTtl(Duration.ofSeconds(collectionsTtl)))
                 .withInitialCacheConfigurations(cacheConfigurations)
@@ -149,6 +163,6 @@ public class CacheConfig {
     @ConditionalOnProperty(name = "spring.cache.type", havingValue = "none", matchIfMissing = true)
     public CacheManager inMemoryCacheManager() {
         log.info("Configuring in-memory cache manager (Redis not available)");
-        return new ConcurrentMapCacheManager(COLLECTIONS_CACHE, COLLECTIONS_LIST_CACHE, JWKS_CACHE, PERMISSIONS_CACHE, GOVERNOR_LIMITS_CACHE, USER_ID_CACHE, WORKFLOW_RULES_CACHE);
+        return new ConcurrentMapCacheManager(COLLECTIONS_CACHE, COLLECTIONS_LIST_CACHE, JWKS_CACHE, PERMISSIONS_CACHE, GOVERNOR_LIMITS_CACHE, USER_ID_CACHE, WORKFLOW_RULES_CACHE, LAYOUTS_CACHE, BOOTSTRAP_CACHE);
     }
 }

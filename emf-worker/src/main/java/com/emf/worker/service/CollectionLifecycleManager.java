@@ -281,6 +281,37 @@ public class CollectionLifecycleManager {
         builder.storageConfig(new com.emf.runtime.model.StorageConfig(
                 StorageMode.valueOf(storageMode), tableName, null));
 
+        // Parse system collection flags
+        if (Boolean.TRUE.equals(data.get("systemCollection"))) {
+            builder.systemCollection(true);
+        }
+        if (data.containsKey("tenantScoped")) {
+            builder.tenantScoped(Boolean.TRUE.equals(data.get("tenantScoped")));
+        }
+        if (Boolean.TRUE.equals(data.get("readOnly"))) {
+            builder.readOnly(true);
+        }
+
+        // Parse immutable fields
+        Object immutableFieldsObj = data.get("immutableFields");
+        if (immutableFieldsObj instanceof List<?> immutableList) {
+            for (Object item : immutableList) {
+                if (item instanceof String fieldName) {
+                    builder.addImmutableField(fieldName);
+                }
+            }
+        }
+
+        // Parse column mapping
+        Object columnMappingObj = data.get("columnMapping");
+        if (columnMappingObj instanceof Map<?, ?> mappingMap) {
+            for (Map.Entry<?, ?> entry : mappingMap.entrySet()) {
+                if (entry.getKey() instanceof String apiName && entry.getValue() instanceof String colName) {
+                    builder.addColumnMapping(apiName, colName);
+                }
+            }
+        }
+
         return builder.build();
     }
 

@@ -176,7 +176,12 @@ public class DefaultQueryEngine implements QueryEngine {
     public Map<String, Object> create(CollectionDefinition definition, Map<String, Object> data) {
         Objects.requireNonNull(definition, "definition cannot be null");
         Objects.requireNonNull(data, "data cannot be null");
-        
+
+        // Reject writes to read-only collections
+        if (definition.readOnly()) {
+            throw new ReadOnlyCollectionException(definition.name());
+        }
+
         // Create mutable copy
         Map<String, Object> recordData = new HashMap<>(data);
         
@@ -227,23 +232,39 @@ public class DefaultQueryEngine implements QueryEngine {
         Objects.requireNonNull(definition, "definition cannot be null");
         Objects.requireNonNull(id, "id cannot be null");
         Objects.requireNonNull(data, "data cannot be null");
-        
+
+        // Reject writes to read-only collections
+        if (definition.readOnly()) {
+            throw new ReadOnlyCollectionException(definition.name());
+        }
+
         // Check if record exists
         Optional<Map<String, Object>> existing = storageAdapter.getById(definition, id);
         if (existing.isEmpty()) {
             return Optional.empty();
         }
-        
+
         // Create mutable copy
         Map<String, Object> recordData = new HashMap<>(data);
-        
+
         // Update timestamp
         recordData.put("updatedAt", Instant.now());
-        
+
         // Don't allow changing id, createdAt, or createdBy
         recordData.remove("id");
         recordData.remove("createdAt");
         recordData.remove("createdBy");
+
+        // Strip immutable fields from update data
+        if (!definition.immutableFields().isEmpty()) {
+            for (String immutableField : definition.immutableFields()) {
+                if (recordData.containsKey(immutableField)) {
+                    logger.debug("Stripping immutable field '{}' from update on collection '{}'",
+                            immutableField, definition.name());
+                    recordData.remove(immutableField);
+                }
+            }
+        }
 
         // Encrypt ENCRYPTED fields before storage
         encryptFields(definition, recordData);
@@ -293,6 +314,11 @@ public class DefaultQueryEngine implements QueryEngine {
     public boolean delete(CollectionDefinition definition, String id) {
         Objects.requireNonNull(definition, "definition cannot be null");
         Objects.requireNonNull(id, "id cannot be null");
+
+        // Reject deletes on read-only collections
+        if (definition.readOnly()) {
+            throw new ReadOnlyCollectionException(definition.name());
+        }
 
         // Pre-fetch record data for the delete event (only when publisher is wired)
         Map<String, Object> recordData = null;

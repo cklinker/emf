@@ -76,8 +76,15 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
     
     @Override
     public void initializeCollection(CollectionDefinition definition) {
+        // System collections use Flyway-managed tables — skip table creation
+        if (definition.systemCollection()) {
+            log.info("Skipping table creation for system collection '{}' (table '{}' managed by Flyway)",
+                    definition.name(), getTableName(definition));
+            return;
+        }
+
         String tableName = getTableName(definition);
-        
+
         StringBuilder sql = new StringBuilder("CREATE TABLE IF NOT EXISTS ");
         sql.append(sanitizeIdentifier(tableName)).append(" (");
         sql.append("id VARCHAR(36) PRIMARY KEY, ");
@@ -94,8 +101,9 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
             }
 
             String sqlType = mapFieldTypeToSql(field.type());
+            String columnName = getColumnName(definition, field);
             sql.append(", ");
-            sql.append(sanitizeIdentifier(field.name())).append(" ").append(sqlType);
+            sql.append(sanitizeIdentifier(columnName)).append(" ").append(sqlType);
 
             if (!field.nullable()) {
                 sql.append(" NOT NULL");
@@ -182,39 +190,47 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
     public QueryResult query(CollectionDefinition definition, QueryRequest request) {
         String tableName = getTableName(definition);
         List<Object> params = new ArrayList<>();
-        
+
         // Build SELECT clause
         StringBuilder sql = new StringBuilder("SELECT ");
         sql.append(buildSelectClause(request.fields(), definition));
         sql.append(" FROM ").append(sanitizeIdentifier(tableName));
-        
+
         // Build WHERE clause for filters
+        List<FilterCondition> allFilters = new ArrayList<>();
         if (request.hasFilters()) {
-            sql.append(" WHERE ");
-            sql.append(buildWhereClause(request.filters(), params));
+            allFilters.addAll(request.filters());
         }
-        
+
+        if (!allFilters.isEmpty()) {
+            sql.append(" WHERE ");
+            sql.append(buildWhereClause(allFilters, definition, params));
+        }
+
         // Build ORDER BY clause
         if (request.hasSorting()) {
             sql.append(" ORDER BY ");
-            sql.append(buildOrderByClause(request.sorting()));
+            sql.append(buildOrderByClause(request.sorting(), definition));
         }
-        
+
         // Build LIMIT and OFFSET for pagination
         Pagination pagination = request.pagination();
         sql.append(" LIMIT ? OFFSET ?");
         params.add(pagination.pageSize());
         params.add(pagination.offset());
-        
+
         try {
             // Execute query
             List<Map<String, Object>> data = jdbcTemplate.queryForList(sql.toString(), params.toArray());
+
+            // Remap column names to field names for system collections
+            remapColumnNames(definition, data);
 
             // Reconstruct companion column values into structured fields
             reconstructCompanionColumns(definition, data);
 
             // Get total count
-            long totalCount = getTotalCount(tableName, request.filters());
+            long totalCount = getTotalCount(tableName, allFilters, definition);
 
             return QueryResult.of(data, totalCount, pagination);
         } catch (DataAccessException e) {
@@ -232,6 +248,8 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
             if (results.isEmpty()) {
                 return Optional.empty();
             }
+            // Remap column names to field names for system collections
+            remapColumnNames(definition, results);
             // Reconstruct companion column values
             reconstructCompanionColumns(definition, results);
             return Optional.of(results.get(0));
@@ -260,22 +278,29 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         columns.add("updated_at");
         values.add(convertValueForStorage(data.get("updatedAt"), FieldType.DATETIME));
         
+        // For tenant-scoped system collections, add tenant_id
+        if (definition.systemCollection() && definition.tenantScoped() && data.containsKey("tenantId")) {
+            columns.add("tenant_id");
+            values.add(data.get("tenantId"));
+        }
+
         // Add user-defined fields
         for (FieldDefinition field : definition.fields()) {
             if (!field.type().hasPhysicalColumn()) {
                 continue; // Skip FORMULA, ROLLUP_SUMMARY
             }
             if (data.containsKey(field.name())) {
-                columns.add(sanitizeIdentifier(field.name()));
+                String columnName = getColumnName(definition, field);
+                columns.add(sanitizeIdentifier(columnName));
                 values.add(convertValueForStorage(data.get(field.name()), field.type()));
 
                 // Handle companion columns
                 if (field.type() == FieldType.CURRENCY && data.containsKey(field.name() + "_currency_code")) {
-                    columns.add(sanitizeIdentifier(field.name() + "_currency_code"));
+                    columns.add(sanitizeIdentifier(columnName + "_currency_code"));
                     values.add(data.get(field.name() + "_currency_code"));
                 }
                 if (field.type() == FieldType.GEOLOCATION && data.get(field.name()) instanceof Map<?,?> geo) {
-                    columns.add(sanitizeIdentifier(field.name() + "_longitude"));
+                    columns.add(sanitizeIdentifier(columnName + "_longitude"));
                     values.add(((Number) geo.get("longitude")).doubleValue());
                 }
             }
@@ -328,7 +353,8 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         // Update user-defined fields
         for (FieldDefinition field : definition.fields()) {
             if (data.containsKey(field.name())) {
-                setClauses.add(sanitizeIdentifier(field.name()) + " = ?");
+                String columnName = getColumnName(definition, field);
+                setClauses.add(sanitizeIdentifier(columnName) + " = ?");
                 values.add(convertValueForStorage(data.get(field.name()), field.type()));
             }
         }
@@ -387,10 +413,11 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
     @Override
     public boolean isUnique(CollectionDefinition definition, String fieldName, Object value, String excludeId) {
         String tableName = getTableName(definition);
-        
+        String columnName = resolveColumnName(definition, fieldName);
+
         StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM ");
         sql.append(sanitizeIdentifier(tableName));
-        sql.append(" WHERE ").append(sanitizeIdentifier(fieldName)).append(" = ?");
+        sql.append(" WHERE ").append(sanitizeIdentifier(columnName)).append(" = ?");
         
         List<Object> params = new ArrayList<>();
         params.add(value);
@@ -508,26 +535,30 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
     
     /**
      * Builds the WHERE clause from filter conditions.
-     * 
+     *
      * @param filters the filter conditions
+     * @param definition the collection definition (used for column name mapping)
      * @param params the parameter list to populate
      * @return the WHERE clause (without the WHERE keyword)
      */
-    private String buildWhereClause(List<FilterCondition> filters, List<Object> params) {
+    private String buildWhereClause(List<FilterCondition> filters, CollectionDefinition definition,
+                                     List<Object> params) {
         return filters.stream()
-            .map(filter -> buildFilterCondition(filter, params))
+            .map(filter -> buildFilterCondition(filter, definition, params))
             .collect(Collectors.joining(" AND "));
     }
     
     /**
      * Builds a single filter condition SQL fragment.
-     * 
+     *
      * @param filter the filter condition
+     * @param definition the collection definition (used for column name mapping)
      * @param params the parameter list to populate
      * @return the SQL fragment for this filter
      */
-    private String buildFilterCondition(FilterCondition filter, List<Object> params) {
-        String fieldName = sanitizeIdentifier(filter.fieldName());
+    private String buildFilterCondition(FilterCondition filter, CollectionDefinition definition,
+                                         List<Object> params) {
+        String fieldName = sanitizeIdentifier(resolveColumnName(definition, filter.fieldName()));
         FilterOperator operator = filter.operator();
         Object value = filter.value();
         
@@ -594,33 +625,37 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
     
     /**
      * Builds the ORDER BY clause from sort fields.
-     * 
+     *
      * @param sorting the sort fields
+     * @param definition the collection definition (used for column name mapping)
      * @return the ORDER BY clause (without the ORDER BY keyword)
      */
-    private String buildOrderByClause(List<SortField> sorting) {
+    private String buildOrderByClause(List<SortField> sorting, CollectionDefinition definition) {
         return sorting.stream()
-            .map(sort -> sanitizeIdentifier(sort.fieldName()) + " " + sort.direction().name())
+            .map(sort -> sanitizeIdentifier(resolveColumnName(definition, sort.fieldName()))
+                    + " " + sort.direction().name())
             .collect(Collectors.joining(", "));
     }
     
     /**
      * Gets the total count of records matching the filter conditions.
-     * 
+     *
      * @param tableName the table name
      * @param filters the filter conditions
+     * @param definition the collection definition (used for column name mapping)
      * @return the total count
      */
-    private long getTotalCount(String tableName, List<FilterCondition> filters) {
+    private long getTotalCount(String tableName, List<FilterCondition> filters,
+                                CollectionDefinition definition) {
         StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM ");
         sql.append(sanitizeIdentifier(tableName));
-        
+
         List<Object> params = new ArrayList<>();
         if (filters != null && !filters.isEmpty()) {
             sql.append(" WHERE ");
-            sql.append(buildWhereClause(filters, params));
+            sql.append(buildWhereClause(filters, definition, params));
         }
-        
+
         Long count = jdbcTemplate.queryForObject(sql.toString(), Long.class, params.toArray());
         return count != null ? count : 0L;
     }
@@ -707,6 +742,107 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         };
     }
     
+    /**
+     * Gets the effective column name for a field within a collection.
+     * For system collections, fields may have a different physical column name
+     * (e.g., API field "firstName" → DB column "first_name").
+     *
+     * @param definition the collection definition
+     * @param field the field definition
+     * @return the effective column name
+     */
+    private String getColumnName(CollectionDefinition definition, FieldDefinition field) {
+        if (definition.systemCollection()) {
+            // Check field-level column name first
+            if (field.columnName() != null) {
+                return field.columnName();
+            }
+            // Then check collection-level column mapping
+            String mapped = definition.columnMapping().get(field.name());
+            if (mapped != null) {
+                return mapped;
+            }
+        }
+        return field.name();
+    }
+
+    /**
+     * Resolves an API field name to its physical database column name.
+     * Handles system field names (createdAt → created_at, etc.) and
+     * collection-level column mappings.
+     *
+     * @param definition the collection definition
+     * @param fieldName the API field name
+     * @return the physical column name
+     */
+    private String resolveColumnName(CollectionDefinition definition, String fieldName) {
+        // System audit fields always map to snake_case columns
+        return switch (fieldName) {
+            case "createdAt" -> "created_at";
+            case "updatedAt" -> "updated_at";
+            case "createdBy" -> "created_by";
+            case "updatedBy" -> "updated_by";
+            case "tenantId" -> "tenant_id";
+            default -> {
+                if (definition.systemCollection()) {
+                    yield definition.getEffectiveColumnName(fieldName);
+                }
+                yield fieldName;
+            }
+        };
+    }
+
+    /**
+     * Remaps column names in query results from physical database column names
+     * back to API field names. This is necessary for system collections where
+     * the column names (snake_case) differ from API field names (camelCase).
+     *
+     * <p>For non-system collections, this is a no-op since column names
+     * match field names.
+     *
+     * @param definition the collection definition
+     * @param records the query result records to remap in place
+     */
+    private void remapColumnNames(CollectionDefinition definition, List<Map<String, Object>> records) {
+        if (!definition.systemCollection()) {
+            return;
+        }
+
+        // Build reverse mapping: column name → field name
+        Map<String, String> reverseMap = new HashMap<>();
+
+        // System audit fields
+        reverseMap.put("created_at", "createdAt");
+        reverseMap.put("updated_at", "updatedAt");
+        reverseMap.put("created_by", "createdBy");
+        reverseMap.put("updated_by", "updatedBy");
+        reverseMap.put("tenant_id", "tenantId");
+
+        // Collection-level column mappings
+        for (Map.Entry<String, String> entry : definition.columnMapping().entrySet()) {
+            reverseMap.put(entry.getValue(), entry.getKey());
+        }
+
+        // Field-level column names
+        for (FieldDefinition field : definition.fields()) {
+            if (field.columnName() != null) {
+                reverseMap.put(field.columnName(), field.name());
+            }
+        }
+
+        // Apply remapping to each record
+        for (Map<String, Object> record : records) {
+            Map<String, Object> remapped = new HashMap<>();
+            for (Map.Entry<String, Object> entry : record.entrySet()) {
+                String columnName = entry.getKey();
+                String fieldName = reverseMap.getOrDefault(columnName, columnName);
+                remapped.put(fieldName, entry.getValue());
+            }
+            record.clear();
+            record.putAll(remapped);
+        }
+    }
+
     /**
      * Post-processes query results to convert JDBC-specific types into
      * JSON-serializable Java types and reconstructs structured values

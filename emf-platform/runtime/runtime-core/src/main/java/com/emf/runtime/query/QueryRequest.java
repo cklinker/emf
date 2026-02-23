@@ -125,10 +125,21 @@ public record QueryRequest(
     
     /**
      * Checks if this request has any filters specified.
-     * 
+     *
      * @return true if filters are specified
      */
     public boolean hasFilters() {
         return !filters.isEmpty();
+    }
+
+    /**
+     * Creates a new QueryRequest with the specified filters, preserving all
+     * other settings (pagination, sorting, fields).
+     *
+     * @param newFilters the new filter conditions
+     * @return a new QueryRequest with the updated filters
+     */
+    public QueryRequest withFilters(List<FilterCondition> newFilters) {
+        return new QueryRequest(pagination, sorting, fields, newFilters);
     }
 }

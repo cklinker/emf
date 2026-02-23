@@ -2,9 +2,12 @@ package com.emf.runtime.router;
 
 import com.emf.runtime.model.CollectionDefinition;
 import com.emf.runtime.model.FieldDefinition;
+import com.emf.runtime.query.FilterCondition;
+import com.emf.runtime.query.FilterOperator;
 import com.emf.runtime.query.QueryEngine;
 import com.emf.runtime.query.QueryRequest;
 import com.emf.runtime.query.QueryResult;
+import com.emf.runtime.query.ReadOnlyCollectionException;
 import com.emf.runtime.registry.CollectionOnDemandLoader;
 import com.emf.runtime.registry.CollectionRegistry;
 import org.slf4j.Logger;
@@ -103,6 +106,10 @@ public class DynamicCollectionRouter {
         }
 
         QueryRequest queryRequest = QueryRequest.fromParams(params);
+
+        // For tenant-scoped system collections, inject tenant_id filter
+        queryRequest = injectTenantFilter(queryRequest, definition, request);
+
         QueryResult result = queryEngine.executeQuery(definition, queryRequest);
 
         return ResponseEntity.ok(toJsonApiListResponse(result, collectionName, definition));
@@ -155,6 +162,12 @@ public class DynamicCollectionRouter {
             return ResponseEntity.notFound().build();
         }
 
+        // Reject writes to read-only collections
+        if (definition.readOnly()) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
+                    toJsonApiErrorResponse("Collection '" + collectionName + "' is read-only"));
+        }
+
         // Extract attributes from JSON:API format
         Map<String, Object> attributes = extractAttributes(requestBody);
 
@@ -172,8 +185,11 @@ public class DynamicCollectionRouter {
             data.put("updatedBy", userId);
         }
 
+        // Inject tenant ID for tenant-scoped system collections
+        injectTenantId(data, definition, request);
+
         Map<String, Object> created = queryEngine.create(definition, data);
-        
+
         // Return in JSON:API format
         return ResponseEntity.status(HttpStatus.CREATED).body(toJsonApiResponse(created, collectionName, definition));
     }
@@ -237,6 +253,12 @@ public class DynamicCollectionRouter {
             return ResponseEntity.notFound().build();
         }
 
+        // Reject writes to read-only collections
+        if (definition.readOnly()) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
+                    toJsonApiErrorResponse("Collection '" + collectionName + "' is read-only"));
+        }
+
         // Extract attributes from JSON:API format
         Map<String, Object> attributes = extractAttributes(requestBody);
 
@@ -278,12 +300,80 @@ public class DynamicCollectionRouter {
             logger.debug("Collection '{}' not found", collectionName);
             return ResponseEntity.notFound().build();
         }
-        
+
+        // Reject deletes on read-only collections
+        if (definition.readOnly()) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+
         boolean deleted = queryEngine.delete(definition, id);
         return deleted ? ResponseEntity.noContent().build() 
                        : ResponseEntity.notFound().build();
     }
     
+    /**
+     * Injects a tenant_id filter for tenant-scoped system collections.
+     * This ensures list queries only return records for the current tenant.
+     *
+     * @param queryRequest the original query request
+     * @param definition the collection definition
+     * @param request the HTTP servlet request (used to extract tenant ID)
+     * @return the query request with tenant filter injected, or the original if not applicable
+     */
+    private QueryRequest injectTenantFilter(QueryRequest queryRequest, CollectionDefinition definition,
+                                             HttpServletRequest request) {
+        if (!definition.systemCollection() || !definition.tenantScoped()) {
+            return queryRequest;
+        }
+
+        String tenantId = request.getHeader("X-Tenant-ID");
+        if (tenantId == null || tenantId.isBlank()) {
+            logger.warn("No tenant ID found for tenant-scoped system collection '{}'", definition.name());
+            return queryRequest;
+        }
+
+        // Add tenant_id filter
+        List<FilterCondition> filters = new ArrayList<>(queryRequest.filters());
+        filters.add(new FilterCondition("tenantId", FilterOperator.EQ, tenantId));
+        return queryRequest.withFilters(filters);
+    }
+
+    /**
+     * Injects tenant ID into record data for tenant-scoped system collections.
+     *
+     * @param data the record data
+     * @param definition the collection definition
+     * @param request the HTTP servlet request (used to extract tenant ID)
+     */
+    private void injectTenantId(Map<String, Object> data, CollectionDefinition definition,
+                                 HttpServletRequest request) {
+        if (!definition.systemCollection() || !definition.tenantScoped()) {
+            return;
+        }
+
+        String tenantId = request.getHeader("X-Tenant-ID");
+        if (tenantId != null && !tenantId.isBlank() && !data.containsKey("tenantId")) {
+            data.put("tenantId", tenantId);
+        }
+    }
+
+    /**
+     * Builds a JSON:API error response.
+     *
+     * @param message the error message
+     * @return a JSON:API error document
+     */
+    private Map<String, Object> toJsonApiErrorResponse(String message) {
+        Map<String, Object> error = new java.util.HashMap<>();
+        error.put("status", "403");
+        error.put("title", "Forbidden");
+        error.put("detail", message);
+
+        Map<String, Object> response = new java.util.HashMap<>();
+        response.put("errors", List.of(error));
+        return response;
+    }
+
     /**
      * Resolves a collection definition by name, with on-demand loading fallback.
      *

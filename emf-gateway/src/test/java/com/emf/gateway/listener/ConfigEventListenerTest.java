@@ -175,12 +175,12 @@ class ConfigEventListenerTest {
         }
 
         @Test
-        @DisplayName("Should ignore collection changed event for any system collection by name prefix")
-        void shouldIgnoreSystemCollectionByNamePrefix() {
+        @DisplayName("Should ignore collection changed event for __control-plane by name")
+        void shouldIgnoreControlPlaneCollectionByName() {
             // Arrange
             CollectionChangedPayload payload = new CollectionChangedPayload();
             payload.setId("some-other-id");
-            payload.setName("__internal-metrics");
+            payload.setName("__control-plane");
             payload.setChangeType(ChangeType.UPDATED);
 
             ConfigEvent<CollectionChangedPayload> event = new ConfigEvent<>(
@@ -197,6 +197,36 @@ class ConfigEventListenerTest {
             // Assert
             verify(routeRegistry, never()).updateRoute(any());
             verify(routeRegistry, never()).removeRoute(any());
+        }
+
+        @Test
+        @DisplayName("Should route system collections like users normally")
+        void shouldRouteSystemCollectionsNormally() {
+            // Arrange — system collections (users, profiles, etc.) should be routed to worker
+            CollectionChangedPayload payload = new CollectionChangedPayload();
+            payload.setId("sys-users-id");
+            payload.setName("users");
+            payload.setChangeType(ChangeType.CREATED);
+
+            ConfigEvent<CollectionChangedPayload> event = new ConfigEvent<>(
+                UUID.randomUUID().toString(),
+                "config.collection.changed",
+                UUID.randomUUID().toString(),
+                Instant.now(),
+                payload
+            );
+
+            // Act
+            listener.handleCollectionChanged(event);
+
+            // Assert — system collections ARE routed
+            ArgumentCaptor<RouteDefinition> routeCaptor = ArgumentCaptor.forClass(RouteDefinition.class);
+            verify(routeRegistry).updateRoute(routeCaptor.capture());
+
+            RouteDefinition route = routeCaptor.getValue();
+            assertEquals("sys-users-id", route.getId());
+            assertEquals("users", route.getCollectionName());
+            assertEquals("/api/users/**", route.getPath());
         }
     }
 
@@ -334,14 +364,14 @@ class ConfigEventListenerTest {
         }
 
         @Test
-        @DisplayName("Should ignore worker assignment event for system collection by name prefix")
-        void shouldIgnoreSystemCollectionWorkerAssignmentByName() {
+        @DisplayName("Should ignore worker assignment event for __control-plane by name")
+        void shouldIgnoreControlPlaneWorkerAssignmentByName() {
             // Arrange
             Map<String, Object> payload = new HashMap<>();
             payload.put("workerId", "worker-1");
             payload.put("collectionId", "some-other-id");
             payload.put("workerBaseUrl", "http://worker-1:8080");
-            payload.put("collectionName", "__internal-metrics");
+            payload.put("collectionName", "__control-plane");
             payload.put("changeType", "CREATED");
 
             ConfigEvent<Object> event = new ConfigEvent<>(
@@ -358,6 +388,38 @@ class ConfigEventListenerTest {
             // Assert
             verify(routeRegistry, never()).updateRoute(any());
             verify(routeRegistry, never()).removeRoute(any());
+        }
+
+        @Test
+        @DisplayName("Should route system collection worker assignment normally")
+        void shouldRouteSystemCollectionWorkerAssignmentNormally() {
+            // Arrange — system collections (profiles, etc.) assigned to worker should be routed
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("workerId", "worker-1");
+            payload.put("collectionId", "sys-profiles-id");
+            payload.put("workerBaseUrl", "http://10.1.150.150:8080");
+            payload.put("collectionName", "profiles");
+            payload.put("changeType", "CREATED");
+
+            ConfigEvent<Object> event = new ConfigEvent<>(
+                UUID.randomUUID().toString(),
+                "emf.worker.assignment.changed",
+                UUID.randomUUID().toString(),
+                Instant.now(),
+                payload
+            );
+
+            // Act
+            listener.handleWorkerAssignmentChanged(event);
+
+            // Assert — system collections ARE routed
+            ArgumentCaptor<RouteDefinition> routeCaptor = ArgumentCaptor.forClass(RouteDefinition.class);
+            verify(routeRegistry).updateRoute(routeCaptor.capture());
+
+            RouteDefinition route = routeCaptor.getValue();
+            assertEquals("sys-profiles-id", route.getId());
+            assertEquals("profiles", route.getCollectionName());
+            assertEquals(WORKER_SERVICE_URL, route.getBackendUrl());
         }
 
         @Test

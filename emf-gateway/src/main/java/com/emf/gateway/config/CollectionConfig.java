@@ -15,6 +15,7 @@ public class CollectionConfig {
     private String path;
     private String workerBaseUrl;
     private List<FieldConfig> fields;
+    private boolean systemCollection;
 
     public CollectionConfig() {
     }
@@ -64,6 +65,14 @@ public class CollectionConfig {
 
     public void setFields(List<FieldConfig> fields) {
         this.fields = fields;
+    }
+
+    public boolean isSystemCollection() {
+        return systemCollection;
+    }
+
+    public void setSystemCollection(boolean systemCollection) {
+        this.systemCollection = systemCollection;
     }
 
     @Override

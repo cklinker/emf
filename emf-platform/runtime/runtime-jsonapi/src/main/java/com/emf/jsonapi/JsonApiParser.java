@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -448,6 +449,59 @@ public class JsonApiParser {
         } catch (JsonProcessingException e) {
             log.error("Failed to serialize ResourceObject to JSON: {}", e.getMessage());
             throw new JsonApiParseException("Failed to serialize ResourceObject to JSON", e);
+        }
+    }
+
+    /**
+     * Serializes a JsonApiDocument to a JSON string.
+     *
+     * <p>Handles the single-resource vs collection distinction for the {@code data}
+     * field: when {@link JsonApiDocument#isSingleResource()} is {@code true} and
+     * data contains exactly one element, the data field is serialized as a single
+     * JSON object instead of an array — as required by the JSON:API specification.
+     *
+     * @param document The JsonApiDocument to serialize
+     * @return JSON string representation of the document
+     * @throws JsonApiParseException if the document is null or serialization fails
+     */
+    public String serialize(JsonApiDocument document) {
+        if (document == null) {
+            throw new JsonApiParseException("JsonApiDocument is null");
+        }
+
+        try {
+            Map<String, Object> result = new LinkedHashMap<>();
+
+            // Serialize data field — respect single resource vs collection
+            if (document.getData() != null) {
+                if (document.isSingleResource() && document.getData().size() == 1) {
+                    result.put("data", document.getData().get(0));
+                } else if (document.isSingleResource() && document.getData().isEmpty()) {
+                    result.put("data", null);
+                } else {
+                    result.put("data", document.getData());
+                }
+            }
+
+            // Serialize included resources
+            if (document.hasIncluded()) {
+                result.put("included", document.getIncluded());
+            }
+
+            // Serialize meta
+            if (document.getMeta() != null) {
+                result.put("meta", document.getMeta());
+            }
+
+            // Serialize errors
+            if (document.hasErrors()) {
+                result.put("errors", document.getErrors());
+            }
+
+            return objectMapper.writeValueAsString(result);
+        } catch (JsonProcessingException e) {
+            log.error("Failed to serialize JsonApiDocument to JSON: {}", e.getMessage());
+            throw new JsonApiParseException("Failed to serialize JsonApiDocument to JSON", e);
         }
     }
 }

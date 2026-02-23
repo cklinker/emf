@@ -66,10 +66,12 @@ public class GatewayBootstrapService {
         // Build a map of collectionId -> workerBaseUrl from READY assignments
         Map<String, String> workerUrlByCollection = buildWorkerUrlMap();
 
-        // Map only non-system collections to route DTOs (system collections like control-plane
-        // are handled by RouteInitializer, not dynamic route creation)
+        // Map all active collections to route DTOs.
+        // System collections (users, profiles, etc.) are included so the gateway creates
+        // routes for them, pointing to the worker. The __control-plane collection is
+        // excluded since it has a static route managed by RouteInitializer.
         List<GatewayBootstrapConfigDto.CollectionDto> collectionDtos = allCollections.stream()
-                .filter(c -> !c.isSystemCollection())
+                .filter(c -> !"__control-plane".equals(c.getName()))
                 .map(c -> mapCollectionToDto(c, workerUrlByCollection.get(c.getId())))
                 .collect(Collectors.toList());
 
@@ -103,7 +105,8 @@ public class GatewayBootstrapService {
                 collection.getName(),
                 path,
                 workerBaseUrl,
-                fieldDtos
+                fieldDtos,
+                collection.isSystemCollection()
         );
     }
 

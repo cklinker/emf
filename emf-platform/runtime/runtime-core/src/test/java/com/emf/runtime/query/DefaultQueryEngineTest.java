@@ -12,6 +12,10 @@ import com.emf.runtime.validation.RecordValidationException;
 import com.emf.runtime.validation.ValidationEngine;
 import com.emf.runtime.validation.ValidationError;
 import com.emf.runtime.validation.ValidationException;
+import com.emf.runtime.validation.ValidationResult;
+import com.emf.runtime.workflow.BeforeSaveHook;
+import com.emf.runtime.workflow.BeforeSaveHookRegistry;
+import com.emf.runtime.workflow.BeforeSaveResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -20,6 +24,7 @@ import org.mockito.ArgumentCaptor;
 
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -839,6 +844,210 @@ class DefaultQueryEngineTest {
             assertTrue(changedFields.contains("category"), "category should be in changedFields");
             assertFalse(changedFields.contains("name"), "name should NOT be in changedFields (unchanged)");
             assertFalse(changedFields.contains("updatedAt"), "updatedAt should NOT be in changedFields");
+        }
+    }
+
+    @Nested
+    @DisplayName("BeforeSaveHook Integration Tests")
+    class BeforeSaveHookTests {
+
+        private BeforeSaveHookRegistry hookRegistry;
+        private DefaultQueryEngine engineWithHooks;
+        private ValidationEngine hookValidationEngine;
+
+        @BeforeEach
+        void setUp() {
+            hookRegistry = new BeforeSaveHookRegistry();
+            hookValidationEngine = mock(ValidationEngine.class);
+            // Default: validation passes for both 3-arg and 4-arg overloads
+            when(hookValidationEngine.validate(any(CollectionDefinition.class), anyMap(), any(OperationType.class)))
+                .thenReturn(ValidationResult.success());
+            when(hookValidationEngine.validate(any(CollectionDefinition.class), anyMap(), any(OperationType.class), any()))
+                .thenCallRealMethod();
+            engineWithHooks = new DefaultQueryEngine(
+                storageAdapter, hookValidationEngine, null, null, null, null, null, null, hookRegistry);
+        }
+
+        @Test
+        @DisplayName("Should call before-create hook during create")
+        void shouldCallBeforeCreateHook() {
+            AtomicBoolean hookCalled = new AtomicBoolean(false);
+            hookRegistry.register(new BeforeSaveHook() {
+                @Override
+                public String getCollectionName() { return "products"; }
+                @Override
+                public BeforeSaveResult beforeCreate(Map<String, Object> record, String tenantId) {
+                    hookCalled.set(true);
+                    return BeforeSaveResult.ok();
+                }
+            });
+
+            Map<String, Object> data = new HashMap<>(Map.of("name", "Widget", "price", 9.99));
+            when(storageAdapter.create(any(CollectionDefinition.class), any())).thenAnswer(inv -> inv.getArgument(1));
+
+            engineWithHooks.create(testCollection, data);
+            assertTrue(hookCalled.get(), "Before-create hook should have been called");
+        }
+
+        @Test
+        @DisplayName("Should apply field updates from before-create hook")
+        void shouldApplyFieldUpdatesFromBeforeCreateHook() {
+            hookRegistry.register(new BeforeSaveHook() {
+                @Override
+                public String getCollectionName() { return "products"; }
+                @Override
+                public BeforeSaveResult beforeCreate(Map<String, Object> record, String tenantId) {
+                    return BeforeSaveResult.withFieldUpdates(Map.of("category", "DEFAULT"));
+                }
+            });
+
+            Map<String, Object> data = new HashMap<>(Map.of("name", "Widget", "price", 9.99));
+            when(storageAdapter.create(any(CollectionDefinition.class), any())).thenAnswer(inv -> {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> savedData = (Map<String, Object>) inv.getArgument(1);
+                return savedData;
+            });
+
+            Map<String, Object> result = engineWithHooks.create(testCollection, data);
+            assertEquals("DEFAULT", result.get("category"), "Field update from hook should be applied");
+        }
+
+        @Test
+        @DisplayName("Should block create when before-create hook returns error")
+        void shouldBlockCreateOnHookError() {
+            hookRegistry.register(new BeforeSaveHook() {
+                @Override
+                public String getCollectionName() { return "products"; }
+                @Override
+                public BeforeSaveResult beforeCreate(Map<String, Object> record, String tenantId) {
+                    return BeforeSaveResult.error("name", "Product name is forbidden");
+                }
+            });
+
+            Map<String, Object> data = new HashMap<>(Map.of("name", "Forbidden", "price", 0.0));
+
+            assertThrows(ValidationException.class, () ->
+                engineWithHooks.create(testCollection, data));
+
+            // Verify storage was never called
+            verify(storageAdapter, never()).create(any(CollectionDefinition.class), any());
+        }
+
+        @Test
+        @DisplayName("Should call before-update hook during update")
+        void shouldCallBeforeUpdateHook() {
+            AtomicBoolean hookCalled = new AtomicBoolean(false);
+            hookRegistry.register(new BeforeSaveHook() {
+                @Override
+                public String getCollectionName() { return "products"; }
+                @Override
+                public BeforeSaveResult beforeUpdate(String id, Map<String, Object> record,
+                                                      Map<String, Object> previous, String tenantId) {
+                    hookCalled.set(true);
+                    return BeforeSaveResult.ok();
+                }
+            });
+
+            String id = UUID.randomUUID().toString();
+            Map<String, Object> existingRecord = new HashMap<>(Map.of(
+                "id", id, "name", "Widget", "price", 9.99, "createdAt", Instant.now().toString(),
+                "updatedAt", Instant.now().toString()));
+
+            when(storageAdapter.getById(any(CollectionDefinition.class), eq(id)))
+                .thenReturn(Optional.of(existingRecord));
+            when(storageAdapter.update(any(CollectionDefinition.class), eq(id), any()))
+                .thenReturn(Optional.of(existingRecord));
+
+            Map<String, Object> updateData = new HashMap<>(Map.of("price", 19.99));
+            engineWithHooks.update(testCollection, id, updateData);
+            assertTrue(hookCalled.get(), "Before-update hook should have been called");
+        }
+
+        @Test
+        @DisplayName("Should block update when before-update hook returns error")
+        void shouldBlockUpdateOnHookError() {
+            hookRegistry.register(new BeforeSaveHook() {
+                @Override
+                public String getCollectionName() { return "products"; }
+                @Override
+                public BeforeSaveResult beforeUpdate(String id, Map<String, Object> record,
+                                                      Map<String, Object> previous, String tenantId) {
+                    return BeforeSaveResult.error("price", "Price cannot be negative");
+                }
+            });
+
+            String id = UUID.randomUUID().toString();
+            Map<String, Object> existingRecord = new HashMap<>(Map.of(
+                "id", id, "name", "Widget", "price", 9.99, "createdAt", Instant.now().toString(),
+                "updatedAt", Instant.now().toString()));
+
+            when(storageAdapter.getById(any(CollectionDefinition.class), eq(id)))
+                .thenReturn(Optional.of(existingRecord));
+
+            Map<String, Object> updateData = new HashMap<>(Map.of("price", -5.0));
+
+            assertThrows(ValidationException.class, () ->
+                engineWithHooks.update(testCollection, id, updateData));
+
+            // Verify storage update was never called
+            verify(storageAdapter, never()).update(any(CollectionDefinition.class), eq(id), any());
+        }
+
+        @Test
+        @DisplayName("Should call after-create hook after successful create")
+        void shouldCallAfterCreateHook() {
+            AtomicBoolean afterHookCalled = new AtomicBoolean(false);
+            hookRegistry.register(new BeforeSaveHook() {
+                @Override
+                public String getCollectionName() { return "products"; }
+                @Override
+                public void afterCreate(Map<String, Object> record, String tenantId) {
+                    afterHookCalled.set(true);
+                }
+            });
+
+            Map<String, Object> data = new HashMap<>(Map.of("name", "Widget", "price", 9.99));
+            when(storageAdapter.create(any(CollectionDefinition.class), any())).thenAnswer(inv -> inv.getArgument(1));
+
+            engineWithHooks.create(testCollection, data);
+            assertTrue(afterHookCalled.get(), "After-create hook should have been called");
+        }
+
+        @Test
+        @DisplayName("Should skip hooks when registry is null")
+        void shouldSkipHooksWhenRegistryIsNull() {
+            DefaultQueryEngine engineNoHooks = new DefaultQueryEngine(storageAdapter, hookValidationEngine);
+
+            Map<String, Object> data = new HashMap<>(Map.of("name", "Widget", "price", 9.99));
+            when(storageAdapter.create(any(CollectionDefinition.class), any())).thenAnswer(inv -> inv.getArgument(1));
+
+            // Should not throw even without hook registry
+            assertDoesNotThrow(() -> engineNoHooks.create(testCollection, data));
+        }
+
+        @Test
+        @DisplayName("Should call after-delete hook after successful delete")
+        void shouldCallAfterDeleteHook() {
+            AtomicBoolean afterHookCalled = new AtomicBoolean(false);
+            hookRegistry.register(new BeforeSaveHook() {
+                @Override
+                public String getCollectionName() { return "products"; }
+                @Override
+                public void afterDelete(String id, String tenantId) {
+                    afterHookCalled.set(true);
+                }
+            });
+
+            String id = UUID.randomUUID().toString();
+            Map<String, Object> existingRecord = new HashMap<>(Map.of(
+                "id", id, "name", "Widget", "price", 9.99));
+            when(storageAdapter.getById(any(CollectionDefinition.class), eq(id)))
+                .thenReturn(Optional.of(existingRecord));
+            when(storageAdapter.delete(any(CollectionDefinition.class), eq(id)))
+                .thenReturn(true);
+
+            engineWithHooks.delete(testCollection, id);
+            assertTrue(afterHookCalled.get(), "After-delete hook should have been called");
         }
     }
 }

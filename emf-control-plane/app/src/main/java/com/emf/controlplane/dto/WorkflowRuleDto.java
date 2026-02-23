@@ -17,6 +17,7 @@ public class WorkflowRuleDto {
     private String filterFormula;
     private boolean reEvaluateOnUpdate;
     private int executionOrder;
+    private String errorHandling;
     private List<ActionDto> actions;
     private Instant createdAt;
     private Instant updatedAt;
@@ -32,6 +33,7 @@ public class WorkflowRuleDto {
         dto.setFilterFormula(entity.getFilterFormula());
         dto.setReEvaluateOnUpdate(entity.isReEvaluateOnUpdate());
         dto.setExecutionOrder(entity.getExecutionOrder());
+        dto.setErrorHandling(entity.getErrorHandling());
         dto.setActions(entity.getActions().stream().map(ActionDto::fromEntity).toList());
         dto.setCreatedAt(entity.getCreatedAt());
         dto.setUpdatedAt(entity.getUpdatedAt());
@@ -85,6 +87,8 @@ public class WorkflowRuleDto {
     public void setReEvaluateOnUpdate(boolean reEvaluateOnUpdate) { this.reEvaluateOnUpdate = reEvaluateOnUpdate; }
     public int getExecutionOrder() { return executionOrder; }
     public void setExecutionOrder(int executionOrder) { this.executionOrder = executionOrder; }
+    public String getErrorHandling() { return errorHandling; }
+    public void setErrorHandling(String errorHandling) { this.errorHandling = errorHandling; }
     public List<ActionDto> getActions() { return actions; }
     public void setActions(List<ActionDto> actions) { this.actions = actions; }
     public Instant getCreatedAt() { return createdAt; }

@@ -69,6 +69,7 @@ public class WorkflowRuleService {
         rule.setFilterFormula(request.getFilterFormula());
         rule.setReEvaluateOnUpdate(request.getReEvaluateOnUpdate() != null ? request.getReEvaluateOnUpdate() : false);
         rule.setExecutionOrder(request.getExecutionOrder() != null ? request.getExecutionOrder() : 0);
+        rule.setErrorHandling(request.getErrorHandling() != null ? request.getErrorHandling() : "STOP_ON_ERROR");
 
         if (request.getActions() != null) {
             for (CreateWorkflowRuleRequest.ActionRequest actionReq : request.getActions()) {
@@ -98,6 +99,7 @@ public class WorkflowRuleService {
         if (request.getFilterFormula() != null) rule.setFilterFormula(request.getFilterFormula());
         if (request.getReEvaluateOnUpdate() != null) rule.setReEvaluateOnUpdate(request.getReEvaluateOnUpdate());
         if (request.getExecutionOrder() != null) rule.setExecutionOrder(request.getExecutionOrder());
+        if (request.getErrorHandling() != null) rule.setErrorHandling(request.getErrorHandling());
 
         if (request.getCollectionId() != null) {
             Collection collection = collectionService.getCollection(request.getCollectionId());

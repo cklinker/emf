@@ -39,6 +39,15 @@ import java.util.Optional;
  *   <li>PUT /api/collections/{collectionName}/{id} - Update an existing record</li>
  *   <li>DELETE /api/collections/{collectionName}/{id} - Delete a record</li>
  * </ul>
+ *
+ * <p>Sub-resource endpoints (for parent-child relationships):
+ * <ul>
+ *   <li>GET /api/collections/{parent}/{parentId}/{child} - List child records for a parent</li>
+ *   <li>GET /api/collections/{parent}/{parentId}/{child}/{childId} - Get a child record</li>
+ *   <li>POST /api/collections/{parent}/{parentId}/{child} - Create a child record</li>
+ *   <li>PUT /api/collections/{parent}/{parentId}/{child}/{childId} - Update a child record</li>
+ *   <li>DELETE /api/collections/{parent}/{parentId}/{child}/{childId} - Delete a child record</li>
+ * </ul>
  * 
  * <p>Query Parameters for list endpoint:
  * <ul>
@@ -307,10 +316,296 @@ public class DynamicCollectionRouter {
         }
 
         boolean deleted = queryEngine.delete(definition, id);
-        return deleted ? ResponseEntity.noContent().build() 
+        return deleted ? ResponseEntity.noContent().build()
                        : ResponseEntity.notFound().build();
     }
-    
+
+    // ==================== Sub-Resource Endpoints ====================
+
+    /**
+     * Lists child records under a parent resource.
+     *
+     * <p>Resolves the relationship between parent and child collections,
+     * then filters child records by the parent's ID.
+     *
+     * @param parentName the parent collection name
+     * @param parentId the parent record ID
+     * @param childName the child collection name
+     * @param params query parameters for pagination, sorting, filtering
+     * @param request the HTTP servlet request
+     * @return child records filtered by parent, or 404 if collections/relationship not found
+     */
+    @GetMapping("/{parentName}/{parentId}/{childName}")
+    public ResponseEntity<Map<String, Object>> listChildren(
+            @PathVariable("parentName") String parentName,
+            @PathVariable("parentId") String parentId,
+            @PathVariable("childName") String childName,
+            @RequestParam(required = false) Map<String, String> params,
+            HttpServletRequest request) {
+
+        logger.debug("List children request: parent='{}', parentId='{}', child='{}'",
+                parentName, parentId, childName);
+
+        SubResourceRelation relation = resolveSubResource(parentName, childName, request);
+        if (relation == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        QueryRequest queryRequest = QueryRequest.fromParams(params);
+
+        // Inject parent ID filter on the child's reference field
+        List<FilterCondition> filters = new ArrayList<>(queryRequest.filters());
+        filters.add(new FilterCondition(relation.parentRefFieldName(), FilterOperator.EQ, parentId));
+        queryRequest = queryRequest.withFilters(filters);
+
+        // Inject tenant filter if applicable
+        queryRequest = injectTenantFilter(queryRequest, relation.childDef(), request);
+
+        QueryResult result = queryEngine.executeQuery(relation.childDef(), queryRequest);
+
+        return ResponseEntity.ok(toJsonApiListResponse(result, childName, relation.childDef()));
+    }
+
+    /**
+     * Gets a single child record under a parent resource.
+     *
+     * @param parentName the parent collection name
+     * @param parentId the parent record ID
+     * @param childName the child collection name
+     * @param childId the child record ID
+     * @param request the HTTP servlet request
+     * @return the child record, or 404 if not found
+     */
+    @GetMapping("/{parentName}/{parentId}/{childName}/{childId}")
+    public ResponseEntity<Map<String, Object>> getChild(
+            @PathVariable("parentName") String parentName,
+            @PathVariable("parentId") String parentId,
+            @PathVariable("childName") String childName,
+            @PathVariable("childId") String childId,
+            HttpServletRequest request) {
+
+        logger.debug("Get child request: parent='{}', parentId='{}', child='{}', childId='{}'",
+                parentName, parentId, childName, childId);
+
+        SubResourceRelation relation = resolveSubResource(parentName, childName, request);
+        if (relation == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        Optional<Map<String, Object>> record = queryEngine.getById(relation.childDef(), childId);
+        return record.map(r -> ResponseEntity.ok(toJsonApiResponse(r, childName, relation.childDef())))
+                     .orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Creates a child record under a parent resource.
+     *
+     * <p>Automatically sets the parent reference field to the parent ID.
+     *
+     * @param parentName the parent collection name
+     * @param parentId the parent record ID
+     * @param childName the child collection name
+     * @param requestBody the JSON:API formatted request body
+     * @param request the HTTP servlet request
+     * @return the created record with 201 status
+     */
+    @PostMapping("/{parentName}/{parentId}/{childName}")
+    public ResponseEntity<Map<String, Object>> createChild(
+            @PathVariable("parentName") String parentName,
+            @PathVariable("parentId") String parentId,
+            @PathVariable("childName") String childName,
+            @RequestBody Map<String, Object> requestBody,
+            HttpServletRequest request) {
+
+        logger.debug("Create child request: parent='{}', parentId='{}', child='{}'",
+                parentName, parentId, childName);
+
+        SubResourceRelation relation = resolveSubResource(parentName, childName, request);
+        if (relation == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        if (relation.childDef().readOnly()) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
+                    toJsonApiErrorResponse("Collection '" + childName + "' is read-only"));
+        }
+
+        Map<String, Object> attributes = extractAttributes(requestBody);
+        Map<String, Object> relationships = extractRelationships(requestBody);
+
+        Map<String, Object> data = new java.util.HashMap<>(attributes);
+        data.putAll(relationships);
+
+        // Auto-set the parent reference field
+        data.put(relation.parentRefFieldName(), parentId);
+
+        // Inject audit fields
+        String userId = request.getHeader("X-User-Id");
+        if (userId != null) {
+            data.put("createdBy", userId);
+            data.put("updatedBy", userId);
+        }
+
+        // Inject tenant ID for tenant-scoped system collections
+        injectTenantId(data, relation.childDef(), request);
+
+        Map<String, Object> created = queryEngine.create(relation.childDef(), data);
+
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(toJsonApiResponse(created, childName, relation.childDef()));
+    }
+
+    /**
+     * Updates a child record under a parent resource (PUT).
+     *
+     * @param parentName the parent collection name
+     * @param parentId the parent record ID
+     * @param childName the child collection name
+     * @param childId the child record ID
+     * @param requestBody the JSON:API formatted request body
+     * @param request the HTTP servlet request
+     * @return the updated record, or 404 if not found
+     */
+    @PutMapping("/{parentName}/{parentId}/{childName}/{childId}")
+    public ResponseEntity<Map<String, Object>> updateChild(
+            @PathVariable("parentName") String parentName,
+            @PathVariable("parentId") String parentId,
+            @PathVariable("childName") String childName,
+            @PathVariable("childId") String childId,
+            @RequestBody Map<String, Object> requestBody,
+            HttpServletRequest request) {
+
+        return performChildUpdate(parentName, parentId, childName, childId, requestBody, request);
+    }
+
+    /**
+     * Updates a child record under a parent resource (PATCH).
+     *
+     * @param parentName the parent collection name
+     * @param parentId the parent record ID
+     * @param childName the child collection name
+     * @param childId the child record ID
+     * @param requestBody the JSON:API formatted request body
+     * @param request the HTTP servlet request
+     * @return the updated record, or 404 if not found
+     */
+    @PatchMapping("/{parentName}/{parentId}/{childName}/{childId}")
+    public ResponseEntity<Map<String, Object>> patchChild(
+            @PathVariable("parentName") String parentName,
+            @PathVariable("parentId") String parentId,
+            @PathVariable("childName") String childName,
+            @PathVariable("childId") String childId,
+            @RequestBody Map<String, Object> requestBody,
+            HttpServletRequest request) {
+
+        return performChildUpdate(parentName, parentId, childName, childId, requestBody, request);
+    }
+
+    /**
+     * Performs the child update operation.
+     */
+    private ResponseEntity<Map<String, Object>> performChildUpdate(
+            String parentName, String parentId,
+            String childName, String childId,
+            Map<String, Object> requestBody,
+            HttpServletRequest request) {
+
+        logger.debug("Update child request: parent='{}', parentId='{}', child='{}', childId='{}'",
+                parentName, parentId, childName, childId);
+
+        SubResourceRelation relation = resolveSubResource(parentName, childName, request);
+        if (relation == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        if (relation.childDef().readOnly()) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
+                    toJsonApiErrorResponse("Collection '" + childName + "' is read-only"));
+        }
+
+        Map<String, Object> attributes = extractAttributes(requestBody);
+        Map<String, Object> relationships = extractRelationships(requestBody);
+
+        Map<String, Object> data = new java.util.HashMap<>(attributes);
+        data.putAll(relationships);
+
+        String userId = request.getHeader("X-User-Id");
+        if (userId != null) {
+            data.put("updatedBy", userId);
+        }
+
+        Optional<Map<String, Object>> updated = queryEngine.update(relation.childDef(), childId, data);
+        return updated.map(r -> ResponseEntity.ok(toJsonApiResponse(r, childName, relation.childDef())))
+                      .orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Deletes a child record under a parent resource.
+     *
+     * @param parentName the parent collection name
+     * @param parentId the parent record ID
+     * @param childName the child collection name
+     * @param childId the child record ID
+     * @param request the HTTP servlet request
+     * @return 204 No Content if deleted, 404 if not found
+     */
+    @DeleteMapping("/{parentName}/{parentId}/{childName}/{childId}")
+    public ResponseEntity<Void> deleteChild(
+            @PathVariable("parentName") String parentName,
+            @PathVariable("parentId") String parentId,
+            @PathVariable("childName") String childName,
+            @PathVariable("childId") String childId,
+            HttpServletRequest request) {
+
+        logger.debug("Delete child request: parent='{}', parentId='{}', child='{}', childId='{}'",
+                parentName, parentId, childName, childId);
+
+        SubResourceRelation relation = resolveSubResource(parentName, childName, request);
+        if (relation == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        if (relation.childDef().readOnly()) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+
+        boolean deleted = queryEngine.delete(relation.childDef(), childId);
+        return deleted ? ResponseEntity.noContent().build()
+                       : ResponseEntity.notFound().build();
+    }
+
+    /**
+     * Resolves a sub-resource relationship between parent and child collections.
+     *
+     * @param parentName the parent collection name
+     * @param childName the child collection name
+     * @param request the HTTP request (for on-demand loading)
+     * @return the SubResourceRelation, or null if not found
+     */
+    private SubResourceRelation resolveSubResource(String parentName, String childName,
+                                                     HttpServletRequest request) {
+        CollectionDefinition parentDef = resolveCollection(parentName, request);
+        if (parentDef == null) {
+            logger.debug("Parent collection '{}' not found", parentName);
+            return null;
+        }
+
+        CollectionDefinition childDef = resolveCollection(childName, request);
+        if (childDef == null) {
+            logger.debug("Child collection '{}' not found", childName);
+            return null;
+        }
+
+        Optional<SubResourceRelation> relation = SubResourceResolver.resolve(parentDef, childDef);
+        if (relation.isEmpty()) {
+            logger.debug("No relationship found between parent '{}' and child '{}'",
+                    parentName, childName);
+            return null;
+        }
+
+        return relation.get();
+    }
+
     /**
      * Injects a tenant_id filter for tenant-scoped system collections.
      * This ensures list queries only return records for the current tenant.

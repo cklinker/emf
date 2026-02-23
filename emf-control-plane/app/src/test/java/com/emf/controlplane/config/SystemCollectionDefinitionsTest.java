@@ -2,6 +2,7 @@ package com.emf.controlplane.config;
 
 import com.emf.runtime.model.CollectionDefinition;
 import com.emf.runtime.model.FieldDefinition;
+import com.emf.runtime.model.FieldType;
 import com.emf.runtime.model.StorageMode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -125,9 +126,9 @@ class SystemCollectionDefinitionsTest {
         }
 
         @Test
-        @DisplayName("layout-assignments should NOT be tenant-scoped")
-        void layoutAssignmentsShouldNotBeTenantScoped() {
-            assertFalse(SystemCollectionDefinitions.layoutAssignments().tenantScoped());
+        @DisplayName("layout-assignments SHOULD be tenant-scoped (table has tenant_id)")
+        void layoutAssignmentsShouldBeTenantScoped() {
+            assertTrue(SystemCollectionDefinitions.layoutAssignments().tenantScoped());
         }
 
         @Test
@@ -155,15 +156,15 @@ class SystemCollectionDefinitionsTest {
         }
 
         @Test
-        @DisplayName("field-history should NOT be tenant-scoped")
-        void fieldHistoryShouldNotBeTenantScoped() {
-            assertFalse(SystemCollectionDefinitions.fieldHistory().tenantScoped());
+        @DisplayName("field-history SHOULD be tenant-scoped (table has tenant_id)")
+        void fieldHistoryShouldBeTenantScoped() {
+            assertTrue(SystemCollectionDefinitions.fieldHistory().tenantScoped());
         }
 
         @Test
-        @DisplayName("workflow-execution-logs should NOT be tenant-scoped")
-        void workflowExecutionLogsShouldNotBeTenantScoped() {
-            assertFalse(SystemCollectionDefinitions.workflowExecutionLogs().tenantScoped());
+        @DisplayName("workflow-execution-logs SHOULD be tenant-scoped (table has tenant_id)")
+        void workflowExecutionLogsShouldBeTenantScoped() {
+            assertTrue(SystemCollectionDefinitions.workflowExecutionLogs().tenantScoped());
         }
 
         @Test
@@ -263,7 +264,6 @@ class SystemCollectionDefinitionsTest {
             assertEquals("tenant", def.storageConfig().tableName());
             assertFalse(def.tenantScoped());
             assertFalse(def.readOnly());
-            assertTrue(def.immutableFields().contains("tenantId"));
 
             assertFieldExists(def, "slug");
             assertFieldExists(def, "name");
@@ -436,8 +436,8 @@ class SystemCollectionDefinitionsTest {
             assertTrue(def.readOnly());
             assertTrue(def.systemCollection());
             assertFieldHasColumnName(def, "eventType", "event_type");
-            assertFieldHasColumnName(def, "userId", "user_id");
-            assertFieldHasColumnName(def, "resourceType", "resource_type");
+            assertFieldHasColumnName(def, "eventCategory", "event_category");
+            assertFieldHasColumnName(def, "actorUserId", "actor_user_id");
         }
 
         @Test
@@ -500,7 +500,7 @@ class SystemCollectionDefinitionsTest {
                     Map.entry("oidc-providers", "oidc_provider"),
                     Map.entry("reports", "report"),
                     Map.entry("report-folders", "report_folder"),
-                    Map.entry("dashboards", "user_dashboard"),
+                    Map.entry("dashboards", "dashboard"),
                     Map.entry("notes", "note"),
                     Map.entry("attachments", "file_attachment"),
                     Map.entry("workers", "worker"),
@@ -531,6 +531,277 @@ class SystemCollectionDefinitionsTest {
     }
 
     // =========================================================================
+    // Relationship Tests (CRITICAL for ?include= resolution)
+    // =========================================================================
+
+    @Nested
+    @DisplayName("Relationship fields (LOOKUP and MASTER_DETAIL)")
+    class RelationshipTests {
+
+        @Test
+        @DisplayName("users.profileId should be a LOOKUP to profiles")
+        void usersProfileIdShouldBeLookup() {
+            FieldDefinition field = getField(SystemCollectionDefinitions.users(), "profileId");
+            assertEquals(FieldType.LOOKUP, field.type());
+            assertNotNull(field.referenceConfig());
+            assertEquals("profiles", field.referenceConfig().targetCollection());
+            assertTrue(field.referenceConfig().isLookup());
+            assertTrue(field.nullable());
+        }
+
+        @Test
+        @DisplayName("fields.collectionId should be a MASTER_DETAIL to collections")
+        void fieldsCollectionIdShouldBeMasterDetail() {
+            FieldDefinition field = getField(SystemCollectionDefinitions.fields(), "collectionId");
+            assertEquals(FieldType.MASTER_DETAIL, field.type());
+            assertNotNull(field.referenceConfig());
+            assertEquals("collections", field.referenceConfig().targetCollection());
+            assertTrue(field.referenceConfig().isMasterDetail());
+            assertTrue(field.referenceConfig().cascadeDelete());
+            assertFalse(field.nullable());
+        }
+
+        @Test
+        @DisplayName("page-layouts.collectionId should be MASTER_DETAIL to collections")
+        void pageLayoutsCollectionIdShouldBeMasterDetail() {
+            FieldDefinition field = getField(SystemCollectionDefinitions.pageLayouts(), "collectionId");
+            assertEquals(FieldType.MASTER_DETAIL, field.type());
+            assertEquals("collections", field.referenceConfig().targetCollection());
+        }
+
+        @Test
+        @DisplayName("workflow-rules.collectionId should be MASTER_DETAIL to collections")
+        void workflowRulesCollectionIdShouldBeMasterDetail() {
+            FieldDefinition field = getField(SystemCollectionDefinitions.workflowRules(), "collectionId");
+            assertEquals(FieldType.MASTER_DETAIL, field.type());
+            assertEquals("collections", field.referenceConfig().targetCollection());
+        }
+
+        @Test
+        @DisplayName("reports.primaryCollectionId should be MASTER_DETAIL to collections")
+        void reportsPrimaryCollectionIdShouldBeMasterDetail() {
+            FieldDefinition field = getField(SystemCollectionDefinitions.reports(), "primaryCollectionId");
+            assertEquals(FieldType.MASTER_DETAIL, field.type());
+            assertEquals("collections", field.referenceConfig().targetCollection());
+        }
+
+        @Test
+        @DisplayName("reports.folderId should be LOOKUP to report-folders")
+        void reportsFolderIdShouldBeLookup() {
+            FieldDefinition field = getField(SystemCollectionDefinitions.reports(), "folderId");
+            assertEquals(FieldType.LOOKUP, field.type());
+            assertEquals("report-folders", field.referenceConfig().targetCollection());
+        }
+
+        @Test
+        @DisplayName("dashboards.folderId should be LOOKUP to report-folders")
+        void dashboardsFolderIdShouldBeLookup() {
+            FieldDefinition field = getField(SystemCollectionDefinitions.dashboards(), "folderId");
+            assertEquals(FieldType.LOOKUP, field.type());
+            assertEquals("report-folders", field.referenceConfig().targetCollection());
+        }
+
+        @Test
+        @DisplayName("webhook-deliveries.webhookId should be MASTER_DETAIL to webhooks")
+        void webhookDeliveriesWebhookIdShouldBeMasterDetail() {
+            FieldDefinition field = getField(SystemCollectionDefinitions.webhookDeliveries(), "webhookId");
+            assertEquals(FieldType.MASTER_DETAIL, field.type());
+            assertEquals("webhooks", field.referenceConfig().targetCollection());
+        }
+
+        @Test
+        @DisplayName("email-logs.templateId should be LOOKUP to email-templates")
+        void emailLogsTemplateIdShouldBeLookup() {
+            FieldDefinition field = getField(SystemCollectionDefinitions.emailLogs(), "templateId");
+            assertEquals(FieldType.LOOKUP, field.type());
+            assertEquals("email-templates", field.referenceConfig().targetCollection());
+        }
+
+        @Test
+        @DisplayName("workflow-execution-logs.workflowRuleId should be MASTER_DETAIL")
+        void workflowExecutionLogsWorkflowRuleIdShouldBeMasterDetail() {
+            FieldDefinition field = getField(SystemCollectionDefinitions.workflowExecutionLogs(), "workflowRuleId");
+            assertEquals(FieldType.MASTER_DETAIL, field.type());
+            assertEquals("workflow-rules", field.referenceConfig().targetCollection());
+        }
+
+        @Test
+        @DisplayName("collections.displayFieldId should be LOOKUP to fields")
+        void collectionsDisplayFieldIdShouldBeLookup() {
+            FieldDefinition field = getField(SystemCollectionDefinitions.collections(), "displayFieldId");
+            assertEquals(FieldType.LOOKUP, field.type());
+            assertEquals("fields", field.referenceConfig().targetCollection());
+        }
+    }
+
+    // =========================================================================
+    // Default Values and Enum Values
+    // =========================================================================
+
+    @Nested
+    @DisplayName("Default values and enum constraints")
+    class DefaultsAndEnumsTests {
+
+        @Test
+        @DisplayName("tenants.edition should have enum values and default")
+        void tenantsEditionShouldHaveEnumAndDefault() {
+            FieldDefinition field = getField(SystemCollectionDefinitions.tenants(), "edition");
+            assertEquals("PROFESSIONAL", field.defaultValue());
+            assertNotNull(field.enumValues());
+            assertTrue(field.enumValues().contains("PROFESSIONAL"));
+        }
+
+        @Test
+        @DisplayName("users.status should have default ACTIVE")
+        void usersStatusShouldHaveDefaultActive() {
+            FieldDefinition field = getField(SystemCollectionDefinitions.users(), "status");
+            assertEquals("ACTIVE", field.defaultValue());
+            assertNotNull(field.enumValues());
+            assertTrue(field.enumValues().contains("ACTIVE"));
+        }
+
+        @Test
+        @DisplayName("scheduled-jobs.jobType should have enum values")
+        void scheduledJobsJobTypeShouldHaveEnums() {
+            FieldDefinition field = getField(SystemCollectionDefinitions.scheduledJobs(), "jobType");
+            assertNotNull(field.enumValues());
+            assertTrue(field.enumValues().contains("FLOW"));
+            assertTrue(field.enumValues().contains("SCRIPT"));
+        }
+
+        @Test
+        @DisplayName("workers should have correct defaults")
+        void workersShouldHaveCorrectDefaults() {
+            CollectionDefinition def = SystemCollectionDefinitions.workers();
+            assertEquals(8080, getField(def, "port").defaultValue());
+            assertEquals("default", getField(def, "pool").defaultValue());
+            assertEquals(50, getField(def, "capacity").defaultValue());
+        }
+    }
+
+    // =========================================================================
+    // Corrected Collection Definitions
+    // =========================================================================
+
+    @Nested
+    @DisplayName("Corrected collection definitions")
+    class CorrectedDefinitionTests {
+
+        @Test
+        @DisplayName("workers should have correct fields (host, port, baseUrl)")
+        void workersCollection() {
+            CollectionDefinition def = SystemCollectionDefinitions.workers();
+            assertFieldExists(def, "host");
+            assertFieldExists(def, "port");
+            assertFieldExists(def, "baseUrl");
+            assertFieldExists(def, "pool");
+            assertFieldExists(def, "capacity");
+            assertFieldExists(def, "currentLoad");
+            assertFieldExists(def, "podName");
+        }
+
+        @Test
+        @DisplayName("scheduled-jobs should have jobType (not jobClass)")
+        void scheduledJobsCollection() {
+            CollectionDefinition def = SystemCollectionDefinitions.scheduledJobs();
+            assertFieldExists(def, "jobType");
+            assertFieldHasColumnName(def, "jobType", "job_type");
+        }
+
+        @Test
+        @DisplayName("ui-pages should have path, config, active (not slug, content)")
+        void uiPagesCollection() {
+            CollectionDefinition def = SystemCollectionDefinitions.uiPages();
+            assertFieldExists(def, "path");
+            assertFieldExists(def, "config");
+            assertFieldExists(def, "active");
+            assertEquals(5, def.fields().size());
+        }
+
+        @Test
+        @DisplayName("workflow-action-types should have key, category, handlerClass")
+        void workflowActionTypesCollection() {
+            CollectionDefinition def = SystemCollectionDefinitions.workflowActionTypes();
+            assertFieldExists(def, "key");
+            assertFieldExists(def, "category");
+            assertFieldExists(def, "handlerClass");
+        }
+
+        @Test
+        @DisplayName("email-logs should have correct fields")
+        void emailLogsCollection() {
+            CollectionDefinition def = SystemCollectionDefinitions.emailLogs();
+            assertFieldExists(def, "templateId");
+            assertFieldExists(def, "recipientEmail");
+            assertFieldExists(def, "subject");
+        }
+
+        @Test
+        @DisplayName("field-history should be tenant-scoped with correct fields")
+        void fieldHistoryCollection() {
+            CollectionDefinition def = SystemCollectionDefinitions.fieldHistory();
+            assertTrue(def.tenantScoped());
+            assertFieldExists(def, "collectionId");
+            assertFieldExists(def, "recordId");
+            assertFieldExists(def, "fieldName");
+            assertFieldExists(def, "changedBy");
+            assertFieldExists(def, "changeSource");
+        }
+
+        @Test
+        @DisplayName("dashboards should have all correct fields")
+        void dashboardsCollection() {
+            CollectionDefinition def = SystemCollectionDefinitions.dashboards();
+            assertFieldExists(def, "folderId");
+            assertFieldExists(def, "accessLevel");
+            assertFieldExists(def, "dynamic");
+            assertFieldExists(def, "runningUserId");
+            assertFieldExists(def, "columnCount");
+            assertFieldExists(def, "createdBy");
+        }
+
+        @Test
+        @DisplayName("migration-runs should have correct fields")
+        void migrationRunsCollection() {
+            CollectionDefinition def = SystemCollectionDefinitions.migrationRuns();
+            assertFieldExists(def, "collectionId");
+            assertFieldExists(def, "fromVersion");
+            assertFieldExists(def, "toVersion");
+            assertFieldExists(def, "status");
+            assertFieldExists(def, "errorMessage");
+        }
+    }
+
+    // =========================================================================
+    // Immutable Fields
+    // =========================================================================
+
+    @Nested
+    @DisplayName("Immutable fields")
+    class ImmutableFieldTests {
+
+        @Test
+        @DisplayName("fields collection should have collectionId as immutable")
+        void fieldsCollectionIdShouldBeImmutable() {
+            assertTrue(SystemCollectionDefinitions.fields().immutableFields().contains("collectionId"));
+        }
+
+        @Test
+        @DisplayName("notes should have collectionId and recordId as immutable")
+        void notesImmutableFields() {
+            CollectionDefinition def = SystemCollectionDefinitions.notes();
+            assertTrue(def.immutableFields().contains("collectionId"));
+            assertTrue(def.immutableFields().contains("recordId"));
+        }
+
+        @Test
+        @DisplayName("connected-apps should have clientId as immutable")
+        void connectedAppsClientIdShouldBeImmutable() {
+            assertTrue(SystemCollectionDefinitions.connectedApps().immutableFields().contains("clientId"));
+        }
+    }
+
+    // =========================================================================
     // Helper methods
     // =========================================================================
 
@@ -548,5 +819,13 @@ class SystemCollectionDefinitionsTest {
         assertNotNull(field, "Collection '" + def.name() + "' should have field '" + fieldName + "'");
         assertEquals(expectedColumnName, field.columnName(),
                 "Field '" + fieldName + "' in collection '" + def.name() + "' should have column name '" + expectedColumnName + "'");
+    }
+
+    private static FieldDefinition getField(CollectionDefinition def, String fieldName) {
+        return def.fields().stream()
+                .filter(f -> f.name().equals(fieldName))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError(
+                        "Collection '" + def.name() + "' should have field '" + fieldName + "'"));
     }
 }

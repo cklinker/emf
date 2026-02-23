@@ -41,6 +41,9 @@ public class SystemCollectionSeeder implements ApplicationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(SystemCollectionSeeder.class);
 
+    /** Sentinel tenant ID for system-owned collection definitions. */
+    static final String SYSTEM_TENANT_ID = "SYSTEM";
+
     private final CollectionRepository collectionRepository;
     private final FieldRepository fieldRepository;
 
@@ -117,6 +120,7 @@ public class SystemCollectionSeeder implements ApplicationRunner {
         collection.setSystemCollection(true);
         collection.setActive(true);
         collection.setCurrentVersion(1);
+        collection.setTenantId(SYSTEM_TENANT_ID);
 
         // Set path for API routing
         if (definition.apiConfig() != null) {

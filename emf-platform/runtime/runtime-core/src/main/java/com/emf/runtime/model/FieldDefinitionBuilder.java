@@ -34,6 +34,7 @@ public class FieldDefinitionBuilder {
     private List<String> enumValues;
     private ReferenceConfig referenceConfig;
     private Map<String, Object> fieldTypeConfig;
+    private String columnName;
 
     /**
      * Creates a new field definition builder.
@@ -152,6 +153,17 @@ public class FieldDefinitionBuilder {
     }
 
     /**
+     * Sets the physical database column name for system collection fields.
+     *
+     * @param columnName the column name (null means use field name)
+     * @return this builder for method chaining
+     */
+    public FieldDefinitionBuilder columnName(String columnName) {
+        this.columnName = columnName;
+        return this;
+    }
+
+    /**
      * Builds the field definition.
      * 
      * @return the constructed field definition
@@ -175,7 +187,8 @@ public class FieldDefinitionBuilder {
             validationRules,
             enumValues,
             referenceConfig,
-            fieldTypeConfig
+            fieldTypeConfig,
+            columnName
         );
     }
     

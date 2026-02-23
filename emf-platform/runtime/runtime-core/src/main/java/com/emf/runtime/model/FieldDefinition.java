@@ -6,10 +6,10 @@ import java.util.Objects;
 
 /**
  * Definition of a single field within a collection.
- * 
+ *
  * <p>Specifies the field's name, data type, validation constraints, and relationships.
  * This record is immutable and uses defensive copying for collection fields.
- * 
+ *
  * @param name Field name (required, must be non-null and non-blank)
  * @param type Data type of the field (required)
  * @param nullable Whether the field accepts null values (default: true)
@@ -20,6 +20,7 @@ import java.util.Objects;
  * @param enumValues List of allowed values for enum-type fields
  * @param referenceConfig Configuration for foreign key relationships
  * @param fieldTypeConfig Type-specific configuration (e.g., auto-number prefix/padding, currency code)
+ * @param columnName Physical database column name for system collections (null = use field name)
  *
  * @since 1.0.0
  */
@@ -33,7 +34,8 @@ public record FieldDefinition(
     ValidationRules validationRules,
     List<String> enumValues,
     ReferenceConfig referenceConfig,
-    Map<String, Object> fieldTypeConfig
+    Map<String, Object> fieldTypeConfig,
+    String columnName
 ) {
     /**
      * Compact constructor with validation and defensive copying.
@@ -49,6 +51,19 @@ public record FieldDefinition(
         enumValues = enumValues != null ? List.copyOf(enumValues) : null;
         // Defensive copy for fieldTypeConfig
         fieldTypeConfig = fieldTypeConfig != null ? Map.copyOf(fieldTypeConfig) : null;
+    }
+
+    /**
+     * Backward-compatible constructor without columnName parameter.
+     * Delegates to the canonical constructor with columnName = null.
+     */
+    public FieldDefinition(
+            String name, FieldType type, boolean nullable, boolean immutable,
+            boolean unique, Object defaultValue, ValidationRules validationRules,
+            List<String> enumValues, ReferenceConfig referenceConfig,
+            Map<String, Object> fieldTypeConfig) {
+        this(name, type, nullable, immutable, unique, defaultValue,
+             validationRules, enumValues, referenceConfig, fieldTypeConfig, null);
     }
 
     /**
@@ -184,6 +199,28 @@ public record FieldDefinition(
         return new FieldDefinition(name, FieldType.STRING, false, false, false, null, null, values, null, null);
     }
     
+    /**
+     * Returns the effective column name for this field.
+     * If columnName is set, returns it; otherwise returns the field name.
+     *
+     * @return the effective database column name
+     */
+    public String effectiveColumnName() {
+        return columnName != null ? columnName : name;
+    }
+
+    /**
+     * Creates a new field definition with the specified column name.
+     *
+     * @param columnName the physical database column name
+     * @return a new field definition with the column name set
+     */
+    public FieldDefinition withColumnName(String columnName) {
+        return new FieldDefinition(name, type, nullable, immutable, unique,
+                defaultValue, validationRules, enumValues, referenceConfig,
+                fieldTypeConfig, columnName);
+    }
+
     /**
      * Creates a reference field to another collection.
      *

@@ -2,17 +2,19 @@ package com.emf.runtime.model;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * In-memory representation of a collection definition.
- * 
+ *
  * <p>Contains all configuration for a runtime-defined resource type including fields,
  * validation rules, storage configuration, API configuration, authorization configuration,
  * and event configuration.
- * 
+ *
  * <p>This record is immutable and uses defensive copying for collection fields.
- * 
+ *
  * @param name Collection name (required, must be non-null and non-blank)
  * @param displayName Human-readable display name
  * @param description Description of the collection
@@ -24,7 +26,12 @@ import java.util.Objects;
  * @param version Version number for optimistic locking
  * @param createdAt Timestamp when the collection was created
  * @param updatedAt Timestamp when the collection was last updated
- * 
+ * @param systemCollection Whether this is a system-defined collection (managed by the platform)
+ * @param tenantScoped Whether this collection's data is scoped to a tenant
+ * @param readOnly Whether this collection is read-only (no create/update/delete via API)
+ * @param immutableFields Set of field names that cannot be updated after creation
+ * @param columnMapping Map of API field name to physical database column name
+ *
  * @since 1.0.0
  */
 public record CollectionDefinition(
@@ -38,7 +45,12 @@ public record CollectionDefinition(
     EventsConfig eventsConfig,
     long version,
     Instant createdAt,
-    Instant updatedAt
+    Instant updatedAt,
+    boolean systemCollection,
+    boolean tenantScoped,
+    boolean readOnly,
+    Set<String> immutableFields,
+    Map<String, String> columnMapping
 ) {
     /**
      * Compact constructor with validation and defensive copying.
@@ -52,9 +64,27 @@ public record CollectionDefinition(
         if (fields.isEmpty()) {
             throw new IllegalArgumentException("fields cannot be empty");
         }
-        
+
         // Defensive copy for fields list
         fields = List.copyOf(fields);
+        // Defensive copy for immutableFields and columnMapping
+        immutableFields = immutableFields != null ? Set.copyOf(immutableFields) : Set.of();
+        columnMapping = columnMapping != null ? Map.copyOf(columnMapping) : Map.of();
+    }
+
+    /**
+     * Backward-compatible constructor without system collection parameters.
+     * Defaults: systemCollection=false, tenantScoped=true, readOnly=false,
+     * immutableFields=empty, columnMapping=empty.
+     */
+    public CollectionDefinition(
+            String name, String displayName, String description,
+            List<FieldDefinition> fields, StorageConfig storageConfig,
+            ApiConfig apiConfig, AuthzConfig authzConfig, EventsConfig eventsConfig,
+            long version, Instant createdAt, Instant updatedAt) {
+        this(name, displayName, description, fields, storageConfig, apiConfig,
+             authzConfig, eventsConfig, version, createdAt, updatedAt,
+             false, true, false, Set.of(), Map.of());
     }
     
     /**
@@ -93,45 +123,51 @@ public record CollectionDefinition(
     
     /**
      * Creates a new collection definition with an incremented version.
-     * 
+     *
      * @return a new collection definition with version + 1 and updated timestamp
      */
     public CollectionDefinition withIncrementedVersion() {
         return new CollectionDefinition(
-            name,
-            displayName,
-            description,
-            fields,
-            storageConfig,
-            apiConfig,
-            authzConfig,
-            eventsConfig,
-            version + 1,
-            createdAt,
-            Instant.now()
+            name, displayName, description, fields,
+            storageConfig, apiConfig, authzConfig, eventsConfig,
+            version + 1, createdAt, Instant.now(),
+            systemCollection, tenantScoped, readOnly,
+            immutableFields, columnMapping
         );
     }
-    
+
     /**
      * Creates a new collection definition with updated fields.
-     * 
+     *
      * @param newFields the new field definitions
      * @return a new collection definition with the updated fields
      */
     public CollectionDefinition withFields(List<FieldDefinition> newFields) {
         return new CollectionDefinition(
-            name,
-            displayName,
-            description,
-            newFields,
-            storageConfig,
-            apiConfig,
-            authzConfig,
-            eventsConfig,
-            version + 1,
-            createdAt,
-            Instant.now()
+            name, displayName, description, newFields,
+            storageConfig, apiConfig, authzConfig, eventsConfig,
+            version + 1, createdAt, Instant.now(),
+            systemCollection, tenantScoped, readOnly,
+            immutableFields, columnMapping
         );
+    }
+
+    /**
+     * Gets the effective column name for an API field name.
+     * Checks the field-level columnName first, then falls back to collection-level
+     * columnMapping, then uses the field name as-is.
+     *
+     * @param fieldName the API field name
+     * @return the physical database column name
+     */
+    public String getEffectiveColumnName(String fieldName) {
+        // Check field-level columnName first
+        FieldDefinition field = getField(fieldName);
+        if (field != null && field.columnName() != null) {
+            return field.columnName();
+        }
+        // Fall back to collection-level columnMapping
+        return columnMapping.getOrDefault(fieldName, fieldName);
     }
     
     /**

@@ -26,9 +26,15 @@ class StorageModeTest {
     }
 
     @Test
-    @DisplayName("Should have exactly 2 storage modes")
-    void shouldHaveExactlyTwoModes() {
-        assertEquals(2, StorageMode.values().length);
+    @DisplayName("Should have VIRTUAL mode")
+    void shouldHaveVirtualMode() {
+        assertNotNull(StorageMode.VIRTUAL);
+    }
+
+    @Test
+    @DisplayName("Should have exactly 3 storage modes")
+    void shouldHaveExactlyThreeModes() {
+        assertEquals(3, StorageMode.values().length);
     }
 
     @Test
@@ -36,5 +42,6 @@ class StorageModeTest {
     void shouldConvertFromString() {
         assertEquals(StorageMode.PHYSICAL_TABLES, StorageMode.valueOf("PHYSICAL_TABLES"));
         assertEquals(StorageMode.JSONB_STORE, StorageMode.valueOf("JSONB_STORE"));
+        assertEquals(StorageMode.VIRTUAL, StorageMode.valueOf("VIRTUAL"));
     }
 }

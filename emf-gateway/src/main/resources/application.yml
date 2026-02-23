@@ -72,11 +72,12 @@ emf:
       url: ${CONTROL_PLANE_URL:http://localhost:8080}
       bootstrap-path: /control/bootstrap
     
-    # Kafka topics for configuration updates
+    # Kafka topics for configuration updates and record change events
     kafka:
       topics:
         collection-changed: emf.config.collection.changed
         worker-assignment-changed: emf.worker.assignment.changed
+        record-changed: emf.record.changed
     
     # Rate limiting is driven by per-tenant governor limits (apiCallsPerDay)
     # fetched from the control plane during bootstrap.

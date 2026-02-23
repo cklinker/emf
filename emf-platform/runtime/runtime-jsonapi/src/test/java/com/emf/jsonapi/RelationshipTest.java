@@ -1,4 +1,4 @@
-package com.emf.gateway.jsonapi;
+package com.emf.jsonapi;
 
 import org.junit.jupiter.api.Test;
 
@@ -15,7 +15,7 @@ class RelationshipTest {
     void shouldCreateRelationshipWithSingleResource() {
         ResourceIdentifier identifier = new ResourceIdentifier("users", "123");
         Relationship relationship = new Relationship(identifier);
-        
+
         assertTrue(relationship.isSingleResource());
         assertFalse(relationship.isResourceCollection());
         assertEquals(identifier, relationship.getDataAsSingle());
@@ -29,7 +29,7 @@ class RelationshipTest {
             new ResourceIdentifier("users", "456")
         );
         Relationship relationship = new Relationship(identifiers);
-        
+
         assertFalse(relationship.isSingleResource());
         assertTrue(relationship.isResourceCollection());
         assertNull(relationship.getDataAsSingle());
@@ -42,16 +42,16 @@ class RelationshipTest {
         Map<String, String> links = new HashMap<>();
         links.put("self", "/api/posts/1/relationships/author");
         links.put("related", "/api/posts/1/author");
-        
+
         Relationship relationship = new Relationship(identifier, links);
-        
+
         assertEquals(links, relationship.getLinks());
     }
 
     @Test
     void shouldSupportDefaultConstructor() {
         Relationship relationship = new Relationship();
-        
+
         assertNull(relationship.getData());
         assertNull(relationship.getLinks());
     }
@@ -62,10 +62,10 @@ class RelationshipTest {
         ResourceIdentifier identifier = new ResourceIdentifier("users", "123");
         Map<String, String> links = new HashMap<>();
         links.put("self", "/api/posts/1/relationships/author");
-        
+
         relationship.setData(identifier);
         relationship.setLinks(links);
-        
+
         assertEquals(identifier, relationship.getData());
         assertEquals(links, relationship.getLinks());
     }
@@ -73,7 +73,7 @@ class RelationshipTest {
     @Test
     void shouldHandleNullData() {
         Relationship relationship = new Relationship(null);
-        
+
         assertFalse(relationship.isSingleResource());
         assertFalse(relationship.isResourceCollection());
         assertNull(relationship.getDataAsSingle());
@@ -85,7 +85,7 @@ class RelationshipTest {
         ResourceIdentifier identifier = new ResourceIdentifier("users", "123");
         Relationship relationship = new Relationship(identifier);
         String str = relationship.toString();
-        
+
         assertTrue(str.contains("Relationship"));
         assertTrue(str.contains("data="));
     }

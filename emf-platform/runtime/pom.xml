@@ -19,5 +19,6 @@
     <modules>
         <module>runtime-core</module>
         <module>runtime-events</module>
+        <module>runtime-jsonapi</module>
     </modules>
 </project>

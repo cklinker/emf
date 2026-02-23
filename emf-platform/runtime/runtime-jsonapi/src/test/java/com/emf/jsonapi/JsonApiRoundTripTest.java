@@ -1,4 +1,4 @@
-package com.emf.gateway.jsonapi;
+package com.emf.jsonapi;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -51,11 +51,11 @@ class JsonApiRoundTripTest {
     void shouldRoundTripCollection() throws Exception {
         // Create a document with multiple resources
         JsonApiDocument original = new JsonApiDocument();
-        
+
         ResourceObject user1 = new ResourceObject("users", "1");
         user1.addAttribute("name", "Alice");
         original.addData(user1);
-        
+
         ResourceObject user2 = new ResourceObject("users", "2");
         user2.addAttribute("name", "Bob");
         original.addData(user2);
@@ -76,7 +76,7 @@ class JsonApiRoundTripTest {
     void shouldRoundTripWithRelationships() throws Exception {
         // Create a post with author relationship
         JsonApiDocument original = new JsonApiDocument();
-        
+
         ResourceObject post = new ResourceObject("posts", "1");
         post.addAttribute("title", "My Post");
         post.addRelationship("author", new Relationship(
@@ -101,14 +101,14 @@ class JsonApiRoundTripTest {
         assertEquals("posts", parsedPost.getType());
         assertEquals("1", parsedPost.getId());
         assertEquals("My Post", parsedPost.getAttributes().get("title"));
-        
+
         // Verify single relationship
         Relationship authorRel = parsedPost.getRelationships().get("author");
         assertNotNull(authorRel);
         assertTrue(authorRel.isSingleResource());
         assertEquals("users", authorRel.getDataAsSingle().getType());
         assertEquals("123", authorRel.getDataAsSingle().getId());
-        
+
         // Verify collection relationship
         Relationship commentsRel = parsedPost.getRelationships().get("comments");
         assertNotNull(commentsRel);
@@ -120,14 +120,14 @@ class JsonApiRoundTripTest {
     void shouldRoundTripWithIncludedResources() throws Exception {
         // Create a document with included resources
         JsonApiDocument original = new JsonApiDocument();
-        
+
         ResourceObject post = new ResourceObject("posts", "1");
         post.addAttribute("title", "My Post");
         post.addRelationship("author", new Relationship(
             new ResourceIdentifier("users", "9")
         ));
         original.addData(post);
-        
+
         ResourceObject author = new ResourceObject("users", "9");
         author.addAttribute("firstName", "Dan");
         author.addAttribute("lastName", "Gebhardt");
@@ -143,7 +143,7 @@ class JsonApiRoundTripTest {
         assertTrue(parsed.hasData());
         assertTrue(parsed.hasIncluded());
         assertEquals(1, parsed.getIncluded().size());
-        
+
         ResourceObject parsedAuthor = parsed.getIncluded().get(0);
         assertEquals("users", parsedAuthor.getType());
         assertEquals("9", parsedAuthor.getId());
@@ -197,7 +197,7 @@ class JsonApiRoundTripTest {
     void shouldRoundTripComplexDocument() throws Exception {
         // Create a complex document similar to JSON:API spec example
         JsonApiDocument original = new JsonApiDocument();
-        
+
         // Primary data - a post with relationships
         ResourceObject post = new ResourceObject("posts", "1");
         post.addAttribute("title", "JSON:API paints my bikeshed!");
@@ -212,21 +212,21 @@ class JsonApiRoundTripTest {
             )
         ));
         original.addData(post);
-        
+
         // Included resources
         ResourceObject author = new ResourceObject("users", "9");
         author.addAttribute("firstName", "Dan");
         author.addAttribute("lastName", "Gebhardt");
         original.addIncluded(author);
-        
+
         ResourceObject comment1 = new ResourceObject("comments", "5");
         comment1.addAttribute("body", "First!");
         original.addIncluded(comment1);
-        
+
         ResourceObject comment2 = new ResourceObject("comments", "12");
         comment2.addAttribute("body", "I like XML better");
         original.addIncluded(comment2);
-        
+
         // Meta
         original.addMeta("copyright", "Copyright 2024");
 
@@ -239,22 +239,22 @@ class JsonApiRoundTripTest {
         // Verify structure
         assertEquals(1, parsed.getData().size());
         assertEquals(3, parsed.getIncluded().size());
-        
+
         // Verify primary data
         ResourceObject parsedPost = parsed.getData().get(0);
         assertEquals("posts", parsedPost.getType());
         assertEquals("1", parsedPost.getId());
         assertEquals("JSON:API paints my bikeshed!", parsedPost.getAttributes().get("title"));
-        
+
         // Verify relationships
         assertNotNull(parsedPost.getRelationships().get("author"));
         assertNotNull(parsedPost.getRelationships().get("comments"));
-        
+
         // Verify included resources
         assertEquals("users", parsed.getIncluded().get(0).getType());
         assertEquals("comments", parsed.getIncluded().get(1).getType());
         assertEquals("comments", parsed.getIncluded().get(2).getType());
-        
+
         // Verify meta
         assertEquals("Copyright 2024", parsed.getMeta().get("copyright"));
     }

@@ -1,6 +1,10 @@
 package com.emf.gateway.jsonapi;
 
 import com.emf.gateway.route.RouteRegistry;
+import com.emf.jsonapi.JsonApiParser;
+import com.emf.jsonapi.Relationship;
+import com.emf.jsonapi.ResourceIdentifier;
+import com.emf.jsonapi.ResourceObject;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

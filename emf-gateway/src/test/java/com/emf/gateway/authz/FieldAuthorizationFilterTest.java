@@ -2,10 +2,10 @@ package com.emf.gateway.authz;
 
 import com.emf.gateway.auth.GatewayPrincipal;
 import com.emf.gateway.jsonapi.IncludeResolver;
-import com.emf.gateway.jsonapi.JsonApiDocument;
-import com.emf.gateway.jsonapi.JsonApiError;
-import com.emf.gateway.jsonapi.JsonApiParser;
-import com.emf.gateway.jsonapi.ResourceObject;
+import com.emf.jsonapi.JsonApiDocument;
+import com.emf.jsonapi.JsonApiError;
+import com.emf.jsonapi.JsonApiParser;
+import com.emf.jsonapi.ResourceObject;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

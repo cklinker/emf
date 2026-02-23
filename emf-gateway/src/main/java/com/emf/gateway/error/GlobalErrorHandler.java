@@ -1,6 +1,6 @@
 package com.emf.gateway.error;
 
-import com.emf.gateway.jsonapi.JsonApiParser;
+import com.emf.jsonapi.JsonApiParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;

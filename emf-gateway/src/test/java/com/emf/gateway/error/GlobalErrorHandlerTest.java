@@ -1,6 +1,6 @@
 package com.emf.gateway.error;
 
-import com.emf.gateway.jsonapi.JsonApiParser;
+import com.emf.jsonapi.JsonApiParser;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

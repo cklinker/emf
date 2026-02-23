@@ -13,14 +13,16 @@ COPY emf-platform/pom.xml ./
 COPY emf-platform/runtime/pom.xml ./runtime/
 COPY emf-platform/runtime/runtime-core/pom.xml ./runtime/runtime-core/
 COPY emf-platform/runtime/runtime-events/pom.xml ./runtime/runtime-events/
+COPY emf-platform/runtime/runtime-jsonapi/pom.xml ./runtime/runtime-jsonapi/
 
 # Download runtime dependencies (cached unless pom.xml changes)
-RUN mvn dependency:go-offline -B -pl runtime/runtime-core,runtime/runtime-events -am || true
+RUN mvn dependency:go-offline -B -pl runtime/runtime-core,runtime/runtime-events,runtime/runtime-jsonapi -am || true
 
 # Copy source and build
 COPY emf-platform/runtime/runtime-core/src ./runtime/runtime-core/src
 COPY emf-platform/runtime/runtime-events/src ./runtime/runtime-events/src
-RUN mvn clean install -DskipTests -pl runtime/runtime-core,runtime/runtime-events -am -B
+COPY emf-platform/runtime/runtime-jsonapi/src ./runtime/runtime-jsonapi/src
+RUN mvn clean install -DskipTests -pl runtime/runtime-core,runtime/runtime-events,runtime/runtime-jsonapi -am -B
 
 # =============================================================================
 # Stage 2: Build the application

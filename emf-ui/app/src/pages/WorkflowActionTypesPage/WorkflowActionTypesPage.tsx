@@ -47,12 +47,15 @@ export function WorkflowActionTypesPage({
     refetch,
   } = useQuery({
     queryKey: ['workflow-action-types'],
-    queryFn: () => apiClient.get<WorkflowActionType[]>('/control/workflow-action-types'),
+    queryFn: () => apiClient.getList<WorkflowActionType>('/api/workflow-action-types'),
   })
 
   const toggleMutation = useMutation({
     mutationFn: (id: string) =>
-      apiClient.patch<WorkflowActionType>(`/control/workflow-action-types/${id}/toggle-active`, {}),
+      apiClient.patch<WorkflowActionType>(
+        `/control/workflow-action-types/${id}/actions/toggle-active`,
+        {}
+      ),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['workflow-action-types'] })
       const status = data?.active ? 'activated' : 'deactivated'

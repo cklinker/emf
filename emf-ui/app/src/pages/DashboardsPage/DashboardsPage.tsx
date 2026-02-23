@@ -1281,7 +1281,7 @@ function DashboardViewer({
     error,
   } = useQuery({
     queryKey: ['dashboard', dashboardId],
-    queryFn: () => apiClient.get<Dashboard>(`/control/dashboards/${dashboardId}`),
+    queryFn: () => apiClient.getOne<Dashboard>(`/api/dashboards/${dashboardId}`),
     enabled: !!dashboardId,
   })
 
@@ -1422,7 +1422,7 @@ function DashboardEditorInner({
 
   const saveMutation = useMutation({
     mutationFn: (components: DashboardComponent[]) =>
-      apiClient.put<Dashboard>(`/control/dashboards/${dashboard.id}`, {
+      apiClient.putResource<Dashboard>(`/api/dashboards/${dashboard.id}`, {
         name: dashboard.name,
         description: dashboard.description,
         accessLevel: dashboard.accessLevel,
@@ -1632,7 +1632,7 @@ function DashboardEditor({ dashboardId, onBack }: DashboardEditorProps): React.R
     error: dashboardError,
   } = useQuery({
     queryKey: ['dashboard', dashboardId],
-    queryFn: () => apiClient.get<Dashboard>(`/control/dashboards/${dashboardId}`),
+    queryFn: () => apiClient.getOne<Dashboard>(`/api/dashboards/${dashboardId}`),
     enabled: !!dashboardId,
   })
 
@@ -1709,14 +1709,14 @@ export function DashboardsPage({
     refetch,
   } = useQuery({
     queryKey: ['dashboards'],
-    queryFn: () => apiClient.get<Dashboard[]>(`/control/dashboards`),
+    queryFn: () => apiClient.getList<Dashboard>(`/api/dashboards`),
   })
 
   const dashboardList: Dashboard[] = dashboards ?? []
 
   const createMutation = useMutation({
     mutationFn: (data: DashboardFormData) =>
-      apiClient.post<Dashboard>(`/control/dashboards?userId=system`, data),
+      apiClient.postResource<Dashboard>(`/api/dashboards`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['dashboards'] })
       showToast('Dashboard created successfully', 'success')
@@ -1729,7 +1729,7 @@ export function DashboardsPage({
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: DashboardFormData }) =>
-      apiClient.put<Dashboard>(`/control/dashboards/${id}`, data),
+      apiClient.putResource<Dashboard>(`/api/dashboards/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['dashboards'] })
       showToast('Dashboard updated successfully', 'success')
@@ -1741,7 +1741,7 @@ export function DashboardsPage({
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiClient.delete(`/control/dashboards/${id}`),
+    mutationFn: (id: string) => apiClient.delete(`/api/dashboards/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['dashboards'] })
       showToast('Dashboard deleted successfully', 'success')

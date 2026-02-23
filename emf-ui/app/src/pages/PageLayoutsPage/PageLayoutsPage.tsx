@@ -576,7 +576,7 @@ function LayoutEditorViewInner({ layoutId, onBack }: LayoutEditorViewProps): Rea
   // Fetch layout detail
   const { data: layoutDetail, isLoading: isLoadingLayout } = useQuery({
     queryKey: ['pageLayout', layoutId],
-    queryFn: () => apiClient.get<PageLayoutDetail>(`/control/layouts/${layoutId}`),
+    queryFn: () => apiClient.getOne<PageLayoutDetail>(`/api/page-layouts/${layoutId}`),
   })
 
   // Fetch collection fields when we know the collectionId
@@ -621,7 +621,7 @@ function LayoutEditorViewInner({ layoutId, onBack }: LayoutEditorViewProps): Rea
         sections: editorSectionsToApi(state.sections),
         relatedLists: editorRelatedListsToApi(state.relatedLists),
       }
-      return apiClient.put(`/control/layouts/${layoutId}`, payload)
+      return apiClient.putResource(`/api/page-layouts/${layoutId}`, payload)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pageLayouts'] })
@@ -712,7 +712,7 @@ export function PageLayoutsPage({
     refetch,
   } = useQuery({
     queryKey: ['pageLayouts'],
-    queryFn: () => apiClient.get<PageLayoutSummary[]>(`/control/layouts`),
+    queryFn: () => apiClient.getList<PageLayoutSummary>(`/api/page-layouts`),
     enabled: viewMode === 'list',
   })
 
@@ -730,8 +730,8 @@ export function PageLayoutsPage({
 
   const createMutation = useMutation({
     mutationFn: (data: PageLayoutFormData) =>
-      apiClient.post<PageLayoutSummary>(
-        `/control/layouts?collectionId=${encodeURIComponent(data.collectionId)}`,
+      apiClient.postResource<PageLayoutSummary>(
+        `/api/page-layouts?collectionId=${encodeURIComponent(data.collectionId)}`,
         data
       ),
     onSuccess: (newLayout) => {
@@ -749,7 +749,7 @@ export function PageLayoutsPage({
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: PageLayoutFormData }) =>
-      apiClient.put<PageLayoutSummary>(`/control/layouts/${id}`, data),
+      apiClient.putResource<PageLayoutSummary>(`/api/page-layouts/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pageLayouts'] })
       showToast('Layout updated successfully', 'success')
@@ -761,7 +761,7 @@ export function PageLayoutsPage({
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiClient.delete(`/control/layouts/${id}`),
+    mutationFn: (id: string) => apiClient.delete(`/api/page-layouts/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pageLayouts'] })
       showToast('Layout deleted successfully', 'success')

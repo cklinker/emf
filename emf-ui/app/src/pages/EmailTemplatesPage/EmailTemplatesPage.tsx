@@ -457,7 +457,7 @@ export function EmailTemplatesPage({
     error: logsError,
   } = useQuery({
     queryKey: ['email-template-logs', logsItemId],
-    queryFn: () => apiClient.get<EmailLog[]>(`/control/email-templates/logs`),
+    queryFn: () => apiClient.getList<EmailLog>(`/api/email-logs`),
     enabled: !!logsItemId,
   })
 
@@ -492,14 +492,14 @@ export function EmailTemplatesPage({
     refetch,
   } = useQuery({
     queryKey: ['email-templates'],
-    queryFn: () => apiClient.get<EmailTemplate[]>(`/control/email-templates`),
+    queryFn: () => apiClient.getList<EmailTemplate>(`/api/email-templates`),
   })
 
   const templateList: EmailTemplate[] = templates ?? []
 
   const createMutation = useMutation({
     mutationFn: (data: EmailTemplateFormData) =>
-      apiClient.post<EmailTemplate>(`/control/email-templates?userId=system`, data),
+      apiClient.postResource<EmailTemplate>(`/api/email-templates`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['email-templates'] })
       showToast('Email template created successfully', 'success')
@@ -512,7 +512,7 @@ export function EmailTemplatesPage({
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: EmailTemplateFormData }) =>
-      apiClient.put<EmailTemplate>(`/control/email-templates/${id}`, data),
+      apiClient.putResource<EmailTemplate>(`/api/email-templates/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['email-templates'] })
       showToast('Email template updated successfully', 'success')
@@ -524,7 +524,7 @@ export function EmailTemplatesPage({
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiClient.delete(`/control/email-templates/${id}`),
+    mutationFn: (id: string) => apiClient.delete(`/api/email-templates/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['email-templates'] })
       showToast('Email template deleted successfully', 'success')

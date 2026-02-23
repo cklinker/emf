@@ -291,7 +291,6 @@ vi.mock('./pages', () => ({
   ConnectedAppsPage: () => <div data-testid="connected-apps-page">Connected Apps Page</div>,
   BulkJobsPage: () => <div data-testid="bulk-jobs-page">Bulk Jobs Page</div>,
   SetupHomePage: () => <div data-testid="setup-home-page">Setup Home Page</div>,
-  WorkersPage: () => <div data-testid="workers-page">Workers Page</div>,
   PluginsPage: () => <div data-testid="plugins-page">Plugins Page</div>,
   UsersPage: () => <div data-testid="users-page">Users Page</div>,
   UserDetailPage: () => <div data-testid="user-detail-page">User Detail Page</div>,

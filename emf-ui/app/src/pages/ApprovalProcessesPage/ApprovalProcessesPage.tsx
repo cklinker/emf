@@ -479,14 +479,14 @@ export function ApprovalProcessesPage({
     refetch,
   } = useQuery({
     queryKey: ['approvalProcesses'],
-    queryFn: () => apiClient.get<ApprovalProcess[]>(`/control/approvals/processes`),
+    queryFn: () => apiClient.getList<ApprovalProcess>(`/api/approval-processes`),
   })
 
   const approvalProcessList: ApprovalProcess[] = approvalProcesses ?? []
 
   const createMutation = useMutation({
     mutationFn: (data: ApprovalProcessFormData) =>
-      apiClient.post<ApprovalProcess>(`/control/approvals/processes?userId=system`, data),
+      apiClient.postResource<ApprovalProcess>(`/api/approval-processes`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['approvalProcesses'] })
       showToast('Approval process created successfully', 'success')
@@ -499,7 +499,7 @@ export function ApprovalProcessesPage({
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: ApprovalProcessFormData }) =>
-      apiClient.put<ApprovalProcess>(`/control/approvals/processes/${id}`, data),
+      apiClient.putResource<ApprovalProcess>(`/api/approval-processes/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['approvalProcesses'] })
       showToast('Approval process updated successfully', 'success')
@@ -511,7 +511,7 @@ export function ApprovalProcessesPage({
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiClient.delete(`/control/approvals/processes/${id}`),
+    mutationFn: (id: string) => apiClient.delete(`/api/approval-processes/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['approvalProcesses'] })
       showToast('Approval process deleted successfully', 'success')

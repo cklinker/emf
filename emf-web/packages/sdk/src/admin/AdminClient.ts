@@ -101,9 +101,19 @@ import type {
   CompositeRequest,
   CompositeResponse,
 } from './types';
+import { toJsonApiBody, unwrapJsonApiResource, unwrapJsonApiList } from './jsonapi-helpers';
 
 /**
- * Admin client for control plane operations
+ * Admin client for control plane operations.
+ *
+ * Sections whose dedicated controllers were removed now route CRUD through
+ * the worker's DynamicCollectionRouter via `/api/{collection}` (JSON:API),
+ * while actions route through the generic CollectionActionController at
+ * `/control/{collection}/{id}/actions/{action}`.
+ *
+ * Sections whose controllers still exist (collections, fields, users,
+ * tenants, profiles, permissionSets, sharing, audit, etc.) remain on
+ * `/control/` unchanged.
  */
 export class AdminClient {
   constructor(private readonly axios: AxiosInstance) {}
@@ -216,34 +226,38 @@ export class AdminClient {
   };
 
   /**
-   * OIDC provider management operations
+   * OIDC provider management operations.
+   * Routed via /api/oidc-providers (JSON:API, worker).
    */
   readonly oidc = {
     list: async (): Promise<OIDCProvider[]> => {
-      const response = await this.axios.get<OIDCProvider[]>('/control/oidc/providers');
-      return response.data;
+      const response = await this.axios.get('/api/oidc-providers');
+      return unwrapJsonApiList<OIDCProvider>(response.data);
     },
 
     get: async (id: string): Promise<OIDCProvider> => {
-      const response = await this.axios.get<OIDCProvider>(`/control/oidc/providers/${id}`);
-      return response.data;
+      const response = await this.axios.get(`/api/oidc-providers/${id}`);
+      return unwrapJsonApiResource<OIDCProvider>(response.data);
     },
 
     create: async (provider: OIDCProvider): Promise<OIDCProvider> => {
-      const response = await this.axios.post<OIDCProvider>('/control/oidc/providers', provider);
-      return response.data;
+      const body = toJsonApiBody('oidc-providers', provider as unknown as Record<string, unknown>);
+      const response = await this.axios.post('/api/oidc-providers', body);
+      return unwrapJsonApiResource<OIDCProvider>(response.data);
     },
 
     update: async (id: string, provider: OIDCProvider): Promise<OIDCProvider> => {
-      const response = await this.axios.put<OIDCProvider>(
-        `/control/oidc/providers/${id}`,
-        provider
+      const body = toJsonApiBody(
+        'oidc-providers',
+        provider as unknown as Record<string, unknown>,
+        id
       );
-      return response.data;
+      const response = await this.axios.patch(`/api/oidc-providers/${id}`, body);
+      return unwrapJsonApiResource<OIDCProvider>(response.data);
     },
 
     delete: async (id: string): Promise<void> => {
-      await this.axios.delete(`/control/oidc/providers/${id}`);
+      await this.axios.delete(`/api/oidc-providers/${id}`);
     },
   };
 
@@ -393,69 +407,76 @@ export class AdminClient {
   };
 
   /**
-   * Picklist management operations
+   * Picklist management operations.
+   * Global picklist CRUD routed via /api/global-picklists (JSON:API, worker).
+   * Global picklist values via sub-resource /api/global-picklists/{id}/picklist-values.
+   * Field-level picklist operations remain on /control/ (TODO: need dedicated handler).
    */
   readonly picklists = {
-    listGlobal: async (tenantId = 'default'): Promise<GlobalPicklist[]> => {
-      const params = new URLSearchParams();
-      params.append('tenantId', tenantId);
-      const response = await this.axios.get<GlobalPicklist[]>(
-        `/control/picklists/global?${params.toString()}`
-      );
-      return response.data;
+    listGlobal: async (_tenantId?: string): Promise<GlobalPicklist[]> => {
+      const response = await this.axios.get('/api/global-picklists');
+      return unwrapJsonApiList<GlobalPicklist>(response.data);
     },
 
     createGlobal: async (
       request: CreateGlobalPicklistRequest,
-      tenantId = 'default'
+      _tenantId?: string
     ): Promise<GlobalPicklist> => {
-      const params = new URLSearchParams();
-      params.append('tenantId', tenantId);
-      const response = await this.axios.post<GlobalPicklist>(
-        `/control/picklists/global?${params.toString()}`,
-        request
-      );
-      return response.data;
+      const body = toJsonApiBody('global-picklists', request as unknown as Record<string, unknown>);
+      const response = await this.axios.post('/api/global-picklists', body);
+      return unwrapJsonApiResource<GlobalPicklist>(response.data);
     },
 
     getGlobal: async (id: string): Promise<GlobalPicklist> => {
-      const response = await this.axios.get<GlobalPicklist>(`/control/picklists/global/${id}`);
-      return response.data;
+      const response = await this.axios.get(`/api/global-picklists/${id}`);
+      return unwrapJsonApiResource<GlobalPicklist>(response.data);
     },
 
     updateGlobal: async (
       id: string,
       request: Partial<CreateGlobalPicklistRequest>
     ): Promise<GlobalPicklist> => {
-      const response = await this.axios.put<GlobalPicklist>(
-        `/control/picklists/global/${id}`,
-        request
+      const body = toJsonApiBody(
+        'global-picklists',
+        request as unknown as Record<string, unknown>,
+        id
       );
-      return response.data;
+      const response = await this.axios.patch(`/api/global-picklists/${id}`, body);
+      return unwrapJsonApiResource<GlobalPicklist>(response.data);
     },
 
     deleteGlobal: async (id: string): Promise<void> => {
-      await this.axios.delete(`/control/picklists/global/${id}`);
+      await this.axios.delete(`/api/global-picklists/${id}`);
     },
 
     getGlobalValues: async (id: string): Promise<PicklistValue[]> => {
-      const response = await this.axios.get<PicklistValue[]>(
-        `/control/picklists/global/${id}/values`
-      );
-      return response.data;
+      const response = await this.axios.get(`/api/global-picklists/${id}/picklist-values`);
+      return unwrapJsonApiList<PicklistValue>(response.data);
     },
 
     setGlobalValues: async (
       id: string,
       values: PicklistValueRequest[]
     ): Promise<PicklistValue[]> => {
-      const response = await this.axios.put<PicklistValue[]>(
-        `/control/picklists/global/${id}/values`,
-        values
+      // Replace all values: delete existing, then create new ones via sub-resource
+      const existingResponse = await this.axios.get(`/api/global-picklists/${id}/picklist-values`);
+      const existing = unwrapJsonApiList<PicklistValue>(existingResponse.data);
+      await Promise.all(
+        existing.map((v) =>
+          this.axios.delete(`/api/global-picklists/${id}/picklist-values/${v.id}`)
+        )
       );
-      return response.data;
+      const created = await Promise.all(
+        values.map((v) => {
+          const body = toJsonApiBody('picklist-values', v as unknown as Record<string, unknown>);
+          return this.axios.post(`/api/global-picklists/${id}/picklist-values`, body);
+        })
+      );
+      return created.map((r) => unwrapJsonApiResource<PicklistValue>(r.data));
     },
 
+    // TODO: Field-level picklist operations need a dedicated controller or action handler.
+    // The PicklistController was removed. These remain on /control/ paths (will 404).
     getFieldValues: async (fieldId: string): Promise<PicklistValue[]> => {
       const response = await this.axios.get<PicklistValue[]>(
         `/control/picklists/fields/${fieldId}/values`
@@ -1023,54 +1044,57 @@ export class AdminClient {
   };
 
   /**
-   * Page layout operations
+   * Page layout operations.
+   * CRUD routed via /api/page-layouts (JSON:API, worker).
+   * Layout assignments via /api/layout-assignments.
    */
   readonly layouts = {
     list: async (collectionId: string): Promise<PageLayout[]> => {
-      const params = new URLSearchParams({ collectionId });
-      const response = await this.axios.get<PageLayout[]>(`/control/layouts?${params.toString()}`);
-      return response.data;
+      const response = await this.axios.get(
+        `/api/page-layouts?filter[collectionId][eq]=${encodeURIComponent(collectionId)}`
+      );
+      return unwrapJsonApiList<PageLayout>(response.data);
     },
 
     get: async (id: string): Promise<PageLayout> => {
-      const response = await this.axios.get<PageLayout>(`/control/layouts/${id}`);
-      return response.data;
+      const response = await this.axios.get(`/api/page-layouts/${id}`);
+      return unwrapJsonApiResource<PageLayout>(response.data);
     },
 
-    create: async (tenantId: string, request: CreatePageLayoutRequest): Promise<PageLayout> => {
-      const params = new URLSearchParams({ tenantId });
-      const response = await this.axios.post<PageLayout>(
-        `/control/layouts?${params.toString()}`,
-        request
-      );
-      return response.data;
+    create: async (_tenantId: string, request: CreatePageLayoutRequest): Promise<PageLayout> => {
+      const body = toJsonApiBody('page-layouts', request as unknown as Record<string, unknown>);
+      const response = await this.axios.post('/api/page-layouts', body);
+      return unwrapJsonApiResource<PageLayout>(response.data);
     },
 
     update: async (id: string, request: Partial<CreatePageLayoutRequest>): Promise<PageLayout> => {
-      const response = await this.axios.put<PageLayout>(`/control/layouts/${id}`, request);
-      return response.data;
+      const body = toJsonApiBody('page-layouts', request as unknown as Record<string, unknown>, id);
+      const response = await this.axios.patch(`/api/page-layouts/${id}`, body);
+      return unwrapJsonApiResource<PageLayout>(response.data);
     },
 
     delete: async (id: string): Promise<void> => {
-      await this.axios.delete(`/control/layouts/${id}`);
+      await this.axios.delete(`/api/page-layouts/${id}`);
     },
 
     listAssignments: async (collectionId: string): Promise<LayoutAssignment[]> => {
-      const params = new URLSearchParams({ collectionId });
-      const response = await this.axios.get<LayoutAssignment[]>(
-        `/control/layouts/assignments?${params.toString()}`
+      const response = await this.axios.get(
+        `/api/layout-assignments?filter[collectionId][eq]=${encodeURIComponent(collectionId)}`
       );
-      return response.data;
+      return unwrapJsonApiList<LayoutAssignment>(response.data);
     },
 
     assign: async (request: LayoutAssignmentRequest): Promise<LayoutAssignment> => {
-      const response = await this.axios.post<LayoutAssignment>(
-        '/control/layouts/assignments',
-        request
+      const body = toJsonApiBody(
+        'layout-assignments',
+        request as unknown as Record<string, unknown>
       );
-      return response.data;
+      const response = await this.axios.post('/api/layout-assignments', body);
+      return unwrapJsonApiResource<LayoutAssignment>(response.data);
     },
 
+    // TODO: resolve requires business logic (layout resolution by collection + profile + record type).
+    // Needs a dedicated controller or action handler.
     resolve: async (
       collectionId: string,
       profileId?: string,
@@ -1087,150 +1111,142 @@ export class AdminClient {
   };
 
   /**
-   * List view operations
+   * List view operations.
+   * Routed via /api/list-views (JSON:API, worker).
    */
   readonly listViews = {
-    list: async (tenantId: string, collectionId: string, userId?: string): Promise<ListView[]> => {
-      const params = new URLSearchParams({ tenantId, collectionId });
-      if (userId) params.set('userId', userId);
-      const response = await this.axios.get<ListView[]>(`/control/listviews?${params.toString()}`);
-      return response.data;
+    list: async (
+      _tenantId: string,
+      collectionId: string,
+      _userId?: string
+    ): Promise<ListView[]> => {
+      const response = await this.axios.get(
+        `/api/list-views?filter[collectionId][eq]=${encodeURIComponent(collectionId)}`
+      );
+      return unwrapJsonApiList<ListView>(response.data);
     },
 
     get: async (id: string): Promise<ListView> => {
-      const response = await this.axios.get<ListView>(`/control/listviews/${id}`);
-      return response.data;
+      const response = await this.axios.get(`/api/list-views/${id}`);
+      return unwrapJsonApiResource<ListView>(response.data);
     },
 
     create: async (
-      tenantId: string,
-      userId: string,
+      _tenantId: string,
+      _userId: string,
       request: CreateListViewRequest
     ): Promise<ListView> => {
-      const params = new URLSearchParams({ tenantId, userId });
-      const response = await this.axios.post<ListView>(
-        `/control/listviews?${params.toString()}`,
-        request
-      );
-      return response.data;
+      const body = toJsonApiBody('list-views', request as unknown as Record<string, unknown>);
+      const response = await this.axios.post('/api/list-views', body);
+      return unwrapJsonApiResource<ListView>(response.data);
     },
 
     update: async (id: string, request: Partial<CreateListViewRequest>): Promise<ListView> => {
-      const response = await this.axios.put<ListView>(`/control/listviews/${id}`, request);
-      return response.data;
+      const body = toJsonApiBody('list-views', request as unknown as Record<string, unknown>, id);
+      const response = await this.axios.patch(`/api/list-views/${id}`, body);
+      return unwrapJsonApiResource<ListView>(response.data);
     },
 
     delete: async (id: string): Promise<void> => {
-      await this.axios.delete(`/control/listviews/${id}`);
+      await this.axios.delete(`/api/list-views/${id}`);
     },
   };
 
   /**
-   * Report operations
+   * Report operations.
+   * CRUD routed via /api/reports (JSON:API, worker).
+   * Folders via /api/report-folders.
    */
   readonly reports = {
-    list: async (tenantId: string, userId?: string): Promise<Report[]> => {
-      const params = new URLSearchParams({ tenantId });
-      if (userId) params.set('userId', userId);
-      const response = await this.axios.get<Report[]>(`/control/reports?${params.toString()}`);
-      return response.data;
+    list: async (_tenantId?: string, _userId?: string): Promise<Report[]> => {
+      const response = await this.axios.get('/api/reports');
+      return unwrapJsonApiList<Report>(response.data);
     },
 
     get: async (id: string): Promise<Report> => {
-      const response = await this.axios.get<Report>(`/control/reports/${id}`);
-      return response.data;
+      const response = await this.axios.get(`/api/reports/${id}`);
+      return unwrapJsonApiResource<Report>(response.data);
     },
 
     create: async (
-      tenantId: string,
-      userId: string,
+      _tenantId: string,
+      _userId: string,
       request: CreateReportRequest
     ): Promise<Report> => {
-      const params = new URLSearchParams({ tenantId, userId });
-      const response = await this.axios.post<Report>(
-        `/control/reports?${params.toString()}`,
-        request
-      );
-      return response.data;
+      const body = toJsonApiBody('reports', request as unknown as Record<string, unknown>);
+      const response = await this.axios.post('/api/reports', body);
+      return unwrapJsonApiResource<Report>(response.data);
     },
 
     update: async (id: string, request: Partial<CreateReportRequest>): Promise<Report> => {
-      const response = await this.axios.put<Report>(`/control/reports/${id}`, request);
-      return response.data;
+      const body = toJsonApiBody('reports', request as unknown as Record<string, unknown>, id);
+      const response = await this.axios.patch(`/api/reports/${id}`, body);
+      return unwrapJsonApiResource<Report>(response.data);
     },
 
     delete: async (id: string): Promise<void> => {
-      await this.axios.delete(`/control/reports/${id}`);
+      await this.axios.delete(`/api/reports/${id}`);
     },
 
-    listFolders: async (tenantId: string): Promise<ReportFolder[]> => {
-      const params = new URLSearchParams({ tenantId });
-      const response = await this.axios.get<ReportFolder[]>(
-        `/control/reports/folders?${params.toString()}`
-      );
-      return response.data;
+    listFolders: async (_tenantId?: string): Promise<ReportFolder[]> => {
+      const response = await this.axios.get('/api/report-folders');
+      return unwrapJsonApiList<ReportFolder>(response.data);
     },
 
     createFolder: async (
-      tenantId: string,
-      userId: string,
+      _tenantId: string,
+      _userId: string,
       name: string,
       accessLevel?: string
     ): Promise<ReportFolder> => {
-      const params = new URLSearchParams({ tenantId, userId, name });
-      if (accessLevel) params.set('accessLevel', accessLevel);
-      const response = await this.axios.post<ReportFolder>(
-        `/control/reports/folders?${params.toString()}`
-      );
-      return response.data;
+      const attrs: Record<string, unknown> = { name };
+      if (accessLevel) attrs.accessLevel = accessLevel;
+      const body = toJsonApiBody('report-folders', attrs);
+      const response = await this.axios.post('/api/report-folders', body);
+      return unwrapJsonApiResource<ReportFolder>(response.data);
     },
 
     deleteFolder: async (id: string): Promise<void> => {
-      await this.axios.delete(`/control/reports/folders/${id}`);
+      await this.axios.delete(`/api/report-folders/${id}`);
     },
   };
 
   /**
-   * Dashboard operations
+   * Dashboard operations.
+   * Routed via /api/dashboards (JSON:API, worker).
    */
   readonly dashboards = {
-    list: async (tenantId: string, userId?: string): Promise<UserDashboard[]> => {
-      const params = new URLSearchParams({ tenantId });
-      if (userId) params.set('userId', userId);
-      const response = await this.axios.get<UserDashboard[]>(
-        `/control/dashboards?${params.toString()}`
-      );
-      return response.data;
+    list: async (_tenantId?: string, _userId?: string): Promise<UserDashboard[]> => {
+      const response = await this.axios.get('/api/dashboards');
+      return unwrapJsonApiList<UserDashboard>(response.data);
     },
 
     get: async (id: string): Promise<UserDashboard> => {
-      const response = await this.axios.get<UserDashboard>(`/control/dashboards/${id}`);
-      return response.data;
+      const response = await this.axios.get(`/api/dashboards/${id}`);
+      return unwrapJsonApiResource<UserDashboard>(response.data);
     },
 
     create: async (
-      tenantId: string,
-      userId: string,
+      _tenantId: string,
+      _userId: string,
       request: CreateDashboardRequest
     ): Promise<UserDashboard> => {
-      const params = new URLSearchParams({ tenantId, userId });
-      const response = await this.axios.post<UserDashboard>(
-        `/control/dashboards?${params.toString()}`,
-        request
-      );
-      return response.data;
+      const body = toJsonApiBody('dashboards', request as unknown as Record<string, unknown>);
+      const response = await this.axios.post('/api/dashboards', body);
+      return unwrapJsonApiResource<UserDashboard>(response.data);
     },
 
     update: async (
       id: string,
       request: Partial<CreateDashboardRequest>
     ): Promise<UserDashboard> => {
-      const response = await this.axios.put<UserDashboard>(`/control/dashboards/${id}`, request);
-      return response.data;
+      const body = toJsonApiBody('dashboards', request as unknown as Record<string, unknown>, id);
+      const response = await this.axios.patch(`/api/dashboards/${id}`, body);
+      return unwrapJsonApiResource<UserDashboard>(response.data);
     },
 
     delete: async (id: string): Promise<void> => {
-      await this.axios.delete(`/control/dashboards/${id}`);
+      await this.axios.delete(`/api/dashboards/${id}`);
     },
   };
 
@@ -1254,149 +1270,145 @@ export class AdminClient {
   };
 
   /**
-   * Email template operations
+   * Email template operations.
+   * CRUD routed via /api/email-templates (JSON:API, worker).
+   * Logs via /api/email-logs (tenant-wide collection).
    */
   readonly emailTemplates = {
-    list: async (tenantId: string): Promise<EmailTemplate[]> => {
-      const params = new URLSearchParams({ tenantId });
-      const response = await this.axios.get<EmailTemplate[]>(
-        `/control/email-templates?${params.toString()}`
-      );
-      return response.data;
+    list: async (_tenantId?: string): Promise<EmailTemplate[]> => {
+      const response = await this.axios.get('/api/email-templates');
+      return unwrapJsonApiList<EmailTemplate>(response.data);
     },
 
     get: async (id: string): Promise<EmailTemplate> => {
-      const response = await this.axios.get<EmailTemplate>(`/control/email-templates/${id}`);
-      return response.data;
+      const response = await this.axios.get(`/api/email-templates/${id}`);
+      return unwrapJsonApiResource<EmailTemplate>(response.data);
     },
 
     create: async (
-      tenantId: string,
-      userId: string,
+      _tenantId: string,
+      _userId: string,
       request: CreateEmailTemplateRequest
     ): Promise<EmailTemplate> => {
-      const params = new URLSearchParams({ tenantId, userId });
-      const response = await this.axios.post<EmailTemplate>(
-        `/control/email-templates?${params.toString()}`,
-        request
-      );
-      return response.data;
+      const body = toJsonApiBody('email-templates', request as unknown as Record<string, unknown>);
+      const response = await this.axios.post('/api/email-templates', body);
+      return unwrapJsonApiResource<EmailTemplate>(response.data);
     },
 
     update: async (
       id: string,
       request: Partial<CreateEmailTemplateRequest>
     ): Promise<EmailTemplate> => {
-      const response = await this.axios.put<EmailTemplate>(
-        `/control/email-templates/${id}`,
-        request
+      const body = toJsonApiBody(
+        'email-templates',
+        request as unknown as Record<string, unknown>,
+        id
       );
-      return response.data;
+      const response = await this.axios.patch(`/api/email-templates/${id}`, body);
+      return unwrapJsonApiResource<EmailTemplate>(response.data);
     },
 
     delete: async (id: string): Promise<void> => {
-      await this.axios.delete(`/control/email-templates/${id}`);
+      await this.axios.delete(`/api/email-templates/${id}`);
     },
 
-    listLogs: async (tenantId: string, status?: string): Promise<EmailLog[]> => {
-      const params = new URLSearchParams({ tenantId });
-      if (status) params.set('status', status);
-      const response = await this.axios.get<EmailLog[]>(
-        `/control/email-templates/logs?${params.toString()}`
-      );
-      return response.data;
+    listLogs: async (_tenantId?: string, _status?: string): Promise<EmailLog[]> => {
+      const response = await this.axios.get('/api/email-logs');
+      return unwrapJsonApiList<EmailLog>(response.data);
     },
   };
 
   /**
-   * Workflow rule operations
+   * Workflow rule operations.
+   * CRUD routed via /api/workflow-rules (JSON:API, worker).
+   * Logs via /api/workflow-execution-logs (tenant-wide collection).
    */
   readonly workflowRules = {
-    list: async (tenantId: string): Promise<WorkflowRule[]> => {
-      const params = new URLSearchParams({ tenantId });
-      const response = await this.axios.get<WorkflowRule[]>(
-        `/control/workflow-rules?${params.toString()}`
-      );
-      return response.data;
+    list: async (_tenantId?: string): Promise<WorkflowRule[]> => {
+      const response = await this.axios.get('/api/workflow-rules');
+      return unwrapJsonApiList<WorkflowRule>(response.data);
     },
 
     get: async (id: string): Promise<WorkflowRule> => {
-      const response = await this.axios.get<WorkflowRule>(`/control/workflow-rules/${id}`);
-      return response.data;
+      const response = await this.axios.get(`/api/workflow-rules/${id}`);
+      return unwrapJsonApiResource<WorkflowRule>(response.data);
     },
 
-    create: async (tenantId: string, request: CreateWorkflowRuleRequest): Promise<WorkflowRule> => {
-      const params = new URLSearchParams({ tenantId });
-      const response = await this.axios.post<WorkflowRule>(
-        `/control/workflow-rules?${params.toString()}`,
-        request
-      );
-      return response.data;
+    create: async (
+      _tenantId: string,
+      request: CreateWorkflowRuleRequest
+    ): Promise<WorkflowRule> => {
+      const body = toJsonApiBody('workflow-rules', request as unknown as Record<string, unknown>);
+      const response = await this.axios.post('/api/workflow-rules', body);
+      return unwrapJsonApiResource<WorkflowRule>(response.data);
     },
 
     update: async (
       id: string,
       request: Partial<CreateWorkflowRuleRequest>
     ): Promise<WorkflowRule> => {
-      const response = await this.axios.put<WorkflowRule>(`/control/workflow-rules/${id}`, request);
-      return response.data;
+      const body = toJsonApiBody(
+        'workflow-rules',
+        request as unknown as Record<string, unknown>,
+        id
+      );
+      const response = await this.axios.patch(`/api/workflow-rules/${id}`, body);
+      return unwrapJsonApiResource<WorkflowRule>(response.data);
     },
 
     delete: async (id: string): Promise<void> => {
-      await this.axios.delete(`/control/workflow-rules/${id}`);
+      await this.axios.delete(`/api/workflow-rules/${id}`);
     },
 
-    listLogs: async (tenantId: string): Promise<WorkflowExecutionLog[]> => {
-      const params = new URLSearchParams({ tenantId });
-      const response = await this.axios.get<WorkflowExecutionLog[]>(
-        `/control/workflow-rules/logs?${params.toString()}`
-      );
-      return response.data;
+    listLogs: async (_tenantId?: string): Promise<WorkflowExecutionLog[]> => {
+      const response = await this.axios.get('/api/workflow-execution-logs');
+      return unwrapJsonApiList<WorkflowExecutionLog>(response.data);
     },
   };
 
   /**
-   * Approval process operations
+   * Approval process operations.
+   * Process CRUD routed via /api/approval-processes (JSON:API, worker).
+   * Instance operations remain on /control/ (ApprovalInstanceController exists).
    */
   readonly approvals = {
-    listProcesses: async (tenantId: string): Promise<ApprovalProcess[]> => {
-      const params = new URLSearchParams({ tenantId });
-      const response = await this.axios.get<ApprovalProcess[]>(
-        `/control/approvals/processes?${params.toString()}`
-      );
-      return response.data;
+    listProcesses: async (_tenantId?: string): Promise<ApprovalProcess[]> => {
+      const response = await this.axios.get('/api/approval-processes');
+      return unwrapJsonApiList<ApprovalProcess>(response.data);
     },
 
     getProcess: async (id: string): Promise<ApprovalProcess> => {
-      const response = await this.axios.get<ApprovalProcess>(`/control/approvals/processes/${id}`);
-      return response.data;
+      const response = await this.axios.get(`/api/approval-processes/${id}`);
+      return unwrapJsonApiResource<ApprovalProcess>(response.data);
     },
 
     createProcess: async (
-      tenantId: string,
+      _tenantId: string,
       request: CreateApprovalProcessRequest
     ): Promise<ApprovalProcess> => {
-      const params = new URLSearchParams({ tenantId });
-      const response = await this.axios.post<ApprovalProcess>(
-        `/control/approvals/processes?${params.toString()}`,
-        request
+      const body = toJsonApiBody(
+        'approval-processes',
+        request as unknown as Record<string, unknown>
       );
-      return response.data;
+      const response = await this.axios.post('/api/approval-processes', body);
+      return unwrapJsonApiResource<ApprovalProcess>(response.data);
     },
 
     updateProcess: async (
       id: string,
       request: Partial<CreateApprovalProcessRequest>
     ): Promise<ApprovalProcess> => {
-      const response = await this.axios.put<ApprovalProcess>(
-        `/control/approvals/processes/${id}`,
-        request
+      const body = toJsonApiBody(
+        'approval-processes',
+        request as unknown as Record<string, unknown>,
+        id
       );
-      return response.data;
+      const response = await this.axios.patch(`/api/approval-processes/${id}`, body);
+      return unwrapJsonApiResource<ApprovalProcess>(response.data);
     },
 
     deleteProcess: async (id: string): Promise<void> => {
-      await this.axios.delete(`/control/approvals/processes/${id}`);
+      await this.axios.delete(`/api/approval-processes/${id}`);
     },
 
     listInstances: async (tenantId: string): Promise<ApprovalInstance[]> => {
@@ -1417,304 +1429,290 @@ export class AdminClient {
   };
 
   /**
-   * Flow engine operations
+   * Flow engine operations.
+   * CRUD routed via /api/flows (JSON:API, worker).
+   * Executions via /api/flow-executions (tenant-wide collection).
    */
   readonly flows = {
-    list: async (tenantId: string): Promise<FlowDefinition[]> => {
-      const params = new URLSearchParams({ tenantId });
-      const response = await this.axios.get<FlowDefinition[]>(
-        `/control/flows?${params.toString()}`
-      );
-      return response.data;
+    list: async (_tenantId?: string): Promise<FlowDefinition[]> => {
+      const response = await this.axios.get('/api/flows');
+      return unwrapJsonApiList<FlowDefinition>(response.data);
     },
 
     get: async (id: string): Promise<FlowDefinition> => {
-      const response = await this.axios.get<FlowDefinition>(`/control/flows/${id}`);
-      return response.data;
+      const response = await this.axios.get(`/api/flows/${id}`);
+      return unwrapJsonApiResource<FlowDefinition>(response.data);
     },
 
     create: async (
-      tenantId: string,
-      userId: string,
+      _tenantId: string,
+      _userId: string,
       request: CreateFlowRequest
     ): Promise<FlowDefinition> => {
-      const params = new URLSearchParams({ tenantId, userId });
-      const response = await this.axios.post<FlowDefinition>(
-        `/control/flows?${params.toString()}`,
-        request
-      );
-      return response.data;
+      const body = toJsonApiBody('flows', request as unknown as Record<string, unknown>);
+      const response = await this.axios.post('/api/flows', body);
+      return unwrapJsonApiResource<FlowDefinition>(response.data);
     },
 
     update: async (id: string, request: Partial<CreateFlowRequest>): Promise<FlowDefinition> => {
-      const response = await this.axios.put<FlowDefinition>(`/control/flows/${id}`, request);
-      return response.data;
+      const body = toJsonApiBody('flows', request as unknown as Record<string, unknown>, id);
+      const response = await this.axios.patch(`/api/flows/${id}`, body);
+      return unwrapJsonApiResource<FlowDefinition>(response.data);
     },
 
     delete: async (id: string): Promise<void> => {
-      await this.axios.delete(`/control/flows/${id}`);
+      await this.axios.delete(`/api/flows/${id}`);
     },
 
-    listExecutions: async (tenantId: string): Promise<FlowExecution[]> => {
-      const params = new URLSearchParams({ tenantId });
-      const response = await this.axios.get<FlowExecution[]>(
-        `/control/flows/executions?${params.toString()}`
-      );
-      return response.data;
+    listExecutions: async (_tenantId?: string): Promise<FlowExecution[]> => {
+      const response = await this.axios.get('/api/flow-executions');
+      return unwrapJsonApiList<FlowExecution>(response.data);
     },
 
     getExecution: async (executionId: string): Promise<FlowExecution> => {
-      const response = await this.axios.get<FlowExecution>(
-        `/control/flows/executions/${executionId}`
-      );
-      return response.data;
+      const response = await this.axios.get(`/api/flow-executions/${executionId}`);
+      return unwrapJsonApiResource<FlowExecution>(response.data);
     },
   };
 
   /**
-   * Scheduled job operations
+   * Scheduled job operations.
+   * CRUD routed via /api/scheduled-jobs (JSON:API, worker).
+   * Logs via sub-resource /api/scheduled-jobs/{id}/job-execution-logs.
    */
   readonly scheduledJobs = {
-    list: async (tenantId: string): Promise<ScheduledJob[]> => {
-      const params = new URLSearchParams({ tenantId });
-      const response = await this.axios.get<ScheduledJob[]>(
-        `/control/scheduled-jobs?${params.toString()}`
-      );
-      return response.data;
+    list: async (_tenantId?: string): Promise<ScheduledJob[]> => {
+      const response = await this.axios.get('/api/scheduled-jobs');
+      return unwrapJsonApiList<ScheduledJob>(response.data);
     },
 
     get: async (id: string): Promise<ScheduledJob> => {
-      const response = await this.axios.get<ScheduledJob>(`/control/scheduled-jobs/${id}`);
-      return response.data;
+      const response = await this.axios.get(`/api/scheduled-jobs/${id}`);
+      return unwrapJsonApiResource<ScheduledJob>(response.data);
     },
 
     create: async (
-      tenantId: string,
-      userId: string,
+      _tenantId: string,
+      _userId: string,
       request: CreateScheduledJobRequest
     ): Promise<ScheduledJob> => {
-      const params = new URLSearchParams({ tenantId, userId });
-      const response = await this.axios.post<ScheduledJob>(
-        `/control/scheduled-jobs?${params.toString()}`,
-        request
-      );
-      return response.data;
+      const body = toJsonApiBody('scheduled-jobs', request as unknown as Record<string, unknown>);
+      const response = await this.axios.post('/api/scheduled-jobs', body);
+      return unwrapJsonApiResource<ScheduledJob>(response.data);
     },
 
     update: async (
       id: string,
       request: Partial<CreateScheduledJobRequest>
     ): Promise<ScheduledJob> => {
-      const response = await this.axios.put<ScheduledJob>(`/control/scheduled-jobs/${id}`, request);
-      return response.data;
+      const body = toJsonApiBody(
+        'scheduled-jobs',
+        request as unknown as Record<string, unknown>,
+        id
+      );
+      const response = await this.axios.patch(`/api/scheduled-jobs/${id}`, body);
+      return unwrapJsonApiResource<ScheduledJob>(response.data);
     },
 
     delete: async (id: string): Promise<void> => {
-      await this.axios.delete(`/control/scheduled-jobs/${id}`);
+      await this.axios.delete(`/api/scheduled-jobs/${id}`);
     },
 
     listLogs: async (id: string): Promise<JobExecutionLog[]> => {
-      const response = await this.axios.get<JobExecutionLog[]>(
-        `/control/scheduled-jobs/${id}/logs`
-      );
-      return response.data;
+      const response = await this.axios.get(`/api/scheduled-jobs/${id}/job-execution-logs`);
+      return unwrapJsonApiList<JobExecutionLog>(response.data);
     },
   };
 
   /**
-   * Script operations
+   * Script operations.
+   * CRUD routed via /api/scripts (JSON:API, worker).
+   * Tenant-wide logs via /api/script-execution-logs.
+   * Per-script logs via sub-resource /api/scripts/{id}/script-execution-logs.
    */
   readonly scripts = {
-    list: async (tenantId: string): Promise<Script[]> => {
-      const params = new URLSearchParams({ tenantId });
-      const response = await this.axios.get<Script[]>(`/control/scripts?${params.toString()}`);
-      return response.data;
+    list: async (_tenantId?: string): Promise<Script[]> => {
+      const response = await this.axios.get('/api/scripts');
+      return unwrapJsonApiList<Script>(response.data);
     },
 
     get: async (id: string): Promise<Script> => {
-      const response = await this.axios.get<Script>(`/control/scripts/${id}`);
-      return response.data;
+      const response = await this.axios.get(`/api/scripts/${id}`);
+      return unwrapJsonApiResource<Script>(response.data);
     },
 
     create: async (
-      tenantId: string,
-      userId: string,
+      _tenantId: string,
+      _userId: string,
       request: CreateScriptRequest
     ): Promise<Script> => {
-      const params = new URLSearchParams({ tenantId, userId });
-      const response = await this.axios.post<Script>(
-        `/control/scripts?${params.toString()}`,
-        request
-      );
-      return response.data;
+      const body = toJsonApiBody('scripts', request as unknown as Record<string, unknown>);
+      const response = await this.axios.post('/api/scripts', body);
+      return unwrapJsonApiResource<Script>(response.data);
     },
 
     update: async (id: string, request: Partial<CreateScriptRequest>): Promise<Script> => {
-      const response = await this.axios.put<Script>(`/control/scripts/${id}`, request);
-      return response.data;
+      const body = toJsonApiBody('scripts', request as unknown as Record<string, unknown>, id);
+      const response = await this.axios.patch(`/api/scripts/${id}`, body);
+      return unwrapJsonApiResource<Script>(response.data);
     },
 
     delete: async (id: string): Promise<void> => {
-      await this.axios.delete(`/control/scripts/${id}`);
+      await this.axios.delete(`/api/scripts/${id}`);
     },
 
-    listLogs: async (tenantId: string): Promise<ScriptExecutionLog[]> => {
-      const params = new URLSearchParams({ tenantId });
-      const response = await this.axios.get<ScriptExecutionLog[]>(
-        `/control/scripts/logs?${params.toString()}`
-      );
-      return response.data;
+    listLogs: async (_tenantId?: string): Promise<ScriptExecutionLog[]> => {
+      const response = await this.axios.get('/api/script-execution-logs');
+      return unwrapJsonApiList<ScriptExecutionLog>(response.data);
     },
 
     listLogsByScript: async (id: string): Promise<ScriptExecutionLog[]> => {
-      const response = await this.axios.get<ScriptExecutionLog[]>(`/control/scripts/${id}/logs`);
-      return response.data;
+      const response = await this.axios.get(`/api/scripts/${id}/script-execution-logs`);
+      return unwrapJsonApiList<ScriptExecutionLog>(response.data);
     },
   };
 
   /**
-   * Webhook operations
+   * Webhook operations.
+   * CRUD routed via /api/webhooks (JSON:API, worker).
+   * Deliveries via sub-resource /api/webhooks/{id}/webhook-deliveries.
    */
   readonly webhooks = {
-    list: async (tenantId: string): Promise<Webhook[]> => {
-      const params = new URLSearchParams({ tenantId });
-      const response = await this.axios.get<Webhook[]>(`/control/webhooks?${params.toString()}`);
-      return response.data;
+    list: async (_tenantId?: string): Promise<Webhook[]> => {
+      const response = await this.axios.get('/api/webhooks');
+      return unwrapJsonApiList<Webhook>(response.data);
     },
 
     get: async (id: string): Promise<Webhook> => {
-      const response = await this.axios.get<Webhook>(`/control/webhooks/${id}`);
-      return response.data;
+      const response = await this.axios.get(`/api/webhooks/${id}`);
+      return unwrapJsonApiResource<Webhook>(response.data);
     },
 
     create: async (
-      tenantId: string,
-      userId: string,
+      _tenantId: string,
+      _userId: string,
       request: CreateWebhookRequest
     ): Promise<Webhook> => {
-      const params = new URLSearchParams({ tenantId, userId });
-      const response = await this.axios.post<Webhook>(
-        `/control/webhooks?${params.toString()}`,
-        request
-      );
-      return response.data;
+      const body = toJsonApiBody('webhooks', request as unknown as Record<string, unknown>);
+      const response = await this.axios.post('/api/webhooks', body);
+      return unwrapJsonApiResource<Webhook>(response.data);
     },
 
     update: async (id: string, request: Partial<CreateWebhookRequest>): Promise<Webhook> => {
-      const response = await this.axios.put<Webhook>(`/control/webhooks/${id}`, request);
-      return response.data;
+      const body = toJsonApiBody('webhooks', request as unknown as Record<string, unknown>, id);
+      const response = await this.axios.patch(`/api/webhooks/${id}`, body);
+      return unwrapJsonApiResource<Webhook>(response.data);
     },
 
     delete: async (id: string): Promise<void> => {
-      await this.axios.delete(`/control/webhooks/${id}`);
+      await this.axios.delete(`/api/webhooks/${id}`);
     },
 
     listDeliveries: async (id: string): Promise<WebhookDelivery[]> => {
-      const response = await this.axios.get<WebhookDelivery[]>(
-        `/control/webhooks/${id}/deliveries`
-      );
-      return response.data;
+      const response = await this.axios.get(`/api/webhooks/${id}/webhook-deliveries`);
+      return unwrapJsonApiList<WebhookDelivery>(response.data);
     },
   };
 
   /**
-   * Connected app operations
+   * Connected app operations.
+   * CRUD routed via /api/connected-apps (JSON:API, worker).
+   * Rotate secret via action: POST /control/connected-apps/{id}/actions/rotate-secret.
+   * Tokens via sub-resource /api/connected-apps/{id}/connected-app-tokens.
    */
   readonly connectedApps = {
-    list: async (tenantId: string): Promise<ConnectedApp[]> => {
-      const params = new URLSearchParams({ tenantId });
-      const response = await this.axios.get<ConnectedApp[]>(
-        `/control/connected-apps?${params.toString()}`
-      );
-      return response.data;
+    list: async (_tenantId?: string): Promise<ConnectedApp[]> => {
+      const response = await this.axios.get('/api/connected-apps');
+      return unwrapJsonApiList<ConnectedApp>(response.data);
     },
 
     get: async (id: string): Promise<ConnectedApp> => {
-      const response = await this.axios.get<ConnectedApp>(`/control/connected-apps/${id}`);
-      return response.data;
+      const response = await this.axios.get(`/api/connected-apps/${id}`);
+      return unwrapJsonApiResource<ConnectedApp>(response.data);
     },
 
     create: async (
-      tenantId: string,
-      userId: string,
+      _tenantId: string,
+      _userId: string,
       request: CreateConnectedAppRequest
     ): Promise<ConnectedAppCreatedResponse> => {
-      const params = new URLSearchParams({ tenantId, userId });
-      const response = await this.axios.post<ConnectedAppCreatedResponse>(
-        `/control/connected-apps?${params.toString()}`,
-        request
-      );
-      return response.data;
+      const body = toJsonApiBody('connected-apps', request as unknown as Record<string, unknown>);
+      const response = await this.axios.post('/api/connected-apps', body);
+      return unwrapJsonApiResource<ConnectedAppCreatedResponse>(response.data);
     },
 
     update: async (
       id: string,
       request: Partial<CreateConnectedAppRequest>
     ): Promise<ConnectedApp> => {
-      const response = await this.axios.put<ConnectedApp>(`/control/connected-apps/${id}`, request);
-      return response.data;
+      const body = toJsonApiBody(
+        'connected-apps',
+        request as unknown as Record<string, unknown>,
+        id
+      );
+      const response = await this.axios.patch(`/api/connected-apps/${id}`, body);
+      return unwrapJsonApiResource<ConnectedApp>(response.data);
     },
 
     delete: async (id: string): Promise<void> => {
-      await this.axios.delete(`/control/connected-apps/${id}`);
+      await this.axios.delete(`/api/connected-apps/${id}`);
     },
 
     rotateSecret: async (id: string): Promise<ConnectedAppCreatedResponse> => {
       const response = await this.axios.post<ConnectedAppCreatedResponse>(
-        `/control/connected-apps/${id}/rotate-secret`
+        `/control/connected-apps/${id}/actions/rotate-secret`
       );
       return response.data;
     },
 
     listTokens: async (id: string): Promise<ConnectedAppToken[]> => {
-      const response = await this.axios.get<ConnectedAppToken[]>(
-        `/control/connected-apps/${id}/tokens`
-      );
-      return response.data;
+      const response = await this.axios.get(`/api/connected-apps/${id}/connected-app-tokens`);
+      return unwrapJsonApiList<ConnectedAppToken>(response.data);
     },
   };
 
   /**
-   * Bulk job operations
+   * Bulk job operations.
+   * CRUD routed via /api/bulk-jobs (JSON:API, worker).
+   * Abort via action: POST /control/bulk-jobs/{id}/actions/abort.
+   * Results via sub-resource /api/bulk-jobs/{id}/bulk-job-results.
    */
   readonly bulkJobs = {
-    list: async (tenantId: string): Promise<BulkJob[]> => {
-      const params = new URLSearchParams({ tenantId });
-      const response = await this.axios.get<BulkJob[]>(`/control/bulk-jobs?${params.toString()}`);
-      return response.data;
+    list: async (_tenantId?: string): Promise<BulkJob[]> => {
+      const response = await this.axios.get('/api/bulk-jobs');
+      return unwrapJsonApiList<BulkJob>(response.data);
     },
 
     get: async (id: string): Promise<BulkJob> => {
-      const response = await this.axios.get<BulkJob>(`/control/bulk-jobs/${id}`);
-      return response.data;
+      const response = await this.axios.get(`/api/bulk-jobs/${id}`);
+      return unwrapJsonApiResource<BulkJob>(response.data);
     },
 
     create: async (
-      tenantId: string,
-      userId: string,
+      _tenantId: string,
+      _userId: string,
       request: CreateBulkJobRequest
     ): Promise<BulkJob> => {
-      const params = new URLSearchParams({ tenantId, userId });
-      const response = await this.axios.post<BulkJob>(
-        `/control/bulk-jobs?${params.toString()}`,
-        request
-      );
-      return response.data;
+      const body = toJsonApiBody('bulk-jobs', request as unknown as Record<string, unknown>);
+      const response = await this.axios.post('/api/bulk-jobs', body);
+      return unwrapJsonApiResource<BulkJob>(response.data);
     },
 
     abort: async (id: string): Promise<BulkJob> => {
-      const response = await this.axios.post<BulkJob>(`/control/bulk-jobs/${id}/abort`);
+      const response = await this.axios.post<BulkJob>(`/control/bulk-jobs/${id}/actions/abort`);
       return response.data;
     },
 
     getResults: async (id: string): Promise<BulkJobResult[]> => {
-      const response = await this.axios.get<BulkJobResult[]>(`/control/bulk-jobs/${id}/results`);
-      return response.data;
+      const response = await this.axios.get(`/api/bulk-jobs/${id}/bulk-job-results`);
+      return unwrapJsonApiList<BulkJobResult>(response.data);
     },
 
     getErrors: async (id: string): Promise<BulkJobResult[]> => {
-      const response = await this.axios.get<BulkJobResult[]>(`/control/bulk-jobs/${id}/errors`);
-      return response.data;
+      const response = await this.axios.get(
+        `/api/bulk-jobs/${id}/bulk-job-results?filter[status][eq]=ERROR`
+      );
+      return unwrapJsonApiList<BulkJobResult>(response.data);
     },
   };
 

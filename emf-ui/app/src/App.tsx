@@ -94,7 +94,6 @@ import {
   ConnectedAppsPage,
   BulkJobsPage,
   SetupHomePage,
-  WorkersPage,
   LoginPage,
   UnauthorizedPage,
   NotFoundPage,
@@ -526,17 +525,6 @@ function TenantRoutes(): React.ReactElement {
       />
 
       {/* Workers route */}
-      <Route
-        path="workers"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="VIEW_SETUP">
-              <WorkersPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
-
       {/* UI Builder routes */}
       <Route
         path="pages"

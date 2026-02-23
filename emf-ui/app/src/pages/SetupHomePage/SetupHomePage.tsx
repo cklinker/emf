@@ -326,13 +326,13 @@ export function SetupHomePage({ testId = 'setup-home-page' }: SetupHomePageProps
 
   const { data: reportsData } = useQuery({
     queryKey: ['setup-stats-reports'],
-    queryFn: () => apiClient.get<unknown>(`/control/reports`),
+    queryFn: () => apiClient.getList<unknown>(`/api/reports`),
     staleTime: 300000,
   })
 
   const { data: dashboardsData } = useQuery({
     queryKey: ['setup-stats-dashboards'],
-    queryFn: () => apiClient.get<unknown>(`/control/dashboards`),
+    queryFn: () => apiClient.getList<unknown>(`/api/dashboards`),
     staleTime: 300000,
   })
 

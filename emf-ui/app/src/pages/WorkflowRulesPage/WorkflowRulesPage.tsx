@@ -225,7 +225,7 @@ function WorkflowRuleForm({
   const { data: actionTypes } = useQuery({
     queryKey: ['workflow-action-types-active'],
     queryFn: () =>
-      apiClient.get<WorkflowActionType[]>('/control/workflow-action-types?activeOnly=true'),
+      apiClient.getList<WorkflowActionType>('/api/workflow-action-types?activeOnly=true'),
   })
 
   useEffect(() => {
@@ -1051,7 +1051,9 @@ function ActionLogDetailModal({
   } = useQuery({
     queryKey: ['workflow-action-logs', executionLogId],
     queryFn: () =>
-      apiClient.get<WorkflowActionLog[]>(`/control/workflow-rules/logs/${executionLogId}/actions`),
+      apiClient.getList<WorkflowActionLog>(
+        `/api/workflow-execution-logs/${executionLogId}/workflow-action-logs`
+      ),
   })
 
   const [expandedRow, setExpandedRow] = useState<string | null>(null)
@@ -1294,7 +1296,9 @@ export function WorkflowRulesPage({
   } = useQuery({
     queryKey: ['workflow-rule-logs', logsItemId],
     queryFn: () =>
-      apiClient.get<WorkflowExecutionLog[]>(`/control/workflow-rules/${logsItemId}/logs`),
+      apiClient.getList<WorkflowExecutionLog>(
+        `/api/workflow-rules/${logsItemId}/workflow-execution-logs`
+      ),
     enabled: !!logsItemId,
   })
 
@@ -1354,14 +1358,14 @@ export function WorkflowRulesPage({
     refetch,
   } = useQuery({
     queryKey: ['workflow-rules'],
-    queryFn: () => apiClient.get<WorkflowRule[]>(`/control/workflow-rules`),
+    queryFn: () => apiClient.getList<WorkflowRule>(`/api/workflow-rules`),
   })
 
   const workflowRuleList: WorkflowRule[] = workflowRules ?? []
 
   const createMutation = useMutation({
     mutationFn: (data: WorkflowRuleFormData) =>
-      apiClient.post<WorkflowRule>(`/control/workflow-rules?userId=system`, data),
+      apiClient.postResource<WorkflowRule>(`/api/workflow-rules`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workflow-rules'] })
       showToast('Workflow rule created successfully', 'success')
@@ -1374,7 +1378,7 @@ export function WorkflowRulesPage({
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: WorkflowRuleFormData }) =>
-      apiClient.put<WorkflowRule>(`/control/workflow-rules/${id}`, data),
+      apiClient.putResource<WorkflowRule>(`/api/workflow-rules/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workflow-rules'] })
       showToast('Workflow rule updated successfully', 'success')
@@ -1386,7 +1390,7 @@ export function WorkflowRulesPage({
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiClient.delete(`/control/workflow-rules/${id}`),
+    mutationFn: (id: string) => apiClient.delete(`/api/workflow-rules/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workflow-rules'] })
       showToast('Workflow rule deleted successfully', 'success')
@@ -1400,9 +1404,12 @@ export function WorkflowRulesPage({
 
   const executeMutation = useMutation({
     mutationFn: (id: string) =>
-      apiClient.post<{ executionLogIds: string[] }>(`/control/workflow-rules/${id}/execute`, {
-        recordIds: [],
-      }),
+      apiClient.post<{ executionLogIds: string[] }>(
+        `/control/workflow-rules/${id}/actions/execute`,
+        {
+          recordIds: [],
+        }
+      ),
     onSuccess: (data) => {
       const count = data?.executionLogIds?.length ?? 0
       showToast(`Manual execution complete: ${count} execution log(s) created`, 'success')

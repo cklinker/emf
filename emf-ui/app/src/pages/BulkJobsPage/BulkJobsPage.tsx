@@ -309,15 +309,14 @@ export function BulkJobsPage({ testId = 'bulk-jobs-page' }: BulkJobsPageProps): 
     refetch,
   } = useQuery({
     queryKey: ['bulk-jobs'],
-    queryFn: () => apiClient.get<BulkJob[]>(`/control/bulk-jobs`),
+    queryFn: () => apiClient.getList<BulkJob>(`/api/bulk-jobs`),
     refetchInterval: 5000,
   })
 
   const jobList: BulkJob[] = bulkJobs ?? []
 
   const createMutation = useMutation({
-    mutationFn: (data: BulkJobFormData) =>
-      apiClient.post<BulkJob>(`/control/bulk-jobs?userId=system`, data),
+    mutationFn: (data: BulkJobFormData) => apiClient.postResource<BulkJob>(`/api/bulk-jobs`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bulk-jobs'] })
       showToast('Bulk job created successfully', 'success')
@@ -329,7 +328,7 @@ export function BulkJobsPage({ testId = 'bulk-jobs-page' }: BulkJobsPageProps): 
   })
 
   const abortMutation = useMutation({
-    mutationFn: (id: string) => apiClient.post<void>(`/control/bulk-jobs/${id}/abort`, {}),
+    mutationFn: (id: string) => apiClient.post<void>(`/control/bulk-jobs/${id}/actions/abort`, {}),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bulk-jobs'] })
       showToast('Bulk job aborted successfully', 'success')

@@ -322,8 +322,8 @@ export function CollectionDetailPage({
   const { data: globalPicklists = [] } = useQuery({
     queryKey: ['global-picklists'],
     queryFn: async () => {
-      const response = await apiClient.get<Array<{ id: string; name: string }>>(
-        '/control/picklists/global'
+      const response = await apiClient.getList<{ id: string; name: string }>(
+        '/api/global-picklists'
       )
       return response
     },

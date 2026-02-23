@@ -399,7 +399,8 @@ export function ScheduledJobsPage({
     error: logsError,
   } = useQuery({
     queryKey: ['scheduled-job-logs', logsItemId],
-    queryFn: () => apiClient.get<JobExecutionLog[]>(`/control/scheduled-jobs/${logsItemId}/logs`),
+    queryFn: () =>
+      apiClient.getList<JobExecutionLog>(`/api/scheduled-jobs/${logsItemId}/job-execution-logs`),
     enabled: !!logsItemId,
   })
 
@@ -449,14 +450,14 @@ export function ScheduledJobsPage({
     refetch,
   } = useQuery({
     queryKey: ['scheduled-jobs'],
-    queryFn: () => apiClient.get<ScheduledJob[]>(`/control/scheduled-jobs`),
+    queryFn: () => apiClient.getList<ScheduledJob>(`/api/scheduled-jobs`),
   })
 
   const scheduledJobList: ScheduledJob[] = scheduledJobs ?? []
 
   const createMutation = useMutation({
     mutationFn: (data: ScheduledJobFormData) =>
-      apiClient.post<ScheduledJob>(`/control/scheduled-jobs?userId=system`, data),
+      apiClient.postResource<ScheduledJob>(`/api/scheduled-jobs`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['scheduled-jobs'] })
       showToast('Scheduled job created successfully', 'success')
@@ -469,7 +470,7 @@ export function ScheduledJobsPage({
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: ScheduledJobFormData }) =>
-      apiClient.put<ScheduledJob>(`/control/scheduled-jobs/${id}`, data),
+      apiClient.putResource<ScheduledJob>(`/api/scheduled-jobs/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['scheduled-jobs'] })
       showToast('Scheduled job updated successfully', 'success')
@@ -481,7 +482,7 @@ export function ScheduledJobsPage({
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiClient.delete(`/control/scheduled-jobs/${id}`),
+    mutationFn: (id: string) => apiClient.delete(`/api/scheduled-jobs/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['scheduled-jobs'] })
       showToast('Scheduled job deleted successfully', 'success')

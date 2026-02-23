@@ -3,9 +3,6 @@ package com.emf.worker.config;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
-import java.net.InetAddress;
-import java.net.UnknownHostException;
-import java.time.Duration;
 import java.util.UUID;
 
 /**
@@ -13,6 +10,9 @@ import java.util.UUID;
  *
  * <p>Binds to the {@code emf.worker} prefix in application configuration.
  * Provides sensible defaults for all properties.
+ *
+ * <p>Worker lifecycle (registration, heartbeat, assignments) has been removed.
+ * Kubernetes manages pod health via liveness/readiness probes.
  */
 @Component
 @ConfigurationProperties(prefix = "emf.worker")
@@ -22,26 +22,6 @@ public class WorkerProperties {
      * Unique worker identifier. Defaults to a random UUID if not set.
      */
     private String id;
-
-    /**
-     * Worker pool name. Workers in the same pool can receive the same types of assignments.
-     */
-    private String pool = "default";
-
-    /**
-     * Maximum number of collections this worker can serve.
-     */
-    private int capacity = 50;
-
-    /**
-     * If set, this worker will only serve collections belonging to this tenant.
-     */
-    private String tenantAffinity;
-
-    /**
-     * Interval between heartbeat reports to the control plane, in milliseconds.
-     */
-    private long heartbeatInterval = 15000;
 
     /**
      * URL of the control plane service.
@@ -59,83 +39,11 @@ public class WorkerProperties {
         this.id = id;
     }
 
-    public String getPool() {
-        return pool;
-    }
-
-    public void setPool(String pool) {
-        this.pool = pool;
-    }
-
-    public int getCapacity() {
-        return capacity;
-    }
-
-    public void setCapacity(int capacity) {
-        this.capacity = capacity;
-    }
-
-    public String getTenantAffinity() {
-        return tenantAffinity;
-    }
-
-    public void setTenantAffinity(String tenantAffinity) {
-        this.tenantAffinity = tenantAffinity;
-    }
-
-    public long getHeartbeatInterval() {
-        return heartbeatInterval;
-    }
-
-    public void setHeartbeatInterval(long heartbeatInterval) {
-        this.heartbeatInterval = heartbeatInterval;
-    }
-
     public String getControlPlaneUrl() {
         return controlPlaneUrl;
     }
 
     public void setControlPlaneUrl(String controlPlaneUrl) {
         this.controlPlaneUrl = controlPlaneUrl;
-    }
-
-    /**
-     * Returns the hostname of this worker, using the HOSTNAME environment variable
-     * (set by Kubernetes) or falling back to the local hostname.
-     *
-     * @return the hostname
-     */
-    public String getHost() {
-        String hostname = System.getenv("HOSTNAME");
-        if (hostname != null && !hostname.isBlank()) {
-            return hostname;
-        }
-        try {
-            return InetAddress.getLocalHost().getHostName();
-        } catch (UnknownHostException e) {
-            return "localhost";
-        }
-    }
-
-    /**
-     * Returns the IP address of this worker pod. Uses the POD_IP environment variable
-     * if set (via Kubernetes downward API), otherwise resolves the local host address.
-     * Falls back to the hostname if IP resolution fails.
-     *
-     * @return the IP address or hostname as fallback
-     */
-    public String getHostIp() {
-        // Prefer POD_IP env var (Kubernetes downward API)
-        String podIp = System.getenv("POD_IP");
-        if (podIp != null && !podIp.isBlank()) {
-            return podIp;
-        }
-        // Resolve IP from hostname
-        try {
-            return InetAddress.getLocalHost().getHostAddress();
-        } catch (UnknownHostException e) {
-            // Fall back to hostname
-            return getHost();
-        }
     }
 }

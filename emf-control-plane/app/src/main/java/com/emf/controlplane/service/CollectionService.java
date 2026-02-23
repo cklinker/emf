@@ -54,7 +54,6 @@ public class CollectionService {
     private final FieldRepository fieldRepository;
     private final ObjectMapper objectMapper;
     private final ConfigEventPublisher eventPublisher;
-    private final CollectionAssignmentService collectionAssignmentService;
     private final DefaultProfileSeeder defaultProfileSeeder;
 
     public CollectionService(
@@ -63,14 +62,12 @@ public class CollectionService {
             FieldRepository fieldRepository,
             ObjectMapper objectMapper,
             @Nullable ConfigEventPublisher eventPublisher,
-            @Nullable CollectionAssignmentService collectionAssignmentService,
             @Nullable DefaultProfileSeeder defaultProfileSeeder) {
         this.collectionRepository = collectionRepository;
         this.versionRepository = versionRepository;
         this.fieldRepository = fieldRepository;
         this.objectMapper = objectMapper;
         this.eventPublisher = eventPublisher;
-        this.collectionAssignmentService = collectionAssignmentService;
         this.defaultProfileSeeder = defaultProfileSeeder;
     }
 
@@ -169,17 +166,6 @@ public class CollectionService {
                 defaultProfileSeeder.seedObjectPermissionsForCollection(tenantId, collection.getId());
             } catch (Exception e) {
                 log.warn("Failed to seed object permissions for collection {}: {}",
-                        collection.getId(), e.getMessage());
-            }
-        }
-
-        // Auto-assign to an available worker (best-effort)
-        if (collectionAssignmentService != null) {
-            try {
-                collectionAssignmentService.assignCollection(collection.getId(), tenantId);
-                log.info("Auto-assigned collection {} to a worker", collection.getId());
-            } catch (IllegalStateException e) {
-                log.warn("No available workers for auto-assignment of collection {}: {}",
                         collection.getId(), e.getMessage());
             }
         }

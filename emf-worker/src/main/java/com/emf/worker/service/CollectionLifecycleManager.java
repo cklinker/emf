@@ -19,7 +19,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -131,6 +130,17 @@ public class CollectionLifecycleManager {
             // Build CollectionDefinition from the response
             CollectionDefinition definition = buildCollectionDefinition(collectionName, collectionData);
 
+            // Skip VIRTUAL collections — they have no physical storage
+            if (definition.storageConfig() != null
+                    && definition.storageConfig().mode() == StorageMode.VIRTUAL) {
+                log.info("Skipping VIRTUAL collection '{}' (id={}) — no storage to initialize",
+                        collectionName, collectionId);
+                // Still register so metadata is available, but skip storage init
+                collectionRegistry.register(definition);
+                activeCollections.put(collectionId, collectionName);
+                return;
+            }
+
             // Register in local registry (makes it available to DynamicCollectionRouter)
             collectionRegistry.register(definition);
 
@@ -144,9 +154,6 @@ public class CollectionLifecycleManager {
             activeCollections.put(collectionId, collectionName);
 
             log.info("Successfully initialized collection '{}' (id={})", collectionName, collectionId);
-
-            // Notify control plane that this collection is ready on this worker
-            notifyCollectionReady(collectionId);
 
         } catch (Exception e) {
             log.error("Failed to initialize collection {}: {}", collectionId, e.getMessage(), e);
@@ -444,26 +451,6 @@ public class CollectionLifecycleManager {
                     collectionName, e.getMessage());
             // Register empty list so validation doesn't fail if rules can't be fetched
             validationRuleRegistry.register(collectionName, List.of());
-        }
-    }
-
-    /**
-     * Notifies the control plane that a collection is ready on this worker.
-     */
-    private void notifyCollectionReady(String collectionId) {
-        try {
-            String url = workerProperties.getControlPlaneUrl()
-                    + "/control/assignments/" + collectionId + "/" + workerProperties.getId() + "/ready";
-
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<String> request = new HttpEntity<>("{}", headers);
-
-            restTemplate.postForEntity(url, request, Void.class);
-            log.info("Notified control plane that collection {} is ready", collectionId);
-        } catch (Exception e) {
-            log.warn("Failed to notify control plane of collection readiness for {}: {}",
-                    collectionId, e.getMessage());
         }
     }
 

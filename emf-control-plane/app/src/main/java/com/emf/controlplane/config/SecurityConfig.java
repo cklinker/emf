@@ -192,13 +192,8 @@ public class SecurityConfig {
                 // Permit tenant slug-map endpoint - used by gateway to resolve URL slugs
                 .requestMatchers("/control/tenants/slug-map").permitAll()
 
-                // Permit worker endpoints - internal cluster communication (registration, heartbeat, assignments)
-                .requestMatchers("/control/workers/**").permitAll()
+                // Permit collection endpoints - used by workers for bootstrap/schema fetch
                 .requestMatchers("/control/collections/**").permitAll()
-                .requestMatchers("/control/assignments/**").permitAll()
-
-                // Permit worker metrics endpoints - used by KEDA and Prometheus for autoscaling
-                .requestMatchers("/control/metrics/**").permitAll()
 
                 // Permit internal endpoints - used by gateway for JWKS lookup before JWT validation
                 .requestMatchers("/internal/**").permitAll()

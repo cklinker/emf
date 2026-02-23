@@ -27,8 +27,6 @@ public class WebConfig implements WebMvcConfigurer {
                         "/control/tenants/slug-map",
                         "/control/ui-bootstrap",
                         "/control/tenants/**",
-                        "/control/workers/**",
-                        "/control/metrics/**",
                         "/internal/**"
                 );
     }

@@ -74,8 +74,6 @@ public class ControlPlaneProperties {
             private String collectionChanged = "config.collection.changed";
             private String uiChanged = "config.ui.changed";
             private String oidcChanged = "config.oidc.changed";
-            private String workerAssignmentChanged = "emf.worker.assignment.changed";
-            private String workerStatusChanged = "emf.worker.status.changed";
             private String workflowRuleChanged = "config.workflow.changed";
 
             public String getCollectionChanged() {
@@ -100,22 +98,6 @@ public class ControlPlaneProperties {
 
             public void setOidcChanged(String oidcChanged) {
                 this.oidcChanged = oidcChanged;
-            }
-
-            public String getWorkerAssignmentChanged() {
-                return workerAssignmentChanged;
-            }
-
-            public void setWorkerAssignmentChanged(String workerAssignmentChanged) {
-                this.workerAssignmentChanged = workerAssignmentChanged;
-            }
-
-            public String getWorkerStatusChanged() {
-                return workerStatusChanged;
-            }
-
-            public void setWorkerStatusChanged(String workerStatusChanged) {
-                this.workerStatusChanged = workerStatusChanged;
             }
 
             public String getWorkflowRuleChanged() {

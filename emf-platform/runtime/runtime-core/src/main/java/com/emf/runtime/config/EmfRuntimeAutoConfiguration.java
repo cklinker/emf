@@ -3,6 +3,7 @@ package com.emf.runtime.config;
 import com.emf.runtime.events.EventPublisher;
 import com.emf.runtime.events.KafkaEventPublisher;
 import com.emf.runtime.events.NoOpEventPublisher;
+import com.emf.runtime.events.RecordEventPublisher;
 import com.emf.runtime.query.DefaultQueryEngine;
 import com.emf.runtime.query.QueryEngine;
 import com.emf.runtime.registry.CollectionRegistry;
@@ -140,9 +141,10 @@ public class EmfRuntimeAutoConfiguration {
     @ConditionalOnMissingBean
     public QueryEngine queryEngine(StorageAdapter storageAdapter,
                                     ValidationEngine validationEngine,
-                                    @Autowired(required = false) CustomValidationRuleEngine customValidationRuleEngine) {
+                                    @Autowired(required = false) CustomValidationRuleEngine customValidationRuleEngine,
+                                    @Autowired(required = false) RecordEventPublisher recordEventPublisher) {
         return new DefaultQueryEngine(storageAdapter, validationEngine,
-                null, null, null, null, customValidationRuleEngine);
+                null, null, null, null, customValidationRuleEngine, recordEventPublisher);
     }
 
     /**

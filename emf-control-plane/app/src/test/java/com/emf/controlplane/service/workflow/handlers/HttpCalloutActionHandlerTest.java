@@ -29,7 +29,7 @@ class HttpCalloutActionHandlerTest {
     @BeforeEach
     void setUp() {
         restTemplate = mock(RestTemplate.class);
-        handler = new HttpCalloutActionHandler(objectMapper);
+        handler = new HttpCalloutActionHandler(objectMapper, null);
         handler.setRestTemplate(restTemplate);
     }
 

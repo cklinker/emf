@@ -194,4 +194,83 @@ class FormulaEvaluatorTest {
                 evaluator.evaluate("UNKNOWN_FUNC(1)", Map.of()));
         }
     }
+
+    @Nested
+    class CompilationCache {
+        @Test
+        void shouldCacheParsedExpression() {
+            evaluator.evaluate("Amount + Tax", Map.of("Amount", 100.0, "Tax", 8.5));
+            assertEquals(1, evaluator.cacheSize());
+
+            // Same expression should be served from cache
+            evaluator.evaluate("Amount + Tax", Map.of("Amount", 200.0, "Tax", 10.0));
+            assertEquals(1, evaluator.cacheSize());
+        }
+
+        @Test
+        void shouldCacheDifferentExpressions() {
+            evaluator.evaluate("Amount + Tax", Map.of("Amount", 100.0, "Tax", 8.5));
+            evaluator.evaluate("Amount * Quantity", Map.of("Amount", 25.0, "Quantity", 4));
+            assertEquals(2, evaluator.cacheSize());
+        }
+
+        @Test
+        void shouldReturnCorrectResultFromCache() {
+            Object result1 = evaluator.evaluate("Amount + Tax", Map.of("Amount", 100.0, "Tax", 8.5));
+            assertEquals(108.5, ((Number) result1).doubleValue(), 0.001);
+
+            // Different context, same expression — should use cached AST
+            Object result2 = evaluator.evaluate("Amount + Tax", Map.of("Amount", 200.0, "Tax", 20.0));
+            assertEquals(220.0, ((Number) result2).doubleValue(), 0.001);
+        }
+
+        @Test
+        void shouldEvictSpecificExpression() {
+            evaluator.evaluate("Amount + Tax", Map.of("Amount", 100.0, "Tax", 8.5));
+            evaluator.evaluate("Amount * Quantity", Map.of("Amount", 25.0, "Quantity", 4));
+            assertEquals(2, evaluator.cacheSize());
+
+            evaluator.evict("Amount + Tax");
+            assertEquals(1, evaluator.cacheSize());
+        }
+
+        @Test
+        void shouldClearAllCachedExpressions() {
+            evaluator.evaluate("Amount + Tax", Map.of("Amount", 100.0, "Tax", 8.5));
+            evaluator.evaluate("Amount * Quantity", Map.of("Amount", 25.0, "Quantity", 4));
+            assertEquals(2, evaluator.cacheSize());
+
+            evaluator.clearCache();
+            assertEquals(0, evaluator.cacheSize());
+        }
+
+        @Test
+        void shouldRespectMaxCacheSize() {
+            // Create evaluator with small cache size
+            FormulaEvaluator smallCacheEvaluator = new FormulaEvaluator(
+                List.of(
+                    new BuiltInFunctions.If(),
+                    new BuiltInFunctions.IsBlank()
+                ), 3);
+
+            smallCacheEvaluator.evaluate("1 + 1", Map.of());
+            smallCacheEvaluator.evaluate("2 + 2", Map.of());
+            smallCacheEvaluator.evaluate("3 + 3", Map.of());
+            assertEquals(3, smallCacheEvaluator.cacheSize());
+
+            // Adding a 4th expression should trigger a clear
+            smallCacheEvaluator.evaluate("4 + 4", Map.of());
+            assertEquals(1, smallCacheEvaluator.cacheSize());
+        }
+
+        @Test
+        void shouldStartWithEmptyCache() {
+            assertEquals(0, evaluator.cacheSize());
+        }
+
+        @Test
+        void evictNonExistentExpressionShouldNotThrow() {
+            assertDoesNotThrow(() -> evaluator.evict("nonexistent"));
+        }
+    }
 }

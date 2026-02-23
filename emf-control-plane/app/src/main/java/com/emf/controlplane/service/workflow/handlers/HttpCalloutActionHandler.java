@@ -50,9 +50,11 @@ public class HttpCalloutActionHandler implements ActionHandler {
     private final ObjectMapper objectMapper;
     private RestTemplate restTemplate;
 
-    public HttpCalloutActionHandler(ObjectMapper objectMapper) {
+    public HttpCalloutActionHandler(ObjectMapper objectMapper,
+                                     @org.springframework.beans.factory.annotation.Qualifier("workflowRestTemplate")
+                                     @org.springframework.lang.Nullable RestTemplate workflowRestTemplate) {
         this.objectMapper = objectMapper;
-        this.restTemplate = new RestTemplate();
+        this.restTemplate = workflowRestTemplate != null ? workflowRestTemplate : new RestTemplate();
     }
 
     /**

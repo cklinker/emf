@@ -14,8 +14,11 @@ import com.emf.runtime.validation.CustomValidationRuleEngine;
 import com.emf.runtime.validation.OperationType;
 import com.emf.runtime.validation.TypeCoercionService;
 import com.emf.runtime.validation.ValidationEngine;
+import com.emf.runtime.validation.FieldError;
 import com.emf.runtime.validation.ValidationException;
 import com.emf.runtime.validation.ValidationResult;
+import com.emf.runtime.workflow.BeforeSaveHookRegistry;
+import com.emf.runtime.workflow.BeforeSaveResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,9 +61,10 @@ public class DefaultQueryEngine implements QueryEngine {
     private final RollupSummaryService rollupSummaryService;
     private final CustomValidationRuleEngine customValidationRuleEngine;
     private final RecordEventPublisher recordEventPublisher;
+    private final BeforeSaveHookRegistry beforeSaveHookRegistry;
 
     /**
-     * Creates a new DefaultQueryEngine with all services including record event publisher.
+     * Creates a new DefaultQueryEngine with all services including before-save hooks.
      *
      * @param storageAdapter the storage adapter for persistence
      * @param validationEngine the validation engine for data validation (may be null)
@@ -70,12 +74,14 @@ public class DefaultQueryEngine implements QueryEngine {
      * @param rollupSummaryService the rollup summary service for ROLLUP_SUMMARY fields (may be null)
      * @param customValidationRuleEngine the custom validation rule engine (may be null)
      * @param recordEventPublisher the publisher for record change events (may be null)
+     * @param beforeSaveHookRegistry the before-save hook registry for lifecycle hooks (may be null)
      */
     public DefaultQueryEngine(StorageAdapter storageAdapter, ValidationEngine validationEngine,
                               FieldEncryptionService encryptionService, AutoNumberService autoNumberService,
                               FormulaEvaluator formulaEvaluator, RollupSummaryService rollupSummaryService,
                               CustomValidationRuleEngine customValidationRuleEngine,
-                              RecordEventPublisher recordEventPublisher) {
+                              RecordEventPublisher recordEventPublisher,
+                              BeforeSaveHookRegistry beforeSaveHookRegistry) {
         this.storageAdapter = Objects.requireNonNull(storageAdapter, "storageAdapter cannot be null");
         this.validationEngine = validationEngine;
         this.encryptionService = encryptionService;
@@ -84,6 +90,20 @@ public class DefaultQueryEngine implements QueryEngine {
         this.rollupSummaryService = rollupSummaryService;
         this.customValidationRuleEngine = customValidationRuleEngine;
         this.recordEventPublisher = recordEventPublisher;
+        this.beforeSaveHookRegistry = beforeSaveHookRegistry;
+    }
+
+    /**
+     * Creates a new DefaultQueryEngine with all services including record event publisher.
+     */
+    public DefaultQueryEngine(StorageAdapter storageAdapter, ValidationEngine validationEngine,
+                              FieldEncryptionService encryptionService, AutoNumberService autoNumberService,
+                              FormulaEvaluator formulaEvaluator, RollupSummaryService rollupSummaryService,
+                              CustomValidationRuleEngine customValidationRuleEngine,
+                              RecordEventPublisher recordEventPublisher) {
+        this(storageAdapter, validationEngine, encryptionService, autoNumberService,
+             formulaEvaluator, rollupSummaryService, customValidationRuleEngine,
+             recordEventPublisher, null);
     }
 
     /**
@@ -94,7 +114,7 @@ public class DefaultQueryEngine implements QueryEngine {
                               FormulaEvaluator formulaEvaluator, RollupSummaryService rollupSummaryService,
                               CustomValidationRuleEngine customValidationRuleEngine) {
         this(storageAdapter, validationEngine, encryptionService, autoNumberService,
-             formulaEvaluator, rollupSummaryService, customValidationRuleEngine, null);
+             formulaEvaluator, rollupSummaryService, customValidationRuleEngine, null, null);
     }
 
     /**
@@ -104,7 +124,7 @@ public class DefaultQueryEngine implements QueryEngine {
                               FieldEncryptionService encryptionService, AutoNumberService autoNumberService,
                               FormulaEvaluator formulaEvaluator, RollupSummaryService rollupSummaryService) {
         this(storageAdapter, validationEngine, encryptionService, autoNumberService,
-             formulaEvaluator, rollupSummaryService, null, null);
+             formulaEvaluator, rollupSummaryService, null, null, null);
     }
 
     /**
@@ -114,7 +134,7 @@ public class DefaultQueryEngine implements QueryEngine {
      * @param validationEngine the validation engine for data validation (may be null)
      */
     public DefaultQueryEngine(StorageAdapter storageAdapter, ValidationEngine validationEngine) {
-        this(storageAdapter, validationEngine, null, null, null, null, null, null);
+        this(storageAdapter, validationEngine, null, null, null, null, null, null, null);
     }
 
     /**
@@ -214,10 +234,16 @@ public class DefaultQueryEngine implements QueryEngine {
             customValidationRuleEngine.evaluate(definition.name(), recordData, OperationType.CREATE);
         }
 
+        // Evaluate before-create hooks (module-provided lifecycle hooks)
+        evaluateBeforeCreateHooks(definition, recordData);
+
         // Persist via storage adapter
         Map<String, Object> created = storageAdapter.create(definition, recordData);
 
         logger.debug("Created record '{}' in collection '{}'", id, definition.name());
+
+        // Invoke after-create hooks
+        invokeAfterCreateHooks(definition, created);
 
         // Publish record change event
         publishRecordEvent(RecordChangeEvent.created(
@@ -292,6 +318,9 @@ public class DefaultQueryEngine implements QueryEngine {
         // Capture previous data for event publishing (before persist overwrites)
         Map<String, Object> previousData = new HashMap<>(existing.get());
 
+        // Evaluate before-update hooks (module-provided lifecycle hooks)
+        evaluateBeforeUpdateHooks(definition, id, recordData, previousData);
+
         // Persist via storage adapter
         Optional<Map<String, Object>> updated = storageAdapter.update(definition, id, recordData);
 
@@ -300,6 +329,9 @@ public class DefaultQueryEngine implements QueryEngine {
 
             // Compute changed fields by comparing previous data with the update data
             List<String> changedFields = computeChangedFields(previousData, recordData);
+
+            // Invoke after-update hooks
+            invokeAfterUpdateHooks(definition, id, record, previousData);
 
             // Publish record change event
             publishRecordEvent(RecordChangeEvent.updated(
@@ -330,6 +362,9 @@ public class DefaultQueryEngine implements QueryEngine {
 
         if (deleted) {
             logger.debug("Deleted record '{}' from collection '{}'", id, definition.name());
+
+            // Invoke after-delete hooks
+            invokeAfterDeleteHooks(definition, id);
 
             // Publish record change event with the pre-fetched data
             if (recordData != null) {
@@ -524,6 +559,86 @@ public class DefaultQueryEngine implements QueryEngine {
             userId = data.get("updatedBy");
         }
         return userId != null ? userId.toString() : "system";
+    }
+
+    /**
+     * Evaluates before-create hooks for the collection. If any hook returns errors,
+     * a ValidationException is thrown. If hooks return field updates, they are merged
+     * into the record data.
+     */
+    private void evaluateBeforeCreateHooks(CollectionDefinition definition, Map<String, Object> recordData) {
+        if (beforeSaveHookRegistry == null) {
+            return;
+        }
+        BeforeSaveResult result = beforeSaveHookRegistry.evaluateBeforeCreate(
+                definition.name(), recordData, extractTenantId(recordData));
+        if (!result.isSuccess()) {
+            throw new ValidationException(ValidationResult.failure(result.getErrors().stream()
+                    .map(e -> new FieldError(
+                            e.field() != null ? e.field() : "_record",
+                            e.message(), "beforeSaveHook"))
+                    .toList()));
+        }
+        if (result.hasFieldUpdates()) {
+            recordData.putAll(result.getFieldUpdates());
+        }
+    }
+
+    /**
+     * Evaluates before-update hooks for the collection. If any hook returns errors,
+     * a ValidationException is thrown. If hooks return field updates, they are merged
+     * into the record data.
+     */
+    private void evaluateBeforeUpdateHooks(CollectionDefinition definition, String id,
+                                            Map<String, Object> recordData,
+                                            Map<String, Object> previousData) {
+        if (beforeSaveHookRegistry == null) {
+            return;
+        }
+        BeforeSaveResult result = beforeSaveHookRegistry.evaluateBeforeUpdate(
+                definition.name(), id, recordData, previousData, extractTenantId(recordData));
+        if (!result.isSuccess()) {
+            throw new ValidationException(ValidationResult.failure(result.getErrors().stream()
+                    .map(e -> new FieldError(
+                            e.field() != null ? e.field() : "_record",
+                            e.message(), "beforeSaveHook"))
+                    .toList()));
+        }
+        if (result.hasFieldUpdates()) {
+            recordData.putAll(result.getFieldUpdates());
+        }
+    }
+
+    /**
+     * Invokes after-create hooks. Failures are logged but do not block the operation.
+     */
+    private void invokeAfterCreateHooks(CollectionDefinition definition, Map<String, Object> record) {
+        if (beforeSaveHookRegistry == null) {
+            return;
+        }
+        beforeSaveHookRegistry.invokeAfterCreate(definition.name(), record, extractTenantId(record));
+    }
+
+    /**
+     * Invokes after-update hooks. Failures are logged but do not block the operation.
+     */
+    private void invokeAfterUpdateHooks(CollectionDefinition definition, String id,
+                                         Map<String, Object> record, Map<String, Object> previous) {
+        if (beforeSaveHookRegistry == null) {
+            return;
+        }
+        beforeSaveHookRegistry.invokeAfterUpdate(definition.name(), id, record, previous,
+                extractTenantId(record));
+    }
+
+    /**
+     * Invokes after-delete hooks. Failures are logged but do not block the operation.
+     */
+    private void invokeAfterDeleteHooks(CollectionDefinition definition, String id) {
+        if (beforeSaveHookRegistry == null) {
+            return;
+        }
+        beforeSaveHookRegistry.invokeAfterDelete(definition.name(), id, "default");
     }
 
     /**

@@ -67,6 +67,19 @@ public class InternalWorkflowController {
         int rulesEvaluated = (int) result.get("rulesEvaluated");
         int actionsExecuted = (int) result.get("actionsExecuted");
 
-        return ResponseEntity.ok(new BeforeSaveResponse(fieldUpdates, rulesEvaluated, actionsExecuted));
+        // Check for lifecycle handler errors
+        @SuppressWarnings("unchecked")
+        List<Map<String, String>> errors = (List<Map<String, String>>) result.get("errors");
+
+        BeforeSaveResponse response = new BeforeSaveResponse(
+                fieldUpdates, rulesEvaluated, actionsExecuted, errors);
+
+        if (response.hasErrors()) {
+            log.warn("Before-save evaluation returned validation errors for collection '{}': {}",
+                    request.getCollectionName(), errors);
+            return ResponseEntity.unprocessableEntity().body(response);
+        }
+
+        return ResponseEntity.ok(response);
     }
 }

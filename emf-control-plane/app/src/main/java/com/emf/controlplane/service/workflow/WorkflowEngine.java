@@ -5,6 +5,9 @@ import com.emf.controlplane.entity.WorkflowAction;
 import com.emf.controlplane.entity.WorkflowActionLog;
 import com.emf.controlplane.entity.WorkflowExecutionLog;
 import com.emf.controlplane.entity.WorkflowRule;
+import com.emf.controlplane.lifecycle.BeforeSaveResult;
+import com.emf.controlplane.lifecycle.SystemCollectionLifecycleHandler;
+import com.emf.controlplane.lifecycle.SystemLifecycleHandlerRegistry;
 import com.emf.controlplane.repository.WorkflowActionLogRepository;
 import com.emf.controlplane.repository.WorkflowExecutionLogRepository;
 import com.emf.controlplane.repository.WorkflowRuleRepository;
@@ -15,6 +18,7 @@ import com.emf.runtime.formula.FormulaEvaluator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -58,6 +62,12 @@ public class WorkflowEngine {
     private final CollectionService collectionService;
     private final ObjectMapper objectMapper;
 
+    /**
+     * Optional lifecycle handler registry for system collection hooks.
+     * Injected via setter to avoid circular dependencies.
+     */
+    private SystemLifecycleHandlerRegistry lifecycleHandlerRegistry;
+
     public WorkflowEngine(WorkflowRuleRepository ruleRepository,
                            WorkflowExecutionLogRepository executionLogRepository,
                            WorkflowActionLogRepository actionLogRepository,
@@ -72,6 +82,11 @@ public class WorkflowEngine {
         this.formulaEvaluator = formulaEvaluator;
         this.collectionService = collectionService;
         this.objectMapper = objectMapper;
+    }
+
+    @Autowired(required = false)
+    public void setLifecycleHandlerRegistry(SystemLifecycleHandlerRegistry lifecycleHandlerRegistry) {
+        this.lifecycleHandlerRegistry = lifecycleHandlerRegistry;
     }
 
     /**
@@ -397,13 +412,55 @@ public class WorkflowEngine {
         log.info("Evaluating before-save workflows: tenant={}, collection={}, trigger={}, record={}",
             tenantId, collectionName, triggerType, recordId);
 
-        List<WorkflowRule> rules = ruleRepository
-            .findByTenantIdAndCollectionIdAndTriggerTypeAndActiveTrueOrderByExecutionOrderAsc(
-                tenantId, collectionId, triggerType);
-
         Map<String, Object> accumulatedUpdates = new HashMap<>();
         int rulesEvaluated = 0;
         int actionsExecuted = 0;
+
+        // --- Evaluate system collection lifecycle handlers first ---
+        if (lifecycleHandlerRegistry != null && lifecycleHandlerRegistry.hasHandler(collectionName)) {
+            Optional<SystemCollectionLifecycleHandler> handlerOpt =
+                    lifecycleHandlerRegistry.getHandler(collectionName);
+            if (handlerOpt.isPresent()) {
+                SystemCollectionLifecycleHandler handler = handlerOpt.get();
+                try {
+                    BeforeSaveResult hookResult;
+                    if ("CREATE".equals(changeType)) {
+                        hookResult = handler.beforeCreate(data, tenantId);
+                    } else {
+                        hookResult = handler.beforeUpdate(recordId, data, previousData, tenantId);
+                    }
+
+                    if (hookResult.hasErrors()) {
+                        // Return errors immediately — block the save
+                        log.warn("Lifecycle handler for '{}' returned validation errors: {}",
+                                collectionName, hookResult.getErrors());
+                        Map<String, Object> errorResult = new HashMap<>();
+                        errorResult.put("fieldUpdates", Map.of());
+                        errorResult.put("rulesEvaluated", 0);
+                        errorResult.put("actionsExecuted", 0);
+                        errorResult.put("errors", hookResult.getErrors().stream()
+                                .map(e -> Map.of("field", e.field() != null ? e.field() : "",
+                                                 "message", e.message()))
+                                .toList());
+                        return errorResult;
+                    }
+
+                    if (hookResult.hasFieldUpdates()) {
+                        accumulatedUpdates.putAll(hookResult.getFieldUpdates());
+                        log.debug("Lifecycle handler for '{}' applied {} field updates",
+                                collectionName, hookResult.getFieldUpdates().size());
+                    }
+                } catch (Exception e) {
+                    log.error("Exception in lifecycle handler for '{}': {}",
+                            collectionName, e.getMessage(), e);
+                }
+            }
+        }
+
+        // --- Then evaluate workflow rules ---
+        List<WorkflowRule> rules = ruleRepository
+            .findByTenantIdAndCollectionIdAndTriggerTypeAndActiveTrueOrderByExecutionOrderAsc(
+                tenantId, collectionId, triggerType);
 
         for (WorkflowRule rule : rules) {
             rulesEvaluated++;

@@ -166,4 +166,108 @@ class InternalWorkflowControllerTest {
         assertNotNull(body);
         assertEquals("changed", body.getFieldUpdates().get("audit_log"));
     }
+
+    @Test
+    @DisplayName("Should return 422 when lifecycle handler returns validation errors")
+    void shouldReturn422OnLifecycleErrors() {
+        BeforeSaveRequest request = new BeforeSaveRequest();
+        request.setTenantId("tenant-1");
+        request.setCollectionId("col-1");
+        request.setCollectionName("users");
+        request.setData(Map.of());
+        request.setChangedFields(List.of());
+        request.setChangeType("CREATE");
+        request.setUserId("user-1");
+
+        // Engine returns errors from lifecycle handler
+        Map<String, Object> engineResult = new java.util.HashMap<>();
+        engineResult.put("fieldUpdates", Map.of());
+        engineResult.put("rulesEvaluated", 0);
+        engineResult.put("actionsExecuted", 0);
+        engineResult.put("errors", List.of(
+                Map.of("field", "email", "message", "Email is required")
+        ));
+
+        when(workflowEngine.evaluateBeforeSave(
+            anyString(), anyString(), anyString(), any(),
+            any(), any(), any(), anyString(), anyString()
+        )).thenReturn(engineResult);
+
+        ResponseEntity<BeforeSaveResponse> response = controller.evaluateBeforeSave(request);
+
+        assertEquals(422, response.getStatusCode().value());
+        BeforeSaveResponse body = response.getBody();
+        assertNotNull(body);
+        assertTrue(body.hasErrors());
+        assertEquals(1, body.getErrors().size());
+        assertEquals("email", body.getErrors().get(0).get("field"));
+        assertEquals("Email is required", body.getErrors().get(0).get("message"));
+    }
+
+    @Test
+    @DisplayName("Should return 200 when no errors present")
+    void shouldReturn200WhenNoErrors() {
+        BeforeSaveRequest request = new BeforeSaveRequest();
+        request.setTenantId("tenant-1");
+        request.setCollectionId("col-1");
+        request.setCollectionName("users");
+        request.setData(Map.of("email", "user@example.com"));
+        request.setChangedFields(List.of());
+        request.setChangeType("CREATE");
+        request.setUserId("user-1");
+
+        // Engine returns success with no errors
+        Map<String, Object> engineResult = new java.util.HashMap<>();
+        engineResult.put("fieldUpdates", Map.of("status", "ACTIVE"));
+        engineResult.put("rulesEvaluated", 0);
+        engineResult.put("actionsExecuted", 0);
+        // No "errors" key in the result
+
+        when(workflowEngine.evaluateBeforeSave(
+            anyString(), anyString(), anyString(), any(),
+            any(), any(), any(), anyString(), anyString()
+        )).thenReturn(engineResult);
+
+        ResponseEntity<BeforeSaveResponse> response = controller.evaluateBeforeSave(request);
+
+        assertEquals(200, response.getStatusCode().value());
+        BeforeSaveResponse body = response.getBody();
+        assertNotNull(body);
+        assertFalse(body.hasErrors());
+        assertEquals("ACTIVE", body.getFieldUpdates().get("status"));
+    }
+
+    @Test
+    @DisplayName("Should return 422 with multiple validation errors")
+    void shouldReturn422WithMultipleErrors() {
+        BeforeSaveRequest request = new BeforeSaveRequest();
+        request.setTenantId("tenant-1");
+        request.setCollectionId("col-1");
+        request.setCollectionName("users");
+        request.setData(Map.of());
+        request.setChangedFields(List.of());
+        request.setChangeType("CREATE");
+        request.setUserId("user-1");
+
+        Map<String, Object> engineResult = new java.util.HashMap<>();
+        engineResult.put("fieldUpdates", Map.of());
+        engineResult.put("rulesEvaluated", 0);
+        engineResult.put("actionsExecuted", 0);
+        engineResult.put("errors", List.of(
+                Map.of("field", "email", "message", "Email is required"),
+                Map.of("field", "name", "message", "Name is required")
+        ));
+
+        when(workflowEngine.evaluateBeforeSave(
+            anyString(), anyString(), anyString(), any(),
+            any(), any(), any(), anyString(), anyString()
+        )).thenReturn(engineResult);
+
+        ResponseEntity<BeforeSaveResponse> response = controller.evaluateBeforeSave(request);
+
+        assertEquals(422, response.getStatusCode().value());
+        BeforeSaveResponse body = response.getBody();
+        assertNotNull(body);
+        assertEquals(2, body.getErrors().size());
+    }
 }

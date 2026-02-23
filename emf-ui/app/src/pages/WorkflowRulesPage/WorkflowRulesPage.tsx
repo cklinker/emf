@@ -42,16 +42,47 @@ interface ActionDto {
   active: boolean
 }
 
+type TriggerType =
+  | 'ON_CREATE'
+  | 'ON_UPDATE'
+  | 'ON_CREATE_OR_UPDATE'
+  | 'ON_DELETE'
+  | 'SCHEDULED'
+  | 'MANUAL'
+  | 'BEFORE_CREATE'
+  | 'BEFORE_UPDATE'
+
+const TRIGGER_TYPE_LABELS: Record<TriggerType, string> = {
+  ON_CREATE: 'On Create',
+  ON_UPDATE: 'On Update',
+  ON_CREATE_OR_UPDATE: 'On Create or Update',
+  ON_DELETE: 'On Delete',
+  SCHEDULED: 'Scheduled',
+  MANUAL: 'Manual',
+  BEFORE_CREATE: 'Before Create',
+  BEFORE_UPDATE: 'Before Update',
+}
+
+/** Trigger types that support trigger field filtering */
+const TRIGGER_FIELDS_TYPES: TriggerType[] = ['ON_UPDATE', 'ON_CREATE_OR_UPDATE', 'BEFORE_UPDATE']
+
+/** Trigger types that run synchronously (before save) */
+const BEFORE_SAVE_TYPES: TriggerType[] = ['BEFORE_CREATE', 'BEFORE_UPDATE']
+
 interface WorkflowRule {
   id: string
   name: string
   description: string | null
   collectionId: string | null
-  triggerType: 'ON_CREATE' | 'ON_UPDATE' | 'ON_CREATE_OR_UPDATE' | 'ON_DELETE'
+  triggerType: TriggerType
   active: boolean
   filterFormula: string | null
   executionOrder: number
   errorHandling: string | null
+  triggerFields: string[] | null
+  cronExpression: string | null
+  timezone: string | null
+  lastScheduledRun: string | null
   actions: ActionDto[]
   createdAt: string
   updatedAt: string
@@ -61,11 +92,14 @@ interface WorkflowRuleFormData {
   name: string
   description: string
   collectionId: string
-  triggerType: 'ON_CREATE' | 'ON_UPDATE' | 'ON_CREATE_OR_UPDATE' | 'ON_DELETE'
+  triggerType: TriggerType
   active: boolean
   filterFormula: string
   executionOrder: number
   errorHandling: string
+  triggerFields: string[]
+  cronExpression: string
+  timezone: string
   actions: ActionFormData[]
 }
 
@@ -148,6 +182,9 @@ function WorkflowRuleForm({
     filterFormula: workflowRule?.filterFormula ?? '',
     executionOrder: workflowRule?.executionOrder ?? 0,
     errorHandling: workflowRule?.errorHandling ?? 'STOP_ON_ERROR',
+    triggerFields: workflowRule?.triggerFields ?? [],
+    cronExpression: workflowRule?.cronExpression ?? '',
+    timezone: workflowRule?.timezone ?? '',
     actions:
       workflowRule?.actions?.map((a) => ({
         actionType: a.actionType,
@@ -156,6 +193,7 @@ function WorkflowRuleForm({
         active: a.active,
       })) ?? [],
   })
+  const [triggerFieldInput, setTriggerFieldInput] = useState('')
   const [errors, setErrors] = useState<FormErrors>({})
   const [touched, setTouched] = useState<Record<string, boolean>>({})
   const nameInputRef = useRef<HTMLInputElement>(null)
@@ -392,25 +430,181 @@ function WorkflowRuleForm({
                   'disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground'
                 )}
                 value={formData.triggerType}
-                onChange={(e) =>
-                  handleChange(
-                    'triggerType',
-                    e.target.value as
-                      | 'ON_CREATE'
-                      | 'ON_UPDATE'
-                      | 'ON_CREATE_OR_UPDATE'
-                      | 'ON_DELETE'
-                  )
-                }
+                onChange={(e) => {
+                  const newType = e.target.value as TriggerType
+                  handleChange('triggerType', newType)
+                  // Clear trigger fields when switching to a type that doesn't support them
+                  if (!TRIGGER_FIELDS_TYPES.includes(newType)) {
+                    setFormData((prev) => ({ ...prev, triggerFields: [] }))
+                  }
+                  // Clear cron when switching away from SCHEDULED
+                  if (newType !== 'SCHEDULED') {
+                    setFormData((prev) => ({ ...prev, cronExpression: '', timezone: '' }))
+                  }
+                }}
                 disabled={isSubmitting}
                 data-testid="workflow-rule-trigger-type-input"
               >
-                <option value="ON_CREATE">ON_CREATE</option>
-                <option value="ON_UPDATE">ON_UPDATE</option>
-                <option value="ON_CREATE_OR_UPDATE">ON_CREATE_OR_UPDATE</option>
-                <option value="ON_DELETE">ON_DELETE</option>
+                {(Object.keys(TRIGGER_TYPE_LABELS) as TriggerType[]).map((type) => (
+                  <option key={type} value={type}>
+                    {TRIGGER_TYPE_LABELS[type]}
+                  </option>
+                ))}
               </select>
+              {BEFORE_SAVE_TYPES.includes(formData.triggerType) && (
+                <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                  Before-save triggers run synchronously and only support Field Update actions.
+                </p>
+              )}
             </div>
+
+            {/* Trigger Fields — shown for ON_UPDATE, ON_CREATE_OR_UPDATE, BEFORE_UPDATE */}
+            {TRIGGER_FIELDS_TYPES.includes(formData.triggerType) && (
+              <div className="flex flex-col gap-2">
+                <label
+                  htmlFor="trigger-field-input"
+                  className="text-sm font-medium text-foreground"
+                >
+                  Trigger Fields
+                  <span className="ml-2 text-xs font-normal text-muted-foreground">
+                    (only fire when these fields change)
+                  </span>
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {formData.triggerFields.map((field) => (
+                    <span
+                      key={field}
+                      className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary"
+                    >
+                      {field}
+                      <button
+                        type="button"
+                        className="ml-0.5 text-primary/60 hover:text-primary"
+                        onClick={() =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            triggerFields: prev.triggerFields.filter((f) => f !== field),
+                          }))
+                        }
+                        aria-label={`Remove ${field}`}
+                        disabled={isSubmitting}
+                      >
+                        &times;
+                      </button>
+                    </span>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    className={cn(
+                      'flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground transition-colors',
+                      'focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20'
+                    )}
+                    value={triggerFieldInput}
+                    onChange={(e) => setTriggerFieldInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if ((e.key === 'Enter' || e.key === ',') && triggerFieldInput.trim()) {
+                        e.preventDefault()
+                        const field = triggerFieldInput.trim().replace(/,/g, '')
+                        if (field && !formData.triggerFields.includes(field)) {
+                          setFormData((prev) => ({
+                            ...prev,
+                            triggerFields: [...prev.triggerFields, field],
+                          }))
+                        }
+                        setTriggerFieldInput('')
+                      }
+                    }}
+                    placeholder="Type field name and press Enter"
+                    disabled={isSubmitting}
+                    id="trigger-field-input"
+                    data-testid="trigger-field-input"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const field = triggerFieldInput.trim().replace(/,/g, '')
+                      if (field && !formData.triggerFields.includes(field)) {
+                        setFormData((prev) => ({
+                          ...prev,
+                          triggerFields: [...prev.triggerFields, field],
+                        }))
+                      }
+                      setTriggerFieldInput('')
+                    }}
+                    disabled={isSubmitting || !triggerFieldInput.trim()}
+                    data-testid="add-trigger-field-button"
+                  >
+                    Add
+                  </Button>
+                </div>
+                {formData.triggerFields.length === 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    No trigger fields — rule fires on any field change.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Cron Expression & Timezone — shown for SCHEDULED */}
+            {formData.triggerType === 'SCHEDULED' && (
+              <>
+                <div className="flex flex-col gap-2">
+                  <label
+                    htmlFor="workflow-rule-cron"
+                    className="text-sm font-medium text-foreground"
+                  >
+                    Cron Expression
+                    <span className="ml-1 text-destructive" aria-hidden="true">
+                      *
+                    </span>
+                  </label>
+                  <input
+                    id="workflow-rule-cron"
+                    type="text"
+                    className={cn(
+                      'rounded-md border border-border bg-background px-3 py-2.5 font-mono text-sm text-foreground transition-colors',
+                      'focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20',
+                      'disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground'
+                    )}
+                    value={formData.cronExpression}
+                    onChange={(e) => handleChange('cronExpression', e.target.value)}
+                    placeholder="0 0 * * * * (sec min hour day month weekday)"
+                    disabled={isSubmitting}
+                    data-testid="workflow-rule-cron-input"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Spring 6-field cron: seconds minutes hours day-of-month month day-of-week
+                  </p>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <label
+                    htmlFor="workflow-rule-timezone"
+                    className="text-sm font-medium text-foreground"
+                  >
+                    Timezone
+                  </label>
+                  <input
+                    id="workflow-rule-timezone"
+                    type="text"
+                    className={cn(
+                      'rounded-md border border-border bg-background px-3 py-2.5 text-sm text-foreground transition-colors',
+                      'focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20',
+                      'disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground'
+                    )}
+                    value={formData.timezone}
+                    onChange={(e) => handleChange('timezone', e.target.value)}
+                    placeholder="UTC (default) or America/Chicago, etc."
+                    disabled={isSubmitting}
+                    data-testid="workflow-rule-timezone-input"
+                  />
+                </div>
+              </>
+            )}
 
             <div className="flex flex-col gap-2">
               <label
@@ -1043,6 +1237,21 @@ export function WorkflowRulesPage({
     },
   })
 
+  const executeMutation = useMutation({
+    mutationFn: (id: string) =>
+      apiClient.post<{ executionLogIds: string[] }>(`/control/workflow-rules/${id}/execute`, {
+        recordIds: [],
+      }),
+    onSuccess: (data) => {
+      const count = data?.executionLogIds?.length ?? 0
+      showToast(`Manual execution complete: ${count} execution log(s) created`, 'success')
+      queryClient.invalidateQueries({ queryKey: ['workflow-rules'] })
+    },
+    onError: (err: Error) => {
+      showToast(err.message || 'An error occurred during execution', 'error')
+    },
+  })
+
   const handleCreate = useCallback(() => {
     setEditingWorkflowRule(undefined)
     setIsFormOpen(true)
@@ -1214,9 +1423,25 @@ export function WorkflowRulesPage({
                     </span>
                   </td>
                   <td role="gridcell" className="px-4 py-3 text-sm text-foreground">
-                    <span className="inline-block rounded-full bg-muted px-3 py-1 text-xs font-semibold uppercase tracking-wider text-primary">
-                      {workflowRule.triggerType}
+                    <span
+                      className={cn(
+                        'inline-block rounded-full px-3 py-1 text-xs font-semibold tracking-wider',
+                        BEFORE_SAVE_TYPES.includes(workflowRule.triggerType)
+                          ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                          : workflowRule.triggerType === 'SCHEDULED'
+                            ? 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300'
+                            : workflowRule.triggerType === 'MANUAL'
+                              ? 'bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300'
+                              : 'bg-muted text-primary'
+                      )}
+                    >
+                      {TRIGGER_TYPE_LABELS[workflowRule.triggerType] ?? workflowRule.triggerType}
                     </span>
+                    {BEFORE_SAVE_TYPES.includes(workflowRule.triggerType) && (
+                      <span className="ml-1.5 inline-block rounded bg-amber-200/60 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-400">
+                        Sync
+                      </span>
+                    )}
                   </td>
                   <td role="gridcell" className="px-4 py-3 text-sm text-foreground">
                     <span className="text-muted-foreground">
@@ -1256,6 +1481,20 @@ export function WorkflowRulesPage({
                   </td>
                   <td role="gridcell" className="px-4 py-3 text-right text-sm">
                     <div className="flex justify-end gap-2">
+                      {workflowRule.triggerType === 'MANUAL' && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="border-violet-300 text-violet-700 hover:bg-violet-50 dark:border-violet-700 dark:text-violet-400 dark:hover:bg-violet-950"
+                          onClick={() => executeMutation.mutate(workflowRule.id)}
+                          disabled={executeMutation.isPending}
+                          aria-label={`Execute ${workflowRule.name}`}
+                          data-testid={`execute-button-${index}`}
+                        >
+                          {executeMutation.isPending ? 'Running...' : 'Execute'}
+                        </Button>
+                      )}
                       <Button
                         type="button"
                         variant="outline"

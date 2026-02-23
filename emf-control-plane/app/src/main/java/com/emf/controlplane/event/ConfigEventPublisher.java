@@ -5,6 +5,7 @@ import com.emf.controlplane.entity.Collection;
 import com.emf.controlplane.entity.OidcProvider;
 import com.emf.controlplane.entity.UiMenu;
 import com.emf.controlplane.entity.UiPage;
+import com.emf.controlplane.entity.WorkflowRule;
 import com.emf.runtime.event.ChangeType;
 import com.emf.runtime.event.CollectionChangedPayload;
 import com.emf.runtime.event.ConfigEvent;
@@ -56,6 +57,7 @@ public class ConfigEventPublisher {
     private static final String EVENT_TYPE_COLLECTION_CHANGED = "emf.config.collection.changed";
     private static final String EVENT_TYPE_UI_CHANGED = "emf.config.ui.changed";
     private static final String EVENT_TYPE_OIDC_CHANGED = "emf.config.oidc.changed";
+    private static final String EVENT_TYPE_WORKFLOW_CHANGED = "emf.config.workflow.changed";
 
     private final KafkaTemplate<String, Object> kafkaTemplate;
     private final ControlPlaneProperties properties;
@@ -135,6 +137,32 @@ public class ConfigEventPublisher {
 
         String topic = properties.getKafka().getTopics().getOidcChanged();
         sendAfterCommit(topic, "oidc-config", event);
+    }
+
+    /**
+     * Publishes a workflow rule changed event to Kafka.
+     *
+     * <p>Builds the payload synchronously from the JPA entity (to access lazy-loaded
+     * fields like the collection within the transaction), then sends to Kafka
+     * asynchronously after the transaction commits.
+     *
+     * <p>Consumers use this event to invalidate workflow rule caches,
+     * ensuring that rule changes propagate immediately without service restarts.
+     *
+     * @param rule The workflow rule that changed
+     * @param changeType The type of change (CREATED, UPDATED, DELETED)
+     */
+    public void publishWorkflowRuleChanged(WorkflowRule rule, ChangeType changeType) {
+        log.info("Publishing workflow rule changed event: ruleId={}, name='{}', changeType={}",
+                rule.getId(), rule.getName(), changeType);
+
+        // Build payload synchronously (accesses lazy-loaded collection within the transaction)
+        WorkflowRuleChangedPayload payload = WorkflowRuleChangedPayload.create(rule, changeType);
+        ConfigEvent<WorkflowRuleChangedPayload> event = EventFactory.createEvent(
+                EVENT_TYPE_WORKFLOW_CHANGED, generateCorrelationId(), payload);
+
+        String topic = properties.getKafka().getTopics().getWorkflowRuleChanged();
+        sendAfterCommit(topic, rule.getId(), event);
     }
 
     /**

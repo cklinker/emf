@@ -47,6 +47,7 @@ public class CacheConfig {
     public static final String PERMISSIONS_CACHE = "permissions";
     public static final String GOVERNOR_LIMITS_CACHE = "governor-limits";
     public static final String USER_ID_CACHE = "user-id";
+    public static final String WORKFLOW_RULES_CACHE = "workflow-rules";
 
     private final ControlPlaneProperties properties;
 
@@ -126,6 +127,11 @@ public class CacheConfig {
                 .entryTtl(Duration.ofMinutes(5)));
         log.info("User ID cache configured with TTL: 5 minutes");
 
+        // Workflow rules cache configuration (5-minute TTL, evicted by Kafka events)
+        cacheConfigurations.put(WORKFLOW_RULES_CACHE, defaultConfig
+                .entryTtl(Duration.ofMinutes(5)));
+        log.info("Workflow rules cache configured with TTL: 5 minutes");
+
         return RedisCacheManager.builder(connectionFactory)
                 .cacheDefaults(defaultConfig.entryTtl(Duration.ofSeconds(collectionsTtl)))
                 .withInitialCacheConfigurations(cacheConfigurations)
@@ -143,6 +149,6 @@ public class CacheConfig {
     @ConditionalOnProperty(name = "spring.cache.type", havingValue = "none", matchIfMissing = true)
     public CacheManager inMemoryCacheManager() {
         log.info("Configuring in-memory cache manager (Redis not available)");
-        return new ConcurrentMapCacheManager(COLLECTIONS_CACHE, COLLECTIONS_LIST_CACHE, JWKS_CACHE, PERMISSIONS_CACHE, GOVERNOR_LIMITS_CACHE, USER_ID_CACHE);
+        return new ConcurrentMapCacheManager(COLLECTIONS_CACHE, COLLECTIONS_LIST_CACHE, JWKS_CACHE, PERMISSIONS_CACHE, GOVERNOR_LIMITS_CACHE, USER_ID_CACHE, WORKFLOW_RULES_CACHE);
     }
 }

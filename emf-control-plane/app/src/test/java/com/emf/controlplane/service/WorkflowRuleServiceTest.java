@@ -1,10 +1,15 @@
 package com.emf.controlplane.service;
 
+import com.emf.controlplane.dto.CreateWorkflowRuleRequest;
 import com.emf.controlplane.dto.WorkflowActionLogDto;
+import com.emf.controlplane.entity.Collection;
 import com.emf.controlplane.entity.WorkflowActionLog;
+import com.emf.controlplane.entity.WorkflowRule;
+import com.emf.controlplane.event.ConfigEventPublisher;
 import com.emf.controlplane.repository.WorkflowActionLogRepository;
 import com.emf.controlplane.repository.WorkflowExecutionLogRepository;
 import com.emf.controlplane.repository.WorkflowRuleRepository;
+import com.emf.runtime.event.ChangeType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -12,8 +17,11 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 class WorkflowRuleServiceTest {
@@ -22,6 +30,7 @@ class WorkflowRuleServiceTest {
     private WorkflowExecutionLogRepository executionLogRepository;
     private WorkflowActionLogRepository actionLogRepository;
     private CollectionService collectionService;
+    private ConfigEventPublisher configEventPublisher;
     private WorkflowRuleService service;
 
     @BeforeEach
@@ -30,8 +39,9 @@ class WorkflowRuleServiceTest {
         executionLogRepository = mock(WorkflowExecutionLogRepository.class);
         actionLogRepository = mock(WorkflowActionLogRepository.class);
         collectionService = mock(CollectionService.class);
+        configEventPublisher = mock(ConfigEventPublisher.class);
         service = new WorkflowRuleService(ruleRepository, executionLogRepository,
-            actionLogRepository, collectionService);
+            actionLogRepository, collectionService, configEventPublisher);
     }
 
     @Nested
@@ -92,6 +102,95 @@ class WorkflowRuleServiceTest {
             assertNotNull(dto.getOutputSnapshot());
             assertEquals(42, dto.getDurationMs());
             assertNotNull(dto.getExecutedAt());
+        }
+    }
+
+    @Nested
+    @DisplayName("Event Publishing")
+    class EventPublishingTests {
+
+        @Test
+        @DisplayName("Should publish CREATED event when rule is created")
+        void shouldPublishCreatedEvent() {
+            Collection collection = new Collection();
+            collection.setId("col-1");
+            collection.setName("orders");
+            when(collectionService.getCollection("col-1")).thenReturn(collection);
+            when(ruleRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            CreateWorkflowRuleRequest request = new CreateWorkflowRuleRequest();
+            request.setName("Test Rule");
+            request.setCollectionId("col-1");
+            request.setTriggerType("ON_CREATE");
+
+            service.createRule("tenant-1", request);
+
+            verify(configEventPublisher).publishWorkflowRuleChanged(any(WorkflowRule.class), eq(ChangeType.CREATED));
+        }
+
+        @Test
+        @DisplayName("Should publish UPDATED event when rule is updated")
+        void shouldPublishUpdatedEvent() {
+            Collection collection = new Collection();
+            collection.setId("col-1");
+
+            WorkflowRule existingRule = new WorkflowRule();
+            existingRule.setTenantId("tenant-1");
+            existingRule.setCollection(collection);
+            existingRule.setName("Original Rule");
+            existingRule.setTriggerType("ON_CREATE");
+
+            when(ruleRepository.findById("rule-1")).thenReturn(Optional.of(existingRule));
+            when(ruleRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            CreateWorkflowRuleRequest request = new CreateWorkflowRuleRequest();
+            request.setName("Updated Rule");
+
+            service.updateRule("rule-1", request);
+
+            verify(configEventPublisher).publishWorkflowRuleChanged(any(WorkflowRule.class), eq(ChangeType.UPDATED));
+        }
+
+        @Test
+        @DisplayName("Should publish DELETED event when rule is deleted")
+        void shouldPublishDeletedEvent() {
+            Collection collection = new Collection();
+            collection.setId("col-1");
+
+            WorkflowRule existingRule = new WorkflowRule();
+            existingRule.setTenantId("tenant-1");
+            existingRule.setCollection(collection);
+            existingRule.setName("Delete Me");
+            existingRule.setTriggerType("ON_CREATE");
+
+            when(ruleRepository.findById("rule-1")).thenReturn(Optional.of(existingRule));
+
+            service.deleteRule("rule-1");
+
+            verify(configEventPublisher).publishWorkflowRuleChanged(any(WorkflowRule.class), eq(ChangeType.DELETED));
+            verify(ruleRepository).delete(existingRule);
+        }
+
+        @Test
+        @DisplayName("Should work when configEventPublisher is null (Kafka disabled)")
+        void shouldWorkWithNullPublisher() {
+            WorkflowRuleService serviceNoKafka = new WorkflowRuleService(
+                ruleRepository, executionLogRepository, actionLogRepository,
+                collectionService, null);
+
+            Collection collection = new Collection();
+            collection.setId("col-1");
+            collection.setName("orders");
+            when(collectionService.getCollection("col-1")).thenReturn(collection);
+            when(ruleRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            CreateWorkflowRuleRequest request = new CreateWorkflowRuleRequest();
+            request.setName("Test Rule");
+            request.setCollectionId("col-1");
+            request.setTriggerType("ON_CREATE");
+
+            // Should not throw
+            assertDoesNotThrow(() -> serviceNoKafka.createRule("tenant-1", request));
         }
     }
 

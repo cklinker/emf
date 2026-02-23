@@ -8,12 +8,15 @@ import com.emf.controlplane.entity.Collection;
 import com.emf.controlplane.entity.WorkflowAction;
 import com.emf.controlplane.entity.WorkflowExecutionLog;
 import com.emf.controlplane.entity.WorkflowRule;
+import com.emf.controlplane.event.ConfigEventPublisher;
 import com.emf.controlplane.exception.ResourceNotFoundException;
 import com.emf.controlplane.repository.WorkflowActionLogRepository;
 import com.emf.controlplane.repository.WorkflowExecutionLogRepository;
 import com.emf.controlplane.repository.WorkflowRuleRepository;
+import com.emf.runtime.event.ChangeType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,15 +31,18 @@ public class WorkflowRuleService {
     private final WorkflowExecutionLogRepository logRepository;
     private final WorkflowActionLogRepository actionLogRepository;
     private final CollectionService collectionService;
+    private final ConfigEventPublisher configEventPublisher;
 
     public WorkflowRuleService(WorkflowRuleRepository ruleRepository,
                                WorkflowExecutionLogRepository logRepository,
                                WorkflowActionLogRepository actionLogRepository,
-                               CollectionService collectionService) {
+                               CollectionService collectionService,
+                               @Nullable ConfigEventPublisher configEventPublisher) {
         this.ruleRepository = ruleRepository;
         this.logRepository = logRepository;
         this.actionLogRepository = actionLogRepository;
         this.collectionService = collectionService;
+        this.configEventPublisher = configEventPublisher;
     }
 
     @Transactional(readOnly = true)
@@ -88,7 +94,9 @@ public class WorkflowRuleService {
             }
         }
 
-        return WorkflowRuleDto.fromEntity(ruleRepository.save(rule));
+        WorkflowRuleDto dto = WorkflowRuleDto.fromEntity(ruleRepository.save(rule));
+        publishWorkflowChanged(rule, ChangeType.CREATED);
+        return dto;
     }
 
     @Transactional
@@ -124,7 +132,9 @@ public class WorkflowRuleService {
             }
         }
 
-        return WorkflowRuleDto.fromEntity(ruleRepository.save(rule));
+        WorkflowRuleDto dto = WorkflowRuleDto.fromEntity(ruleRepository.save(rule));
+        publishWorkflowChanged(rule, ChangeType.UPDATED);
+        return dto;
     }
 
     @Transactional
@@ -132,6 +142,8 @@ public class WorkflowRuleService {
     public void deleteRule(String id) {
         log.info("Deleting workflow rule: {}", id);
         WorkflowRule rule = getRule(id);
+        // Publish event before delete so payload can access lazy-loaded fields
+        publishWorkflowChanged(rule, ChangeType.DELETED);
         ruleRepository.delete(rule);
     }
 
@@ -153,5 +165,13 @@ public class WorkflowRuleService {
     public List<WorkflowActionLogDto> listActionLogsByExecution(String executionLogId) {
         return actionLogRepository.findByExecutionLogIdOrderByExecutedAtAsc(executionLogId)
                 .stream().map(WorkflowActionLogDto::fromEntity).toList();
+    }
+
+    // --- Event Publishing ---
+
+    private void publishWorkflowChanged(WorkflowRule rule, ChangeType changeType) {
+        if (configEventPublisher != null) {
+            configEventPublisher.publishWorkflowRuleChanged(rule, changeType);
+        }
     }
 }

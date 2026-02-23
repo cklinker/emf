@@ -253,7 +253,7 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
     refetch,
   } = useQuery({
     queryKey: ['reports'],
-    queryFn: () => apiClient.get<Report[]>(`/control/reports`),
+    queryFn: () => apiClient.getList<Report>(`/api/reports`),
   })
 
   const reportList = useMemo<Report[]>(() => reports ?? [], [reports])
@@ -318,7 +318,7 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
   /* ────── Mutations ────── */
   const createMutation = useMutation({
     mutationFn: (data: Record<string, unknown>) =>
-      apiClient.post<Report>(`/control/reports?userId=system`, data),
+      apiClient.postResource<Report>(`/api/reports`, data),
     onSuccess: (created: Report) => {
       queryClient.invalidateQueries({ queryKey: ['reports'] })
       showToast('Report created successfully', 'success')
@@ -332,7 +332,7 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: Record<string, unknown> }) =>
-      apiClient.put<Report>(`/control/reports/${id}`, data),
+      apiClient.putResource<Report>(`/api/reports/${id}`, data),
     onSuccess: (updated: Report) => {
       queryClient.invalidateQueries({ queryKey: ['reports'] })
       showToast('Report updated successfully', 'success')
@@ -345,7 +345,7 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiClient.delete(`/control/reports/${id}`),
+    mutationFn: (id: string) => apiClient.delete(`/api/reports/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['reports'] })
       showToast('Report deleted successfully', 'success')

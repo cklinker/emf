@@ -142,6 +142,49 @@ export class ResourceClient<T = unknown> {
   }
 
   /**
+   * List child resources under a parent record (sub-resource query).
+   *
+   * Calls: GET /api/{parent}/{parentId}/{child}
+   *
+   * @param parentId the parent record ID
+   * @param childResource the child collection name
+   * @param options optional pagination, sorting, and filtering options
+   * @returns paginated list of child resources
+   */
+  async listChildren<C = unknown>(
+    parentId: string,
+    childResource: string,
+    options?: ListOptions
+  ): Promise<ListResponse<C>> {
+    const params = this.buildQueryParams(options);
+    const response = await this.client
+      .getAxiosInstance()
+      .get<ListResponse<C>>(`/api/${this.resourceName}/${parentId}/${childResource}`, { params });
+    return response.data;
+  }
+
+  /**
+   * Get a specific child resource under a parent record.
+   *
+   * Calls: GET /api/{parent}/{parentId}/{child}/{childId}
+   *
+   * @param parentId the parent record ID
+   * @param childResource the child collection name
+   * @param childId the child record ID
+   * @returns the child resource
+   */
+  async getChild<C = unknown>(
+    parentId: string,
+    childResource: string,
+    childId: string
+  ): Promise<C> {
+    const response = await this.client
+      .getAxiosInstance()
+      .get<C>(`/api/${this.resourceName}/${parentId}/${childResource}/${childId}`);
+    return response.data;
+  }
+
+  /**
    * Create a query builder for fluent query construction
    */
   query(): QueryBuilder<T> {

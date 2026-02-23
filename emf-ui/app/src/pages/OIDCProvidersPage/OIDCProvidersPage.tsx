@@ -687,7 +687,7 @@ export function OIDCProvidersPage({
     refetch,
   } = useQuery({
     queryKey: ['oidc-providers'],
-    queryFn: () => apiClient.get<OIDCProvider[]>('/control/oidc/providers'),
+    queryFn: () => apiClient.getList<OIDCProvider>('/api/oidc-providers'),
   })
 
   // Create mutation
@@ -705,7 +705,7 @@ export function OIDCProvidersPage({
       if (data.emailClaim?.trim()) payload.emailClaim = data.emailClaim.trim()
       if (data.usernameClaim?.trim()) payload.usernameClaim = data.usernameClaim.trim()
       if (data.nameClaim?.trim()) payload.nameClaim = data.nameClaim.trim()
-      return apiClient.post<OIDCProvider>('/control/oidc/providers', payload)
+      return apiClient.postResource<OIDCProvider>('/api/oidc-providers', payload)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['oidc-providers'] })
@@ -732,7 +732,7 @@ export function OIDCProvidersPage({
       if (data.emailClaim?.trim()) payload.emailClaim = data.emailClaim.trim()
       if (data.usernameClaim?.trim()) payload.usernameClaim = data.usernameClaim.trim()
       if (data.nameClaim?.trim()) payload.nameClaim = data.nameClaim.trim()
-      return apiClient.put<OIDCProvider>(`/control/oidc/providers/${id}`, payload)
+      return apiClient.putResource<OIDCProvider>(`/api/oidc-providers/${id}`, payload)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['oidc-providers'] })
@@ -746,7 +746,7 @@ export function OIDCProvidersPage({
 
   // Delete mutation
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiClient.delete(`/control/oidc/providers/${id}`),
+    mutationFn: (id: string) => apiClient.delete(`/api/oidc-providers/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['oidc-providers'] })
       showToast(t('success.deleted', { item: t('navigation.oidcProviders') }), 'success')
@@ -761,7 +761,7 @@ export function OIDCProvidersPage({
   // Test connection mutation
   const testConnectionMutation = useMutation({
     mutationFn: (id: string) =>
-      apiClient.post<TestConnectionResult>(`/control/oidc/providers/${id}/test`, {}),
+      apiClient.post<TestConnectionResult>(`/control/oidc-providers/${id}/actions/test`, {}),
     onSuccess: (result) => {
       if (result.success) {
         showToast(t('oidc.connectionSuccess'), 'success')

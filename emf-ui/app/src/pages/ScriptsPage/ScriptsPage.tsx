@@ -370,7 +370,8 @@ export function ScriptsPage({ testId = 'scripts-page' }: ScriptsPageProps): Reac
     error: logsError,
   } = useQuery({
     queryKey: ['script-logs', logsItemId],
-    queryFn: () => apiClient.get<ScriptExecutionLog[]>(`/control/scripts/${logsItemId}/logs`),
+    queryFn: () =>
+      apiClient.getList<ScriptExecutionLog>(`/api/scripts/${logsItemId}/script-execution-logs`),
     enabled: !!logsItemId,
   })
 
@@ -421,14 +422,13 @@ export function ScriptsPage({ testId = 'scripts-page' }: ScriptsPageProps): Reac
     refetch,
   } = useQuery({
     queryKey: ['scripts'],
-    queryFn: () => apiClient.get<Script[]>(`/control/scripts`),
+    queryFn: () => apiClient.getList<Script>(`/api/scripts`),
   })
 
   const scriptList: Script[] = scripts ?? []
 
   const createMutation = useMutation({
-    mutationFn: (data: ScriptFormData) =>
-      apiClient.post<Script>(`/control/scripts?userId=system`, data),
+    mutationFn: (data: ScriptFormData) => apiClient.postResource<Script>(`/api/scripts`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['scripts'] })
       showToast('Script created successfully', 'success')
@@ -441,7 +441,7 @@ export function ScriptsPage({ testId = 'scripts-page' }: ScriptsPageProps): Reac
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: ScriptFormData }) =>
-      apiClient.put<Script>(`/control/scripts/${id}`, data),
+      apiClient.putResource<Script>(`/api/scripts/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['scripts'] })
       showToast('Script updated successfully', 'success')
@@ -453,7 +453,7 @@ export function ScriptsPage({ testId = 'scripts-page' }: ScriptsPageProps): Reac
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiClient.delete(`/control/scripts/${id}`),
+    mutationFn: (id: string) => apiClient.delete(`/api/scripts/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['scripts'] })
       showToast('Script deleted successfully', 'success')

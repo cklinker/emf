@@ -414,7 +414,8 @@ export function WebhooksPage({ testId = 'webhooks-page' }: WebhooksPageProps): R
     error: deliveriesError,
   } = useQuery({
     queryKey: ['webhook-deliveries', logsItemId],
-    queryFn: () => apiClient.get<WebhookDelivery[]>(`/control/webhooks/${logsItemId}/deliveries`),
+    queryFn: () =>
+      apiClient.getList<WebhookDelivery>(`/api/webhooks/${logsItemId}/webhook-deliveries`),
     enabled: !!logsItemId,
   })
 
@@ -464,7 +465,7 @@ export function WebhooksPage({ testId = 'webhooks-page' }: WebhooksPageProps): R
     refetch,
   } = useQuery({
     queryKey: ['webhooks'],
-    queryFn: () => apiClient.get<Webhook[]>(`/control/webhooks`),
+    queryFn: () => apiClient.getList<Webhook>(`/api/webhooks`),
   })
 
   const webhookList: Webhook[] = webhooks ?? []
@@ -480,7 +481,7 @@ export function WebhooksPage({ testId = 'webhooks-page' }: WebhooksPageProps): R
         secret: data.secret || null,
         active: data.active,
       }
-      return apiClient.post<Webhook>(`/control/webhooks?userId=system`, payload)
+      return apiClient.postResource<Webhook>(`/api/webhooks`, payload)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['webhooks'] })
@@ -503,7 +504,7 @@ export function WebhooksPage({ testId = 'webhooks-page' }: WebhooksPageProps): R
         secret: data.secret || null,
         active: data.active,
       }
-      return apiClient.put<Webhook>(`/control/webhooks/${id}`, payload)
+      return apiClient.putResource<Webhook>(`/api/webhooks/${id}`, payload)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['webhooks'] })
@@ -516,7 +517,7 @@ export function WebhooksPage({ testId = 'webhooks-page' }: WebhooksPageProps): R
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiClient.delete(`/control/webhooks/${id}`),
+    mutationFn: (id: string) => apiClient.delete(`/api/webhooks/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['webhooks'] })
       showToast('Webhook deleted successfully', 'success')

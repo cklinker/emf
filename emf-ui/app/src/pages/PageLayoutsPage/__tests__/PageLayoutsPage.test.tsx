@@ -80,7 +80,7 @@ const mockLayouts = [
  */
 function setupAxiosMocks(overrides: { layouts?: unknown; collections?: unknown } = {}) {
   mockAxios.get.mockImplementation((url: string) => {
-    if (url.includes('/control/layouts')) {
+    if (url.includes('/api/page-layouts')) {
       return Promise.resolve({ data: overrides.layouts ?? mockLayouts })
     }
     if (url.includes('/control/collections/summary')) {
@@ -134,7 +134,7 @@ describe('PageLayoutsPage', () => {
   describe('Error State', () => {
     it('should display error message when fetch fails', async () => {
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/layouts')) {
+        if (url.includes('/api/page-layouts')) {
           return Promise.reject(createAxiosError(500))
         }
         if (url.includes('/control/collections/summary')) {
@@ -155,7 +155,7 @@ describe('PageLayoutsPage', () => {
 
     it('should display retry button on error', async () => {
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/layouts')) {
+        if (url.includes('/api/page-layouts')) {
           return Promise.reject(createAxiosError(500))
         }
         if (url.includes('/control/collections/summary')) {
@@ -415,7 +415,7 @@ describe('PageLayoutsPage', () => {
 
       // The POST URL should include collectionId
       const postCall = mockAxios.post.mock.calls[0]
-      expect(postCall[0]).toContain('/control/layouts')
+      expect(postCall[0]).toContain('/api/page-layouts')
       expect(postCall[0]).toContain('collectionId=col-1')
     })
 
@@ -623,7 +623,7 @@ describe('PageLayoutsPage', () => {
 
       // Verify the delete was called with the correct layout ID
       const deleteUrl = mockAxios.delete.mock.calls[0][0]
-      expect(deleteUrl).toContain('/control/layouts/layout-1')
+      expect(deleteUrl).toContain('/api/page-layouts/layout-1')
     })
 
     it('should show delete confirmation title as Delete Layout', async () => {

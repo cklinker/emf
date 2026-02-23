@@ -462,14 +462,14 @@ export function ConnectedAppsPage({
     refetch,
   } = useQuery({
     queryKey: ['connected-apps'],
-    queryFn: () => apiClient.get<ConnectedApp[]>(`/control/connected-apps`),
+    queryFn: () => apiClient.getList<ConnectedApp>(`/api/connected-apps`),
   })
 
   const appList: ConnectedApp[] = connectedApps ?? []
 
   const createMutation = useMutation({
     mutationFn: (data: ConnectedAppFormData) =>
-      apiClient.post<ConnectedAppCreatedResponse>(`/control/connected-apps?userId=system`, data),
+      apiClient.postResource<ConnectedAppCreatedResponse>(`/api/connected-apps`, data),
     onSuccess: (result: ConnectedAppCreatedResponse) => {
       queryClient.invalidateQueries({ queryKey: ['connected-apps'] })
       showToast('Connected app created successfully', 'success')
@@ -483,7 +483,7 @@ export function ConnectedAppsPage({
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: ConnectedAppFormData }) =>
-      apiClient.put<ConnectedApp>(`/control/connected-apps/${id}`, data),
+      apiClient.putResource<ConnectedApp>(`/api/connected-apps/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['connected-apps'] })
       showToast('Connected app updated successfully', 'success')
@@ -495,7 +495,7 @@ export function ConnectedAppsPage({
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiClient.delete(`/control/connected-apps/${id}`),
+    mutationFn: (id: string) => apiClient.delete(`/api/connected-apps/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['connected-apps'] })
       showToast('Connected app deleted successfully', 'success')

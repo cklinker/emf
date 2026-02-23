@@ -285,14 +285,14 @@ export function PicklistsPage({
     refetch,
   } = useQuery({
     queryKey: ['picklists'],
-    queryFn: () => apiClient.get<GlobalPicklist[]>('/control/picklists/global'),
+    queryFn: () => apiClient.getList<GlobalPicklist>('/api/global-picklists'),
   })
 
   const picklistList = picklists ?? []
 
   const createMutation = useMutation({
     mutationFn: (data: PicklistFormData) =>
-      apiClient.post<GlobalPicklist>('/control/picklists/global', data),
+      apiClient.postResource<GlobalPicklist>('/api/global-picklists', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['picklists'] })
       showToast(t('success.created', { item: t('picklists.title') }), 'success')
@@ -305,7 +305,7 @@ export function PicklistsPage({
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: PicklistFormData }) =>
-      apiClient.put<GlobalPicklist>(`/control/picklists/global/${id}`, data),
+      apiClient.putResource<GlobalPicklist>(`/api/global-picklists/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['picklists'] })
       showToast(t('success.updated', { item: t('picklists.title') }), 'success')
@@ -317,7 +317,7 @@ export function PicklistsPage({
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiClient.delete(`/control/picklists/global/${id}`),
+    mutationFn: (id: string) => apiClient.delete(`/api/global-picklists/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['picklists'] })
       showToast(t('success.deleted', { item: t('picklists.title') }), 'success')

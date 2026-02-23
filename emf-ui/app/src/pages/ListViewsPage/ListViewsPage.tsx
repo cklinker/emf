@@ -419,7 +419,7 @@ export function ListViewsPage({
     refetch,
   } = useQuery({
     queryKey: ['listviews'],
-    queryFn: () => apiClient.get<ListView[]>(`/control/listviews`),
+    queryFn: () => apiClient.getList<ListView>(`/api/list-views`),
   })
 
   const { summaries: collections } = useCollectionSummaries()
@@ -444,8 +444,8 @@ export function ListViewsPage({
         sortField: data.sortField,
         sortDirection: data.sortDirection,
       }
-      return apiClient.post<ListView>(
-        `/control/listviews?collectionId=${encodeURIComponent(data.collectionId)}&userId=system`,
+      return apiClient.postResource<ListView>(
+        `/api/list-views?collectionId=${encodeURIComponent(data.collectionId)}&userId=system`,
         payload
       )
     },
@@ -469,7 +469,7 @@ export function ListViewsPage({
         sortField: data.sortField,
         sortDirection: data.sortDirection,
       }
-      return apiClient.put<ListView>(`/control/listviews/${id}`, payload)
+      return apiClient.putResource<ListView>(`/api/list-views/${id}`, payload)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['listviews'] })
@@ -482,7 +482,7 @@ export function ListViewsPage({
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiClient.delete(`/control/listviews/${id}`),
+    mutationFn: (id: string) => apiClient.delete(`/api/list-views/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['listviews'] })
       showToast('List view deleted successfully', 'success')

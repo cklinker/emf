@@ -16,4 +16,9 @@ public interface WorkflowRuleRepository extends JpaRepository<WorkflowRule, Stri
 
     List<WorkflowRule> findByTenantIdAndCollectionIdAndTriggerTypeAndActiveTrueOrderByExecutionOrderAsc(
             String tenantId, String collectionId, String triggerType);
+
+    /**
+     * Finds all active SCHEDULED workflow rules across all tenants.
+     */
+    List<WorkflowRule> findByTriggerTypeAndActiveTrueOrderByExecutionOrderAsc(String triggerType);
 }

@@ -2,15 +2,18 @@ package com.emf.runtime.model;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Builder for constructing {@link CollectionDefinition} instances.
- * 
+ *
  * <p>Provides a fluent API with method chaining for building collection definitions.
  * Required fields (name and at least one field) must be set before calling {@link #build()}.
- * 
+ *
  * <p>Sensible defaults are applied for optional configuration:
  * <ul>
  *   <li>Storage: Mode A (Physical Tables) with table name "tbl_{name}"</li>
@@ -18,8 +21,11 @@ import java.util.Map;
  *   <li>Authorization: Disabled</li>
  *   <li>Events: Disabled</li>
  *   <li>Version: 1</li>
+ *   <li>System collection: false</li>
+ *   <li>Tenant scoped: true</li>
+ *   <li>Read only: false</li>
  * </ul>
- * 
+ *
  * <p>Example usage:
  * <pre>{@code
  * CollectionDefinition collection = CollectionDefinition.builder()
@@ -32,11 +38,11 @@ import java.util.Map;
  *     .storageConfig(StorageConfig.physicalTable("tbl_products"))
  *     .build();
  * }</pre>
- * 
+ *
  * @since 1.0.0
  */
 public class CollectionDefinitionBuilder {
-    
+
     private String name;
     private String displayName;
     private String description;
@@ -48,16 +54,21 @@ public class CollectionDefinitionBuilder {
     private long version = 1L;
     private Instant createdAt;
     private Instant updatedAt;
-    
+    private boolean systemCollection = false;
+    private boolean tenantScoped = true;
+    private boolean readOnly = false;
+    private Set<String> immutableFields = new HashSet<>();
+    private Map<String, String> columnMapping = new HashMap<>();
+
     /**
      * Creates a new collection definition builder.
      */
     public CollectionDefinitionBuilder() {
     }
-    
+
     /**
      * Sets the collection name.
-     * 
+     *
      * @param name the collection name (required)
      * @return this builder for method chaining
      */
@@ -65,10 +76,10 @@ public class CollectionDefinitionBuilder {
         this.name = name;
         return this;
     }
-    
+
     /**
      * Sets the display name.
-     * 
+     *
      * @param displayName the human-readable display name
      * @return this builder for method chaining
      */
@@ -76,10 +87,10 @@ public class CollectionDefinitionBuilder {
         this.displayName = displayName;
         return this;
     }
-    
+
     /**
      * Sets the description.
-     * 
+     *
      * @param description the collection description
      * @return this builder for method chaining
      */
@@ -87,10 +98,10 @@ public class CollectionDefinitionBuilder {
         this.description = description;
         return this;
     }
-    
+
     /**
      * Adds a field definition to the collection.
-     * 
+     *
      * @param field the field definition to add
      * @return this builder for method chaining
      */
@@ -98,10 +109,10 @@ public class CollectionDefinitionBuilder {
         this.fields.add(field);
         return this;
     }
-    
+
     /**
      * Sets all field definitions for the collection.
-     * 
+     *
      * @param fields the list of field definitions
      * @return this builder for method chaining
      */
@@ -109,10 +120,10 @@ public class CollectionDefinitionBuilder {
         this.fields = new ArrayList<>(fields);
         return this;
     }
-    
+
     /**
      * Sets the storage configuration.
-     * 
+     *
      * @param storageConfig the storage configuration
      * @return this builder for method chaining
      */
@@ -120,10 +131,10 @@ public class CollectionDefinitionBuilder {
         this.storageConfig = storageConfig;
         return this;
     }
-    
+
     /**
      * Sets the API configuration.
-     * 
+     *
      * @param apiConfig the API configuration
      * @return this builder for method chaining
      */
@@ -131,10 +142,10 @@ public class CollectionDefinitionBuilder {
         this.apiConfig = apiConfig;
         return this;
     }
-    
+
     /**
      * Sets the authorization configuration.
-     * 
+     *
      * @param authzConfig the authorization configuration
      * @return this builder for method chaining
      */
@@ -142,10 +153,10 @@ public class CollectionDefinitionBuilder {
         this.authzConfig = authzConfig;
         return this;
     }
-    
+
     /**
      * Sets the events configuration.
-     * 
+     *
      * @param eventsConfig the events configuration
      * @return this builder for method chaining
      */
@@ -153,10 +164,10 @@ public class CollectionDefinitionBuilder {
         this.eventsConfig = eventsConfig;
         return this;
     }
-    
+
     /**
      * Sets the version number.
-     * 
+     *
      * @param version the version number
      * @return this builder for method chaining
      */
@@ -164,10 +175,10 @@ public class CollectionDefinitionBuilder {
         this.version = version;
         return this;
     }
-    
+
     /**
      * Sets the creation timestamp.
-     * 
+     *
      * @param createdAt the creation timestamp
      * @return this builder for method chaining
      */
@@ -175,10 +186,10 @@ public class CollectionDefinitionBuilder {
         this.createdAt = createdAt;
         return this;
     }
-    
+
     /**
      * Sets the last update timestamp.
-     * 
+     *
      * @param updatedAt the last update timestamp
      * @return this builder for method chaining
      */
@@ -186,10 +197,88 @@ public class CollectionDefinitionBuilder {
         this.updatedAt = updatedAt;
         return this;
     }
-    
+
+    /**
+     * Marks this collection as a system collection (managed by the platform).
+     *
+     * @param systemCollection true if this is a system collection
+     * @return this builder for method chaining
+     */
+    public CollectionDefinitionBuilder systemCollection(boolean systemCollection) {
+        this.systemCollection = systemCollection;
+        return this;
+    }
+
+    /**
+     * Sets whether this collection's data is scoped to a tenant.
+     *
+     * @param tenantScoped true if tenant-scoped (default: true)
+     * @return this builder for method chaining
+     */
+    public CollectionDefinitionBuilder tenantScoped(boolean tenantScoped) {
+        this.tenantScoped = tenantScoped;
+        return this;
+    }
+
+    /**
+     * Marks this collection as read-only (no create/update/delete via API).
+     *
+     * @param readOnly true if read-only
+     * @return this builder for method chaining
+     */
+    public CollectionDefinitionBuilder readOnly(boolean readOnly) {
+        this.readOnly = readOnly;
+        return this;
+    }
+
+    /**
+     * Sets the field names that cannot be updated after record creation.
+     *
+     * @param immutableFields set of immutable field names
+     * @return this builder for method chaining
+     */
+    public CollectionDefinitionBuilder immutableFields(Set<String> immutableFields) {
+        this.immutableFields = new HashSet<>(immutableFields);
+        return this;
+    }
+
+    /**
+     * Adds a single immutable field name.
+     *
+     * @param fieldName the field name that should be immutable
+     * @return this builder for method chaining
+     */
+    public CollectionDefinitionBuilder addImmutableField(String fieldName) {
+        this.immutableFields.add(fieldName);
+        return this;
+    }
+
+    /**
+     * Sets the mapping of API field names to physical database column names.
+     *
+     * @param columnMapping map of API name to column name
+     * @return this builder for method chaining
+     */
+    public CollectionDefinitionBuilder columnMapping(Map<String, String> columnMapping) {
+        this.columnMapping = new HashMap<>(columnMapping);
+        return this;
+    }
+
+    /**
+     * Adds a single column mapping entry.
+     *
+     * @param apiFieldName the API field name
+     * @param columnName the physical database column name
+     * @return this builder for method chaining
+     */
+    public CollectionDefinitionBuilder addColumnMapping(String apiFieldName, String columnName) {
+        this.columnMapping.put(apiFieldName, columnName);
+        return this;
+    }
+
     /**
      * Builds the collection definition.
-     * 
+     *
      * <p>Applies sensible defaults for optional configuration:
      * <ul>
      *   <li>Storage: Mode A (Physical Tables) with table name "tbl_{name}"</li>
@@ -198,7 +287,7 @@ public class CollectionDefinitionBuilder {
      *   <li>Events: Disabled</li>
      *   <li>Timestamps: Current time if not set</li>
      * </ul>
-     * 
+     *
      * @return the constructed collection definition
      * @throws IllegalStateException if required fields (name, fields) are not set
      */
@@ -210,7 +299,7 @@ public class CollectionDefinitionBuilder {
         if (fields.isEmpty()) {
             throw new IllegalStateException("At least one field is required");
         }
-        
+
         // Apply defaults
         if (storageConfig == null) {
             storageConfig = new StorageConfig(StorageMode.PHYSICAL_TABLES, "tbl_" + name, Map.of());
@@ -224,7 +313,7 @@ public class CollectionDefinitionBuilder {
         if (eventsConfig == null) {
             eventsConfig = EventsConfig.disabled();
         }
-        
+
         Instant now = Instant.now();
         if (createdAt == null) {
             createdAt = now;
@@ -232,7 +321,7 @@ public class CollectionDefinitionBuilder {
         if (updatedAt == null) {
             updatedAt = now;
         }
-        
+
         return new CollectionDefinition(
             name,
             displayName != null ? displayName : name,
@@ -244,7 +333,12 @@ public class CollectionDefinitionBuilder {
             eventsConfig,
             version,
             createdAt,
-            updatedAt
+            updatedAt,
+            systemCollection,
+            tenantScoped,
+            readOnly,
+            immutableFields,
+            columnMapping
         );
     }
 }

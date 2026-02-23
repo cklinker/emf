@@ -1,6 +1,7 @@
 package com.emf.controlplane.controller;
 
 import com.emf.controlplane.dto.CreateWorkflowRuleRequest;
+import com.emf.controlplane.dto.WorkflowActionLogDto;
 import com.emf.controlplane.dto.WorkflowRuleDto;
 import com.emf.controlplane.entity.WorkflowExecutionLog;
 import com.emf.controlplane.service.WorkflowRuleService;
@@ -66,5 +67,12 @@ public class WorkflowRuleController {
     @GetMapping("/{id}/logs")
     public List<WorkflowExecutionLog> listLogsByRule(@PathVariable String id) {
         return workflowRuleService.listExecutionLogsByRule(id);
+    }
+
+    // --- Action Logs ---
+
+    @GetMapping("/logs/{executionLogId}/actions")
+    public List<WorkflowActionLogDto> listActionLogs(@PathVariable String executionLogId) {
+        return workflowRuleService.listActionLogsByExecution(executionLogId);
     }
 }

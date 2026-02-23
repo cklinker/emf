@@ -11,6 +11,7 @@ import com.emf.controlplane.service.CollectionService;
 import com.emf.runtime.event.ChangeType;
 import com.emf.runtime.event.RecordChangeEvent;
 import com.emf.runtime.formula.FormulaEvaluator;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -52,19 +53,22 @@ public class WorkflowEngine {
     private final ActionHandlerRegistry handlerRegistry;
     private final FormulaEvaluator formulaEvaluator;
     private final CollectionService collectionService;
+    private final ObjectMapper objectMapper;
 
     public WorkflowEngine(WorkflowRuleRepository ruleRepository,
                            WorkflowExecutionLogRepository executionLogRepository,
                            WorkflowActionLogRepository actionLogRepository,
                            ActionHandlerRegistry handlerRegistry,
                            FormulaEvaluator formulaEvaluator,
-                           CollectionService collectionService) {
+                           CollectionService collectionService,
+                           ObjectMapper objectMapper) {
         this.ruleRepository = ruleRepository;
         this.executionLogRepository = executionLogRepository;
         this.actionLogRepository = actionLogRepository;
         this.handlerRegistry = handlerRegistry;
         this.formulaEvaluator = formulaEvaluator;
         this.collectionService = collectionService;
+        this.objectMapper = objectMapper;
     }
 
     /**
@@ -146,11 +150,13 @@ public class WorkflowEngine {
         String overallError = null;
 
         for (WorkflowAction action : activeActions) {
+            long actionStartTime = System.currentTimeMillis();
             ActionResult result = executeAction(action, rule, event, executionLog.getId());
+            int actionDurationMs = (int) (System.currentTimeMillis() - actionStartTime);
             actionsExecuted++;
 
-            // Log per-action result
-            logActionExecution(executionLog.getId(), action, result);
+            // Log per-action result with input snapshot and duration
+            logActionExecution(executionLog.getId(), action, result, event, actionDurationMs);
 
             if (!result.successful()) {
                 if (stopOnError) {
@@ -275,22 +281,35 @@ public class WorkflowEngine {
     }
 
     /**
-     * Logs individual action execution result.
+     * Logs individual action execution result with input snapshot and duration.
      */
-    private void logActionExecution(String executionLogId, WorkflowAction action, ActionResult result) {
+    private void logActionExecution(String executionLogId, WorkflowAction action,
+                                      ActionResult result, RecordChangeEvent event, int durationMs) {
         WorkflowActionLog actionLog = new WorkflowActionLog();
         actionLog.setExecutionLogId(executionLogId);
         actionLog.setActionId(action.getId());
         actionLog.setActionType(action.getActionType());
         actionLog.setStatus(result.successful() ? "SUCCESS" : "FAILURE");
         actionLog.setErrorMessage(result.errorMessage());
+        actionLog.setDurationMs(durationMs);
         actionLog.setExecutedAt(Instant.now());
 
+        // Capture input snapshot (action config + record data summary)
+        try {
+            Map<String, Object> inputSnapshot = Map.of(
+                "actionConfig", action.getConfig() != null ? action.getConfig() : "{}",
+                "recordId", event.getRecordId() != null ? event.getRecordId() : "",
+                "collectionName", event.getCollectionName() != null ? event.getCollectionName() : ""
+            );
+            actionLog.setInputSnapshot(objectMapper.writeValueAsString(inputSnapshot));
+        } catch (Exception e) {
+            log.warn("Failed to serialize action input snapshot: {}", e.getMessage());
+        }
+
+        // Capture output snapshot
         try {
             if (result.outputData() != null && !result.outputData().isEmpty()) {
-                actionLog.setOutputSnapshot(
-                    new com.fasterxml.jackson.databind.ObjectMapper()
-                        .writeValueAsString(result.outputData()));
+                actionLog.setOutputSnapshot(objectMapper.writeValueAsString(result.outputData()));
             }
         } catch (Exception e) {
             log.warn("Failed to serialize action output: {}", e.getMessage());

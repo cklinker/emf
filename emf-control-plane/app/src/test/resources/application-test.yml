@@ -4,7 +4,7 @@ spring:
 
   # H2 Database for Testing
   datasource:
-    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;NON_KEYWORDS=KEY,VALUE
     username: sa
     password: 
     driver-class-name: org.h2.Driver

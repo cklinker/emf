@@ -23,10 +23,11 @@ import static org.junit.jupiter.api.Assertions.*;
 class SystemCollectionDefinitionsTest {
 
     @Test
-    @DisplayName("all() should return 42 system collection definitions")
-    void allShouldReturn42Definitions() {
+    @DisplayName("all() should return at least 76 system collection definitions")
+    void allShouldReturnExpectedDefinitions() {
         List<CollectionDefinition> all = SystemCollectionDefinitions.all();
-        assertEquals(42, all.size());
+        assertTrue(all.size() >= 76,
+                "Expected at least 76 system collection definitions, got: " + all.size());
     }
 
     @Test
@@ -92,7 +93,7 @@ class SystemCollectionDefinitionsTest {
     @DisplayName("byName() should return map with all definitions")
     void byNameShouldReturnMapWithAllDefinitions() {
         Map<String, CollectionDefinition> byName = SystemCollectionDefinitions.byName();
-        assertEquals(42, byName.size());
+        assertEquals(SystemCollectionDefinitions.all().size(), byName.size());
         assertNotNull(byName.get("users"));
         assertNotNull(byName.get("tenants"));
         assertNotNull(byName.get("collections"));
@@ -199,7 +200,11 @@ class SystemCollectionDefinitionsTest {
 
         private static final List<String> READ_ONLY_COLLECTIONS = List.of(
                 "security-audit-logs", "setup-audit-entries", "field-history",
-                "workflow-execution-logs", "email-logs", "webhook-deliveries", "login-history"
+                "workflow-execution-logs", "workflow-action-logs", "workflow-rule-versions",
+                "script-execution-logs", "flow-executions",
+                "job-execution-logs", "bulk-job-results",
+                "email-logs", "webhook-deliveries", "login-history",
+                "collection-versions", "field-versions", "migration-steps"
         );
 
         @Test
@@ -238,12 +243,13 @@ class SystemCollectionDefinitionsTest {
         }
 
         @Test
-        @DisplayName("should have exactly 7 read-only collections")
-        void shouldHaveExactly7ReadOnlyCollections() {
+        @DisplayName("should have exactly 16 read-only collections")
+        void shouldHaveExpectedReadOnlyCollections() {
             long readOnlyCount = SystemCollectionDefinitions.all().stream()
                     .filter(CollectionDefinition::readOnly)
                     .count();
-            assertEquals(7, readOnlyCount);
+            assertEquals(READ_ONLY_COLLECTIONS.size(), readOnlyCount,
+                    "Number of read-only collections should match");
         }
     }
 

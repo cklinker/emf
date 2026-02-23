@@ -43,27 +43,57 @@ public final class SystemCollectionDefinitions {
         definitions.add(collections());
         definitions.add(fields());
 
+        // Groups & Membership
+        definitions.add(userGroups());
+        definitions.add(groupMemberships());
+
+        // Permission tables (profile-based)
+        definitions.add(profileSystemPermissions());
+        definitions.add(profileObjectPermissions());
+        definitions.add(profileFieldPermissions());
+
+        // Permission tables (permission-set-based)
+        definitions.add(permsetSystemPermissions());
+        definitions.add(permsetObjectPermissions());
+        definitions.add(permsetFieldPermissions());
+
+        // Permission assignments
+        definitions.add(userPermissionSets());
+        definitions.add(groupPermissionSets());
+
         // UI & Layout
         definitions.add(pageLayouts());
+        definitions.add(layoutSections());
+        definitions.add(layoutFields());
+        definitions.add(layoutRelatedLists());
         definitions.add(layoutAssignments());
         definitions.add(listViews());
         definitions.add(uiPages());
         definitions.add(uiMenus());
+        definitions.add(uiMenuItems());
 
         // Picklists
         definitions.add(globalPicklists());
         definitions.add(picklistValues());
+        definitions.add(picklistDependencies());
 
         // Record types & Validation
         definitions.add(recordTypes());
+        definitions.add(recordTypePicklists());
         definitions.add(validationRules());
 
         // Workflows & Automation
         definitions.add(workflowRules());
+        definitions.add(workflowActions());
         definitions.add(workflowActionTypes());
+        definitions.add(workflowPendingActions());
         definitions.add(scripts());
+        definitions.add(scriptTriggers());
         definitions.add(flows());
         definitions.add(approvalProcesses());
+        definitions.add(approvalSteps());
+        definitions.add(approvalInstances());
+        definitions.add(approvalStepInstances());
         definitions.add(scheduledJobs());
 
         // Communication
@@ -72,12 +102,14 @@ public final class SystemCollectionDefinitions {
 
         // Integration
         definitions.add(connectedApps());
+        definitions.add(connectedAppTokens());
         definitions.add(oidcProviders());
 
         // Reports & Dashboards
         definitions.add(reports());
         definitions.add(reportFolders());
         definitions.add(dashboards());
+        definitions.add(dashboardComponents());
 
         // Collaboration
         definitions.add(notes());
@@ -88,6 +120,7 @@ public final class SystemCollectionDefinitions {
         definitions.add(collectionAssignments());
         definitions.add(bulkJobs());
         definitions.add(packages());
+        definitions.add(packageItems());
         definitions.add(migrationRuns());
 
         // Read-only audit/log collections
@@ -95,9 +128,18 @@ public final class SystemCollectionDefinitions {
         definitions.add(setupAuditEntries());
         definitions.add(fieldHistory());
         definitions.add(workflowExecutionLogs());
+        definitions.add(workflowActionLogs());
+        definitions.add(workflowRuleVersions());
+        definitions.add(scriptExecutionLogs());
+        definitions.add(flowExecutions());
+        definitions.add(jobExecutionLogs());
+        definitions.add(bulkJobResults());
         definitions.add(emailLogs());
         definitions.add(webhookDeliveries());
         definitions.add(loginHistory());
+        definitions.add(collectionVersions());
+        definitions.add(fieldVersions());
+        definitions.add(migrationSteps());
 
         return Collections.unmodifiableList(definitions);
     }
@@ -883,6 +925,717 @@ public final class SystemCollectionDefinitions {
             .addField(FieldDefinition.string("loginType", 20).withColumnName("login_type"))
             .addField(FieldDefinition.string("status", 20))
             .addField(FieldDefinition.text("userAgent").withColumnName("user_agent"))
+            .build();
+    }
+
+    // =========================================================================
+    // Groups & Membership Collections
+    // =========================================================================
+
+    public static CollectionDefinition userGroups() {
+        return systemBuilder("user-groups", "User Groups", "user_group")
+            .addField(FieldDefinition.requiredString("name", 100))
+            .addField(FieldDefinition.string("description", 500))
+            .addField(FieldDefinition.string("groupType", 20).withColumnName("group_type")
+                .withDefault("PUBLIC")
+                .withEnumValues(List.of("PUBLIC", "QUEUE", "SYSTEM")))
+            .addField(FieldDefinition.requiredString("source", 20)
+                .withDefault("MANUAL"))
+            .addField(FieldDefinition.string("oidcGroupName", 200)
+                .withColumnName("oidc_group_name"))
+            .build();
+    }
+
+    public static CollectionDefinition groupMemberships() {
+        return systemBuilder("group-memberships", "Group Memberships", "group_membership")
+            .tenantScoped(false)
+            .addField(FieldDefinition.masterDetail("groupId", "user-groups", "Group")
+                .withColumnName("group_id"))
+            .addField(FieldDefinition.requiredString("memberType", 10)
+                .withColumnName("member_type")
+                .withEnumValues(List.of("USER", "GROUP")))
+            .addField(FieldDefinition.requiredString("memberId", 36)
+                .withColumnName("member_id"))
+            .build();
+    }
+
+    // =========================================================================
+    // Permission Collections (Profile-based)
+    // =========================================================================
+
+    public static CollectionDefinition profileSystemPermissions() {
+        return systemBuilder("profile-system-permissions", "Profile System Permissions",
+                "profile_system_permission")
+            .tenantScoped(false)
+            .addField(FieldDefinition.masterDetail("profileId", "profiles", "Profile")
+                .withColumnName("profile_id"))
+            .addField(FieldDefinition.requiredString("permissionName", 100)
+                .withColumnName("permission_name"))
+            .addField(FieldDefinition.bool("granted").withDefault(false)
+                .withNullable(false))
+            .build();
+    }
+
+    public static CollectionDefinition profileObjectPermissions() {
+        return systemBuilder("profile-object-permissions", "Profile Object Permissions",
+                "profile_object_permission")
+            .tenantScoped(false)
+            .addField(FieldDefinition.masterDetail("profileId", "profiles", "Profile")
+                .withColumnName("profile_id"))
+            .addField(FieldDefinition.masterDetail("collectionId", "collections", "Collection")
+                .withColumnName("collection_id"))
+            .addField(FieldDefinition.bool("canCreate").withColumnName("can_create")
+                .withDefault(false).withNullable(false))
+            .addField(FieldDefinition.bool("canRead").withColumnName("can_read")
+                .withDefault(false).withNullable(false))
+            .addField(FieldDefinition.bool("canEdit").withColumnName("can_edit")
+                .withDefault(false).withNullable(false))
+            .addField(FieldDefinition.bool("canDelete").withColumnName("can_delete")
+                .withDefault(false).withNullable(false))
+            .addField(FieldDefinition.bool("canViewAll").withColumnName("can_view_all")
+                .withDefault(false).withNullable(false))
+            .addField(FieldDefinition.bool("canModifyAll").withColumnName("can_modify_all")
+                .withDefault(false).withNullable(false))
+            .build();
+    }
+
+    public static CollectionDefinition profileFieldPermissions() {
+        return systemBuilder("profile-field-permissions", "Profile Field Permissions",
+                "profile_field_permission")
+            .tenantScoped(false)
+            .addField(FieldDefinition.masterDetail("profileId", "profiles", "Profile")
+                .withColumnName("profile_id"))
+            .addField(FieldDefinition.masterDetail("collectionId", "collections", "Collection")
+                .withColumnName("collection_id"))
+            .addField(FieldDefinition.masterDetail("fieldId", "fields", "Field")
+                .withColumnName("field_id"))
+            .addField(FieldDefinition.requiredString("visibility", 20)
+                .withDefault("VISIBLE"))
+            .build();
+    }
+
+    // =========================================================================
+    // Permission Collections (PermissionSet-based)
+    // =========================================================================
+
+    public static CollectionDefinition permsetSystemPermissions() {
+        return systemBuilder("permset-system-permissions", "Permission Set System Permissions",
+                "permset_system_permission")
+            .tenantScoped(false)
+            .addField(FieldDefinition.masterDetail("permissionSetId", "permission-sets",
+                "Permission Set").withColumnName("permission_set_id"))
+            .addField(FieldDefinition.requiredString("permissionName", 100)
+                .withColumnName("permission_name"))
+            .addField(FieldDefinition.bool("granted").withDefault(false)
+                .withNullable(false))
+            .build();
+    }
+
+    public static CollectionDefinition permsetObjectPermissions() {
+        return systemBuilder("permset-object-permissions", "Permission Set Object Permissions",
+                "permset_object_permission")
+            .tenantScoped(false)
+            .addField(FieldDefinition.masterDetail("permissionSetId", "permission-sets",
+                "Permission Set").withColumnName("permission_set_id"))
+            .addField(FieldDefinition.masterDetail("collectionId", "collections", "Collection")
+                .withColumnName("collection_id"))
+            .addField(FieldDefinition.bool("canCreate").withColumnName("can_create")
+                .withDefault(false).withNullable(false))
+            .addField(FieldDefinition.bool("canRead").withColumnName("can_read")
+                .withDefault(false).withNullable(false))
+            .addField(FieldDefinition.bool("canEdit").withColumnName("can_edit")
+                .withDefault(false).withNullable(false))
+            .addField(FieldDefinition.bool("canDelete").withColumnName("can_delete")
+                .withDefault(false).withNullable(false))
+            .addField(FieldDefinition.bool("canViewAll").withColumnName("can_view_all")
+                .withDefault(false).withNullable(false))
+            .addField(FieldDefinition.bool("canModifyAll").withColumnName("can_modify_all")
+                .withDefault(false).withNullable(false))
+            .build();
+    }
+
+    public static CollectionDefinition permsetFieldPermissions() {
+        return systemBuilder("permset-field-permissions", "Permission Set Field Permissions",
+                "permset_field_permission")
+            .tenantScoped(false)
+            .addField(FieldDefinition.masterDetail("permissionSetId", "permission-sets",
+                "Permission Set").withColumnName("permission_set_id"))
+            .addField(FieldDefinition.masterDetail("collectionId", "collections", "Collection")
+                .withColumnName("collection_id"))
+            .addField(FieldDefinition.masterDetail("fieldId", "fields", "Field")
+                .withColumnName("field_id"))
+            .addField(FieldDefinition.requiredString("visibility", 20)
+                .withDefault("VISIBLE"))
+            .build();
+    }
+
+    // =========================================================================
+    // Permission Assignment Collections
+    // =========================================================================
+
+    public static CollectionDefinition userPermissionSets() {
+        return systemBuilder("user-permission-sets", "User Permission Sets",
+                "user_permission_set")
+            .tenantScoped(false)
+            .addField(FieldDefinition.masterDetail("userId", "users", "User")
+                .withColumnName("user_id"))
+            .addField(FieldDefinition.masterDetail("permissionSetId", "permission-sets",
+                "Permission Set").withColumnName("permission_set_id"))
+            .build();
+    }
+
+    public static CollectionDefinition groupPermissionSets() {
+        return systemBuilder("group-permission-sets", "Group Permission Sets",
+                "group_permission_set")
+            .tenantScoped(false)
+            .addField(FieldDefinition.masterDetail("groupId", "user-groups", "Group")
+                .withColumnName("group_id"))
+            .addField(FieldDefinition.masterDetail("permissionSetId", "permission-sets",
+                "Permission Set").withColumnName("permission_set_id"))
+            .build();
+    }
+
+    // =========================================================================
+    // Layout Child Collections
+    // =========================================================================
+
+    public static CollectionDefinition layoutSections() {
+        return systemBuilder("layout-sections", "Layout Sections", "layout_section")
+            .tenantScoped(false)
+            .addField(FieldDefinition.masterDetail("layoutId", "page-layouts", "Layout")
+                .withColumnName("layout_id"))
+            .addField(FieldDefinition.string("heading", 200))
+            .addField(FieldDefinition.integer("columns").withDefault(2))
+            .addField(FieldDefinition.requiredInteger("sortOrder")
+                .withColumnName("sort_order"))
+            .addField(FieldDefinition.bool("collapsed").withDefault(false))
+            .addField(FieldDefinition.string("style", 20).withDefault("DEFAULT"))
+            .addField(FieldDefinition.string("sectionType", 30)
+                .withColumnName("section_type").withDefault("STANDARD"))
+            .addField(FieldDefinition.string("tabGroup", 100)
+                .withColumnName("tab_group"))
+            .addField(FieldDefinition.string("tabLabel", 200)
+                .withColumnName("tab_label"))
+            .addField(FieldDefinition.json("visibilityRule")
+                .withColumnName("visibility_rule"))
+            .build();
+    }
+
+    public static CollectionDefinition layoutFields() {
+        return systemBuilder("layout-fields", "Layout Fields", "layout_field")
+            .tenantScoped(false)
+            .addField(FieldDefinition.masterDetail("sectionId", "layout-sections", "Section")
+                .withColumnName("section_id"))
+            .addField(FieldDefinition.masterDetail("fieldId", "fields", "Field")
+                .withColumnName("field_id"))
+            .addField(FieldDefinition.integer("columnNumber")
+                .withColumnName("column_number").withDefault(1))
+            .addField(FieldDefinition.requiredInteger("sortOrder")
+                .withColumnName("sort_order"))
+            .addField(FieldDefinition.bool("isRequiredOnLayout")
+                .withColumnName("is_required_on_layout").withDefault(false))
+            .addField(FieldDefinition.bool("isReadOnlyOnLayout")
+                .withColumnName("is_read_only_on_layout").withDefault(false))
+            .addField(FieldDefinition.string("labelOverride", 200)
+                .withColumnName("label_override"))
+            .addField(FieldDefinition.string("helpTextOverride", 500)
+                .withColumnName("help_text_override"))
+            .addField(FieldDefinition.json("visibilityRule")
+                .withColumnName("visibility_rule"))
+            .addField(FieldDefinition.integer("columnSpan")
+                .withColumnName("column_span").withDefault(1))
+            .build();
+    }
+
+    public static CollectionDefinition layoutRelatedLists() {
+        return systemBuilder("layout-related-lists", "Layout Related Lists",
+                "layout_related_list")
+            .tenantScoped(false)
+            .addField(FieldDefinition.masterDetail("layoutId", "page-layouts", "Layout")
+                .withColumnName("layout_id"))
+            .addField(FieldDefinition.masterDetail("relatedCollectionId", "collections",
+                "Related Collection").withColumnName("related_collection_id"))
+            .addField(FieldDefinition.masterDetail("relationshipFieldId", "fields",
+                "Relationship Field").withColumnName("relationship_field_id"))
+            .addField(FieldDefinition.requiredJson("displayColumns")
+                .withColumnName("display_columns"))
+            .addField(FieldDefinition.string("sortField", 100)
+                .withColumnName("sort_field"))
+            .addField(FieldDefinition.string("sortDirection", 4)
+                .withColumnName("sort_direction").withDefault("DESC"))
+            .addField(FieldDefinition.integer("rowLimit")
+                .withColumnName("row_limit").withDefault(10))
+            .addField(FieldDefinition.requiredInteger("sortOrder")
+                .withColumnName("sort_order"))
+            .build();
+    }
+
+    public static CollectionDefinition uiMenuItems() {
+        return systemBuilder("ui-menu-items", "UI Menu Items", "ui_menu_item")
+            .tenantScoped(false)
+            .addField(FieldDefinition.masterDetail("menuId", "ui-menus", "Menu")
+                .withColumnName("menu_id"))
+            .addField(FieldDefinition.requiredString("label", 100))
+            .addField(FieldDefinition.requiredString("path", 200))
+            .addField(FieldDefinition.string("icon", 100))
+            .addField(FieldDefinition.integer("displayOrder")
+                .withColumnName("display_order").withDefault(0)
+                .withNullable(false))
+            .addField(FieldDefinition.bool("active").withDefault(true)
+                .withNullable(false))
+            .build();
+    }
+
+    // =========================================================================
+    // Picklist Child Collections
+    // =========================================================================
+
+    public static CollectionDefinition picklistDependencies() {
+        return systemBuilder("picklist-dependencies", "Picklist Dependencies",
+                "picklist_dependency")
+            .tenantScoped(false)
+            .addField(FieldDefinition.masterDetail("controllingFieldId", "fields",
+                "Controlling Field").withColumnName("controlling_field_id"))
+            .addField(FieldDefinition.masterDetail("dependentFieldId", "fields",
+                "Dependent Field").withColumnName("dependent_field_id"))
+            .addField(FieldDefinition.requiredJson("mapping"))
+            .build();
+    }
+
+    // =========================================================================
+    // Record Type Child Collections
+    // =========================================================================
+
+    public static CollectionDefinition recordTypePicklists() {
+        return systemBuilder("record-type-picklists", "Record Type Picklists",
+                "record_type_picklist")
+            .tenantScoped(false)
+            .addField(FieldDefinition.masterDetail("recordTypeId", "record-types",
+                "Record Type").withColumnName("record_type_id"))
+            .addField(FieldDefinition.masterDetail("fieldId", "fields", "Field")
+                .withColumnName("field_id"))
+            .addField(FieldDefinition.requiredJson("availableValues")
+                .withColumnName("available_values"))
+            .addField(FieldDefinition.string("defaultValue", 255)
+                .withColumnName("default_value"))
+            .build();
+    }
+
+    // =========================================================================
+    // Workflow Child Collections
+    // =========================================================================
+
+    public static CollectionDefinition workflowActions() {
+        return systemBuilder("workflow-actions", "Workflow Actions", "workflow_action")
+            .tenantScoped(false)
+            .addField(FieldDefinition.masterDetail("workflowRuleId", "workflow-rules",
+                "Workflow Rule").withColumnName("workflow_rule_id"))
+            .addField(FieldDefinition.requiredString("actionType", 30)
+                .withColumnName("action_type"))
+            .addField(FieldDefinition.integer("executionOrder")
+                .withColumnName("execution_order").withDefault(0))
+            .addField(FieldDefinition.requiredJson("config"))
+            .addField(FieldDefinition.bool("active").withDefault(true))
+            .addField(FieldDefinition.integer("retryCount")
+                .withColumnName("retry_count").withDefault(0)
+                .withNullable(false))
+            .addField(FieldDefinition.integer("retryDelaySeconds")
+                .withColumnName("retry_delay_seconds").withDefault(60)
+                .withNullable(false))
+            .addField(FieldDefinition.requiredString("retryBackoff", 20)
+                .withColumnName("retry_backoff").withDefault("FIXED"))
+            .build();
+    }
+
+    public static CollectionDefinition workflowPendingActions() {
+        return systemBuilder("workflow-pending-actions", "Workflow Pending Actions",
+                "workflow_pending_action")
+            .addField(FieldDefinition.masterDetail("executionLogId",
+                "workflow-execution-logs", "Execution Log")
+                .withColumnName("execution_log_id"))
+            .addField(FieldDefinition.masterDetail("workflowRuleId", "workflow-rules",
+                "Workflow Rule").withColumnName("workflow_rule_id"))
+            .addField(FieldDefinition.requiredInteger("actionIndex")
+                .withColumnName("action_index"))
+            .addField(FieldDefinition.string("recordId", 36)
+                .withColumnName("record_id"))
+            .addField(FieldDefinition.json("recordSnapshot")
+                .withColumnName("record_snapshot"))
+            .addField(FieldDefinition.datetime("scheduledAt")
+                .withColumnName("scheduled_at").withNullable(false))
+            .addField(FieldDefinition.string("status", 20).withDefault("PENDING"))
+            .build();
+    }
+
+    // =========================================================================
+    // Script Child Collections
+    // =========================================================================
+
+    public static CollectionDefinition scriptTriggers() {
+        return systemBuilder("script-triggers", "Script Triggers", "script_trigger")
+            .tenantScoped(false)
+            .addField(FieldDefinition.masterDetail("scriptId", "scripts", "Script")
+                .withColumnName("script_id"))
+            .addField(FieldDefinition.masterDetail("collectionId", "collections",
+                "Collection").withColumnName("collection_id"))
+            .addField(FieldDefinition.requiredString("triggerEvent", 20)
+                .withColumnName("trigger_event")
+                .withEnumValues(List.of("INSERT", "UPDATE", "DELETE")))
+            .addField(FieldDefinition.integer("executionOrder")
+                .withColumnName("execution_order").withDefault(0))
+            .addField(FieldDefinition.bool("active").withDefault(true))
+            .build();
+    }
+
+    // =========================================================================
+    // Approval Child Collections
+    // =========================================================================
+
+    public static CollectionDefinition approvalSteps() {
+        return systemBuilder("approval-steps", "Approval Steps", "approval_step")
+            .tenantScoped(false)
+            .addField(FieldDefinition.masterDetail("approvalProcessId",
+                "approval-processes", "Approval Process")
+                .withColumnName("approval_process_id"))
+            .addField(FieldDefinition.requiredInteger("stepNumber")
+                .withColumnName("step_number"))
+            .addField(FieldDefinition.requiredString("name", 200))
+            .addField(FieldDefinition.string("description", 500))
+            .addField(FieldDefinition.text("entryCriteria")
+                .withColumnName("entry_criteria"))
+            .addField(FieldDefinition.requiredString("approverType", 30)
+                .withColumnName("approver_type"))
+            .addField(FieldDefinition.string("approverId", 36)
+                .withColumnName("approver_id"))
+            .addField(FieldDefinition.string("approverField", 100)
+                .withColumnName("approver_field"))
+            .addField(FieldDefinition.bool("unanimityRequired")
+                .withColumnName("unanimity_required").withDefault(false))
+            .addField(FieldDefinition.integer("escalationTimeoutHours")
+                .withColumnName("escalation_timeout_hours"))
+            .addField(FieldDefinition.string("escalationAction", 20)
+                .withColumnName("escalation_action"))
+            .addField(FieldDefinition.string("onApproveAction", 20)
+                .withColumnName("on_approve_action").withDefault("NEXT_STEP"))
+            .addField(FieldDefinition.string("onRejectAction", 20)
+                .withColumnName("on_reject_action").withDefault("REJECT_FINAL"))
+            .build();
+    }
+
+    public static CollectionDefinition approvalInstances() {
+        return systemBuilder("approval-instances", "Approval Instances",
+                "approval_instance")
+            .addField(FieldDefinition.masterDetail("approvalProcessId",
+                "approval-processes", "Approval Process")
+                .withColumnName("approval_process_id"))
+            .addField(FieldDefinition.masterDetail("collectionId", "collections",
+                "Collection").withColumnName("collection_id"))
+            .addField(FieldDefinition.requiredString("recordId", 36)
+                .withColumnName("record_id"))
+            .addField(FieldDefinition.requiredString("submittedBy", 36)
+                .withColumnName("submitted_by"))
+            .addField(FieldDefinition.requiredInteger("currentStepNumber")
+                .withColumnName("current_step_number").withDefault(1))
+            .addField(FieldDefinition.requiredString("status", 20)
+                .withDefault("PENDING")
+                .withEnumValues(List.of("PENDING", "APPROVED", "REJECTED", "RECALLED")))
+            .addField(FieldDefinition.datetime("submittedAt")
+                .withColumnName("submitted_at").withNullable(false))
+            .addField(FieldDefinition.datetime("completedAt")
+                .withColumnName("completed_at"))
+            .build();
+    }
+
+    public static CollectionDefinition approvalStepInstances() {
+        return systemBuilder("approval-step-instances", "Approval Step Instances",
+                "approval_step_instance")
+            .tenantScoped(false)
+            .addField(FieldDefinition.masterDetail("approvalInstanceId",
+                "approval-instances", "Approval Instance")
+                .withColumnName("approval_instance_id"))
+            .addField(FieldDefinition.masterDetail("stepId", "approval-steps",
+                "Approval Step").withColumnName("step_id"))
+            .addField(FieldDefinition.requiredString("assignedTo", 36)
+                .withColumnName("assigned_to"))
+            .addField(FieldDefinition.requiredString("status", 20)
+                .withDefault("PENDING")
+                .withEnumValues(List.of("PENDING", "APPROVED", "REJECTED", "REASSIGNED")))
+            .addField(FieldDefinition.text("comments"))
+            .addField(FieldDefinition.datetime("actedAt")
+                .withColumnName("acted_at"))
+            .build();
+    }
+
+    // =========================================================================
+    // Integration Child Collections
+    // =========================================================================
+
+    public static CollectionDefinition connectedAppTokens() {
+        return systemBuilder("connected-app-tokens", "Connected App Tokens",
+                "connected_app_token")
+            .tenantScoped(false)
+            .addField(FieldDefinition.masterDetail("connectedAppId", "connected-apps",
+                "Connected App").withColumnName("connected_app_id"))
+            .addField(FieldDefinition.requiredString("tokenHash", 200)
+                .withColumnName("token_hash"))
+            .addField(FieldDefinition.requiredJson("scopes"))
+            .addField(FieldDefinition.datetime("issuedAt")
+                .withColumnName("issued_at").withNullable(false))
+            .addField(FieldDefinition.datetime("expiresAt")
+                .withColumnName("expires_at").withNullable(false))
+            .addField(FieldDefinition.bool("revoked").withDefault(false))
+            .addField(FieldDefinition.datetime("revokedAt")
+                .withColumnName("revoked_at"))
+            .build();
+    }
+
+    // =========================================================================
+    // Dashboard Child Collections
+    // =========================================================================
+
+    public static CollectionDefinition dashboardComponents() {
+        return systemBuilder("dashboard-components", "Dashboard Components",
+                "dashboard_component")
+            .tenantScoped(false)
+            .addField(FieldDefinition.masterDetail("dashboardId", "dashboards",
+                "Dashboard").withColumnName("dashboard_id"))
+            .addField(FieldDefinition.masterDetail("reportId", "reports", "Report")
+                .withColumnName("report_id"))
+            .addField(FieldDefinition.requiredString("componentType", 20)
+                .withColumnName("component_type"))
+            .addField(FieldDefinition.string("title", 200))
+            .addField(FieldDefinition.requiredInteger("columnPosition")
+                .withColumnName("column_position"))
+            .addField(FieldDefinition.requiredInteger("rowPosition")
+                .withColumnName("row_position"))
+            .addField(FieldDefinition.integer("columnSpan")
+                .withColumnName("column_span").withDefault(1))
+            .addField(FieldDefinition.integer("rowSpan")
+                .withColumnName("row_span").withDefault(1))
+            .addField(FieldDefinition.json("config").withDefault("{}"))
+            .addField(FieldDefinition.requiredInteger("sortOrder")
+                .withColumnName("sort_order"))
+            .build();
+    }
+
+    // =========================================================================
+    // Package Child Collections
+    // =========================================================================
+
+    public static CollectionDefinition packageItems() {
+        return systemBuilder("package-items", "Package Items", "package_item")
+            .tenantScoped(false)
+            .addField(FieldDefinition.masterDetail("packageId", "packages", "Package")
+                .withColumnName("package_id"))
+            .addField(FieldDefinition.requiredString("itemType", 50)
+                .withColumnName("item_type")
+                .withEnumValues(List.of("COLLECTION", "FIELD", "ROLE", "POLICY",
+                    "ROUTE_POLICY", "FIELD_POLICY", "OIDC_PROVIDER",
+                    "UI_PAGE", "UI_MENU", "UI_MENU_ITEM")))
+            .addField(FieldDefinition.requiredString("itemId", 36)
+                .withColumnName("item_id"))
+            .addField(FieldDefinition.json("content"))
+            .build();
+    }
+
+    // =========================================================================
+    // Read-Only: Workflow Logs & Versions
+    // =========================================================================
+
+    public static CollectionDefinition workflowActionLogs() {
+        return readOnlySystemBuilder("workflow-action-logs", "Workflow Action Logs",
+                "workflow_action_log")
+            .tenantScoped(false)
+            .addField(FieldDefinition.masterDetail("executionLogId",
+                "workflow-execution-logs", "Execution Log")
+                .withColumnName("execution_log_id"))
+            .addField(FieldDefinition.lookup("actionId", "workflow-actions", "Action")
+                .withColumnName("action_id"))
+            .addField(FieldDefinition.requiredString("actionType", 50)
+                .withColumnName("action_type"))
+            .addField(FieldDefinition.requiredString("status", 20))
+            .addField(FieldDefinition.text("errorMessage")
+                .withColumnName("error_message"))
+            .addField(FieldDefinition.json("inputSnapshot")
+                .withColumnName("input_snapshot"))
+            .addField(FieldDefinition.json("outputSnapshot")
+                .withColumnName("output_snapshot"))
+            .addField(FieldDefinition.integer("durationMs")
+                .withColumnName("duration_ms"))
+            .addField(FieldDefinition.datetime("executedAt")
+                .withColumnName("executed_at"))
+            .addField(FieldDefinition.requiredInteger("attemptNumber")
+                .withColumnName("attempt_number").withDefault(1))
+            .build();
+    }
+
+    public static CollectionDefinition workflowRuleVersions() {
+        return readOnlySystemBuilder("workflow-rule-versions", "Workflow Rule Versions",
+                "workflow_rule_version")
+            .tenantScoped(false)
+            .addField(FieldDefinition.masterDetail("workflowRuleId", "workflow-rules",
+                "Workflow Rule").withColumnName("workflow_rule_id"))
+            .addField(FieldDefinition.requiredInteger("versionNumber")
+                .withColumnName("version_number"))
+            .addField(FieldDefinition.requiredJson("snapshot"))
+            .addField(FieldDefinition.string("changeSummary", 500)
+                .withColumnName("change_summary"))
+            .addField(FieldDefinition.string("createdBy", 255)
+                .withColumnName("created_by"))
+            .build();
+    }
+
+    // =========================================================================
+    // Read-Only: Script & Flow Execution Logs
+    // =========================================================================
+
+    public static CollectionDefinition scriptExecutionLogs() {
+        return readOnlySystemBuilder("script-execution-logs", "Script Execution Logs",
+                "script_execution_log")
+            .tenantScoped(true)
+            .addField(FieldDefinition.masterDetail("scriptId", "scripts", "Script")
+                .withColumnName("script_id"))
+            .addField(FieldDefinition.requiredString("status", 20)
+                .withEnumValues(List.of("SUCCESS", "FAILURE", "TIMEOUT",
+                    "GOVERNOR_LIMIT")))
+            .addField(FieldDefinition.string("triggerType", 30)
+                .withColumnName("trigger_type"))
+            .addField(FieldDefinition.string("recordId", 36)
+                .withColumnName("record_id"))
+            .addField(FieldDefinition.integer("durationMs")
+                .withColumnName("duration_ms"))
+            .addField(FieldDefinition.integer("cpuMs")
+                .withColumnName("cpu_ms"))
+            .addField(FieldDefinition.integer("queriesExecuted")
+                .withColumnName("queries_executed").withDefault(0))
+            .addField(FieldDefinition.integer("dmlRows")
+                .withColumnName("dml_rows").withDefault(0))
+            .addField(FieldDefinition.integer("callouts").withDefault(0))
+            .addField(FieldDefinition.text("errorMessage")
+                .withColumnName("error_message"))
+            .addField(FieldDefinition.text("logOutput")
+                .withColumnName("log_output"))
+            .addField(FieldDefinition.datetime("executedAt")
+                .withColumnName("executed_at"))
+            .build();
+    }
+
+    public static CollectionDefinition flowExecutions() {
+        return readOnlySystemBuilder("flow-executions", "Flow Executions",
+                "flow_execution")
+            .tenantScoped(true)
+            .addField(FieldDefinition.masterDetail("flowId", "flows", "Flow")
+                .withColumnName("flow_id"))
+            .addField(FieldDefinition.requiredString("status", 20)
+                .withDefault("RUNNING")
+                .withEnumValues(List.of("RUNNING", "COMPLETED", "FAILED",
+                    "WAITING", "CANCELLED")))
+            .addField(FieldDefinition.string("startedBy", 36)
+                .withColumnName("started_by"))
+            .addField(FieldDefinition.string("triggerRecordId", 36)
+                .withColumnName("trigger_record_id"))
+            .addField(FieldDefinition.json("variables").withDefault("{}"))
+            .addField(FieldDefinition.string("currentNodeId", 100)
+                .withColumnName("current_node_id"))
+            .addField(FieldDefinition.text("errorMessage")
+                .withColumnName("error_message"))
+            .addField(FieldDefinition.datetime("startedAt")
+                .withColumnName("started_at").withNullable(false))
+            .addField(FieldDefinition.datetime("completedAt")
+                .withColumnName("completed_at"))
+            .build();
+    }
+
+    // =========================================================================
+    // Read-Only: Job & Bulk Job Logs
+    // =========================================================================
+
+    public static CollectionDefinition jobExecutionLogs() {
+        return readOnlySystemBuilder("job-execution-logs", "Job Execution Logs",
+                "job_execution_log")
+            .tenantScoped(false)
+            .addField(FieldDefinition.masterDetail("jobId", "scheduled-jobs",
+                "Scheduled Job").withColumnName("job_id"))
+            .addField(FieldDefinition.requiredString("status", 20))
+            .addField(FieldDefinition.integer("recordsProcessed")
+                .withColumnName("records_processed").withDefault(0))
+            .addField(FieldDefinition.text("errorMessage")
+                .withColumnName("error_message"))
+            .addField(FieldDefinition.datetime("startedAt")
+                .withColumnName("started_at").withNullable(false))
+            .addField(FieldDefinition.datetime("completedAt")
+                .withColumnName("completed_at"))
+            .addField(FieldDefinition.integer("durationMs")
+                .withColumnName("duration_ms"))
+            .build();
+    }
+
+    public static CollectionDefinition bulkJobResults() {
+        return readOnlySystemBuilder("bulk-job-results", "Bulk Job Results",
+                "bulk_job_result")
+            .tenantScoped(false)
+            .addField(FieldDefinition.masterDetail("bulkJobId", "bulk-jobs",
+                "Bulk Job").withColumnName("bulk_job_id"))
+            .addField(FieldDefinition.requiredInteger("recordIndex")
+                .withColumnName("record_index"))
+            .addField(FieldDefinition.string("recordId", 36)
+                .withColumnName("record_id"))
+            .addField(FieldDefinition.requiredString("status", 20)
+                .withEnumValues(List.of("SUCCESS", "FAILURE")))
+            .addField(FieldDefinition.text("errorMessage")
+                .withColumnName("error_message"))
+            .build();
+    }
+
+    // =========================================================================
+    // Read-Only: Schema Version Collections
+    // =========================================================================
+
+    public static CollectionDefinition collectionVersions() {
+        return readOnlySystemBuilder("collection-versions", "Collection Versions",
+                "collection_version")
+            .tenantScoped(false)
+            .addField(FieldDefinition.masterDetail("collectionId", "collections",
+                "Collection").withColumnName("collection_id"))
+            .addField(FieldDefinition.requiredInteger("version"))
+            .addField(FieldDefinition.json("schema"))
+            .build();
+    }
+
+    public static CollectionDefinition fieldVersions() {
+        return readOnlySystemBuilder("field-versions", "Field Versions", "field_version")
+            .tenantScoped(false)
+            .addField(FieldDefinition.masterDetail("collectionVersionId",
+                "collection-versions", "Collection Version")
+                .withColumnName("collection_version_id"))
+            .addField(FieldDefinition.masterDetail("fieldId", "fields", "Field")
+                .withColumnName("field_id"))
+            .addField(FieldDefinition.requiredString("name", 100))
+            .addField(FieldDefinition.requiredString("type", 50))
+            .addField(FieldDefinition.bool("required").withDefault(false)
+                .withNullable(false))
+            .addField(FieldDefinition.bool("active").withDefault(true)
+                .withNullable(false))
+            .addField(FieldDefinition.json("constraints"))
+            .build();
+    }
+
+    public static CollectionDefinition migrationSteps() {
+        return readOnlySystemBuilder("migration-steps", "Migration Steps",
+                "migration_step")
+            .tenantScoped(false)
+            .addField(FieldDefinition.masterDetail("migrationRunId", "migration-runs",
+                "Migration Run").withColumnName("migration_run_id"))
+            .addField(FieldDefinition.requiredInteger("stepNumber")
+                .withColumnName("step_number"))
+            .addField(FieldDefinition.requiredString("operation", 100))
+            .addField(FieldDefinition.requiredString("status", 50)
+                .withDefault("PENDING")
+                .withEnumValues(List.of("PENDING", "RUNNING", "COMPLETED",
+                    "FAILED", "SKIPPED")))
+            .addField(FieldDefinition.json("details"))
+            .addField(FieldDefinition.string("errorMessage", 2000)
+                .withColumnName("error_message"))
             .build();
     }
 

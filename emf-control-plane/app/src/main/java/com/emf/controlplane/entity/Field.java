@@ -76,6 +76,12 @@ public class Field extends BaseEntity {
     @Column(name = "track_history")
     private boolean trackHistory = false;
 
+    @Column(name = "column_name", length = 100)
+    private String columnName;
+
+    @Column(name = "immutable", nullable = false)
+    private boolean immutable = false;
+
     public Field() {
         super();
     }
@@ -245,6 +251,22 @@ public class Field extends BaseEntity {
 
     public void setTrackHistory(boolean trackHistory) {
         this.trackHistory = trackHistory;
+    }
+
+    public String getColumnName() {
+        return columnName;
+    }
+
+    public void setColumnName(String columnName) {
+        this.columnName = columnName;
+    }
+
+    public boolean isImmutable() {
+        return immutable;
+    }
+
+    public void setImmutable(boolean immutable) {
+        this.immutable = immutable;
     }
 
     @Override

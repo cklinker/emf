@@ -42,7 +42,26 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
-            
+
+            <!-- Override byte-buddy from Spring Boot BOM for Java 24 compatibility -->
+            <dependency>
+                <groupId>net.bytebuddy</groupId>
+                <artifactId>byte-buddy</artifactId>
+                <version>${byte-buddy.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>net.bytebuddy</groupId>
+                <artifactId>byte-buddy-agent</artifactId>
+                <version>${byte-buddy.version}</version>
+            </dependency>
+
+            <!-- Override Mockito from Spring Boot BOM for Java 24 compatibility -->
+            <dependency>
+                <groupId>org.mockito</groupId>
+                <artifactId>mockito-core</artifactId>
+                <version>${mockito.version}</version>
+            </dependency>
+
             <!-- Testcontainers BOM -->
             <dependency>
                 <groupId>org.testcontainers</groupId>
@@ -77,6 +96,8 @@
                             <include>**/*Tests.java</include>
                             <include>**/*Properties.java</include>
                         </includes>
+                        <!-- Java 21+ requires byte-buddy agent for Mockito inline mock maker -->
+                        <argLine>-javaagent:${settings.localRepository}/net/bytebuddy/byte-buddy-agent/${byte-buddy.version}/byte-buddy-agent-${byte-buddy.version}.jar</argLine>
                     </configuration>
                 </plugin>
                 <plugin>

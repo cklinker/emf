@@ -1,5 +1,6 @@
 package com.emf.runtime.formula;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -27,6 +28,7 @@ public class FormulaEvaluator {
     private final ConcurrentHashMap<String, FormulaAst> compilationCache;
     private final int cacheMaxSize;
 
+    @Autowired
     public FormulaEvaluator(List<FormulaFunction> functionList) {
         this(functionList, DEFAULT_CACHE_MAX_SIZE);
     }

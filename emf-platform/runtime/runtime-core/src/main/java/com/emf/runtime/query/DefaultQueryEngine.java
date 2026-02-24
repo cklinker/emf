@@ -19,6 +19,7 @@ import com.emf.runtime.validation.ValidationException;
 import com.emf.runtime.validation.ValidationResult;
 import com.emf.runtime.workflow.BeforeSaveHookRegistry;
 import com.emf.runtime.workflow.BeforeSaveResult;
+import com.emf.runtime.workflow.WorkflowEngine;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,9 +63,10 @@ public class DefaultQueryEngine implements QueryEngine {
     private final CustomValidationRuleEngine customValidationRuleEngine;
     private final RecordEventPublisher recordEventPublisher;
     private final BeforeSaveHookRegistry beforeSaveHookRegistry;
+    private final WorkflowEngine workflowEngine;
 
     /**
-     * Creates a new DefaultQueryEngine with all services including before-save hooks.
+     * Creates a new DefaultQueryEngine with all services including workflow engine.
      *
      * @param storageAdapter the storage adapter for persistence
      * @param validationEngine the validation engine for data validation (may be null)
@@ -75,13 +77,15 @@ public class DefaultQueryEngine implements QueryEngine {
      * @param customValidationRuleEngine the custom validation rule engine (may be null)
      * @param recordEventPublisher the publisher for record change events (may be null)
      * @param beforeSaveHookRegistry the before-save hook registry for lifecycle hooks (may be null)
+     * @param workflowEngine the workflow engine for before-save workflow rules (may be null)
      */
     public DefaultQueryEngine(StorageAdapter storageAdapter, ValidationEngine validationEngine,
                               FieldEncryptionService encryptionService, AutoNumberService autoNumberService,
                               FormulaEvaluator formulaEvaluator, RollupSummaryService rollupSummaryService,
                               CustomValidationRuleEngine customValidationRuleEngine,
                               RecordEventPublisher recordEventPublisher,
-                              BeforeSaveHookRegistry beforeSaveHookRegistry) {
+                              BeforeSaveHookRegistry beforeSaveHookRegistry,
+                              WorkflowEngine workflowEngine) {
         this.storageAdapter = Objects.requireNonNull(storageAdapter, "storageAdapter cannot be null");
         this.validationEngine = validationEngine;
         this.encryptionService = encryptionService;
@@ -91,6 +95,21 @@ public class DefaultQueryEngine implements QueryEngine {
         this.customValidationRuleEngine = customValidationRuleEngine;
         this.recordEventPublisher = recordEventPublisher;
         this.beforeSaveHookRegistry = beforeSaveHookRegistry;
+        this.workflowEngine = workflowEngine;
+    }
+
+    /**
+     * Creates a new DefaultQueryEngine with all services including before-save hooks (no workflow engine).
+     */
+    public DefaultQueryEngine(StorageAdapter storageAdapter, ValidationEngine validationEngine,
+                              FieldEncryptionService encryptionService, AutoNumberService autoNumberService,
+                              FormulaEvaluator formulaEvaluator, RollupSummaryService rollupSummaryService,
+                              CustomValidationRuleEngine customValidationRuleEngine,
+                              RecordEventPublisher recordEventPublisher,
+                              BeforeSaveHookRegistry beforeSaveHookRegistry) {
+        this(storageAdapter, validationEngine, encryptionService, autoNumberService,
+             formulaEvaluator, rollupSummaryService, customValidationRuleEngine,
+             recordEventPublisher, beforeSaveHookRegistry, null);
     }
 
     /**
@@ -103,7 +122,7 @@ public class DefaultQueryEngine implements QueryEngine {
                               RecordEventPublisher recordEventPublisher) {
         this(storageAdapter, validationEngine, encryptionService, autoNumberService,
              formulaEvaluator, rollupSummaryService, customValidationRuleEngine,
-             recordEventPublisher, null);
+             recordEventPublisher, null, null);
     }
 
     /**
@@ -114,7 +133,7 @@ public class DefaultQueryEngine implements QueryEngine {
                               FormulaEvaluator formulaEvaluator, RollupSummaryService rollupSummaryService,
                               CustomValidationRuleEngine customValidationRuleEngine) {
         this(storageAdapter, validationEngine, encryptionService, autoNumberService,
-             formulaEvaluator, rollupSummaryService, customValidationRuleEngine, null, null);
+             formulaEvaluator, rollupSummaryService, customValidationRuleEngine, null, null, null);
     }
 
     /**
@@ -124,7 +143,7 @@ public class DefaultQueryEngine implements QueryEngine {
                               FieldEncryptionService encryptionService, AutoNumberService autoNumberService,
                               FormulaEvaluator formulaEvaluator, RollupSummaryService rollupSummaryService) {
         this(storageAdapter, validationEngine, encryptionService, autoNumberService,
-             formulaEvaluator, rollupSummaryService, null, null, null);
+             formulaEvaluator, rollupSummaryService, null, null, null, null);
     }
 
     /**
@@ -134,7 +153,7 @@ public class DefaultQueryEngine implements QueryEngine {
      * @param validationEngine the validation engine for data validation (may be null)
      */
     public DefaultQueryEngine(StorageAdapter storageAdapter, ValidationEngine validationEngine) {
-        this(storageAdapter, validationEngine, null, null, null, null, null, null, null);
+        this(storageAdapter, validationEngine, null, null, null, null, null, null, null, null);
     }
 
     /**
@@ -237,6 +256,9 @@ public class DefaultQueryEngine implements QueryEngine {
         // Evaluate before-create hooks (module-provided lifecycle hooks)
         evaluateBeforeCreateHooks(definition, recordData);
 
+        // Evaluate before-save workflow rules (BEFORE_CREATE trigger)
+        evaluateBeforeSaveWorkflows(definition, recordData, null, id, List.of(), "CREATE");
+
         // Persist via storage adapter
         Map<String, Object> created = storageAdapter.create(definition, recordData);
 
@@ -320,6 +342,13 @@ public class DefaultQueryEngine implements QueryEngine {
 
         // Evaluate before-update hooks (module-provided lifecycle hooks)
         evaluateBeforeUpdateHooks(definition, id, recordData, previousData);
+
+        // Compute changed fields for before-save workflow trigger field matching
+        List<String> changedFieldsForWorkflow = computeChangedFields(previousData, recordData);
+
+        // Evaluate before-save workflow rules (BEFORE_UPDATE trigger)
+        evaluateBeforeSaveWorkflows(definition, recordData, previousData, id,
+            changedFieldsForWorkflow, "UPDATE");
 
         // Persist via storage adapter
         Optional<Map<String, Object>> updated = storageAdapter.update(definition, id, recordData);
@@ -606,6 +635,40 @@ public class DefaultQueryEngine implements QueryEngine {
         }
         if (result.hasFieldUpdates()) {
             recordData.putAll(result.getFieldUpdates());
+        }
+    }
+
+    /**
+     * Evaluates before-save workflow rules (BEFORE_CREATE / BEFORE_UPDATE triggers).
+     * Field updates from workflow actions are merged into the record data before persist.
+     * Failures are logged but do not block the save operation.
+     */
+    @SuppressWarnings("unchecked")
+    private void evaluateBeforeSaveWorkflows(CollectionDefinition definition,
+                                               Map<String, Object> recordData,
+                                               Map<String, Object> previousData,
+                                               String recordId,
+                                               List<String> changedFields,
+                                               String changeType) {
+        if (workflowEngine == null) {
+            return;
+        }
+        try {
+            Map<String, Object> result = workflowEngine.evaluateBeforeSave(
+                extractTenantId(recordData), definition.name(),
+                recordId, recordData, previousData,
+                changedFields, extractUserId(recordData), changeType);
+
+            Map<String, Object> fieldUpdates =
+                (Map<String, Object>) result.getOrDefault("fieldUpdates", Map.of());
+            if (!fieldUpdates.isEmpty()) {
+                recordData.putAll(fieldUpdates);
+                logger.debug("Before-save workflow applied {} field updates to record '{}' in collection '{}'",
+                    fieldUpdates.size(), recordId, definition.name());
+            }
+        } catch (Exception e) {
+            logger.error("Error evaluating before-save workflows for record '{}' in collection '{}': {}",
+                recordId, definition.name(), e.getMessage(), e);
         }
     }
 

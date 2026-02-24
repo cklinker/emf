@@ -149,7 +149,7 @@ export function AttachmentsSection({
   // Delete attachment mutation
   const deleteMutation = useMutation({
     mutationFn: async (attachmentId: string) => {
-      return apiClient.delete(`/control/attachments/${attachmentId}`)
+      return apiClient.deleteResource(`/api/attachments/${attachmentId}`)
     },
     onSuccess: () => {
       invalidateCache()
@@ -162,7 +162,7 @@ export function AttachmentsSection({
       const formData = new FormData()
       formData.append('file', file)
       return apiClient.postFormData<Attachment>(
-        `/control/attachments/${collectionId}/${recordId}`,
+        `/api/attachments?filter[collectionId][eq]=${collectionId}&filter[recordId][eq]=${recordId}`,
         formData
       )
     },
@@ -202,15 +202,15 @@ export function AttachmentsSection({
         window.open(attachment.downloadUrl, '_blank')
       } else {
         try {
-          const response = await apiClient.get<{ url: string }>(
-            `/control/attachments/download/${attachment.id}`
+          const response = await apiClient.getOne<{ url: string }>(
+            `/api/attachments/${attachment.id}`
           )
           if (response?.url) {
             window.open(response.url, '_blank')
           }
         } catch {
           // Fallback: attempt direct navigation
-          window.open(`/control/attachments/download/${attachment.id}`, '_blank')
+          window.open(`/api/attachments/${attachment.id}`, '_blank')
         }
       }
     },

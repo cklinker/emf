@@ -53,7 +53,7 @@ export function CollectionFormPage({
     error,
   } = useQuery({
     queryKey: ['collection', id],
-    queryFn: () => apiClient.get<CollectionWithFields>(`/control/collections/${id}`),
+    queryFn: () => apiClient.get<CollectionWithFields>(`/api/collections/${id}`),
     enabled: isEditMode,
   })
 
@@ -79,7 +79,7 @@ export function CollectionFormPage({
         if (data.displayFieldId !== undefined) {
           requestData.displayFieldId = data.displayFieldId || ''
         }
-        await apiClient.put(`/control/collections/${id}`, requestData)
+        await apiClient.putResource(`/api/collections/${id}`, requestData)
         navigate(`/${getTenantSlug()}/collections/${id}`)
       } else {
         // Create new collection
@@ -88,7 +88,7 @@ export function CollectionFormPage({
           description: data.description || '',
         }
 
-        const created = await apiClient.post<{
+        const created = await apiClient.postResource<{
           id: string
           name: string
           description: string
@@ -96,7 +96,7 @@ export function CollectionFormPage({
           currentVersion: number
           createdAt: string
           updatedAt: string
-        }>('/control/collections', requestData)
+        }>('/api/collections', requestData)
 
         console.log('Created collection:', created)
         navigate(`/${getTenantSlug()}/collections/${created.id}`)

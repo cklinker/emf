@@ -58,7 +58,9 @@ export function DataPathPicker({
   const { data: fields, isLoading } = useQuery({
     queryKey: ['data-paths', collectionId, depth],
     queryFn: () =>
-      apiClient.get<FieldNode[]>(`/control/collections/${collectionId}/data-paths?depth=${depth}`),
+      apiClient.getList<FieldNode>(
+        `/api/data-paths?filter[collectionId][eq]=${collectionId}&depth=${depth}`
+      ),
     enabled: !!collectionId,
   })
 

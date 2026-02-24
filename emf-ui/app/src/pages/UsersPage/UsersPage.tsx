@@ -236,15 +236,15 @@ export function UsersPage({ testId = 'users-page' }: UsersPageProps) {
       const params = new URLSearchParams()
       if (filter) params.append('filter', filter)
       if (statusFilter) params.append('status', statusFilter)
-      params.append('page', page.toString())
-      params.append('size', '20')
-      return apiClient.get<PageResponse<PlatformUser>>(`/control/users?${params}`)
+      params.append('page[number]', page.toString())
+      params.append('page[size]', '20')
+      return apiClient.get<PageResponse<PlatformUser>>(`/api/users?${params}`)
     },
   })
 
   const createMutation = useMutation({
     mutationFn: (formData: CreateUserFormData) =>
-      apiClient.post<PlatformUser>('/control/users', formData),
+      apiClient.postResource<PlatformUser>('/api/users', formData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] })
       showToast(t('users.createSuccess'), 'success')
@@ -257,7 +257,9 @@ export function UsersPage({ testId = 'users-page' }: UsersPageProps) {
 
   const statusMutation = useMutation({
     mutationFn: ({ userId, action }: { userId: string; action: 'deactivate' | 'activate' }) =>
-      apiClient.post(`/control/users/${userId}/${action}`, {}),
+      apiClient.patchResource(`/api/users/${userId}`, {
+        status: action === 'activate' ? 'ACTIVE' : 'INACTIVE',
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] })
       showToast(

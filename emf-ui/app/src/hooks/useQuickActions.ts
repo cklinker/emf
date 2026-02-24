@@ -1,18 +1,13 @@
 /**
  * useQuickActions Hook
  *
- * Fetches quick action definitions for a collection from the control plane.
- * Returns actions filtered by context (record vs list) for display in
- * RecordHeader or ListViewToolbar.
- *
- * Falls back to an empty list when the endpoint is unavailable,
- * since the backend quick actions API may not yet be implemented.
+ * Returns quick action definitions for a collection.
+ * Returns an empty list — quick actions endpoint is not yet
+ * available via JSON:API.
  */
 
 import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { useApi } from '@/context/ApiContext'
-import type { ApiClient } from '@/services/apiClient'
 import type { QuickActionDefinition, QuickActionContext } from '@/types/quickActions'
 
 export interface UseQuickActionsOptions {
@@ -32,21 +27,12 @@ export interface UseQuickActionsReturn {
 }
 
 /**
- * Fetch quick actions for a collection from the control plane.
+ * Return empty quick actions list.
+ * Quick actions endpoint is not yet available via JSON:API.
  */
-async function fetchQuickActions(
-  apiClient: ApiClient,
-  collectionName: string
-): Promise<QuickActionDefinition[]> {
-  try {
-    const response = await apiClient.get<QuickActionDefinition[]>(
-      `/control/quick-actions/${encodeURIComponent(collectionName)}`
-    )
-    return Array.isArray(response) ? response : []
-  } catch {
-    // Endpoint not yet implemented — return empty list
-    return []
-  }
+async function fetchQuickActions(): Promise<QuickActionDefinition[]> {
+  // Quick actions are not yet available via JSON:API — return empty list
+  return []
 }
 
 /**
@@ -57,11 +43,10 @@ async function fetchQuickActions(
  */
 export function useQuickActions(options: UseQuickActionsOptions): UseQuickActionsReturn {
   const { collectionName, context } = options
-  const { apiClient } = useApi()
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['quick-actions', collectionName],
-    queryFn: () => fetchQuickActions(apiClient, collectionName!),
+    queryFn: () => fetchQuickActions(),
     enabled: !!collectionName,
     staleTime: 5 * 60 * 1000, // 5 minutes
     retry: false,

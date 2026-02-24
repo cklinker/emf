@@ -19,14 +19,6 @@ interface PlatformUser {
   updatedAt: string
 }
 
-interface PageResponse<T> {
-  content: T[]
-  totalElements: number
-  totalPages: number
-  number: number
-  size: number
-}
-
 type SortField = 'lastLoginAt' | 'name' | 'loginCount'
 type SortDirection = 'asc' | 'desc'
 
@@ -79,7 +71,7 @@ export function LoginHistoryPage({
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['login-history', tenantSlug],
     queryFn: async () => {
-      return apiClient.get<PageResponse<PlatformUser>>('/control/users?size=100')
+      return apiClient.getPage<PlatformUser>('/api/users?page[size]=100')
     },
   })
 

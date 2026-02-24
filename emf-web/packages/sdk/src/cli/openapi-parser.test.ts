@@ -207,7 +207,7 @@ describe('OpenAPI Parser', () => {
     });
 
     it('should return null for non-matching paths', () => {
-      expect(extractCollectionName('/control/_admin/collections')).toBeNull();
+      expect(extractCollectionName('/internal/_admin/collections')).toBeNull();
       expect(extractCollectionName('/health')).toBeNull();
       expect(extractCollectionName('/api')).toBeNull();
     });
@@ -318,13 +318,13 @@ describe('OpenAPI Parser', () => {
       expect(collections[0].operations).toContain('create');
     });
 
-    it('should skip admin and meta endpoints', () => {
+    it('should skip non-API endpoints', () => {
       const spec: OpenAPISpec = {
         openapi: '3.0.0',
         info: { title: 'Test', version: '1.0.0' },
         paths: {
-          '/control/_admin/collections': { get: { responses: {} } },
-          '/control/_meta/resources': { get: { responses: {} } },
+          '/internal/_admin/collections': { get: { responses: {} } },
+          '/health': { get: { responses: {} } },
           '/api/users': { get: { responses: {} } },
         },
       };

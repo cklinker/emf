@@ -177,7 +177,13 @@ describe('ProfilesPage', () => {
     const user = userEvent.setup()
     mockAxios.get.mockResolvedValueOnce({ data: mockProfiles })
     mockAxios.post.mockResolvedValueOnce({
-      data: { id: '3', name: 'New Profile', description: 'Test', system: false },
+      data: {
+        data: {
+          type: 'profiles',
+          id: '3',
+          attributes: { name: 'New Profile', description: 'Test', system: false },
+        },
+      },
     })
     mockAxios.get.mockResolvedValueOnce({ data: mockProfiles })
     render(<ProfilesPage />, { wrapper: createTestWrapper() })
@@ -189,9 +195,14 @@ describe('ProfilesPage', () => {
     await user.type(screen.getByTestId('profile-description-input'), 'Test description')
     await user.click(screen.getByTestId('profile-form-submit'))
     await waitFor(() => {
-      expect(mockAxios.post).toHaveBeenCalledWith('/control/profiles', {
-        name: 'New Profile',
-        description: 'Test description',
+      expect(mockAxios.post).toHaveBeenCalledWith('/api/profiles', {
+        data: {
+          type: 'profiles',
+          attributes: {
+            name: 'New Profile',
+            description: 'Test description',
+          },
+        },
       })
     })
   })
@@ -212,7 +223,15 @@ describe('ProfilesPage', () => {
   it('calls clone API when clone button is clicked', async () => {
     const user = userEvent.setup()
     mockAxios.get.mockResolvedValueOnce({ data: mockProfiles })
-    mockAxios.post.mockResolvedValueOnce({ data: { id: '3', name: 'Standard User (Copy)' } })
+    mockAxios.post.mockResolvedValueOnce({
+      data: {
+        data: {
+          type: 'profiles',
+          id: '3',
+          attributes: { name: 'Standard User (Copy)' },
+        },
+      },
+    })
     mockAxios.get.mockResolvedValueOnce({ data: mockProfiles })
     render(<ProfilesPage />, { wrapper: createTestWrapper() })
     await waitFor(() => {
@@ -220,7 +239,12 @@ describe('ProfilesPage', () => {
     })
     await user.click(screen.getByTestId('clone-button-0'))
     await waitFor(() => {
-      expect(mockAxios.post).toHaveBeenCalledWith('/control/profiles/1/clone', {})
+      expect(mockAxios.post).toHaveBeenCalledWith('/api/profiles/1/clone', {
+        data: {
+          type: 'clone',
+          attributes: {},
+        },
+      })
     })
   })
 

@@ -523,14 +523,14 @@ export function ApprovalProcessesPage({
     },
   })
 
-  // Instances query
+  // Instances query — fetches from JSON:API endpoint
   const {
     data: allInstances,
     isLoading: instancesLoading,
     error: instancesError,
   } = useQuery({
     queryKey: ['approval-instances'],
-    queryFn: () => apiClient.get<ApprovalInstance[]>(`/control/approvals/instances`),
+    queryFn: () => apiClient.getList<ApprovalInstance>(`/api/approval-instances`),
     enabled: !!instancesItemId,
   })
 
@@ -538,11 +538,12 @@ export function ApprovalProcessesPage({
     (i) => i.approvalProcessId === instancesItemId
   )
 
-  // Approve mutation
+  // Approve mutation — graceful degradation (action endpoint not available in JSON:API)
   const approveMutation = useMutation({
-    mutationFn: (stepInstanceId: string) =>
-      apiClient.post(
-        `/control/approvals/instances/steps/${stepInstanceId}/approve?${new URLSearchParams({ userId: 'system', comments: '' }).toString()}`
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    mutationFn: (_stepInstanceId: string) =>
+      Promise.reject(
+        new Error('Approval actions are temporarily unavailable during platform migration')
       ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['approval-instances'] })
@@ -553,11 +554,12 @@ export function ApprovalProcessesPage({
     },
   })
 
-  // Reject mutation
+  // Reject mutation — graceful degradation (action endpoint not available in JSON:API)
   const rejectMutation = useMutation({
-    mutationFn: (stepInstanceId: string) =>
-      apiClient.post(
-        `/control/approvals/instances/steps/${stepInstanceId}/reject?${new URLSearchParams({ userId: 'system', comments: '' }).toString()}`
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    mutationFn: (_stepInstanceId: string) =>
+      Promise.reject(
+        new Error('Rejection actions are temporarily unavailable during platform migration')
       ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['approval-instances'] })
@@ -568,11 +570,12 @@ export function ApprovalProcessesPage({
     },
   })
 
-  // Recall mutation
+  // Recall mutation — graceful degradation (action endpoint not available in JSON:API)
   const recallMutation = useMutation({
-    mutationFn: (instanceId: string) =>
-      apiClient.post(
-        `/control/approvals/instances/${instanceId}/recall?${new URLSearchParams({ userId: 'system' }).toString()}`
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    mutationFn: (_instanceId: string) =>
+      Promise.reject(
+        new Error('Recall actions are temporarily unavailable during platform migration')
       ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['approval-instances'] })

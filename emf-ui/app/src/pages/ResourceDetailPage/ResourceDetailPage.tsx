@@ -263,7 +263,14 @@ async function fetchCollectionSchema(
   apiClient: ApiClient,
   collectionName: string
 ): Promise<CollectionSchema> {
-  const response = await apiClient.get<CollectionSchema>(`/control/collections/${collectionName}`)
+  // Fetch all collections and find the one with matching name
+  const collections = await apiClient.getList<CollectionSchema>('/api/collections')
+  const collection = collections.find((c) => c.name === collectionName)
+  if (!collection) {
+    throw new Error(`Collection '${collectionName}' not found`)
+  }
+  // Fetch full collection details by ID
+  const response = await apiClient.getOne<CollectionSchema>(`/api/collections/${collection.id}`)
   // Normalize field types from backend canonical form (e.g. "PICKLIST") to
   // UI form (e.g. "picklist") so type display and rendering works correctly.
   if (response.fields) {
@@ -380,8 +387,8 @@ export function ResourceDetailPage({
     queryKey: ['record-shares', schema?.id, resourceId],
     queryFn: async () => {
       try {
-        return await apiClient.get<RecordShare[]>(
-          `/control/sharing/records/${schema!.id}/${resourceId}`
+        return await apiClient.getList<RecordShare>(
+          `/api/record-shares?filter[collectionId][eq]=${schema!.id}&filter[recordId][eq]=${resourceId}`
         )
       } catch {
         return [] as RecordShare[]
@@ -395,7 +402,8 @@ export function ResourceDetailPage({
   // Sharing: create share
   const createShareMutation = useMutation({
     mutationFn: (data: { sharedWithId: string; sharedWithType: string; accessLevel: string }) =>
-      apiClient.post(`/control/sharing/records/${schema!.id}`, {
+      apiClient.postResource(`/api/record-shares`, {
+        collectionId: schema!.id,
         recordId: resourceId,
         ...data,
       }),
@@ -411,7 +419,7 @@ export function ResourceDetailPage({
 
   // Sharing: delete share
   const deleteShareMutation = useMutation({
-    mutationFn: (shareId: string) => apiClient.delete(`/control/sharing/records/shares/${shareId}`),
+    mutationFn: (shareId: string) => apiClient.deleteResource(`/api/record-shares/${shareId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['record-shares', schema?.id, resourceId] })
       showToast(t('sharing.shareDeleted'), 'success')
@@ -429,8 +437,8 @@ export function ResourceDetailPage({
     queryKey: ['user', createdById],
     queryFn: async () => {
       try {
-        return await apiClient.get<{ id: string; firstName: string; lastName: string }>(
-          `/control/users/${createdById}`
+        return await apiClient.getOne<{ id: string; firstName: string; lastName: string }>(
+          `/api/users/${createdById}`
         )
       } catch {
         return null
@@ -444,8 +452,8 @@ export function ResourceDetailPage({
     queryKey: ['user', updatedById],
     queryFn: async () => {
       try {
-        return await apiClient.get<{ id: string; firstName: string; lastName: string }>(
-          `/control/users/${updatedById}`
+        return await apiClient.getOne<{ id: string; firstName: string; lastName: string }>(
+          `/api/users/${updatedById}`
         )
       } catch {
         return null

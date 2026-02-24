@@ -282,10 +282,7 @@ async function fetchCollectionSchema(
   console.log('[fetchCollectionSchema] Fetching collection by name:', collectionName)
 
   // First, fetch all collections to find the one with matching name
-  const response = await apiClient.get<{ content: CollectionSchema[] }>('/control/collections')
-  console.log('[fetchCollectionSchema] Collections response:', response)
-
-  const collections = response?.content || []
+  const collections = await apiClient.getList<CollectionSchema>('/api/collections')
   console.log('[fetchCollectionSchema] Collections array:', collections)
 
   const collection = collections.find((c: CollectionSchema) => c.name === collectionName)
@@ -296,7 +293,7 @@ async function fetchCollectionSchema(
   }
 
   // Now fetch the full collection details by ID
-  const schema = await apiClient.get<CollectionSchema>(`/control/collections/${collection.id}`)
+  const schema = await apiClient.getOne<CollectionSchema>(`/api/collections/${collection.id}`)
   console.log('[fetchCollectionSchema] Collection schema:', schema)
   // Normalize field types from backend canonical form to UI form
   if (schema.fields) {

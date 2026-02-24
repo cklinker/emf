@@ -119,7 +119,7 @@ export function CollectionsPage({
     queryKey: ['collections', { showSystem }],
     queryFn: () =>
       apiClient.get<PageResponse<Collection>>(
-        `/control/collections?size=1000${showSystem ? '&includeSystem=true' : ''}`
+        `/api/collections?page[size]=1000${showSystem ? '&includeSystem=true' : ''}`
       ),
   })
 
@@ -130,7 +130,7 @@ export function CollectionsPage({
 
   // Delete mutation
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiClient.delete(`/control/collections/${id}`),
+    mutationFn: (id: string) => apiClient.deleteResource(`/api/collections/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['collections'] })
       showToast(t('success.deleted', { item: t('collections.title') }), 'success')

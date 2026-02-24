@@ -76,7 +76,7 @@ export function ProfileDetailPage({
     refetch: refetchProfile,
   } = useQuery({
     queryKey: ['profile', id],
-    queryFn: () => apiClient.get<ProfileDetail>(`/control/profiles/${id}`),
+    queryFn: () => apiClient.get<ProfileDetail>(`/api/profiles/${id}`),
     enabled: !!id,
   })
 
@@ -88,7 +88,7 @@ export function ProfileDetailPage({
   } = useQuery({
     queryKey: ['profile-system-permissions', id],
     queryFn: () =>
-      apiClient.get<ProfileSystemPermission[]>(`/control/profiles/${id}/system-permissions`),
+      apiClient.get<ProfileSystemPermission[]>(`/api/profiles/${id}/system-permissions`),
     enabled: !!id,
   })
 
@@ -96,7 +96,7 @@ export function ProfileDetailPage({
   const { data: objectPermissions } = useQuery({
     queryKey: ['profile-object-permissions', id],
     queryFn: () =>
-      apiClient.get<ProfileObjectPermission[]>(`/control/profiles/${id}/object-permissions`),
+      apiClient.get<ProfileObjectPermission[]>(`/api/profiles/${id}/object-permissions`),
     enabled: !!id,
   })
 
@@ -149,7 +149,7 @@ export function ProfileDetailPage({
   // Save system permissions mutation
   const savePermissionsMutation = useMutation({
     mutationFn: (permissions: Record<string, boolean>) =>
-      apiClient.put(`/control/profiles/${id}/system-permissions`, permissions),
+      apiClient.putResource(`/api/profiles/${id}/system-permissions`, permissions),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['profile-system-permissions', id] })
       showToast('System permissions saved successfully', 'success')
@@ -162,7 +162,7 @@ export function ProfileDetailPage({
 
   // Delete mutation
   const deleteMutation = useMutation({
-    mutationFn: () => apiClient.delete(`/control/profiles/${id}`),
+    mutationFn: () => apiClient.deleteResource(`/api/profiles/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['profiles'] })
       showToast('Profile deleted successfully', 'success')

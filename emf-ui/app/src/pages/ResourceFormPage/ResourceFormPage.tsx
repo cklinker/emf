@@ -160,7 +160,14 @@ async function fetchCollectionSchema(
   apiClient: ApiClient,
   collectionName: string
 ): Promise<CollectionSchema> {
-  const response = await apiClient.get<CollectionSchema>(`/control/collections/${collectionName}`)
+  // Fetch all collections and find the one with matching name
+  const collections = await apiClient.getList<CollectionSchema>('/api/collections')
+  const collection = collections.find((c) => c.name === collectionName)
+  if (!collection) {
+    throw new Error(`Collection '${collectionName}' not found`)
+  }
+  // Fetch full collection details by ID
+  const response = await apiClient.getOne<CollectionSchema>(`/api/collections/${collection.id}`)
   // Normalize field types from backend canonical form (e.g. "PICKLIST") to
   // UI form (e.g. "picklist") so switch-case rendering works correctly.
   if (response.fields) {
@@ -347,8 +354,8 @@ export function ResourceFormPage({
         picklistFields.map(async (field) => {
           try {
             // Try field-level endpoint which resolves global picklist automatically
-            const values = await apiClient.get<PicklistValueDto[]>(
-              `/control/picklists/fields/${field.id}/values`
+            const values = await apiClient.getList<PicklistValueDto>(
+              `/api/picklist-values?filter[fieldId][eq]=${field.id}`
             )
             map[field.id] = values
               .filter((v) => v.active)
@@ -395,8 +402,8 @@ export function ResourceFormPage({
           try {
             // Fetch the target collection schema by its UUID to find display field
             // and resolve the collection name for the /api/ endpoint.
-            const targetSchema = await apiClient.get<CollectionSchema>(
-              `/control/collections/${targetCollectionId}`
+            const targetSchema = await apiClient.getOne<CollectionSchema>(
+              `/api/collections/${targetCollectionId}`
             )
             const targetName = targetSchema.name
 

@@ -104,11 +104,11 @@ export interface MenuBuilderPageProps {
 
 // API functions using apiClient
 async function fetchMenus(apiClient: ApiClient): Promise<UIMenu[]> {
-  return apiClient.get('/control/ui/menus')
+  return apiClient.getList('/api/ui-menus')
 }
 
 async function createMenu(apiClient: ApiClient, data: Partial<UIMenu>): Promise<UIMenu> {
-  return apiClient.post('/control/ui/menus', data)
+  return apiClient.postResource('/api/ui-menus', data)
 }
 
 async function updateMenu(
@@ -116,11 +116,11 @@ async function updateMenu(
   id: string,
   data: Partial<UIMenu>
 ): Promise<UIMenu> {
-  return apiClient.put(`/control/ui/menus/${id}`, data)
+  return apiClient.putResource(`/api/ui-menus/${id}`, data)
 }
 
 async function deleteMenu(apiClient: ApiClient, id: string): Promise<void> {
-  return apiClient.delete(`/control/ui/menus/${id}`)
+  return apiClient.deleteResource(`/api/ui-menus/${id}`)
 }
 
 /**
@@ -137,7 +137,7 @@ interface Policy {
  */
 async function fetchPolicies(apiClient: ApiClient): Promise<Policy[]> {
   try {
-    return await apiClient.get('/control/policies')
+    return await apiClient.getList('/api/policies')
   } catch {
     // Return empty array if policies endpoint fails - policies are optional
     return []

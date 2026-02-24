@@ -131,17 +131,17 @@ export function RelatedRecordsSection({
     error: collectionsError,
   } = useQuery({
     queryKey: ['related-records-collections', collectionName],
-    queryFn: () => apiClient.get<{ content: CollectionSchema[] }>('/control/collections'),
+    queryFn: () => apiClient.getList<CollectionSchema>('/api/collections'),
     enabled: !!collectionName && !!recordId,
   })
 
   // Discover related collections: collections that have fields referencing the current collection
   const relatedCollections = useMemo<RelatedCollection[]>(() => {
-    if (!collectionsResponse?.content) return []
+    if (!collectionsResponse || collectionsResponse.length === 0) return []
 
     const related: RelatedCollection[] = []
 
-    for (const collection of collectionsResponse.content) {
+    for (const collection of collectionsResponse) {
       // Skip the current collection itself
       if (collection.name === collectionName) continue
 

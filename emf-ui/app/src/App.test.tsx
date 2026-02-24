@@ -4,7 +4,7 @@
  * Tests for the root App component that wires together all providers and routing.
  *
  * Requirements:
- * - 1.1: Fetch bootstrap configuration from /control/ui-bootstrap on startup
+ * - 1.1: Fetch bootstrap configuration from JSON:API endpoints on startup
  * - 1.2: Configure application routes based on page definitions
  * - 2.1: Redirect unauthenticated users to OIDC provider login page
  */
@@ -325,10 +325,64 @@ describe('App', () => {
     mockAuthContext.isLoading = false
     mockAuthContext.error = null
 
-    // Setup MSW handlers
+    // Setup MSW handlers for JSON:API bootstrap endpoints
     server.use(
-      http.get('/control/ui-bootstrap', () => {
-        return HttpResponse.json(mockBootstrapConfig)
+      http.get('*/api/ui-pages', () => {
+        return HttpResponse.json({
+          data: mockBootstrapConfig.pages.map((p: Record<string, unknown>, i: number) => ({
+            type: 'ui-pages',
+            id: p.id ?? `page-${i + 1}`,
+            attributes: Object.fromEntries(Object.entries(p).filter(([k]) => k !== 'id')),
+          })),
+          metadata: {
+            totalCount: mockBootstrapConfig.pages.length,
+            currentPage: 0,
+            pageSize: 500,
+            totalPages: 1,
+          },
+        })
+      }),
+      http.get('*/api/ui-menus', () => {
+        return HttpResponse.json({
+          data: mockBootstrapConfig.menus.map((m: Record<string, unknown>, i: number) => ({
+            type: 'ui-menus',
+            id: m.id ?? `menu-${i + 1}`,
+            attributes: Object.fromEntries(Object.entries(m).filter(([k]) => k !== 'id')),
+          })),
+          metadata: {
+            totalCount: mockBootstrapConfig.menus.length,
+            currentPage: 0,
+            pageSize: 500,
+            totalPages: 1,
+          },
+        })
+      }),
+      http.get('*/api/oidc-providers', () => {
+        return HttpResponse.json({
+          data: mockBootstrapConfig.oidcProviders.map((p: Record<string, unknown>, i: number) => ({
+            type: 'oidc-providers',
+            id: p.id ?? `provider-${i + 1}`,
+            attributes: Object.fromEntries(Object.entries(p).filter(([k]) => k !== 'id')),
+          })),
+          metadata: {
+            totalCount: mockBootstrapConfig.oidcProviders.length,
+            currentPage: 0,
+            pageSize: 100,
+            totalPages: 1,
+          },
+        })
+      }),
+      http.get('*/api/tenants', () => {
+        return HttpResponse.json({
+          data: [
+            {
+              type: 'tenants',
+              id: 'tenant-1',
+              attributes: { slug: 'test-tenant', name: 'Test Tenant' },
+            },
+          ],
+          metadata: { totalCount: 1, currentPage: 0, pageSize: 1, totalPages: 1 },
+        })
       })
     )
   })

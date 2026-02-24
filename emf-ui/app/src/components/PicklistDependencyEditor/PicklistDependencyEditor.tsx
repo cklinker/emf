@@ -39,14 +39,18 @@ export function PicklistDependencyEditor({
   const { data: controllingValues, isLoading: loadingControlling } = useQuery({
     queryKey: ['field-picklist-values', controllingFieldId],
     queryFn: () =>
-      apiClient.get<PicklistValue[]>(`/control/picklists/fields/${controllingFieldId}/values`),
+      apiClient.getList<PicklistValue>(
+        `/api/picklist-values?filter[fieldId][eq]=${controllingFieldId}&filter[source][eq]=FIELD`
+      ),
     enabled: !!controllingFieldId,
   })
 
   const { data: dependentValues, isLoading: loadingDependent } = useQuery({
     queryKey: ['field-picklist-values', dependentFieldId],
     queryFn: () =>
-      apiClient.get<PicklistValue[]>(`/control/picklists/fields/${dependentFieldId}/values`),
+      apiClient.getList<PicklistValue>(
+        `/api/picklist-values?filter[fieldId][eq]=${dependentFieldId}&filter[source][eq]=FIELD`
+      ),
     enabled: !!dependentFieldId,
   })
 

@@ -93,13 +93,12 @@ export function RecordActionsBar({
   // Submit for approval mutation
   const submitApprovalMutation = useMutation({
     mutationFn: async () => {
-      const params = new URLSearchParams({
+      return apiClient.postResource(`/api/approval-instances`, {
         collectionId: collectionName,
         recordId: recordId,
         processId: '',
         userId: 'system',
       })
-      return apiClient.post(`/control/approvals/instances/submit?${params.toString()}`, {})
     },
     onSuccess: () => {
       showToast(t('recordActions.approvalSubmitted'), 'success')
@@ -118,7 +117,7 @@ export function RecordActionsBar({
   const { data: approvalInstances } = useQuery({
     queryKey: ['approval-instances', collectionName, recordId],
     queryFn: async () => {
-      const result = await apiClient.get<ApprovalInstance[]>(`/control/approvals/instances`)
+      const result = await apiClient.getList<ApprovalInstance>(`/api/approval-instances`)
       return result
     },
     enabled: !!collectionName && !!recordId,

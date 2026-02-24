@@ -5,7 +5,7 @@
  */
 
 /**
- * Bootstrap configuration returned from /control/ui-bootstrap
+ * Bootstrap configuration returned from the JSON:API bootstrap endpoint
  */
 export interface BootstrapConfig {
   pages: PageConfig[]

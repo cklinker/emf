@@ -5,7 +5,7 @@
  * Wires together all context providers and configures React Router.
  *
  * Requirements:
- * - 1.1: Fetch bootstrap configuration from /control/ui-bootstrap on startup
+ * - 1.1: Fetch bootstrap configuration from JSON:API bootstrap endpoint on startup
  * - 1.2: Configure application routes based on page definitions
  * - 1.3: Configure navigation menus based on menu definitions
  * - 2.1: Redirect unauthenticated users to OIDC provider login page

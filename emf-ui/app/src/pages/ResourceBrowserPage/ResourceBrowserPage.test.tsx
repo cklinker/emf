@@ -37,7 +37,7 @@ vi.mock('react-router-dom', async () => {
   }
 })
 
-// Mock collection summaries - format matches /control/collections/summary API response
+// Mock collection summaries - format matches /api/collections API response
 // The summary endpoint only returns active collections as a flat array
 const mockCollectionSummaries = [
   { id: '1', name: 'users', displayName: 'Users' },

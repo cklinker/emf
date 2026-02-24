@@ -81,18 +81,50 @@ Object.defineProperty(window, 'localStorage', {
 
 // MSW Server setup for API mocking
 // Export the server so tests can add handlers
+// Bootstrap config is now composed from 4 parallel JSON:API calls
 export const server = setupServer(
-  // Default handler for bootstrap config
-  http.get('/control/ui-bootstrap', () => {
+  // Default handler for ui-pages
+  http.get('*/api/ui-pages', () => {
     return HttpResponse.json({
-      oidcProviders: [
+      data: [],
+      metadata: { totalCount: 0, currentPage: 0, pageSize: 500, totalPages: 0 },
+    })
+  }),
+  // Default handler for ui-menus
+  http.get('*/api/ui-menus', () => {
+    return HttpResponse.json({
+      data: [],
+      metadata: { totalCount: 0, currentPage: 0, pageSize: 500, totalPages: 0 },
+    })
+  }),
+  // Default handler for oidc-providers
+  http.get('*/api/oidc-providers', () => {
+    return HttpResponse.json({
+      data: [
         {
+          type: 'oidc-providers',
           id: 'test-provider',
-          name: 'Test Provider',
-          issuer: 'https://test.example.com',
-          clientId: 'test-client-id',
+          attributes: {
+            name: 'Test Provider',
+            issuer: 'https://test.example.com',
+            clientId: 'test-client-id',
+          },
         },
       ],
+      metadata: { totalCount: 1, currentPage: 0, pageSize: 100, totalPages: 1 },
+    })
+  }),
+  // Default handler for tenants
+  http.get('*/api/tenants', () => {
+    return HttpResponse.json({
+      data: [
+        {
+          type: 'tenants',
+          id: 'tenant-1',
+          attributes: { slug: 'default', name: 'Default Tenant' },
+        },
+      ],
+      metadata: { totalCount: 1, currentPage: 0, pageSize: 1, totalPages: 1 },
     })
   })
 )

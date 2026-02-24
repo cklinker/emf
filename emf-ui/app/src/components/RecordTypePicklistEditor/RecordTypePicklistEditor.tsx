@@ -62,8 +62,8 @@ export function RecordTypePicklistEditor({
   const { data: existingOverrides = [], isLoading: loadingOverrides } = useQuery({
     queryKey: ['record-type-picklist-overrides', recordType.id],
     queryFn: () =>
-      apiClient.get<RecordTypePicklistOverride[]>(
-        `/control/collections/${collectionId}/record-types/${recordType.id}/picklists`
+      apiClient.getList<RecordTypePicklistOverride>(
+        `/api/record-type-picklist-values?filter[recordTypeId][eq]=${recordType.id}`
       ),
   })
 
@@ -75,8 +75,8 @@ export function RecordTypePicklistEditor({
       await Promise.all(
         picklistFields.map(async (field) => {
           try {
-            const values = await apiClient.get<PicklistValue[]>(
-              `/control/picklists/fields/${field.id}/values`
+            const values = await apiClient.getList<PicklistValue>(
+              `/api/picklist-values?filter[fieldId][eq]=${field.id}&filter[source][eq]=FIELD`
             )
             results[field.id] = values
           } catch {
@@ -223,16 +223,16 @@ export function RecordTypePicklistEditor({
           // All values selected with no default — remove override if it existed
           if (state.hasExistingOverride) {
             operations.push(
-              apiClient.delete(
-                `/control/collections/${collectionId}/record-types/${recordType.id}/picklists/${fieldId}`
+              apiClient.deleteResource(
+                `/api/record-type-picklist-values?filter[recordTypeId][eq]=${recordType.id}&filter[fieldId][eq]=${fieldId}`
               )
             )
           }
         } else if (state.checkedValues.size > 0) {
           // Some values selected (or has a default value) — set/update override
           operations.push(
-            apiClient.put(
-              `/control/collections/${collectionId}/record-types/${recordType.id}/picklists/${fieldId}`,
+            apiClient.putResource(
+              `/api/record-type-picklist-values?filter[recordTypeId][eq]=${recordType.id}&filter[fieldId][eq]=${fieldId}`,
               {
                 availableValues: Array.from(state.checkedValues),
                 defaultValue: state.defaultValue || null,

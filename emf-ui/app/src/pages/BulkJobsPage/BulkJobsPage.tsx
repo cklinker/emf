@@ -328,7 +328,8 @@ export function BulkJobsPage({ testId = 'bulk-jobs-page' }: BulkJobsPageProps): 
   })
 
   const abortMutation = useMutation({
-    mutationFn: (id: string) => apiClient.post<void>(`/control/bulk-jobs/${id}/actions/abort`, {}),
+    mutationFn: (id: string) =>
+      apiClient.patchResource<void>(`/api/bulk-jobs/${id}`, { status: 'ABORTED' }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bulk-jobs'] })
       showToast('Bulk job aborted successfully', 'success')

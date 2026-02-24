@@ -255,7 +255,7 @@ export function PermissionSetsPage({
     refetch,
   } = useQuery({
     queryKey: ['permission-sets'],
-    queryFn: () => apiClient.get<PermissionSet[]>('/control/permission-sets'),
+    queryFn: () => apiClient.getList<PermissionSet>('/api/permission-sets'),
   })
 
   const permissionSetList = permissionSets ?? []
@@ -263,7 +263,7 @@ export function PermissionSetsPage({
   // Mutations
   const createMutation = useMutation({
     mutationFn: (data: PermissionSetFormData) =>
-      apiClient.post<PermissionSet>('/control/permission-sets', data),
+      apiClient.postResource<PermissionSet>('/api/permission-sets', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['permission-sets'] })
       showToast('Permission set created successfully', 'success')
@@ -276,7 +276,7 @@ export function PermissionSetsPage({
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: PermissionSetFormData }) =>
-      apiClient.put<PermissionSet>(`/control/permission-sets/${id}`, data),
+      apiClient.putResource<PermissionSet>(`/api/permission-sets/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['permission-sets'] })
       showToast('Permission set updated successfully', 'success')
@@ -288,7 +288,7 @@ export function PermissionSetsPage({
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiClient.delete(`/control/permission-sets/${id}`),
+    mutationFn: (id: string) => apiClient.deleteResource(`/api/permission-sets/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['permission-sets'] })
       showToast('Permission set deleted successfully', 'success')
@@ -302,7 +302,7 @@ export function PermissionSetsPage({
 
   const cloneMutation = useMutation({
     mutationFn: (id: string) =>
-      apiClient.post<PermissionSet>(`/control/permission-sets/${id}/clone`, {}),
+      apiClient.postResource<PermissionSet>(`/api/permission-sets/${id}/clone`, {}),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['permission-sets'] })
       showToast('Permission set cloned successfully', 'success')

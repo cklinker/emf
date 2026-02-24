@@ -166,7 +166,7 @@ const mockMigrationDetails = {
   completedAt: '2024-01-15T10:30:10Z',
 }
 
-// Mock collection summaries (returned by /control/collections/summary)
+// Mock collection summaries (returned by /api/collections)
 const mockCollectionSummaries = [
   { id: 'col-1', name: 'users', displayName: 'Users' },
   { id: 'col-2', name: 'products', displayName: 'Products' },
@@ -248,7 +248,7 @@ const mockMigrationPlan = {
 // Helper to setup Axios mocks for all endpoints
 function setupAxiosMocks(overrides: Record<string, unknown> = {}) {
   mockAxios.get.mockImplementation((url: string) => {
-    if (url.match(/\/control\/migrations\/[^/]+$/) && !url.endsWith('/control/migrations')) {
+    if (url.match(/\/api\/migrations\/[^/]+$/) && !url.endsWith('/api/migrations')) {
       const id = url.split('/').pop()
       if (overrides.details) {
         return Promise.resolve({ data: overrides.details })
@@ -259,14 +259,13 @@ function setupAxiosMocks(overrides: Record<string, unknown> = {}) {
       }
       return Promise.resolve({ data: mockMigrationDetails })
     }
-    if (url.includes('/control/migrations')) {
+    if (url.includes('/api/migrations')) {
       return Promise.resolve({ data: overrides.history ?? mockMigrationHistory })
     }
-    if (url.match(/\/control\/collections\/[^/]+\/versions/)) {
-      const parts = url.split('/')
-      const idIndex = parts.indexOf('collections') + 1
-      const id = parts[idIndex]
-      const collection = mockCollections.find((c) => c.id === id)
+    if (url.includes('/api/collection-versions')) {
+      const idMatch = url.match(/filter\[collectionId\]\[eq\]=([^&]+)/)
+      const id = idMatch ? idMatch[1] : undefined
+      const collection = id ? mockCollections.find((c) => c.id === id) : undefined
       if (collection && collection.availableVersions) {
         return Promise.resolve({
           data: collection.availableVersions.map((v: number) => ({ version: v })),
@@ -274,12 +273,7 @@ function setupAxiosMocks(overrides: Record<string, unknown> = {}) {
       }
       return Promise.resolve({ data: [] })
     }
-    if (url.includes('/control/collections/summary')) {
-      return Promise.resolve({
-        data: overrides.collections ?? mockCollectionSummaries,
-      })
-    }
-    if (url.includes('/control/collections')) {
+    if (url.includes('/api/collections')) {
       return Promise.resolve({
         data: overrides.collections ?? mockCollectionSummaries,
       })
@@ -288,13 +282,17 @@ function setupAxiosMocks(overrides: Record<string, unknown> = {}) {
   })
 
   mockAxios.post.mockImplementation((url: string, body?: unknown) => {
-    if (url.includes('/control/migrations/plan')) {
+    if (url.includes('/api/migrations/plan')) {
       if (overrides.planError) {
         return Promise.reject(createAxiosError(500))
       }
-      const typedBody = body as { collectionId: string; targetVersion: number } | undefined
-      const collection = typedBody
-        ? mockCollections.find((c) => c.id === typedBody.collectionId)
+      // postResource wraps body as { data: { type, attributes: { collectionId, targetVersion } } }
+      const wrappedBody = body as
+        | { data?: { attributes?: { collectionId?: string; targetVersion?: number } } }
+        | undefined
+      const attrs = wrappedBody?.data?.attributes
+      const collection = attrs
+        ? mockCollections.find((c) => c.id === attrs.collectionId)
         : undefined
       if (overrides.plan) {
         return Promise.resolve({ data: overrides.plan })
@@ -302,17 +300,17 @@ function setupAxiosMocks(overrides: Record<string, unknown> = {}) {
       return Promise.resolve({
         data: {
           ...mockMigrationPlan,
-          collectionId: typedBody?.collectionId ?? mockMigrationPlan.collectionId,
+          collectionId: attrs?.collectionId ?? mockMigrationPlan.collectionId,
           collectionName: collection?.displayName || collection?.name || 'Unknown',
           fromVersion: collection?.currentVersion || 1,
-          toVersion: typedBody?.targetVersion ?? mockMigrationPlan.toVersion,
+          toVersion: attrs?.targetVersion ?? mockMigrationPlan.toVersion,
         },
       })
     }
-    if (url.match(/\/control\/migrations\/[^/]+\/rollback/)) {
+    if (url.match(/\/api\/migrations\/[^/]+\/rollback/)) {
       return Promise.resolve({ data: {} })
     }
-    if (url.includes('/control/migrations/execute')) {
+    if (url.includes('/api/migrations/execute')) {
       return Promise.resolve({ data: {} })
     }
     return Promise.resolve({ data: {} })
@@ -447,13 +445,10 @@ describe('MigrationsPage', () => {
 
     it('displays empty state when no migrations', async () => {
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/migrations')) {
+        if (url.includes('/api/migrations')) {
           return Promise.resolve({ data: [] })
         }
-        if (url.includes('/control/collections/summary')) {
-          return Promise.resolve({ data: mockCollectionSummaries })
-        }
-        if (url.includes('/control/collections')) {
+        if (url.includes('/api/collections')) {
           return Promise.resolve({ data: mockCollectionSummaries })
         }
         return Promise.resolve({ data: {} })
@@ -627,13 +622,10 @@ describe('MigrationsPage', () => {
   describe('Error Handling', () => {
     it('handles history fetch error', async () => {
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/migrations')) {
+        if (url.includes('/api/migrations')) {
           return Promise.reject(createAxiosError(500))
         }
-        if (url.includes('/control/collections/summary')) {
-          return Promise.resolve({ data: mockCollectionSummaries })
-        }
-        if (url.includes('/control/collections')) {
+        if (url.includes('/api/collections')) {
           return Promise.resolve({ data: mockCollectionSummaries })
         }
         return Promise.resolve({ data: {} })
@@ -648,17 +640,16 @@ describe('MigrationsPage', () => {
 
     it('handles details fetch error', async () => {
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.match(/\/control\/migrations\/[^/]+$/) && !url.endsWith('/control/migrations')) {
+        if (url.match(/\/api\/migrations\/[^/]+$/) && !url.endsWith('/api/migrations')) {
           return Promise.reject(createAxiosError(500))
         }
-        if (url.includes('/control/migrations')) {
+        if (url.includes('/api/migrations')) {
           return Promise.resolve({ data: mockMigrationHistory })
         }
-        if (url.match(/\/control\/collections\/[^/]+\/versions/)) {
-          const parts = url.split('/')
-          const idIndex = parts.indexOf('collections') + 1
-          const id = parts[idIndex]
-          const collection = mockCollections.find((c) => c.id === id)
+        if (url.includes('/api/collection-versions')) {
+          const idMatch = url.match(/filter\[collectionId\]\[eq\]=([^&]+)/)
+          const id = idMatch ? idMatch[1] : undefined
+          const collection = id ? mockCollections.find((c) => c.id === id) : undefined
           if (collection && collection.availableVersions) {
             return Promise.resolve({
               data: collection.availableVersions.map((v: number) => ({ version: v })),
@@ -666,10 +657,7 @@ describe('MigrationsPage', () => {
           }
           return Promise.resolve({ data: [] })
         }
-        if (url.includes('/control/collections/summary')) {
-          return Promise.resolve({ data: mockCollectionSummaries })
-        }
-        if (url.includes('/control/collections')) {
+        if (url.includes('/api/collections')) {
           return Promise.resolve({ data: mockCollectionSummaries })
         }
         return Promise.resolve({ data: {} })
@@ -697,13 +685,10 @@ describe('MigrationsPage', () => {
 
     it('displays retry button on error', async () => {
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/migrations')) {
+        if (url.includes('/api/migrations')) {
           return Promise.reject(createAxiosError(500))
         }
-        if (url.includes('/control/collections/summary')) {
-          return Promise.resolve({ data: mockCollectionSummaries })
-        }
-        if (url.includes('/control/collections')) {
+        if (url.includes('/api/collections')) {
           return Promise.resolve({ data: mockCollectionSummaries })
         }
         return Promise.resolve({ data: {} })
@@ -1313,13 +1298,13 @@ describe('MigrationsPage', () => {
 
     it('handles collections fetch error in planning form', async () => {
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/collections/summary')) {
+        if (url.includes('/api/collections')) {
           return Promise.reject(createAxiosError(500))
         }
-        if (url.includes('/control/collections')) {
+        if (url.includes('/api/collections')) {
           return Promise.reject(createAxiosError(500))
         }
-        if (url.includes('/control/migrations')) {
+        if (url.includes('/api/migrations')) {
           return Promise.resolve({ data: mockMigrationHistory })
         }
         return Promise.resolve({ data: {} })
@@ -1440,7 +1425,7 @@ describe('MigrationsPage', () => {
       } = {}
     ) {
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.match(/\/control\/migrations\/[^/]+$/) && !url.endsWith('/control/migrations')) {
+        if (url.match(/\/api\/migrations\/[^/]+$/) && !url.endsWith('/api/migrations')) {
           const id = url.split('/').pop()
           if (id === 'run-new-1') {
             switch (options.runStatus) {
@@ -1457,14 +1442,13 @@ describe('MigrationsPage', () => {
           const migration = mockMigrationHistory.find((m) => m.id === id)
           return Promise.resolve({ data: migration || mockMigrationDetails })
         }
-        if (url.includes('/control/migrations')) {
+        if (url.includes('/api/migrations')) {
           return Promise.resolve({ data: mockMigrationHistory })
         }
-        if (url.match(/\/control\/collections\/[^/]+\/versions/)) {
-          const parts = url.split('/')
-          const idIndex = parts.indexOf('collections') + 1
-          const id = parts[idIndex]
-          const collection = mockCollections.find((c) => c.id === id)
+        if (url.includes('/api/collection-versions')) {
+          const idMatch = url.match(/filter\[collectionId\]\[eq\]=([^&]+)/)
+          const id = idMatch ? idMatch[1] : undefined
+          const collection = id ? mockCollections.find((c) => c.id === id) : undefined
           if (collection && collection.availableVersions) {
             return Promise.resolve({
               data: collection.availableVersions.map((v: number) => ({ version: v })),
@@ -1472,26 +1456,23 @@ describe('MigrationsPage', () => {
           }
           return Promise.resolve({ data: [] })
         }
-        if (url.includes('/control/collections/summary')) {
-          return Promise.resolve({ data: mockCollectionSummaries })
-        }
-        if (url.includes('/control/collections')) {
+        if (url.includes('/api/collections')) {
           return Promise.resolve({ data: mockCollectionSummaries })
         }
         return Promise.resolve({ data: {} })
       })
 
       mockAxios.post.mockImplementation((url: string) => {
-        if (url.includes('/control/migrations/plan')) {
+        if (url.includes('/api/migrations/plan')) {
           return Promise.resolve({ data: mockMigrationPlan })
         }
-        if (url.includes('/control/migrations/execute')) {
+        if (url.includes('/api/migrations/execute')) {
           if (options.executeError) {
             return Promise.reject(createAxiosError(500, { message: 'Failed to start migration' }))
           }
           return Promise.resolve({ data: mockExecutionResponse })
         }
-        if (url.match(/\/control\/migrations\/[^/]+\/rollback/)) {
+        if (url.match(/\/api\/migrations\/[^/]+\/rollback/)) {
           if (options.rollbackError) {
             return Promise.reject(createAxiosError(500, { message: 'Rollback failed' }))
           }
@@ -1792,7 +1773,7 @@ describe('MigrationsPage', () => {
       let rollbackCalled = false
 
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.match(/\/control\/migrations\/[^/]+$/) && !url.endsWith('/control/migrations')) {
+        if (url.match(/\/api\/migrations\/[^/]+$/) && !url.endsWith('/api/migrations')) {
           const id = url.split('/').pop()
           if (id === 'run-new-1') {
             if (rollbackCalled) {
@@ -1803,14 +1784,13 @@ describe('MigrationsPage', () => {
           const migration = mockMigrationHistory.find((m) => m.id === id)
           return Promise.resolve({ data: migration || mockMigrationDetails })
         }
-        if (url.includes('/control/migrations')) {
+        if (url.includes('/api/migrations')) {
           return Promise.resolve({ data: mockMigrationHistory })
         }
-        if (url.match(/\/control\/collections\/[^/]+\/versions/)) {
-          const parts = url.split('/')
-          const idIndex = parts.indexOf('collections') + 1
-          const id = parts[idIndex]
-          const collection = mockCollections.find((c) => c.id === id)
+        if (url.includes('/api/collection-versions')) {
+          const idMatch = url.match(/filter\[collectionId\]\[eq\]=([^&]+)/)
+          const cvId = idMatch ? idMatch[1] : undefined
+          const collection = cvId ? mockCollections.find((c) => c.id === cvId) : undefined
           if (collection && collection.availableVersions) {
             return Promise.resolve({
               data: collection.availableVersions.map((v: number) => ({ version: v })),
@@ -1818,23 +1798,20 @@ describe('MigrationsPage', () => {
           }
           return Promise.resolve({ data: [] })
         }
-        if (url.includes('/control/collections/summary')) {
-          return Promise.resolve({ data: mockCollectionSummaries })
-        }
-        if (url.includes('/control/collections')) {
+        if (url.includes('/api/collections')) {
           return Promise.resolve({ data: mockCollectionSummaries })
         }
         return Promise.resolve({ data: {} })
       })
 
       mockAxios.post.mockImplementation((url: string) => {
-        if (url.includes('/control/migrations/plan')) {
+        if (url.includes('/api/migrations/plan')) {
           return Promise.resolve({ data: mockMigrationPlan })
         }
-        if (url.includes('/control/migrations/execute')) {
+        if (url.includes('/api/migrations/execute')) {
           return Promise.resolve({ data: mockExecutionResponse })
         }
-        if (url.match(/\/control\/migrations\/[^/]+\/rollback/)) {
+        if (url.match(/\/api\/migrations\/[^/]+\/rollback/)) {
           rollbackCalled = true
           return Promise.resolve({ data: mockRolledBackMigration })
         }

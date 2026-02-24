@@ -320,7 +320,7 @@ export function SetupHomePage({ testId = 'setup-home-page' }: SetupHomePageProps
 
   const { data: usersData } = useQuery({
     queryKey: ['setup-stats-users'],
-    queryFn: () => apiClient.get<unknown>('/control/users?size=1'),
+    queryFn: () => apiClient.getPage<unknown>('/api/users?page[size]=1'),
     staleTime: 300000,
   })
 

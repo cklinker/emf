@@ -218,7 +218,7 @@ export function ActivityTimeline({
     queryKey: ['activity-approvals', collectionId, recordId],
     queryFn: async () => {
       try {
-        const instances = await apiClient.get<ApprovalInstance[]>(`/control/approvals/instances`)
+        const instances = await apiClient.getList<ApprovalInstance>(`/api/approval-instances`)
         // Filter client-side for instances matching this record
         return (instances || []).filter((instance) => instance.recordId === recordId)
       } catch {
@@ -234,8 +234,8 @@ export function ActivityTimeline({
     queryKey: ['activity-shares', collectionId, recordId],
     queryFn: async () => {
       try {
-        const result = await apiClient.get<RecordShare[]>(
-          `/control/sharing/records/${collectionId}/${recordId}`
+        const result = await apiClient.getList<RecordShare>(
+          `/api/record-shares?filter[collectionId][eq]=${collectionId}&filter[recordId][eq]=${recordId}`
         )
         return result || []
       } catch {

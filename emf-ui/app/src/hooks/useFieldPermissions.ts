@@ -2,9 +2,8 @@
  * useFieldPermissions Hook
  *
  * Returns field-level visibility for each field in a collection.
- * Fetches the current user's effective field permissions from the
- * control plane. Falls back to all-visible defaults when the
- * endpoint is unavailable.
+ * Returns all-visible defaults since the permissions endpoint
+ * is not yet available via JSON:API. Falls back gracefully.
  *
  * Field visibility values:
  * - VISIBLE: field is shown and editable
@@ -14,8 +13,6 @@
 
 import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { useApi } from '@/context/ApiContext'
-import type { ApiClient } from '@/services/apiClient'
 
 /**
  * Field visibility level.
@@ -48,20 +45,12 @@ interface FieldPermissionResponse {
 
 /**
  * Fetch effective field permissions for the current user on a collection.
+ * Returns empty array (all fields visible) — permissions endpoint
+ * is not yet available via JSON:API.
  */
-async function fetchFieldPermissions(
-  apiClient: ApiClient,
-  collectionName: string
-): Promise<FieldPermissionResponse[]> {
-  try {
-    const response = await apiClient.get<FieldPermissionResponse[]>(
-      `/control/my-permissions/fields/${encodeURIComponent(collectionName)}`
-    )
-    return Array.isArray(response) ? response : []
-  } catch {
-    // Endpoint not yet implemented — return empty (all fields default to VISIBLE)
-    return []
-  }
+async function fetchFieldPermissions(): Promise<FieldPermissionResponse[]> {
+  // Permissions are not yet available via JSON:API — return empty (all fields default to VISIBLE)
+  return []
 }
 
 /**
@@ -71,11 +60,9 @@ async function fetchFieldPermissions(
  * @returns Field permission map and helper functions
  */
 export function useFieldPermissions(collectionName: string | undefined): UseFieldPermissionsReturn {
-  const { apiClient } = useApi()
-
   const { data, isLoading, error } = useQuery({
     queryKey: ['field-permissions', collectionName],
-    queryFn: () => fetchFieldPermissions(apiClient, collectionName!),
+    queryFn: () => fetchFieldPermissions(),
     enabled: !!collectionName,
     staleTime: 5 * 60 * 1000, // 5 minutes
     retry: false,

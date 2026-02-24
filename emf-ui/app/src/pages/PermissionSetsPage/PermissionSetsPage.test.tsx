@@ -59,6 +59,33 @@ const mockPermissionSets = [
   },
 ]
 
+/** Wrap flat objects into JSON:API list response format for mockAxios */
+function jsonApiList(items: typeof mockPermissionSets) {
+  return {
+    data: {
+      data: items.map((item) => ({
+        type: 'permission-sets',
+        id: item.id,
+        attributes: { ...item, id: undefined },
+      })),
+      metadata: { totalCount: items.length, currentPage: 0, pageSize: 20, totalPages: 1 },
+    },
+  }
+}
+
+/** Wrap a flat object into JSON:API single response format for mockAxios */
+function jsonApiSingle(item: Record<string, unknown>) {
+  return {
+    data: {
+      data: {
+        type: 'permission-sets',
+        id: item.id,
+        attributes: { ...item, id: undefined },
+      },
+    },
+  }
+}
+
 describe('PermissionSetsPage', () => {
   let cleanupAuthMocks: () => void
 
@@ -88,7 +115,7 @@ describe('PermissionSetsPage', () => {
   })
 
   it('renders empty state when no permission sets', async () => {
-    mockAxios.get.mockResolvedValueOnce({ data: [] })
+    mockAxios.get.mockResolvedValueOnce(jsonApiList([]))
     render(<PermissionSetsPage />, { wrapper: createTestWrapper() })
     await waitFor(() => {
       expect(screen.getByText('No permission sets found')).toBeInTheDocument()
@@ -96,7 +123,7 @@ describe('PermissionSetsPage', () => {
   })
 
   it('renders permission sets list with correct data', async () => {
-    mockAxios.get.mockResolvedValueOnce({ data: mockPermissionSets })
+    mockAxios.get.mockResolvedValueOnce(jsonApiList(mockPermissionSets))
     render(<PermissionSetsPage />, { wrapper: createTestWrapper() })
     await waitFor(() => {
       expect(screen.getByText('System Admin')).toBeInTheDocument()
@@ -108,7 +135,7 @@ describe('PermissionSetsPage', () => {
   })
 
   it('shows system badge for system permission sets', async () => {
-    mockAxios.get.mockResolvedValueOnce({ data: mockPermissionSets })
+    mockAxios.get.mockResolvedValueOnce(jsonApiList(mockPermissionSets))
     render(<PermissionSetsPage />, { wrapper: createTestWrapper() })
     await waitFor(() => {
       expect(screen.getByText('System Admin')).toBeInTheDocument()
@@ -119,7 +146,7 @@ describe('PermissionSetsPage', () => {
   })
 
   it('does not show edit/delete buttons for system permission sets', async () => {
-    mockAxios.get.mockResolvedValueOnce({ data: mockPermissionSets })
+    mockAxios.get.mockResolvedValueOnce(jsonApiList(mockPermissionSets))
     render(<PermissionSetsPage />, { wrapper: createTestWrapper() })
     await waitFor(() => {
       expect(screen.getByText('System Admin')).toBeInTheDocument()
@@ -130,7 +157,7 @@ describe('PermissionSetsPage', () => {
   })
 
   it('shows edit/delete buttons for non-system permission sets', async () => {
-    mockAxios.get.mockResolvedValueOnce({ data: mockPermissionSets })
+    mockAxios.get.mockResolvedValueOnce(jsonApiList(mockPermissionSets))
     render(<PermissionSetsPage />, { wrapper: createTestWrapper() })
     await waitFor(() => {
       expect(screen.getByText('Report Manager')).toBeInTheDocument()
@@ -141,7 +168,7 @@ describe('PermissionSetsPage', () => {
 
   it('opens create modal when New Permission Set button is clicked', async () => {
     const user = userEvent.setup()
-    mockAxios.get.mockResolvedValueOnce({ data: mockPermissionSets })
+    mockAxios.get.mockResolvedValueOnce(jsonApiList(mockPermissionSets))
     render(<PermissionSetsPage />, { wrapper: createTestWrapper() })
     await waitFor(() => {
       expect(screen.getByText('System Admin')).toBeInTheDocument()
@@ -154,7 +181,7 @@ describe('PermissionSetsPage', () => {
 
   it('validates required name field on create', async () => {
     const user = userEvent.setup()
-    mockAxios.get.mockResolvedValueOnce({ data: mockPermissionSets })
+    mockAxios.get.mockResolvedValueOnce(jsonApiList(mockPermissionSets))
     render(<PermissionSetsPage />, { wrapper: createTestWrapper() })
     await waitFor(() => {
       expect(screen.getByText('System Admin')).toBeInTheDocument()
@@ -168,11 +195,11 @@ describe('PermissionSetsPage', () => {
 
   it('submits create form successfully', async () => {
     const user = userEvent.setup()
-    mockAxios.get.mockResolvedValueOnce({ data: mockPermissionSets })
-    mockAxios.post.mockResolvedValueOnce({
-      data: { id: 'ps4', name: 'New PS', description: 'Test', system: false },
-    })
-    mockAxios.get.mockResolvedValueOnce({ data: mockPermissionSets })
+    mockAxios.get.mockResolvedValueOnce(jsonApiList(mockPermissionSets))
+    mockAxios.post.mockResolvedValueOnce(
+      jsonApiSingle({ id: 'ps4', name: 'New PS', description: 'Test', system: false })
+    )
+    mockAxios.get.mockResolvedValueOnce(jsonApiList(mockPermissionSets))
     render(<PermissionSetsPage />, { wrapper: createTestWrapper() })
     await waitFor(() => {
       expect(screen.getByText('System Admin')).toBeInTheDocument()
@@ -182,16 +209,21 @@ describe('PermissionSetsPage', () => {
     await user.type(screen.getByTestId('permission-set-description-input'), 'Test description')
     await user.click(screen.getByTestId('permission-set-form-submit'))
     await waitFor(() => {
-      expect(mockAxios.post).toHaveBeenCalledWith('/control/permission-sets', {
-        name: 'New PS',
-        description: 'Test description',
+      expect(mockAxios.post).toHaveBeenCalledWith('/api/permission-sets', {
+        data: {
+          type: 'permission-sets',
+          attributes: {
+            name: 'New PS',
+            description: 'Test description',
+          },
+        },
       })
     })
   })
 
   it('opens edit modal with pre-filled data', async () => {
     const user = userEvent.setup()
-    mockAxios.get.mockResolvedValueOnce({ data: mockPermissionSets })
+    mockAxios.get.mockResolvedValueOnce(jsonApiList(mockPermissionSets))
     render(<PermissionSetsPage />, { wrapper: createTestWrapper() })
     await waitFor(() => {
       expect(screen.getByText('Report Manager')).toBeInTheDocument()
@@ -206,7 +238,7 @@ describe('PermissionSetsPage', () => {
 
   it('opens delete confirmation dialog', async () => {
     const user = userEvent.setup()
-    mockAxios.get.mockResolvedValueOnce({ data: mockPermissionSets })
+    mockAxios.get.mockResolvedValueOnce(jsonApiList(mockPermissionSets))
     render(<PermissionSetsPage />, { wrapper: createTestWrapper() })
     await waitFor(() => {
       expect(screen.getByText('Report Manager')).toBeInTheDocument()
@@ -218,7 +250,7 @@ describe('PermissionSetsPage', () => {
   })
 
   it('has correct page structure', async () => {
-    mockAxios.get.mockResolvedValueOnce({ data: mockPermissionSets })
+    mockAxios.get.mockResolvedValueOnce(jsonApiList(mockPermissionSets))
     render(<PermissionSetsPage />, { wrapper: createTestWrapper() })
     await waitFor(() => {
       expect(screen.getByText('Permission Sets')).toBeInTheDocument()

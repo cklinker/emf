@@ -113,14 +113,11 @@ export interface PackagesPageProps {
 
 // API functions using apiClient
 async function fetchPackageHistory(apiClient: ApiClient): Promise<Package[]> {
-  return apiClient.get('/control/packages/history')
+  return apiClient.getList('/api/packages/history')
 }
 
 async function fetchRoles(apiClient: ApiClient): Promise<SelectableItem[]> {
-  const data = await apiClient.get<{ content?: Array<{ id: string; name: string }> }>(
-    '/control/roles?size=1000'
-  )
-  const roles = data.content || (data as unknown as Array<{ id: string; name: string }>)
+  const roles = await apiClient.getList<{ id: string; name: string }>('/api/roles?page[size]=1000')
   return roles.map((r: { id: string; name: string }) => ({
     id: r.id,
     name: r.name,
@@ -129,10 +126,9 @@ async function fetchRoles(apiClient: ApiClient): Promise<SelectableItem[]> {
 }
 
 async function fetchPolicies(apiClient: ApiClient): Promise<SelectableItem[]> {
-  const data = await apiClient.get<{ content?: Array<{ id: string; name: string }> }>(
-    '/control/policies?size=1000'
+  const policies = await apiClient.getList<{ id: string; name: string }>(
+    '/api/policies?page[size]=1000'
   )
-  const policies = data.content || (data as unknown as Array<{ id: string; name: string }>)
   return policies.map((p: { id: string; name: string }) => ({
     id: p.id,
     name: p.name,
@@ -141,10 +137,9 @@ async function fetchPolicies(apiClient: ApiClient): Promise<SelectableItem[]> {
 }
 
 async function fetchPages(apiClient: ApiClient): Promise<SelectableItem[]> {
-  const data = await apiClient.get<{ content?: Array<{ id: string; name: string }> }>(
-    '/control/ui/pages?size=1000'
+  const pages = await apiClient.getList<{ id: string; name: string }>(
+    '/api/ui-pages?page[size]=1000'
   )
-  const pages = data.content || (data as unknown as Array<{ id: string; name: string }>)
   return pages.map((p: { id: string; name: string }) => ({
     id: p.id,
     name: p.name,
@@ -153,10 +148,9 @@ async function fetchPages(apiClient: ApiClient): Promise<SelectableItem[]> {
 }
 
 async function fetchMenus(apiClient: ApiClient): Promise<SelectableItem[]> {
-  const data = await apiClient.get<{ content?: Array<{ id: string; name: string }> }>(
-    '/control/ui/menus?size=1000'
+  const menus = await apiClient.getList<{ id: string; name: string }>(
+    '/api/ui-menus?page[size]=1000'
   )
-  const menus = data.content || (data as unknown as Array<{ id: string; name: string }>)
   return menus.map((m: { id: string; name: string }) => ({
     id: m.id,
     name: m.name,
@@ -165,13 +159,13 @@ async function fetchMenus(apiClient: ApiClient): Promise<SelectableItem[]> {
 }
 
 async function exportPackage(apiClient: ApiClient, options: ExportOptions): Promise<Blob> {
-  return apiClient.post('/control/packages/export', options, { responseType: 'blob' })
+  return apiClient.postResource('/api/packages/export', options, { responseType: 'blob' })
 }
 
 async function previewImport(apiClient: ApiClient, file: File): Promise<ImportPreview> {
   const formData = new FormData()
   formData.append('file', file)
-  return apiClient.post('/control/packages/import/preview', formData)
+  return apiClient.postResource('/api/packages/import/preview', formData)
 }
 
 async function executeImport(
@@ -182,7 +176,7 @@ async function executeImport(
   const formData = new FormData()
   formData.append('file', file)
   formData.append('dryRun', String(dryRun))
-  return apiClient.post('/control/packages/import', formData)
+  return apiClient.postResource('/api/packages/import', formData)
 }
 
 /**

@@ -436,7 +436,7 @@ describe('MenuBuilderPage', () => {
   describe('Menu Editor', () => {
     beforeEach(() => {
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/authz/policies')) {
+        if (url.includes('/api/policies')) {
           return Promise.resolve({
             data: {
               content: mockPolicies,
@@ -447,7 +447,7 @@ describe('MenuBuilderPage', () => {
             },
           })
         }
-        if (url.includes('/control/policies')) {
+        if (url.includes('/api/policies')) {
           return Promise.resolve({ data: mockPolicies })
         }
         return Promise.resolve({ data: mockMenus })
@@ -510,7 +510,7 @@ describe('MenuBuilderPage', () => {
   describe('Menu Tree View', () => {
     beforeEach(() => {
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/authz/policies')) {
+        if (url.includes('/api/policies')) {
           return Promise.resolve({
             data: {
               content: mockPolicies,
@@ -521,7 +521,7 @@ describe('MenuBuilderPage', () => {
             },
           })
         }
-        if (url.includes('/control/policies')) {
+        if (url.includes('/api/policies')) {
           return Promise.resolve({ data: mockPolicies })
         }
         return Promise.resolve({ data: mockMenus })
@@ -580,7 +580,7 @@ describe('MenuBuilderPage', () => {
   describe('Add Menu Item', () => {
     beforeEach(() => {
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/authz/policies')) {
+        if (url.includes('/api/policies')) {
           return Promise.resolve({
             data: {
               content: mockPolicies,
@@ -591,7 +591,7 @@ describe('MenuBuilderPage', () => {
             },
           })
         }
-        if (url.includes('/control/policies')) {
+        if (url.includes('/api/policies')) {
           return Promise.resolve({ data: mockPolicies })
         }
         return Promise.resolve({ data: mockMenus })
@@ -686,7 +686,7 @@ describe('MenuBuilderPage', () => {
   describe('Menu Preview', () => {
     beforeEach(() => {
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/authz/policies')) {
+        if (url.includes('/api/policies')) {
           return Promise.resolve({
             data: {
               content: mockPolicies,
@@ -697,7 +697,7 @@ describe('MenuBuilderPage', () => {
             },
           })
         }
-        if (url.includes('/control/policies')) {
+        if (url.includes('/api/policies')) {
           return Promise.resolve({ data: mockPolicies })
         }
         return Promise.resolve({ data: mockMenus })
@@ -739,7 +739,7 @@ describe('MenuBuilderPage', () => {
   describe('Save Menu', () => {
     beforeEach(() => {
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/authz/policies')) {
+        if (url.includes('/api/policies')) {
           return Promise.resolve({
             data: {
               content: mockPolicies,
@@ -750,7 +750,7 @@ describe('MenuBuilderPage', () => {
             },
           })
         }
-        if (url.includes('/control/policies')) {
+        if (url.includes('/api/policies')) {
           return Promise.resolve({ data: mockPolicies })
         }
         return Promise.resolve({ data: mockMenus })
@@ -803,7 +803,7 @@ describe('MenuBuilderPage', () => {
 
     it('should save menu when save button is clicked', async () => {
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/authz/policies')) {
+        if (url.includes('/api/policies')) {
           return Promise.resolve({
             data: {
               content: mockPolicies,
@@ -814,7 +814,7 @@ describe('MenuBuilderPage', () => {
             },
           })
         }
-        if (url.includes('/control/policies')) {
+        if (url.includes('/api/policies')) {
           return Promise.resolve({ data: mockPolicies })
         }
         return Promise.resolve({ data: mockMenus })
@@ -860,7 +860,7 @@ describe('MenuBuilderPage', () => {
     beforeEach(() => {
       mockAxios.get.mockImplementation((url: string) => {
         // Check for policies endpoint first (more specific)
-        if (url.includes('/control/policies')) {
+        if (url.includes('/api/policies')) {
           return Promise.resolve({ data: mockPolicies })
         }
         // Default to menus list
@@ -1018,7 +1018,7 @@ describe('MenuBuilderPage', () => {
     it('should display no policies message when no policies available', async () => {
       mockAxios.get.mockImplementation((url: string) => {
         // Check for policies endpoint first - return empty array
-        if (url.includes('/control/policies')) {
+        if (url.includes('/api/policies')) {
           return Promise.resolve({ data: [] })
         }
         // Default to menus list
@@ -1058,7 +1058,7 @@ describe('MenuBuilderPage', () => {
     beforeEach(() => {
       mockAxios.get.mockImplementation((url: string) => {
         // Check for policies endpoint first (more specific)
-        if (url.includes('/control/policies')) {
+        if (url.includes('/api/policies')) {
           return Promise.resolve({ data: mockPolicies })
         }
         // Default to menus list

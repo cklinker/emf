@@ -71,11 +71,11 @@ export function useLookupDisplayMap(
         Array.from(targetGroupMap.entries()).map(async ([targetCollectionId, groupFields]) => {
           try {
             // Fetch target collection schema to determine display field and name
-            const targetSchema = await apiClient.get<{
+            const targetSchema = await apiClient.getOne<{
               name: string
               displayFieldName?: string
               fields?: Array<{ name: string; type: string }>
-            }>(`/control/collections/${targetCollectionId}`)
+            }>(`/api/collections/${targetCollectionId}`)
             const targetName = targetSchema.name
 
             // Track target collection name for each field (useful for building links)

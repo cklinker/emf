@@ -27,6 +27,18 @@ import type { AxiosInstance } from 'axios'
 import axios from 'axios'
 
 /**
+ * Paginated response compatible with JSON:API metadata format.
+ * Maps JSON:API pagination metadata to a flat page structure.
+ */
+export interface PageResponse<T> {
+  content: T[]
+  totalElements: number
+  totalPages: number
+  size: number
+  number: number
+}
+
+/**
  * Structured field-level error from the API
  */
 export interface ApiFieldError {
@@ -239,9 +251,9 @@ function isAlreadyWrapped(data: unknown): boolean {
  * JSON:API wrapping/unwrapping — they return raw response.data. This
  * ensures compatibility with existing hooks that handle JSON:API themselves.
  *
- * The convenience methods (getList, getOne, postResource, putResource,
- * patchResource) DO perform JSON:API wrapping/unwrapping, for use by
- * pages migrated from /control/ to /api/.
+ * The convenience methods (getList, getOne, getPage, postResource,
+ * putResource, patchResource, deleteResource) DO perform JSON:API
+ * wrapping/unwrapping for /api/ routes.
  */
 export class ApiClient {
   private axios: AxiosInstance
@@ -330,7 +342,6 @@ export class ApiClient {
 
   // ---------------------------------------------------------------------------
   // JSON:API convenience methods — auto-wrap/unwrap for /api/ routes
-  // Used by pages migrated from /control/ to /api/.
   // ---------------------------------------------------------------------------
 
   /**
@@ -354,6 +365,41 @@ export class ApiClient {
     try {
       const response = await this.axios.get(url)
       return unwrapJsonApiSingle<T>(response.data)
+    } catch (error) {
+      throw parseAxiosError(error)
+    }
+  }
+
+  /**
+   * GET a paginated list of resources from a JSON:API endpoint.
+   * Unwraps JSON:API list format and maps metadata to PageResponse<T>.
+   */
+  async getPage<T = unknown>(url: string): Promise<PageResponse<T>> {
+    try {
+      const response = await this.axios.get(url)
+      const items = unwrapJsonApiList<T>(response.data)
+      const meta = (response.data as Record<string, unknown>)?.metadata as
+        | Record<string, number>
+        | undefined
+      return {
+        content: items,
+        totalElements: meta?.totalCount ?? items.length,
+        totalPages: meta?.totalPages ?? 1,
+        size: meta?.pageSize ?? items.length,
+        number: meta?.currentPage ?? 0,
+      }
+    } catch (error) {
+      throw parseAxiosError(error)
+    }
+  }
+
+  /**
+   * DELETE a resource from a JSON:API endpoint.
+   * Returns void (most deletes return 204 No Content).
+   */
+  async deleteResource(url: string): Promise<void> {
+    try {
+      await this.axios.delete(url)
     } catch (error) {
       throw parseAxiosError(error)
     }

@@ -96,7 +96,7 @@ export function PermissionSetDetailPage({
     refetch,
   } = useQuery({
     queryKey: ['permission-set', id],
-    queryFn: () => apiClient.get<PermissionSetDetail>(`/control/permission-sets/${id}`),
+    queryFn: () => apiClient.getOne<PermissionSetDetail>(`/api/permission-sets/${id}`),
     enabled: !!id,
   })
 
@@ -108,7 +108,9 @@ export function PermissionSetDetailPage({
   } = useQuery({
     queryKey: ['permission-set-system-permissions', id],
     queryFn: () =>
-      apiClient.get<PermsetSystemPermission[]>(`/control/permission-sets/${id}/system-permissions`),
+      apiClient.getList<PermsetSystemPermission>(
+        `/api/system-permissions?filter[permissionSetId][eq]=${id}`
+      ),
     enabled: !!id,
   })
 
@@ -116,7 +118,9 @@ export function PermissionSetDetailPage({
   const { data: objectPermissions } = useQuery({
     queryKey: ['permission-set-object-permissions', id],
     queryFn: () =>
-      apiClient.get<PermsetObjectPermission[]>(`/control/permission-sets/${id}/object-permissions`),
+      apiClient.getList<PermsetObjectPermission>(
+        `/api/object-permissions?filter[permissionSetId][eq]=${id}`
+      ),
     enabled: !!id,
   })
 
@@ -126,7 +130,7 @@ export function PermissionSetDetailPage({
   // Fetch assignments
   const { data: assignments } = useQuery({
     queryKey: ['permission-set-assignments', id],
-    queryFn: () => apiClient.get<Assignments>(`/control/permission-sets/${id}/assignments`),
+    queryFn: () => apiClient.getOne<Assignments>(`/api/permission-sets/${id}/assignments`),
     enabled: !!id,
   })
 
@@ -176,7 +180,7 @@ export function PermissionSetDetailPage({
   // Save system permissions mutation
   const savePermissionsMutation = useMutation({
     mutationFn: (permissions: Record<string, boolean>) =>
-      apiClient.put(`/control/permission-sets/${id}/system-permissions`, permissions),
+      apiClient.putResource(`/api/permission-sets/${id}/system-permissions`, permissions),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['permission-set-system-permissions', id] })
       showToast('System permissions saved successfully', 'success')
@@ -189,7 +193,7 @@ export function PermissionSetDetailPage({
 
   // Delete mutation
   const deleteMutation = useMutation({
-    mutationFn: () => apiClient.delete(`/control/permission-sets/${id}`),
+    mutationFn: () => apiClient.deleteResource(`/api/permission-sets/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['permission-sets'] })
       showToast('Permission set deleted successfully', 'success')

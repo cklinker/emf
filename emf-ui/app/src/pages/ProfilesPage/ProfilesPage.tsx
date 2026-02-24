@@ -247,7 +247,7 @@ export function ProfilesPage({ testId = 'profiles-page' }: ProfilesPageProps): R
     refetch,
   } = useQuery({
     queryKey: ['profiles'],
-    queryFn: () => apiClient.get<SecurityProfile[]>('/control/profiles'),
+    queryFn: () => apiClient.get<SecurityProfile[]>('/api/profiles'),
   })
 
   const profileList = profiles ?? []
@@ -255,7 +255,7 @@ export function ProfilesPage({ testId = 'profiles-page' }: ProfilesPageProps): R
   // Mutations
   const createMutation = useMutation({
     mutationFn: (data: ProfileFormData) =>
-      apiClient.post<SecurityProfile>('/control/profiles', data),
+      apiClient.postResource<SecurityProfile>('/api/profiles', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['profiles'] })
       showToast('Profile created successfully', 'success')
@@ -268,7 +268,7 @@ export function ProfilesPage({ testId = 'profiles-page' }: ProfilesPageProps): R
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: ProfileFormData }) =>
-      apiClient.put<SecurityProfile>(`/control/profiles/${id}`, data),
+      apiClient.putResource<SecurityProfile>(`/api/profiles/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['profiles'] })
       showToast('Profile updated successfully', 'success')
@@ -280,7 +280,7 @@ export function ProfilesPage({ testId = 'profiles-page' }: ProfilesPageProps): R
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiClient.delete(`/control/profiles/${id}`),
+    mutationFn: (id: string) => apiClient.deleteResource(`/api/profiles/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['profiles'] })
       showToast('Profile deleted successfully', 'success')
@@ -294,7 +294,7 @@ export function ProfilesPage({ testId = 'profiles-page' }: ProfilesPageProps): R
 
   const cloneMutation = useMutation({
     mutationFn: (id: string) =>
-      apiClient.post<SecurityProfile>(`/control/profiles/${id}/clone`, {}),
+      apiClient.postResource<SecurityProfile>(`/api/profiles/${id}/clone`, {}),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['profiles'] })
       showToast('Profile cloned successfully', 'success')

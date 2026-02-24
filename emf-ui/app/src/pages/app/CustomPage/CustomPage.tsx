@@ -1,7 +1,7 @@
 /**
  * CustomPage
  *
- * Renders a custom page defined in the control plane's page configuration.
+ * Renders a custom page defined via the JSON:API /api/ui-pages endpoint.
  * Resolves the page slug from the URL, fetches the page definition,
  * and renders the appropriate component from the ComponentRegistry.
  *
@@ -30,7 +30,7 @@ import { componentRegistry } from '@/services/componentRegistry'
 import type { ApiClient } from '@/services/apiClient'
 
 /**
- * Page definition returned from the control plane.
+ * Page definition returned from the JSON:API endpoint.
  */
 interface CustomPageDefinition {
   id: string
@@ -42,20 +42,22 @@ interface CustomPageDefinition {
   props?: Record<string, unknown>
   /** Optional: associated collection name */
   collectionName?: string
+  /** Slug used to look up the page */
+  slug?: string
 }
 
 /**
- * Fetch a custom page definition by slug.
+ * Fetch a custom page definition by slug from JSON:API.
  */
 async function fetchPageDefinition(
   apiClient: ApiClient,
   pageSlug: string
 ): Promise<CustomPageDefinition | null> {
   try {
-    const response = await apiClient.get<CustomPageDefinition>(
-      `/control/ui/pages/${encodeURIComponent(pageSlug)}`
+    const results = await apiClient.getList<CustomPageDefinition>(
+      `/api/ui-pages?filter[slug][eq]=${encodeURIComponent(pageSlug)}`
     )
-    return response || null
+    return results && results.length > 0 ? results[0] : null
   } catch {
     // Endpoint not yet implemented — return null
     return null

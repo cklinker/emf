@@ -486,7 +486,7 @@ describe('PageBuilderPage', () => {
   describe('Page Editor', () => {
     beforeEach(() => {
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/ui/pages/2')) {
+        if (url.includes('/api/ui-pages/2')) {
           return Promise.resolve({ data: mockPages[1] })
         }
         return Promise.resolve({ data: mockPages })
@@ -550,7 +550,7 @@ describe('PageBuilderPage', () => {
   describe('Component Palette', () => {
     beforeEach(() => {
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/ui/pages/1')) {
+        if (url.includes('/api/ui-pages/1')) {
           return Promise.resolve({ data: mockPages[0] })
         }
         return Promise.resolve({ data: mockPages })
@@ -606,7 +606,7 @@ describe('PageBuilderPage', () => {
   describe('Property Panel', () => {
     beforeEach(() => {
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/ui/pages/1')) {
+        if (url.includes('/api/ui-pages/1')) {
           return Promise.resolve({ data: mockPages[0] })
         }
         return Promise.resolve({ data: mockPages })
@@ -798,7 +798,7 @@ describe('PageBuilderPage', () => {
   describe('Save Page', () => {
     beforeEach(() => {
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/ui/pages/1')) {
+        if (url.includes('/api/ui-pages/1')) {
           return Promise.resolve({ data: mockPages[0] })
         }
         return Promise.resolve({ data: mockPages })
@@ -846,7 +846,7 @@ describe('PageBuilderPage', () => {
       const user = userEvent.setup()
 
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/ui/pages/1')) {
+        if (url.includes('/api/ui-pages/1')) {
           return Promise.resolve({ data: mockPages[0] })
         }
         return Promise.resolve({ data: mockPages })
@@ -883,7 +883,7 @@ describe('PageBuilderPage', () => {
   describe('Preview Mode (Requirement 7.7)', () => {
     beforeEach(() => {
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/ui/pages/1')) {
+        if (url.includes('/api/ui-pages/1')) {
           return Promise.resolve({ data: mockPages[0] })
         }
         return Promise.resolve({ data: mockPages })
@@ -932,10 +932,10 @@ describe('PageBuilderPage', () => {
 
       // Use MSW handlers for this test
       server.use(
-        http.get('/control/ui/pages', () => {
+        http.get('/api/ui-pages', () => {
           return HttpResponse.json(mockPages)
         }),
-        http.get('/control/ui/pages/1', () => {
+        http.get('/api/ui-pages/1', () => {
           return HttpResponse.json(mockPages[0])
         })
       )
@@ -1131,7 +1131,7 @@ describe('PageBuilderPage', () => {
       const user = userEvent.setup()
 
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/ui/pages/2')) {
+        if (url.includes('/api/ui-pages/2')) {
           return Promise.resolve({ data: mockPages[1] })
         }
         return Promise.resolve({ data: mockPages })
@@ -1235,7 +1235,7 @@ describe('PageBuilderPage', () => {
       const user = userEvent.setup()
 
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/ui/pages/1')) {
+        if (url.includes('/api/ui-pages/1')) {
           return Promise.resolve({ data: mockPages[0] })
         }
         return Promise.resolve({ data: mockPages })
@@ -1269,7 +1269,7 @@ describe('PageBuilderPage', () => {
       }
 
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/ui/pages/4')) {
+        if (url.includes('/api/ui-pages/4')) {
           return Promise.resolve({
             data: {
               content: duplicatedPage,
@@ -1320,7 +1320,7 @@ describe('PageBuilderPage', () => {
       }
 
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/ui/pages/4')) {
+        if (url.includes('/api/ui-pages/4')) {
           return Promise.resolve({
             data: {
               content: duplicatedPage,
@@ -1331,7 +1331,7 @@ describe('PageBuilderPage', () => {
             },
           })
         }
-        if (url.includes('/control/ui/pages/1')) {
+        if (url.includes('/api/ui-pages/1')) {
           return Promise.resolve({ data: mockPages[0] })
         }
         return Promise.resolve({ data: mockPages })
@@ -1387,7 +1387,7 @@ describe('PageBuilderPage', () => {
       }
 
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/ui/pages/4')) {
+        if (url.includes('/api/ui-pages/4')) {
           return Promise.resolve({
             data: {
               content: duplicatedPage,
@@ -1537,7 +1537,7 @@ describe('PageBuilderPage', () => {
       const user = userEvent.setup()
 
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/ui/pages/1')) {
+        if (url.includes('/api/ui-pages/1')) {
           return Promise.resolve({ data: mockPages[0] })
         }
         return Promise.resolve({ data: mockPages })
@@ -1611,7 +1611,7 @@ describe('PageBuilderPage', () => {
 
       // Mock page without components - we'll add one via the palette
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/ui/pages/1')) {
+        if (url.includes('/api/ui-pages/1')) {
           return Promise.resolve({
             data: {
               ...mockPages[0],
@@ -1693,7 +1693,7 @@ describe('PageBuilderPage', () => {
 
       // Mock page without components
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/ui/pages/1')) {
+        if (url.includes('/api/ui-pages/1')) {
           return Promise.resolve({
             data: {
               ...mockPages[0],

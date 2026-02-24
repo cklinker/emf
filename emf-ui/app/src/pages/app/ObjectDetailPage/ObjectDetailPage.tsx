@@ -261,8 +261,10 @@ export function ObjectDetailPage(): React.ReactElement {
 
   const { data: allCollections } = useQuery({
     queryKey: ['all-collections-metadata'],
-    queryFn: () =>
-      apiClient.get<{ content: CollectionWithFields[] }>('/control/collections?size=1000'),
+    queryFn: async () => {
+      const list = await apiClient.getList<CollectionWithFields>('/api/collections?page[size]=1000')
+      return { content: list }
+    },
     enabled: !!collectionName && !hasLayoutRelatedLists && !layoutLoading,
     staleTime: 5 * 60 * 1000, // 5 minutes — collection metadata rarely changes
   })

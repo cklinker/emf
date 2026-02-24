@@ -1,5 +1,6 @@
 package com.emf.gateway.listener;
 
+import com.emf.gateway.authz.PermissionResolutionService;
 import com.emf.gateway.route.RouteRegistry;
 import com.emf.runtime.event.ChangeType;
 import com.emf.runtime.event.RecordChangeEvent;
@@ -40,6 +41,9 @@ class SystemCollectionRouteListenerTest {
     @Mock
     private ReactiveRedisTemplate<String, String> redisTemplate;
 
+    @Mock
+    private PermissionResolutionService permissionResolutionService;
+
     private ObjectMapper objectMapper;
     private SystemCollectionRouteListener listener;
 
@@ -48,7 +52,8 @@ class SystemCollectionRouteListenerTest {
         objectMapper = new ObjectMapper();
         objectMapper.registerModule(new JavaTimeModule());
         listener = new SystemCollectionRouteListener(
-                routeRegistry, applicationEventPublisher, redisTemplate, objectMapper
+                routeRegistry, applicationEventPublisher, redisTemplate, objectMapper,
+                permissionResolutionService
         );
     }
 
@@ -84,6 +89,8 @@ class SystemCollectionRouteListenerTest {
         void shouldNotRefreshRoutesForNonCollections() throws Exception {
             // Arrange
             when(redisTemplate.delete(anyString())).thenReturn(Mono.just(1L));
+            when(permissionResolutionService.evictPermissionCache("tenant-1"))
+                    .thenReturn(Mono.empty());
             String message = createEventMessage("users", "user-1", ChangeType.UPDATED);
 
             // Act
@@ -117,6 +124,8 @@ class SystemCollectionRouteListenerTest {
         void shouldInvalidateRedisCacheForChangedRecord() throws Exception {
             // Arrange
             when(redisTemplate.delete(anyString())).thenReturn(Mono.just(1L));
+            when(permissionResolutionService.evictPermissionCache("tenant-1"))
+                    .thenReturn(Mono.empty());
             String message = createEventMessage("users", "user-123", ChangeType.UPDATED);
 
             // Act
@@ -146,10 +155,129 @@ class SystemCollectionRouteListenerTest {
         void shouldHandleRedisErrorsGracefully() throws Exception {
             // Arrange
             when(redisTemplate.delete(anyString())).thenReturn(Mono.error(new RuntimeException("Redis down")));
-            String message = createEventMessage("users", "user-1", ChangeType.UPDATED);
+            String message = createEventMessage("products", "prod-1", ChangeType.UPDATED);
 
             // Act — should not throw
             assertDoesNotThrow(() -> listener.onRecordChanged(message));
+        }
+    }
+
+    @Nested
+    @DisplayName("Permission Cache Eviction Tests")
+    class PermissionCacheEvictionTests {
+
+        @Test
+        @DisplayName("Should evict permission cache when profiles collection changes")
+        void shouldEvictPermissionCacheForProfilesChange() throws Exception {
+            when(redisTemplate.delete(anyString())).thenReturn(Mono.just(1L));
+            when(permissionResolutionService.evictPermissionCache("tenant-1"))
+                    .thenReturn(Mono.empty());
+
+            String message = createEventMessage("profiles", "profile-1", ChangeType.UPDATED);
+            listener.onRecordChanged(message);
+
+            verify(permissionResolutionService).evictPermissionCache("tenant-1");
+        }
+
+        @Test
+        @DisplayName("Should evict permission cache when permission-sets collection changes")
+        void shouldEvictPermissionCacheForPermissionSetsChange() throws Exception {
+            when(redisTemplate.delete(anyString())).thenReturn(Mono.just(1L));
+            when(permissionResolutionService.evictPermissionCache("tenant-1"))
+                    .thenReturn(Mono.empty());
+
+            String message = createEventMessage("permission-sets", "ps-1", ChangeType.CREATED);
+            listener.onRecordChanged(message);
+
+            verify(permissionResolutionService).evictPermissionCache("tenant-1");
+        }
+
+        @Test
+        @DisplayName("Should evict permission cache when users collection changes")
+        void shouldEvictPermissionCacheForUsersChange() throws Exception {
+            when(redisTemplate.delete(anyString())).thenReturn(Mono.just(1L));
+            when(permissionResolutionService.evictPermissionCache("tenant-1"))
+                    .thenReturn(Mono.empty());
+
+            String message = createEventMessage("users", "user-1", ChangeType.UPDATED);
+            listener.onRecordChanged(message);
+
+            verify(permissionResolutionService).evictPermissionCache("tenant-1");
+        }
+
+        @Test
+        @DisplayName("Should evict permission cache when profile-system-permissions changes")
+        void shouldEvictPermissionCacheForProfileSystemPermsChange() throws Exception {
+            when(redisTemplate.delete(anyString())).thenReturn(Mono.just(1L));
+            when(permissionResolutionService.evictPermissionCache("tenant-1"))
+                    .thenReturn(Mono.empty());
+
+            String message = createEventMessage("profile-system-permissions", "psp-1", ChangeType.CREATED);
+            listener.onRecordChanged(message);
+
+            verify(permissionResolutionService).evictPermissionCache("tenant-1");
+        }
+
+        @Test
+        @DisplayName("Should evict permission cache when user-permission-sets changes")
+        void shouldEvictPermissionCacheForUserPermSetsChange() throws Exception {
+            when(redisTemplate.delete(anyString())).thenReturn(Mono.just(1L));
+            when(permissionResolutionService.evictPermissionCache("tenant-1"))
+                    .thenReturn(Mono.empty());
+
+            String message = createEventMessage("user-permission-sets", "ups-1", ChangeType.DELETED);
+            listener.onRecordChanged(message);
+
+            verify(permissionResolutionService).evictPermissionCache("tenant-1");
+        }
+
+        @Test
+        @DisplayName("Should evict permission cache when group-memberships changes")
+        void shouldEvictPermissionCacheForGroupMembershipsChange() throws Exception {
+            when(redisTemplate.delete(anyString())).thenReturn(Mono.just(1L));
+            when(permissionResolutionService.evictPermissionCache("tenant-1"))
+                    .thenReturn(Mono.empty());
+
+            String message = createEventMessage("group-memberships", "gm-1", ChangeType.CREATED);
+            listener.onRecordChanged(message);
+
+            verify(permissionResolutionService).evictPermissionCache("tenant-1");
+        }
+
+        @Test
+        @DisplayName("Should NOT evict permission cache for non-permission collections")
+        void shouldNotEvictPermissionCacheForNonPermissionCollections() throws Exception {
+            when(redisTemplate.delete(anyString())).thenReturn(Mono.just(1L));
+
+            String message = createEventMessage("products", "prod-1", ChangeType.UPDATED);
+            listener.onRecordChanged(message);
+
+            verify(permissionResolutionService, never()).evictPermissionCache(any());
+        }
+
+        @Test
+        @DisplayName("Should NOT evict permission cache for collections change")
+        void shouldNotEvictPermissionCacheForCollectionsChange() throws Exception {
+            when(redisTemplate.delete(anyString())).thenReturn(Mono.just(1L));
+
+            String message = createEventMessage("collections", "col-1", ChangeType.UPDATED);
+            listener.onRecordChanged(message);
+
+            verify(permissionResolutionService, never()).evictPermissionCache(any());
+        }
+
+        @Test
+        @DisplayName("Should work when permissionResolutionService is null")
+        void shouldWorkWhenPermissionServiceIsNull() throws Exception {
+            SystemCollectionRouteListener listenerNoPerms = new SystemCollectionRouteListener(
+                    routeRegistry, applicationEventPublisher, redisTemplate, objectMapper, null
+            );
+
+            when(redisTemplate.delete(anyString())).thenReturn(Mono.just(1L));
+
+            String message = createEventMessage("profiles", "profile-1", ChangeType.UPDATED);
+
+            assertDoesNotThrow(() -> listenerNoPerms.onRecordChanged(message));
         }
     }
 

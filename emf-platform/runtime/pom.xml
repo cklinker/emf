@@ -21,6 +21,7 @@
         <module>runtime-events</module>
         <module>runtime-jsonapi</module>
         <module>runtime-module-core</module>
+        <module>runtime-module-integration</module>
         <module>runtime-module-schema</module>
     </modules>
 </project>

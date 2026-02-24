@@ -30,9 +30,7 @@ import java.util.concurrent.TimeUnit;
  *
  * Rate-limited paths (unauthenticated endpoints):
  * <ul>
- *   <li>/control/bootstrap</li>
- *   <li>/control/ui-bootstrap</li>
- *   <li>/control/tenants/slug-map</li>
+ *   <li>/actuator/health</li>
  * </ul>
  *
  * Rate limit: 100 requests per 60-second sliding window per IP.
@@ -50,9 +48,7 @@ public class IpRateLimitFilter implements GlobalFilter, Ordered {
     private static final long CLEANUP_INTERVAL_SECONDS = 120L;
 
     private static final Set<String> RATE_LIMITED_PATHS = Set.of(
-            "/control/bootstrap",
-            "/control/ui-bootstrap",
-            "/control/tenants/slug-map"
+            "/actuator/health"
     );
 
     // IP -> timestamps of requests within the current window

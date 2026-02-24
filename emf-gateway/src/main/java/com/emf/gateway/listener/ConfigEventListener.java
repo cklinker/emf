@@ -17,7 +17,7 @@ import org.springframework.stereotype.Component;
 import java.util.Map;
 
 /**
- * Kafka listener for configuration change events from the control plane.
+ * Kafka listener for configuration change events.
  *
  * This listener subscribes to Kafka topics:
  * - Collection changed events: Updates route registry when collections are created/updated/deleted
@@ -26,10 +26,10 @@ import java.util.Map;
  * All event processing is done asynchronously and handles malformed events gracefully
  * by logging errors and continuing to process subsequent events.
  *
- * The __control-plane system collection is ignored because its route is managed
- * statically by {@link com.emf.gateway.config.RouteInitializer}. Other system
- * collections (users, profiles, etc.) are handled normally since they are routed
- * to the worker like any other collection.
+ * The __control-plane system collection is ignored because it is a legacy internal
+ * collection that should not have a gateway route. Other system collections
+ * (users, profiles, etc.) are handled normally since they are routed to the
+ * worker like any other collection.
  */
 @Component
 public class ConfigEventListener {
@@ -39,7 +39,7 @@ public class ConfigEventListener {
     /** Well-known UUID for the __control-plane system collection (see V43 migration). */
     private static final String CONTROL_PLANE_COLLECTION_ID = "00000000-0000-0000-0000-000000000100";
 
-    /** Name of the control-plane system collection whose route is managed statically. */
+    /** Name of the legacy control-plane system collection that should not have a route. */
     private static final String CONTROL_PLANE_COLLECTION_NAME = "__control-plane";
 
     private final RouteRegistry routeRegistry;
@@ -58,8 +58,8 @@ public class ConfigEventListener {
     }
 
     /**
-     * Checks whether a collection is the __control-plane collection whose route
-     * is managed statically by {@link com.emf.gateway.config.RouteInitializer}.
+     * Checks whether a collection is the legacy __control-plane collection
+     * which should not have a gateway route.
      * Only the __control-plane collection is skipped — other system collections
      * (users, profiles, etc.) are routed to the worker like normal collections.
      */
@@ -93,7 +93,7 @@ public class ConfigEventListener {
             logger.debug("Processing collection change: id={}, name={}, changeType={}",
                         payload.getId(), payload.getName(), payload.getChangeType());
 
-            // Skip system collections — their routes are managed by RouteInitializer
+            // Skip legacy __control-plane collection — it should not have a gateway route
             if (isControlPlaneCollection(payload.getId(), payload.getName())) {
                 logger.debug("Ignoring collection changed event for __control-plane collection: id={}, name={}",
                             payload.getId(), payload.getName());

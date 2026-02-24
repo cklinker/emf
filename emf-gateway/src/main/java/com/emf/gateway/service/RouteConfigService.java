@@ -13,53 +13,56 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
 /**
- * Service for fetching and managing route configuration from the control plane.
+ * Service for fetching and managing route configuration from the worker service.
  *
- * This service is responsible for:
- * - Fetching initial bootstrap configuration when the gateway starts
- * - Parsing bootstrap response into RouteDefinition objects
- * - Validating required fields before adding routes to the registry
- * - Loading per-tenant governor limits for rate limiting
- * - Refreshing routes on demand
+ * <p>This service is responsible for:
+ * <ul>
+ *   <li>Fetching initial bootstrap configuration from the worker's internal API</li>
+ *   <li>Parsing bootstrap response into RouteDefinition objects</li>
+ *   <li>Validating required fields before adding routes to the registry</li>
+ *   <li>Loading per-tenant governor limits for rate limiting</li>
+ *   <li>Refreshing routes on demand</li>
+ * </ul>
+ *
+ * <p>The worker exposes {@code /internal/bootstrap} which returns collections
+ * and governor limits. This replaces the previous dependency on the control
+ * plane's bootstrap endpoint, now replaced by the worker's
+ * {@code /internal/bootstrap} endpoint.
  */
 @Service
 public class RouteConfigService {
 
     private static final Logger logger = LoggerFactory.getLogger(RouteConfigService.class);
 
+    private static final String BOOTSTRAP_PATH = "/internal/bootstrap";
+
     private final WebClient webClient;
     private final RouteRegistry routeRegistry;
     private final TenantGovernorLimitCache governorLimitCache;
-    private final String controlPlaneUrl;
-    private final String bootstrapPath;
     private final String workerServiceUrl;
 
     public RouteConfigService(
             WebClient.Builder webClientBuilder,
             RouteRegistry routeRegistry,
             TenantGovernorLimitCache governorLimitCache,
-            @Value("${emf.gateway.control-plane.url}") String controlPlaneUrl,
-            @Value("${emf.gateway.control-plane.bootstrap-path}") String bootstrapPath,
             @Value("${emf.gateway.worker-service-url:http://emf-worker:80}") String workerServiceUrl) {
-        this.webClient = webClientBuilder.baseUrl(controlPlaneUrl).build();
+        this.webClient = webClientBuilder.baseUrl(workerServiceUrl).build();
         this.routeRegistry = routeRegistry;
         this.governorLimitCache = governorLimitCache;
-        this.controlPlaneUrl = controlPlaneUrl;
-        this.bootstrapPath = bootstrapPath;
         this.workerServiceUrl = workerServiceUrl;
 
-        logger.info("RouteConfigService initialized with control plane URL: {}", controlPlaneUrl);
+        logger.info("RouteConfigService initialized with worker URL: {}", workerServiceUrl);
     }
 
     /**
-     * Fetches the complete bootstrap configuration from the control plane.
+     * Fetches the complete bootstrap configuration from the worker service.
      */
     public Mono<BootstrapConfig> fetchBootstrapConfig() {
-        String url = controlPlaneUrl + bootstrapPath;
+        String url = workerServiceUrl + BOOTSTRAP_PATH;
         logger.info("Fetching bootstrap configuration from: {}", url);
 
         return webClient.get()
-                .uri(bootstrapPath)
+                .uri(BOOTSTRAP_PATH)
                 .retrieve()
                 .bodyToMono(BootstrapConfig.class)
                 .doOnSuccess(config -> {

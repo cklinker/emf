@@ -30,14 +30,14 @@ class RouteConfigServiceTest {
     private RouteRegistry routeRegistry;
     private TenantGovernorLimitCache governorLimitCache;
 
-    private static final String WORKER_SERVICE_URL = "http://emf-worker:80";
+    private String workerServiceUrl;
 
     @BeforeEach
     void setUp() throws IOException {
         mockWebServer = new MockWebServer();
         mockWebServer.start();
 
-        String baseUrl = mockWebServer.url("/").toString();
+        workerServiceUrl = mockWebServer.url("/").toString().replaceAll("/$", "");
         routeRegistry = new RouteRegistry();
         governorLimitCache = new TenantGovernorLimitCache();
 
@@ -45,9 +45,7 @@ class RouteConfigServiceTest {
             WebClient.builder(),
             routeRegistry,
             governorLimitCache,
-            baseUrl,
-            "/control/bootstrap",
-            WORKER_SERVICE_URL
+            workerServiceUrl
         );
     }
 
@@ -167,7 +165,7 @@ class RouteConfigServiceTest {
         assertNotNull(usersRoute);
         assertEquals("users-collection", usersRoute.getId());
         assertEquals("/api/users/**", usersRoute.getPath());
-        assertEquals(WORKER_SERVICE_URL, usersRoute.getBackendUrl());
+        assertEquals(workerServiceUrl, usersRoute.getBackendUrl());
         assertEquals("users", usersRoute.getCollectionName());
 
         // Verify second route (path has /** wildcard added)
@@ -216,12 +214,12 @@ class RouteConfigServiceTest {
         // Even though bootstrap included a pod IP, gateway should use configured service URL
         RouteDefinition productRoute = routeRegistry.findByPath("/api/product/**").orElse(null);
         assertNotNull(productRoute);
-        assertEquals(WORKER_SERVICE_URL, productRoute.getBackendUrl());
+        assertEquals(workerServiceUrl, productRoute.getBackendUrl());
 
         // Collection without workerBaseUrl also uses configured service URL
         RouteDefinition tasksRoute = routeRegistry.findByPath("/api/tasks/**").orElse(null);
         assertNotNull(tasksRoute);
-        assertEquals(WORKER_SERVICE_URL, tasksRoute.getBackendUrl());
+        assertEquals(workerServiceUrl, tasksRoute.getBackendUrl());
     }
 
     @Test

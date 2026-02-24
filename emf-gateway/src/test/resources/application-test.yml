@@ -32,13 +32,10 @@ spring:
 emf:
   gateway:
     worker-service-url: http://emf-worker:80
-    control-plane:
-      url: http://localhost:8081
-      bootstrap-path: /control/bootstrap
     kafka:
       topics:
         collection-changed: emf.collection.changed
-    # Rate limiting is driven by per-tenant governor limits from the control plane
+    # Rate limiting is driven by per-tenant governor limits from the worker
 
 # Disable actuator endpoints for tests
 management:

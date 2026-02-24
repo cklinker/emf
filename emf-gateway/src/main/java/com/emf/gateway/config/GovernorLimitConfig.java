@@ -1,7 +1,7 @@
 package com.emf.gateway.config;
 
 /**
- * Governor limit configuration for a tenant, received from the control plane bootstrap.
+ * Governor limit configuration for a tenant, received from the worker bootstrap.
  * Used by the gateway to enforce per-tenant rate limiting.
  */
 public class GovernorLimitConfig {

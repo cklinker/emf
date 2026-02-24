@@ -57,7 +57,7 @@ class TenantSlugExtractionFilterTest {
 
     private TenantSlugCache slugCache;
 
-    private static final List<String> PLATFORM_PATHS = List.of("/actuator", "/platform", "/control");
+    private static final List<String> PLATFORM_PATHS = List.of("/actuator", "/platform", "/internal");
 
     @BeforeEach
     void setUp() {
@@ -184,16 +184,16 @@ class TenantSlugExtractionFilterTest {
     }
 
     @Test
-    void shouldBypassControlPlanePaths() {
+    void shouldBypassInternalPaths() {
         TenantSlugExtractionFilter filter = createFilter(true, true);
 
-        MockServerHttpRequest request = MockServerHttpRequest.get("/control/ui-bootstrap").build();
+        MockServerHttpRequest request = MockServerHttpRequest.get("/internal/bootstrap").build();
         MockServerWebExchange exchange = MockServerWebExchange.from(request);
 
         StepVerifier.create(filter.filter(exchange, chain))
                 .verifyComplete();
 
-        // Should pass through without slug extraction — "control" is a platform path, not a slug
+        // Should pass through without slug extraction — "internal" is a platform path, not a slug
         verify(chain).filter(exchange);
     }
 
@@ -432,7 +432,7 @@ class TenantSlugExtractionFilterTest {
     @SuppressWarnings("unchecked")
     private void populateCache(Map<String, String> slugMap) {
         when(webClient.get()).thenReturn(requestHeadersUriSpec);
-        when(requestHeadersUriSpec.uri("/control/tenants/slug-map")).thenReturn(requestHeadersSpec);
+        when(requestHeadersUriSpec.uri("/internal/tenants/slug-map")).thenReturn(requestHeadersSpec);
         when(requestHeadersSpec.retrieve()).thenReturn(responseSpec);
         when(responseSpec.bodyToMono(any(ParameterizedTypeReference.class)))
                 .thenReturn(Mono.just(slugMap));

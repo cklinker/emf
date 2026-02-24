@@ -61,16 +61,11 @@ emf:
     tenant-slug:
       enabled: ${TENANT_SLUG_ENABLED:true}
       require-prefix: ${TENANT_SLUG_REQUIRE_PREFIX:false}
-      platform-paths: /actuator,/platform,/control
+      platform-paths: /actuator,/platform,/internal
       cache-refresh-ms: 60000
 
-    # Worker service URL
+    # Worker service URL (used for routing AND internal API calls)
     worker-service-url: ${WORKER_SERVICE_URL:http://emf-worker:80}
-
-    # Control plane connection
-    control-plane:
-      url: ${CONTROL_PLANE_URL:http://localhost:8080}
-      bootstrap-path: /control/bootstrap
     
     # Kafka topics for configuration updates and record change events
     kafka:
@@ -80,7 +75,7 @@ emf:
         record-changed: emf.record.changed
     
     # Rate limiting is driven by per-tenant governor limits (apiCallsPerDay)
-    # fetched from the control plane during bootstrap.
+    # fetched from the worker during bootstrap.
     # See TenantGovernorLimitCache for details.
 
     # Security settings

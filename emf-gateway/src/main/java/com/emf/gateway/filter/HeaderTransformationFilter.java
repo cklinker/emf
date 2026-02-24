@@ -98,7 +98,7 @@ public class HeaderTransformationFilter implements GlobalFilter, Ordered {
                     }
                     // Default to "default" tenant for authenticated requests with no tenant context.
                     // The UI doesn't send X-Tenant-ID/X-Tenant-Slug headers, so we inject
-                    // the default slug so the control plane can resolve the proper tenant ID.
+                    // the default slug so the worker can resolve the proper tenant ID.
                     if (tenantId == null && tenantSlug == null) {
                         headers.set(X_TENANT_SLUG_HEADER, "default");
                         log.debug("No tenant context for authenticated user {}, defaulting to 'default' tenant",

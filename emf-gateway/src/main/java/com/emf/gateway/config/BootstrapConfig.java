@@ -4,7 +4,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Data model representing the complete bootstrap configuration from the control plane.
+ * Data model representing the complete bootstrap configuration from the worker service.
  *
  * This configuration is fetched when the gateway starts and contains all necessary
  * information to set up routes and per-tenant governor limits.

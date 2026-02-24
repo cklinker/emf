@@ -9,27 +9,27 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 
 /**
  * Integration test for health check endpoints.
- * 
+ *
  * Tests:
  * - Overall health endpoint returns status
  * - Redis health indicator is included
  * - Kafka health indicator is included
- * - Control plane health indicator is included
+ * - Worker health indicator is included
  * - Health endpoint is accessible without authentication
  * - Individual component health can be checked
- * 
+ *
  * Validates: Requirements 12.1, 12.2, 12.3, 12.4, 12.5
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
 class HealthCheckIntegrationTest {
-    
+
     @LocalServerPort
     private int port;
-    
+
     @Autowired
     private WebTestClient webTestClient;
-    
+
     @Test
     void testHealthEndpoint_ReturnsStatus() {
         // Act & Assert - health endpoint should be accessible
@@ -40,7 +40,7 @@ class HealthCheckIntegrationTest {
                 .expectBody()
                 .jsonPath("$.status").exists();
     }
-    
+
     @Test
     void testHealthEndpoint_NoAuthenticationRequired() {
         // Act & Assert - health endpoint should not require authentication
@@ -48,10 +48,10 @@ class HealthCheckIntegrationTest {
                 .uri("/actuator/health")
                 .exchange()
                 .expectStatus().isOk();
-        
+
         // No Authorization header provided, but request should succeed
     }
-    
+
     @Test
     void testHealthEndpoint_IncludesRedisStatus() {
         // Act & Assert - health response should include Redis status
@@ -61,11 +61,11 @@ class HealthCheckIntegrationTest {
                 .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$.components.redis").exists();
-        
+
         // Redis status will be UP if Redis is available, DOWN otherwise
         // Both are valid - the important thing is that the component is checked
     }
-    
+
     @Test
     void testHealthEndpoint_IncludesKafkaStatus() {
         // Act & Assert - health response should include Kafka status
@@ -75,25 +75,25 @@ class HealthCheckIntegrationTest {
                 .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$.components.kafka").exists();
-        
+
         // Kafka status will be UP if Kafka is available, DOWN otherwise
         // Both are valid - the important thing is that the component is checked
     }
-    
+
     @Test
-    void testHealthEndpoint_IncludesControlPlaneStatus() {
-        // Act & Assert - health response should include control plane status
+    void testHealthEndpoint_IncludesWorkerStatus() {
+        // Act & Assert - health response should include worker status
         webTestClient.get()
                 .uri("/actuator/health")
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
-                .jsonPath("$.components.controlPlane").exists();
-        
-        // Control plane status will be UP if control plane is available, DOWN otherwise
+                .jsonPath("$.components.worker").exists();
+
+        // Worker status will be UP if worker is available, DOWN otherwise
         // Both are valid - the important thing is that the component is checked
     }
-    
+
     @Test
     void testHealthEndpoint_ShowsDetails() {
         // Act & Assert - health endpoint should show component details
@@ -105,9 +105,9 @@ class HealthCheckIntegrationTest {
                 .jsonPath("$.components").exists()
                 .jsonPath("$.components.redis.status").exists()
                 .jsonPath("$.components.kafka.status").exists()
-                .jsonPath("$.components.controlPlane.status").exists();
+                .jsonPath("$.components.worker.status").exists();
     }
-    
+
     @Test
     void testHealthEndpoint_OverallStatus() {
         // Act & Assert - overall status should be determined by component statuses
@@ -122,7 +122,7 @@ class HealthCheckIntegrationTest {
                     // All are valid responses
                 });
     }
-    
+
     @Test
     void testHealthEndpoint_LivenessProbe() {
         // Act & Assert - liveness probe should indicate if application is running
@@ -132,10 +132,10 @@ class HealthCheckIntegrationTest {
                 .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$.status").isEqualTo("UP");
-        
+
         // Liveness should always be UP if the application is running
     }
-    
+
     @Test
     void testHealthEndpoint_ReadinessProbe() {
         // Act & Assert - readiness probe should indicate if application is ready
@@ -145,15 +145,15 @@ class HealthCheckIntegrationTest {
                 .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$.status").exists();
-        
+
         // Readiness depends on whether dependencies are available
         // Can be UP or DOWN
     }
-    
+
     @Test
     void testHealthEndpoint_IndividualComponents() {
         // Act & Assert - individual component health can be checked
-        
+
         // Redis health
         webTestClient.get()
                 .uri("/actuator/health/redis")
@@ -161,7 +161,7 @@ class HealthCheckIntegrationTest {
                 .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$.status").exists();
-        
+
         // Kafka health
         webTestClient.get()
                 .uri("/actuator/health/kafka")
@@ -169,16 +169,16 @@ class HealthCheckIntegrationTest {
                 .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$.status").exists();
-        
-        // Control plane health
+
+        // Worker health
         webTestClient.get()
-                .uri("/actuator/health/controlPlane")
+                .uri("/actuator/health/worker")
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$.status").exists();
     }
-    
+
     @Test
     void testHealthEndpoint_JsonFormat() {
         // Act & Assert - health response should be in JSON format

@@ -16,7 +16,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Kafka configuration for consuming configuration change events from the control plane.
+ * Kafka configuration for consuming configuration change events.
  * 
  * This configuration sets up Kafka consumers to listen to three topics:
  * - Collection changed events

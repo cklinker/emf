@@ -26,7 +26,7 @@ import static org.mockito.Mockito.*;
  * - After refresh(), resolve() returns correct tenantId for known slugs
  * - After refresh(), isKnownSlug() returns true for known slugs
  * - Unknown slugs return Optional.empty() even after refresh
- * - Errors from the control-plane endpoint are handled gracefully
+ * - Errors from the worker endpoint are handled gracefully
  */
 @ExtendWith(MockitoExtension.class)
 class TenantSlugCacheTest {
@@ -48,14 +48,14 @@ class TenantSlugCacheTest {
 
     private TenantSlugCache cache;
 
-    private static final String CONTROL_PLANE_URL = "http://localhost:8080";
+    private static final String WORKER_SERVICE_URL = "http://localhost:8080";
 
     @BeforeEach
     void setUp() {
         when(webClientBuilder.baseUrl(anyString())).thenReturn(webClientBuilder);
         when(webClientBuilder.build()).thenReturn(webClient);
 
-        cache = new TenantSlugCache(webClientBuilder, CONTROL_PLANE_URL);
+        cache = new TenantSlugCache(webClientBuilder, WORKER_SERVICE_URL);
     }
 
     // --- Empty cache ---
@@ -247,7 +247,7 @@ class TenantSlugCacheTest {
     @SuppressWarnings("unchecked")
     private void stubRefreshResponse(Mono<Map<String, String>> response) {
         when(webClient.get()).thenReturn(requestHeadersUriSpec);
-        when(requestHeadersUriSpec.uri("/control/tenants/slug-map")).thenReturn(requestHeadersSpec);
+        when(requestHeadersUriSpec.uri("/internal/tenants/slug-map")).thenReturn(requestHeadersSpec);
         when(requestHeadersSpec.retrieve()).thenReturn(responseSpec);
         when(responseSpec.bodyToMono(any(ParameterizedTypeReference.class))).thenReturn(response);
     }

@@ -18,12 +18,12 @@ import java.util.Map;
 
 /**
  * Configuration for service account authentication using OAuth2 client credentials flow.
- * 
- * This configuration enables the gateway to authenticate with the control plane
+ *
+ * <p>This configuration enables the gateway to authenticate with the worker service
  * using a service account (client credentials grant type). The service account
  * credentials are configured in Keycloak and provided via environment variables.
- * 
- * The WebClient is configured with a filter that automatically acquires and adds
+ *
+ * <p>The WebClient is configured with a filter that automatically acquires and adds
  * Bearer tokens to requests using client credentials flow.
  */
 @Configuration
@@ -61,10 +61,10 @@ public class ServiceAccountConfig {
      */
     @Bean(name = "serviceAccountWebClient")
     public WebClient serviceAccountWebClient(
-            @Value("${emf.gateway.control-plane.url}") String controlPlaneUrl) {
-        
+            @Value("${emf.gateway.worker-service-url:http://emf-worker:80}") String workerServiceUrl) {
+
         return WebClient.builder()
-            .baseUrl(controlPlaneUrl)
+            .baseUrl(workerServiceUrl)
             .filter(oauth2ClientCredentialsFilter())
             .build();
     }

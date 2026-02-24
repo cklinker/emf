@@ -24,7 +24,7 @@ import reactor.core.publisher.Mono;
  * - Validates JWT tokens using Spring Security's ReactiveJwtDecoder
  * - Stores the extracted GatewayPrincipal in ServerWebExchange attributes
  * - Returns 401 Unauthorized for missing, invalid, or expired tokens
- * - Allows unauthenticated access to the /control/bootstrap endpoint
+ * - Allows unauthenticated access to actuator and platform paths
  */
 @Component
 public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
@@ -34,8 +34,6 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
     private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
     private static final String PRINCIPAL_ATTRIBUTE = "gateway.principal";
-    private static final String BOOTSTRAP_PATH = "/control/bootstrap";
-    private static final String UI_BOOTSTRAP_PATH = "/control/ui-bootstrap";
 
     private final ReactiveJwtDecoder jwtDecoder;
     private final PrincipalExtractor principalExtractor;
@@ -61,12 +59,6 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
             return chain.filter(exchange);
         }
 
-        // Allow unauthenticated access to bootstrap endpoints
-        if (path.equals(BOOTSTRAP_PATH) || path.equals(UI_BOOTSTRAP_PATH)) {
-            log.debug("Allowing unauthenticated access to bootstrap endpoint: {}", path);
-            return chain.filter(exchange);
-        }
-        
         // Extract Authorization header
         String authHeader = exchange.getRequest().getHeaders().getFirst(AUTHORIZATION_HEADER);
         

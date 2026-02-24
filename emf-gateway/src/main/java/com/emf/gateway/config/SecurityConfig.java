@@ -36,8 +36,8 @@ public class SecurityConfig {
     @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}")
     private String issuerUri;
 
-    @Value("${emf.gateway.control-plane.url}")
-    private String controlPlaneUrl;
+    @Value("${emf.gateway.worker-service-url:http://emf-worker:80}")
+    private String workerServiceUrl;
 
     @Value("${CORS_ALLOWED_ORIGIN_PATTERN:*}")
     private String corsAllowedOriginPattern;
@@ -89,13 +89,16 @@ public class SecurityConfig {
      * Creates a DynamicReactiveJwtDecoder bean that supports multi-provider JWT validation.
      * Resolves the correct JWKS URI based on the token's issuer claim.
      * Falls back to the configured default issuer if no provider is found.
+     *
+     * <p>OIDC provider info is fetched from the worker's internal API
+     * ({@code /internal/oidc/by-issuer}).
      */
     @Bean
     public ReactiveJwtDecoder jwtDecoder(@Nullable ReactiveStringRedisTemplate redisTemplate) {
-        WebClient controlPlaneClient = WebClient.builder()
-                .baseUrl(controlPlaneUrl)
+        WebClient workerClient = WebClient.builder()
+                .baseUrl(workerServiceUrl)
                 .build();
-        return new DynamicReactiveJwtDecoder(controlPlaneClient, redisTemplate, issuerUri,
+        return new DynamicReactiveJwtDecoder(workerClient, redisTemplate, issuerUri,
                 Duration.ofSeconds(jwtClockSkewSeconds));
     }
 }

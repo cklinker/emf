@@ -20,8 +20,7 @@ import reactor.core.publisher.Mono;
  * requests are forwarded to the backend service, which handles its own
  * fine-grained authorization via Spring Security.
  *
- * <p>Bootstrap endpoints ({@code /control/bootstrap} and {@code /control/ui-bootstrap})
- * are allowed without authentication so the UI and gateway can fetch initial config.
+ * <p>Actuator and internal paths are excluded from authentication requirements.
  */
 @Component
 public class RouteAuthorizationFilter implements GlobalFilter, Ordered {
@@ -31,11 +30,6 @@ public class RouteAuthorizationFilter implements GlobalFilter, Ordered {
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         String path = exchange.getRequest().getPath().value();
-
-        // Allow unauthenticated access to bootstrap endpoints
-        if ("/control/bootstrap".equals(path) || "/control/ui-bootstrap".equals(path)) {
-            return chain.filter(exchange);
-        }
 
         GatewayPrincipal principal = JwtAuthenticationFilter.getPrincipal(exchange);
 

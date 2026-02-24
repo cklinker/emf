@@ -19,7 +19,7 @@ import java.net.URI;
  * and provides them to the gateway's routing mechanism through a reactive Flux.
  * 
  * Routes are loaded dynamically from the RouteRegistry, which is updated through:
- * - Initial bootstrap from the control plane
+ * - Initial bootstrap from the worker service
  * - Real-time Kafka events for configuration changes
  * 
  * Validates: Requirements 1.3

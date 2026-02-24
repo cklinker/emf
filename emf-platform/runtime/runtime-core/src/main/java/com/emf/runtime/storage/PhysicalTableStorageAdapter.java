@@ -9,6 +9,7 @@ import com.emf.runtime.query.Pagination;
 import com.emf.runtime.query.QueryRequest;
 import com.emf.runtime.query.QueryResult;
 import com.emf.runtime.query.SortField;
+import com.emf.runtime.validation.TypeCoercionService;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -561,7 +562,13 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         String fieldName = sanitizeIdentifier(resolveColumnName(definition, filter.fieldName()));
         FilterOperator operator = filter.operator();
         Object value = filter.value();
-        
+
+        // Coerce string filter values to match the field's database type (e.g., "false" → Boolean.FALSE)
+        FieldDefinition fieldDef = definition.getField(filter.fieldName());
+        if (fieldDef != null && value instanceof String) {
+            value = TypeCoercionService.coerceValue(value, fieldDef.type());
+        }
+
         return switch (operator) {
             case EQ -> {
                 params.add(value);

@@ -14,15 +14,21 @@ COPY emf-platform/runtime/pom.xml ./runtime/
 COPY emf-platform/runtime/runtime-core/pom.xml ./runtime/runtime-core/
 COPY emf-platform/runtime/runtime-events/pom.xml ./runtime/runtime-events/
 COPY emf-platform/runtime/runtime-jsonapi/pom.xml ./runtime/runtime-jsonapi/
+COPY emf-platform/runtime/runtime-module-core/pom.xml ./runtime/runtime-module-core/
+COPY emf-platform/runtime/runtime-module-integration/pom.xml ./runtime/runtime-module-integration/
+COPY emf-platform/runtime/runtime-module-schema/pom.xml ./runtime/runtime-module-schema/
 
 # Download runtime dependencies (cached unless pom.xml changes)
-RUN mvn dependency:go-offline -B -pl runtime/runtime-core,runtime/runtime-events,runtime/runtime-jsonapi -am || true
+RUN mvn dependency:go-offline -B -pl runtime/runtime-core,runtime/runtime-events,runtime/runtime-jsonapi,runtime/runtime-module-core,runtime/runtime-module-integration,runtime/runtime-module-schema -am || true
 
 # Copy source and build
 COPY emf-platform/runtime/runtime-core/src ./runtime/runtime-core/src
 COPY emf-platform/runtime/runtime-events/src ./runtime/runtime-events/src
 COPY emf-platform/runtime/runtime-jsonapi/src ./runtime/runtime-jsonapi/src
-RUN mvn clean install -DskipTests -pl runtime/runtime-core,runtime/runtime-events,runtime/runtime-jsonapi -am -B
+COPY emf-platform/runtime/runtime-module-core/src ./runtime/runtime-module-core/src
+COPY emf-platform/runtime/runtime-module-integration/src ./runtime/runtime-module-integration/src
+COPY emf-platform/runtime/runtime-module-schema/src ./runtime/runtime-module-schema/src
+RUN mvn clean install -DskipTests -pl runtime/runtime-core,runtime/runtime-events,runtime/runtime-jsonapi,runtime/runtime-module-core,runtime/runtime-module-integration,runtime/runtime-module-schema -am -B
 
 # =============================================================================
 # Stage 2: Build Control Plane

@@ -41,6 +41,12 @@ interface PermissionSetSummary {
   system: boolean
 }
 
+interface UserPermSetAssignment {
+  id: string
+  userId: string
+  permissionSetId: string
+}
+
 interface LoginHistoryEntry {
   id: string
   userId: string
@@ -155,25 +161,40 @@ export function UserDetailPage({ testId = 'user-detail-page' }: UserDetailPagePr
     enabled: activeTab === 'security',
   })
 
-  const { data: userPermissionSets } = useQuery({
-    queryKey: ['users', id, 'permission-sets'],
+  const { data: userPermSetAssignments } = useQuery({
+    queryKey: ['users', id, 'user-permission-sets'],
     queryFn: () =>
-      apiClient.getList<PermissionSetSummary>(`/api/permission-sets?filter[userId][eq]=${id}`),
+      apiClient.getList<UserPermSetAssignment>(
+        `/api/user-permission-sets?filter[userId][eq]=${id}`
+      ),
     enabled: !!id && activeTab === 'security',
   })
 
   const { data: allPermissionSets } = useQuery({
     queryKey: ['permission-sets'],
     queryFn: () => apiClient.getList<PermissionSetSummary>('/api/permission-sets'),
-    enabled: activeTab === 'security' && showAssignModal,
+    enabled: activeTab === 'security',
   })
+
+  // Derive assigned permission sets by joining junction records with full details
+  const userPermissionSets = useMemo(() => {
+    if (!allPermissionSets || !userPermSetAssignments) return []
+    const permSetMap = new Map(allPermissionSets.map((ps) => [ps.id, ps]))
+    return userPermSetAssignments
+      .map((assignment) => {
+        const ps = permSetMap.get(assignment.permissionSetId)
+        if (!ps) return null
+        return { ...ps, assignmentId: assignment.id }
+      })
+      .filter((ps): ps is PermissionSetSummary & { assignmentId: string } => ps !== null)
+  }, [allPermissionSets, userPermSetAssignments])
 
   // Available permission sets (not already assigned)
   const availablePermissionSets = useMemo(() => {
-    if (!allPermissionSets || !userPermissionSets) return []
-    const assignedIds = new Set(userPermissionSets.map((ps) => ps.id))
+    if (!allPermissionSets || !userPermSetAssignments) return []
+    const assignedIds = new Set(userPermSetAssignments.map((a) => a.permissionSetId))
     return allPermissionSets.filter((ps) => !assignedIds.has(ps.id))
-  }, [allPermissionSets, userPermissionSets])
+  }, [allPermissionSets, userPermSetAssignments])
 
   const profileId = user?.profileId
   const currentProfile = useMemo(() => {
@@ -224,11 +245,12 @@ export function UserDetailPage({ testId = 'user-detail-page' }: UserDetailPagePr
 
   const assignPermSetMutation = useMutation({
     mutationFn: (permSetId: string) =>
-      apiClient.postResource(`/api/permission-sets/${permSetId}/assignments/users`, {
-        userIds: [id],
+      apiClient.postResource('/api/user-permission-sets', {
+        userId: id,
+        permissionSetId: permSetId,
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users', id, 'permission-sets'] })
+      queryClient.invalidateQueries({ queryKey: ['users', id, 'user-permission-sets'] })
       showToast('Permission set assigned successfully', 'success')
       setShowAssignModal(false)
     },
@@ -238,10 +260,10 @@ export function UserDetailPage({ testId = 'user-detail-page' }: UserDetailPagePr
   })
 
   const unassignPermSetMutation = useMutation({
-    mutationFn: (permSetId: string) =>
-      apiClient.deleteResource(`/api/permission-sets/${permSetId}/assignments/users/${id}`),
+    mutationFn: (assignmentId: string) =>
+      apiClient.deleteResource(`/api/user-permission-sets/${assignmentId}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users', id, 'permission-sets'] })
+      queryClient.invalidateQueries({ queryKey: ['users', id, 'user-permission-sets'] })
       showToast('Permission set removed successfully', 'success')
     },
     onError: (err: Error) => {
@@ -589,7 +611,7 @@ export function UserDetailPage({ testId = 'user-detail-page' }: UserDetailPagePr
                       )}
                     </div>
                     <button
-                      onClick={() => unassignPermSetMutation.mutate(ps.id)}
+                      onClick={() => unassignPermSetMutation.mutate(ps.assignmentId)}
                       disabled={unassignPermSetMutation.isPending}
                       className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-destructive"
                       title="Remove permission set"

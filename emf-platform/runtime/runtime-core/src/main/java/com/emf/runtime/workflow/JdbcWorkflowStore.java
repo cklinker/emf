@@ -70,6 +70,31 @@ public class JdbcWorkflowStore implements WorkflowStore {
     }
 
     @Override
+    public Optional<WorkflowRuleData> findRuleById(String ruleId) {
+        String sql = """
+            SELECT wr.id, wr.tenant_id, wr.collection_id, c.name AS collection_name,
+                   wr.name, wr.description, wr.active, wr.trigger_type, wr.filter_formula,
+                   wr.re_evaluate_on_update, wr.execution_order, wr.error_handling,
+                   wr.trigger_fields, wr.cron_expression, wr.timezone,
+                   wr.last_scheduled_run, wr.execution_mode
+            FROM workflow_rule wr
+            JOIN collection c ON wr.collection_id = c.id
+            WHERE wr.id = ? AND wr.active = true
+            """;
+
+        List<WorkflowRuleData> rules = jdbcTemplate.query(sql,
+            (rs, rowNum) -> mapRule(rs), ruleId);
+
+        if (rules.isEmpty()) {
+            return Optional.empty();
+        }
+
+        WorkflowRuleData rule = rules.get(0);
+        List<WorkflowActionData> actions = loadActionsForRule(rule.id());
+        return Optional.of(withActions(rule, actions));
+    }
+
+    @Override
     public List<WorkflowRuleData> findScheduledRules() {
         String sql = """
             SELECT wr.id, wr.tenant_id, wr.collection_id, c.name AS collection_name,

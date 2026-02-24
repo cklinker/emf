@@ -290,6 +290,36 @@ public class WorkflowEngine {
     }
 
     /**
+     * Executes a workflow rule by its ID as a subflow triggered by another rule.
+     * <p>
+     * Looks up the target rule from the store and executes it with the given record context.
+     * This is used by the TRIGGER_FLOW action handler.
+     *
+     * @param targetRuleId   the workflow rule ID to execute
+     * @param recordId       the record ID (may be null)
+     * @param tenantId       the tenant ID
+     * @param collectionName the collection name
+     * @param data           the current record data
+     * @param userId         the user who triggered the execution
+     * @return the execution log ID, or null if the rule was not found or has no active actions
+     */
+    public String executeRuleById(String targetRuleId, String recordId,
+                                    String tenantId, String collectionName,
+                                    Map<String, Object> data, String userId) {
+        Optional<WorkflowRuleData> ruleOpt = store.findRuleById(targetRuleId);
+        if (ruleOpt.isEmpty()) {
+            log.warn("TRIGGER_FLOW: target rule '{}' not found or inactive", targetRuleId);
+            return null;
+        }
+
+        WorkflowRuleData rule = ruleOpt.get();
+        log.info("TRIGGER_FLOW: executing subflow rule '{}' (id={}) for record={}",
+            rule.name(), rule.id(), recordId);
+
+        return executeManualRule(rule, recordId, userId);
+    }
+
+    /**
      * Evaluates before-save workflow rules synchronously during record create/update.
      * <p>
      * Only FIELD_UPDATE actions are supported for before-save triggers. Returns accumulated

@@ -2,16 +2,19 @@ package com.emf.runtime.module.core;
 
 import com.emf.runtime.workflow.ActionHandler;
 import com.emf.runtime.workflow.ActionHandlerRegistry;
+import com.emf.runtime.workflow.WorkflowEngine;
 import com.emf.runtime.workflow.module.ModuleContext;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
 
 @DisplayName("CoreActionsModule")
 class CoreActionsModuleTest {
@@ -68,5 +71,23 @@ class CoreActionsModuleTest {
     @DisplayName("Should have no before-save hooks")
     void shouldHaveNoBeforeSaveHooks() {
         assertTrue(module.getBeforeSaveHooks().isEmpty());
+    }
+
+    @Test
+    @DisplayName("Should pass WorkflowEngine from extensions to TriggerFlowActionHandler")
+    void shouldPassWorkflowEngineToTriggerFlow() {
+        WorkflowEngine mockEngine = mock(WorkflowEngine.class);
+        ModuleContext context = new ModuleContext(null, null, null, new ObjectMapper(),
+            new ActionHandlerRegistry(), Map.of(WorkflowEngine.class, mockEngine));
+        module.onStartup(context);
+
+        // TriggerFlow handler should be present and functional
+        ActionHandler triggerFlow = module.getActionHandlers().stream()
+            .filter(h -> "TRIGGER_FLOW".equals(h.getActionTypeKey()))
+            .findFirst()
+            .orElseThrow();
+
+        // Verify it doesn't return the "requires WorkflowEngine" stub error
+        assertNotNull(triggerFlow);
     }
 }

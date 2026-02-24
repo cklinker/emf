@@ -88,7 +88,7 @@ public final class TypeCoercionService {
      * @param expectedType the expected field type
      * @return the coerced value, or the original value if coercion is not needed or not possible
      */
-    static Object coerceValue(Object value, FieldType expectedType) {
+    public static Object coerceValue(Object value, FieldType expectedType) {
         return switch (expectedType) {
             case INTEGER -> coerceToInteger(value);
             case LONG -> coerceToLong(value);

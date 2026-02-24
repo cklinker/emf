@@ -616,6 +616,57 @@ class PhysicalTableStorageAdapterTest {
         }
         
         @Test
+        @DisplayName("Should filter boolean field with string value 'false'")
+        void shouldFilterBooleanFieldWithStringValueFalse() {
+            // Simulates filter from URL: filter[active][eq]=false (value is String "false")
+            QueryRequest request = new QueryRequest(
+                Pagination.defaults(),
+                List.of(),
+                List.of(),
+                List.of(FilterCondition.eq("active", "false"))
+            );
+
+            QueryResult result = adapter.query(testCollection, request);
+
+            // Cherry (active=false) and Elderberry (active=false)
+            assertEquals(2, result.data().size());
+        }
+
+        @Test
+        @DisplayName("Should filter boolean field with string value 'true'")
+        void shouldFilterBooleanFieldWithStringValueTrue() {
+            // Simulates filter from URL: filter[active][eq]=true (value is String "true")
+            QueryRequest request = new QueryRequest(
+                Pagination.defaults(),
+                List.of(),
+                List.of(),
+                List.of(FilterCondition.eq("active", "true"))
+            );
+
+            QueryResult result = adapter.query(testCollection, request);
+
+            // Apple (active=true), Banana (active=true), Date (active=true)
+            assertEquals(3, result.data().size());
+        }
+
+        @Test
+        @DisplayName("Should filter numeric field with string value")
+        void shouldFilterNumericFieldWithStringValue() {
+            // Simulates filter from URL: filter[quantity][gt]=50 (value is String "50")
+            QueryRequest request = new QueryRequest(
+                Pagination.defaults(),
+                List.of(),
+                List.of(),
+                List.of(new FilterCondition("quantity", FilterOperator.GT, "50"))
+            );
+
+            QueryResult result = adapter.query(testCollection, request);
+
+            // Apple (100) and Banana (200)
+            assertEquals(2, result.data().size());
+        }
+
+        @Test
         @DisplayName("Should combine multiple filters with AND logic")
         void shouldCombineMultipleFiltersWithAndLogic() {
             QueryRequest request = new QueryRequest(

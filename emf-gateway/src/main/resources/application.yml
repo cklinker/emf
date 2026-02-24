@@ -83,6 +83,9 @@ emf:
       jwt-clock-skew-seconds: 30   # Tolerance for clock drift between gateway and IdP
       permissions-enabled: ${PERMISSIONS_ENABLED:false}   # Enable object-level permission enforcement
       permissions-cache-ttl-minutes: ${PERMISSIONS_CACHE_TTL:5}   # Redis cache TTL for resolved permissions
+      # Paths accessible without authentication (GET/HEAD only).
+      # Matched as prefixes against the slug-stripped path.
+      public-paths: /api/ui-pages,/api/ui-menus,/api/oidc-providers,/api/tenants
 
 # Actuator configuration for health and metrics
 management:

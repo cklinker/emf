@@ -1,6 +1,7 @@
 package com.emf.gateway.authz;
 
 import com.emf.gateway.auth.GatewayPrincipal;
+import com.emf.gateway.auth.PublicPathMatcher;
 import com.emf.gateway.route.RouteDefinition;
 import com.emf.gateway.route.RouteRegistry;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,16 +44,20 @@ class RouteAuthorizationFilterTest {
     private RouteRegistry routeRegistry;
 
     @Mock
+    private PublicPathMatcher publicPathMatcher;
+
+    @Mock
     private GatewayFilterChain filterChain;
 
     @BeforeEach
     void setUp() {
         lenient().when(filterChain.filter(any(ServerWebExchange.class))).thenReturn(Mono.empty());
+        lenient().when(publicPathMatcher.isPublicRequest(any(ServerWebExchange.class))).thenReturn(false);
     }
 
     @Test
     void shouldHaveOrderZero() {
-        RouteAuthorizationFilter filter = new RouteAuthorizationFilter(routeRegistry, false);
+        RouteAuthorizationFilter filter = new RouteAuthorizationFilter(routeRegistry, false, publicPathMatcher);
         assertThat(filter.getOrder()).isEqualTo(0);
     }
 
@@ -68,7 +73,23 @@ class RouteAuthorizationFilterTest {
 
         @BeforeEach
         void setUp() {
-            filter = new RouteAuthorizationFilter(routeRegistry, false);
+            filter = new RouteAuthorizationFilter(routeRegistry, false, publicPathMatcher);
+        }
+
+        @Test
+        @DisplayName("Should allow public path without principal")
+        void shouldAllowPublicPathWithoutPrincipal() {
+            MockServerHttpRequest request = MockServerHttpRequest.get("/api/ui-pages").build();
+            MockServerWebExchange exchange = MockServerWebExchange.from(request);
+
+            when(publicPathMatcher.isPublicRequest(exchange)).thenReturn(true);
+
+            StepVerifier.create(filter.filter(exchange, filterChain))
+                    .expectComplete()
+                    .verify();
+
+            verify(filterChain).filter(exchange);
+            assertThat(exchange.getResponse().getStatusCode()).isNull();
         }
 
         @Test
@@ -144,7 +165,23 @@ class RouteAuthorizationFilterTest {
 
         @BeforeEach
         void setUp() {
-            filter = new RouteAuthorizationFilter(routeRegistry, true);
+            filter = new RouteAuthorizationFilter(routeRegistry, true, publicPathMatcher);
+        }
+
+        @Test
+        @DisplayName("Should allow public path without principal")
+        void shouldAllowPublicPathWithoutPrincipal() {
+            MockServerHttpRequest request = MockServerHttpRequest.get("/api/oidc-providers").build();
+            MockServerWebExchange exchange = MockServerWebExchange.from(request);
+
+            when(publicPathMatcher.isPublicRequest(exchange)).thenReturn(true);
+
+            StepVerifier.create(filter.filter(exchange, filterChain))
+                    .expectComplete()
+                    .verify();
+
+            verify(filterChain).filter(exchange);
+            assertThat(exchange.getResponse().getStatusCode()).isNull();
         }
 
         @Test

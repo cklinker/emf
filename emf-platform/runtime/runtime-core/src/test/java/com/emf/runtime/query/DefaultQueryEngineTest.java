@@ -16,6 +16,7 @@ import com.emf.runtime.validation.ValidationResult;
 import com.emf.runtime.workflow.BeforeSaveHook;
 import com.emf.runtime.workflow.BeforeSaveHookRegistry;
 import com.emf.runtime.workflow.BeforeSaveResult;
+import com.emf.runtime.workflow.WorkflowEngine;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -1048,6 +1049,158 @@ class DefaultQueryEngineTest {
 
             engineWithHooks.delete(testCollection, id);
             assertTrue(afterHookCalled.get(), "After-delete hook should have been called");
+        }
+    }
+
+    @Nested
+    @DisplayName("WorkflowEngine Before-Save Integration Tests")
+    class WorkflowEngineBeforeSaveTests {
+
+        private WorkflowEngine workflowEngine;
+        private DefaultQueryEngine engineWithWorkflow;
+        private ValidationEngine wfValidationEngine;
+
+        @BeforeEach
+        void setUp() {
+            workflowEngine = mock(WorkflowEngine.class);
+            wfValidationEngine = mock(ValidationEngine.class);
+            when(wfValidationEngine.validate(any(CollectionDefinition.class), anyMap(), any(OperationType.class)))
+                .thenReturn(ValidationResult.success());
+            when(wfValidationEngine.validate(any(CollectionDefinition.class), anyMap(), any(OperationType.class), any()))
+                .thenCallRealMethod();
+            engineWithWorkflow = new DefaultQueryEngine(
+                storageAdapter, wfValidationEngine, null, null, null, null, null, null, null, workflowEngine);
+        }
+
+        @Test
+        @DisplayName("Should call evaluateBeforeSave on create with BEFORE_CREATE trigger")
+        void shouldCallWorkflowBeforeSaveOnCreate() {
+            when(workflowEngine.evaluateBeforeSave(
+                anyString(), anyString(), anyString(), anyMap(), any(), anyList(), anyString(), anyString()))
+                .thenReturn(Map.of("fieldUpdates", Map.of(), "rulesEvaluated", 0, "actionsExecuted", 0));
+            when(storageAdapter.create(any(CollectionDefinition.class), any())).thenAnswer(inv -> inv.getArgument(1));
+
+            Map<String, Object> data = new HashMap<>(Map.of("name", "Widget", "price", 9.99));
+            engineWithWorkflow.create(testCollection, data);
+
+            verify(workflowEngine).evaluateBeforeSave(
+                anyString(), eq("products"), anyString(), anyMap(), isNull(), anyList(), anyString(), eq("CREATE"));
+        }
+
+        @Test
+        @DisplayName("Should apply field updates from before-save workflow on create")
+        void shouldApplyFieldUpdatesFromWorkflowOnCreate() {
+            when(workflowEngine.evaluateBeforeSave(
+                anyString(), anyString(), anyString(), anyMap(), any(), anyList(), anyString(), anyString()))
+                .thenReturn(Map.of("fieldUpdates", Map.of("priority", "HIGH"), "rulesEvaluated", 1, "actionsExecuted", 1));
+            when(storageAdapter.create(any(CollectionDefinition.class), any())).thenAnswer(inv -> {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> savedData = (Map<String, Object>) inv.getArgument(1);
+                return savedData;
+            });
+
+            Map<String, Object> data = new HashMap<>(Map.of("name", "Widget", "price", 9.99));
+            Map<String, Object> result = engineWithWorkflow.create(testCollection, data);
+
+            assertEquals("HIGH", result.get("priority"),
+                "Field update from workflow should be applied");
+        }
+
+        @Test
+        @DisplayName("Should call evaluateBeforeSave on update with BEFORE_UPDATE trigger")
+        void shouldCallWorkflowBeforeSaveOnUpdate() {
+            String id = UUID.randomUUID().toString();
+            Map<String, Object> existingRecord = new HashMap<>(Map.of(
+                "id", id, "name", "Widget", "price", 9.99));
+            when(storageAdapter.getById(any(CollectionDefinition.class), eq(id)))
+                .thenReturn(Optional.of(existingRecord));
+            when(storageAdapter.update(any(CollectionDefinition.class), eq(id), any()))
+                .thenAnswer(inv -> Optional.of(inv.getArgument(2)));
+            when(workflowEngine.evaluateBeforeSave(
+                anyString(), anyString(), anyString(), anyMap(), anyMap(), anyList(), anyString(), anyString()))
+                .thenReturn(Map.of("fieldUpdates", Map.of(), "rulesEvaluated", 0, "actionsExecuted", 0));
+
+            Map<String, Object> updateData = new HashMap<>(Map.of("price", 19.99));
+            engineWithWorkflow.update(testCollection, id, updateData);
+
+            verify(workflowEngine).evaluateBeforeSave(
+                anyString(), eq("products"), eq(id), anyMap(), anyMap(), anyList(), anyString(), eq("UPDATE"));
+        }
+
+        @Test
+        @DisplayName("Should apply field updates from before-save workflow on update")
+        void shouldApplyFieldUpdatesFromWorkflowOnUpdate() {
+            String id = UUID.randomUUID().toString();
+            Map<String, Object> existingRecord = new HashMap<>(Map.of(
+                "id", id, "name", "Widget", "price", 9.99, "status", "DRAFT"));
+            when(storageAdapter.getById(any(CollectionDefinition.class), eq(id)))
+                .thenReturn(Optional.of(existingRecord));
+            when(storageAdapter.update(any(CollectionDefinition.class), eq(id), any()))
+                .thenAnswer(inv -> Optional.of(inv.getArgument(2)));
+            when(workflowEngine.evaluateBeforeSave(
+                anyString(), anyString(), anyString(), anyMap(), anyMap(), anyList(), anyString(), anyString()))
+                .thenReturn(Map.of("fieldUpdates", Map.of("status", "ACTIVE"), "rulesEvaluated", 1, "actionsExecuted", 1));
+
+            Map<String, Object> updateData = new HashMap<>(Map.of("name", "Widget v2"));
+            Optional<Map<String, Object>> result = engineWithWorkflow.update(testCollection, id, updateData);
+
+            assertTrue(result.isPresent());
+            assertEquals("ACTIVE", result.get().get("status"),
+                "Field update from workflow should be applied to update data");
+        }
+
+        @Test
+        @DisplayName("Should not call workflow engine when not wired")
+        void shouldSkipWhenWorkflowEngineIsNull() {
+            DefaultQueryEngine engineWithoutWorkflow = new DefaultQueryEngine(
+                storageAdapter, wfValidationEngine);
+
+            when(storageAdapter.create(any(CollectionDefinition.class), any())).thenAnswer(inv -> inv.getArgument(1));
+
+            Map<String, Object> data = new HashMap<>(Map.of("name", "Widget", "price", 9.99));
+            assertDoesNotThrow(() -> engineWithoutWorkflow.create(testCollection, data));
+
+            verifyNoInteractions(workflowEngine);
+        }
+
+        @Test
+        @DisplayName("Should handle workflow engine exception gracefully on create")
+        void shouldHandleWorkflowExceptionGracefullyOnCreate() {
+            when(workflowEngine.evaluateBeforeSave(
+                anyString(), anyString(), anyString(), anyMap(), any(), anyList(), anyString(), anyString()))
+                .thenThrow(new RuntimeException("Workflow engine error"));
+            when(storageAdapter.create(any(CollectionDefinition.class), any())).thenAnswer(inv -> inv.getArgument(1));
+
+            Map<String, Object> data = new HashMap<>(Map.of("name", "Widget", "price", 9.99));
+
+            // Should not throw — workflow errors are logged, not propagated
+            assertDoesNotThrow(() -> engineWithWorkflow.create(testCollection, data));
+
+            // storageAdapter.create should still be called (save proceeds despite error)
+            verify(storageAdapter).create(any(CollectionDefinition.class), any());
+        }
+
+        @Test
+        @DisplayName("Should handle workflow engine exception gracefully on update")
+        void shouldHandleWorkflowExceptionGracefullyOnUpdate() {
+            String id = UUID.randomUUID().toString();
+            Map<String, Object> existingRecord = new HashMap<>(Map.of(
+                "id", id, "name", "Widget", "price", 9.99));
+            when(storageAdapter.getById(any(CollectionDefinition.class), eq(id)))
+                .thenReturn(Optional.of(existingRecord));
+            when(storageAdapter.update(any(CollectionDefinition.class), eq(id), any()))
+                .thenAnswer(inv -> Optional.of(inv.getArgument(2)));
+            when(workflowEngine.evaluateBeforeSave(
+                anyString(), anyString(), anyString(), anyMap(), anyMap(), anyList(), anyString(), anyString()))
+                .thenThrow(new RuntimeException("Workflow engine error"));
+
+            Map<String, Object> updateData = new HashMap<>(Map.of("price", 19.99));
+
+            // Should not throw — workflow errors are logged, not propagated
+            assertDoesNotThrow(() -> engineWithWorkflow.update(testCollection, id, updateData));
+
+            // storageAdapter.update should still be called
+            verify(storageAdapter).update(any(CollectionDefinition.class), eq(id), any());
         }
     }
 }

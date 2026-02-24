@@ -62,15 +62,6 @@ export interface CollectionsPageProps {
   testId?: string
 }
 
-// API response type for paginated collections
-interface PageResponse<T> {
-  content: T[]
-  totalElements: number
-  totalPages: number
-  size: number
-  number: number
-}
-
 /**
  * CollectionsPage Component
  *
@@ -118,8 +109,10 @@ export function CollectionsPage({
   } = useQuery({
     queryKey: ['collections', { showSystem }],
     queryFn: () =>
-      apiClient.get<PageResponse<Collection>>(
-        `/api/collections?page[size]=1000${showSystem ? '&includeSystem=true' : ''}`
+      apiClient.getPage<Collection>(
+        showSystem
+          ? '/api/collections?page[size]=1000'
+          : '/api/collections?filter[systemCollection][eq]=false&page[size]=1000'
       ),
   })
 

@@ -25,14 +25,6 @@ interface PlatformUser {
   updatedAt: string
 }
 
-interface PageResponse<T> {
-  content: T[]
-  totalElements: number
-  totalPages: number
-  number: number
-  size: number
-}
-
 interface CreateUserFormData {
   email: string
   firstName: string
@@ -238,7 +230,7 @@ export function UsersPage({ testId = 'users-page' }: UsersPageProps) {
       if (statusFilter) params.append('status', statusFilter)
       params.append('page[number]', page.toString())
       params.append('page[size]', '20')
-      return apiClient.get<PageResponse<PlatformUser>>(`/api/users?${params}`)
+      return apiClient.getPage<PlatformUser>(`/api/users?${params}`)
     },
   })
 

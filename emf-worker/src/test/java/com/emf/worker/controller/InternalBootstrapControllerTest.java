@@ -299,6 +299,251 @@ class InternalBootstrapControllerTest {
         }
     }
 
+    // ==================== Permission Resolution Tests ====================
+
+    @Nested
+    @DisplayName("GET /internal/permissions")
+    class PermissionsTests {
+
+        @Test
+        @DisplayName("Should return 404 when user not found")
+        void returns404WhenUserNotFound() {
+            when(jdbcTemplate.queryForList(contains("FROM platform_user"),
+                    eq("unknown@test.com"), eq("tenant-1")))
+                    .thenReturn(List.of());
+
+            ResponseEntity<Map<String, Object>> response =
+                    controller.resolvePermissions("unknown@test.com", "tenant-1");
+
+            assertThat(response.getStatusCode().value()).isEqualTo(404);
+        }
+
+        @Test
+        @DisplayName("Should return empty permissions when user has no profile")
+        void returnsEmptyPermissionsWhenNoProfile() {
+            Map<String, Object> userRow = new HashMap<>();
+            userRow.put("id", "user-1");
+            userRow.put("profile_id", null);
+
+            when(jdbcTemplate.queryForList(contains("FROM platform_user"),
+                    eq("user@test.com"), eq("tenant-1")))
+                    .thenReturn(List.of(userRow));
+
+            // No direct or group permission sets
+            when(jdbcTemplate.queryForList(contains("FROM user_permission_set"), eq("user-1")))
+                    .thenReturn(List.of());
+            when(jdbcTemplate.queryForList(contains("FROM group_membership"), eq("user-1")))
+                    .thenReturn(List.of());
+
+            ResponseEntity<Map<String, Object>> response =
+                    controller.resolvePermissions("user@test.com", "tenant-1");
+
+            assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+            Map<String, Object> body = response.getBody();
+            assertThat(body).isNotNull();
+            assertThat(body.get("userId")).isEqualTo("user-1");
+
+            @SuppressWarnings("unchecked")
+            Map<String, Boolean> systemPerms = (Map<String, Boolean>) body.get("systemPermissions");
+            assertThat(systemPerms).isEmpty();
+        }
+
+        @Test
+        @DisplayName("Should load profile permissions")
+        void loadsProfilePermissions() {
+            // User with profile
+            Map<String, Object> userRow = new HashMap<>();
+            userRow.put("id", "user-1");
+            userRow.put("profile_id", "profile-1");
+
+            when(jdbcTemplate.queryForList(contains("FROM platform_user"),
+                    eq("user@test.com"), eq("tenant-1")))
+                    .thenReturn(List.of(userRow));
+
+            // Profile system permissions
+            when(jdbcTemplate.queryForList(contains("FROM profile_system_permission"),
+                    eq("profile-1")))
+                    .thenReturn(List.of(
+                            systemPermRow("API_ACCESS", true),
+                            systemPermRow("MANAGE_USERS", false)
+                    ));
+
+            // Profile object permissions
+            when(jdbcTemplate.queryForList(contains("FROM profile_object_permission"),
+                    eq("profile-1")))
+                    .thenReturn(List.of(
+                            objectPermRow("coll-1", true, true, false, false, false, false)
+                    ));
+
+            // Profile field permissions
+            when(jdbcTemplate.queryForList(contains("FROM profile_field_permission"),
+                    eq("profile-1")))
+                    .thenReturn(List.of(
+                            fieldPermRow("coll-1", "field-1", "VISIBLE")
+                    ));
+
+            // No direct or group permission sets
+            when(jdbcTemplate.queryForList(contains("FROM user_permission_set"), eq("user-1")))
+                    .thenReturn(List.of());
+            when(jdbcTemplate.queryForList(contains("FROM group_membership"), eq("user-1")))
+                    .thenReturn(List.of());
+
+            ResponseEntity<Map<String, Object>> response =
+                    controller.resolvePermissions("user@test.com", "tenant-1");
+
+            assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+            Map<String, Object> body = response.getBody();
+
+            @SuppressWarnings("unchecked")
+            Map<String, Boolean> systemPerms = (Map<String, Boolean>) body.get("systemPermissions");
+            assertThat(systemPerms.get("API_ACCESS")).isTrue();
+            // MANAGE_USERS is false so not included (only granted=true are added)
+            assertThat(systemPerms.containsKey("MANAGE_USERS")).isFalse();
+
+            @SuppressWarnings("unchecked")
+            Map<String, Map<String, Object>> objectPerms =
+                    (Map<String, Map<String, Object>>) body.get("objectPermissions");
+            assertThat(objectPerms).containsKey("coll-1");
+            assertThat(objectPerms.get("coll-1").get("canCreate")).isEqualTo(true);
+            assertThat(objectPerms.get("coll-1").get("canRead")).isEqualTo(true);
+            assertThat(objectPerms.get("coll-1").get("canEdit")).isEqualTo(false);
+
+            @SuppressWarnings("unchecked")
+            Map<String, Map<String, String>> fieldPerms =
+                    (Map<String, Map<String, String>>) body.get("fieldPermissions");
+            assertThat(fieldPerms.get("coll-1").get("field-1")).isEqualTo("VISIBLE");
+        }
+
+        @Test
+        @DisplayName("Should merge permission set permissions with most-permissive-wins")
+        void mergesPermissionSetsWithMostPermissiveWins() {
+            // User with profile
+            Map<String, Object> userRow = new HashMap<>();
+            userRow.put("id", "user-1");
+            userRow.put("profile_id", "profile-1");
+
+            when(jdbcTemplate.queryForList(contains("FROM platform_user"),
+                    eq("user@test.com"), eq("tenant-1")))
+                    .thenReturn(List.of(userRow));
+
+            // Profile grants canRead only
+            when(jdbcTemplate.queryForList(contains("FROM profile_system_permission"),
+                    eq("profile-1")))
+                    .thenReturn(List.of(systemPermRow("API_ACCESS", true)));
+            when(jdbcTemplate.queryForList(contains("FROM profile_object_permission"),
+                    eq("profile-1")))
+                    .thenReturn(List.of(
+                            objectPermRow("coll-1", false, true, false, false, false, false)
+                    ));
+            when(jdbcTemplate.queryForList(contains("FROM profile_field_permission"),
+                    eq("profile-1")))
+                    .thenReturn(List.of(
+                            fieldPermRow("coll-1", "field-1", "READ_ONLY")
+                    ));
+
+            // One direct permission set
+            when(jdbcTemplate.queryForList(contains("FROM user_permission_set"), eq("user-1")))
+                    .thenReturn(List.of(Map.of("permission_set_id", (Object) "ps-1")));
+
+            // No group permission sets
+            when(jdbcTemplate.queryForList(contains("FROM group_membership"), eq("user-1")))
+                    .thenReturn(List.of());
+
+            // Permission set grants canCreate on coll-1 + VISIBLE on field-1
+            when(jdbcTemplate.queryForList(contains("FROM permset_system_permission"),
+                    eq("ps-1")))
+                    .thenReturn(List.of(systemPermRow("VIEW_ALL_DATA", true)));
+            when(jdbcTemplate.queryForList(contains("FROM permset_object_permission"),
+                    eq("ps-1")))
+                    .thenReturn(List.of(
+                            objectPermRow("coll-1", true, false, false, false, false, false)
+                    ));
+            when(jdbcTemplate.queryForList(contains("FROM permset_field_permission"),
+                    eq("ps-1")))
+                    .thenReturn(List.of(
+                            fieldPermRow("coll-1", "field-1", "VISIBLE")
+                    ));
+
+            ResponseEntity<Map<String, Object>> response =
+                    controller.resolvePermissions("user@test.com", "tenant-1");
+
+            Map<String, Object> body = response.getBody();
+
+            @SuppressWarnings("unchecked")
+            Map<String, Boolean> systemPerms = (Map<String, Boolean>) body.get("systemPermissions");
+            assertThat(systemPerms.get("API_ACCESS")).isTrue();
+            assertThat(systemPerms.get("VIEW_ALL_DATA")).isTrue();
+
+            // Most-permissive-wins: profile(canRead) OR permset(canCreate) = both true
+            @SuppressWarnings("unchecked")
+            Map<String, Map<String, Object>> objectPerms =
+                    (Map<String, Map<String, Object>>) body.get("objectPermissions");
+            assertThat(objectPerms.get("coll-1").get("canCreate")).isEqualTo(true);
+            assertThat(objectPerms.get("coll-1").get("canRead")).isEqualTo(true);
+
+            // Field visibility: READ_ONLY vs VISIBLE → VISIBLE wins
+            @SuppressWarnings("unchecked")
+            Map<String, Map<String, String>> fieldPerms =
+                    (Map<String, Map<String, String>>) body.get("fieldPermissions");
+            assertThat(fieldPerms.get("coll-1").get("field-1")).isEqualTo("VISIBLE");
+        }
+
+        @Test
+        @DisplayName("Should include group-inherited permission sets")
+        void includesGroupInheritedPermissionSets() {
+            Map<String, Object> userRow = new HashMap<>();
+            userRow.put("id", "user-1");
+            userRow.put("profile_id", null);
+
+            when(jdbcTemplate.queryForList(contains("FROM platform_user"),
+                    eq("user@test.com"), eq("tenant-1")))
+                    .thenReturn(List.of(userRow));
+
+            // No direct permission sets
+            when(jdbcTemplate.queryForList(contains("FROM user_permission_set"), eq("user-1")))
+                    .thenReturn(List.of());
+
+            // User belongs to one group
+            when(jdbcTemplate.queryForList(contains("FROM group_membership"), eq("user-1")))
+                    .thenReturn(List.of(Map.of("group_id", (Object) "group-1")));
+
+            // Group has a permission set
+            when(jdbcTemplate.queryForList(contains("FROM group_permission_set"),
+                    eq("group-1")))
+                    .thenReturn(List.of(Map.of("permission_set_id", (Object) "ps-group-1")));
+
+            // Group permission set grants permissions
+            when(jdbcTemplate.queryForList(contains("FROM permset_system_permission"),
+                    eq("ps-group-1")))
+                    .thenReturn(List.of(systemPermRow("API_ACCESS", true)));
+            when(jdbcTemplate.queryForList(contains("FROM permset_object_permission"),
+                    eq("ps-group-1")))
+                    .thenReturn(List.of(
+                            objectPermRow("coll-1", true, true, true, true, false, false)
+                    ));
+            when(jdbcTemplate.queryForList(contains("FROM permset_field_permission"),
+                    eq("ps-group-1")))
+                    .thenReturn(List.of());
+
+            ResponseEntity<Map<String, Object>> response =
+                    controller.resolvePermissions("user@test.com", "tenant-1");
+
+            Map<String, Object> body = response.getBody();
+
+            @SuppressWarnings("unchecked")
+            Map<String, Boolean> systemPerms = (Map<String, Boolean>) body.get("systemPermissions");
+            assertThat(systemPerms.get("API_ACCESS")).isTrue();
+
+            @SuppressWarnings("unchecked")
+            Map<String, Map<String, Object>> objectPerms =
+                    (Map<String, Map<String, Object>>) body.get("objectPermissions");
+            assertThat(objectPerms.get("coll-1").get("canCreate")).isEqualTo(true);
+            assertThat(objectPerms.get("coll-1").get("canRead")).isEqualTo(true);
+            assertThat(objectPerms.get("coll-1").get("canEdit")).isEqualTo(true);
+            assertThat(objectPerms.get("coll-1").get("canDelete")).isEqualTo(true);
+        }
+    }
+
     // ==================== Helper Methods ====================
 
     private Map<String, Object> collectionRow(String id, String name, String path, boolean system) {
@@ -321,6 +566,35 @@ class InternalBootstrapControllerTest {
         Map<String, Object> row = new HashMap<>();
         row.put("id", id);
         row.put("slug", slug);
+        return row;
+    }
+
+    private Map<String, Object> systemPermRow(String name, boolean granted) {
+        Map<String, Object> row = new HashMap<>();
+        row.put("permission_name", name);
+        row.put("granted", granted);
+        return row;
+    }
+
+    private Map<String, Object> objectPermRow(String collectionId,
+                                                boolean canCreate, boolean canRead, boolean canEdit,
+                                                boolean canDelete, boolean canViewAll, boolean canModifyAll) {
+        Map<String, Object> row = new HashMap<>();
+        row.put("collection_id", collectionId);
+        row.put("can_create", canCreate);
+        row.put("can_read", canRead);
+        row.put("can_edit", canEdit);
+        row.put("can_delete", canDelete);
+        row.put("can_view_all", canViewAll);
+        row.put("can_modify_all", canModifyAll);
+        return row;
+    }
+
+    private Map<String, Object> fieldPermRow(String collectionId, String fieldId, String visibility) {
+        Map<String, Object> row = new HashMap<>();
+        row.put("collection_id", collectionId);
+        row.put("field_id", fieldId);
+        row.put("visibility", visibility);
         return row;
     }
 }

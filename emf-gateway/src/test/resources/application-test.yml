@@ -36,6 +36,9 @@ emf:
       topics:
         collection-changed: emf.collection.changed
     # Rate limiting is driven by per-tenant governor limits from the worker
+    security:
+      permissions-enabled: false
+      permissions-cache-ttl-minutes: 5
 
 # Disable actuator endpoints for tests
 management:

@@ -37,16 +37,20 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
 
     private final ReactiveJwtDecoder jwtDecoder;
     private final PrincipalExtractor principalExtractor;
-    
+    private final PublicPathMatcher publicPathMatcher;
+
     /**
      * Creates a new JwtAuthenticationFilter.
      *
      * @param jwtDecoder the JWT decoder for validating tokens
      * @param principalExtractor the extractor for creating GatewayPrincipal from JWT
+     * @param publicPathMatcher the matcher for public (unauthenticated) paths
      */
-    public JwtAuthenticationFilter(ReactiveJwtDecoder jwtDecoder, PrincipalExtractor principalExtractor) {
+    public JwtAuthenticationFilter(ReactiveJwtDecoder jwtDecoder, PrincipalExtractor principalExtractor,
+                                   PublicPathMatcher publicPathMatcher) {
         this.jwtDecoder = jwtDecoder;
         this.principalExtractor = principalExtractor;
+        this.publicPathMatcher = publicPathMatcher;
     }
     
     @Override
@@ -56,6 +60,12 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
         // Allow CORS preflight requests through — browsers send OPTIONS without credentials
         if (exchange.getRequest().getMethod() == HttpMethod.OPTIONS) {
             log.debug("Allowing CORS preflight request for path: {}", path);
+            return chain.filter(exchange);
+        }
+
+        // Allow unauthenticated access to public bootstrap paths (GET/HEAD only)
+        if (publicPathMatcher.isPublicRequest(exchange)) {
+            log.debug("Allowing unauthenticated access to public path: {}", path);
             return chain.filter(exchange);
         }
 

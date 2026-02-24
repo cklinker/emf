@@ -2,6 +2,7 @@ package com.emf.gateway.authz;
 
 import com.emf.gateway.auth.GatewayPrincipal;
 import com.emf.gateway.auth.JwtAuthenticationFilter;
+import com.emf.gateway.auth.PublicPathMatcher;
 import com.emf.gateway.route.RouteDefinition;
 import com.emf.gateway.route.RouteRegistry;
 import org.slf4j.Logger;
@@ -46,17 +47,25 @@ public class RouteAuthorizationFilter implements GlobalFilter, Ordered {
 
     private final RouteRegistry routeRegistry;
     private final boolean permissionsEnabled;
+    private final PublicPathMatcher publicPathMatcher;
 
     public RouteAuthorizationFilter(
             RouteRegistry routeRegistry,
-            @Value("${emf.gateway.security.permissions-enabled:false}") boolean permissionsEnabled) {
+            @Value("${emf.gateway.security.permissions-enabled:false}") boolean permissionsEnabled,
+            PublicPathMatcher publicPathMatcher) {
         this.routeRegistry = routeRegistry;
         this.permissionsEnabled = permissionsEnabled;
+        this.publicPathMatcher = publicPathMatcher;
     }
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         String path = exchange.getRequest().getPath().value();
+
+        // Allow public paths through without principal check
+        if (publicPathMatcher.isPublicRequest(exchange)) {
+            return chain.filter(exchange);
+        }
 
         GatewayPrincipal principal = JwtAuthenticationFilter.getPrincipal(exchange);
 

@@ -35,21 +35,26 @@ class JwtAuthenticationFilterTest {
     
     @Mock
     private ReactiveJwtDecoder jwtDecoder;
-    
+
     @Mock
     private PrincipalExtractor principalExtractor;
-    
+
+    @Mock
+    private PublicPathMatcher publicPathMatcher;
+
     @Mock
     private GatewayFilterChain filterChain;
-    
+
     private JwtAuthenticationFilter filter;
-    
+
     @BeforeEach
     void setUp() {
-        filter = new JwtAuthenticationFilter(jwtDecoder, principalExtractor);
-        
+        filter = new JwtAuthenticationFilter(jwtDecoder, principalExtractor, publicPathMatcher);
+
         // Mock filter chain to return completed Mono (lenient to avoid unnecessary stubbing errors)
         lenient().when(filterChain.filter(any(ServerWebExchange.class))).thenReturn(Mono.empty());
+        // Default: no public paths match (most tests require auth)
+        lenient().when(publicPathMatcher.isPublicRequest(any(ServerWebExchange.class))).thenReturn(false);
     }
     
     @Test
@@ -78,6 +83,27 @@ class JwtAuthenticationFilterTest {
         verify(jwtDecoder, never()).decode(anyString());
     }
     
+    @Test
+    void shouldAllowPublicPathRequestsWithoutAuth() {
+        // Given
+        MockServerHttpRequest request = MockServerHttpRequest
+            .get("/api/ui-pages")
+            .build();
+        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        when(publicPathMatcher.isPublicRequest(exchange)).thenReturn(true);
+
+        // When
+        Mono<Void> result = filter.filter(exchange, filterChain);
+
+        // Then
+        StepVerifier.create(result)
+            .verifyComplete();
+
+        verify(filterChain).filter(exchange);
+        verify(jwtDecoder, never()).decode(anyString());
+    }
+
     @Test
     void shouldReturn401WhenAuthorizationHeaderIsMissing() {
         // Given

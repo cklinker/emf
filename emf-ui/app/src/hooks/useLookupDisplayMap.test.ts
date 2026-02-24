@@ -7,10 +7,12 @@ import type { FieldDefinition } from './useCollectionSchema'
 
 // Mock API context
 const mockGet = vi.fn()
+const mockGetOne = vi.fn()
 vi.mock('../context/ApiContext', () => ({
   useApi: vi.fn(() => ({
     apiClient: {
       get: mockGet,
+      getOne: mockGetOne,
       post: vi.fn(),
       put: vi.fn(),
       patch: vi.fn(),
@@ -41,6 +43,7 @@ function makeField(overrides: Partial<FieldDefinition> & { name: string }): Fiel
 describe('useLookupDisplayMap', () => {
   beforeEach(() => {
     mockGet.mockReset()
+    mockGetOne.mockReset()
   })
 
   it('returns undefined when fields is undefined', () => {
@@ -90,15 +93,20 @@ describe('useLookupDisplayMap', () => {
       }),
     ]
 
-    // Mock: fetch target collection schema
-    mockGet.mockImplementation((url: string) => {
-      if (url === '/control/collections/col-customers') {
+    // Mock: getOne for collection schema (JSON:API auto-unwrapped)
+    mockGetOne.mockImplementation((url: string) => {
+      if (url === '/api/collections/col-customers') {
         return Promise.resolve({
           name: 'customers',
           displayFieldName: 'full_name',
           fields: [{ name: 'full_name', type: 'STRING' }],
         })
       }
+      return Promise.reject(new Error(`Unexpected getOne URL: ${url}`))
+    })
+
+    // Mock: get for records (returns JSON:API envelope)
+    mockGet.mockImplementation((url: string) => {
       if (url.startsWith('/api/customers')) {
         return Promise.resolve({
           data: [
@@ -107,7 +115,7 @@ describe('useLookupDisplayMap', () => {
           ],
         })
       }
-      return Promise.reject(new Error(`Unexpected URL: ${url}`))
+      return Promise.reject(new Error(`Unexpected get URL: ${url}`))
     })
 
     const { result } = renderHook(() => useLookupDisplayMap(fields), {
@@ -133,19 +141,25 @@ describe('useLookupDisplayMap', () => {
       }),
     ]
 
-    mockGet.mockImplementation((url: string) => {
-      if (url === '/control/collections/col-categories') {
+    // Mock: getOne for collection schema (JSON:API auto-unwrapped)
+    mockGetOne.mockImplementation((url: string) => {
+      if (url === '/api/collections/col-categories') {
         return Promise.resolve({
           name: 'categories',
           fields: [{ name: 'name', type: 'STRING' }],
         })
       }
+      return Promise.reject(new Error(`Unexpected getOne URL: ${url}`))
+    })
+
+    // Mock: get for records
+    mockGet.mockImplementation((url: string) => {
       if (url.startsWith('/api/categories')) {
         return Promise.resolve({
           data: [{ id: 'cat-1', name: 'Electronics' }],
         })
       }
-      return Promise.reject(new Error(`Unexpected URL: ${url}`))
+      return Promise.reject(new Error(`Unexpected get URL: ${url}`))
     })
 
     const { result } = renderHook(() => useLookupDisplayMap(fields), {
@@ -169,8 +183,9 @@ describe('useLookupDisplayMap', () => {
       }),
     ]
 
-    mockGet.mockImplementation((url: string) => {
-      if (url === '/control/collections/col-products') {
+    // Mock: getOne for collection schema (JSON:API auto-unwrapped)
+    mockGetOne.mockImplementation((url: string) => {
+      if (url === '/api/collections/col-products') {
         return Promise.resolve({
           name: 'products',
           fields: [
@@ -179,12 +194,17 @@ describe('useLookupDisplayMap', () => {
           ],
         })
       }
+      return Promise.reject(new Error(`Unexpected getOne URL: ${url}`))
+    })
+
+    // Mock: get for records
+    mockGet.mockImplementation((url: string) => {
       if (url.startsWith('/api/products')) {
         return Promise.resolve({
           data: [{ id: 'prod-1', sku: 'SKU-001', price: 29.99 }],
         })
       }
-      return Promise.reject(new Error(`Unexpected URL: ${url}`))
+      return Promise.reject(new Error(`Unexpected get URL: ${url}`))
     })
 
     const { result } = renderHook(() => useLookupDisplayMap(fields), {
@@ -212,20 +232,26 @@ describe('useLookupDisplayMap', () => {
       }),
     ]
 
-    mockGet.mockImplementation((url: string) => {
-      if (url === '/control/collections/col-customers') {
+    // Mock: getOne for collection schema (JSON:API auto-unwrapped)
+    mockGetOne.mockImplementation((url: string) => {
+      if (url === '/api/collections/col-customers') {
         return Promise.resolve({
           name: 'customers',
           displayFieldName: 'full_name',
           fields: [{ name: 'full_name', type: 'STRING' }],
         })
       }
+      return Promise.reject(new Error(`Unexpected getOne URL: ${url}`))
+    })
+
+    // Mock: get for records
+    mockGet.mockImplementation((url: string) => {
       if (url.startsWith('/api/customers')) {
         return Promise.resolve({
           data: [{ id: 'cust-1', full_name: 'Alice' }],
         })
       }
-      return Promise.reject(new Error(`Unexpected URL: ${url}`))
+      return Promise.reject(new Error(`Unexpected get URL: ${url}`))
     })
 
     const { result } = renderHook(() => useLookupDisplayMap(fields), {
@@ -240,9 +266,9 @@ describe('useLookupDisplayMap', () => {
     expect(result.current.lookupDisplayMap!['customer']['cust-1']).toBe('Alice')
     expect(result.current.lookupDisplayMap!['billing_customer']['cust-1']).toBe('Alice')
 
-    // Should only have fetched the collection schema once
-    const schemaCallCount = mockGet.mock.calls.filter(
-      (c) => c[0] === '/control/collections/col-customers'
+    // Should only have fetched the collection schema once via getOne
+    const schemaCallCount = mockGetOne.mock.calls.filter(
+      (c: string[]) => c[0] === '/api/collections/col-customers'
     ).length
     expect(schemaCallCount).toBe(1)
   })
@@ -256,7 +282,8 @@ describe('useLookupDisplayMap', () => {
       }),
     ]
 
-    mockGet.mockRejectedValue(new Error('Network error'))
+    // getOne (collection schema) rejects with error
+    mockGetOne.mockRejectedValue(new Error('Network error'))
 
     const { result } = renderHook(() => useLookupDisplayMap(fields), {
       wrapper: TestWrapper,

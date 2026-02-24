@@ -315,7 +315,12 @@ describe('ResourceDetailPage', () => {
 
     it('should display error message when resource fetch fails', async () => {
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/collections/')) {
+        // getList('/api/collections') — return flat array so unwrapJsonApiList passes through
+        if (url === '/api/collections') {
+          return Promise.resolve({ data: [mockSchema] })
+        }
+        // getOne('/api/collections/col-1') — return flat object so unwrapJsonApiSingle passes through
+        if (url.includes('/api/collections/')) {
           return Promise.resolve({ data: mockSchema })
         }
         return Promise.reject(createAxiosError(500))
@@ -330,7 +335,10 @@ describe('ResourceDetailPage', () => {
 
     it('should display not found error when resource returns 404', async () => {
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/collections/')) {
+        if (url === '/api/collections') {
+          return Promise.resolve({ data: [mockSchema] })
+        }
+        if (url.includes('/api/collections/')) {
           return Promise.resolve({ data: mockSchema })
         }
         return Promise.reject(createAxiosError(404))
@@ -347,11 +355,12 @@ describe('ResourceDetailPage', () => {
   describe('Successful Data Display', () => {
     beforeEach(() => {
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/collections/users')) {
-          return Promise.resolve({ data: mockSchema })
+        // getList('/api/collections') — return flat array for unwrapJsonApiList
+        if (url === '/api/collections') {
+          return Promise.resolve({ data: [mockSchema] })
         }
         // Lookup: fetch target collection schema by ID for master_detail resolution
-        if (url.includes('/control/collections/org-collection-id')) {
+        if (url.includes('/api/collections/org-collection-id')) {
           return Promise.resolve({
             data: {
               id: 'org-collection-id',
@@ -361,7 +370,8 @@ describe('ResourceDetailPage', () => {
             },
           })
         }
-        if (url.includes('/control/collections/')) {
+        // getOne('/api/collections/col-1') — return flat object for unwrapJsonApiSingle
+        if (url.includes('/api/collections/')) {
           return Promise.resolve({ data: mockSchema })
         }
         // Lookup: fetch target collection records for display name resolution
@@ -372,10 +382,18 @@ describe('ResourceDetailPage', () => {
             },
           })
         }
+        // getList for notes, attachments, record-shares — return empty flat arrays
+        if (
+          url.includes('/api/notes') ||
+          url.includes('/api/attachments') ||
+          url.includes('/api/record-shares')
+        ) {
+          return Promise.resolve({ data: [] })
+        }
+        // get('/api/users/res-123') — return flat resource for apiClient.get()
         if (url.includes('/api/')) {
           return Promise.resolve({ data: mockResource })
         }
-        // sharing endpoint
         return Promise.resolve({ data: [] })
       })
     })
@@ -478,8 +496,18 @@ describe('ResourceDetailPage', () => {
   describe('Navigation', () => {
     beforeEach(() => {
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/collections/')) {
+        if (url === '/api/collections') {
+          return Promise.resolve({ data: [mockSchema] })
+        }
+        if (url.includes('/api/collections/')) {
           return Promise.resolve({ data: mockSchema })
+        }
+        if (
+          url.includes('/api/notes') ||
+          url.includes('/api/attachments') ||
+          url.includes('/api/record-shares')
+        ) {
+          return Promise.resolve({ data: [] })
         }
         if (url.includes('/api/')) {
           return Promise.resolve({ data: mockResource })
@@ -518,8 +546,18 @@ describe('ResourceDetailPage', () => {
   describe('Delete Functionality - Requirement 11.10', () => {
     beforeEach(() => {
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/collections/')) {
+        if (url === '/api/collections') {
+          return Promise.resolve({ data: [mockSchema] })
+        }
+        if (url.includes('/api/collections/')) {
           return Promise.resolve({ data: mockSchema })
+        }
+        if (
+          url.includes('/api/notes') ||
+          url.includes('/api/attachments') ||
+          url.includes('/api/record-shares')
+        ) {
+          return Promise.resolve({ data: [] })
         }
         if (url.includes('/api/')) {
           return Promise.resolve({ data: mockResource })
@@ -609,8 +647,18 @@ describe('ResourceDetailPage', () => {
       }
 
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/collections/')) {
+        if (url === '/api/collections') {
+          return Promise.resolve({ data: [mockSchema] })
+        }
+        if (url.includes('/api/collections/')) {
           return Promise.resolve({ data: mockSchema })
+        }
+        if (
+          url.includes('/api/notes') ||
+          url.includes('/api/attachments') ||
+          url.includes('/api/record-shares')
+        ) {
+          return Promise.resolve({ data: [] })
         }
         if (url.includes('/api/')) {
           return Promise.resolve({ data: resourceWithNulls })
@@ -638,8 +686,18 @@ describe('ResourceDetailPage', () => {
       }
 
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/collections/')) {
+        if (url === '/api/collections') {
+          return Promise.resolve({ data: [mockSchema] })
+        }
+        if (url.includes('/api/collections/')) {
           return Promise.resolve({ data: mockSchema })
+        }
+        if (
+          url.includes('/api/notes') ||
+          url.includes('/api/attachments') ||
+          url.includes('/api/record-shares')
+        ) {
+          return Promise.resolve({ data: [] })
         }
         if (url.includes('/api/')) {
           return Promise.resolve({ data: resourceWithFalse })
@@ -657,11 +715,20 @@ describe('ResourceDetailPage', () => {
 
   describe('Props Override', () => {
     it('should use props over route params when provided', async () => {
+      const productsSchema = { ...mockSchema, name: 'products', displayName: 'Products' }
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/collections/')) {
-          return Promise.resolve({
-            data: { ...mockSchema, name: 'products', displayName: 'Products' },
-          })
+        if (url === '/api/collections') {
+          return Promise.resolve({ data: [productsSchema] })
+        }
+        if (url.includes('/api/collections/')) {
+          return Promise.resolve({ data: productsSchema })
+        }
+        if (
+          url.includes('/api/notes') ||
+          url.includes('/api/attachments') ||
+          url.includes('/api/record-shares')
+        ) {
+          return Promise.resolve({ data: [] })
         }
         if (url.includes('/api/')) {
           return Promise.resolve({ data: { ...mockResource, id: 'prod-789' } })
@@ -689,8 +756,18 @@ describe('ResourceDetailPage', () => {
   describe('Accessibility', () => {
     beforeEach(() => {
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/collections/')) {
+        if (url === '/api/collections') {
+          return Promise.resolve({ data: [mockSchema] })
+        }
+        if (url.includes('/api/collections/')) {
           return Promise.resolve({ data: mockSchema })
+        }
+        if (
+          url.includes('/api/notes') ||
+          url.includes('/api/attachments') ||
+          url.includes('/api/record-shares')
+        ) {
+          return Promise.resolve({ data: [] })
         }
         if (url.includes('/api/')) {
           return Promise.resolve({ data: mockResource })

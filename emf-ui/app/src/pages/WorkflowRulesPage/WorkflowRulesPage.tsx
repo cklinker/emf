@@ -1402,15 +1402,14 @@ export function WorkflowRulesPage({
     },
   })
 
+  // Execute mutation — graceful degradation (action endpoint not available in JSON:API)
   const executeMutation = useMutation({
-    mutationFn: (id: string) =>
-      apiClient.post<{ executionLogIds: string[] }>(
-        `/control/workflow-rules/${id}/actions/execute`,
-        {
-          recordIds: [],
-        }
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    mutationFn: (_id: string) =>
+      Promise.reject(
+        new Error('Manual workflow execution is temporarily unavailable during platform migration')
       ),
-    onSuccess: (data) => {
+    onSuccess: (data: { executionLogIds: string[] } | null) => {
       const count = data?.executionLogIds?.length ?? 0
       showToast(`Manual execution complete: ${count} execution log(s) created`, 'success')
       queryClient.invalidateQueries({ queryKey: ['workflow-rules'] })

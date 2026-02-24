@@ -1,20 +1,20 @@
 /**
  * useScriptExecution Hook
  *
- * Executes server-side scripts via the control plane API and handles
- * the result actions (refresh, redirect, toast, open record).
+ * Executes server-side scripts and handles the result actions
+ * (refresh, redirect, toast, open record).
  *
  * Scripts are executed with a record context (collection, record ID,
  * record data) and optional user-provided parameters.
  *
- * Falls back gracefully when the backend endpoint is unavailable.
+ * Script execution is not yet available via JSON:API — returns a
+ * graceful error message.
  */
 
 import { useCallback } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { useApi } from '@/context/ApiContext'
 import type { ScriptExecutionResult, QuickActionExecutionContext } from '@/types/quickActions'
 
 export interface ExecuteScriptParams {
@@ -48,7 +48,6 @@ export interface UseScriptExecutionReturn {
  * @returns Script execution function and state
  */
 export function useScriptExecution(): UseScriptExecutionReturn {
-  const { apiClient } = useApi()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 
@@ -112,28 +111,12 @@ export function useScriptExecution(): UseScriptExecutionReturn {
   )
 
   const mutation = useMutation({
-    mutationFn: async (params: ExecuteScriptParams): Promise<ScriptExecutionResult> => {
-      try {
-        const response = await apiClient.post<ScriptExecutionResult>(
-          `/control/scripts/${encodeURIComponent(params.scriptId)}/execute`,
-          {
-            collectionName: params.context.collectionName,
-            recordId: params.context.recordId,
-            recordData: params.context.record,
-            selectedIds: params.context.selectedIds,
-            parameters: params.parameters || {},
-          }
-        )
-        return response
-      } catch (error) {
-        // If the endpoint doesn't exist yet, return a friendly error
-        return {
-          success: false,
-          message:
-            error instanceof Error
-              ? error.message
-              : 'Script execution failed. The scripts API may not be available.',
-        }
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    mutationFn: async (_params: ExecuteScriptParams): Promise<ScriptExecutionResult> => {
+      // Script execution is not yet available via JSON:API
+      return {
+        success: false,
+        message: 'Script execution is temporarily unavailable.',
       }
     },
   })

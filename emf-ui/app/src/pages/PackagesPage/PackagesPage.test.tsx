@@ -98,35 +98,35 @@ const mockImportResult = {
 // Helper to setup Axios mocks for all endpoints
 function setupAxiosMocks(overrides: Record<string, unknown> = {}) {
   mockAxios.get.mockImplementation((url: string) => {
-    if (url.includes('/control/packages/history')) {
+    if (url.includes('/api/packages/history')) {
       return Promise.resolve({ data: overrides.history ?? mockPackageHistory })
     }
-    if (url.includes('/control/collections')) {
+    if (url.includes('/api/collections')) {
       return Promise.resolve({ data: overrides.collections ?? mockCollections })
     }
-    if (url.includes('/control/roles')) {
+    if (url.includes('/api/roles')) {
       return Promise.resolve({ data: overrides.roles ?? mockRoles })
     }
-    if (url.includes('/control/policies')) {
+    if (url.includes('/api/policies')) {
       return Promise.resolve({ data: overrides.policies ?? mockPolicies })
     }
-    if (url.includes('/control/ui/pages')) {
+    if (url.includes('/api/ui-pages')) {
       return Promise.resolve({ data: overrides.pages ?? mockPages })
     }
-    if (url.includes('/control/ui/menus')) {
+    if (url.includes('/api/ui-menus')) {
       return Promise.resolve({ data: overrides.menus ?? mockMenus })
     }
     return Promise.resolve({ data: {} })
   })
 
   mockAxios.post.mockImplementation((url: string) => {
-    if (url.includes('/control/packages/export')) {
+    if (url.includes('/api/packages/export')) {
       return Promise.resolve({ data: {} })
     }
-    if (url.includes('/control/packages/import/preview')) {
+    if (url.includes('/api/packages/import/preview')) {
       return Promise.resolve({ data: overrides.importPreview ?? mockImportPreview })
     }
-    if (url.includes('/control/packages/import')) {
+    if (url.includes('/api/packages/import')) {
       return Promise.resolve({ data: overrides.importResult ?? mockImportResult })
     }
     return Promise.resolve({ data: {} })
@@ -314,14 +314,14 @@ describe('PackagesPage', () => {
     it('triggers export when export button is clicked', async () => {
       let exportCalled = false
       mockAxios.post.mockImplementation((url: string) => {
-        if (url.includes('/control/packages/export')) {
+        if (url.includes('/api/packages/export')) {
           exportCalled = true
           return Promise.resolve({ data: {} })
         }
-        if (url.includes('/control/packages/import/preview')) {
+        if (url.includes('/api/packages/import/preview')) {
           return Promise.resolve({ data: mockImportPreview })
         }
-        if (url.includes('/control/packages/import')) {
+        if (url.includes('/api/packages/import')) {
           return Promise.resolve({ data: mockImportResult })
         }
         return Promise.resolve({ data: {} })
@@ -466,14 +466,14 @@ describe('PackagesPage', () => {
     it('triggers dry run when dry run button is clicked', async () => {
       let dryRunCalled = false
       mockAxios.post.mockImplementation((url: string) => {
-        if (url.includes('/control/packages/import/preview')) {
+        if (url.includes('/api/packages/import/preview')) {
           return Promise.resolve({ data: mockImportPreview })
         }
-        if (url.includes('/control/packages/import')) {
+        if (url.includes('/api/packages/import')) {
           dryRunCalled = true
           return Promise.resolve({ data: mockImportResult })
         }
-        if (url.includes('/control/packages/export')) {
+        if (url.includes('/api/packages/export')) {
           return Promise.resolve({ data: {} })
         }
         return Promise.resolve({ data: {} })
@@ -618,22 +618,22 @@ describe('PackagesPage', () => {
   describe('Error Handling', () => {
     it('handles history fetch error', async () => {
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/packages/history')) {
+        if (url.includes('/api/packages/history')) {
           return Promise.reject(createAxiosError(500))
         }
-        if (url.includes('/control/collections')) {
+        if (url.includes('/api/collections')) {
           return Promise.resolve({ data: mockCollections })
         }
-        if (url.includes('/control/roles')) {
+        if (url.includes('/api/roles')) {
           return Promise.resolve({ data: mockRoles })
         }
-        if (url.includes('/control/policies')) {
+        if (url.includes('/api/policies')) {
           return Promise.resolve({ data: mockPolicies })
         }
-        if (url.includes('/control/ui/pages')) {
+        if (url.includes('/api/ui-pages')) {
           return Promise.resolve({ data: mockPages })
         }
-        if (url.includes('/control/ui/menus')) {
+        if (url.includes('/api/ui-menus')) {
           return Promise.resolve({ data: mockMenus })
         }
         return Promise.resolve({ data: {} })
@@ -651,13 +651,13 @@ describe('PackagesPage', () => {
 
     it('handles export error gracefully', async () => {
       mockAxios.post.mockImplementation((url: string) => {
-        if (url.includes('/control/packages/export')) {
+        if (url.includes('/api/packages/export')) {
           return Promise.reject(createAxiosError(500, { message: 'Export failed' }))
         }
-        if (url.includes('/control/packages/import/preview')) {
+        if (url.includes('/api/packages/import/preview')) {
           return Promise.resolve({ data: mockImportPreview })
         }
-        if (url.includes('/control/packages/import')) {
+        if (url.includes('/api/packages/import')) {
           return Promise.resolve({ data: mockImportResult })
         }
         return Promise.resolve({ data: {} })
@@ -681,13 +681,13 @@ describe('PackagesPage', () => {
 
     it('handles import preview error gracefully - Requirement 9.9', async () => {
       mockAxios.post.mockImplementation((url: string) => {
-        if (url.includes('/control/packages/import/preview')) {
+        if (url.includes('/api/packages/import/preview')) {
           return Promise.reject(createAxiosError(400, { message: 'Invalid package format' }))
         }
-        if (url.includes('/control/packages/export')) {
+        if (url.includes('/api/packages/export')) {
           return Promise.resolve({ data: {} })
         }
-        if (url.includes('/control/packages/import')) {
+        if (url.includes('/api/packages/import')) {
           return Promise.resolve({ data: mockImportResult })
         }
         return Promise.resolve({ data: {} })
@@ -714,13 +714,13 @@ describe('PackagesPage', () => {
 
     it('handles import execution error gracefully - Requirement 9.9', async () => {
       mockAxios.post.mockImplementation((url: string) => {
-        if (url.includes('/control/packages/import/preview')) {
+        if (url.includes('/api/packages/import/preview')) {
           return Promise.resolve({ data: mockImportPreview })
         }
-        if (url.includes('/control/packages/import')) {
+        if (url.includes('/api/packages/import')) {
           return Promise.reject(createAxiosError(500, { message: 'Import failed: database error' }))
         }
-        if (url.includes('/control/packages/export')) {
+        if (url.includes('/api/packages/export')) {
           return Promise.resolve({ data: {} })
         }
         return Promise.resolve({ data: {} })
@@ -763,13 +763,13 @@ describe('PackagesPage', () => {
       }
 
       mockAxios.post.mockImplementation((url: string) => {
-        if (url.includes('/control/packages/import/preview')) {
+        if (url.includes('/api/packages/import/preview')) {
           return Promise.resolve({ data: mockImportPreview })
         }
-        if (url.includes('/control/packages/import')) {
+        if (url.includes('/api/packages/import')) {
           return Promise.resolve({ data: importResultWithErrors })
         }
-        if (url.includes('/control/packages/export')) {
+        if (url.includes('/api/packages/export')) {
           return Promise.resolve({ data: {} })
         }
         return Promise.resolve({ data: {} })

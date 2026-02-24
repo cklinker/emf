@@ -88,7 +88,7 @@ function setupMocks(profile = mockProfile) {
   mockAxios.get.mockImplementation((url: string) => {
     if (url.includes('/system-permissions')) return Promise.resolve({ data: mockSysPerms })
     if (url.includes('/object-permissions')) return Promise.resolve({ data: mockObjPerms })
-    if (url.includes('/control/collections')) return Promise.resolve({ data: mockCollections })
+    if (url.includes('/api/collections')) return Promise.resolve({ data: mockCollections })
     return Promise.resolve({ data: profile })
   })
 }

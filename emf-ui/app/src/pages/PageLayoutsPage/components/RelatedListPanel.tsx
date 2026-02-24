@@ -105,7 +105,7 @@ export function RelatedListPanel(): React.ReactElement {
   // Fetch the current layout collection's fields (to find master-side relationships)
   const { data: currentCollectionDetail } = useQuery({
     queryKey: ['collection-detail-for-rl', collectionId],
-    queryFn: () => apiClient.get<CollectionDetailResponse>(`/control/collections/${collectionId}`),
+    queryFn: () => apiClient.getOne<CollectionDetailResponse>(`/api/collections/${collectionId}`),
     enabled: !!collectionId,
   })
 
@@ -119,7 +119,7 @@ export function RelatedListPanel(): React.ReactElement {
   const { data: relatedCollectionDetail } = useQuery({
     queryKey: ['collection-detail-for-rl', selectedCollectionId],
     queryFn: () =>
-      apiClient.get<CollectionDetailResponse>(`/control/collections/${selectedCollectionId}`),
+      apiClient.getOne<CollectionDetailResponse>(`/api/collections/${selectedCollectionId}`),
     enabled: !!selectedCollectionId,
   })
 

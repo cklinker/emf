@@ -2,10 +2,10 @@
  * usePageLayout Hook
  *
  * Resolves the page layout for a given collection and user.
- * Calls GET /control/layouts/resolve to determine which layout
- * (if any) should be used for rendering the record detail view.
+ * Queries JSON:API layout-assignments to find the matching layout,
+ * then fetches the page-layout details.
  *
- * Returns null when no layout is configured (204) or on error,
+ * Returns null when no layout is configured or on error,
  * so the caller can fall back to default rendering.
  */
 
@@ -97,16 +97,44 @@ export function usePageLayout(
     queryKey: ['page-layout-resolve', collectionId, profileId],
     queryFn: async () => {
       try {
-        const result = await apiClient.get<PageLayoutDto>(
-          `/control/layouts/resolve?collectionId=${collectionId}&profileId=${profileId}`
+        // Step 1: Find layout assignment for this collection + profile
+        const assignments = await apiClient.getList<{
+          id: string
+          collectionId: string
+          profileId: string
+          layoutId: string
+        }>(
+          `/api/layout-assignments?filter[collectionId][eq]=${collectionId}&filter[profileId][eq]=${profileId}&page[size]=1`
         )
-        // If the response has no sections, treat it as no layout
+
+        // Try default assignment if no profile-specific one found
+        let layoutId: string | undefined
+        if (assignments.length > 0) {
+          layoutId = assignments[0].layoutId
+        } else {
+          // Fall back to default layout for this collection
+          const defaultAssignments = await apiClient.getList<{
+            id: string
+            collectionId: string
+            layoutId: string
+            isDefault: boolean
+          }>(`/api/layout-assignments?filter[collectionId][eq]=${collectionId}&page[size]=10`)
+          const defaultAssignment = defaultAssignments.find((a) => a.isDefault)
+          if (defaultAssignment) {
+            layoutId = defaultAssignment.layoutId
+          }
+        }
+
+        if (!layoutId) return null
+
+        // Step 2: Fetch the layout itself
+        const result = await apiClient.getOne<PageLayoutDto>(`/api/page-layouts/${layoutId}`)
         if (!result || !result.sections) {
           return null
         }
         return result
       } catch {
-        // 204 No Content or any error means no layout configured
+        // Any error means no layout configured
         return null
       }
     },

@@ -2,10 +2,10 @@
  * useCollectionSummaries Hook
  *
  * Fetches a lightweight list of all active collections with only
- * id, name, and displayName from the /control/collections/summary
- * endpoint. This is the preferred way to get collection metadata
- * for sidebars, dropdowns, ID→name maps, and other UI components
- * that don't need full field definitions.
+ * id, name, and displayName from the /api/collections endpoint
+ * with sparse fieldsets. This is the preferred way to get collection
+ * metadata for sidebars, dropdowns, ID→name maps, and other UI
+ * components that don't need full field definitions.
  *
  * Uses a shared React Query key so all consumers share one cache
  * entry with a 5-minute stale time.
@@ -45,7 +45,10 @@ export function useCollectionSummaries(): UseCollectionSummariesReturn {
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['collection-summaries'],
-    queryFn: () => apiClient.get<CollectionSummary[]>('/control/collections/summary'),
+    queryFn: () =>
+      apiClient.getList<CollectionSummary>(
+        '/api/collections?filter[systemCollection][eq]=false&page[size]=500'
+      ),
     staleTime: 5 * 60 * 1000, // 5 minutes — collection metadata rarely changes
   })
 

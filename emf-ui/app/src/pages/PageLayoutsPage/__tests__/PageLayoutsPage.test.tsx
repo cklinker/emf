@@ -30,7 +30,7 @@ import { PageLayoutsPage } from '../PageLayoutsPage'
 // Mock data
 // ---------------------------------------------------------------------------
 
-// Collection summaries returned by /control/collections/summary (flat array)
+// Collection summaries returned by /api/collections (flat array)
 const mockCollectionSummaries = [
   { id: 'col-1', name: 'accounts', displayName: 'Accounts' },
   { id: 'col-2', name: 'contacts', displayName: 'Contacts' },
@@ -83,10 +83,10 @@ function setupAxiosMocks(overrides: { layouts?: unknown; collections?: unknown }
     if (url.includes('/api/page-layouts')) {
       return Promise.resolve({ data: overrides.layouts ?? mockLayouts })
     }
-    if (url.includes('/control/collections/summary')) {
+    if (url.includes('/api/collections')) {
       return Promise.resolve({ data: overrides.collections ?? mockCollectionSummaries })
     }
-    if (url.includes('/control/collections')) {
+    if (url.includes('/api/collections')) {
       return Promise.resolve({ data: overrides.collections ?? mockCollectionSummaries })
     }
     return Promise.resolve({ data: {} })
@@ -137,10 +137,10 @@ describe('PageLayoutsPage', () => {
         if (url.includes('/api/page-layouts')) {
           return Promise.reject(createAxiosError(500))
         }
-        if (url.includes('/control/collections/summary')) {
+        if (url.includes('/api/collections')) {
           return Promise.resolve({ data: mockCollectionSummaries })
         }
-        if (url.includes('/control/collections')) {
+        if (url.includes('/api/collections')) {
           return Promise.resolve({ data: mockCollectionSummaries })
         }
         return Promise.resolve({ data: {} })
@@ -158,10 +158,10 @@ describe('PageLayoutsPage', () => {
         if (url.includes('/api/page-layouts')) {
           return Promise.reject(createAxiosError(500))
         }
-        if (url.includes('/control/collections/summary')) {
+        if (url.includes('/api/collections')) {
           return Promise.resolve({ data: mockCollectionSummaries })
         }
-        if (url.includes('/control/collections')) {
+        if (url.includes('/api/collections')) {
           return Promise.resolve({ data: mockCollectionSummaries })
         }
         return Promise.resolve({ data: {} })

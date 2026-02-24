@@ -51,19 +51,40 @@ let originalFetch: typeof fetch
 let bootstrapFetchWrapper: typeof fetch
 
 /**
- * Create a fetch wrapper that always handles bootstrap config
+ * Build a JSON:API list response for mock data.
+ */
+function jsonApiListResponse(type: string, items: Record<string, unknown>[]) {
+  return {
+    data: items.map((item, i) => ({
+      type,
+      id: (item.id as string) ?? `${type}-${i + 1}`,
+      attributes: Object.fromEntries(Object.entries(item).filter(([k]) => k !== 'id')),
+    })),
+    metadata: {
+      totalCount: items.length,
+      currentPage: 0,
+      pageSize: 500,
+      totalPages: 1,
+    },
+  }
+}
+
+/**
+ * Create a fetch wrapper that always handles bootstrap JSON:API config requests.
+ *
+ * Bootstrap is now composed from 4 parallel JSON:API calls:
+ *   /api/ui-pages, /api/ui-menus, /api/oidc-providers, /api/tenants
  */
 function createBootstrapFetchWrapper(baseFetch: typeof fetch): typeof fetch {
   return ((url: string | URL | Request, ...args: unknown[]) => {
     const urlString = typeof url === 'string' ? url : url instanceof URL ? url.toString() : url.url
 
-    // Always intercept bootstrap config requests
-    if (urlString.includes('/control/ui-bootstrap')) {
-      return Promise.resolve({
+    const makeJsonResponse = (body: unknown) =>
+      ({
         ok: true,
         status: 200,
-        json: () => Promise.resolve(mockBootstrapConfig),
-        text: () => Promise.resolve(JSON.stringify(mockBootstrapConfig)),
+        json: () => Promise.resolve(body),
+        text: () => Promise.resolve(JSON.stringify(body)),
         clone: function () {
           return this
         },
@@ -78,7 +99,33 @@ function createBootstrapFetchWrapper(baseFetch: typeof fetch): typeof fetch {
         blob: () => Promise.resolve(new Blob()),
         formData: () => Promise.resolve(new FormData()),
         bytes: () => Promise.resolve(new Uint8Array()),
-      } as Response)
+      }) as Response
+
+    // Intercept JSON:API bootstrap endpoints
+    if (urlString.includes('/api/ui-pages')) {
+      return Promise.resolve(makeJsonResponse(jsonApiListResponse('ui-pages', [])))
+    }
+    if (urlString.includes('/api/ui-menus')) {
+      return Promise.resolve(makeJsonResponse(jsonApiListResponse('ui-menus', [])))
+    }
+    if (urlString.includes('/api/oidc-providers')) {
+      return Promise.resolve(
+        makeJsonResponse(
+          jsonApiListResponse(
+            'oidc-providers',
+            mockBootstrapConfig.oidcProviders as unknown as Record<string, unknown>[]
+          )
+        )
+      )
+    }
+    if (urlString.includes('/api/tenants')) {
+      return Promise.resolve(
+        makeJsonResponse(
+          jsonApiListResponse('tenants', [
+            { id: 'tenant-1', slug: 'default', name: 'Default Tenant' },
+          ])
+        )
+      )
     }
 
     // For all other requests, use the base fetch (which might be a test mock)

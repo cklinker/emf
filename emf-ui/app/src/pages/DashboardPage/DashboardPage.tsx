@@ -583,7 +583,7 @@ export function DashboardPage({
     refetch,
   } = useQuery({
     queryKey: ['dashboard', timeRange],
-    queryFn: () => apiClient.get<DashboardData>(`/control/_admin/dashboard?timeRange=${timeRange}`),
+    queryFn: () => apiClient.getOne<DashboardData>(`/api/admin/dashboard?timeRange=${timeRange}`),
     refetchInterval: refreshIntervalMs,
   })
 

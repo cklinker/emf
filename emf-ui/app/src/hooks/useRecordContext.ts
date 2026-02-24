@@ -1,9 +1,8 @@
 /**
  * useRecordContext Hook
  *
- * Fetches both notes and attachments for a record in a single API call,
- * eliminating two separate HTTP round trips. The combined endpoint
- * only requires one permission check and one user ID resolution.
+ * Fetches both notes and attachments for a record from separate JSON:API
+ * endpoints (/api/notes and /api/attachments) using filter queries.
  */
 
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -71,11 +70,22 @@ export function useRecordContext(
     queryKey: ['record-context', collectionId, recordId],
     queryFn: async () => {
       try {
-        return await apiClient.get<RecordContext>(
-          `/control/record-context/${collectionId}/${recordId}`
-        )
+        // Fetch notes and attachments in parallel from JSON:API endpoints
+        const [notes, attachments] = await Promise.all([
+          apiClient
+            .getList<Note>(
+              `/api/notes?filter[collectionId][eq]=${collectionId}&filter[recordId][eq]=${recordId}`
+            )
+            .catch(() => [] as Note[]),
+          apiClient
+            .getList<Attachment>(
+              `/api/attachments?filter[collectionId][eq]=${collectionId}&filter[recordId][eq]=${recordId}`
+            )
+            .catch(() => [] as Attachment[]),
+        ])
+        return { notes, attachments } as RecordContext
       } catch {
-        // Return empty context if endpoint not available
+        // Return empty context if endpoints not available
         return { notes: [], attachments: [] } as RecordContext
       }
     },

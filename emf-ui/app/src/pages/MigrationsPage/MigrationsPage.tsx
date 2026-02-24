@@ -115,11 +115,11 @@ export interface MigrationsPageProps {
 
 // API functions using apiClient
 async function fetchMigrationHistory(apiClient: ApiClient): Promise<MigrationRun[]> {
-  return apiClient.get('/control/migrations')
+  return apiClient.getList('/api/migrations')
 }
 
 async function fetchMigrationDetails(apiClient: ApiClient, id: string): Promise<MigrationRun> {
-  return apiClient.get(`/control/migrations/${id}`)
+  return apiClient.getOne(`/api/migrations/${id}`)
 }
 
 async function fetchCollectionVersions(
@@ -128,8 +128,8 @@ async function fetchCollectionVersions(
 ): Promise<CollectionSummary[]> {
   return Promise.all(
     collectionSummaries.map(async (collection) => {
-      const versions = await apiClient.get<Array<Record<string, unknown>>>(
-        `/control/collections/${collection.id}/versions`
+      const versions = await apiClient.getList<Record<string, unknown>>(
+        `/api/collection-versions?filter[collectionId][eq]=${collection.id}`
       )
       const versionNumbers = Array.isArray(versions)
         ? versions.map((v: Record<string, unknown>) => v.version as number)
@@ -155,7 +155,7 @@ async function createMigrationPlan(
   apiClient: ApiClient,
   request: CreateMigrationPlanRequest
 ): Promise<MigrationPlan> {
-  return apiClient.post('/control/migrations/plan', request)
+  return apiClient.postResource('/api/migrations/plan', request)
 }
 
 /**
@@ -175,7 +175,7 @@ async function executeMigration(
   apiClient: ApiClient,
   request: ExecuteMigrationRequest
 ): Promise<ExecuteMigrationResponse> {
-  return apiClient.post('/control/migrations/execute', request)
+  return apiClient.postResource('/api/migrations/execute', request)
 }
 
 /**
@@ -183,14 +183,14 @@ async function executeMigration(
  * Requirement 10.7: Migration execution offers rollback option on failure
  */
 async function rollbackMigration(apiClient: ApiClient, runId: string): Promise<MigrationRun> {
-  return apiClient.post(`/control/migrations/${runId}/rollback`, {})
+  return apiClient.postResource(`/api/migrations/${runId}/rollback`, {})
 }
 
 /**
  * Get migration run status for polling
  */
 async function getMigrationRunStatus(apiClient: ApiClient, runId: string): Promise<MigrationRun> {
-  return apiClient.get(`/control/migrations/${runId}`)
+  return apiClient.getOne(`/api/migrations/${runId}`)
 }
 
 /**

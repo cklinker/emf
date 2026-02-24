@@ -583,7 +583,7 @@ function LayoutEditorViewInner({ layoutId, onBack }: LayoutEditorViewProps): Rea
   const collectionId = layoutDetail?.collectionId ?? null
   const { data: collectionDetail } = useQuery({
     queryKey: ['collection-detail', collectionId],
-    queryFn: () => apiClient.get<CollectionDetail>(`/control/collections/${collectionId}`),
+    queryFn: () => apiClient.getOne<CollectionDetail>(`/api/collections/${collectionId}`),
     enabled: !!collectionId,
   })
 

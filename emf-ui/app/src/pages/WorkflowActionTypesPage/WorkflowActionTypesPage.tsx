@@ -51,11 +51,10 @@ export function WorkflowActionTypesPage({
   })
 
   const toggleMutation = useMutation({
-    mutationFn: (id: string) =>
-      apiClient.patch<WorkflowActionType>(
-        `/control/workflow-action-types/${id}/actions/toggle-active`,
-        {}
-      ),
+    mutationFn: (actionType: WorkflowActionType) =>
+      apiClient.patchResource<WorkflowActionType>(`/api/workflow-action-types/${actionType.id}`, {
+        active: !actionType.active,
+      }),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['workflow-action-types'] })
       const status = data?.active ? 'activated' : 'deactivated'
@@ -68,7 +67,7 @@ export function WorkflowActionTypesPage({
 
   const handleToggle = useCallback(
     (actionType: WorkflowActionType) => {
-      toggleMutation.mutate(actionType.id)
+      toggleMutation.mutate(actionType)
     },
     [toggleMutation]
   )

@@ -2,10 +2,11 @@
  * Configuration Context
  *
  * Provides bootstrap configuration state and management for the application.
- * Fetches configuration from /control/ui-bootstrap and handles loading, error, and reload states.
+ * Composes configuration from parallel JSON:API calls to /api/ui-pages,
+ * /api/ui-menus, and /api/oidc-providers (via bootstrapCache.ts).
  *
  * Requirements:
- * - 1.1: Fetch bootstrap configuration from /control/ui-bootstrap on startup
+ * - 1.1: Fetch bootstrap configuration on startup (composed from JSON:API)
  * - 1.2: Configure application routes based on page definitions
  * - 1.3: Configure navigation menus based on menu definitions
  * - 1.4: Apply theme settings including colors, fonts, and spacing

@@ -220,8 +220,13 @@ describe('ResourceFormPage', () => {
 
     it('should display error message when resource fetch fails in edit mode', async () => {
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/collections/')) {
+        // getOne: /api/collections/{id}
+        if (url.match(/\/api\/collections\/[^?]+$/) && !url.includes('filter[')) {
           return Promise.resolve({ data: mockSchema })
+        }
+        // getList: /api/collections (list call)
+        if (url.match(/\/api\/collections(\?|$)/)) {
+          return Promise.resolve({ data: [mockSchema] })
         }
         // Resource fetch fails
         return Promise.reject(createAxiosError(404))
@@ -240,8 +245,13 @@ describe('ResourceFormPage', () => {
   describe('Create Mode', () => {
     beforeEach(() => {
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/collections/')) {
+        // getOne: /api/collections/{id}
+        if (url.match(/\/api\/collections\/[^?]+$/) && !url.includes('filter[')) {
           return Promise.resolve({ data: mockSchema })
+        }
+        // getList: /api/collections (no trailing slash, possibly with query params)
+        if (url.match(/\/api\/collections(\?|$)/)) {
+          return Promise.resolve({ data: [mockSchema] })
         }
         return Promise.reject(createAxiosError(404))
       })
@@ -400,8 +410,13 @@ describe('ResourceFormPage', () => {
       const user = userEvent.setup()
 
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/collections/')) {
+        // getOne: /api/collections/{id}
+        if (url.match(/\/api\/collections\/[^?]+$/) && !url.includes('filter[')) {
           return Promise.resolve({ data: mockSchema })
+        }
+        // getList: /api/collections (no trailing slash, possibly with query params)
+        if (url.match(/\/api\/collections(\?|$)/)) {
+          return Promise.resolve({ data: [mockSchema] })
         }
         return Promise.reject(createAxiosError(404))
       })
@@ -436,8 +451,13 @@ describe('ResourceFormPage', () => {
       const user = userEvent.setup()
 
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/collections/')) {
+        // getOne: /api/collections/{id}
+        if (url.match(/\/api\/collections\/[^?]+$/) && !url.includes('filter[')) {
           return Promise.resolve({ data: mockSchema })
+        }
+        // getList: /api/collections (no trailing slash, possibly with query params)
+        if (url.match(/\/api\/collections(\?|$)/)) {
+          return Promise.resolve({ data: [mockSchema] })
         }
         return Promise.reject(createAxiosError(404))
       })
@@ -484,10 +504,15 @@ describe('ResourceFormPage', () => {
   describe('Edit Mode', () => {
     beforeEach(() => {
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/collections/')) {
+        // getOne: /api/collections/{id}
+        if (url.match(/\/api\/collections\/[^?]+$/) && !url.includes('filter[')) {
           return Promise.resolve({ data: mockSchema })
         }
-        if (url.includes('/users/res-123') && !url.includes('/control')) {
+        // getList: /api/collections (list call)
+        if (url.match(/\/api\/collections(\?|$)/)) {
+          return Promise.resolve({ data: [mockSchema] })
+        }
+        if (url.includes('/users/res-123') && !url.includes('/api/collections')) {
           return Promise.resolve({ data: mockResource })
         }
         return Promise.reject(createAxiosError(404))
@@ -536,10 +561,15 @@ describe('ResourceFormPage', () => {
       const user = userEvent.setup()
 
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/collections/')) {
+        // getOne: /api/collections/{id}
+        if (url.match(/\/api\/collections\/[^?]+$/) && !url.includes('filter[')) {
           return Promise.resolve({ data: mockSchema })
         }
-        if (url.includes('/users/res-123') && !url.includes('/control')) {
+        // getList: /api/collections (list call)
+        if (url.match(/\/api\/collections(\?|$)/)) {
+          return Promise.resolve({ data: [mockSchema] })
+        }
+        if (url.includes('/users/res-123') && !url.includes('/api/collections')) {
           return Promise.resolve({ data: mockResource })
         }
         return Promise.reject(createAxiosError(404))
@@ -577,10 +607,15 @@ describe('ResourceFormPage', () => {
       const user = userEvent.setup()
 
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/collections/')) {
+        // getOne: /api/collections/{id}
+        if (url.match(/\/api\/collections\/[^?]+$/) && !url.includes('filter[')) {
           return Promise.resolve({ data: mockSchema })
         }
-        if (url.includes('/users/res-123') && !url.includes('/control')) {
+        // getList: /api/collections (list call)
+        if (url.match(/\/api\/collections(\?|$)/)) {
+          return Promise.resolve({ data: [mockSchema] })
+        }
+        if (url.includes('/users/res-123') && !url.includes('/api/collections')) {
           return Promise.resolve({ data: mockResource })
         }
         return Promise.reject(createAxiosError(404))
@@ -627,8 +662,13 @@ describe('ResourceFormPage', () => {
   describe('Field Type Handling', () => {
     beforeEach(() => {
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/collections/')) {
+        // getOne: /api/collections/{id}
+        if (url.match(/\/api\/collections\/[^?]+$/) && !url.includes('filter[')) {
           return Promise.resolve({ data: mockSchema })
+        }
+        // getList: /api/collections (no trailing slash, possibly with query params)
+        if (url.match(/\/api\/collections(\?|$)/)) {
+          return Promise.resolve({ data: [mockSchema] })
         }
         return Promise.reject(createAxiosError(404))
       })
@@ -682,8 +722,13 @@ describe('ResourceFormPage', () => {
   describe('Validation Rules', () => {
     beforeEach(() => {
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/collections/')) {
+        // getOne: /api/collections/{id}
+        if (url.match(/\/api\/collections\/[^?]+$/) && !url.includes('filter[')) {
           return Promise.resolve({ data: mockSchema })
+        }
+        // getList: /api/collections (no trailing slash, possibly with query params)
+        if (url.match(/\/api\/collections(\?|$)/)) {
+          return Promise.resolve({ data: [mockSchema] })
         }
         return Promise.reject(createAxiosError(404))
       })
@@ -766,8 +811,13 @@ describe('ResourceFormPage', () => {
   describe('Accessibility', () => {
     beforeEach(() => {
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/collections/')) {
+        // getOne: /api/collections/{id}
+        if (url.match(/\/api\/collections\/[^?]+$/) && !url.includes('filter[')) {
           return Promise.resolve({ data: mockSchema })
+        }
+        // getList: /api/collections (no trailing slash, possibly with query params)
+        if (url.match(/\/api\/collections(\?|$)/)) {
+          return Promise.resolve({ data: [mockSchema] })
         }
         return Promise.reject(createAxiosError(404))
       })
@@ -838,13 +888,14 @@ describe('ResourceFormPage', () => {
   describe('Empty Schema', () => {
     it('should display empty state when schema has no fields', async () => {
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/collections/')) {
-          return Promise.resolve({
-            data: {
-              ...mockSchema,
-              fields: [],
-            },
-          })
+        const emptySchema = { ...mockSchema, fields: [] }
+        // getOne: /api/collections/{id}
+        if (url.match(/\/api\/collections\/[^?]+$/) && !url.includes('filter[')) {
+          return Promise.resolve({ data: emptySchema })
+        }
+        // getList: /api/collections (list call)
+        if (url.match(/\/api\/collections(\?|$)/)) {
+          return Promise.resolve({ data: [emptySchema] })
         }
         return Promise.reject(createAxiosError(404))
       })
@@ -858,13 +909,14 @@ describe('ResourceFormPage', () => {
 
     it('should disable submit button when schema has no fields', async () => {
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/collections/')) {
-          return Promise.resolve({
-            data: {
-              ...mockSchema,
-              fields: [],
-            },
-          })
+        const emptySchema = { ...mockSchema, fields: [] }
+        // getOne: /api/collections/{id}
+        if (url.match(/\/api\/collections\/[^?]+$/) && !url.includes('filter[')) {
+          return Promise.resolve({ data: emptySchema })
+        }
+        // getList: /api/collections (list call)
+        if (url.match(/\/api\/collections(\?|$)/)) {
+          return Promise.resolve({ data: [emptySchema] })
         }
         return Promise.reject(createAxiosError(404))
       })
@@ -918,8 +970,13 @@ describe('ResourceFormPage', () => {
 
     beforeEach(() => {
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/collections/')) {
+        // getOne: /api/collections/{id}
+        if (url.match(/\/api\/collections\/[^?]+$/) && !url.includes('filter[')) {
           return Promise.resolve({ data: mockSchema })
+        }
+        // getList: /api/collections (no trailing slash, possibly with query params)
+        if (url.match(/\/api\/collections(\?|$)/)) {
+          return Promise.resolve({ data: [mockSchema] })
         }
         return Promise.reject(createAxiosError(404))
       })
@@ -1056,8 +1113,13 @@ describe('ResourceFormPage', () => {
       }
 
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/collections/')) {
+        // getOne: /api/collections/{id}
+        if (url.match(/\/api\/collections\/[^?]+$/) && !url.includes('filter[')) {
           return Promise.resolve({ data: mockSchema })
+        }
+        // getList: /api/collections (no trailing slash, possibly with query params)
+        if (url.match(/\/api\/collections(\?|$)/)) {
+          return Promise.resolve({ data: [mockSchema] })
         }
         return Promise.reject(createAxiosError(404))
       })
@@ -1159,8 +1221,13 @@ describe('ResourceFormPage', () => {
       }
 
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/control/collections/')) {
+        // getOne: /api/collections/{id}
+        if (url.match(/\/api\/collections\/[^?]+$/) && !url.includes('filter[')) {
           return Promise.resolve({ data: schemaWithCustomType })
+        }
+        // getList: /api/collections (list call)
+        if (url.match(/\/api\/collections(\?|$)/)) {
+          return Promise.resolve({ data: [schemaWithCustomType] })
         }
         return Promise.reject(createAxiosError(404))
       })

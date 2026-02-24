@@ -1092,14 +1092,14 @@ export function PageBuilderPage({
     refetch: refetchPages,
   } = useQuery({
     queryKey: ['ui-pages'],
-    queryFn: () => apiClient.get<UIPage[]>('/control/ui/pages'),
+    queryFn: () => apiClient.getList<UIPage>('/api/ui-pages'),
     enabled: viewMode === 'list',
   })
 
   // Fetch single page query for editing
   const { data: currentPage } = useQuery({
     queryKey: ['ui-page', editingPageId],
-    queryFn: () => apiClient.get<UIPage>(`/control/ui/pages/${editingPageId}`),
+    queryFn: () => apiClient.getOne<UIPage>(`/api/ui-pages/${editingPageId}`),
     enabled: viewMode === 'editor' && !!editingPageId,
   })
 
@@ -1114,7 +1114,7 @@ export function PageBuilderPage({
 
   // Create mutation
   const createMutation = useMutation({
-    mutationFn: (data: Partial<UIPage>) => apiClient.post<UIPage>('/control/ui/pages', data),
+    mutationFn: (data: Partial<UIPage>) => apiClient.postResource<UIPage>('/api/ui-pages', data),
     onSuccess: (newPage) => {
       queryClient.invalidateQueries({ queryKey: ['ui-pages'] })
       showToast(t('success.created', { item: t('builder.pages.page') }), 'success')
@@ -1132,7 +1132,7 @@ export function PageBuilderPage({
   // Update mutation
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: Partial<UIPage> }) =>
-      apiClient.put<UIPage>(`/control/ui/pages/${id}`, data),
+      apiClient.putResource<UIPage>(`/api/ui-pages/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ui-pages'] })
       queryClient.invalidateQueries({ queryKey: ['ui-page', editingPageId] })
@@ -1147,7 +1147,7 @@ export function PageBuilderPage({
 
   // Delete mutation
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiClient.delete(`/control/ui/pages/${id}`),
+    mutationFn: (id: string) => apiClient.deleteResource(`/api/ui-pages/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ui-pages'] })
       showToast(t('success.deleted', { item: t('builder.pages.page') }), 'success')
@@ -1165,7 +1165,7 @@ export function PageBuilderPage({
 
   // Publish mutation (Requirement 7.9)
   const publishMutation = useMutation({
-    mutationFn: (id: string) => apiClient.post<UIPage>(`/control/ui/pages/${id}/publish`, {}),
+    mutationFn: (id: string) => apiClient.postResource<UIPage>(`/api/ui-pages/${id}/publish`, {}),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ui-pages'] })
       queryClient.invalidateQueries({ queryKey: ['ui-page', editingPageId] })
@@ -1178,7 +1178,7 @@ export function PageBuilderPage({
 
   // Unpublish mutation
   const unpublishMutation = useMutation({
-    mutationFn: (id: string) => apiClient.post<UIPage>(`/control/ui/pages/${id}/unpublish`, {}),
+    mutationFn: (id: string) => apiClient.postResource<UIPage>(`/api/ui-pages/${id}/unpublish`, {}),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ui-pages'] })
       queryClient.invalidateQueries({ queryKey: ['ui-page', editingPageId] })
@@ -1191,7 +1191,7 @@ export function PageBuilderPage({
 
   // Duplicate mutation (Requirement 7.10)
   const duplicateMutation = useMutation({
-    mutationFn: (id: string) => apiClient.post<UIPage>(`/control/ui/pages/${id}/duplicate`, {}),
+    mutationFn: (id: string) => apiClient.postResource<UIPage>(`/api/ui-pages/${id}/duplicate`, {}),
     onSuccess: (newPage) => {
       queryClient.invalidateQueries({ queryKey: ['ui-pages'] })
       showToast(t('builder.pages.duplicateSuccess') || 'Page duplicated successfully', 'success')

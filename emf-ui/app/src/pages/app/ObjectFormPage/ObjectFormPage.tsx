@@ -517,8 +517,8 @@ export function ObjectFormPage(): React.ReactElement {
       await Promise.all(
         picklistFields.map(async (field) => {
           try {
-            const values = await apiClient.get<PicklistValueDto[]>(
-              `/control/picklists/fields/${field.id}/values`
+            const values = await apiClient.getList<PicklistValueDto>(
+              `/api/picklist-values?filter[fieldId][eq]=${encodeURIComponent(field.id)}`
             )
             map[field.id] = values
               .filter((v) => v.active)

@@ -72,11 +72,6 @@ interface FieldDefinition {
   required: boolean
 }
 
-interface GatewayResponse {
-  content: Record<string, unknown>[]
-  totalElements: number
-}
-
 type ViewMode = 'list' | 'builder' | 'viewer'
 
 /* ─────────── Builder State ─────────── */
@@ -265,14 +260,11 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
   /* ────── Collections query (for builder) ────── */
   const { data: collectionsData } = useQuery({
     queryKey: ['collections-for-reports'],
-    queryFn: () => apiClient.get<{ content: CollectionSummary[] }>('/control/collections?size=100'),
+    queryFn: () => apiClient.getList<CollectionSummary>('/api/collections?page[size]=100'),
     enabled: viewMode === 'builder',
   })
 
-  const collections = useMemo<CollectionSummary[]>(
-    () => collectionsData?.content ?? [],
-    [collectionsData]
-  )
+  const collections = useMemo<CollectionSummary[]>(() => collectionsData ?? [], [collectionsData])
 
   const filteredCollections = useMemo(() => {
     if (!collectionSearch.trim()) return collections
@@ -289,7 +281,9 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
   const { data: fieldsData } = useQuery({
     queryKey: ['fields-for-report', builder.collectionId],
     queryFn: () =>
-      apiClient.get<FieldDefinition[]>(`/control/collections/${builder.collectionId}/fields`),
+      apiClient.getList<FieldDefinition>(
+        `/api/fields?filter[collectionId][eq]=${builder.collectionId}`
+      ),
     enabled: !!builder.collectionId && viewMode === 'builder',
   })
 
@@ -304,14 +298,15 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
 
   const { data: gatewayData, isLoading: isLoadingGateway } = useQuery({
     queryKey: ['report-data', selectedReportId, collectionNameForViewer],
-    queryFn: () => apiClient.get<GatewayResponse>(`/gateway/${collectionNameForViewer}?size=1000`),
+    queryFn: () =>
+      apiClient.getList<Record<string, unknown>>(`/api/${collectionNameForViewer}?page[size]=1000`),
     enabled: viewMode === 'viewer' && !!selectedReportId && !!collectionNameForViewer,
   })
 
   /* Also fetch collections list in viewer mode so we can resolve names */
   useQuery({
     queryKey: ['collections-for-reports'],
-    queryFn: () => apiClient.get<{ content: CollectionSummary[] }>('/control/collections?size=100'),
+    queryFn: () => apiClient.getList<CollectionSummary>('/api/collections?page[size]=100'),
     enabled: viewMode === 'viewer',
   })
 
@@ -377,7 +372,7 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
   }, [selectedReport])
 
   const processedRecords = useMemo(() => {
-    const raw = gatewayData?.content ?? []
+    const raw = gatewayData ?? []
     const filtered = applyFilters(raw, viewerFilters)
     const sortBy = selectedReport?.sortBy ?? ''
     const dir = selectedReport?.sortDirection ?? 'ASC'

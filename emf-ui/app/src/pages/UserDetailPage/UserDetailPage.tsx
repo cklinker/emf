@@ -130,7 +130,7 @@ export function UserDetailPage({ testId = 'user-detail-page' }: UserDetailPagePr
   } = useQuery({
     queryKey: ['users', id],
     queryFn: async () => {
-      const result = await apiClient.get<PlatformUser>(`/control/users/${id}`)
+      const result = await apiClient.get<PlatformUser>(`/api/users/${id}`)
       setFormData({
         firstName: result.firstName,
         lastName: result.lastName,
@@ -147,10 +147,10 @@ export function UserDetailPage({ testId = 'user-detail-page' }: UserDetailPagePr
     queryKey: ['users', id, 'login-history', historyPage],
     queryFn: async () => {
       const params = new URLSearchParams()
-      params.append('page', historyPage.toString())
-      params.append('size', '20')
+      params.append('page[number]', historyPage.toString())
+      params.append('page[size]', '20')
       return apiClient.get<PageResponse<LoginHistoryEntry>>(
-        `/control/users/${id}/login-history?${params}`
+        `/api/login-history?filter[userId][eq]=${id}&${params}`
       )
     },
     enabled: !!id && activeTab === 'loginHistory',
@@ -159,19 +159,20 @@ export function UserDetailPage({ testId = 'user-detail-page' }: UserDetailPagePr
   // Security tab data
   const { data: profiles } = useQuery({
     queryKey: ['profiles'],
-    queryFn: () => apiClient.get<ProfileSummary[]>('/control/profiles'),
+    queryFn: () => apiClient.get<ProfileSummary[]>('/api/profiles'),
     enabled: activeTab === 'security',
   })
 
   const { data: userPermissionSets } = useQuery({
     queryKey: ['users', id, 'permission-sets'],
-    queryFn: () => apiClient.get<PermissionSetSummary[]>(`/control/users/${id}/permission-sets`),
+    queryFn: () =>
+      apiClient.get<PermissionSetSummary[]>(`/api/permission-sets?filter[userId][eq]=${id}`),
     enabled: !!id && activeTab === 'security',
   })
 
   const { data: allPermissionSets } = useQuery({
     queryKey: ['permission-sets'],
-    queryFn: () => apiClient.get<PermissionSetSummary[]>('/control/permission-sets'),
+    queryFn: () => apiClient.get<PermissionSetSummary[]>('/api/permission-sets'),
     enabled: activeTab === 'security' && showAssignModal,
   })
 
@@ -189,7 +190,8 @@ export function UserDetailPage({ testId = 'user-detail-page' }: UserDetailPagePr
   }, [profiles, profileId])
 
   const updateMutation = useMutation({
-    mutationFn: (data: UpdateFormData) => apiClient.put<PlatformUser>(`/control/users/${id}`, data),
+    mutationFn: (data: UpdateFormData) =>
+      apiClient.putResource<PlatformUser>(`/api/users/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users', id] })
       queryClient.invalidateQueries({ queryKey: ['users'] })
@@ -203,7 +205,9 @@ export function UserDetailPage({ testId = 'user-detail-page' }: UserDetailPagePr
 
   const statusMutation = useMutation({
     mutationFn: (action: 'deactivate' | 'activate') =>
-      apiClient.post(`/control/users/${id}/${action}`, {}),
+      apiClient.patchResource(`/api/users/${id}`, {
+        status: action === 'activate' ? 'ACTIVE' : 'INACTIVE',
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users', id] })
       queryClient.invalidateQueries({ queryKey: ['users'] })
@@ -216,7 +220,7 @@ export function UserDetailPage({ testId = 'user-detail-page' }: UserDetailPagePr
 
   const changeProfileMutation = useMutation({
     mutationFn: (profileId: string) =>
-      apiClient.put<PlatformUser>(`/control/users/${id}`, { profileId }),
+      apiClient.putResource<PlatformUser>(`/api/users/${id}`, { profileId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users', id] })
       showToast('Profile updated successfully', 'success')
@@ -228,7 +232,7 @@ export function UserDetailPage({ testId = 'user-detail-page' }: UserDetailPagePr
 
   const assignPermSetMutation = useMutation({
     mutationFn: (permSetId: string) =>
-      apiClient.post(`/control/permission-sets/${permSetId}/assignments/users`, {
+      apiClient.postResource(`/api/permission-sets/${permSetId}/assignments/users`, {
         userIds: [id],
       }),
     onSuccess: () => {
@@ -243,7 +247,7 @@ export function UserDetailPage({ testId = 'user-detail-page' }: UserDetailPagePr
 
   const unassignPermSetMutation = useMutation({
     mutationFn: (permSetId: string) =>
-      apiClient.delete(`/control/permission-sets/${permSetId}/assignments/users/${id}`),
+      apiClient.deleteResource(`/api/permission-sets/${permSetId}/assignments/users/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users', id, 'permission-sets'] })
       showToast('Permission set removed successfully', 'success')

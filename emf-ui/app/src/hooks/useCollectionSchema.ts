@@ -2,7 +2,7 @@
  * useCollectionSchema Hook
  *
  * Fetches and caches a collection's schema (name, displayName, fields)
- * from the control plane. Field types are normalized from backend
+ * from the JSON:API endpoint. Field types are normalized from backend
  * canonical form (uppercase) to UI form (lowercase).
  */
 
@@ -88,17 +88,17 @@ function normalizeFieldType(backendType: string): FieldType {
 }
 
 /**
- * Fetch a collection schema by name from the control plane.
+ * Fetch a collection schema by name from the JSON:API endpoint.
  * The backend resolves by name or ID via getCollectionByIdOrName(),
- * so a single call to /control/collections/{name} suffices.
+ * so a single call to /api/collections/{name} suffices.
  */
 async function fetchCollectionSchema(
   apiClient: ApiClient,
   collectionName: string
 ): Promise<CollectionSchema> {
   // Backend resolves by name or ID — no need to fetch all collections first
-  const schema = await apiClient.get<CollectionSchema>(
-    `/control/collections/${encodeURIComponent(collectionName)}`
+  const schema = await apiClient.getOne<CollectionSchema>(
+    `/api/collections/${encodeURIComponent(collectionName)}`
   )
 
   // Normalize field types from backend canonical form to UI form

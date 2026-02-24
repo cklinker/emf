@@ -47,7 +47,9 @@ export function HomePage({ testId = 'home-page' }: HomePageProps): JSX.Element {
   const { data: pendingApprovals } = useQuery({
     queryKey: ['pending-approvals'],
     queryFn: () =>
-      apiClient.get<ApprovalInstance[]>('/control/approvals/instances/pending?userId=system'),
+      apiClient.getList<ApprovalInstance>(
+        '/api/approval-instances?filter[status][eq]=pending&filter[userId][eq]=system'
+      ),
     staleTime: 60000,
   })
 

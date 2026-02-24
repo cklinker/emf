@@ -17,6 +17,7 @@ import type { BootstrapConfig } from '../types/config'
 const originalFetch = global.fetch
 
 // Valid mock bootstrap config
+// Note: theme and branding come from bootstrapCache defaults, not from JSON:API endpoints
 const mockBootstrapConfig: BootstrapConfig = {
   pages: [
     {
@@ -43,15 +44,17 @@ const mockBootstrapConfig: BootstrapConfig = {
       ],
     },
   ],
+  // These match bootstrapCache DEFAULT_THEME
   theme: {
     primaryColor: '#1976d2',
     secondaryColor: '#dc004e',
-    fontFamily: 'Roboto, sans-serif',
+    fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
     borderRadius: '4px',
   },
+  // These match bootstrapCache DEFAULT_BRANDING
   branding: {
-    logoUrl: '/logo.png',
-    applicationName: 'EMF Admin',
+    logoUrl: '/logo.svg',
+    applicationName: 'EMF Platform',
     faviconUrl: '/favicon.ico',
   },
   oidcProviders: [
@@ -63,7 +66,28 @@ const mockBootstrapConfig: BootstrapConfig = {
   ],
 }
 
+/**
+ * Build JSON:API list response wrapper for mock data.
+ */
+function jsonApiList(type: string, items: Record<string, unknown>[]) {
+  return {
+    data: items.map((item, i) => ({
+      type,
+      id: item.id ?? `${type}-${i + 1}`,
+      attributes: Object.fromEntries(Object.entries(item).filter(([k]) => k !== 'id')),
+    })),
+    metadata: {
+      totalCount: items.length,
+      currentPage: 0,
+      pageSize: 500,
+      totalPages: 1,
+    },
+  }
+}
+
 // Create mock fetch function
+// The bootstrap config is now composed from 4 parallel JSON:API calls:
+//   /api/ui-pages, /api/ui-menus, /api/oidc-providers, /api/tenants
 function createMockFetch(
   options: {
     config?: BootstrapConfig | Partial<BootstrapConfig>
@@ -74,6 +98,8 @@ function createMockFetch(
     delay?: number
   } = {}
 ) {
+  const cfg = (options.config || mockBootstrapConfig) as Record<string, unknown>
+
   return vi.fn(async (input: RequestInfo | URL) => {
     const url =
       typeof input === 'string'
@@ -86,15 +112,16 @@ function createMockFetch(
       await new Promise((resolve) => setTimeout(resolve, options.delay))
     }
 
-    if (url.includes('/control/ui-bootstrap')) {
-      if (options.shouldFail) {
-        return {
-          ok: false,
-          status: options.failStatus || 500,
-          statusText: options.failStatusText || 'Internal Server Error',
-        } as Response
-      }
+    // When shouldFail is true, simulate a network error (fetch throws)
+    // This causes bootstrapCache's .catch() to fire with the error
+    if (options.shouldFail) {
+      const status = options.failStatus || 500
+      const statusText = options.failStatusText || 'Internal Server Error'
+      throw new Error(`Failed to fetch bootstrap configuration: ${status} ${statusText}`)
+    }
 
+    // Handle /api/ui-pages
+    if (url.includes('/api/ui-pages')) {
       if (options.invalidJson) {
         return {
           ok: true,
@@ -103,10 +130,45 @@ function createMockFetch(
           },
         } as unknown as Response
       }
-
+      const pages = (cfg.pages as Record<string, unknown>[]) || []
       return {
         ok: true,
-        json: async () => options.config || mockBootstrapConfig,
+        json: async () => jsonApiList('ui-pages', pages),
+      } as Response
+    }
+
+    // Handle /api/ui-menus
+    if (url.includes('/api/ui-menus')) {
+      if (options.invalidJson) {
+        return {
+          ok: true,
+          json: async () => {
+            throw new SyntaxError('Unexpected token')
+          },
+        } as unknown as Response
+      }
+      const menus = (cfg.menus as Record<string, unknown>[]) || []
+      return {
+        ok: true,
+        json: async () => jsonApiList('ui-menus', menus),
+      } as Response
+    }
+
+    // Handle /api/oidc-providers
+    if (url.includes('/api/oidc-providers')) {
+      const providers = (cfg.oidcProviders as Record<string, unknown>[]) || []
+      return {
+        ok: true,
+        json: async () => jsonApiList('oidc-providers', providers),
+      } as Response
+    }
+
+    // Handle /api/tenants
+    if (url.includes('/api/tenants')) {
+      return {
+        ok: true,
+        json: async () =>
+          jsonApiList('tenants', [{ id: 'tenant-1', slug: 'default', name: 'Default Tenant' }]),
       } as Response
     }
 
@@ -192,7 +254,7 @@ describe('ConfigContext', () => {
   })
 
   describe('Fetch Bootstrap Configuration (Requirement 1.1)', () => {
-    it('should fetch bootstrap config from /control/ui-bootstrap on mount', async () => {
+    it('should fetch bootstrap config from JSON:API endpoints on mount', async () => {
       const mockFetch = createMockFetch()
       global.fetch = mockFetch
 
@@ -202,8 +264,12 @@ describe('ConfigContext', () => {
         expect(screen.getByTestId('loading')).toHaveTextContent('not-loading')
       })
 
-      // Verify fetch was called with correct endpoint (tenant-scoped)
-      expect(mockFetch).toHaveBeenCalledWith('/default/control/ui-bootstrap')
+      // Verify fetch was called with the 4 JSON:API endpoints (tenant-scoped)
+      const calledUrls = mockFetch.mock.calls.map((call: unknown[]) => call[0] as string)
+      expect(calledUrls.some((u: string) => u.includes('/api/ui-pages'))).toBe(true)
+      expect(calledUrls.some((u: string) => u.includes('/api/ui-menus'))).toBe(true)
+      expect(calledUrls.some((u: string) => u.includes('/api/oidc-providers'))).toBe(true)
+      expect(calledUrls.some((u: string) => u.includes('/api/tenants'))).toBe(true)
     })
 
     it('should load config successfully', async () => {
@@ -313,7 +379,7 @@ describe('ConfigContext', () => {
       expect(theme).toMatchObject({
         primaryColor: '#1976d2',
         secondaryColor: '#dc004e',
-        fontFamily: 'Roboto, sans-serif',
+        fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
         borderRadius: '4px',
       })
     })
@@ -327,7 +393,7 @@ describe('ConfigContext', () => {
         expect(screen.getByTestId('loading')).toHaveTextContent('not-loading')
       })
 
-      expect(screen.getByTestId('app-name')).toHaveTextContent('EMF Admin')
+      expect(screen.getByTestId('app-name')).toHaveTextContent('EMF Platform')
     })
 
     it('should include logo, app name, and favicon in branding', async () => {
@@ -348,8 +414,8 @@ describe('ConfigContext', () => {
       const branding = configValue?.config?.branding
       expect(branding).toBeDefined()
       expect(branding).toMatchObject({
-        logoUrl: '/logo.png',
-        applicationName: 'EMF Admin',
+        logoUrl: '/logo.svg',
+        applicationName: 'EMF Platform',
         faviconUrl: '/favicon.ico',
       })
     })
@@ -428,7 +494,7 @@ describe('ConfigContext', () => {
   })
 
   describe('Error Handling - Invalid Config (Requirement 1.7)', () => {
-    it('should set error when config is invalid JSON', async () => {
+    it('should set error when config response has invalid JSON', async () => {
       global.fetch = createMockFetch({ invalidJson: true })
 
       renderWithConfig()
@@ -437,57 +503,95 @@ describe('ConfigContext', () => {
         expect(screen.getByTestId('loading')).toHaveTextContent('not-loading')
       })
 
-      expect(screen.getByTestId('error')).toHaveTextContent(
-        'Failed to parse bootstrap configuration: Invalid JSON response'
+      // When JSON parsing fails, the SyntaxError propagates through bootstrapCache
+      expect(screen.getByTestId('error')).not.toHaveTextContent('no-error')
+    })
+
+    it('should use defaults when pages config is empty', async () => {
+      // With JSON:API bootstrap, pages/menus come from endpoints while
+      // theme/branding are provided as defaults by bootstrapCache.
+      // Empty pages endpoint returns [], which is valid.
+      global.fetch = createMockFetch({
+        config: {
+          pages: [],
+          menus: [],
+          oidcProviders: [],
+          theme: mockBootstrapConfig.theme,
+          branding: mockBootstrapConfig.branding,
+        } as unknown as BootstrapConfig,
+      })
+
+      renderWithConfig()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('loading')).toHaveTextContent('not-loading')
+      })
+
+      // bootstrapCache always provides defaults for theme/branding,
+      // so validation passes even with empty pages/menus
+      expect(screen.getByTestId('has-config')).toHaveTextContent('has-config')
+      expect(screen.getByTestId('pages-count')).toHaveTextContent('0')
+    })
+
+    it('should use default theme when endpoints return empty data', async () => {
+      // bootstrapCache provides DEFAULT_THEME, so theme is always present
+      global.fetch = createMockFetch({
+        config: {
+          pages: [],
+          menus: [],
+          oidcProviders: [],
+        } as unknown as BootstrapConfig,
+      })
+
+      let configValue: ReturnType<typeof useConfig> | undefined
+
+      renderWithConfig(
+        <TestComponent
+          onRender={(config) => {
+            configValue = config
+          }}
+        />
       )
-    })
-
-    it('should set error when config is missing pages array', async () => {
-      global.fetch = createMockFetch({
-        config: {
-          menus: [],
-          theme: mockBootstrapConfig.theme,
-          branding: mockBootstrapConfig.branding,
-        } as unknown as BootstrapConfig,
-      })
-
-      renderWithConfig()
 
       await waitFor(() => {
-        expect(screen.getByTestId('loading')).toHaveTextContent('not-loading')
+        expect(configValue?.isLoading).toBe(false)
       })
 
-      expect(screen.getByTestId('error')).toHaveTextContent('Invalid bootstrap configuration')
-      expect(screen.getByTestId('error')).toHaveTextContent('pages')
+      // bootstrapCache always provides default theme and branding
+      expect(configValue?.config?.theme).toBeDefined()
+      expect(configValue?.config?.branding).toBeDefined()
+      expect(configValue?.error).toBeNull()
     })
 
-    it('should set error when config is missing theme', async () => {
+    it('should use default branding when endpoints return empty data', async () => {
       global.fetch = createMockFetch({
         config: {
           pages: [],
           menus: [],
-          branding: mockBootstrapConfig.branding,
+          oidcProviders: [],
         } as unknown as BootstrapConfig,
       })
 
-      renderWithConfig()
+      let configValue: ReturnType<typeof useConfig> | undefined
+
+      renderWithConfig(
+        <TestComponent
+          onRender={(config) => {
+            configValue = config
+          }}
+        />
+      )
 
       await waitFor(() => {
-        expect(screen.getByTestId('loading')).toHaveTextContent('not-loading')
+        expect(configValue?.isLoading).toBe(false)
       })
 
-      expect(screen.getByTestId('error')).toHaveTextContent('Invalid bootstrap configuration')
-      expect(screen.getByTestId('error')).toHaveTextContent('theme')
+      expect(configValue?.config?.branding).toBeDefined()
+      expect(configValue?.config?.branding.applicationName).toBe('EMF Platform')
     })
 
-    it('should set error when config is missing branding', async () => {
-      global.fetch = createMockFetch({
-        config: {
-          pages: [],
-          menus: [],
-          theme: mockBootstrapConfig.theme,
-        } as unknown as BootstrapConfig,
-      })
+    it('should set error when network failure prevents config loading', async () => {
+      global.fetch = createMockFetch({ shouldFail: true })
 
       renderWithConfig()
 
@@ -495,28 +599,9 @@ describe('ConfigContext', () => {
         expect(screen.getByTestId('loading')).toHaveTextContent('not-loading')
       })
 
-      expect(screen.getByTestId('error')).toHaveTextContent('Invalid bootstrap configuration')
-      expect(screen.getByTestId('error')).toHaveTextContent('branding')
-    })
-
-    it('should provide diagnostic information in error message', async () => {
-      global.fetch = createMockFetch({
-        config: {} as unknown as BootstrapConfig,
-      })
-
-      renderWithConfig()
-
-      await waitFor(() => {
-        expect(screen.getByTestId('loading')).toHaveTextContent('not-loading')
-      })
-
-      const errorText = screen.getByTestId('error').textContent
-      expect(errorText).toContain('Invalid bootstrap configuration')
-      // Should list multiple missing fields
-      expect(errorText).toContain('pages')
-      expect(errorText).toContain('menus')
-      expect(errorText).toContain('theme')
-      expect(errorText).toContain('branding')
+      // Network errors propagate through bootstrapCache as error messages
+      expect(screen.getByTestId('error')).not.toHaveTextContent('no-error')
+      expect(screen.getByTestId('has-config')).toHaveTextContent('no-config')
     })
   })
 
@@ -550,14 +635,15 @@ describe('ConfigContext', () => {
         expect(screen.getByTestId('loading')).toHaveTextContent('not-loading')
       })
 
-      // Initial fetch
-      expect(mockFetch).toHaveBeenCalledTimes(1)
+      // Initial fetch makes 4 parallel JSON:API calls
+      expect(mockFetch).toHaveBeenCalledTimes(4)
 
       // Click reload button
       await user.click(screen.getByText('Reload'))
 
       await waitFor(() => {
-        expect(mockFetch).toHaveBeenCalledTimes(2)
+        // Reload fires another 4 JSON:API calls
+        expect(mockFetch).toHaveBeenCalledTimes(8)
       })
     })
 
@@ -569,16 +655,21 @@ describe('ConfigContext', () => {
       renderWithConfig()
 
       await waitFor(() => {
-        expect(screen.getByTestId('app-name')).toHaveTextContent('EMF Admin')
+        expect(screen.getByTestId('pages-count')).toHaveTextContent('2')
       })
 
-      // Update fetch to return different config
+      // Update fetch to return different page config
       const updatedConfig: BootstrapConfig = {
         ...mockBootstrapConfig,
-        branding: {
-          ...mockBootstrapConfig.branding,
-          applicationName: 'Updated App Name',
-        },
+        pages: [
+          ...mockBootstrapConfig.pages,
+          {
+            id: 'page-3',
+            path: '/settings',
+            title: 'Settings',
+            component: 'SettingsPage',
+          },
+        ],
       }
       global.fetch = createMockFetch({ config: updatedConfig })
 
@@ -586,7 +677,8 @@ describe('ConfigContext', () => {
       await user.click(screen.getByText('Reload'))
 
       await waitFor(() => {
-        expect(screen.getByTestId('app-name')).toHaveTextContent('Updated App Name')
+        // Pages count should increase from 2 to 3 after reload
+        expect(screen.getByTestId('pages-count')).toHaveTextContent('3')
       })
     })
 
@@ -686,8 +778,8 @@ describe('ConfigContext', () => {
         expect(screen.getByTestId('loading')).toHaveTextContent('not-loading')
       })
 
-      // Initial fetch
-      expect(mockFetch).toHaveBeenCalledTimes(1)
+      // Initial fetch makes 4 parallel JSON:API calls
+      expect(mockFetch).toHaveBeenCalledTimes(4)
 
       // Advance time by poll interval
       await act(async () => {
@@ -695,7 +787,8 @@ describe('ConfigContext', () => {
       })
 
       await waitFor(() => {
-        expect(mockFetch).toHaveBeenCalledTimes(2)
+        // Second poll: another 4 calls
+        expect(mockFetch).toHaveBeenCalledTimes(8)
       })
 
       // Advance again
@@ -704,7 +797,8 @@ describe('ConfigContext', () => {
       })
 
       await waitFor(() => {
-        expect(mockFetch).toHaveBeenCalledTimes(3)
+        // Third poll: another 4 calls
+        expect(mockFetch).toHaveBeenCalledTimes(12)
       })
     })
 
@@ -718,16 +812,16 @@ describe('ConfigContext', () => {
         expect(screen.getByTestId('loading')).toHaveTextContent('not-loading')
       })
 
-      // Initial fetch
-      expect(mockFetch).toHaveBeenCalledTimes(1)
+      // Initial fetch makes 4 parallel JSON:API calls
+      expect(mockFetch).toHaveBeenCalledTimes(4)
 
       // Advance time
       await act(async () => {
         vi.advanceTimersByTime(10000)
       })
 
-      // Should still be 1 call
-      expect(mockFetch).toHaveBeenCalledTimes(1)
+      // Should still be 4 calls (no additional polling)
+      expect(mockFetch).toHaveBeenCalledTimes(4)
     })
 
     it('should not poll when in error state', async () => {
@@ -740,16 +834,16 @@ describe('ConfigContext', () => {
         expect(screen.getByTestId('loading')).toHaveTextContent('not-loading')
       })
 
-      // Initial fetch (failed)
-      expect(mockFetch).toHaveBeenCalledTimes(1)
+      // Initial fetch (failed) — still makes 4 calls (all fail)
+      expect(mockFetch).toHaveBeenCalledTimes(4)
 
       // Advance time
       await act(async () => {
         vi.advanceTimersByTime(10000)
       })
 
-      // Should still be 1 call (no polling during error)
-      expect(mockFetch).toHaveBeenCalledTimes(1)
+      // Should still be 4 calls (no polling during error)
+      expect(mockFetch).toHaveBeenCalledTimes(4)
     })
   })
 })

@@ -6,11 +6,13 @@ import { CustomPage } from './CustomPage'
 import { componentRegistry } from '@/services/componentRegistry'
 
 // Mock API context
-const mockGet = vi.fn()
+const mockGetList = vi.fn()
 vi.mock('@/context/ApiContext', () => ({
   useApi: vi.fn(() => ({
     apiClient: {
-      get: mockGet,
+      get: vi.fn(),
+      getList: mockGetList,
+      getOne: vi.fn(),
       post: vi.fn(),
       put: vi.fn(),
       patch: vi.fn(),
@@ -43,7 +45,7 @@ describe('CustomPage', () => {
   })
 
   it('shows page not found when API returns null', async () => {
-    mockGet.mockResolvedValueOnce(null)
+    mockGetList.mockResolvedValueOnce([])
 
     render(
       <TestWrapper initialEntries={['/test-tenant/app/p/my-page']}>
@@ -59,12 +61,14 @@ describe('CustomPage', () => {
   })
 
   it('shows component not available when not registered', async () => {
-    mockGet.mockResolvedValueOnce({
-      id: 'page-1',
-      path: 'my-page',
-      title: 'My Custom Page',
-      component: 'unregistered_widget',
-    })
+    mockGetList.mockResolvedValueOnce([
+      {
+        id: 'page-1',
+        path: 'my-page',
+        title: 'My Custom Page',
+        component: 'unregistered_widget',
+      },
+    ])
 
     render(
       <TestWrapper initialEntries={['/test-tenant/app/p/my-page']}>
@@ -86,13 +90,15 @@ describe('CustomPage', () => {
     )
     componentRegistry.registerPageComponent('test_widget', TestPageComponent)
 
-    mockGet.mockResolvedValueOnce({
-      id: 'page-1',
-      path: 'my-page',
-      title: 'Test Page',
-      component: 'test_widget',
-      props: { message: 'Hello World' },
-    })
+    mockGetList.mockResolvedValueOnce([
+      {
+        id: 'page-1',
+        path: 'my-page',
+        title: 'Test Page',
+        component: 'test_widget',
+        props: { message: 'Hello World' },
+      },
+    ])
 
     render(
       <TestWrapper initialEntries={['/test-tenant/app/p/my-page']}>
@@ -112,12 +118,14 @@ describe('CustomPage', () => {
     const TestComponent = () => <div>Test</div>
     componentRegistry.registerPageComponent('my_comp', TestComponent)
 
-    mockGet.mockResolvedValueOnce({
-      id: 'page-1',
-      path: 'dashboard',
-      title: 'Sales Dashboard',
-      component: 'my_comp',
-    })
+    mockGetList.mockResolvedValueOnce([
+      {
+        id: 'page-1',
+        path: 'dashboard',
+        title: 'Sales Dashboard',
+        component: 'my_comp',
+      },
+    ])
 
     render(
       <TestWrapper initialEntries={['/test-tenant/app/p/dashboard']}>
@@ -134,7 +142,7 @@ describe('CustomPage', () => {
   })
 
   it('handles API error gracefully', async () => {
-    mockGet.mockRejectedValueOnce(new Error('Network error'))
+    mockGetList.mockRejectedValueOnce(new Error('Network error'))
 
     render(
       <TestWrapper initialEntries={['/test-tenant/app/p/broken-page']}>

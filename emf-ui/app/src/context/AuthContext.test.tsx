@@ -78,17 +78,68 @@ const mockDiscoveryDoc = {
   response_types_supported: ['code'],
 }
 
+/**
+ * Build JSON:API list response wrapper for mock data.
+ */
+function jsonApiList(type: string, items: Record<string, unknown>[]) {
+  return {
+    data: items.map((item, i) => ({
+      type,
+      id: item.id ?? `${type}-${i + 1}`,
+      attributes: Object.fromEntries(Object.entries(item).filter(([k]) => k !== 'id')),
+    })),
+    metadata: {
+      totalCount: items.length,
+      currentPage: 0,
+      pageSize: 500,
+      totalPages: 1,
+    },
+  }
+}
+
 // Create mock fetch function
+// The bootstrap config is now composed from 4 parallel JSON:API calls:
+//   /api/ui-pages, /api/ui-menus, /api/oidc-providers, /api/tenants
 function createMockFetch(overrides: Record<string, unknown> = {}) {
+  const cfg = (overrides.bootstrapConfig || mockBootstrapConfig) as Record<string, unknown>
+
   return vi.fn(async (input: RequestInfo | URL) => {
     const url =
       typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
 
-    if (url.includes('/control/ui-bootstrap')) {
-      const config = overrides.bootstrapConfig || mockBootstrapConfig
+    // Handle /api/ui-pages
+    if (url.includes('/api/ui-pages')) {
+      const pages = (cfg.pages as Record<string, unknown>[]) || []
       return {
         ok: true,
-        json: async () => config,
+        json: async () => jsonApiList('ui-pages', pages),
+      } as Response
+    }
+
+    // Handle /api/ui-menus
+    if (url.includes('/api/ui-menus')) {
+      const menus = (cfg.menus as Record<string, unknown>[]) || []
+      return {
+        ok: true,
+        json: async () => jsonApiList('ui-menus', menus),
+      } as Response
+    }
+
+    // Handle /api/oidc-providers
+    if (url.includes('/api/oidc-providers')) {
+      const providers = (cfg.oidcProviders as Record<string, unknown>[]) || []
+      return {
+        ok: true,
+        json: async () => jsonApiList('oidc-providers', providers),
+      } as Response
+    }
+
+    // Handle /api/tenants
+    if (url.includes('/api/tenants')) {
+      return {
+        ok: true,
+        json: async () =>
+          jsonApiList('tenants', [{ id: 'tenant-1', slug: 'default', name: 'Default Tenant' }]),
       } as Response
     }
 
@@ -239,7 +290,7 @@ describe('AuthContext', () => {
       expect(screen.getByTestId('user')).toHaveTextContent('no-user')
     })
 
-    it('should fetch bootstrap config on mount', async () => {
+    it('should fetch bootstrap config via JSON:API endpoints on mount', async () => {
       const mockFetch = createMockFetch()
       global.fetch = mockFetch
 
@@ -249,14 +300,18 @@ describe('AuthContext', () => {
         expect(screen.getByTestId('loading')).toHaveTextContent('not-loading')
       })
 
-      // Verify fetch was called
+      // Verify fetch was called with the 4 JSON:API endpoints
       expect(mockFetch).toHaveBeenCalled()
-      const calls = mockFetch.mock.calls
-      const bootstrapCall = calls.find((call) => {
-        const url = typeof call[0] === 'string' ? call[0] : call[0]?.url
-        return url?.includes('/control/ui-bootstrap')
+      const calledUrls = mockFetch.mock.calls.map((call: unknown[]) => {
+        const arg = call[0]
+        return typeof arg === 'string' ? arg : (arg as { url?: string })?.url
       })
-      expect(bootstrapCall).toBeDefined()
+      expect(calledUrls.some((u: string | undefined) => u?.includes('/api/ui-pages'))).toBe(true)
+      expect(calledUrls.some((u: string | undefined) => u?.includes('/api/ui-menus'))).toBe(true)
+      expect(calledUrls.some((u: string | undefined) => u?.includes('/api/oidc-providers'))).toBe(
+        true
+      )
+      expect(calledUrls.some((u: string | undefined) => u?.includes('/api/tenants'))).toBe(true)
     })
   })
 

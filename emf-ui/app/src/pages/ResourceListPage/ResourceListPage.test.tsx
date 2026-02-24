@@ -98,7 +98,7 @@ function createTestQueryClient() {
 // Helper to set up standard Axios mocks for ResourceListPage tests
 function setupResourceListHandlers() {
   mockAxios.get.mockImplementation((url: string) => {
-    if (url === '/control/collections') {
+    if (url === '/api/collections') {
       return Promise.resolve({
         data: {
           content: [mockSchema],
@@ -109,7 +109,7 @@ function setupResourceListHandlers() {
         },
       })
     }
-    if (url.startsWith('/control/collections/')) {
+    if (url.startsWith('/api/collections/')) {
       return Promise.resolve({ data: mockSchema })
     }
     if (url.startsWith('/api/users')) {
@@ -362,7 +362,7 @@ describe('ResourceListPage', () => {
 
     it('should display empty state when no records', async () => {
       mockAxios.get.mockImplementation((url: string) => {
-        if (url === '/control/collections') {
+        if (url === '/api/collections') {
           return Promise.resolve({
             data: {
               content: [mockSchema],
@@ -373,7 +373,7 @@ describe('ResourceListPage', () => {
             },
           })
         }
-        if (url.startsWith('/control/collections/')) {
+        if (url.startsWith('/api/collections/')) {
           return Promise.resolve({ data: mockSchema })
         }
         if (url.startsWith('/api/users')) {
@@ -854,7 +854,7 @@ describe('ResourceListPage', () => {
     // SKIPPED: Component rendering issues - needs further investigation
     beforeEach(() => {
       mockAxios.get.mockImplementation((url: string) => {
-        if (url === '/control/collections') {
+        if (url === '/api/collections') {
           return Promise.resolve({
             data: {
               content: [mockSchema],
@@ -865,7 +865,7 @@ describe('ResourceListPage', () => {
             },
           })
         }
-        if (url.startsWith('/control/collections/')) {
+        if (url.startsWith('/api/collections/')) {
           return Promise.resolve({ data: mockSchema })
         }
         if (url.startsWith('/api/users')) {

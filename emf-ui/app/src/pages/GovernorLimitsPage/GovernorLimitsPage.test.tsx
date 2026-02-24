@@ -24,13 +24,13 @@ const mockStatus = {
 
 function setupAxiosMocks() {
   mockAxios.get.mockImplementation((url: string) => {
-    if (url.includes('/control/governor-limits')) {
+    if (url.includes('/api/governor-limits')) {
       return Promise.resolve({ data: mockStatus })
     }
     return Promise.resolve({ data: {} })
   })
   mockAxios.put.mockImplementation((url: string) => {
-    if (url.includes('/control/governor-limits')) {
+    if (url.includes('/api/governor-limits')) {
       return Promise.resolve({ data: mockStatus.limits })
     }
     return Promise.resolve({ data: {} })

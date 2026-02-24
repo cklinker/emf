@@ -176,7 +176,7 @@ describe('AttachmentsSection', () => {
     await waitFor(() => {
       expect(mockApiClient.postFormData).toHaveBeenCalledTimes(1)
       const [url, formData] = mockApiClient.postFormData.mock.calls[0]
-      expect(url).toBe('/control/attachments/col-1/rec-1')
+      expect(url).toBe('/api/attachments?filter[collectionId][eq]=col-1&filter[recordId][eq]=rec-1')
       expect(formData).toBeInstanceOf(FormData)
     })
   })

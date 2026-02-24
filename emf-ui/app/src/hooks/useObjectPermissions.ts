@@ -1,18 +1,15 @@
 /**
  * useObjectPermissions Hook
  *
- * Returns CRUD permission flags for a given collection. Fetches the current
- * user's effective object permissions from the control plane. When the
- * permission endpoint is unavailable (not yet implemented), falls back to
- * permissive defaults so the UI degrades gracefully.
+ * Returns CRUD permission flags for a given collection. Returns permissive
+ * defaults since the permissions endpoint is not yet available via JSON:API.
+ * The UI degrades gracefully with all permissions allowed.
  *
  * The hook uses React Query with a long stale time (5 min) since permissions
  * change infrequently.
  */
 
 import { useQuery } from '@tanstack/react-query'
-import { useApi } from '@/context/ApiContext'
-import type { ApiClient } from '@/services/apiClient'
 
 /**
  * Object-level CRUD permission flags.
@@ -43,31 +40,13 @@ const PERMISSIVE_DEFAULTS: ObjectPermissions = {
 }
 
 /**
- * Fetch effective object permissions for the current user on a collection.
- * Tries GET /control/my-permissions/objects/{collectionName}.
- * Falls back to permissive defaults on 404/501 (endpoint not yet implemented).
+ * Return permissive object permissions.
+ * Permissions endpoint is not yet available via JSON:API — fall back
+ * to permissive defaults so the UI works without the permission backend.
  */
-async function fetchObjectPermissions(
-  apiClient: ApiClient,
-  collectionName: string
-): Promise<ObjectPermissions> {
-  try {
-    const response = await apiClient.get<ObjectPermissions>(
-      `/control/my-permissions/objects/${encodeURIComponent(collectionName)}`
-    )
-    return {
-      canCreate: response?.canCreate ?? true,
-      canRead: response?.canRead ?? true,
-      canEdit: response?.canEdit ?? true,
-      canDelete: response?.canDelete ?? true,
-      canViewAll: response?.canViewAll ?? true,
-      canModifyAll: response?.canModifyAll ?? true,
-    }
-  } catch {
-    // Endpoint not yet implemented — fall back to permissive defaults.
-    // This ensures the UI works without the permission backend.
-    return PERMISSIVE_DEFAULTS
-  }
+async function fetchObjectPermissions(): Promise<ObjectPermissions> {
+  // Permissions are not yet available via JSON:API — return permissive defaults
+  return PERMISSIVE_DEFAULTS
 }
 
 /**
@@ -79,11 +58,9 @@ async function fetchObjectPermissions(
 export function useObjectPermissions(
   collectionName: string | undefined
 ): UseObjectPermissionsReturn {
-  const { apiClient } = useApi()
-
   const { data, isLoading, error } = useQuery({
     queryKey: ['object-permissions', collectionName],
-    queryFn: () => fetchObjectPermissions(apiClient, collectionName!),
+    queryFn: () => fetchObjectPermissions(),
     enabled: !!collectionName,
     staleTime: 5 * 60 * 1000, // 5 minutes — permissions change rarely
     retry: false, // Don't retry on failure (likely 404)

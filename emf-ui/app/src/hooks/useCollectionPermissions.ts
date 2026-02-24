@@ -1,10 +1,9 @@
 /**
  * useCollectionPermissions Hook
  *
- * Fetches both object-level CRUD permissions and field-level visibility
- * for a collection in a single API call. This replaces the pattern of
- * calling useObjectPermissions + useFieldPermissions separately, which
- * made 2 HTTP requests per page load.
+ * Returns both object-level CRUD permissions and field-level visibility
+ * for a collection. Returns permissive defaults since the combined
+ * permissions endpoint is not yet available via JSON:API.
  *
  * The individual hooks (useObjectPermissions, useFieldPermissions) still
  * exist for backward compatibility but app route pages should prefer
@@ -13,8 +12,6 @@
 
 import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { useApi } from '@/context/ApiContext'
-import type { ApiClient } from '@/services/apiClient'
 import type { ObjectPermissions } from './useObjectPermissions'
 
 /**
@@ -54,33 +51,15 @@ const PERMISSIVE_DEFAULTS: ObjectPermissions = {
 }
 
 /**
- * Fetch combined object + field permissions for the current user on a collection.
+ * Return permissive combined object + field permissions.
+ * Permissions endpoint is not yet available via JSON:API — fall back
+ * to permissive defaults so the UI works without the permission backend.
  */
-async function fetchCollectionPermissions(
-  apiClient: ApiClient,
-  collectionName: string
-): Promise<CollectionPermissionsResponse> {
-  try {
-    const response = await apiClient.get<CollectionPermissionsResponse>(
-      `/control/my-permissions/collection/${encodeURIComponent(collectionName)}`
-    )
-    return {
-      objectPermissions: {
-        canCreate: response?.objectPermissions?.canCreate ?? true,
-        canRead: response?.objectPermissions?.canRead ?? true,
-        canEdit: response?.objectPermissions?.canEdit ?? true,
-        canDelete: response?.objectPermissions?.canDelete ?? true,
-        canViewAll: response?.objectPermissions?.canViewAll ?? true,
-        canModifyAll: response?.objectPermissions?.canModifyAll ?? true,
-      },
-      fieldPermissions: response?.fieldPermissions ?? {},
-    }
-  } catch {
-    // Endpoint not yet implemented — fall back to permissive defaults.
-    return {
-      objectPermissions: PERMISSIVE_DEFAULTS,
-      fieldPermissions: {},
-    }
+async function fetchCollectionPermissions(): Promise<CollectionPermissionsResponse> {
+  // Permissions are not yet available via JSON:API — return permissive defaults
+  return {
+    objectPermissions: PERMISSIVE_DEFAULTS,
+    fieldPermissions: {},
   }
 }
 
@@ -94,11 +73,9 @@ async function fetchCollectionPermissions(
 export function useCollectionPermissions(
   collectionName: string | undefined
 ): UseCollectionPermissionsReturn {
-  const { apiClient } = useApi()
-
   const { data, isLoading, error } = useQuery({
     queryKey: ['collection-permissions', collectionName],
-    queryFn: () => fetchCollectionPermissions(apiClient, collectionName!),
+    queryFn: () => fetchCollectionPermissions(),
     enabled: !!collectionName,
     staleTime: 5 * 60 * 1000, // 5 minutes — permissions change rarely
     retry: false,

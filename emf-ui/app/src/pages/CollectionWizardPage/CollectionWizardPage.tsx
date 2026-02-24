@@ -220,7 +220,7 @@ export function CollectionWizardPage({
     queryKey: ['policies'],
     queryFn: () =>
       apiClient.get<Array<{ id: string; name: string; description?: string }>>(
-        '/control/policies?size=100'
+        '/api/policies?page[size]=100'
       ),
   })
 
@@ -368,7 +368,7 @@ export function CollectionWizardPage({
     setIsCreating(true)
     try {
       // Step 1: Create the collection
-      const created = await apiClient.post<{
+      const created = await apiClient.postResource<{
         id: string
         name: string
         description: string
@@ -376,7 +376,7 @@ export function CollectionWizardPage({
         currentVersion: number
         createdAt: string
         updatedAt: string
-      }>('/control/collections', {
+      }>('/api/collections', {
         name: basics.name,
         description: basics.description || '',
       })
@@ -386,7 +386,8 @@ export function CollectionWizardPage({
       // Step 2: Create fields
       for (const field of fields) {
         if (field.name && field.displayName) {
-          await apiClient.post(`/control/collections/${collectionId}/fields`, {
+          await apiClient.postResource(`/api/fields`, {
+            collectionId,
             name: field.name,
             displayName: field.displayName,
             type: field.type,
@@ -407,7 +408,7 @@ export function CollectionWizardPage({
         const collectionPath = basics.name
 
         if (authorization.readPolicyId) {
-          await apiClient.post('/control/authorization/route-policies', {
+          await apiClient.postResource('/api/route-policies', {
             method: 'GET',
             pathPattern: `/gateway/${collectionPath}/**`,
             policyId: authorization.readPolicyId,
@@ -415,7 +416,7 @@ export function CollectionWizardPage({
         }
 
         if (authorization.createPolicyId) {
-          await apiClient.post('/control/authorization/route-policies', {
+          await apiClient.postResource('/api/route-policies', {
             method: 'POST',
             pathPattern: `/gateway/${collectionPath}`,
             policyId: authorization.createPolicyId,
@@ -423,7 +424,7 @@ export function CollectionWizardPage({
         }
 
         if (authorization.updatePolicyId) {
-          await apiClient.post('/control/authorization/route-policies', {
+          await apiClient.postResource('/api/route-policies', {
             method: 'PUT',
             pathPattern: `/gateway/${collectionPath}/**`,
             policyId: authorization.updatePolicyId,
@@ -431,7 +432,7 @@ export function CollectionWizardPage({
         }
 
         if (authorization.deletePolicyId) {
-          await apiClient.post('/control/authorization/route-policies', {
+          await apiClient.postResource('/api/route-policies', {
             method: 'DELETE',
             pathPattern: `/gateway/${collectionPath}/**`,
             policyId: authorization.deletePolicyId,

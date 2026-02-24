@@ -759,9 +759,13 @@ export function OIDCProvidersPage({
   })
 
   // Test connection mutation
+  // Note: The test connection action endpoint is temporarily unavailable
+  // after the control-plane to worker API migration. Graceful degradation.
   const testConnectionMutation = useMutation({
-    mutationFn: (id: string) =>
-      apiClient.post<TestConnectionResult>(`/control/oidc-providers/${id}/actions/test`, {}),
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    mutationFn: async (_id: string): Promise<TestConnectionResult> => {
+      return { success: false, message: 'Test connection is temporarily unavailable' }
+    },
     onSuccess: (result) => {
       if (result.success) {
         showToast(t('oidc.connectionSuccess'), 'success')

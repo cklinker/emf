@@ -188,7 +188,7 @@ export function CollectionDetailPage({
   } = useQuery({
     queryKey: ['collection', collectionId],
     queryFn: async () => {
-      const response = await apiClient.get<Collection>(`/control/collections/${collectionId}`)
+      const response = await apiClient.get<Collection>(`/api/collections/${collectionId}`)
       // Normalize field types from backend canonical form to UI form.
       // The backend stores types as uppercase enums (e.g., "STRING", "DOUBLE", "PICKLIST")
       // but the UI uses lowercase aliases (e.g., "string", "number", "picklist").
@@ -212,7 +212,7 @@ export function CollectionDetailPage({
     queryKey: ['collection-versions', collectionId],
     queryFn: async () => {
       const response = await apiClient.get<CollectionVersion[]>(
-        `/control/collections/${collectionId}/versions`
+        `/api/collection-versions?filter[collectionId][eq]=${collectionId}`
       )
       return response
     },
@@ -224,7 +224,7 @@ export function CollectionDetailPage({
     queryKey: ['validation-rules', collectionId],
     queryFn: async () => {
       const response = await apiClient.get<CollectionValidationRule[]>(
-        `/control/collections/${collectionId}/validation-rules`
+        `/api/validation-rules?filter[collectionId][eq]=${collectionId}`
       )
       return response
     },
@@ -236,7 +236,7 @@ export function CollectionDetailPage({
     queryKey: ['record-types', collectionId],
     queryFn: async () => {
       const response = await apiClient.get<RecordType[]>(
-        `/control/collections/${collectionId}/record-types`
+        `/api/record-types?filter[collectionId][eq]=${collectionId}`
       )
       return response
     },
@@ -258,7 +258,9 @@ export function CollectionDetailPage({
       const results = await Promise.all(
         picklistFieldIds.map((fieldId) =>
           apiClient
-            .get<PicklistDependency[]>(`/control/picklists/fields/${fieldId}/dependencies`)
+            .get<
+              PicklistDependency[]
+            >(`/api/picklist-dependencies?filter[controllingFieldId][eq]=${fieldId}`)
             .catch(() => [] as PicklistDependency[])
         )
       )
@@ -285,7 +287,9 @@ export function CollectionDetailPage({
       const response = await apiClient.get<{
         content: SetupAuditTrailEntry[]
         totalElements: number
-      }>(`/control/audit/entity/Collection/${collectionId}?size=50`)
+      }>(
+        `/api/setup-audit-entries?filter[entityType][eq]=Collection&filter[entityId][eq]=${collectionId}&page[size]=50`
+      )
       return response
     },
     enabled: activeTab === 'setupAudit' && !!collectionId,
@@ -303,7 +307,9 @@ export function CollectionDetailPage({
           apiClient
             .get<{
               content: FieldHistoryEntry[]
-            }>(`/control/collections/${collectionId}/field-history/${field.name}?size=20`)
+            }>(
+              `/api/field-history?filter[collectionId][eq]=${collectionId}&filter[fieldName][eq]=${field.name}&page[size]=20`
+            )
             .catch(() => ({ content: [] as FieldHistoryEntry[] }))
         )
       )
@@ -333,7 +339,7 @@ export function CollectionDetailPage({
   // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: async () => {
-      await apiClient.delete(`/control/collections/${collectionId}`)
+      await apiClient.deleteResource(`/api/collections/${collectionId}`)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['collections'] })
@@ -348,7 +354,7 @@ export function CollectionDetailPage({
   // Add field mutation
   const addFieldMutation = useMutation({
     mutationFn: async (fieldData: Omit<FieldEditorDefinition, 'id' | 'order'>) => {
-      await apiClient.post(`/control/collections/${collectionId}/fields`, fieldData)
+      await apiClient.postResource(`/api/fields`, { ...fieldData, collectionId })
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['collection', collectionId] })
@@ -370,7 +376,7 @@ export function CollectionDetailPage({
       fieldId: string
       fieldData: Partial<FieldEditorDefinition>
     }) => {
-      await apiClient.put(`/control/collections/${collectionId}/fields/${fieldId}`, fieldData)
+      await apiClient.putResource(`/api/fields/${fieldId}`, fieldData)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['collection', collectionId] })
@@ -386,7 +392,7 @@ export function CollectionDetailPage({
   // --- Validation Rule mutations ---
   const createValidationRuleMutation = useMutation({
     mutationFn: async (data: Record<string, unknown>) => {
-      await apiClient.post(`/control/collections/${collectionId}/validation-rules`, data)
+      await apiClient.postResource(`/api/validation-rules`, { ...data, collectionId })
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['validation-rules', collectionId] })
@@ -401,7 +407,7 @@ export function CollectionDetailPage({
 
   const updateValidationRuleMutation = useMutation({
     mutationFn: async ({ ruleId, data }: { ruleId: string; data: Record<string, unknown> }) => {
-      await apiClient.put(`/control/collections/${collectionId}/validation-rules/${ruleId}`, data)
+      await apiClient.putResource(`/api/validation-rules/${ruleId}`, data)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['validation-rules', collectionId] })
@@ -416,7 +422,7 @@ export function CollectionDetailPage({
 
   const deleteValidationRuleMutation = useMutation({
     mutationFn: async (ruleId: string) => {
-      await apiClient.delete(`/control/collections/${collectionId}/validation-rules/${ruleId}`)
+      await apiClient.deleteResource(`/api/validation-rules/${ruleId}`)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['validation-rules', collectionId] })
@@ -431,10 +437,7 @@ export function CollectionDetailPage({
 
   const activateValidationRuleMutation = useMutation({
     mutationFn: async (ruleId: string) => {
-      await apiClient.post(
-        `/control/collections/${collectionId}/validation-rules/${ruleId}/activate`,
-        {}
-      )
+      await apiClient.patchResource(`/api/validation-rules/${ruleId}`, { active: true })
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['validation-rules', collectionId] })
@@ -447,10 +450,7 @@ export function CollectionDetailPage({
 
   const deactivateValidationRuleMutation = useMutation({
     mutationFn: async (ruleId: string) => {
-      await apiClient.post(
-        `/control/collections/${collectionId}/validation-rules/${ruleId}/deactivate`,
-        {}
-      )
+      await apiClient.patchResource(`/api/validation-rules/${ruleId}`, { active: false })
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['validation-rules', collectionId] })
@@ -464,7 +464,7 @@ export function CollectionDetailPage({
   // --- Record Type mutations ---
   const createRecordTypeMutation = useMutation({
     mutationFn: async (data: Record<string, unknown>) => {
-      await apiClient.post(`/control/collections/${collectionId}/record-types`, data)
+      await apiClient.postResource(`/api/record-types`, { ...data, collectionId })
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['record-types', collectionId] })
@@ -479,7 +479,7 @@ export function CollectionDetailPage({
 
   const updateRecordTypeMutation = useMutation({
     mutationFn: async ({ rtId, data }: { rtId: string; data: Record<string, unknown> }) => {
-      await apiClient.put(`/control/collections/${collectionId}/record-types/${rtId}`, data)
+      await apiClient.putResource(`/api/record-types/${rtId}`, data)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['record-types', collectionId] })
@@ -494,7 +494,7 @@ export function CollectionDetailPage({
 
   const deleteRecordTypeMutation = useMutation({
     mutationFn: async (rtId: string) => {
-      await apiClient.delete(`/control/collections/${collectionId}/record-types/${rtId}`)
+      await apiClient.deleteResource(`/api/record-types/${rtId}`)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['record-types', collectionId] })
@@ -514,7 +514,7 @@ export function CollectionDetailPage({
       dependentFieldId: string
       mapping: Record<string, string[]>
     }) => {
-      await apiClient.put('/control/picklists/dependencies', data)
+      await apiClient.putResource('/api/picklist-dependencies', data)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
@@ -531,8 +531,8 @@ export function CollectionDetailPage({
 
   const deleteDependencyMutation = useMutation({
     mutationFn: async (dep: PicklistDependency) => {
-      await apiClient.delete(
-        `/control/picklists/dependencies/${dep.controllingFieldId}/${dep.dependentFieldId}`
+      await apiClient.deleteResource(
+        `/api/picklist-dependencies?filter[controllingFieldId][eq]=${dep.controllingFieldId}&filter[dependentFieldId][eq]=${dep.dependentFieldId}`
       )
     },
     onSuccess: () => {
@@ -838,7 +838,7 @@ export function CollectionDetailPage({
 
   const reorderFieldsMutation = useMutation({
     mutationFn: async (fieldIds: string[]) => {
-      await apiClient.put(`/control/collections/${collectionId}/fields/reorder`, {
+      await apiClient.putResource(`/api/collections/${collectionId}/fields/reorder`, {
         fieldIds,
       })
     },

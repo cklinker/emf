@@ -107,7 +107,9 @@ export function NotesSection({
   // Create note mutation
   const createMutation = useMutation({
     mutationFn: async (content: string) => {
-      return apiClient.post<Note>(`/control/notes/${collectionId}/${recordId}`, {
+      return apiClient.postResource<Note>(`/api/notes`, {
+        collectionId,
+        recordId,
         content,
       })
     },
@@ -121,7 +123,7 @@ export function NotesSection({
   // Update note mutation
   const updateMutation = useMutation({
     mutationFn: async ({ noteId, content }: { noteId: string; content: string }) => {
-      return apiClient.put<Note>(`/control/notes/${noteId}`, { content })
+      return apiClient.putResource<Note>(`/api/notes/${noteId}`, { content })
     },
     onSuccess: () => {
       invalidateCache()
@@ -133,7 +135,7 @@ export function NotesSection({
   // Delete note mutation
   const deleteMutation = useMutation({
     mutationFn: async (noteId: string) => {
-      return apiClient.delete(`/control/notes/${noteId}`)
+      return apiClient.deleteResource(`/api/notes/${noteId}`)
     },
     onSuccess: () => {
       invalidateCache()

@@ -65,7 +65,10 @@ export function PicklistValuesEditor({
     error,
   } = useQuery({
     queryKey: ['picklist-values', picklistId],
-    queryFn: () => apiClient.get<PicklistValue[]>(`/control/picklists/global/${picklistId}/values`),
+    queryFn: () =>
+      apiClient.getList<PicklistValue>(
+        `/api/global-picklist-values?filter[picklistId][eq]=${picklistId}`
+      ),
   })
 
   const initialValues = useMemo(
@@ -77,7 +80,10 @@ export function PicklistValuesEditor({
 
   const saveMutation = useMutation({
     mutationFn: (values: PicklistValue[]) =>
-      apiClient.put<PicklistValue[]>(`/control/picklists/global/${picklistId}/values`, values),
+      apiClient.putResource<PicklistValue[]>(
+        `/api/global-picklist-values?filter[picklistId][eq]=${picklistId}`,
+        values
+      ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['picklist-values', picklistId] })
       showToast(t('picklists.valueSaved'), 'success')

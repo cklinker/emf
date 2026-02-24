@@ -40,7 +40,7 @@ export class EMFClient {
   private discoveryCacheTime: number = 0;
 
   /**
-   * Admin client for control plane operations
+   * Admin client for platform administration operations
    */
   public readonly admin: AdminClient;
 
@@ -95,10 +95,13 @@ export class EMFClient {
   }
 
   /**
-   * Discover available resources from the control plane
+   * Discover available resources via the JSON:API collections endpoint.
    *
-   * Fetches resource metadata from the Discovery_Endpoint (/control/_meta/resources)
-   * and caches the results for the configured TTL period.
+   * Fetches resource metadata from /api/collections (served by the
+   * DynamicCollectionRouter) and caches the results for the configured
+   * TTL period.
+   *
+   * Only user-facing (non-system) collections are returned by default.
    *
    * @returns Promise<ResourceMetadata[]> - Array of resource metadata objects
    * @throws ValidationError - If the response doesn't match the expected schema
@@ -112,13 +115,33 @@ export class EMFClient {
     }
 
     try {
-      // Fetch fresh data from discovery endpoint
-      const response = await this.axiosInstance.get('/control/_meta/resources');
+      // Fetch collections from JSON:API endpoint
+      const response = await this.axiosInstance.get(
+        '/api/collections?filter[systemCollection][eq]=false&page[size]=500'
+      );
 
-      // Validate response with Zod schema if validation is enabled
-      let resources: ResourceMetadata[];
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      const body = response.data;
+
+      // Convert JSON:API response to ResourceMetadata[] format
+      // JSON:API shape: { data: [{ type, id, attributes }] }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+      const dataArray: unknown[] = Array.isArray(body?.data) ? body.data : [];
+
+      const resources: ResourceMetadata[] = dataArray.map((item: unknown) => {
+        const resource = item as { id: string; attributes?: Record<string, unknown> };
+        const attrs = resource.attributes ?? {};
+        return {
+          name: (attrs.name as string) ?? '',
+          displayName: (attrs.displayName as string) ?? (attrs.name as string) ?? '',
+          fields: [], // Fields are fetched separately per collection
+          operations: ['list', 'get', 'create', 'update', 'delete'],
+        };
+      });
+
+      // Validate with Zod schema if validation is enabled
       if (this.validationEnabled) {
-        const parseResult = DiscoveryResponseSchema.safeParse(response.data);
+        const parseResult = DiscoveryResponseSchema.safeParse({ resources });
         if (!parseResult.success) {
           const errorMessages = parseResult.error.errors.map(
             (e) => `${e.path.join('.')}: ${e.message}`
@@ -127,11 +150,6 @@ export class EMFClient {
             schema: errorMessages,
           });
         }
-        resources = parseResult.data.resources;
-      } else {
-        // Skip validation - use raw response
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-        resources = response.data.resources ?? [];
       }
 
       // Update cache with fresh data

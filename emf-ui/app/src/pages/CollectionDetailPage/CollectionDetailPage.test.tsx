@@ -186,26 +186,40 @@ function createGetHandler(
   versions: CollectionVersion[] = []
 ) {
   return (url: string) => {
-    if (url.match(/\/control\/collections\/[^/]+\/versions/)) {
+    // Collection versions: /api/collection-versions?filter[collectionId][eq]=...
+    if (url.match(/\/api\/collection-versions/)) {
       return Promise.resolve({ data: versions })
     }
-    if (url.match(/\/control\/collections\/[^/]+\/validation-rules/)) {
+    // Validation rules: /api/validation-rules?filter[collectionId][eq]=...
+    if (url.match(/\/api\/validation-rules/)) {
       return Promise.resolve({ data: [] })
     }
-    if (url.match(/\/control\/collections\/[^/]+\/record-types/)) {
+    // Record types: /api/record-types?filter[collectionId][eq]=...
+    if (url.match(/\/api\/record-types/)) {
       return Promise.resolve({ data: [] })
     }
-    if (url.match(/\/control\/collections\/[^/]+$/)) {
+    // Single collection: /api/collections/{id} (raw get)
+    if (url.match(/\/api\/collections\/[^?]+$/) && !url.includes('filter[')) {
       return Promise.resolve({ data: collection })
     }
-    if (url.match(/\/control\/collections$/)) {
-      return Promise.resolve({ data: { content: [] } })
+    // Collection list (getList via useCollectionSummaries): /api/collections?filter[...]
+    // getList calls unwrapJsonApiList on response.data, so return JSON:API format
+    if (url.match(/\/api\/collections/)) {
+      return Promise.resolve({
+        data: {
+          data: [],
+          metadata: { totalCount: 0, currentPage: 0, pageSize: 500, totalPages: 0 },
+        },
+      })
     }
-    if (url.match(/\/control\/picklists\/global/)) {
-      return Promise.resolve({ data: [] })
-    }
-    if (url.match(/\/control\/picklists/)) {
-      return Promise.resolve({ data: [] })
+    // Global picklists (getList): /api/global-picklists
+    if (url.match(/\/api\/global-picklists/)) {
+      return Promise.resolve({
+        data: {
+          data: [],
+          metadata: { totalCount: 0, currentPage: 0, pageSize: 20, totalPages: 0 },
+        },
+      })
     }
     return Promise.resolve({ data: [] })
   }
@@ -284,12 +298,21 @@ describe('CollectionDetailPage', () => {
     it('should allow retry on error', async () => {
       let callCount = 0
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.match(/\/control\/collections\/[^/]+$/)) {
+        if (url.match(/\/api\/collections\/[^?]+$/) && !url.includes('filter[')) {
           callCount++
           if (callCount === 1) {
             return Promise.reject(createAxiosError(500))
           }
           return Promise.resolve({ data: mockCollection })
+        }
+        // Collection list (getList via useCollectionSummaries) - JSON:API format
+        if (url.match(/\/api\/collections/)) {
+          return Promise.resolve({
+            data: {
+              data: [],
+              metadata: { totalCount: 0, currentPage: 0, pageSize: 500, totalPages: 0 },
+            },
+          })
         }
         return Promise.resolve({ data: {} })
       })

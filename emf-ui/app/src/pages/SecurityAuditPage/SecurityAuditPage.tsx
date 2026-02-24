@@ -19,14 +19,6 @@ interface SecurityAuditEntry {
   createdAt: string
 }
 
-interface PageResponse<T> {
-  content: T[]
-  totalElements: number
-  totalPages: number
-  number: number
-  size: number
-}
-
 interface SecurityAuditSummary {
   totalEventsLast24h: number
   authEvents: number
@@ -74,8 +66,8 @@ export function SecurityAuditPage({ className }: SecurityAuditPageProps): React.
   } = useQuery({
     queryKey: ['security-audit', tenantSlug, page],
     queryFn: async () => {
-      return apiClient.get<PageResponse<SecurityAuditEntry>>(
-        `/control/security-audit?page=${page}&size=50`
+      return apiClient.getPage<SecurityAuditEntry>(
+        `/api/setup-audit-entries?page[number]=${page}&page[size]=50`
       )
     },
   })
@@ -83,7 +75,7 @@ export function SecurityAuditPage({ className }: SecurityAuditPageProps): React.
   const { data: summary } = useQuery({
     queryKey: ['security-audit-summary', tenantSlug],
     queryFn: async () => {
-      return apiClient.get<SecurityAuditSummary>('/control/security-audit/summary')
+      return apiClient.getOne<SecurityAuditSummary>('/api/setup-audit-entries/summary')
     },
   })
 

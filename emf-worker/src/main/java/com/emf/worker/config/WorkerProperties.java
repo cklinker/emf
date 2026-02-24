@@ -13,6 +13,9 @@ import java.util.UUID;
  *
  * <p>Worker lifecycle (registration, heartbeat, assignments) has been removed.
  * Kubernetes manages pod health via liveness/readiness probes.
+ *
+ * <p>The worker reads collection definitions directly from the shared database,
+ * so no control plane URL is needed.
  */
 @Component
 @ConfigurationProperties(prefix = "emf.worker")
@@ -23,11 +26,6 @@ public class WorkerProperties {
      */
     private String id;
 
-    /**
-     * URL of the control plane service.
-     */
-    private String controlPlaneUrl = "http://localhost:8080";
-
     public String getId() {
         if (id == null || id.isBlank()) {
             id = "worker-" + UUID.randomUUID().toString().substring(0, 8);
@@ -37,13 +35,5 @@ public class WorkerProperties {
 
     public void setId(String id) {
         this.id = id;
-    }
-
-    public String getControlPlaneUrl() {
-        return controlPlaneUrl;
-    }
-
-    public void setControlPlaneUrl(String controlPlaneUrl) {
-        this.controlPlaneUrl = controlPlaneUrl;
     }
 }

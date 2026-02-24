@@ -27,7 +27,6 @@ spring:
 emf:
   worker:
     id: ${WORKER_ID:}
-    control-plane-url: ${CONTROL_PLANE_URL:http://localhost:8081}
   storage:
     mode: PHYSICAL_TABLES
   kafka:

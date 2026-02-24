@@ -172,51 +172,6 @@ services:
       - tools
 
   # ===========================================
-  # EMF Control Plane Service
-  # ===========================================
-  emf-control-plane:
-    build:
-      context: .
-      dockerfile: emf-control-plane/Dockerfile
-    container_name: emf-control-plane
-    restart: unless-stopped
-    environment:
-      SPRING_PROFILES_ACTIVE: integration-test
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/emf_control_plane
-      SPRING_DATASOURCE_USERNAME: emf
-      SPRING_DATASOURCE_PASSWORD: emf
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
-      SPRING_JPA_SHOW_SQL: "false"
-      SPRING_FLYWAY_ENABLED: "true"
-      SPRING_DATA_REDIS_HOST: redis
-      SPRING_DATA_REDIS_PORT: 6379
-      KAFKA_EVENTS_ENABLED: "true"
-      # JWT validation: Use emf-keycloak for JWKS (container can reach it)
-      # Issuer validation is disabled in IntegrationTestSecurityConfig to accept localhost tokens
-      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://emf-keycloak:8180/realms/emf/protocol/openid-connect/certs
-      SECURITY_ENABLED: "true"
-      LOGGING_LEVEL_COM_EMF: DEBUG
-      LOGGING_LEVEL_ROOT: INFO
-    ports:
-      - "8081:8080"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      kafka:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 60s
-    networks:
-      - emf-network
-
-  # ===========================================
   # EMF API Gateway Service
   # ===========================================
   emf-gateway:
@@ -227,7 +182,6 @@ services:
     restart: unless-stopped
     environment:
       SPRING_PROFILES_ACTIVE: integration-test
-      EMF_GATEWAY_CONTROL_PLANE_URL: http://emf-control-plane:8080
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
@@ -239,8 +193,6 @@ services:
     ports:
       - "8080:8080"
     depends_on:
-      emf-control-plane:
-        condition: service_healthy
       redis:
         condition: service_healthy
       kafka:
@@ -272,7 +224,6 @@ services:
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      CONTROL_PLANE_URL: http://emf-control-plane:8080
       WORKER_POOL: default
       WORKER_CAPACITY: 50
       LOGGING_LEVEL_COM_EMF: INFO
@@ -284,8 +235,6 @@ services:
       redis:
         condition: service_healthy
       kafka:
-        condition: service_healthy
-      emf-control-plane:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
@@ -312,7 +261,6 @@ services:
       SPRING_DATASOURCE_PASSWORD: emf
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
-      EMF_CONTROL_PLANE_URL: http://emf-control-plane:8080
       EMF_STORAGE_MODE: PHYSICAL_TABLES
       LOGGING_LEVEL_COM_EMF: INFO
     ports:
@@ -321,8 +269,6 @@ services:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_healthy
-      emf-control-plane:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]

@@ -3,6 +3,7 @@ package com.emf.runtime.workflow;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Data access interface for the workflow engine.
@@ -46,6 +47,16 @@ public interface WorkflowStore {
      * @return all active SCHEDULED rules with their actions
      */
     List<WorkflowRuleData> findScheduledRules();
+
+    /**
+     * Finds a specific workflow rule by its ID, including its actions.
+     * <p>
+     * Used by the TRIGGER_FLOW action handler to look up and execute subflow rules.
+     *
+     * @param ruleId the workflow rule ID
+     * @return the rule with its actions, or empty if not found or inactive
+     */
+    Optional<WorkflowRuleData> findRuleById(String ruleId);
 
     // ---- Execution logging ----
 

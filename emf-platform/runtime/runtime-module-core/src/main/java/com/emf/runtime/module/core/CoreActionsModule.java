@@ -2,6 +2,7 @@ package com.emf.runtime.module.core;
 
 import com.emf.runtime.module.core.handlers.*;
 import com.emf.runtime.workflow.ActionHandler;
+import com.emf.runtime.workflow.WorkflowEngine;
 import com.emf.runtime.workflow.module.EmfModule;
 import com.emf.runtime.workflow.module.ModuleContext;
 
@@ -20,7 +21,7 @@ import java.util.List;
  *   <li><b>CREATE_TASK</b> — Creates a task record for follow-up</li>
  *   <li><b>LOG_MESSAGE</b> — Writes a message to the execution log</li>
  *   <li><b>DECISION</b> — Implements conditional branching (if/else)</li>
- *   <li><b>TRIGGER_FLOW</b> — Stub: will invoke another workflow rule in Phase 3</li>
+ *   <li><b>TRIGGER_FLOW</b> — Invokes another workflow rule as a subflow</li>
  * </ul>
  *
  * <p>Handlers requiring runtime services (CollectionRegistry, FormulaEvaluator,
@@ -56,7 +57,10 @@ public class CoreActionsModule implements EmfModule {
         handlers.add(new FieldUpdateActionHandler(objectMapper));
         handlers.add(new CreateTaskActionHandler(objectMapper));
         handlers.add(new LogMessageActionHandler(objectMapper));
-        handlers.add(new TriggerFlowActionHandler(objectMapper));
+
+        // TriggerFlow handler — uses WorkflowEngine from extensions for subflow execution
+        WorkflowEngine workflowEngine = context.getExtension(WorkflowEngine.class);
+        handlers.add(new TriggerFlowActionHandler(objectMapper, workflowEngine));
 
         // Handlers needing CollectionRegistry
         handlers.add(new CreateRecordActionHandler(objectMapper, collectionRegistry));

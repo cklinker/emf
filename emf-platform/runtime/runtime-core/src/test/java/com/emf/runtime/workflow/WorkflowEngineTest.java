@@ -435,6 +435,57 @@ class WorkflowEngineTest {
     }
 
     @Nested
+    @DisplayName("executeRuleById")
+    class ExecuteRuleByIdTests {
+
+        @Test
+        @DisplayName("Should execute target rule when found")
+        void shouldExecuteTargetRuleWhenFound() {
+            WorkflowRuleData targetRule = createRule("target-1", "ON_CREATE", null, null,
+                "STOP_ON_ERROR", List.of(WorkflowActionData.of("act-1", "LOG_MESSAGE", 0, "{}", true)));
+
+            when(store.findRuleById("target-1")).thenReturn(Optional.of(targetRule));
+            when(store.createExecutionLog("t1", "target-1", "r1", "MANUAL"))
+                .thenReturn("log-1");
+
+            registerHandler("LOG_MESSAGE", ActionResult.success());
+
+            String logId = engine.executeRuleById("target-1", "r1", "t1", "orders",
+                Map.of("status", "Active"), "user-1");
+
+            assertEquals("log-1", logId);
+            verify(store).findRuleById("target-1");
+            verify(store).updateExecutionLog(eq("log-1"), eq("SUCCESS"), eq(1), isNull(), anyInt());
+        }
+
+        @Test
+        @DisplayName("Should return null when target rule not found")
+        void shouldReturnNullWhenNotFound() {
+            when(store.findRuleById("nonexistent")).thenReturn(Optional.empty());
+
+            String logId = engine.executeRuleById("nonexistent", "r1", "t1", "orders",
+                Map.of(), "user-1");
+
+            assertNull(logId);
+            verify(store, never()).createExecutionLog(anyString(), anyString(), anyString(), anyString());
+        }
+
+        @Test
+        @DisplayName("Should return null when target rule has no active actions")
+        void shouldReturnNullWhenNoActiveActions() {
+            WorkflowRuleData emptyRule = createRule("target-1", "ON_CREATE", null, null,
+                "STOP_ON_ERROR", List.of());
+
+            when(store.findRuleById("target-1")).thenReturn(Optional.of(emptyRule));
+
+            String logId = engine.executeRuleById("target-1", "r1", "t1", "orders",
+                Map.of(), "user-1");
+
+            assertNull(logId);
+        }
+    }
+
+    @Nested
     @DisplayName("evaluateBeforeSave")
     class EvaluateBeforeSaveTests {
 
@@ -750,6 +801,135 @@ class WorkflowEngineTest {
             WorkflowRuleData rule = createRule("rule-1", "ON_CREATE", null, null,
                 "CONTINUE_ON_ERROR", List.of());
             assertFalse(rule.stopOnError());
+        }
+    }
+
+    @Nested
+    @DisplayName("Field-change driven workflow patterns")
+    class FieldChangeDrivenTests {
+
+        @Test
+        @DisplayName("Should fire workflow when specific field changes (trigger fields match)")
+        void shouldFireWhenSpecificFieldChanges() {
+            // Rule triggers only when "status" field changes
+            WorkflowRuleData rule = createRule("rule-1", "ON_UPDATE", null,
+                List.of("status"), "STOP_ON_ERROR",
+                List.of(WorkflowActionData.of("act-1", "FIELD_UPDATE", 0, "{}", true)));
+
+            when(store.findActiveRules("t1", "orders", "ON_UPDATE")).thenReturn(List.of(rule));
+            when(store.findActiveRules("t1", "orders", "ON_CREATE_OR_UPDATE")).thenReturn(List.of());
+            when(store.createExecutionLog(anyString(), anyString(), anyString(), anyString()))
+                .thenReturn("log-1");
+
+            registerHandler("FIELD_UPDATE", ActionResult.success(Map.of("updatedFields",
+                Map.of("processedAt", "2026-01-01"))));
+
+            // Event with status change
+            RecordChangeEvent event = createEvent(ChangeType.UPDATED,
+                Map.of("status", "Approved", "name", "Order-1"),
+                Map.of("status", "Pending", "name", "Order-1"),
+                List.of("status"));
+
+            engine.evaluate(event);
+
+            verify(store).createExecutionLog("t1", "rule-1", "r1", "ON_UPDATE");
+            verify(store).updateExecutionLog(eq("log-1"), eq("SUCCESS"), eq(1), isNull(), anyInt());
+        }
+
+        @Test
+        @DisplayName("Should NOT fire workflow when non-trigger field changes")
+        void shouldNotFireWhenNonTriggerFieldChanges() {
+            // Rule triggers only when "status" field changes
+            WorkflowRuleData rule = createRule("rule-1", "ON_UPDATE", null,
+                List.of("status"), "STOP_ON_ERROR",
+                List.of(WorkflowActionData.of("act-1", "FIELD_UPDATE", 0, "{}", true)));
+
+            when(store.findActiveRules("t1", "orders", "ON_UPDATE")).thenReturn(List.of(rule));
+            when(store.findActiveRules("t1", "orders", "ON_CREATE_OR_UPDATE")).thenReturn(List.of());
+
+            // Event where only "name" changed, not "status"
+            RecordChangeEvent event = createEvent(ChangeType.UPDATED,
+                Map.of("status", "Pending", "name", "Updated Order"),
+                Map.of("status", "Pending", "name", "Original Order"),
+                List.of("name"));
+
+            engine.evaluate(event);
+
+            verify(store, never()).createExecutionLog(anyString(), anyString(), anyString(), anyString());
+        }
+
+        @Test
+        @DisplayName("Should accumulate field updates from before-save workflow on field change")
+        void shouldAccumulateFieldUpdatesOnBeforeSave() {
+            // Before-save rule that fires when "status" changes and applies processedAt
+            WorkflowRuleData rule = createRule("rule-1", "BEFORE_UPDATE", null,
+                List.of("status"), "STOP_ON_ERROR",
+                List.of(WorkflowActionData.of("act-1", "FIELD_UPDATE", 0,
+                    "{\"updates\":[{\"field\":\"processedAt\",\"value\":\"2026-01-01\"}]}", true)));
+
+            when(store.findActiveRules("t1", "orders", "BEFORE_UPDATE")).thenReturn(List.of(rule));
+
+            registerHandler("FIELD_UPDATE", ActionResult.success(Map.of("updatedFields",
+                Map.of("processedAt", "2026-01-01"))));
+
+            Map<String, Object> result = engine.evaluateBeforeSave(
+                "t1", "orders", "r1",
+                Map.of("status", "Approved"),
+                Map.of("status", "Pending"),
+                List.of("status"), "user-1", "UPDATE");
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> fieldUpdates = (Map<String, Object>) result.get("fieldUpdates");
+            assertEquals("2026-01-01", fieldUpdates.get("processedAt"));
+            assertEquals(1, result.get("actionsExecuted"));
+        }
+
+        @Test
+        @DisplayName("Should NOT apply before-save updates when trigger field not in changed fields")
+        void shouldNotApplyBeforeSaveWhenTriggerFieldNotChanged() {
+            WorkflowRuleData rule = createRule("rule-1", "BEFORE_UPDATE", null,
+                List.of("status"), "STOP_ON_ERROR",
+                List.of(WorkflowActionData.of("act-1", "FIELD_UPDATE", 0, "{}", true)));
+
+            when(store.findActiveRules("t1", "orders", "BEFORE_UPDATE")).thenReturn(List.of(rule));
+
+            // Only "name" changed, not "status"
+            Map<String, Object> result = engine.evaluateBeforeSave(
+                "t1", "orders", "r1",
+                Map.of("name", "New Name"),
+                Map.of("name", "Old Name"),
+                List.of("name"), "user-1", "UPDATE");
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> fieldUpdates = (Map<String, Object>) result.get("fieldUpdates");
+            assertTrue(fieldUpdates.isEmpty());
+            assertEquals(0, result.get("actionsExecuted"));
+        }
+
+        @Test
+        @DisplayName("Should combine filter formula with trigger fields for precise matching")
+        void shouldCombineFilterWithTriggerFields() {
+            // Rule: triggers on "status" change AND status must equal "Approved"
+            WorkflowRuleData rule = createRule("rule-1", "ON_UPDATE", "true",
+                List.of("status"), "STOP_ON_ERROR",
+                List.of(WorkflowActionData.of("act-1", "LOG_MESSAGE", 0, "{}", true)));
+
+            when(store.findActiveRules("t1", "orders", "ON_UPDATE")).thenReturn(List.of(rule));
+            when(store.findActiveRules("t1", "orders", "ON_CREATE_OR_UPDATE")).thenReturn(List.of());
+            when(store.createExecutionLog(anyString(), anyString(), anyString(), anyString()))
+                .thenReturn("log-1");
+
+            registerHandler("LOG_MESSAGE", ActionResult.success());
+
+            // Status changed to Approved
+            RecordChangeEvent event = createEvent(ChangeType.UPDATED,
+                Map.of("status", "Approved"),
+                Map.of("status", "Pending"),
+                List.of("status"));
+
+            engine.evaluate(event);
+
+            verify(store).createExecutionLog("t1", "rule-1", "r1", "ON_UPDATE");
         }
     }
 

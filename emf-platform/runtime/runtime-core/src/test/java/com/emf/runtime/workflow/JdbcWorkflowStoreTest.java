@@ -15,6 +15,7 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -115,6 +116,76 @@ class JdbcWorkflowStoreTest {
             assertEquals(1, result.get(0).actions().size());
             assertEquals("FIELD_UPDATE", result.get(0).actions().get(0).actionType());
             assertEquals(0, result.get(1).actions().size());
+        }
+    }
+
+    @Nested
+    @DisplayName("findRuleById")
+    class FindRuleByIdTests {
+
+        @Test
+        @DisplayName("Should return rule when found by ID")
+        @SuppressWarnings("unchecked")
+        void shouldReturnRuleWhenFound() {
+            WorkflowRuleData rule = createRule("rule-1", "tenant-1", "col-1", "orders");
+
+            // Main query: (sql, rowMapper, ruleId)
+            when(jdbcTemplate.query(anyString(), any(RowMapper.class), eq("rule-1")))
+                .thenReturn(List.of(rule));
+
+            Optional<WorkflowRuleData> result = store.findRuleById("rule-1");
+
+            assertTrue(result.isPresent());
+            assertEquals("rule-1", result.get().id());
+        }
+
+        @Test
+        @DisplayName("Should return empty when rule not found")
+        @SuppressWarnings("unchecked")
+        void shouldReturnEmptyWhenNotFound() {
+            when(jdbcTemplate.query(anyString(), any(RowMapper.class), eq("nonexistent")))
+                .thenReturn(List.of());
+
+            Optional<WorkflowRuleData> result = store.findRuleById("nonexistent");
+
+            assertTrue(result.isEmpty());
+        }
+
+        @Test
+        @DisplayName("Should load actions for the found rule")
+        @SuppressWarnings("unchecked")
+        void shouldLoadActionsForFoundRule() {
+            WorkflowRuleData rule = createRule("rule-1", "tenant-1", "col-1", "orders");
+
+            // First call (main query): returns the rule
+            // Second call (action query): returns actions
+            WorkflowActionData action = WorkflowActionData.of("a1", "FIELD_UPDATE", 1, "{}", true);
+
+            when(jdbcTemplate.query(anyString(), any(RowMapper.class), eq("rule-1")))
+                .thenReturn(List.of(rule))
+                .thenReturn(List.of(action));
+
+            Optional<WorkflowRuleData> result = store.findRuleById("rule-1");
+
+            assertTrue(result.isPresent());
+            assertEquals(1, result.get().actions().size());
+            assertEquals("FIELD_UPDATE", result.get().actions().get(0).actionType());
+        }
+
+        @Test
+        @DisplayName("Should query with correct SQL for active rules by ID")
+        void shouldQueryWithCorrectSql() {
+            when(jdbcTemplate.query(anyString(), any(RowMapper.class), eq("rule-1")))
+                .thenReturn(List.of());
+
+            store.findRuleById("rule-1");
+
+            ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+            verify(jdbcTemplate).query(sqlCaptor.capture(), any(RowMapper.class), eq("rule-1"));
+
+            String sql = sqlCaptor.getValue();
+            assertTrue(sql.contains("wr.id = ?"));
+            assertTrue(sql.contains("wr.active = true"));
         }
     }
 

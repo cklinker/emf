@@ -57,13 +57,15 @@ public class WorkflowConfig {
                                           QueryEngine queryEngine,
                                           CollectionRegistry collectionRegistry,
                                           @Autowired(required = false) FormulaEvaluator formulaEvaluator,
-                                          ObjectMapper objectMapper) {
+                                          ObjectMapper objectMapper,
+                                          WorkflowEngine workflowEngine) {
         ModuleRegistry registry = new ModuleRegistry(actionHandlerRegistry, beforeSaveHookRegistry);
 
         if (discoveredModules != null && !discoveredModules.isEmpty()) {
+            // Pass WorkflowEngine via extensions so modules (e.g., TriggerFlowActionHandler) can use it
             ModuleContext context = new ModuleContext(
                 queryEngine, collectionRegistry, formulaEvaluator, objectMapper,
-                actionHandlerRegistry, Map.of());
+                actionHandlerRegistry, Map.of(WorkflowEngine.class, workflowEngine));
 
             registry.initialize(discoveredModules, context);
             log.info("Module system initialized with {} modules", discoveredModules.size());

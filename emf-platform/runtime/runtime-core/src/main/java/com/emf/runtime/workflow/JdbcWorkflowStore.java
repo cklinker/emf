@@ -154,6 +154,28 @@ public class JdbcWorkflowStore implements WorkflowStore {
             Timestamp.from(timestamp), Timestamp.from(Instant.now()), ruleId);
     }
 
+    @Override
+    public boolean claimScheduledRule(String ruleId, Instant expectedLastRun, Instant newTimestamp) {
+        int rowsUpdated;
+        if (expectedLastRun == null) {
+            rowsUpdated = jdbcTemplate.update("""
+                UPDATE workflow_rule
+                SET last_scheduled_run = ?, updated_at = ?
+                WHERE id = ? AND last_scheduled_run IS NULL
+                """,
+                Timestamp.from(newTimestamp), Timestamp.from(Instant.now()), ruleId);
+        } else {
+            rowsUpdated = jdbcTemplate.update("""
+                UPDATE workflow_rule
+                SET last_scheduled_run = ?, updated_at = ?
+                WHERE id = ? AND last_scheduled_run = ?
+                """,
+                Timestamp.from(newTimestamp), Timestamp.from(Instant.now()),
+                ruleId, Timestamp.from(expectedLastRun));
+        }
+        return rowsUpdated > 0;
+    }
+
     // ---- Internal helpers ----
 
     private List<WorkflowActionData> loadActionsForRule(String ruleId) {

@@ -311,6 +311,57 @@ class JdbcWorkflowStoreTest {
     }
 
     @Nested
+    @DisplayName("claimScheduledRule")
+    class ClaimScheduledRuleTests {
+
+        @Test
+        @DisplayName("Should claim rule with null lastScheduledRun (never run before)")
+        void shouldClaimRuleWithNullLastRun() {
+            Instant now = Instant.now();
+            // 3 varargs: Timestamp, Timestamp, String
+            when(jdbcTemplate.update(anyString(), any(), any(), any())).thenReturn(1);
+
+            boolean claimed = store.claimScheduledRule("rule-1", null, now);
+
+            assertTrue(claimed);
+
+            ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+            verify(jdbcTemplate).update(sqlCaptor.capture(), any(), any(), any());
+
+            assertTrue(sqlCaptor.getValue().contains("last_scheduled_run IS NULL"));
+        }
+
+        @Test
+        @DisplayName("Should claim rule with matching lastScheduledRun")
+        void shouldClaimRuleWithMatchingLastRun() {
+            Instant lastRun = Instant.now().minusSeconds(3600);
+            Instant now = Instant.now();
+            // 4 varargs: Timestamp, Timestamp, String, Timestamp
+            when(jdbcTemplate.update(anyString(), any(), any(), any(), any())).thenReturn(1);
+
+            boolean claimed = store.claimScheduledRule("rule-1", lastRun, now);
+
+            assertTrue(claimed);
+
+            ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+            verify(jdbcTemplate).update(sqlCaptor.capture(), any(), any(), any(), any());
+
+            assertTrue(sqlCaptor.getValue().contains("last_scheduled_run = ?"));
+        }
+
+        @Test
+        @DisplayName("Should return false when claim fails (already claimed)")
+        void shouldReturnFalseWhenClaimFails() {
+            // 3 varargs for null lastRun case
+            when(jdbcTemplate.update(anyString(), any(), any(), any())).thenReturn(0);
+
+            boolean claimed = store.claimScheduledRule("rule-1", null, Instant.now());
+
+            assertFalse(claimed);
+        }
+    }
+
+    @Nested
     @DisplayName("Row mapping")
     class RowMappingTests {
 

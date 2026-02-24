@@ -104,4 +104,19 @@ public interface WorkflowStore {
      * @param timestamp the execution timestamp
      */
     void updateLastScheduledRun(String ruleId, Instant timestamp);
+
+    /**
+     * Atomically claims a scheduled rule for execution using optimistic locking.
+     * <p>
+     * Performs an atomic UPDATE that sets {@code lastScheduledRun} to {@code newTimestamp}
+     * only if the current {@code lastScheduledRun} matches {@code expectedLastRun}.
+     * This prevents multiple worker pods from executing the same scheduled rule
+     * simultaneously.
+     *
+     * @param ruleId          the workflow rule ID
+     * @param expectedLastRun the expected current value of lastScheduledRun (null if never run)
+     * @param newTimestamp     the new timestamp to set
+     * @return true if the rule was claimed (row was updated), false if another pod already claimed it
+     */
+    boolean claimScheduledRule(String ruleId, Instant expectedLastRun, Instant newTimestamp);
 }

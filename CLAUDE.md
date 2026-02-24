@@ -80,7 +80,7 @@ Run the full build pipeline locally. **All steps must pass with zero errors.**
 
 ```bash
 # 1. Build runtime modules (dependency for control-plane and gateway)
-mvn clean install -DskipTests -f emf-platform/pom.xml -pl runtime/runtime-core,runtime/runtime-events -am -B
+mvn clean install -DskipTests -f emf-platform/pom.xml -pl runtime/runtime-core,runtime/runtime-events,runtime/runtime-jsonapi,runtime/runtime-module-core,runtime/runtime-module-integration,runtime/runtime-module-schema -am -B
 
 # 2. Run control-plane tests
 mvn verify -f emf-control-plane/pom.xml -B

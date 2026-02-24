@@ -51,14 +51,6 @@ interface LoginHistoryEntry {
   userAgent: string
 }
 
-interface PageResponse<T> {
-  content: T[]
-  totalElements: number
-  totalPages: number
-  number: number
-  size: number
-}
-
 interface UpdateFormData {
   firstName: string
   lastName: string
@@ -130,7 +122,7 @@ export function UserDetailPage({ testId = 'user-detail-page' }: UserDetailPagePr
   } = useQuery({
     queryKey: ['users', id],
     queryFn: async () => {
-      const result = await apiClient.get<PlatformUser>(`/api/users/${id}`)
+      const result = await apiClient.getOne<PlatformUser>(`/api/users/${id}`)
       setFormData({
         firstName: result.firstName,
         lastName: result.lastName,
@@ -149,7 +141,7 @@ export function UserDetailPage({ testId = 'user-detail-page' }: UserDetailPagePr
       const params = new URLSearchParams()
       params.append('page[number]', historyPage.toString())
       params.append('page[size]', '20')
-      return apiClient.get<PageResponse<LoginHistoryEntry>>(
+      return apiClient.getPage<LoginHistoryEntry>(
         `/api/login-history?filter[userId][eq]=${id}&${params}`
       )
     },
@@ -159,20 +151,20 @@ export function UserDetailPage({ testId = 'user-detail-page' }: UserDetailPagePr
   // Security tab data
   const { data: profiles } = useQuery({
     queryKey: ['profiles'],
-    queryFn: () => apiClient.get<ProfileSummary[]>('/api/profiles'),
+    queryFn: () => apiClient.getList<ProfileSummary>('/api/profiles'),
     enabled: activeTab === 'security',
   })
 
   const { data: userPermissionSets } = useQuery({
     queryKey: ['users', id, 'permission-sets'],
     queryFn: () =>
-      apiClient.get<PermissionSetSummary[]>(`/api/permission-sets?filter[userId][eq]=${id}`),
+      apiClient.getList<PermissionSetSummary>(`/api/permission-sets?filter[userId][eq]=${id}`),
     enabled: !!id && activeTab === 'security',
   })
 
   const { data: allPermissionSets } = useQuery({
     queryKey: ['permission-sets'],
-    queryFn: () => apiClient.get<PermissionSetSummary[]>('/api/permission-sets'),
+    queryFn: () => apiClient.getList<PermissionSetSummary>('/api/permission-sets'),
     enabled: activeTab === 'security' && showAssignModal,
   })
 

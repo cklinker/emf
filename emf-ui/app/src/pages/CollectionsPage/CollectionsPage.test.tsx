@@ -33,6 +33,38 @@ import {
 } from '../../test/testUtils'
 import { CollectionsPage, Collection } from './CollectionsPage'
 
+/**
+ * Convert flat Collection objects to a JSON:API list response shape.
+ * This matches the format returned by the DynamicCollectionRouter.
+ */
+function toJsonApiResponse(collections: Collection[]) {
+  return {
+    data: {
+      data: collections.map((c) => ({
+        type: 'collections',
+        id: c.id,
+        attributes: {
+          name: c.name,
+          displayName: c.displayName,
+          description: c.description,
+          storageMode: c.storageMode,
+          active: c.active,
+          systemCollection: c.systemCollection ?? false,
+          currentVersion: c.currentVersion,
+          createdAt: c.createdAt,
+          updatedAt: c.updatedAt,
+        },
+      })),
+      metadata: {
+        totalCount: collections.length,
+        totalPages: Math.ceil(collections.length / 1000),
+        pageSize: 1000,
+        currentPage: 1,
+      },
+    },
+  }
+}
+
 // Mock navigate function
 const mockNavigate = vi.fn()
 vi.mock('react-router-dom', async () => {
@@ -104,19 +136,7 @@ describe('CollectionsPage', () => {
       mockAxios.get.mockImplementation(
         () =>
           new Promise((resolve) =>
-            setTimeout(
-              () =>
-                resolve({
-                  data: {
-                    content: mockCollections,
-                    totalElements: mockCollections.length,
-                    totalPages: 1,
-                    size: 1000,
-                    number: 0,
-                  },
-                }),
-              100
-            )
+            setTimeout(() => resolve(toJsonApiResponse(mockCollections)), 100)
           )
       )
 
@@ -151,15 +171,7 @@ describe('CollectionsPage', () => {
 
   describe('Collections List Display', () => {
     beforeEach(() => {
-      mockAxios.get.mockResolvedValue({
-        data: {
-          content: mockCollections,
-          totalElements: mockCollections.length,
-          totalPages: 1,
-          size: 1000,
-          number: 0,
-        },
-      })
+      mockAxios.get.mockResolvedValue(toJsonApiResponse(mockCollections))
     })
 
     it('should display all collections in the table', async () => {
@@ -211,15 +223,7 @@ describe('CollectionsPage', () => {
 
   describe('Filtering', () => {
     beforeEach(() => {
-      mockAxios.get.mockResolvedValue({
-        data: {
-          content: mockCollections,
-          totalElements: mockCollections.length,
-          totalPages: 1,
-          size: 1000,
-          number: 0,
-        },
-      })
+      mockAxios.get.mockResolvedValue(toJsonApiResponse(mockCollections))
     })
 
     it('should filter collections by name', async () => {
@@ -313,15 +317,7 @@ describe('CollectionsPage', () => {
 
   describe('Sorting', () => {
     beforeEach(() => {
-      mockAxios.get.mockResolvedValue({
-        data: {
-          content: mockCollections,
-          totalElements: mockCollections.length,
-          totalPages: 1,
-          size: 1000,
-          number: 0,
-        },
-      })
+      mockAxios.get.mockResolvedValue(toJsonApiResponse(mockCollections))
     })
 
     it('should sort collections by name ascending by default', async () => {
@@ -415,15 +411,7 @@ describe('CollectionsPage', () => {
 
   describe('Actions', () => {
     beforeEach(() => {
-      mockAxios.get.mockResolvedValue({
-        data: {
-          content: mockCollections,
-          totalElements: mockCollections.length,
-          totalPages: 1,
-          size: 1000,
-          number: 0,
-        },
-      })
+      mockAxios.get.mockResolvedValue(toJsonApiResponse(mockCollections))
     })
 
     it('should navigate to create page when clicking create button', async () => {
@@ -524,15 +512,9 @@ describe('CollectionsPage', () => {
 
       // Mock the delete response, then the refetch
       mockAxios.delete.mockResolvedValueOnce({ data: null })
-      mockAxios.get.mockResolvedValue({
-        data: {
-          content: mockCollections.filter((c) => c.name !== 'orders'),
-          totalElements: 2,
-          totalPages: 1,
-          size: 1000,
-          number: 0,
-        },
-      })
+      mockAxios.get.mockResolvedValue(
+        toJsonApiResponse(mockCollections.filter((c) => c.name !== 'orders'))
+      )
 
       // Click delete on the first row (orders after sorting)
       const deleteButton = screen.getByTestId('delete-button-0')
@@ -566,15 +548,7 @@ describe('CollectionsPage', () => {
         updatedAt: new Date(2024, 0, i + 1).toISOString(),
       }))
 
-      mockAxios.get.mockResolvedValue({
-        data: {
-          content: manyCollections,
-          totalElements: manyCollections.length,
-          totalPages: 2,
-          size: 1000,
-          number: 0,
-        },
-      })
+      mockAxios.get.mockResolvedValue(toJsonApiResponse(manyCollections))
 
       render(<CollectionsPage />, { wrapper: createTestWrapper() })
 
@@ -597,15 +571,7 @@ describe('CollectionsPage', () => {
         updatedAt: new Date(2024, 0, i + 1).toISOString(),
       }))
 
-      mockAxios.get.mockResolvedValue({
-        data: {
-          content: manyCollections,
-          totalElements: manyCollections.length,
-          totalPages: 2,
-          size: 1000,
-          number: 0,
-        },
-      })
+      mockAxios.get.mockResolvedValue(toJsonApiResponse(manyCollections))
 
       const user = userEvent.setup()
       render(<CollectionsPage />, { wrapper: createTestWrapper() })
@@ -634,15 +600,7 @@ describe('CollectionsPage', () => {
         updatedAt: new Date(2024, 0, i + 1).toISOString(),
       }))
 
-      mockAxios.get.mockResolvedValue({
-        data: {
-          content: manyCollections,
-          totalElements: manyCollections.length,
-          totalPages: 2,
-          size: 1000,
-          number: 0,
-        },
-      })
+      mockAxios.get.mockResolvedValue(toJsonApiResponse(manyCollections))
 
       render(<CollectionsPage />, { wrapper: createTestWrapper() })
 
@@ -666,15 +624,7 @@ describe('CollectionsPage', () => {
         updatedAt: new Date(2024, 0, i + 1).toISOString(),
       }))
 
-      mockAxios.get.mockResolvedValue({
-        data: {
-          content: manyCollections,
-          totalElements: manyCollections.length,
-          totalPages: 2,
-          size: 1000,
-          number: 0,
-        },
-      })
+      mockAxios.get.mockResolvedValue(toJsonApiResponse(manyCollections))
 
       const user = userEvent.setup()
       render(<CollectionsPage />, { wrapper: createTestWrapper() })
@@ -694,15 +644,7 @@ describe('CollectionsPage', () => {
 
   describe('Accessibility', () => {
     beforeEach(() => {
-      mockAxios.get.mockResolvedValue({
-        data: {
-          content: mockCollections,
-          totalElements: mockCollections.length,
-          totalPages: 1,
-          size: 1000,
-          number: 0,
-        },
-      })
+      mockAxios.get.mockResolvedValue(toJsonApiResponse(mockCollections))
     })
 
     it('should have accessible table structure', async () => {

@@ -150,56 +150,6 @@ class ConfigEventListenerTest {
         }
 
         @Test
-        @DisplayName("Should ignore collection changed event for control-plane system collection by ID")
-        void shouldIgnoreControlPlaneCollectionById() {
-            // Arrange
-            CollectionChangedPayload payload = new CollectionChangedPayload();
-            payload.setId("00000000-0000-0000-0000-000000000100");
-            payload.setName("__control-plane");
-            payload.setChangeType(ChangeType.CREATED);
-
-            ConfigEvent<CollectionChangedPayload> event = new ConfigEvent<>(
-                UUID.randomUUID().toString(),
-                "config.collection.changed",
-                UUID.randomUUID().toString(),
-                Instant.now(),
-                payload
-            );
-
-            // Act
-            listener.handleCollectionChanged(event);
-
-            // Assert — route registry must NOT be touched
-            verify(routeRegistry, never()).updateRoute(any());
-            verify(routeRegistry, never()).removeRoute(any());
-        }
-
-        @Test
-        @DisplayName("Should ignore collection changed event for __control-plane by name")
-        void shouldIgnoreControlPlaneCollectionByName() {
-            // Arrange
-            CollectionChangedPayload payload = new CollectionChangedPayload();
-            payload.setId("some-other-id");
-            payload.setName("__control-plane");
-            payload.setChangeType(ChangeType.UPDATED);
-
-            ConfigEvent<CollectionChangedPayload> event = new ConfigEvent<>(
-                UUID.randomUUID().toString(),
-                "config.collection.changed",
-                UUID.randomUUID().toString(),
-                Instant.now(),
-                payload
-            );
-
-            // Act
-            listener.handleCollectionChanged(event);
-
-            // Assert
-            verify(routeRegistry, never()).updateRoute(any());
-            verify(routeRegistry, never()).removeRoute(any());
-        }
-
-        @Test
         @DisplayName("Should route system collections like users normally")
         void shouldRouteSystemCollectionsNormally() {
             // Arrange — system collections (users, profiles, etc.) should be routed to worker
@@ -337,60 +287,6 @@ class ConfigEventListenerTest {
         }
 
         @Test
-        @DisplayName("Should ignore worker assignment event for control-plane system collection by ID")
-        void shouldIgnoreControlPlaneWorkerAssignmentById() {
-            // Arrange
-            Map<String, Object> payload = new HashMap<>();
-            payload.put("workerId", "worker-1");
-            payload.put("collectionId", "00000000-0000-0000-0000-000000000100");
-            payload.put("workerBaseUrl", "http://worker-1:8080");
-            payload.put("collectionName", "__control-plane");
-            payload.put("changeType", "CREATED");
-
-            ConfigEvent<Object> event = new ConfigEvent<>(
-                UUID.randomUUID().toString(),
-                "emf.worker.assignment.changed",
-                UUID.randomUUID().toString(),
-                Instant.now(),
-                payload
-            );
-
-            // Act
-            listener.handleWorkerAssignmentChanged(event);
-
-            // Assert — must NOT create a route for the legacy __control-plane collection
-            verify(routeRegistry, never()).updateRoute(any());
-            verify(routeRegistry, never()).removeRoute(any());
-        }
-
-        @Test
-        @DisplayName("Should ignore worker assignment event for __control-plane by name")
-        void shouldIgnoreControlPlaneWorkerAssignmentByName() {
-            // Arrange
-            Map<String, Object> payload = new HashMap<>();
-            payload.put("workerId", "worker-1");
-            payload.put("collectionId", "some-other-id");
-            payload.put("workerBaseUrl", "http://worker-1:8080");
-            payload.put("collectionName", "__control-plane");
-            payload.put("changeType", "CREATED");
-
-            ConfigEvent<Object> event = new ConfigEvent<>(
-                UUID.randomUUID().toString(),
-                "emf.worker.assignment.changed",
-                UUID.randomUUID().toString(),
-                Instant.now(),
-                payload
-            );
-
-            // Act
-            listener.handleWorkerAssignmentChanged(event);
-
-            // Assert
-            verify(routeRegistry, never()).updateRoute(any());
-            verify(routeRegistry, never()).removeRoute(any());
-        }
-
-        @Test
         @DisplayName("Should route system collection worker assignment normally")
         void shouldRouteSystemCollectionWorkerAssignmentNormally() {
             // Arrange — system collections (profiles, etc.) assigned to worker should be routed
@@ -422,30 +318,5 @@ class ConfigEventListenerTest {
             assertEquals(WORKER_SERVICE_URL, route.getBackendUrl());
         }
 
-        @Test
-        @DisplayName("Should ignore DELETED worker assignment event for system collection")
-        void shouldIgnoreDeletedWorkerAssignmentForSystemCollection() {
-            // Arrange
-            Map<String, Object> payload = new HashMap<>();
-            payload.put("workerId", "worker-1");
-            payload.put("collectionId", "00000000-0000-0000-0000-000000000100");
-            payload.put("collectionName", "__control-plane");
-            payload.put("changeType", "DELETED");
-
-            ConfigEvent<Object> event = new ConfigEvent<>(
-                UUID.randomUUID().toString(),
-                "emf.worker.assignment.changed",
-                UUID.randomUUID().toString(),
-                Instant.now(),
-                payload
-            );
-
-            // Act
-            listener.handleWorkerAssignmentChanged(event);
-
-            // Assert — must NOT remove the static control-plane route
-            verify(routeRegistry, never()).removeRoute(any());
-            verify(routeRegistry, never()).updateRoute(any());
-        }
     }
 }

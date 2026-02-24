@@ -26,21 +26,11 @@ import java.util.Map;
  * All event processing is done asynchronously and handles malformed events gracefully
  * by logging errors and continuing to process subsequent events.
  *
- * The __control-plane system collection is ignored because it is a legacy internal
- * collection that should not have a gateway route. Other system collections
- * (users, profiles, etc.) are handled normally since they are routed to the
- * worker like any other collection.
  */
 @Component
 public class ConfigEventListener {
 
     private static final Logger logger = LoggerFactory.getLogger(ConfigEventListener.class);
-
-    /** Well-known UUID for the __control-plane system collection (see V43 migration). */
-    private static final String CONTROL_PLANE_COLLECTION_ID = "00000000-0000-0000-0000-000000000100";
-
-    /** Name of the legacy control-plane system collection that should not have a route. */
-    private static final String CONTROL_PLANE_COLLECTION_NAME = "__control-plane";
 
     private final RouteRegistry routeRegistry;
     private final ObjectMapper objectMapper;
@@ -55,19 +45,6 @@ public class ConfigEventListener {
         this.objectMapper = objectMapper;
         this.applicationEventPublisher = applicationEventPublisher;
         this.workerServiceUrl = workerServiceUrl;
-    }
-
-    /**
-     * Checks whether a collection is the legacy __control-plane collection
-     * which should not have a gateway route.
-     * Only the __control-plane collection is skipped — other system collections
-     * (users, profiles, etc.) are routed to the worker like normal collections.
-     */
-    private boolean isControlPlaneCollection(String collectionId, String collectionName) {
-        if (CONTROL_PLANE_COLLECTION_ID.equals(collectionId)) {
-            return true;
-        }
-        return CONTROL_PLANE_COLLECTION_NAME.equals(collectionName);
     }
 
     /**
@@ -92,13 +69,6 @@ public class ConfigEventListener {
 
             logger.debug("Processing collection change: id={}, name={}, changeType={}",
                         payload.getId(), payload.getName(), payload.getChangeType());
-
-            // Skip legacy __control-plane collection — it should not have a gateway route
-            if (isControlPlaneCollection(payload.getId(), payload.getName())) {
-                logger.debug("Ignoring collection changed event for __control-plane collection: id={}, name={}",
-                            payload.getId(), payload.getName());
-                return;
-            }
 
             if (payload.getChangeType() == ChangeType.DELETED) {
                 routeRegistry.removeRoute(payload.getId());
@@ -186,13 +156,6 @@ public class ConfigEventListener {
 
             logger.info("Processing worker assignment: workerId={}, collectionId={}, collectionName={}, changeType={}",
                         workerId, collectionId, collectionName, changeType);
-
-            // Skip system collections — their routes are managed by RouteInitializer
-            if (isControlPlaneCollection(collectionId, collectionName)) {
-                logger.debug("Ignoring worker assignment event for __control-plane collection: id={}, name={}",
-                            collectionId, collectionName);
-                return;
-            }
 
             if ("DELETED".equals(changeType)) {
                 routeRegistry.removeRoute(collectionId);

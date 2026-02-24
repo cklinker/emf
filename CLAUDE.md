@@ -13,8 +13,8 @@ This is the EMF Enterprise Platform monorepo. When working on tasks, follow this
 ```
 emf-platform/runtime/runtime-core   # Core runtime library (Java, JAR)
 emf-platform/runtime/runtime-events # Shared Kafka event classes (Java, JAR)
-emf-control-plane/app               # Control plane Spring Boot service (Java)
 emf-gateway                         # Spring Cloud Gateway service (Java)
+emf-worker                          # Worker service (Java, owns DB migrations)
 emf-web                             # Frontend SDK, components, plugin-sdk (TypeScript/React)
 emf-ui/app                          # Admin/builder UI (TypeScript/React/Vite)
 ```
@@ -79,14 +79,14 @@ Run the full build pipeline locally. **All steps must pass with zero errors.**
 #### Java Backend
 
 ```bash
-# 1. Build runtime modules (dependency for control-plane and gateway)
+# 1. Build runtime modules (dependency for gateway and worker)
 mvn clean install -DskipTests -f emf-platform/pom.xml -pl runtime/runtime-core,runtime/runtime-events,runtime/runtime-jsonapi,runtime/runtime-module-core,runtime/runtime-module-integration,runtime/runtime-module-schema -am -B
 
-# 2. Run control-plane tests
-mvn verify -f emf-control-plane/pom.xml -B
-
-# 3. Run gateway tests
+# 2. Run gateway tests
 mvn verify -f emf-gateway/pom.xml -B
+
+# 3. Run worker tests
+mvn verify -f emf-worker/pom.xml -B
 ```
 
 #### Frontend (always — CI runs these on every PR)
@@ -110,8 +110,8 @@ npm run test:run
 
 #### Checklist Before PR
 
-- [ ] `mvn verify` passes for control-plane (zero test failures, zero lint errors)
 - [ ] `mvn verify` passes for gateway (zero test failures, zero lint errors)
+- [ ] `mvn verify` passes for worker (zero test failures, zero lint errors)
 - [ ] `npm run lint` passes in emf-web
 - [ ] `npm run typecheck` passes in emf-web
 - [ ] `npm run format:check` passes in emf-web
@@ -129,9 +129,9 @@ git push -u origin feature/<task-id>-<short-description>
 ```
 
 **Commit message format:**
-- `feat(control-plane): add GlobalPicklist entity and repository`
 - `feat(runtime-core): extend FieldType enum with 16 new types`
-- `test(control-plane): add PicklistService unit tests`
+- `feat(worker): add internal permissions endpoint`
+- `feat(gateway): add permission enforcement filter`
 - `fix(gateway): handle lookup field resolution in IncludeResolver`
 
 ### 6. Open a Pull Request and Auto-Merge
@@ -176,10 +176,10 @@ gh pr merge --auto --squash
 
 | Fact | Value |
 |------|-------|
-| Flyway migration ranges | V7 (base), V8–V13 (Phase 1), V14–V20 (Phase 2), V21–V24 (Phase 3), V25–V29 (Phase 4), V30–V35 (Phase 5), V36 (OIDC role mapping), V40 (Remove service table) |
+| Flyway migration ranges | V1-V65 in emf-worker/src/main/resources/db/migration/ |
 | FieldType enum (runtime-core) | STRING, INTEGER, LONG, DOUBLE, BOOLEAN, DATE, DATETIME, JSON |
 | FieldService VALID_FIELD_TYPES | "string", "number", "boolean", "date", "datetime", "reference", "array", "object" |
-| Control-plane "number" maps to | runtime DOUBLE (not INTEGER) |
+| Worker "number" field type maps to | runtime DOUBLE (not INTEGER) |
 | BaseEntity fields | UUID string id (36 chars), createdAt, updatedAt |
 | ConfigEventPublisher | Kafka-based, @Async, @ConditionalOnProperty |
 | ReferenceConfig record | targetCollection, targetField, cascadeDelete |
@@ -195,8 +195,8 @@ As new phases are planned, their EPIC documents will follow the pattern `EPIC-PH
 
 ## CI/CD
 
-- **PR checks** (`.github/workflows/ci.yml`): test-java (build runtime + test control-plane, gateway, worker) + test-frontend → quality-gate
-- **Deploy** (`.github/workflows/build-and-publish-containers.yml`): On main push, test-java + test-frontend → build-and-push (all 4 images) → deploy → smoke-test
+- **PR checks** (`.github/workflows/ci.yml`): test-java (build runtime + test gateway, worker) + test-frontend → quality-gate
+- **Deploy** (`.github/workflows/build-and-publish-containers.yml`): On main push, test-java + test-frontend → build-and-push (gateway, worker, UI images) → deploy → smoke-test
 - All CI checks must pass before a PR can be merged
 - **Deployment**: ArgoCD deploys to a local Kubernetes cluster. ArgoCD manifests are in a separate repo:
   - GitHub: `https://github.com/cklinker/homelab-argo`
@@ -209,24 +209,20 @@ The platform is deployed via ArgoCD to a local Kubernetes cluster. Use `kubectl`
 | Resource | Value |
 |----------|-------|
 | Namespace | `emf` |
-| Control Plane | `deployment/emf-control-plane` |
 | Gateway | `deployment/emf-gateway` |
 | Worker | `deployment/emf-worker` |
 
 ### Useful Commands
 
 ```bash
-# View recent control plane logs
-kubectl logs -n emf deployment/emf-control-plane --tail=200
-
-# Search for errors in last hour
-kubectl logs -n emf deployment/emf-control-plane --since=1h | grep -i "ERROR\|exception"
-
 # View gateway logs
 kubectl logs -n emf deployment/emf-gateway --tail=200
 
 # View worker logs
 kubectl logs -n emf deployment/emf-worker --tail=200
+
+# Search for errors in last hour
+kubectl logs -n emf deployment/emf-worker --since=1h | grep -i "ERROR\|exception"
 
 # Check pod status
 kubectl get pods -n emf

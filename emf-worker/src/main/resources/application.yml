@@ -10,6 +10,10 @@ spring:
     username: ${SPRING_DATASOURCE_USERNAME:emf}
     password: ${SPRING_DATASOURCE_PASSWORD:emf}
     driver-class-name: org.postgresql.Driver
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 0
   data:
     redis:
       host: ${SPRING_DATA_REDIS_HOST:localhost}

@@ -1,9 +1,10 @@
 package com.emf.worker.service;
 
 import com.emf.runtime.model.CollectionDefinition;
+import com.emf.runtime.model.FieldType;
+import com.emf.runtime.model.system.SystemCollectionDefinitions;
 import com.emf.runtime.registry.CollectionRegistry;
 import com.emf.runtime.storage.StorageAdapter;
-import com.emf.worker.config.WorkerProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -11,35 +12,32 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 /**
- * Tests for system collection flag parsing in CollectionLifecycleManager.
+ * Tests for CollectionLifecycleManager's DB-direct collection loading.
  *
- * <p>Verifies that when the control plane returns collection data with
- * system collection flags (systemCollection, tenantScoped, readOnly,
- * immutableFields, columnMapping), the CollectionLifecycleManager correctly
- * parses them and creates a CollectionDefinition with the proper flags set.
- *
- * <p>Since buildCollectionDefinition is private, we test it indirectly through
- * the public initializeCollection method.
+ * <p>Verifies that the manager correctly:
+ * <ul>
+ *   <li>Uses canonical SystemCollectionDefinitions for system collections</li>
+ *   <li>Builds definitions from DB data for user-defined collections</li>
+ *   <li>Reverse-maps field types from DB format to FieldType enum</li>
+ *   <li>Loads validation rules from the database</li>
+ * </ul>
  */
 class CollectionLifecycleManagerSystemCollectionTest {
 
     private CollectionRegistry collectionRegistry;
     private StorageAdapter storageAdapter;
-    private RestTemplate restTemplate;
-    private WorkerProperties workerProperties;
+    private JdbcTemplate jdbcTemplate;
     private ObjectMapper objectMapper;
     private CollectionLifecycleManager lifecycleManager;
 
@@ -47,360 +45,385 @@ class CollectionLifecycleManagerSystemCollectionTest {
     void setUp() {
         collectionRegistry = mock(CollectionRegistry.class);
         storageAdapter = mock(StorageAdapter.class);
-        restTemplate = mock(RestTemplate.class);
-        workerProperties = new WorkerProperties();
-        workerProperties.setControlPlaneUrl("http://localhost:8080");
-        workerProperties.setId("worker-test");
+        jdbcTemplate = mock(JdbcTemplate.class);
         objectMapper = new ObjectMapper();
 
         lifecycleManager = new CollectionLifecycleManager(
-                collectionRegistry, storageAdapter, restTemplate,
-                workerProperties, objectMapper);
+                collectionRegistry, storageAdapter, jdbcTemplate, objectMapper);
     }
 
     // ==================== Helper Methods ====================
 
     /**
-     * Builds mock control plane response data for a system collection.
+     * Builds a mock DB row for a system collection.
      */
-    private Map<String, Object> buildSystemCollectionResponse(String name) {
-        Map<String, Object> data = new HashMap<>();
-        data.put("id", "coll-123");
-        data.put("name", name);
-        data.put("displayName", "System " + name);
-        data.put("description", "A system collection");
-        data.put("systemCollection", true);
-        data.put("tenantScoped", true);
-        data.put("readOnly", true);
-        data.put("immutableFields", List.of("tenantId", "email"));
-        data.put("columnMapping", Map.of("firstName", "first_name", "lastName", "last_name"));
-        data.put("fields", List.of(
-                Map.of("name", "firstName", "type", "STRING"),
-                Map.of("name", "lastName", "type", "STRING"),
-                Map.of("name", "email", "type", "STRING", "required", true)
-        ));
-        return data;
+    private Map<String, Object> buildSystemCollectionRow(String name) {
+        Map<String, Object> row = new HashMap<>();
+        row.put("id", "coll-123");
+        row.put("name", name);
+        row.put("display_name", "System " + name);
+        row.put("description", "A system collection");
+        row.put("storage_mode", "PHYSICAL_TABLES");
+        row.put("active", true);
+        row.put("current_version", 1);
+        row.put("system_collection", true);
+        row.put("path", "/api/" + name);
+        row.put("tenant_id", "00000000-0000-0000-0000-000000000001");
+        return row;
     }
 
     /**
-     * Builds mock control plane response data for a standard (non-system) collection.
+     * Builds a mock DB row for a user-defined collection.
      */
-    private Map<String, Object> buildNonSystemCollectionResponse(String name) {
-        Map<String, Object> data = new HashMap<>();
-        data.put("id", "coll-456");
-        data.put("name", name);
-        data.put("displayName", name);
-        data.put("fields", List.of(
-                Map.of("name", "title", "type", "STRING"),
-                Map.of("name", "price", "type", "DOUBLE")
-        ));
-        return data;
+    private Map<String, Object> buildUserCollectionRow(String name) {
+        Map<String, Object> row = new HashMap<>();
+        row.put("id", "coll-456");
+        row.put("name", name);
+        row.put("display_name", name);
+        row.put("description", null);
+        row.put("storage_mode", "PHYSICAL_TABLES");
+        row.put("active", true);
+        row.put("current_version", 1);
+        row.put("system_collection", false);
+        row.put("path", "/api/" + name);
+        row.put("tenant_id", "tenant-abc");
+        return row;
     }
 
     /**
-     * Sets up the RestTemplate mock to return the given response data for a collection.
+     * Builds mock field DB rows.
      */
-    @SuppressWarnings("unchecked")
-    private void mockControlPlaneResponse(String collectionId, Map<String, Object> responseData) {
-        String collectionUrl = "http://localhost:8080/control/collections/" + collectionId;
-        ResponseEntity<Map> collectionResponse = new ResponseEntity<>(responseData, HttpStatus.OK);
-        when(restTemplate.getForEntity(eq(collectionUrl), eq(Map.class)))
-                .thenReturn(collectionResponse);
+    private List<Map<String, Object>> buildFieldRows() {
+        Map<String, Object> f1 = new HashMap<>();
+        f1.put("name", "title");
+        f1.put("type", "string");
+        f1.put("required", true);
+        f1.put("unique_constraint", false);
+        f1.put("indexed", false);
+        f1.put("default_value", null);
+        f1.put("constraints", null);
+        f1.put("field_type_config", null);
+        f1.put("reference_target", null);
+        f1.put("relationship_type", null);
+        f1.put("relationship_name", null);
+        f1.put("cascade_delete", false);
+        f1.put("field_order", 0);
+        f1.put("column_name", null);
+        f1.put("immutable", false);
 
-        // Mock the validation rules endpoint (returns empty list)
-        String rulesUrl = "http://localhost:8080/control/collections/" + collectionId + "/validation-rules";
-        ResponseEntity<List> rulesResponse = new ResponseEntity<>(List.of(), HttpStatus.OK);
-        when(restTemplate.getForEntity(eq(rulesUrl), eq(List.class)))
-                .thenReturn(rulesResponse);
+        Map<String, Object> f2 = new HashMap<>();
+        f2.put("name", "price");
+        f2.put("type", "number");
+        f2.put("required", false);
+        f2.put("unique_constraint", false);
+        f2.put("indexed", false);
+        f2.put("default_value", null);
+        f2.put("constraints", null);
+        f2.put("field_type_config", null);
+        f2.put("reference_target", null);
+        f2.put("relationship_type", null);
+        f2.put("relationship_name", null);
+        f2.put("cascade_delete", false);
+        f2.put("field_order", 1);
+        f2.put("column_name", null);
+        f2.put("immutable", false);
 
-        // Mock the ready notification
-        String readyUrl = "http://localhost:8080/control/assignments/" + collectionId + "/worker-test/ready";
-        when(restTemplate.postForEntity(eq(readyUrl), any(), eq(Void.class)))
-                .thenReturn(new ResponseEntity<>(HttpStatus.OK));
+        return List.of(f1, f2);
     }
 
-    // ==================== System Collection Flag Tests ====================
+    /**
+     * Sets up DB mocks for collection + fields + validation rules.
+     */
+    private void mockDbForCollection(String collectionId, Map<String, Object> collectionRow,
+                                       List<Map<String, Object>> fieldRows) {
+        when(jdbcTemplate.queryForList(contains("FROM collection WHERE id"), eq(collectionId)))
+                .thenReturn(List.of(collectionRow));
+        when(jdbcTemplate.queryForList(contains("FROM field WHERE"), eq(collectionId)))
+                .thenReturn(fieldRows);
+        when(jdbcTemplate.queryForList(contains("FROM validation_rule"), eq(collectionId)))
+                .thenReturn(List.of());
+    }
+
+    // ==================== System Collection Tests ====================
 
     @Nested
-    @DisplayName("System Collection Flag Parsing")
-    class SystemCollectionFlagTests {
+    @DisplayName("System Collection Loading")
+    class SystemCollectionTests {
 
         @Test
-        @DisplayName("Should parse systemCollection=true from control plane response")
-        void initializeCollection_parsesSystemCollectionFlag() {
-            String collectionId = "coll-123";
-            Map<String, Object> response = buildSystemCollectionResponse("users");
-            mockControlPlaneResponse(collectionId, response);
+        @DisplayName("Should use canonical definition for system collections")
+        void usesCanonicalDefinitionForSystemCollections() {
+            // Given: a system collection "users" exists in the DB
+            Map<String, Object> row = buildSystemCollectionRow("users");
+            mockDbForCollection("coll-123", row, List.of());
 
-            lifecycleManager.initializeCollection(collectionId);
+            // When
+            lifecycleManager.initializeCollection("coll-123");
 
-            // Capture the CollectionDefinition registered
+            // Then: should register the canonical SystemCollectionDefinition
             ArgumentCaptor<CollectionDefinition> defCaptor =
                     ArgumentCaptor.forClass(CollectionDefinition.class);
             verify(collectionRegistry).register(defCaptor.capture());
 
-            CollectionDefinition registeredDef = defCaptor.getValue();
-            assertTrue(registeredDef.systemCollection(),
-                    "Collection should have systemCollection=true");
+            CollectionDefinition registered = defCaptor.getValue();
+            CollectionDefinition canonical = SystemCollectionDefinitions.users();
+
+            assertThat(registered.name()).isEqualTo("users");
+            assertThat(registered.systemCollection()).isTrue();
+            assertThat(registered.tenantScoped()).isEqualTo(canonical.tenantScoped());
+            assertThat(registered.fields()).hasSameSizeAs(canonical.fields());
+            assertThat(registered.storageConfig().tableName())
+                    .isEqualTo(canonical.storageConfig().tableName());
         }
 
         @Test
-        @DisplayName("Should parse tenantScoped=true from control plane response")
-        void initializeCollection_parsesTenantScopedFlag() {
-            String collectionId = "coll-123";
-            Map<String, Object> response = buildSystemCollectionResponse("users");
-            mockControlPlaneResponse(collectionId, response);
+        @DisplayName("Should use canonical definition for profiles")
+        void usesCanonicalDefinitionForProfiles() {
+            Map<String, Object> row = buildSystemCollectionRow("profiles");
+            mockDbForCollection("coll-123", row, List.of());
 
-            lifecycleManager.initializeCollection(collectionId);
+            lifecycleManager.initializeCollection("coll-123");
 
             ArgumentCaptor<CollectionDefinition> defCaptor =
                     ArgumentCaptor.forClass(CollectionDefinition.class);
             verify(collectionRegistry).register(defCaptor.capture());
 
-            CollectionDefinition registeredDef = defCaptor.getValue();
-            assertTrue(registeredDef.tenantScoped(),
-                    "Collection should have tenantScoped=true");
+            CollectionDefinition registered = defCaptor.getValue();
+            assertThat(registered.name()).isEqualTo("profiles");
+            assertThat(registered.systemCollection()).isTrue();
+            assertThat(registered.fields()).hasSize(
+                    SystemCollectionDefinitions.profiles().fields().size());
         }
 
         @Test
-        @DisplayName("Should parse readOnly=true from control plane response")
-        void initializeCollection_parsesReadOnlyFlag() {
-            String collectionId = "coll-123";
-            Map<String, Object> response = buildSystemCollectionResponse("users");
-            mockControlPlaneResponse(collectionId, response);
+        @DisplayName("Should use canonical definition for workflow-rules")
+        void usesCanonicalDefinitionForWorkflowRules() {
+            Map<String, Object> row = buildSystemCollectionRow("workflow-rules");
+            mockDbForCollection("coll-123", row, List.of());
 
-            lifecycleManager.initializeCollection(collectionId);
-
-            ArgumentCaptor<CollectionDefinition> defCaptor =
-                    ArgumentCaptor.forClass(CollectionDefinition.class);
-            verify(collectionRegistry).register(defCaptor.capture());
-
-            CollectionDefinition registeredDef = defCaptor.getValue();
-            assertTrue(registeredDef.readOnly(),
-                    "Collection should have readOnly=true");
-        }
-
-        @Test
-        @DisplayName("Should parse immutableFields from control plane response")
-        void initializeCollection_parsesImmutableFields() {
-            String collectionId = "coll-123";
-            Map<String, Object> response = buildSystemCollectionResponse("users");
-            mockControlPlaneResponse(collectionId, response);
-
-            lifecycleManager.initializeCollection(collectionId);
+            lifecycleManager.initializeCollection("coll-123");
 
             ArgumentCaptor<CollectionDefinition> defCaptor =
                     ArgumentCaptor.forClass(CollectionDefinition.class);
             verify(collectionRegistry).register(defCaptor.capture());
 
-            CollectionDefinition registeredDef = defCaptor.getValue();
-            Set<String> immutableFields = registeredDef.immutableFields();
-            assertNotNull(immutableFields, "immutableFields should not be null");
-            assertEquals(2, immutableFields.size(),
-                    "Should have 2 immutable fields");
-            assertTrue(immutableFields.contains("tenantId"),
-                    "immutableFields should contain 'tenantId'");
-            assertTrue(immutableFields.contains("email"),
-                    "immutableFields should contain 'email'");
-        }
-
-        @Test
-        @DisplayName("Should parse columnMapping from control plane response")
-        void initializeCollection_parsesColumnMapping() {
-            String collectionId = "coll-123";
-            Map<String, Object> response = buildSystemCollectionResponse("users");
-            mockControlPlaneResponse(collectionId, response);
-
-            lifecycleManager.initializeCollection(collectionId);
-
-            ArgumentCaptor<CollectionDefinition> defCaptor =
-                    ArgumentCaptor.forClass(CollectionDefinition.class);
-            verify(collectionRegistry).register(defCaptor.capture());
-
-            CollectionDefinition registeredDef = defCaptor.getValue();
-            Map<String, String> columnMapping = registeredDef.columnMapping();
-            assertNotNull(columnMapping, "columnMapping should not be null");
-            assertEquals(2, columnMapping.size(),
-                    "Should have 2 column mappings");
-            assertEquals("first_name", columnMapping.get("firstName"),
-                    "firstName should map to first_name");
-            assertEquals("last_name", columnMapping.get("lastName"),
-                    "lastName should map to last_name");
+            CollectionDefinition registered = defCaptor.getValue();
+            assertThat(registered.name()).isEqualTo("workflow-rules");
+            assertThat(registered.storageConfig().tableName()).isEqualTo("workflow_rule");
         }
     }
 
-    // ==================== Default Values for Non-System Collections ====================
+    // ==================== User Collection Tests ====================
 
     @Nested
-    @DisplayName("Default Values for Non-System Collections")
-    class DefaultValueTests {
+    @DisplayName("User Collection Loading")
+    class UserCollectionTests {
 
         @Test
-        @DisplayName("Should default systemCollection to false when not present in response")
-        void initializeCollection_defaultsSystemCollectionToFalse() {
-            String collectionId = "coll-456";
-            Map<String, Object> response = buildNonSystemCollectionResponse("products");
-            mockControlPlaneResponse(collectionId, response);
+        @DisplayName("Should build definition from DB for user-defined collections")
+        void buildsFromDbForUserCollections() {
+            Map<String, Object> row = buildUserCollectionRow("products");
+            mockDbForCollection("coll-456", row, buildFieldRows());
 
-            lifecycleManager.initializeCollection(collectionId);
+            lifecycleManager.initializeCollection("coll-456");
 
             ArgumentCaptor<CollectionDefinition> defCaptor =
                     ArgumentCaptor.forClass(CollectionDefinition.class);
             verify(collectionRegistry).register(defCaptor.capture());
 
-            CollectionDefinition registeredDef = defCaptor.getValue();
-            assertFalse(registeredDef.systemCollection(),
-                    "Non-system collection should default to systemCollection=false");
+            CollectionDefinition registered = defCaptor.getValue();
+            assertThat(registered.name()).isEqualTo("products");
+            assertThat(registered.systemCollection()).isFalse();
+            assertThat(registered.fields()).hasSize(2);
         }
 
         @Test
-        @DisplayName("Should default readOnly to false when not present in response")
-        void initializeCollection_defaultsReadOnlyToFalse() {
-            String collectionId = "coll-456";
-            Map<String, Object> response = buildNonSystemCollectionResponse("products");
-            mockControlPlaneResponse(collectionId, response);
+        @DisplayName("Should reverse-map field types from DB format")
+        void reverseMapFieldTypes() {
+            Map<String, Object> row = buildUserCollectionRow("orders");
+            mockDbForCollection("coll-456", row, buildFieldRows());
 
-            lifecycleManager.initializeCollection(collectionId);
+            lifecycleManager.initializeCollection("coll-456");
 
             ArgumentCaptor<CollectionDefinition> defCaptor =
                     ArgumentCaptor.forClass(CollectionDefinition.class);
             verify(collectionRegistry).register(defCaptor.capture());
 
-            CollectionDefinition registeredDef = defCaptor.getValue();
-            assertFalse(registeredDef.readOnly(),
-                    "Non-system collection should default to readOnly=false");
+            CollectionDefinition registered = defCaptor.getValue();
+            // "string" → STRING, "number" → DOUBLE
+            assertThat(registered.fields().get(0).type()).isEqualTo(FieldType.STRING);
+            assertThat(registered.fields().get(1).type()).isEqualTo(FieldType.DOUBLE);
         }
 
         @Test
-        @DisplayName("Should default immutableFields to empty set when not present in response")
-        void initializeCollection_defaultsImmutableFieldsToEmpty() {
-            String collectionId = "coll-456";
-            Map<String, Object> response = buildNonSystemCollectionResponse("products");
-            mockControlPlaneResponse(collectionId, response);
+        @DisplayName("Should parse reference fields from DB")
+        void parsesReferenceFields() {
+            Map<String, Object> row = buildUserCollectionRow("invoices");
+            Map<String, Object> refField = new HashMap<>();
+            refField.put("name", "customerId");
+            refField.put("type", "string");
+            refField.put("required", true);
+            refField.put("unique_constraint", false);
+            refField.put("indexed", false);
+            refField.put("default_value", null);
+            refField.put("constraints", null);
+            refField.put("field_type_config", null);
+            refField.put("reference_target", "customers");
+            refField.put("relationship_type", "LOOKUP");
+            refField.put("relationship_name", "Customer");
+            refField.put("cascade_delete", false);
+            refField.put("field_order", 0);
+            refField.put("column_name", "customer_id");
+            refField.put("immutable", false);
 
-            lifecycleManager.initializeCollection(collectionId);
+            mockDbForCollection("coll-456", row, List.of(refField));
+
+            lifecycleManager.initializeCollection("coll-456");
 
             ArgumentCaptor<CollectionDefinition> defCaptor =
                     ArgumentCaptor.forClass(CollectionDefinition.class);
             verify(collectionRegistry).register(defCaptor.capture());
 
-            CollectionDefinition registeredDef = defCaptor.getValue();
-            assertNotNull(registeredDef.immutableFields());
-            assertTrue(registeredDef.immutableFields().isEmpty(),
-                    "Non-system collection should have empty immutableFields");
+            CollectionDefinition registered = defCaptor.getValue();
+            assertThat(registered.fields().get(0).referenceConfig()).isNotNull();
+            assertThat(registered.fields().get(0).referenceConfig().targetCollection())
+                    .isEqualTo("customers");
+            assertThat(registered.fields().get(0).referenceConfig().relationshipType())
+                    .isEqualTo("LOOKUP");
+            assertThat(registered.fields().get(0).columnName()).isEqualTo("customer_id");
         }
 
         @Test
-        @DisplayName("Should default columnMapping to empty map when not present in response")
-        void initializeCollection_defaultsColumnMappingToEmpty() {
-            String collectionId = "coll-456";
-            Map<String, Object> response = buildNonSystemCollectionResponse("products");
-            mockControlPlaneResponse(collectionId, response);
+        @DisplayName("Should not call storageAdapter for missing collection")
+        void skipsStorageForMissingCollection() {
+            when(jdbcTemplate.queryForList(contains("FROM collection WHERE id"), eq("missing")))
+                    .thenReturn(List.of());
 
-            lifecycleManager.initializeCollection(collectionId);
+            lifecycleManager.initializeCollection("missing");
 
-            ArgumentCaptor<CollectionDefinition> defCaptor =
-                    ArgumentCaptor.forClass(CollectionDefinition.class);
-            verify(collectionRegistry).register(defCaptor.capture());
-
-            CollectionDefinition registeredDef = defCaptor.getValue();
-            assertNotNull(registeredDef.columnMapping());
-            assertTrue(registeredDef.columnMapping().isEmpty(),
-                    "Non-system collection should have empty columnMapping");
+            verify(collectionRegistry, never()).register(any());
+            verify(storageAdapter, never()).initializeCollection(any());
         }
     }
 
-    // ==================== Partial Flag Combinations ====================
+    // ==================== reverseMapFieldType Tests ====================
 
     @Nested
-    @DisplayName("Partial Flag Combinations")
-    class PartialFlagTests {
+    @DisplayName("reverseMapFieldType")
+    class ReverseMapFieldTypeTests {
 
         @Test
-        @DisplayName("Should parse tenantScoped=false for global system collection")
-        void initializeCollection_parsesTenantScopedFalse() {
-            String collectionId = "coll-789";
-            Map<String, Object> response = new HashMap<>();
-            response.put("id", "coll-789");
-            response.put("name", "global-config");
-            response.put("systemCollection", true);
-            response.put("tenantScoped", false);
-            response.put("readOnly", false);
-            response.put("fields", List.of(
-                    Map.of("name", "key", "type", "STRING"),
-                    Map.of("name", "value", "type", "STRING")
-            ));
-            mockControlPlaneResponse(collectionId, response);
-
-            lifecycleManager.initializeCollection(collectionId);
-
-            ArgumentCaptor<CollectionDefinition> defCaptor =
-                    ArgumentCaptor.forClass(CollectionDefinition.class);
-            verify(collectionRegistry).register(defCaptor.capture());
-
-            CollectionDefinition registeredDef = defCaptor.getValue();
-            assertTrue(registeredDef.systemCollection(),
-                    "Should be a system collection");
-            assertFalse(registeredDef.tenantScoped(),
-                    "Should have tenantScoped=false for global collections");
-            assertFalse(registeredDef.readOnly(),
-                    "Should have readOnly=false");
+        void shouldMapString() {
+            assertThat(CollectionLifecycleManager.reverseMapFieldType("string"))
+                    .isEqualTo(FieldType.STRING);
         }
 
         @Test
-        @DisplayName("Should handle system collection with immutableFields but no columnMapping")
-        void initializeCollection_handlesImmutableFieldsWithoutColumnMapping() {
-            String collectionId = "coll-999";
-            Map<String, Object> response = new HashMap<>();
-            response.put("id", "coll-999");
-            response.put("name", "sessions");
-            response.put("systemCollection", true);
-            response.put("tenantScoped", true);
-            response.put("immutableFields", List.of("sessionToken"));
-            response.put("fields", List.of(
-                    Map.of("name", "sessionToken", "type", "STRING"),
-                    Map.of("name", "userId", "type", "STRING")
-            ));
-            mockControlPlaneResponse(collectionId, response);
+        void shouldMapNumber() {
+            assertThat(CollectionLifecycleManager.reverseMapFieldType("number"))
+                    .isEqualTo(FieldType.DOUBLE);
+        }
 
-            lifecycleManager.initializeCollection(collectionId);
+        @Test
+        void shouldMapBoolean() {
+            assertThat(CollectionLifecycleManager.reverseMapFieldType("boolean"))
+                    .isEqualTo(FieldType.BOOLEAN);
+        }
 
-            ArgumentCaptor<CollectionDefinition> defCaptor =
-                    ArgumentCaptor.forClass(CollectionDefinition.class);
-            verify(collectionRegistry).register(defCaptor.capture());
+        @Test
+        void shouldMapDate() {
+            assertThat(CollectionLifecycleManager.reverseMapFieldType("date"))
+                    .isEqualTo(FieldType.DATE);
+        }
 
-            CollectionDefinition registeredDef = defCaptor.getValue();
-            assertEquals(1, registeredDef.immutableFields().size());
-            assertTrue(registeredDef.immutableFields().contains("sessionToken"));
-            assertTrue(registeredDef.columnMapping().isEmpty(),
-                    "columnMapping should default to empty when not provided");
+        @Test
+        void shouldMapDatetime() {
+            assertThat(CollectionLifecycleManager.reverseMapFieldType("datetime"))
+                    .isEqualTo(FieldType.DATETIME);
+        }
+
+        @Test
+        void shouldMapObject() {
+            assertThat(CollectionLifecycleManager.reverseMapFieldType("object"))
+                    .isEqualTo(FieldType.JSON);
+        }
+
+        @Test
+        void shouldMapArray() {
+            assertThat(CollectionLifecycleManager.reverseMapFieldType("array"))
+                    .isEqualTo(FieldType.ARRAY);
+        }
+
+        @Test
+        void shouldHandleNull() {
+            assertThat(CollectionLifecycleManager.reverseMapFieldType(null))
+                    .isEqualTo(FieldType.STRING);
+        }
+
+        @Test
+        void shouldHandleUnknownType() {
+            assertThat(CollectionLifecycleManager.reverseMapFieldType("xyz_unknown"))
+                    .isEqualTo(FieldType.STRING);
+        }
+
+        @Test
+        void shouldHandleDirectEnumMatch() {
+            // If someone stores "STRING" (uppercase enum name) in DB
+            assertThat(CollectionLifecycleManager.reverseMapFieldType("STRING"))
+                    .isEqualTo(FieldType.STRING);
         }
     }
 
-    // ==================== Storage Adapter Interaction ====================
+    // ==================== Load Collection By Name Tests ====================
 
     @Nested
-    @DisplayName("Storage Adapter Interaction")
-    class StorageAdapterTests {
+    @DisplayName("loadCollectionByName")
+    class LoadCollectionByNameTests {
 
         @Test
-        @DisplayName("Should call storageAdapter.initializeCollection with the parsed definition")
-        void initializeCollection_callsStorageAdapterWithParsedDefinition() {
-            String collectionId = "coll-123";
-            Map<String, Object> response = buildSystemCollectionResponse("users");
-            mockControlPlaneResponse(collectionId, response);
+        @DisplayName("Should return existing definition if already loaded")
+        void returnsExistingDefinition() {
+            CollectionDefinition existingDef = SystemCollectionDefinitions.tenants();
+            when(collectionRegistry.get("tenants")).thenReturn(existingDef);
 
-            lifecycleManager.initializeCollection(collectionId);
+            CollectionDefinition result = lifecycleManager.loadCollectionByName("tenants", null);
 
-            // Verify storageAdapter was called with the definition
-            ArgumentCaptor<CollectionDefinition> defCaptor =
-                    ArgumentCaptor.forClass(CollectionDefinition.class);
-            verify(storageAdapter).initializeCollection(defCaptor.capture());
+            assertThat(result).isSameAs(existingDef);
+            // Should not query DB
+            verify(jdbcTemplate, never()).queryForList(anyString(), any(Object[].class));
+        }
 
-            CollectionDefinition storageDef = defCaptor.getValue();
-            assertEquals("users", storageDef.name());
-            assertTrue(storageDef.systemCollection(),
-                    "Definition passed to storage adapter should have systemCollection=true");
+        @Test
+        @DisplayName("Should return null for nonexistent collection")
+        void returnsNullForNonexistent() {
+            when(collectionRegistry.get("nonexistent")).thenReturn(null);
+            when(jdbcTemplate.queryForList(contains("FROM collection WHERE name"), eq("nonexistent")))
+                    .thenReturn(List.of());
+
+            CollectionDefinition result = lifecycleManager.loadCollectionByName("nonexistent", null);
+
+            assertThat(result).isNull();
+        }
+    }
+
+    // ==================== Teardown Tests ====================
+
+    @Nested
+    @DisplayName("teardownCollection")
+    class TeardownTests {
+
+        @Test
+        @DisplayName("Should unregister collection on teardown")
+        void unregistersOnTeardown() {
+            // First initialize a collection
+            Map<String, Object> row = buildUserCollectionRow("products");
+            mockDbForCollection("coll-456", row, buildFieldRows());
+            lifecycleManager.initializeCollection("coll-456");
+
+            // Then tear it down
+            lifecycleManager.teardownCollection("coll-456");
+
+            verify(collectionRegistry).unregister("products");
         }
     }
 }

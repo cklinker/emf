@@ -24,7 +24,7 @@ import static org.mockito.Mockito.when;
  * Tests verify that:
  * - /api/xxx paths are rewritten to /api/collections/xxx
  * - /api/collections/xxx paths are NOT rewritten (no double-rewrite)
- * - /control/xxx and other non-API paths pass through unchanged
+ * - Non-API paths (e.g. /internal/xxx) pass through unchanged
  * - GATEWAY_REQUEST_URL_ATTR is updated when present
  * - Filter order is correct (after RouteToRequestUrlFilter, before NettyRoutingFilter)
  */
@@ -109,9 +109,9 @@ class CollectionPathRewriteFilterTest {
     }
 
     @Test
-    void shouldNotRewriteControlPlanePath() {
+    void shouldNotRewriteInternalPath() {
         MockServerHttpRequest request = MockServerHttpRequest
-                .get("/control/bootstrap")
+                .get("/internal/bootstrap")
                 .build();
         MockServerWebExchange exchange = MockServerWebExchange.from(request);
 
@@ -120,7 +120,7 @@ class CollectionPathRewriteFilterTest {
 
         assertThat(capturedExchange.get()).isNotNull();
         assertThat(capturedExchange.get().getRequest().getURI().getRawPath())
-                .isEqualTo("/control/bootstrap");
+                .isEqualTo("/internal/bootstrap");
     }
 
     @Test

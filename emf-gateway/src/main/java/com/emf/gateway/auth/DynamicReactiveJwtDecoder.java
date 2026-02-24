@@ -27,7 +27,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * Dynamic JWT decoder that resolves the OIDC provider from the token's issuer claim.
  * Supports multi-provider JWT validation by:
  * 1. Parsing the JWT to extract the issuer (without signature validation)
- * 2. Looking up the OIDC provider configuration from the control plane (cached in Redis)
+ * 2. Looking up the OIDC provider configuration from the worker service (cached in Redis)
  * 3. Creating/caching a NimbusReactiveJwtDecoder per JWKS URI
  * 4. Validating the token with the correct decoder
  */
@@ -37,7 +37,7 @@ public class DynamicReactiveJwtDecoder implements ReactiveJwtDecoder {
     private static final Duration PROVIDER_CACHE_TTL = Duration.ofMinutes(15);
     private static final String REDIS_PREFIX = "oidc:provider:";
 
-    private final WebClient controlPlaneClient;
+    private final WebClient workerClient;
     private final ReactiveStringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
     private final String fallbackIssuerUri;
@@ -50,7 +50,7 @@ public class DynamicReactiveJwtDecoder implements ReactiveJwtDecoder {
     private final ConcurrentHashMap<String, String> audienceCache = new ConcurrentHashMap<>();
 
     /**
-     * Holds provider configuration resolved from the control plane.
+     * Holds provider configuration resolved from the worker service.
      */
     record ProviderInfo(String jwksUri, String audience) {}
 
@@ -58,26 +58,26 @@ public class DynamicReactiveJwtDecoder implements ReactiveJwtDecoder {
      * Creates a DynamicReactiveJwtDecoder with default clock skew (0 seconds).
      */
     public DynamicReactiveJwtDecoder(
-            WebClient controlPlaneClient,
+            WebClient workerClient,
             @Nullable ReactiveStringRedisTemplate redisTemplate,
             String fallbackIssuerUri) {
-        this(controlPlaneClient, redisTemplate, fallbackIssuerUri, Duration.ZERO);
+        this(workerClient, redisTemplate, fallbackIssuerUri, Duration.ZERO);
     }
 
     /**
      * Creates a DynamicReactiveJwtDecoder with configurable clock skew tolerance.
      *
-     * @param controlPlaneClient WebClient for control plane API calls
+     * @param workerClient WebClient for worker service internal API calls
      * @param redisTemplate Redis template for caching (nullable)
      * @param fallbackIssuerUri fallback OIDC issuer URI
      * @param clockSkew tolerance for clock drift between gateway and identity provider
      */
     public DynamicReactiveJwtDecoder(
-            WebClient controlPlaneClient,
+            WebClient workerClient,
             @Nullable ReactiveStringRedisTemplate redisTemplate,
             String fallbackIssuerUri,
             Duration clockSkew) {
-        this.controlPlaneClient = controlPlaneClient;
+        this.workerClient = workerClient;
         this.redisTemplate = redisTemplate;
         this.objectMapper = new ObjectMapper();
         this.fallbackIssuerUri = fallbackIssuerUri;
@@ -199,28 +199,28 @@ public class DynamicReactiveJwtDecoder implements ReactiveJwtDecoder {
 
     /**
      * Resolves the provider info (JWKS URI + audience) for an issuer.
-     * Checks Redis cache first for JWKS URI, then calls the control plane's internal API.
+     * Checks Redis cache first for JWKS URI, then calls the worker's internal API.
      * Falls back to the configured default OIDC issuer if no provider is found.
      */
     private Mono<ProviderInfo> resolveProviderInfo(String issuer) {
         if (redisTemplate == null) {
-            return lookupFromControlPlane(issuer);
+            return lookupFromWorker(issuer);
         }
 
         String redisKey = REDIS_PREFIX + issuer;
         return redisTemplate.opsForValue().get(redisKey)
                 .map(jwksUri -> new ProviderInfo(jwksUri, audienceCache.get(issuer)))
                 .switchIfEmpty(
-                        lookupFromControlPlane(issuer)
+                        lookupFromWorker(issuer)
                                 .flatMap(info ->
                                         redisTemplate.opsForValue()
                                                 .set(redisKey, info.jwksUri(), PROVIDER_CACHE_TTL)
                                                 .thenReturn(info)));
     }
 
-    private Mono<ProviderInfo> lookupFromControlPlane(String issuer) {
-        log.debug("Looking up OIDC provider from control plane for issuer: {}", issuer);
-        return controlPlaneClient.get()
+    private Mono<ProviderInfo> lookupFromWorker(String issuer) {
+        log.debug("Looking up OIDC provider from worker for issuer: {}", issuer);
+        return workerClient.get()
                 .uri("/internal/oidc/by-issuer?issuer={issuer}", issuer)
                 .retrieve()
                 .bodyToMono(JsonNode.class)
@@ -231,9 +231,9 @@ public class DynamicReactiveJwtDecoder implements ReactiveJwtDecoder {
                     if (audienceNode != null && !audienceNode.isNull() && !audienceNode.asText().isBlank()) {
                         audience = audienceNode.asText();
                         audienceCache.put(issuer, audience);
-                        log.debug("Control plane returned audience: {} for issuer: {}", audience, issuer);
+                        log.debug("Worker returned audience: {} for issuer: {}", audience, issuer);
                     }
-                    log.debug("Control plane returned JWKS URI: {} for issuer: {}", jwksUri, issuer);
+                    log.debug("Worker returned JWKS URI: {} for issuer: {}", jwksUri, issuer);
                     return new ProviderInfo(jwksUri, audience);
                 })
                 .onErrorResume(e -> {
@@ -246,7 +246,7 @@ public class DynamicReactiveJwtDecoder implements ReactiveJwtDecoder {
 
     /**
      * Discovers the JWKS URI from the issuer's standard OIDC discovery endpoint.
-     * This is a fallback when the control plane lookup fails or returns stale data.
+     * This is a fallback when the worker lookup fails or returns stale data.
      */
     private Mono<String> discoverJwksUri(String issuer) {
         String discoveryUrl = issuer.replaceAll("/$", "") + "/.well-known/openid-configuration";

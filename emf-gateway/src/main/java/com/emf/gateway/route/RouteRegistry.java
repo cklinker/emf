@@ -16,7 +16,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * All operations are thread-safe using ConcurrentHashMap.
  * 
  * This registry is updated dynamically through:
- * - Initial bootstrap from the control plane
+ * - Initial bootstrap from the worker service
  * - Real-time Kafka events for configuration changes
  */
 @Component

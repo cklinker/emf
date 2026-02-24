@@ -15,8 +15,8 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * In-memory cache of tenant slug to tenant ID mappings.
  * <p>
- * Populated on startup and refreshed periodically from the control plane's
- * {@code /control/tenants/slug-map} endpoint. Used by {@link TenantSlugExtractionFilter}
+ * Populated on startup and refreshed periodically from the worker's
+ * {@code /internal/tenants/slug-map} endpoint. Used by {@link TenantSlugExtractionFilter}
  * to resolve tenant slugs from URL path prefixes without a database round-trip.
  */
 @Component
@@ -29,8 +29,8 @@ public class TenantSlugCache {
 
     public TenantSlugCache(
             WebClient.Builder webClientBuilder,
-            @Value("${emf.gateway.control-plane.url}") String controlPlaneUrl) {
-        this.webClient = webClientBuilder.baseUrl(controlPlaneUrl).build();
+            @Value("${emf.gateway.worker-service-url:http://emf-worker:80}") String workerServiceUrl) {
+        this.webClient = webClientBuilder.baseUrl(workerServiceUrl).build();
     }
 
     /**
@@ -61,7 +61,7 @@ public class TenantSlugCache {
     }
 
     /**
-     * Refreshes the cache from the control plane.
+     * Refreshes the cache from the worker service.
      * Called on startup by {@link com.emf.gateway.config.RouteInitializer}
      * and periodically via {@code @Scheduled}.
      */
@@ -69,7 +69,7 @@ public class TenantSlugCache {
     public void refresh() {
         try {
             Map<String, String> mapping = webClient.get()
-                    .uri("/control/tenants/slug-map")
+                    .uri("/internal/tenants/slug-map")
                     .retrieve()
                     .bodyToMono(new ParameterizedTypeReference<Map<String, String>>() {})
                     .block();

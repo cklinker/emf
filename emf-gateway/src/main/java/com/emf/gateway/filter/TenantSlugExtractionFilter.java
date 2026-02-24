@@ -29,7 +29,7 @@ import java.util.regex.Pattern;
  * <p>
  * Implemented as a {@link WebFilter} (not a Gateway GlobalFilter) so that
  * path rewriting occurs <em>before</em> Spring Cloud Gateway's route matching.
- * This is essential because route predicates like {@code /control/**} or
+ * This is essential because route predicates like {@code /internal/**} or
  * {@code /api/**} must see the bare (slug-stripped) path.
  * <p>
  * Platform paths (actuator, etc.) are exempted and pass through without a slug.
@@ -99,7 +99,7 @@ public class TenantSlugExtractionFilter implements WebFilter, Ordered {
         }
 
         // Strip the slug segment from the path (must happen regardless of cache hit
-        // so that downstream route matching sees bare paths like /control/** and /api/**)
+        // so that downstream route matching sees bare paths like /api/**)
         String strippedPath = stripFirstSegment(path, firstSegment);
         if (strippedPath.isEmpty()) {
             strippedPath = "/";
@@ -113,7 +113,7 @@ public class TenantSlugExtractionFilter implements WebFilter, Ordered {
             }
             // Slug pattern matched but not in cache — strip the segment anyway so
             // route matching works, but don't set tenant attributes. The downstream
-            // TenantResolutionFilter or control-plane will resolve tenant from headers.
+            // TenantResolutionFilter or worker will resolve tenant from headers.
             log.warn("Slug '{}' matches pattern but is not in cache; stripping path but no tenant context set", firstSegment);
         } else {
             // Set tenant context on exchange attributes

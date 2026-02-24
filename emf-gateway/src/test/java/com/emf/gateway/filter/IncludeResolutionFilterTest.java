@@ -76,7 +76,7 @@ class IncludeResolutionFilterTest {
             AtomicReference<ServerWebExchange> captured = new AtomicReference<>();
             GatewayFilterChain chain = createCapturingChain(captured);
             MockServerHttpRequest request = MockServerHttpRequest
-                    .get("/control/bootstrap?include=collections")
+                    .get("/internal/bootstrap?include=collections")
                     .build();
             MockServerWebExchange exchange = MockServerWebExchange.from(request);
 

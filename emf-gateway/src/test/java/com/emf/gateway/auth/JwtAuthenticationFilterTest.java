@@ -58,20 +58,22 @@ class JwtAuthenticationFilterTest {
     }
     
     @Test
-    void shouldAllowUnauthenticatedAccessToBootstrapEndpoint() {
+    void shouldAllowCorsPreflightRequests() {
         // Given
         MockServerHttpRequest request = MockServerHttpRequest
-            .get("/control/bootstrap")
+            .options("/api/users")
+            .header("Origin", "http://localhost:3000")
+            .header("Access-Control-Request-Method", "GET")
             .build();
         MockServerWebExchange exchange = MockServerWebExchange.from(request);
-        
+
         // When
         Mono<Void> result = filter.filter(exchange, filterChain);
-        
+
         // Then
         StepVerifier.create(result)
             .verifyComplete();
-        
+
         verify(filterChain).filter(exchange);
         verify(jwtDecoder, never()).decode(anyString());
     }

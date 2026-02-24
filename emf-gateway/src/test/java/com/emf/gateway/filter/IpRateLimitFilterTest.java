@@ -48,21 +48,9 @@ class IpRateLimitFilterTest {
     class PathMatching {
 
         @Test
-        @DisplayName("should rate-limit /control/bootstrap")
-        void shouldRateLimitBootstrapPath() {
-            assertThat(IpRateLimitFilter.isRateLimitedPath("/control/bootstrap")).isTrue();
-        }
-
-        @Test
-        @DisplayName("should rate-limit /control/ui-bootstrap")
-        void shouldRateLimitUiBootstrapPath() {
-            assertThat(IpRateLimitFilter.isRateLimitedPath("/control/ui-bootstrap")).isTrue();
-        }
-
-        @Test
-        @DisplayName("should rate-limit /control/tenants/slug-map")
-        void shouldRateLimitSlugMapPath() {
-            assertThat(IpRateLimitFilter.isRateLimitedPath("/control/tenants/slug-map")).isTrue();
+        @DisplayName("should rate-limit /actuator/health")
+        void shouldRateLimitHealthPath() {
+            assertThat(IpRateLimitFilter.isRateLimitedPath("/actuator/health")).isTrue();
         }
 
         @Test
@@ -72,15 +60,15 @@ class IpRateLimitFilterTest {
         }
 
         @Test
-        @DisplayName("should not rate-limit actuator paths")
-        void shouldNotRateLimitActuatorPaths() {
-            assertThat(IpRateLimitFilter.isRateLimitedPath("/actuator/health")).isFalse();
+        @DisplayName("should not rate-limit actuator metrics paths")
+        void shouldNotRateLimitActuatorMetricsPaths() {
+            assertThat(IpRateLimitFilter.isRateLimitedPath("/actuator/metrics")).isFalse();
         }
 
         @Test
-        @DisplayName("should not rate-limit other control paths")
-        void shouldNotRateLimitOtherControlPaths() {
-            assertThat(IpRateLimitFilter.isRateLimitedPath("/control/other")).isFalse();
+        @DisplayName("should not rate-limit internal paths")
+        void shouldNotRateLimitInternalPaths() {
+            assertThat(IpRateLimitFilter.isRateLimitedPath("/internal/bootstrap")).isFalse();
         }
     }
 
@@ -91,7 +79,7 @@ class IpRateLimitFilterTest {
         @Test
         @DisplayName("should allow requests within limit")
         void shouldAllowRequestsWithinLimit() {
-            MockServerWebExchange exchange = createExchange("/control/bootstrap", "192.168.1.1");
+            MockServerWebExchange exchange = createExchange("/actuator/health", "192.168.1.1");
 
             StepVerifier.create(filter.filter(exchange, chain))
                     .verifyComplete();
@@ -118,13 +106,13 @@ class IpRateLimitFilterTest {
 
             // Exhaust the rate limit
             for (int i = 0; i < IpRateLimitFilter.MAX_REQUESTS_PER_WINDOW; i++) {
-                MockServerWebExchange exchange = createExchange("/control/bootstrap", clientIp);
+                MockServerWebExchange exchange = createExchange("/actuator/health", clientIp);
                 StepVerifier.create(filter.filter(exchange, chain))
                         .verifyComplete();
             }
 
             // Next request should be rate-limited
-            MockServerWebExchange exceededExchange = createExchange("/control/bootstrap", clientIp);
+            MockServerWebExchange exceededExchange = createExchange("/actuator/health", clientIp);
             StepVerifier.create(filter.filter(exceededExchange, chain))
                     .verifyComplete();
 
@@ -139,13 +127,13 @@ class IpRateLimitFilterTest {
         void shouldTrackIpsIndependently() {
             // Fill up limit for IP 1
             for (int i = 0; i < IpRateLimitFilter.MAX_REQUESTS_PER_WINDOW; i++) {
-                MockServerWebExchange exchange = createExchange("/control/bootstrap", "10.0.0.1");
+                MockServerWebExchange exchange = createExchange("/actuator/health", "10.0.0.1");
                 StepVerifier.create(filter.filter(exchange, chain))
                         .verifyComplete();
             }
 
             // IP 2 should still be allowed
-            MockServerWebExchange otherIpExchange = createExchange("/control/bootstrap", "10.0.0.2");
+            MockServerWebExchange otherIpExchange = createExchange("/actuator/health", "10.0.0.2");
             StepVerifier.create(filter.filter(otherIpExchange, chain))
                     .verifyComplete();
 
@@ -160,12 +148,12 @@ class IpRateLimitFilterTest {
 
             // Exhaust the rate limit
             for (int i = 0; i < IpRateLimitFilter.MAX_REQUESTS_PER_WINDOW; i++) {
-                MockServerWebExchange exchange = createExchange("/control/bootstrap", clientIp);
+                MockServerWebExchange exchange = createExchange("/actuator/health", clientIp);
                 StepVerifier.create(filter.filter(exchange, chain))
                         .verifyComplete();
             }
 
-            MockServerWebExchange exceededExchange = createExchange("/control/bootstrap", clientIp);
+            MockServerWebExchange exceededExchange = createExchange("/actuator/health", clientIp);
             StepVerifier.create(filter.filter(exceededExchange, chain))
                     .verifyComplete();
 
@@ -182,7 +170,7 @@ class IpRateLimitFilterTest {
         @DisplayName("should use X-Forwarded-For header when present")
         void shouldUseXForwardedForHeader() {
             MockServerHttpRequest request = MockServerHttpRequest
-                    .get("/control/bootstrap")
+                    .get("/actuator/health")
                     .header("X-Forwarded-For", "203.0.113.50, 70.41.3.18, 150.172.238.178")
                     .build();
             MockServerWebExchange exchange = MockServerWebExchange.from(request);
@@ -194,7 +182,7 @@ class IpRateLimitFilterTest {
         @Test
         @DisplayName("should fall back to remote address when no X-Forwarded-For")
         void shouldFallBackToRemoteAddress() {
-            MockServerWebExchange exchange = createExchangeWithRemoteAddress("/control/bootstrap");
+            MockServerWebExchange exchange = createExchangeWithRemoteAddress("/actuator/health");
             String ip = filter.resolveClientIp(exchange);
             // MockServerHttpRequest uses localhost by default
             assertThat(ip).isNotBlank();
@@ -209,7 +197,7 @@ class IpRateLimitFilterTest {
         @DisplayName("should clean up stale entries")
         void shouldCleanupStaleEntries() {
             // Add some entries
-            MockServerWebExchange exchange = createExchange("/control/bootstrap", "10.0.0.99");
+            MockServerWebExchange exchange = createExchange("/actuator/health", "10.0.0.99");
             StepVerifier.create(filter.filter(exchange, chain))
                     .verifyComplete();
 
@@ -223,8 +211,8 @@ class IpRateLimitFilterTest {
         @Test
         @DisplayName("clearAll should remove all tracked IPs")
         void clearAllShouldRemoveAllTrackedIps() {
-            MockServerWebExchange exchange1 = createExchange("/control/bootstrap", "10.0.0.1");
-            MockServerWebExchange exchange2 = createExchange("/control/bootstrap", "10.0.0.2");
+            MockServerWebExchange exchange1 = createExchange("/actuator/health", "10.0.0.1");
+            MockServerWebExchange exchange2 = createExchange("/actuator/health", "10.0.0.2");
 
             StepVerifier.create(filter.filter(exchange1, chain)).verifyComplete();
             StepVerifier.create(filter.filter(exchange2, chain)).verifyComplete();

@@ -358,7 +358,7 @@ class ConfigEventListenerTest {
             // Act
             listener.handleWorkerAssignmentChanged(event);
 
-            // Assert — must NOT overwrite the static control-plane route
+            // Assert — must NOT create a route for the legacy __control-plane collection
             verify(routeRegistry, never()).updateRoute(any());
             verify(routeRegistry, never()).removeRoute(any());
         }

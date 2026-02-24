@@ -50,34 +50,6 @@ class RouteAuthorizationFilterTest {
     }
 
     @Test
-    void shouldAllowUnauthenticatedAccessToBootstrapEndpoint() {
-        MockServerHttpRequest request = MockServerHttpRequest
-                .get("/control/bootstrap")
-                .build();
-        MockServerWebExchange exchange = MockServerWebExchange.from(request);
-
-        StepVerifier.create(filter.filter(exchange, filterChain))
-                .expectComplete()
-                .verify();
-
-        verify(filterChain).filter(exchange);
-    }
-
-    @Test
-    void shouldAllowUnauthenticatedAccessToUiBootstrapEndpoint() {
-        MockServerHttpRequest request = MockServerHttpRequest
-                .get("/control/ui-bootstrap")
-                .build();
-        MockServerWebExchange exchange = MockServerWebExchange.from(request);
-
-        StepVerifier.create(filter.filter(exchange, filterChain))
-                .expectComplete()
-                .verify();
-
-        verify(filterChain).filter(exchange);
-    }
-
-    @Test
     void shouldReturnForbiddenWhenNoPrincipal() {
         MockServerHttpRequest request = MockServerHttpRequest
                 .get("/api/users")
@@ -110,10 +82,10 @@ class RouteAuthorizationFilterTest {
     }
 
     @Test
-    void shouldAllowAuthenticatedUsersToControlPlane() {
+    void shouldAllowAuthenticatedUsersToAnyApiPath() {
         GatewayPrincipal principal = new GatewayPrincipal("admin1", List.of("ADMIN"), Map.of());
         MockServerHttpRequest request = MockServerHttpRequest
-                .get("/control/collections")
+                .get("/api/collections")
                 .build();
         MockServerWebExchange exchange = MockServerWebExchange.from(request);
         exchange.getAttributes().put("gateway.principal", principal);

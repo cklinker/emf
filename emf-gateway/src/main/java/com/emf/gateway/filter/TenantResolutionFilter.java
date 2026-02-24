@@ -17,7 +17,7 @@ import reactor.core.publisher.Mono;
  *
  * Resolution strategy:
  * 1. X-Tenant-ID header (direct tenant ID)
- * 2. X-Tenant-Slug header (slug-based resolution, forwarded as-is for control-plane to resolve)
+ * 2. X-Tenant-Slug header (slug-based resolution, forwarded as-is for the worker to resolve)
  *
  * Sets tenant info as exchange attributes and propagates headers to downstream services.
  */
@@ -52,7 +52,7 @@ public class TenantResolutionFilter implements GlobalFilter, Ordered {
             log.debug("Resolved tenant from header: id={}, slug={}", tenantId, tenantSlug);
         } else if (tenantSlug != null && !tenantSlug.isBlank()) {
             // Only slug provided — store it for header propagation.
-            // The control-plane's TenantResolutionFilter will resolve the ID.
+            // The worker's TenantResolutionFilter will resolve the ID.
             exchange.getAttributes().put(TENANT_SLUG_ATTR, tenantSlug.trim());
             log.debug("Resolved tenant slug from header: {}", tenantSlug);
         } else {

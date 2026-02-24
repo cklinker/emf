@@ -27,23 +27,21 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Integration test for control plane bootstrap integration.
+ * Integration test for worker bootstrap integration.
  *
  * Tests:
- * - Gateway fetches bootstrap configuration from control plane on startup
+ * - Gateway fetches bootstrap configuration from the worker on startup
  * - Bootstrap response is parsed correctly
  * - Routes are created from bootstrap configuration
- * - Authorization configuration is loaded
  * - Invalid bootstrap data is handled gracefully
- * - Bootstrap endpoint is accessible without authentication
  *
  * Validates: Requirements 1.1, 1.2, 1.3, 1.4, 1.5, 10.4
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
-class ControlPlaneBootstrapIntegrationTest {
+class WorkerBootstrapIntegrationTest {
 
-    private static MockWebServer mockControlPlane;
+    private static MockWebServer mockWorker;
 
     @Autowired
     private RouteConfigService routeConfigService;
@@ -56,22 +54,20 @@ class ControlPlaneBootstrapIntegrationTest {
 
     @BeforeAll
     static void setUpMockServer() throws IOException {
-        // Start mock control plane server BEFORE Spring context loads
-        mockControlPlane = new MockWebServer();
-        mockControlPlane.start();
+        mockWorker = new MockWebServer();
+        mockWorker.start();
     }
 
     @AfterAll
     static void tearDownMockServer() throws IOException {
-        if (mockControlPlane != null) {
-            mockControlPlane.shutdown();
+        if (mockWorker != null) {
+            mockWorker.shutdown();
         }
     }
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
-        registry.add("emf.gateway.control-plane.url", () -> mockControlPlane.url("/").toString().replaceAll("/$", ""));
-        registry.add("emf.gateway.control-plane.bootstrap-path", () -> "/control/bootstrap");
+        registry.add("emf.gateway.worker-service-url", () -> mockWorker.url("/").toString().replaceAll("/$", ""));
     }
 
     @BeforeEach
@@ -106,38 +102,11 @@ class ControlPlaneBootstrapIntegrationTest {
                                 {"name": "price", "type": "number"}
                             ]
                         }
-                    ],
-                    "authorization": {
-                        "roles": [
-                            {"id": "admin", "name": "ADMIN"},
-                            {"id": "user", "name": "USER"}
-                        ],
-                        "policies": [
-                            {
-                                "id": "admin-only",
-                                "name": "Admin Only",
-                                "rules": {"roles": ["ADMIN"]}
-                            }
-                        ],
-                        "routePolicies": [
-                            {
-                                "collectionId": "users-collection",
-                                "method": "POST",
-                                "policyId": "admin-only"
-                            }
-                        ],
-                        "fieldPolicies": [
-                            {
-                                "collectionId": "users-collection",
-                                "fieldName": "email",
-                                "policyId": "admin-only"
-                            }
-                        ]
-                    }
+                    ]
                 }
                 """;
 
-        mockControlPlane.enqueue(new MockResponse()
+        mockWorker.enqueue(new MockResponse()
                 .setResponseCode(200)
                 .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .setBody(bootstrapResponse));
@@ -157,9 +126,9 @@ class ControlPlaneBootstrapIntegrationTest {
         assertThat(productsRoute.get().getId()).isEqualTo("products-collection");
         assertThat(productsRoute.get().getBackendUrl()).isNotNull();
 
-        // Verify request was made to bootstrap endpoint
-        RecordedRequest request = mockControlPlane.takeRequest();
-        assertThat(request.getPath()).isEqualTo("/control/bootstrap");
+        // Verify request was made to worker's bootstrap endpoint
+        RecordedRequest request = mockWorker.takeRequest();
+        assertThat(request.getPath()).isEqualTo("/internal/bootstrap");
         assertThat(request.getMethod()).isEqualTo("GET");
     }
 
@@ -180,17 +149,11 @@ class ControlPlaneBootstrapIntegrationTest {
                             "name": "invalid",
                             "fields": []
                         }
-                    ],
-                    "authorization": {
-                        "roles": [],
-                        "policies": [],
-                        "routePolicies": [],
-                        "fieldPolicies": []
-                    }
+                    ]
                 }
                 """;
 
-        mockControlPlane.enqueue(new MockResponse()
+        mockWorker.enqueue(new MockResponse()
                 .setResponseCode(200)
                 .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .setBody(bootstrapResponse));
@@ -212,17 +175,11 @@ class ControlPlaneBootstrapIntegrationTest {
         // Arrange - create empty bootstrap response
         String bootstrapResponse = """
                 {
-                    "collections": [],
-                    "authorization": {
-                        "roles": [],
-                        "policies": [],
-                        "routePolicies": [],
-                        "fieldPolicies": []
-                    }
+                    "collections": []
                 }
                 """;
 
-        mockControlPlane.enqueue(new MockResponse()
+        mockWorker.enqueue(new MockResponse()
                 .setResponseCode(200)
                 .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .setBody(bootstrapResponse));
@@ -231,15 +188,15 @@ class ControlPlaneBootstrapIntegrationTest {
         // Act - fetch bootstrap configuration
         routeConfigService.refreshRoutes();
 
-        // Assert - no routes should be added (except control plane route)
+        // Assert - no routes should be added
         List<RouteDefinition> routes = routeRegistry.getAllRoutes();
-        assertThat(routes).allMatch(route -> route.getId().equals("control-plane"));
+        assertThat(routes).isEmpty();
     }
 
     @Test
-    void testBootstrapConfiguration_ControlPlaneUnavailable() {
-        // Arrange - mock control plane returns error
-        mockControlPlane.enqueue(new MockResponse()
+    void testBootstrapConfiguration_WorkerUnavailable() {
+        // Arrange - mock worker returns error
+        mockWorker.enqueue(new MockResponse()
                 .setResponseCode(500)
                 .setBody("Internal Server Error"));
 
@@ -256,8 +213,8 @@ class ControlPlaneBootstrapIntegrationTest {
 
     @Test
     void testBootstrapConfiguration_MalformedJson() {
-        // Arrange - mock control plane returns malformed JSON
-        mockControlPlane.enqueue(new MockResponse()
+        // Arrange - mock worker returns malformed JSON
+        mockWorker.enqueue(new MockResponse()
                 .setResponseCode(200)
                 .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .setBody("{ invalid json }"));
@@ -274,8 +231,8 @@ class ControlPlaneBootstrapIntegrationTest {
     }
 
     @Test
-    void testBootstrapConfiguration_WithRateLimits() throws Exception {
-        // Arrange - create bootstrap response with rate limits
+    void testBootstrapConfiguration_WithGovernorLimits() throws Exception {
+        // Arrange - create bootstrap response with governor limits
         String bootstrapResponse = """
                 {
                     "collections": [
@@ -283,23 +240,18 @@ class ControlPlaneBootstrapIntegrationTest {
                             "id": "rate-limited-collection",
                             "name": "ratelimited",
                             "path": "/api/ratelimited",
-                            "fields": [],
-                            "rateLimit": {
-                                "requestsPerWindow": 100,
-                                "windowDuration": "PT1M"
-                            }
+                            "fields": []
                         }
                     ],
-                    "authorization": {
-                        "roles": [],
-                        "policies": [],
-                        "routePolicies": [],
-                        "fieldPolicies": []
+                    "governorLimits": {
+                        "tenant-1": {
+                            "apiCallsPerDay": 50000
+                        }
                     }
                 }
                 """;
 
-        mockControlPlane.enqueue(new MockResponse()
+        mockWorker.enqueue(new MockResponse()
                 .setResponseCode(200)
                 .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .setBody(bootstrapResponse));

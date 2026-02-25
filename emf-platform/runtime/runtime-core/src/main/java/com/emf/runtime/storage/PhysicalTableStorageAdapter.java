@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -626,6 +627,24 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
             case IEQ -> {
                 params.add(value.toString().toLowerCase());
                 yield "LOWER(" + fieldName + ") = ?";
+            }
+            case IN -> {
+                if (value instanceof Collection<?> coll) {
+                    if (coll.isEmpty()) {
+                        yield "1 = 0"; // always false for empty IN list
+                    }
+                    String placeholders = coll.stream()
+                            .map(v -> {
+                                params.add(v);
+                                return "?";
+                            })
+                            .collect(Collectors.joining(", "));
+                    yield fieldName + " IN (" + placeholders + ")";
+                } else {
+                    // Single value fallback
+                    params.add(value);
+                    yield fieldName + " = ?";
+                }
             }
         };
     }

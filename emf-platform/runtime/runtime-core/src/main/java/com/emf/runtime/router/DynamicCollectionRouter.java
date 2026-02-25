@@ -4,6 +4,7 @@ import com.emf.runtime.model.CollectionDefinition;
 import com.emf.runtime.model.FieldDefinition;
 import com.emf.runtime.query.FilterCondition;
 import com.emf.runtime.query.FilterOperator;
+import com.emf.runtime.query.Pagination;
 import com.emf.runtime.query.QueryEngine;
 import com.emf.runtime.query.QueryRequest;
 import com.emf.runtime.query.QueryResult;
@@ -19,10 +20,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * Dynamic REST controller for collection CRUD operations.
@@ -121,9 +124,21 @@ public class DynamicCollectionRouter {
 
         QueryResult result = queryEngine.executeQuery(definition, queryRequest);
 
-        return ResponseEntity.ok(toJsonApiListResponse(result, collectionName, definition));
+        Map<String, Object> response = toJsonApiListResponse(result, collectionName, definition);
+
+        // Resolve JSON:API ?include= parameter for inverse (has-many) relationships
+        List<String> includeNames = parseIncludeParam(params);
+        if (!includeNames.isEmpty() && !result.data().isEmpty()) {
+            List<Map<String, Object>> included = resolveIncludes(
+                    includeNames, result.data(), collectionName, definition, request);
+            if (!included.isEmpty()) {
+                response.put("included", included);
+            }
+        }
+
+        return ResponseEntity.ok(response);
     }
-    
+
     /**
      * Gets a single record by ID.
      * 
@@ -135,6 +150,7 @@ public class DynamicCollectionRouter {
     public ResponseEntity<Map<String, Object>> get(
             @PathVariable("collectionName") String collectionName,
             @PathVariable("id") String id,
+            @RequestParam(required = false) Map<String, String> params,
             HttpServletRequest request) {
 
         logger.debug("Get request for collection '{}', id '{}'", collectionName, id);
@@ -146,8 +162,23 @@ public class DynamicCollectionRouter {
         }
 
         Optional<Map<String, Object>> record = queryEngine.getById(definition, id);
-        return record.map(r -> ResponseEntity.ok(toJsonApiResponse(r, collectionName, definition)))
-                     .orElse(ResponseEntity.notFound().build());
+        if (record.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        Map<String, Object> response = toJsonApiResponse(record.get(), collectionName, definition);
+
+        // Resolve JSON:API ?include= parameter for inverse (has-many) relationships
+        List<String> includeNames = parseIncludeParam(params);
+        if (!includeNames.isEmpty()) {
+            List<Map<String, Object>> included = resolveIncludes(
+                    includeNames, List.of(record.get()), collectionName, definition, request);
+            if (!included.isEmpty()) {
+                response.put("included", included);
+            }
+        }
+
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -872,5 +903,113 @@ public class DynamicCollectionRouter {
             "totalPages", result.metadata().totalPages()
         ));
         return response;
+    }
+
+    // ==================== Include Resolution ====================
+
+    /**
+     * Parses the {@code include} query parameter into a list of relationship names.
+     *
+     * @param params the query parameters
+     * @return list of include names, or empty list if not present
+     */
+    private List<String> parseIncludeParam(Map<String, String> params) {
+        if (params == null) {
+            return List.of();
+        }
+        String includeParam = params.get("include");
+        if (includeParam == null || includeParam.isBlank()) {
+            return List.of();
+        }
+        return Arrays.stream(includeParam.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .toList();
+    }
+
+    /**
+     * Resolves included resources for JSON:API {@code ?include=} parameter.
+     *
+     * <p>For each include name, looks up the target collection in the registry and
+     * uses {@link SubResourceResolver} to find an inverse relationship (a field on
+     * the target collection that references the primary collection). If found,
+     * queries the target collection for all records whose reference field matches
+     * any of the primary record IDs.
+     *
+     * @param includeNames the requested include relationship names
+     * @param primaryData the primary data records
+     * @param primaryCollectionName the primary collection name
+     * @param primaryDefinition the primary collection definition
+     * @param request the HTTP servlet request
+     * @return list of included resource objects in JSON:API format
+     */
+    private List<Map<String, Object>> resolveIncludes(
+            List<String> includeNames,
+            List<Map<String, Object>> primaryData,
+            String primaryCollectionName,
+            CollectionDefinition primaryDefinition,
+            HttpServletRequest request) {
+
+        // Collect all primary record IDs
+        List<Object> parentIds = primaryData.stream()
+                .map(record -> record.get("id"))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+
+        if (parentIds.isEmpty()) {
+            return List.of();
+        }
+
+        List<Map<String, Object>> allIncluded = new ArrayList<>();
+
+        for (String includeName : includeNames) {
+            // Look up the target collection by include name
+            CollectionDefinition childDef = resolveCollection(includeName, request);
+            if (childDef == null) {
+                logger.debug("Include target collection '{}' not found, skipping", includeName);
+                continue;
+            }
+
+            // Use SubResourceResolver to find the inverse relationship
+            Optional<SubResourceRelation> relation =
+                    SubResourceResolver.resolve(primaryDefinition, childDef);
+            if (relation.isEmpty()) {
+                logger.debug("No inverse relationship from '{}' to '{}', skipping include",
+                        primaryCollectionName, includeName);
+                continue;
+            }
+
+            String parentRefField = relation.get().parentRefFieldName();
+            logger.debug("Resolving include '{}': querying where {}  IN {} parent IDs",
+                    includeName, parentRefField, parentIds.size());
+
+            // Build a query with IN filter for all parent IDs
+            List<FilterCondition> filters = new ArrayList<>();
+            filters.add(new FilterCondition(parentRefField, FilterOperator.IN, parentIds));
+
+            // Use a large page to fetch all child records
+            QueryRequest childQuery = new QueryRequest(
+                    new Pagination(1, 1000),
+                    List.of(),
+                    List.of(),
+                    filters
+            );
+
+            // Inject tenant filter if the child collection is tenant-scoped
+            childQuery = injectTenantFilter(childQuery, childDef, request);
+
+            try {
+                QueryResult childResult = queryEngine.executeQuery(childDef, childQuery);
+                for (Map<String, Object> childRecord : childResult.data()) {
+                    allIncluded.add(toJsonApiResourceObject(childRecord, includeName, childDef));
+                }
+                logger.debug("Resolved {} included records for '{}'",
+                        childResult.data().size(), includeName);
+            } catch (Exception e) {
+                logger.warn("Failed to resolve include '{}': {}", includeName, e.getMessage());
+            }
+        }
+
+        return allIncluded;
     }
 }

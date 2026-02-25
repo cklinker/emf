@@ -26,6 +26,7 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -325,6 +326,13 @@ public class JsonbStorageAdapter implements StorageAdapter {
                 if (recordValue == null && filterValue == null) yield true;
                 if (recordValue == null || filterValue == null) yield false;
                 yield recordValue.toString().equalsIgnoreCase(filterValue.toString());
+            }
+            case IN -> {
+                if (recordValue == null) yield false;
+                if (filterValue instanceof Collection<?> coll) {
+                    yield coll.stream().anyMatch(v -> recordValue.toString().equals(v.toString()));
+                }
+                yield recordValue.toString().equals(filterValue.toString());
             }
         };
     }

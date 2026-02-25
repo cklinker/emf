@@ -185,6 +185,7 @@ public final class SystemCollectionDefinitions {
 
     public static CollectionDefinition users() {
         return systemBuilder("users", "Users", "platform_user")
+            .displayFieldName("email")
             .addImmutableField("tenantId")
             .addField(FieldDefinition.requiredString("email", 320))
             .addField(FieldDefinition.string("username", 100))
@@ -208,6 +209,7 @@ public final class SystemCollectionDefinitions {
 
     public static CollectionDefinition profiles() {
         return systemBuilder("profiles", "Profiles", "profile")
+            .displayFieldName("name")
             .addField(FieldDefinition.requiredString("name", 255))
             .addField(FieldDefinition.text("description"))
             .addField(FieldDefinition.bool("isSystem").withColumnName("is_system").withDefault(false))
@@ -216,6 +218,7 @@ public final class SystemCollectionDefinitions {
 
     public static CollectionDefinition permissionSets() {
         return systemBuilder("permission-sets", "Permission Sets", "permission_set")
+            .displayFieldName("name")
             .addField(FieldDefinition.requiredString("name", 255))
             .addField(FieldDefinition.text("description"))
             .addField(FieldDefinition.bool("isSystem").withColumnName("is_system").withDefault(false))
@@ -224,6 +227,7 @@ public final class SystemCollectionDefinitions {
 
     public static CollectionDefinition collections() {
         return systemBuilder("collections", "Collections", "collection")
+            .displayFieldName("name")
             .addField(FieldDefinition.requiredString("name", 100))
             .addField(FieldDefinition.string("displayName", 100).withColumnName("display_name"))
             .addField(FieldDefinition.string("description", 500))
@@ -242,6 +246,7 @@ public final class SystemCollectionDefinitions {
 
     public static CollectionDefinition fields() {
         return systemBuilder("fields", "Fields", "field")
+            .displayFieldName("name")
             .tenantScoped(false)
             .addImmutableField("collectionId")
             .addField(FieldDefinition.masterDetail("collectionId", "collections", "Collection")
@@ -279,6 +284,7 @@ public final class SystemCollectionDefinitions {
 
     public static CollectionDefinition pageLayouts() {
         return systemBuilder("page-layouts", "Page Layouts", "page_layout")
+            .displayFieldName("name")
             .addField(FieldDefinition.masterDetail("collectionId", "collections", "Collection")
                 .withColumnName("collection_id"))
             .addField(FieldDefinition.requiredString("name", 100))
@@ -304,6 +310,7 @@ public final class SystemCollectionDefinitions {
 
     public static CollectionDefinition listViews() {
         return systemBuilder("list-views", "List Views", "list_view")
+            .displayFieldName("name")
             .addField(FieldDefinition.masterDetail("collectionId", "collections", "Collection")
                 .withColumnName("collection_id"))
             .addField(FieldDefinition.requiredString("name", 100))
@@ -324,6 +331,7 @@ public final class SystemCollectionDefinitions {
 
     public static CollectionDefinition uiPages() {
         return systemBuilder("ui-pages", "UI Pages", "ui_page")
+            .displayFieldName("name")
             .addField(FieldDefinition.requiredString("name", 100))
             .addField(FieldDefinition.requiredString("path", 200))
             .addField(FieldDefinition.string("title", 200))
@@ -334,6 +342,7 @@ public final class SystemCollectionDefinitions {
 
     public static CollectionDefinition uiMenus() {
         return systemBuilder("ui-menus", "UI Menus", "ui_menu")
+            .displayFieldName("name")
             .addField(FieldDefinition.requiredString("name", 100))
             .addField(FieldDefinition.string("description", 500))
             .addField(FieldDefinition.integer("displayOrder").withColumnName("display_order")
@@ -347,6 +356,7 @@ public final class SystemCollectionDefinitions {
 
     public static CollectionDefinition globalPicklists() {
         return systemBuilder("global-picklists", "Global Picklists", "global_picklist")
+            .displayFieldName("name")
             .addField(FieldDefinition.requiredString("name", 100))
             .addField(FieldDefinition.string("description", 500))
             .addField(FieldDefinition.bool("sorted").withDefault(false))
@@ -356,6 +366,7 @@ public final class SystemCollectionDefinitions {
 
     public static CollectionDefinition picklistValues() {
         return systemBuilder("picklist-values", "Picklist Values", "picklist_value")
+            .displayFieldName("label")
             .tenantScoped(false)
             .addField(FieldDefinition.requiredString("picklistSourceType", 20)
                 .withColumnName("picklist_source_type")
@@ -379,6 +390,7 @@ public final class SystemCollectionDefinitions {
 
     public static CollectionDefinition recordTypes() {
         return systemBuilder("record-types", "Record Types", "record_type")
+            .displayFieldName("name")
             .addField(FieldDefinition.masterDetail("collectionId", "collections", "Collection")
                 .withColumnName("collection_id"))
             .addField(FieldDefinition.requiredString("name", 100))
@@ -392,6 +404,7 @@ public final class SystemCollectionDefinitions {
 
     public static CollectionDefinition validationRules() {
         return systemBuilder("validation-rules", "Validation Rules", "validation_rule")
+            .displayFieldName("name")
             .addField(FieldDefinition.masterDetail("collectionId", "collections", "Collection")
                 .withColumnName("collection_id"))
             .addField(FieldDefinition.requiredString("name", 100))
@@ -415,6 +428,7 @@ public final class SystemCollectionDefinitions {
 
     public static CollectionDefinition workflowRules() {
         return systemBuilder("workflow-rules", "Workflow Rules", "workflow_rule")
+            .displayFieldName("name")
             .addField(FieldDefinition.masterDetail("collectionId", "collections", "Collection")
                 .withColumnName("collection_id"))
             .addField(FieldDefinition.requiredString("name", 200))
@@ -445,6 +459,7 @@ public final class SystemCollectionDefinitions {
 
     public static CollectionDefinition workflowActionTypes() {
         return systemBuilder("workflow-action-types", "Workflow Action Types", "workflow_action_type")
+            .displayFieldName("key")
             .tenantScoped(false)
             .addField(FieldDefinition.requiredString("key", 50).withUnique(true))
             .addField(FieldDefinition.requiredString("name", 100))
@@ -462,6 +477,7 @@ public final class SystemCollectionDefinitions {
 
     public static CollectionDefinition scripts() {
         return systemBuilder("scripts", "Scripts", "script")
+            .displayFieldName("name")
             .addField(FieldDefinition.requiredString("name", 200))
             .addField(FieldDefinition.string("description", 500))
             .addField(FieldDefinition.requiredString("scriptType", 30).withColumnName("script_type")
@@ -477,6 +493,7 @@ public final class SystemCollectionDefinitions {
 
     public static CollectionDefinition flows() {
         return systemBuilder("flows", "Flows", "flow")
+            .displayFieldName("name")
             .addField(FieldDefinition.requiredString("name", 200))
             .addField(FieldDefinition.string("description", 1000))
             .addField(FieldDefinition.requiredString("flowType", 30).withColumnName("flow_type")
@@ -492,6 +509,7 @@ public final class SystemCollectionDefinitions {
 
     public static CollectionDefinition approvalProcesses() {
         return systemBuilder("approval-processes", "Approval Processes", "approval_process")
+            .displayFieldName("name")
             .addField(FieldDefinition.masterDetail("collectionId", "collections", "Collection")
                 .withColumnName("collection_id"))
             .addField(FieldDefinition.requiredString("name", 200))
@@ -519,6 +537,7 @@ public final class SystemCollectionDefinitions {
 
     public static CollectionDefinition scheduledJobs() {
         return systemBuilder("scheduled-jobs", "Scheduled Jobs", "scheduled_job")
+            .displayFieldName("name")
             .addField(FieldDefinition.requiredString("name", 200))
             .addField(FieldDefinition.string("description", 500))
             .addField(FieldDefinition.requiredString("jobType", 20).withColumnName("job_type")
@@ -543,6 +562,7 @@ public final class SystemCollectionDefinitions {
 
     public static CollectionDefinition emailTemplates() {
         return systemBuilder("email-templates", "Email Templates", "email_template")
+            .displayFieldName("name")
             .addField(FieldDefinition.requiredString("name", 200))
             .addField(FieldDefinition.string("description", 500))
             .addField(FieldDefinition.requiredString("subject", 500))
@@ -559,6 +579,7 @@ public final class SystemCollectionDefinitions {
 
     public static CollectionDefinition webhooks() {
         return systemBuilder("webhooks", "Webhooks", "webhook")
+            .displayFieldName("name")
             .addField(FieldDefinition.requiredString("name", 200))
             .addField(FieldDefinition.requiredString("url", 2048))
             .addField(FieldDefinition.requiredJson("events"))
@@ -579,6 +600,7 @@ public final class SystemCollectionDefinitions {
 
     public static CollectionDefinition connectedApps() {
         return systemBuilder("connected-apps", "Connected Apps", "connected_app")
+            .displayFieldName("name")
             .addImmutableField("clientId")
             .addField(FieldDefinition.requiredString("name", 200))
             .addField(FieldDefinition.string("description", 500))
@@ -600,6 +622,7 @@ public final class SystemCollectionDefinitions {
 
     public static CollectionDefinition oidcProviders() {
         return systemBuilder("oidc-providers", "OIDC Providers", "oidc_provider")
+            .displayFieldName("name")
             .addField(FieldDefinition.requiredString("name", 100))
             .addField(FieldDefinition.requiredString("issuer", 500))
             .addField(FieldDefinition.requiredString("jwksUri", 500)
@@ -626,6 +649,7 @@ public final class SystemCollectionDefinitions {
 
     public static CollectionDefinition reports() {
         return systemBuilder("reports", "Reports", "report")
+            .displayFieldName("name")
             .addField(FieldDefinition.requiredString("name", 200))
             .addField(FieldDefinition.string("description", 1000))
             .addField(FieldDefinition.requiredString("reportType", 20)
@@ -655,6 +679,7 @@ public final class SystemCollectionDefinitions {
 
     public static CollectionDefinition reportFolders() {
         return systemBuilder("report-folders", "Report Folders", "report_folder")
+            .displayFieldName("name")
             .addField(FieldDefinition.requiredString("name", 100))
             .addField(FieldDefinition.string("accessLevel", 20)
                 .withColumnName("access_level").withDefault("PRIVATE"))
@@ -665,6 +690,7 @@ public final class SystemCollectionDefinitions {
 
     public static CollectionDefinition dashboards() {
         return systemBuilder("dashboards", "Dashboards", "dashboard")
+            .displayFieldName("name")
             .addField(FieldDefinition.requiredString("name", 200))
             .addField(FieldDefinition.string("description", 1000))
             .addField(FieldDefinition.lookup("folderId", "report-folders", "Folder")
@@ -699,6 +725,7 @@ public final class SystemCollectionDefinitions {
 
     public static CollectionDefinition attachments() {
         return systemBuilder("attachments", "Attachments", "file_attachment")
+            .displayFieldName("fileName")
             .addImmutableField("collectionId")
             .addImmutableField("recordId")
             .addField(FieldDefinition.masterDetail("collectionId", "collections", "Collection")
@@ -749,6 +776,7 @@ public final class SystemCollectionDefinitions {
 
     public static CollectionDefinition packages() {
         return systemBuilder("packages", "Packages", "package")
+            .displayFieldName("name")
             .addField(FieldDefinition.requiredString("name", 100))
             .addField(FieldDefinition.requiredString("version", 50))
             .addField(FieldDefinition.string("description"))
@@ -922,6 +950,7 @@ public final class SystemCollectionDefinitions {
 
     public static CollectionDefinition userGroups() {
         return systemBuilder("user-groups", "User Groups", "user_group")
+            .displayFieldName("name")
             .addField(FieldDefinition.requiredString("name", 100))
             .addField(FieldDefinition.string("description", 500))
             .addField(FieldDefinition.string("groupType", 20).withColumnName("group_type")
@@ -1156,6 +1185,7 @@ public final class SystemCollectionDefinitions {
 
     public static CollectionDefinition uiMenuItems() {
         return systemBuilder("ui-menu-items", "UI Menu Items", "ui_menu_item")
+            .displayFieldName("label")
             .tenantScoped(false)
             .addField(FieldDefinition.masterDetail("menuId", "ui-menus", "Menu")
                 .withColumnName("menu_id"))
@@ -1261,6 +1291,7 @@ public final class SystemCollectionDefinitions {
 
     public static CollectionDefinition approvalSteps() {
         return systemBuilder("approval-steps", "Approval Steps", "approval_step")
+            .displayFieldName("name")
             .tenantScoped(false)
             .addField(FieldDefinition.masterDetail("approvalProcessId",
                 "approval-processes", "Approval Process")

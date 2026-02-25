@@ -104,7 +104,7 @@ async function fetchCollectionSchema(
 ): Promise<CollectionSchema> {
   // Use raw get() to preserve the full JSON:API response including `included` array
   const response = await apiClient.get(
-    `/api/collections/${encodeURIComponent(collectionName)}?include=fields`
+    `/api/collections/collections/${encodeURIComponent(collectionName)}?include=fields`
   )
 
   // Extract the collection record from the response envelope

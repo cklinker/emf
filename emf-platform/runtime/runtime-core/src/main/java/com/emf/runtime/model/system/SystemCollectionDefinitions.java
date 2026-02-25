@@ -228,7 +228,7 @@ public final class SystemCollectionDefinitions {
     public static CollectionDefinition collections() {
         return systemBuilder("collections", "Collections", "collection")
             .displayFieldName("name")
-            .addField(FieldDefinition.requiredString("name", 100))
+            .addField(FieldDefinition.requiredString("name", 100).withUnique(true))
             .addField(FieldDefinition.string("displayName", 100).withColumnName("display_name"))
             .addField(FieldDefinition.string("description", 500))
             .addField(FieldDefinition.string("path", 255))

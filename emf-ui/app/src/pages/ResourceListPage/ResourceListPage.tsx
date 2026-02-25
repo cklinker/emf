@@ -282,7 +282,7 @@ async function fetchCollectionSchema(
   // Fetch the collection record with included field definitions in a single request.
   // Uses raw get() to preserve the full JSON:API response including `included` array.
   const response = await apiClient.get(
-    `/api/collections/${encodeURIComponent(collectionName)}?include=fields`
+    `/api/collections/collections/${encodeURIComponent(collectionName)}?include=fields`
   )
 
   // Extract the collection record from the response envelope

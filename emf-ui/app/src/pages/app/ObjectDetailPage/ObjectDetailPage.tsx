@@ -13,7 +13,7 @@
 
 import React, { useState, useCallback, useMemo, useEffect } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueries } from '@tanstack/react-query'
 import { Loader2, AlertCircle, Pencil, Copy, Trash2, MoreHorizontal } from 'lucide-react'
 import {
   Breadcrumb,
@@ -45,10 +45,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { useCollectionSchema } from '@/hooks/useCollectionSchema'
+import { useCollectionSchema, fetchCollectionSchema } from '@/hooks/useCollectionSchema'
 import { useRecord } from '@/hooks/useRecord'
 import { useRecordMutation } from '@/hooks/useRecordMutation'
 import { useCollectionPermissions } from '@/hooks/useCollectionPermissions'
+import { buildIncludedDisplayMap } from '@/utils/jsonapi'
 import { FieldRenderer } from '@/components/FieldRenderer'
 import { DetailSection } from '@/components/DetailSection'
 import { RelatedList } from '@/components/RelatedList'
@@ -62,7 +63,6 @@ import { useAppContext } from '@/context/AppContext'
 import { useAuth } from '@/context/AuthContext'
 import { useApi } from '@/context/ApiContext'
 import { usePageLayout } from '@/hooks/usePageLayout'
-import { useLookupDisplayMap } from '@/hooks/useLookupDisplayMap'
 import { useRecordContext } from '@/hooks/useRecordContext'
 import type { FieldDefinition } from '@/hooks/useCollectionSchema'
 import type { QuickActionExecutionContext } from '@/types/quickActions'
@@ -106,6 +106,9 @@ const SYSTEM_FIELDS = new Set([
 
 /** Max fields to show in the highlights panel */
 const MAX_HIGHLIGHT_FIELDS = 4
+
+/** Reference field types that indicate a foreign key to another collection */
+const REFERENCE_FIELD_TYPES = new Set(['master_detail', 'lookup', 'reference'])
 
 /**
  * Determine the record's display name from its fields.
@@ -163,18 +166,59 @@ export function ObjectDetailPage(): React.ReactElement {
   // Resolve page layout for this collection (returns null if none configured)
   const { layout, isLoading: layoutLoading } = usePageLayout(schema?.id, user?.id)
 
-  // Resolve display labels for reference/lookup/master_detail fields
-  const { lookupDisplayMap } = useLookupDisplayMap(fields)
+  // Identify reference fields that need included resources for display labels
+  const referenceFields = useMemo(
+    () => fields.filter((f) => REFERENCE_FIELD_TYPES.has(f.type) && f.referenceTarget),
+    [fields]
+  )
 
-  // Fetch record
+  // Build include param from reference field names
+  const includeParam = useMemo(() => {
+    if (referenceFields.length === 0) return undefined
+    return referenceFields.map((f) => f.name).join(',')
+  }, [referenceFields])
+
+  // Fetch record with includes for reference fields
   const {
     record,
     isLoading: recordLoading,
     error: recordError,
+    rawResponse,
   } = useRecord({
     collectionName,
     recordId,
+    include: includeParam,
   })
+
+  // Fetch schemas for referenced collections to determine their display field names
+  const refSchemaQueries = useQueries({
+    queries: referenceFields.map((f) => ({
+      queryKey: ['collection-schema', f.referenceTarget],
+      queryFn: () => fetchCollectionSchema(apiClient, f.referenceTarget!),
+      enabled: !!f.referenceTarget,
+      staleTime: 5 * 60 * 1000,
+    })),
+  })
+
+  // Build lookup display map from included resources
+  const lookupDisplayMap = useMemo(() => {
+    if (!rawResponse || referenceFields.length === 0) return undefined
+
+    const map: Record<string, Record<string, string>> = {}
+
+    referenceFields.forEach((field, idx) => {
+      const refSchema = refSchemaQueries[idx]?.data
+      const displayField = refSchema?.displayFieldName || 'name'
+      const targetType = field.referenceTarget!
+
+      const fieldMap = buildIncludedDisplayMap(rawResponse, targetType, displayField)
+      if (Object.keys(fieldMap).length > 0) {
+        map[field.name] = fieldMap
+      }
+    })
+
+    return Object.keys(map).length > 0 ? map : undefined
+  }, [rawResponse, referenceFields, refSchemaQueries])
 
   // Fetch permissions (combined object + field in one call)
   const {

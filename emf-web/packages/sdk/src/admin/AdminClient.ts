@@ -105,6 +105,7 @@ import {
   toJsonApiBody,
   unwrapJsonApiResource,
   unwrapJsonApiList,
+  unwrapJsonApiMenusWithItems,
   extractMetadata,
   buildJsonApiParams,
 } from './jsonapi-helpers';
@@ -311,12 +312,12 @@ export class AdminClient {
     getBootstrap: async (): Promise<UIConfig> => {
       const [pagesRes, menusRes, providersRes] = await Promise.all([
         this.axios.get('/api/ui-pages'),
-        this.axios.get('/api/ui-menus'),
+        this.axios.get('/api/ui-menus?include=ui-menu-items'),
         this.axios.get('/api/oidc-providers'),
       ]);
       return {
         pages: unwrapJsonApiList(pagesRes.data),
-        menus: unwrapJsonApiList(menusRes.data),
+        menus: unwrapJsonApiMenusWithItems(menusRes.data),
         oidcProviders: unwrapJsonApiList(providersRes.data),
         theme: DEFAULT_THEME,
         branding: DEFAULT_BRANDING,
@@ -341,8 +342,8 @@ export class AdminClient {
     },
 
     listMenus: async (): Promise<UIMenu[]> => {
-      const response = await this.axios.get('/api/ui-menus');
-      return unwrapJsonApiList<UIMenu>(response.data);
+      const response = await this.axios.get('/api/ui-menus?include=ui-menu-items');
+      return unwrapJsonApiMenusWithItems<UIMenu>(response.data);
     },
 
     updateMenu: async (id: string, menu: UIMenu): Promise<UIMenu> => {

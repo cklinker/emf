@@ -100,6 +100,66 @@ export function unwrapJsonApiList<T>(response: unknown): T[] {
 }
 
 /**
+ * JSON:API list response that may include sideloaded resources.
+ */
+interface JsonApiListResponseWithIncludes extends JsonApiListResponse {
+  included?: JsonApiResourceObject[];
+}
+
+/**
+ * Unwraps a JSON:API menus response that uses `?include=ui-menu-items`.
+ *
+ * The included menu-item resources are grouped by their `menuId` attribute,
+ * sorted by `displayOrder`, and attached to each menu as an `items` array.
+ *
+ * @param response the JSON:API response with data + included
+ * @returns an array of menu objects with nested items
+ */
+export function unwrapJsonApiMenusWithItems<T>(response: unknown): T[] {
+  const typed = response as JsonApiListResponseWithIncludes;
+  if (!typed?.data || !Array.isArray(typed.data)) {
+    if (Array.isArray(response)) {
+      return response as T[];
+    }
+    return [];
+  }
+
+  const menus = typed.data.map((item) => flattenResourceObject<Record<string, unknown>>(item));
+
+  // Group included menu items by menuId
+  const included = Array.isArray(typed.included) ? typed.included : [];
+  const itemsByMenuId = new Map<string, Record<string, unknown>[]>();
+
+  for (const resource of included) {
+    if (resource.type !== 'ui-menu-items') continue;
+    const flat = flattenResourceObject<Record<string, unknown>>(resource);
+    const menuId = flat.menuId as string | undefined;
+    if (!menuId) continue;
+
+    const existing = itemsByMenuId.get(menuId);
+    if (existing) {
+      existing.push(flat);
+    } else {
+      itemsByMenuId.set(menuId, [flat]);
+    }
+  }
+
+  // Attach sorted items to each menu
+  for (const menu of menus) {
+    const menuId = menu.id as string;
+    const items = itemsByMenuId.get(menuId) || [];
+    items.sort((a, b) => {
+      const orderA = (a.displayOrder as number) ?? 0;
+      const orderB = (b.displayOrder as number) ?? 0;
+      return orderA - orderB;
+    });
+    menu.items = items;
+  }
+
+  return menus as T[];
+}
+
+/**
  * Extracts pagination metadata from a JSON:API list response.
  */
 export function extractMetadata(response: unknown): {

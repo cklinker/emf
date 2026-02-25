@@ -91,5 +91,13 @@ public enum FilterOperator {
      * Equals (case-insensitive).
      * <p>Usage: {@code filter[field][ieq]=value}
      */
-    IEQ
+    IEQ,
+
+    /**
+     * In a set of values.
+     * <p>The filter value should be a {@link java.util.Collection} of values.
+     * <p>Usage (internal): created programmatically via
+     * {@code new FilterCondition("field", FilterOperator.IN, listOfValues)}
+     */
+    IN
 }

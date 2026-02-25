@@ -2,12 +2,15 @@
  * useCollectionSchema Hook
  *
  * Fetches and caches a collection's schema (name, displayName, fields)
- * from the JSON:API endpoint. Field types are normalized from backend
- * canonical form (uppercase) to UI form (lowercase).
+ * from the JSON:API endpoint. Uses `?include=fields` to fetch the
+ * collection record and its field definitions in a single request.
+ * Field types are normalized from backend canonical form (uppercase)
+ * to UI form (lowercase).
  */
 
 import { useQuery } from '@tanstack/react-query'
 import { useApi } from '../context/ApiContext'
+import { unwrapResource, extractIncluded } from '../utils/jsonapi'
 import type { ApiClient } from '../services/apiClient'
 
 /**
@@ -89,27 +92,61 @@ function normalizeFieldType(backendType: string): FieldType {
 
 /**
  * Fetch a collection schema by name from the JSON:API endpoint.
- * The backend resolves by name or ID via getCollectionByIdOrName(),
- * so a single call to /api/collections/{name} suffices.
+ *
+ * Uses `?include=fields` to fetch the collection record and its field
+ * definitions in a single request. The backend resolves by name or ID,
+ * and the include resolver fetches all field records whose collectionId
+ * matches the resolved collection.
  */
 async function fetchCollectionSchema(
   apiClient: ApiClient,
   collectionName: string
 ): Promise<CollectionSchema> {
-  // Backend resolves by name or ID — no need to fetch all collections first
-  const schema = await apiClient.getOne<CollectionSchema>(
-    `/api/collections/${encodeURIComponent(collectionName)}`
+  // Use raw get() to preserve the full JSON:API response including `included` array
+  const response = await apiClient.get(
+    `/api/collections/${encodeURIComponent(collectionName)}?include=fields`
   )
 
-  // Normalize field types from backend canonical form to UI form
-  if (schema.fields) {
-    schema.fields = schema.fields.map((f) => ({
-      ...f,
-      type: normalizeFieldType(f.type),
-    }))
+  // Extract the collection record from the response envelope
+  const collection = unwrapResource<Record<string, unknown>>(response)
+
+  // Extract included field records from the JSON:API `included` array
+  const fieldRecords = extractIncluded<Record<string, unknown>>(response, 'fields')
+
+  // Resolve displayFieldName from the displayFieldId relationship
+  let displayFieldName: string | undefined
+  if (collection.displayFieldId) {
+    const displayField = fieldRecords.find((f) => f.id === collection.displayFieldId)
+    if (displayField) {
+      displayFieldName = displayField.name as string
+    }
   }
 
-  return schema
+  // Sort by fieldOrder and filter to active fields, then normalize types.
+  // Spread all properties to preserve constraints, validation, etc.
+  const fields: FieldDefinition[] = fieldRecords
+    .filter((f) => f.active !== false)
+    .sort((a, b) => {
+      const orderA = typeof a.fieldOrder === 'number' ? a.fieldOrder : 999
+      const orderB = typeof b.fieldOrder === 'number' ? b.fieldOrder : 999
+      return orderA - orderB
+    })
+    .map((f) => ({
+      ...(f as unknown as FieldDefinition),
+      type: normalizeFieldType(f.type as string),
+      required: !!f.required,
+      displayName: (f.displayName as string) || undefined,
+      referenceTarget: (f.referenceTarget as string) || undefined,
+      referenceCollectionId: (f.referenceCollectionId as string) || undefined,
+    }))
+
+  return {
+    id: collection.id as string,
+    name: collection.name as string,
+    displayName: (collection.displayName as string) || (collection.name as string),
+    displayFieldName,
+    fields,
+  }
 }
 
 export interface UseCollectionSchemaReturn {

@@ -258,6 +258,53 @@ function createTestQueryClient() {
   })
 }
 
+/**
+ * Convert a CollectionSchema into a JSON:API response with included field records.
+ */
+function toJsonApiWithFields(schema: {
+  id: string
+  name: string
+  displayName: string
+  fields: Array<Record<string, unknown>>
+}) {
+  return {
+    data: {
+      type: 'collections',
+      id: schema.id,
+      attributes: {
+        name: schema.name,
+        displayName: schema.displayName,
+      },
+    },
+    included: (schema.fields || []).map((f, i) => {
+      // Spread ALL field properties into attributes to preserve validation, order, etc.
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { id: _id, referenceCollectionId: _ref, ...rest } = f
+      return {
+        type: 'fields',
+        id: f.id,
+        attributes: {
+          ...rest,
+          type: (f.type as string).toUpperCase(),
+          required: f.required ?? false,
+          fieldOrder: (f as Record<string, unknown>).order ?? i + 1,
+          active: true,
+        },
+        relationships: {
+          collectionId: { data: { type: 'collections', id: schema.id } },
+          ...(f.referenceCollectionId
+            ? {
+                referenceCollectionId: {
+                  data: { type: 'collections', id: f.referenceCollectionId },
+                },
+              }
+            : {}),
+        },
+      }
+    }),
+  }
+}
+
 // Helper to render with providers
 function renderWithProviders(
   ui: React.ReactElement,
@@ -315,13 +362,9 @@ describe('ResourceDetailPage', () => {
 
     it('should display error message when resource fetch fails', async () => {
       mockAxios.get.mockImplementation((url: string) => {
-        // getList('/api/collections') — return flat array so unwrapJsonApiList passes through
-        if (url === '/api/collections') {
-          return Promise.resolve({ data: [mockSchema] })
-        }
-        // getOne('/api/collections/col-1') — return flat object so unwrapJsonApiSingle passes through
-        if (url.includes('/api/collections/')) {
-          return Promise.resolve({ data: mockSchema })
+        // Collection schema with included fields (JSON:API format)
+        if (url.includes('/api/collections/') && url.includes('include=fields')) {
+          return Promise.resolve({ data: toJsonApiWithFields(mockSchema) })
         }
         return Promise.reject(createAxiosError(500))
       })
@@ -335,11 +378,9 @@ describe('ResourceDetailPage', () => {
 
     it('should display not found error when resource returns 404', async () => {
       mockAxios.get.mockImplementation((url: string) => {
-        if (url === '/api/collections') {
-          return Promise.resolve({ data: [mockSchema] })
-        }
-        if (url.includes('/api/collections/')) {
-          return Promise.resolve({ data: mockSchema })
+        // Collection schema with included fields (JSON:API format)
+        if (url.includes('/api/collections/') && url.includes('include=fields')) {
+          return Promise.resolve({ data: toJsonApiWithFields(mockSchema) })
         }
         return Promise.reject(createAxiosError(404))
       })
@@ -355,9 +396,9 @@ describe('ResourceDetailPage', () => {
   describe('Successful Data Display', () => {
     beforeEach(() => {
       mockAxios.get.mockImplementation((url: string) => {
-        // getList('/api/collections') — return flat array for unwrapJsonApiList
-        if (url === '/api/collections') {
-          return Promise.resolve({ data: [mockSchema] })
+        // Collection schema with included fields (JSON:API format)
+        if (url.includes('/api/collections/') && url.includes('include=fields')) {
+          return Promise.resolve({ data: toJsonApiWithFields(mockSchema) })
         }
         // Lookup: fetch target collection schema by ID for master_detail resolution
         if (url.includes('/api/collections/org-collection-id')) {
@@ -369,10 +410,6 @@ describe('ResourceDetailPage', () => {
               fields: [{ name: 'name', type: 'STRING' }],
             },
           })
-        }
-        // getOne('/api/collections/col-1') — return flat object for unwrapJsonApiSingle
-        if (url.includes('/api/collections/')) {
-          return Promise.resolve({ data: mockSchema })
         }
         // Lookup: fetch target collection records for display name resolution
         if (url.includes('/api/organizations')) {
@@ -496,11 +533,9 @@ describe('ResourceDetailPage', () => {
   describe('Navigation', () => {
     beforeEach(() => {
       mockAxios.get.mockImplementation((url: string) => {
-        if (url === '/api/collections') {
-          return Promise.resolve({ data: [mockSchema] })
-        }
-        if (url.includes('/api/collections/')) {
-          return Promise.resolve({ data: mockSchema })
+        // Collection schema with included fields (JSON:API format)
+        if (url.includes('/api/collections/') && url.includes('include=fields')) {
+          return Promise.resolve({ data: toJsonApiWithFields(mockSchema) })
         }
         if (
           url.includes('/api/notes') ||
@@ -546,11 +581,9 @@ describe('ResourceDetailPage', () => {
   describe('Delete Functionality - Requirement 11.10', () => {
     beforeEach(() => {
       mockAxios.get.mockImplementation((url: string) => {
-        if (url === '/api/collections') {
-          return Promise.resolve({ data: [mockSchema] })
-        }
-        if (url.includes('/api/collections/')) {
-          return Promise.resolve({ data: mockSchema })
+        // Collection schema with included fields (JSON:API format)
+        if (url.includes('/api/collections/') && url.includes('include=fields')) {
+          return Promise.resolve({ data: toJsonApiWithFields(mockSchema) })
         }
         if (
           url.includes('/api/notes') ||
@@ -647,11 +680,9 @@ describe('ResourceDetailPage', () => {
       }
 
       mockAxios.get.mockImplementation((url: string) => {
-        if (url === '/api/collections') {
-          return Promise.resolve({ data: [mockSchema] })
-        }
-        if (url.includes('/api/collections/')) {
-          return Promise.resolve({ data: mockSchema })
+        // Collection schema with included fields (JSON:API format)
+        if (url.includes('/api/collections/') && url.includes('include=fields')) {
+          return Promise.resolve({ data: toJsonApiWithFields(mockSchema) })
         }
         if (
           url.includes('/api/notes') ||
@@ -686,11 +717,8 @@ describe('ResourceDetailPage', () => {
       }
 
       mockAxios.get.mockImplementation((url: string) => {
-        if (url === '/api/collections') {
-          return Promise.resolve({ data: [mockSchema] })
-        }
-        if (url.includes('/api/collections/')) {
-          return Promise.resolve({ data: mockSchema })
+        if (url.includes('/api/collections/') && url.includes('include=fields')) {
+          return Promise.resolve({ data: toJsonApiWithFields(mockSchema) })
         }
         if (
           url.includes('/api/notes') ||
@@ -717,8 +745,8 @@ describe('ResourceDetailPage', () => {
     it('should use props over route params when provided', async () => {
       const productsSchema = { ...mockSchema, name: 'products', displayName: 'Products' }
       mockAxios.get.mockImplementation((url: string) => {
-        if (url === '/api/collections') {
-          return Promise.resolve({ data: [productsSchema] })
+        if (url.includes('/api/collections/') && url.includes('include=fields')) {
+          return Promise.resolve({ data: toJsonApiWithFields(productsSchema) })
         }
         if (url.includes('/api/collections/')) {
           return Promise.resolve({ data: productsSchema })
@@ -756,11 +784,8 @@ describe('ResourceDetailPage', () => {
   describe('Accessibility', () => {
     beforeEach(() => {
       mockAxios.get.mockImplementation((url: string) => {
-        if (url === '/api/collections') {
-          return Promise.resolve({ data: [mockSchema] })
-        }
-        if (url.includes('/api/collections/')) {
-          return Promise.resolve({ data: mockSchema })
+        if (url.includes('/api/collections/') && url.includes('include=fields')) {
+          return Promise.resolve({ data: toJsonApiWithFields(mockSchema) })
         }
         if (
           url.includes('/api/notes') ||

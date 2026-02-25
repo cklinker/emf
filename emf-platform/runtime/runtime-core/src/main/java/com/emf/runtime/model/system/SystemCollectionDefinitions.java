@@ -167,6 +167,7 @@ public final class SystemCollectionDefinitions {
     public static CollectionDefinition tenants() {
         return systemBuilder("tenants", "Tenants", "tenant")
             .tenantScoped(false)
+            .displayFieldName("slug")
             .addField(FieldDefinition.requiredString("slug", 63)
                 .withUnique(true)
                 .withValidation(ValidationRules.forString(null, 63, "^[a-z][a-z0-9-]{1,61}[a-z0-9]$")))

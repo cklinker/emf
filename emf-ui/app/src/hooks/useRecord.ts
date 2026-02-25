@@ -3,6 +3,7 @@
  *
  * Fetches a single record by ID from a collection via JSON:API endpoint.
  * Automatically unwraps JSON:API response format to a flat object.
+ * Supports ?include= for fetching related resources in a single request.
  */
 
 import { useQuery } from '@tanstack/react-query'
@@ -17,6 +18,8 @@ export interface UseRecordOptions {
   recordId: string | undefined
   /** Whether the query is enabled */
   enabled?: boolean
+  /** Comma-separated list of relationship names to include via JSON:API ?include= */
+  include?: string
 }
 
 export interface UseRecordReturn {
@@ -24,6 +27,8 @@ export interface UseRecordReturn {
   isLoading: boolean
   error: Error | null
   refetch: () => void
+  /** Raw JSON:API response for building display maps from included resources */
+  rawResponse: unknown
 }
 
 /**
@@ -34,27 +39,27 @@ export interface UseRecordReturn {
  */
 export function useRecord(options: UseRecordOptions): UseRecordReturn {
   const { apiClient } = useApi()
-  const { collectionName, recordId, enabled = true } = options
+  const { collectionName, recordId, enabled = true, include } = options
 
-  const {
-    data: record,
-    isLoading,
-    error,
-    refetch,
-  } = useQuery({
-    queryKey: ['record', collectionName, recordId],
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ['record', collectionName, recordId, include],
     queryFn: async () => {
-      const response = await apiClient.get(`/api/${collectionName}/${recordId}`)
-      return unwrapResource<CollectionRecord>(response)
+      const url = include
+        ? `/api/${collectionName}/${recordId}?include=${encodeURIComponent(include)}`
+        : `/api/${collectionName}/${recordId}`
+      const response = await apiClient.get(url)
+      const record = unwrapResource<CollectionRecord>(response)
+      return { record, rawResponse: response }
     },
     enabled: !!collectionName && !!recordId && enabled,
     staleTime: 30 * 1000, // 30 seconds
   })
 
   return {
-    record,
+    record: data?.record,
     isLoading,
     error: error as Error | null,
     refetch,
+    rawResponse: data?.rawResponse,
   }
 }

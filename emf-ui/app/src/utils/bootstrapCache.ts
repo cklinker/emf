@@ -82,17 +82,40 @@ function unwrapMenusWithItems(body: unknown): Record<string, unknown>[] {
     ? (obj.included as Array<Record<string, unknown>>)
     : []
 
-  // Group included menu items by their parent menuId
+  // Group included menu items by their parent menuId.
+  // menuId may appear as a plain attribute OR as a JSON:API relationship
+  // (the worker puts FK/reference fields into `relationships`).
   const itemsByMenuId = new Map<string, Record<string, unknown>[]>()
   for (const resource of included) {
     const type = resource.type as string | undefined
     if (type !== 'ui-menu-items') continue
 
     const attrs = (resource.attributes || {}) as Record<string, unknown>
-    const menuId = attrs.menuId as string | undefined
+
+    // Extract menuId: first try attributes, then relationships
+    let menuId = attrs.menuId as string | undefined
+    if (!menuId) {
+      const rels = resource.relationships as
+        | Record<string, { data?: { id?: string } | null }>
+        | undefined
+      menuId = rels?.menuId?.data?.id as string | undefined
+    }
     if (!menuId) continue
 
-    const item: Record<string, unknown> = { id: resource.id, ...attrs }
+    const item: Record<string, unknown> = { id: resource.id, ...attrs, menuId }
+
+    // Also flatten any other relationship IDs into the item
+    const rels = resource.relationships as
+      | Record<string, { data?: { id?: string } | null }>
+      | undefined
+    if (rels) {
+      for (const [key, rel] of Object.entries(rels)) {
+        if (item[key] === undefined) {
+          item[key] = rel?.data?.id ?? null
+        }
+      }
+    }
+
     const existing = itemsByMenuId.get(menuId)
     if (existing) {
       existing.push(item)

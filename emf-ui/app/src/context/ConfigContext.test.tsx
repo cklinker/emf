@@ -100,7 +100,9 @@ function jsonApiMenusWithItems(menus: Record<string, unknown>[]) {
     }
   })
 
-  // Flatten all menu items into the `included` array
+  // Flatten all menu items into the `included` array.
+  // menuId is placed in `relationships` (not attributes) to match the
+  // real DynamicCollectionRouter response which puts FK fields there.
   const included: Record<string, unknown>[] = []
   for (const menu of menus) {
     const menuId = menu.id as string
@@ -110,7 +112,10 @@ function jsonApiMenusWithItems(menus: Record<string, unknown>[]) {
       included.push({
         type: 'ui-menu-items',
         id,
-        attributes: { ...itemAttrs, menuId },
+        attributes: itemAttrs,
+        relationships: {
+          menuId: { data: { type: 'ui-menus', id: menuId } },
+        },
       })
     }
   }

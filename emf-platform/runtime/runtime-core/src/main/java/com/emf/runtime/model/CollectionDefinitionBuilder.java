@@ -59,6 +59,7 @@ public class CollectionDefinitionBuilder {
     private boolean readOnly = false;
     private Set<String> immutableFields = new HashSet<>();
     private Map<String, String> columnMapping = new HashMap<>();
+    private String displayFieldName;
 
     /**
      * Creates a new collection definition builder.
@@ -277,6 +278,17 @@ public class CollectionDefinitionBuilder {
     }
 
     /**
+     * Sets the display field name for display-value lookups.
+     *
+     * @param displayFieldName the field name used for display-value lookups
+     * @return this builder for method chaining
+     */
+    public CollectionDefinitionBuilder displayFieldName(String displayFieldName) {
+        this.displayFieldName = displayFieldName;
+        return this;
+    }
+
+    /**
      * Builds the collection definition.
      *
      * <p>Applies sensible defaults for optional configuration:
@@ -338,7 +350,8 @@ public class CollectionDefinitionBuilder {
             tenantScoped,
             readOnly,
             immutableFields,
-            columnMapping
+            columnMapping,
+            displayFieldName
         );
     }
 }

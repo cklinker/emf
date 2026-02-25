@@ -47,15 +47,19 @@ public class CollectionLifecycleManager {
 
     private static final String SELECT_COLLECTION_BY_ID = """
             SELECT id, name, display_name, description, storage_mode, active,
-                   current_version, system_collection, path, tenant_id
+                   current_version, system_collection, path, tenant_id, display_field_id
             FROM collection WHERE id = ? AND active = true
             """;
 
     private static final String SELECT_COLLECTION_BY_NAME = """
             SELECT id, name, display_name, description, storage_mode, active,
-                   current_version, system_collection, path, tenant_id
+                   current_version, system_collection, path, tenant_id, display_field_id
             FROM collection WHERE name = ? AND active = true
             LIMIT 1
+            """;
+
+    private static final String SELECT_FIELD_NAME_BY_ID = """
+            SELECT name FROM field WHERE id = ? AND active = true
             """;
 
     private static final String SELECT_FIELDS_BY_COLLECTION = """
@@ -369,6 +373,15 @@ public class CollectionLifecycleManager {
         }
         builder.fields(fields);
 
+        // Resolve display field ID to field name
+        String displayFieldId = getStringOrNull(data, "display_field_id", null);
+        if (displayFieldId != null) {
+            String displayFieldName = resolveFieldName(displayFieldId);
+            if (displayFieldName != null) {
+                builder.displayFieldName(displayFieldName);
+            }
+        }
+
         // Parse storage config
         String storageMode = getStringOrNull(data, "storage_mode", "PHYSICAL_TABLES");
         if ("PHYSICAL_TABLE".equals(storageMode)) {
@@ -529,6 +542,22 @@ public class CollectionLifecycleManager {
                 }
             }
         };
+    }
+
+    /**
+     * Resolves a field ID to its field name.
+     */
+    private String resolveFieldName(String fieldId) {
+        try {
+            List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                    SELECT_FIELD_NAME_BY_ID, fieldId);
+            if (!rows.isEmpty()) {
+                return (String) rows.get(0).get("name");
+            }
+        } catch (Exception e) {
+            log.warn("Failed to resolve field name for id '{}': {}", fieldId, e.getMessage());
+        }
+        return null;
     }
 
     private String getStringOrNull(Map<String, Object> data, String key, String defaultValue) {

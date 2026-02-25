@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -68,6 +69,9 @@ import java.util.stream.Collectors;
 public class DynamicCollectionRouter {
     
     private static final Logger logger = LoggerFactory.getLogger(DynamicCollectionRouter.class);
+
+    private static final Pattern UUID_PATTERN = Pattern.compile(
+            "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$");
     
     private final CollectionRegistry registry;
     private final QueryEngine queryEngine;
@@ -162,6 +166,12 @@ public class DynamicCollectionRouter {
         }
 
         Optional<Map<String, Object>> record = queryEngine.getById(definition, id);
+
+        // If not found by ID and the value is not a UUID, try display field lookup
+        if (record.isEmpty() && !UUID_PATTERN.matcher(id).matches()) {
+            record = resolveByDisplayField(definition, id, request);
+        }
+
         if (record.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
@@ -733,6 +743,62 @@ public class DynamicCollectionRouter {
         }
 
         return definition;
+    }
+
+    /**
+     * Resolves a record by its display field value.
+     *
+     * <p>Looks up the collection's display field and verifies it is both unique
+     * and required (non-nullable). If so, queries for a single record matching
+     * the given value. This allows GET-by-id to accept human-readable values
+     * (e.g., a slug or name) instead of UUIDs.
+     *
+     * @param definition the collection definition
+     * @param value the display field value to look up
+     * @param request the HTTP servlet request
+     * @return the matching record, or empty if not found or display field is not eligible
+     */
+    private Optional<Map<String, Object>> resolveByDisplayField(
+            CollectionDefinition definition, String value, HttpServletRequest request) {
+
+        String displayFieldName = definition.displayFieldName();
+        if (displayFieldName == null) {
+            logger.debug("Collection '{}' has no display field configured", definition.name());
+            return Optional.empty();
+        }
+
+        FieldDefinition displayField = definition.getField(displayFieldName);
+        if (displayField == null) {
+            logger.debug("Display field '{}' not found in collection '{}'",
+                    displayFieldName, definition.name());
+            return Optional.empty();
+        }
+
+        // Only allow display-field lookup when the field is unique and required
+        if (!displayField.unique() || displayField.nullable()) {
+            logger.debug("Display field '{}' on collection '{}' is not eligible for lookup " +
+                    "(unique={}, nullable={})", displayFieldName, definition.name(),
+                    displayField.unique(), displayField.nullable());
+            return Optional.empty();
+        }
+
+        logger.debug("Resolving '{}' by display field '{}' = '{}'",
+                definition.name(), displayFieldName, value);
+
+        List<FilterCondition> filters = new ArrayList<>();
+        filters.add(new FilterCondition(displayFieldName, FilterOperator.EQ, value));
+
+        // Inject tenant filter if applicable
+        QueryRequest queryRequest = new QueryRequest(
+                new Pagination(1, 1), List.of(), List.of(), filters);
+        queryRequest = injectTenantFilter(queryRequest, definition, request);
+
+        QueryResult result = queryEngine.executeQuery(definition, queryRequest);
+        if (result.data().isEmpty()) {
+            return Optional.empty();
+        }
+
+        return Optional.of(result.data().get(0));
     }
 
     /**

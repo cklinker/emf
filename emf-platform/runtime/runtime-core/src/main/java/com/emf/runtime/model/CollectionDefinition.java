@@ -31,6 +31,9 @@ import java.util.Set;
  * @param readOnly Whether this collection is read-only (no create/update/delete via API)
  * @param immutableFields Set of field names that cannot be updated after creation
  * @param columnMapping Map of API field name to physical database column name
+ * @param displayFieldName Name of the field used for display-value lookups (nullable).
+ *                         When set and the referenced field is unique and required,
+ *                         GET-by-id requests accept either a UUID or this field's value.
  *
  * @since 1.0.0
  */
@@ -50,7 +53,8 @@ public record CollectionDefinition(
     boolean tenantScoped,
     boolean readOnly,
     Set<String> immutableFields,
-    Map<String, String> columnMapping
+    Map<String, String> columnMapping,
+    String displayFieldName
 ) {
     /**
      * Compact constructor with validation and defensive copying.
@@ -84,7 +88,22 @@ public record CollectionDefinition(
             long version, Instant createdAt, Instant updatedAt) {
         this(name, displayName, description, fields, storageConfig, apiConfig,
              authzConfig, eventsConfig, version, createdAt, updatedAt,
-             false, true, false, Set.of(), Map.of());
+             false, true, false, Set.of(), Map.of(), null);
+    }
+
+    /**
+     * Backward-compatible constructor without displayFieldName parameter.
+     */
+    public CollectionDefinition(
+            String name, String displayName, String description,
+            List<FieldDefinition> fields, StorageConfig storageConfig,
+            ApiConfig apiConfig, AuthzConfig authzConfig, EventsConfig eventsConfig,
+            long version, Instant createdAt, Instant updatedAt,
+            boolean systemCollection, boolean tenantScoped, boolean readOnly,
+            Set<String> immutableFields, Map<String, String> columnMapping) {
+        this(name, displayName, description, fields, storageConfig, apiConfig,
+             authzConfig, eventsConfig, version, createdAt, updatedAt,
+             systemCollection, tenantScoped, readOnly, immutableFields, columnMapping, null);
     }
     
     /**
@@ -132,7 +151,7 @@ public record CollectionDefinition(
             storageConfig, apiConfig, authzConfig, eventsConfig,
             version + 1, createdAt, Instant.now(),
             systemCollection, tenantScoped, readOnly,
-            immutableFields, columnMapping
+            immutableFields, columnMapping, displayFieldName
         );
     }
 
@@ -148,7 +167,7 @@ public record CollectionDefinition(
             storageConfig, apiConfig, authzConfig, eventsConfig,
             version + 1, createdAt, Instant.now(),
             systemCollection, tenantScoped, readOnly,
-            immutableFields, columnMapping
+            immutableFields, columnMapping, displayFieldName
         );
     }
 

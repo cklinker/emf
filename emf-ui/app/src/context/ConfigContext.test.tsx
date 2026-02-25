@@ -85,6 +85,48 @@ function jsonApiList(type: string, items: Record<string, unknown>[]) {
   }
 }
 
+/**
+ * Build a JSON:API list response for menus that includes menu items
+ * via the `included` sideload (matching `?include=ui-menu-items`).
+ */
+function jsonApiMenusWithItems(menus: Record<string, unknown>[]) {
+  const data = menus.map((menu, i) => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { id, items: _items, ...attrs } = menu
+    return {
+      type: 'ui-menus',
+      id: id ?? `ui-menus-${i + 1}`,
+      attributes: attrs,
+    }
+  })
+
+  // Flatten all menu items into the `included` array
+  const included: Record<string, unknown>[] = []
+  for (const menu of menus) {
+    const menuId = menu.id as string
+    const items = (menu.items as Record<string, unknown>[]) || []
+    for (const item of items) {
+      const { id, ...itemAttrs } = item
+      included.push({
+        type: 'ui-menu-items',
+        id,
+        attributes: { ...itemAttrs, menuId },
+      })
+    }
+  }
+
+  return {
+    data,
+    included: included.length > 0 ? included : undefined,
+    metadata: {
+      totalCount: menus.length,
+      currentPage: 0,
+      pageSize: 500,
+      totalPages: 1,
+    },
+  }
+}
+
 // Create mock fetch function
 // The bootstrap config is now composed from 4 parallel JSON:API calls:
 //   /api/ui-pages, /api/ui-menus, /api/oidc-providers, /api/tenants
@@ -137,7 +179,7 @@ function createMockFetch(
       } as Response
     }
 
-    // Handle /api/ui-menus
+    // Handle /api/ui-menus (with ?include=ui-menu-items)
     if (url.includes('/api/ui-menus')) {
       if (options.invalidJson) {
         return {
@@ -150,7 +192,7 @@ function createMockFetch(
       const menus = (cfg.menus as Record<string, unknown>[]) || []
       return {
         ok: true,
-        json: async () => jsonApiList('ui-menus', menus),
+        json: async () => jsonApiMenusWithItems(menus),
       } as Response
     }
 

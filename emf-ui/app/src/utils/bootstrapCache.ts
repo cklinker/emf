@@ -56,6 +56,67 @@ function unwrapList(body: unknown): Record<string, unknown>[] {
 }
 
 /**
+ * Unwrap a JSON:API menus response that includes `ui-menu-items` via
+ * the `?include=ui-menu-items` query parameter.
+ *
+ * The response shape is:
+ * ```json
+ * {
+ *   "data": [ { "type":"ui-menus", "id":"…", "attributes":{ "name":"…" } } ],
+ *   "included": [ { "type":"ui-menu-items", "id":"…", "attributes":{ "menuId":"…", … } } ]
+ * }
+ * ```
+ *
+ * Each menu is returned with an `items` array of its child menu-items,
+ * sorted by `displayOrder`.
+ */
+function unwrapMenusWithItems(body: unknown): Record<string, unknown>[] {
+  if (!body || typeof body !== 'object') return []
+  const obj = body as Record<string, unknown>
+
+  // Unwrap primary menu data
+  const menus = unwrapList(body)
+
+  // Extract included resources (menu items)
+  const included = Array.isArray(obj.included)
+    ? (obj.included as Array<Record<string, unknown>>)
+    : []
+
+  // Group included menu items by their parent menuId
+  const itemsByMenuId = new Map<string, Record<string, unknown>[]>()
+  for (const resource of included) {
+    const type = resource.type as string | undefined
+    if (type !== 'ui-menu-items') continue
+
+    const attrs = (resource.attributes || {}) as Record<string, unknown>
+    const menuId = attrs.menuId as string | undefined
+    if (!menuId) continue
+
+    const item: Record<string, unknown> = { id: resource.id, ...attrs }
+    const existing = itemsByMenuId.get(menuId)
+    if (existing) {
+      existing.push(item)
+    } else {
+      itemsByMenuId.set(menuId, [item])
+    }
+  }
+
+  // Attach items to each menu, sorted by displayOrder
+  for (const menu of menus) {
+    const menuId = menu.id as string
+    const items = itemsByMenuId.get(menuId) || []
+    items.sort((a, b) => {
+      const orderA = (a.displayOrder as number) ?? 0
+      const orderB = (b.displayOrder as number) ?? 0
+      return orderA - orderB
+    })
+    menu.items = items
+  }
+
+  return menus
+}
+
+/**
  * Fetch the bootstrap config by composing parallel JSON:API calls.
  * Returns a shape compatible with the BootstrapConfig interface.
  * Callers are responsible for validation.
@@ -82,7 +143,7 @@ export function fetchBootstrapConfig(): Promise<unknown> {
       if (!r.ok) return { data: [] }
       return r.json()
     }),
-    fetch(`${base}/api/ui-menus?page[size]=500`).then(async (r) => {
+    fetch(`${base}/api/ui-menus?include=ui-menu-items&page[size]=500`).then(async (r) => {
       if (!r.ok) return { data: [] }
       return r.json()
     }),
@@ -100,7 +161,7 @@ export function fetchBootstrapConfig(): Promise<unknown> {
   ])
     .then(([pagesRes, menusRes, providersRes, tenantsRes]) => {
       const pages = unwrapList(pagesRes)
-      const menus = unwrapList(menusRes)
+      const menus = unwrapMenusWithItems(menusRes)
       const oidcProviders = unwrapList(providersRes)
       const tenants = unwrapList(tenantsRes)
       const tenantId = tenants.length > 0 ? (tenants[0].id as string) : undefined

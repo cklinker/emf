@@ -20,7 +20,7 @@ import { useI18n } from '../../context/I18nContext'
 import { getTenantSlug } from '../../context/TenantContext'
 import { useApi } from '../../context/ApiContext'
 import { ApiClient } from '../../services/apiClient'
-import { unwrapCollection } from '../../utils/jsonapi'
+import { unwrapCollection, unwrapResource, extractIncluded } from '../../utils/jsonapi'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
 import { useSavedViews } from '../../hooks/useSavedViews'
 import { useLookupDisplayMap } from '../../hooks/useLookupDisplayMap'
@@ -279,30 +279,41 @@ async function fetchCollectionSchema(
   apiClient: ApiClient,
   collectionName: string
 ): Promise<CollectionSchema> {
-  console.log('[fetchCollectionSchema] Fetching collection by name:', collectionName)
+  // Fetch the collection record with included field definitions in a single request.
+  // Uses raw get() to preserve the full JSON:API response including `included` array.
+  const response = await apiClient.get(
+    `/api/collections/${encodeURIComponent(collectionName)}?include=fields`
+  )
 
-  // First, fetch all collections to find the one with matching name
-  const collections = await apiClient.getList<CollectionSchema>('/api/collections')
-  console.log('[fetchCollectionSchema] Collections array:', collections)
+  // Extract the collection record from the response envelope
+  const collection = unwrapResource<Record<string, unknown>>(response)
 
-  const collection = collections.find((c: CollectionSchema) => c.name === collectionName)
-  console.log('[fetchCollectionSchema] Found collection:', collection)
+  // Extract included field records from the JSON:API `included` array
+  const fieldRecords = extractIncluded<Record<string, unknown>>(response, 'fields')
 
-  if (!collection) {
-    throw new Error(`Collection '${collectionName}' not found`)
-  }
-
-  // Now fetch the full collection details by ID
-  const schema = await apiClient.getOne<CollectionSchema>(`/api/collections/${collection.id}`)
-  console.log('[fetchCollectionSchema] Collection schema:', schema)
-  // Normalize field types from backend canonical form to UI form
-  if (schema.fields) {
-    schema.fields = schema.fields.map((f) => ({
-      ...f,
-      type: normalizeFieldType(f.type),
+  // Sort by fieldOrder and filter to active fields, then normalize types.
+  // Spread all properties to preserve validation rules, constraints, etc.
+  const fields: FieldDefinition[] = fieldRecords
+    .filter((f) => f.active !== false)
+    .sort((a, b) => {
+      const orderA = typeof a.fieldOrder === 'number' ? a.fieldOrder : 999
+      const orderB = typeof b.fieldOrder === 'number' ? b.fieldOrder : 999
+      return orderA - orderB
+    })
+    .map((f) => ({
+      ...(f as unknown as FieldDefinition),
+      type: normalizeFieldType(f.type as string),
+      required: !!f.required,
+      displayName: (f.displayName as string) || undefined,
+      referenceTarget: (f.referenceTarget as string) || undefined,
     }))
+
+  return {
+    id: collection.id as string,
+    name: collection.name as string,
+    displayName: (collection.displayName as string) || (collection.name as string),
+    fields,
   }
-  return schema
 }
 
 interface FetchResourcesParams {

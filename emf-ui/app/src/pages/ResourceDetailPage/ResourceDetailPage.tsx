@@ -32,7 +32,7 @@ import { usePageLayout } from '../../hooks/usePageLayout'
 import { useLookupDisplayMap } from '../../hooks/useLookupDisplayMap'
 import { LayoutFieldSections } from '../../components/LayoutFieldSections/LayoutFieldSections'
 import { LayoutRelatedLists } from '../../components/LayoutRelatedLists/LayoutRelatedLists'
-import { unwrapResource } from '../../utils/jsonapi'
+import { unwrapResource, extractIncluded } from '../../utils/jsonapi'
 import type { ApiClient } from '../../services/apiClient'
 
 /**
@@ -263,23 +263,40 @@ async function fetchCollectionSchema(
   apiClient: ApiClient,
   collectionName: string
 ): Promise<CollectionSchema> {
-  // Fetch all collections and find the one with matching name
-  const collections = await apiClient.getList<CollectionSchema>('/api/collections')
-  const collection = collections.find((c) => c.name === collectionName)
-  if (!collection) {
-    throw new Error(`Collection '${collectionName}' not found`)
-  }
-  // Fetch full collection details by ID
-  const response = await apiClient.getOne<CollectionSchema>(`/api/collections/${collection.id}`)
-  // Normalize field types from backend canonical form (e.g. "PICKLIST") to
-  // UI form (e.g. "picklist") so type display and rendering works correctly.
-  if (response.fields) {
-    response.fields = response.fields.map((f) => ({
-      ...f,
-      type: normalizeFieldType(f.type),
+  // Fetch the collection record with included field definitions in a single request.
+  const response = await apiClient.get(
+    `/api/collections/${encodeURIComponent(collectionName)}?include=fields`
+  )
+
+  // Extract the collection record from the response envelope
+  const collection = unwrapResource<Record<string, unknown>>(response)
+
+  // Extract included field records from the JSON:API `included` array
+  const fieldRecords = extractIncluded<Record<string, unknown>>(response, 'fields')
+
+  // Sort by fieldOrder and filter to active fields, then normalize types.
+  // Spread all properties to preserve validation rules, constraints, etc.
+  const fields: FieldDefinition[] = fieldRecords
+    .filter((f) => f.active !== false)
+    .sort((a, b) => {
+      const orderA = typeof a.fieldOrder === 'number' ? a.fieldOrder : 999
+      const orderB = typeof b.fieldOrder === 'number' ? b.fieldOrder : 999
+      return orderA - orderB
+    })
+    .map((f) => ({
+      ...(f as unknown as FieldDefinition),
+      type: normalizeFieldType(f.type as string),
+      required: !!f.required,
+      displayName: (f.displayName as string) || undefined,
+      referenceTarget: (f.referenceTarget as string) || undefined,
     }))
+
+  return {
+    id: collection.id as string,
+    name: collection.name as string,
+    displayName: (collection.displayName as string) || (collection.name as string),
+    fields,
   }
-  return response
 }
 
 async function fetchResource(

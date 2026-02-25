@@ -58,6 +58,7 @@ export interface PaginatedResponse {
   total: number
   page: number
   pageSize: number
+  rawResponse?: unknown
 }
 
 /**
@@ -81,6 +82,7 @@ interface FetchRecordsParams {
   pageSize: number
   sort?: SortState
   filters?: FilterCondition[]
+  include?: string
 }
 
 /**
@@ -90,7 +92,7 @@ async function fetchRecords(
   apiClient: ApiClient,
   params: FetchRecordsParams
 ): Promise<PaginatedResponse> {
-  const { collectionName, page, pageSize, sort, filters } = params
+  const { collectionName, page, pageSize, sort, filters, include } = params
 
   const queryParams = new URLSearchParams()
   queryParams.set('page[number]', String(page))
@@ -108,8 +110,13 @@ async function fetchRecords(
     }
   }
 
+  if (include) {
+    queryParams.set('include', include)
+  }
+
   const response = await apiClient.get(`/api/${collectionName}?${queryParams.toString()}`)
-  return unwrapCollection<CollectionRecord>(response)
+  const unwrapped = unwrapCollection<CollectionRecord>(response)
+  return { ...unwrapped, rawResponse: response }
 }
 
 export interface UseCollectionRecordsOptions {
@@ -125,6 +132,8 @@ export interface UseCollectionRecordsOptions {
   filters?: FilterCondition[]
   /** Whether the query is enabled */
   enabled?: boolean
+  /** Comma-separated list of relationship names to include via JSON:API ?include= */
+  include?: string
 }
 
 export interface UseCollectionRecordsReturn {
@@ -135,6 +144,8 @@ export interface UseCollectionRecordsReturn {
   isLoading: boolean
   error: Error | null
   refetch: () => void
+  /** Raw JSON:API response for building display maps from included resources */
+  rawResponse: unknown
 }
 
 /**
@@ -150,7 +161,15 @@ export function useCollectionRecords(
   options: UseCollectionRecordsOptions
 ): UseCollectionRecordsReturn {
   const { apiClient } = useApi()
-  const { collectionName, page = 1, pageSize = 25, sort, filters, enabled = true } = options
+  const {
+    collectionName,
+    page = 1,
+    pageSize = 25,
+    sort,
+    filters,
+    enabled = true,
+    include,
+  } = options
 
   const {
     data: response,
@@ -158,7 +177,7 @@ export function useCollectionRecords(
     error,
     refetch,
   } = useQuery({
-    queryKey: ['collection-records', collectionName, page, pageSize, sort, filters],
+    queryKey: ['collection-records', collectionName, page, pageSize, sort, filters, include],
     queryFn: () =>
       fetchRecords(apiClient, {
         collectionName: collectionName!,
@@ -166,6 +185,7 @@ export function useCollectionRecords(
         pageSize,
         sort,
         filters,
+        include,
       }),
     enabled: !!collectionName && enabled,
     staleTime: 30 * 1000, // 30 seconds — record data changes more frequently
@@ -179,5 +199,6 @@ export function useCollectionRecords(
     isLoading,
     error: error as Error | null,
     refetch,
+    rawResponse: response?.rawResponse,
   }
 }

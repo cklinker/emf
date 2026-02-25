@@ -98,7 +98,7 @@ function normalizeFieldType(backendType: string): FieldType {
  * and the include resolver fetches all field records whose collectionId
  * matches the resolved collection.
  */
-async function fetchCollectionSchema(
+export async function fetchCollectionSchema(
   apiClient: ApiClient,
   collectionName: string
 ): Promise<CollectionSchema> {

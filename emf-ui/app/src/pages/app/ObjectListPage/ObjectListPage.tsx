@@ -18,6 +18,7 @@
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { useNavigate, useParams, useSearchParams, Link } from 'react-router-dom'
+import { useQueries } from '@tanstack/react-query'
 import { Loader2, AlertCircle } from 'lucide-react'
 import {
   Breadcrumb,
@@ -39,10 +40,12 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
-import { useCollectionSchema } from '@/hooks/useCollectionSchema'
+import { useCollectionSchema, fetchCollectionSchema } from '@/hooks/useCollectionSchema'
 import { useCollectionRecords } from '@/hooks/useCollectionRecords'
 import { useRecordMutation } from '@/hooks/useRecordMutation'
 import { useCollectionPermissions } from '@/hooks/useCollectionPermissions'
+import { useApi } from '@/context/ApiContext'
+import { buildIncludedDisplayMap } from '@/utils/jsonapi'
 import type { SortState, FilterCondition, CollectionRecord } from '@/hooks/useCollectionRecords'
 import { ObjectDataTable } from '@/components/ObjectDataTable/ObjectDataTable'
 import { DataTablePagination } from '@/components/ObjectDataTable/DataTablePagination'
@@ -141,6 +144,9 @@ function parseListViewParams(searchParams: URLSearchParams): {
   }
 }
 
+/** Reference field types that indicate a foreign key to another collection */
+const REFERENCE_FIELD_TYPES = new Set(['master_detail', 'lookup', 'reference'])
+
 export function ObjectListPage(): React.ReactElement {
   const { tenantSlug, collection: collectionName } = useParams<{
     tenantSlug: string
@@ -148,6 +154,7 @@ export function ObjectListPage(): React.ReactElement {
   }>()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
+  const { apiClient } = useApi()
   const basePath = `/${tenantSlug}/app`
 
   // Parse list state from URL params (deep linking support)
@@ -187,13 +194,26 @@ export function ObjectListPage(): React.ReactElement {
       .slice(0, 6)
   }, [fields, isFieldVisible])
 
-  // Fetch records
+  // Identify reference fields in visible columns that need included resources
+  const referenceFields = useMemo(
+    () => visibleFields.filter((f) => REFERENCE_FIELD_TYPES.has(f.type) && f.referenceTarget),
+    [visibleFields]
+  )
+
+  // Build include param from reference field names
+  const includeParam = useMemo(() => {
+    if (referenceFields.length === 0) return undefined
+    return referenceFields.map((f) => f.name).join(',')
+  }, [referenceFields])
+
+  // Fetch records with includes for reference fields
   const {
     data: records,
     total,
     isLoading: recordsLoading,
     error: recordsError,
     refetch,
+    rawResponse,
   } = useCollectionRecords({
     collectionName,
     page,
@@ -201,7 +221,38 @@ export function ObjectListPage(): React.ReactElement {
     sort,
     filters: filters.length > 0 ? filters : undefined,
     enabled: !!schema,
+    include: includeParam,
   })
+
+  // Fetch schemas for referenced collections to determine their display field names
+  const refSchemaQueries = useQueries({
+    queries: referenceFields.map((f) => ({
+      queryKey: ['collection-schema', f.referenceTarget],
+      queryFn: () => fetchCollectionSchema(apiClient, f.referenceTarget!),
+      enabled: !!f.referenceTarget,
+      staleTime: 5 * 60 * 1000,
+    })),
+  })
+
+  // Build lookup display map from included resources
+  const lookupDisplayMap = useMemo(() => {
+    if (!rawResponse || referenceFields.length === 0) return undefined
+
+    const map: Record<string, Record<string, string>> = {}
+
+    referenceFields.forEach((field, idx) => {
+      const refSchema = refSchemaQueries[idx]?.data
+      const displayField = refSchema?.displayFieldName || 'name'
+      const targetType = field.referenceTarget!
+
+      const fieldMap = buildIncludedDisplayMap(rawResponse, targetType, displayField)
+      if (Object.keys(fieldMap).length > 0) {
+        map[field.name] = fieldMap
+      }
+    })
+
+    return Object.keys(map).length > 0 ? map : undefined
+  }, [rawResponse, referenceFields, refSchemaQueries])
 
   // Screen reader announcements for dynamic state changes
   const { announce } = useAnnounce()
@@ -490,6 +541,7 @@ export function ObjectListPage(): React.ReactElement {
         collectionName={collectionName || ''}
         onEdit={permissions.canEdit ? handleEdit : undefined}
         onDelete={permissions.canDelete ? handleDeleteClick : undefined}
+        lookupDisplayMap={lookupDisplayMap}
       />
 
       {/* Pagination */}

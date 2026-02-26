@@ -263,28 +263,33 @@ export function RelatedListPanel(): React.ReactElement {
   const handleEdit = useCallback((rl: EditorRelatedList) => {
     setEditingId(rl.id)
 
-    // Parse displayColumns: may be a JSON array string '["col1","col2"]' or CSV 'col1,col2'
+    // Parse displayColumns: may be a parsed JSON array, a JSON string '["col1","col2"]', or CSV 'col1,col2'
     let parsedColumns: string[] = []
     if (rl.displayColumns) {
-      const trimmed = rl.displayColumns.trim()
-      if (trimmed.startsWith('[')) {
-        try {
-          const parsed = JSON.parse(trimmed) as unknown
-          if (Array.isArray(parsed)) {
-            parsedColumns = parsed.map(String).filter(Boolean)
+      // Already a parsed array (JSONB from API)
+      if (Array.isArray(rl.displayColumns)) {
+        parsedColumns = (rl.displayColumns as unknown[]).map(String).filter(Boolean)
+      } else if (typeof rl.displayColumns === 'string') {
+        const trimmed = rl.displayColumns.trim()
+        if (trimmed.startsWith('[')) {
+          try {
+            const parsed = JSON.parse(trimmed) as unknown
+            if (Array.isArray(parsed)) {
+              parsedColumns = parsed.map(String).filter(Boolean)
+            }
+          } catch {
+            // Fall back to CSV parsing if JSON parse fails
+            parsedColumns = trimmed
+              .split(',')
+              .map((s) => s.trim())
+              .filter(Boolean)
           }
-        } catch {
-          // Fall back to CSV parsing if JSON parse fails
+        } else {
           parsedColumns = trimmed
             .split(',')
             .map((s) => s.trim())
             .filter(Boolean)
         }
-      } else {
-        parsedColumns = trimmed
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean)
       }
     }
 

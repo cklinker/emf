@@ -214,85 +214,6 @@ function apiRelatedListToEditor(r: ApiRelatedList): EditorRelatedList {
 }
 
 // ---------------------------------------------------------------------------
-// Mapping helpers: Editor state → API request
-// ---------------------------------------------------------------------------
-
-function editorSectionsToApi(sections: EditorSection[]): {
-  heading: string
-  columns: number
-  sortOrder: number
-  collapsed: boolean
-  style: string
-  sectionType: string
-  tabGroup?: string
-  tabLabel?: string
-  visibilityRule?: string
-  fields: {
-    fieldId: string
-    columnNumber: number
-    columnSpan?: number
-    sortOrder: number
-    requiredOnLayout: boolean
-    readOnlyOnLayout: boolean
-    labelOverride?: string
-    helpTextOverride?: string
-    visibilityRule?: string
-  }[]
-}[] {
-  return sections
-    .slice()
-    .sort((a, b) => a.sortOrder - b.sortOrder)
-    .map((s) => ({
-      heading: s.heading,
-      columns: s.columns,
-      sortOrder: s.sortOrder,
-      collapsed: s.collapsed,
-      style: s.style?.toUpperCase() ?? 'DEFAULT',
-      sectionType: s.sectionType?.toUpperCase() ?? 'STANDARD',
-      tabGroup: s.tabGroup || undefined,
-      tabLabel: s.tabLabel || undefined,
-      visibilityRule: s.visibilityRule || undefined,
-      fields: s.fields
-        .slice()
-        .sort((a, b) => a.sortOrder - b.sortOrder)
-        .map((f) => ({
-          fieldId: f.fieldId,
-          columnNumber: f.columnNumber,
-          columnSpan: f.columnSpan && f.columnSpan > 1 ? f.columnSpan : undefined,
-          sortOrder: f.sortOrder,
-          requiredOnLayout: f.requiredOnLayout,
-          readOnlyOnLayout: f.readOnlyOnLayout,
-          labelOverride: f.labelOverride || undefined,
-          helpTextOverride: f.helpTextOverride || undefined,
-          visibilityRule: f.visibilityRule || undefined,
-        })),
-    }))
-}
-
-function editorRelatedListsToApi(lists: EditorRelatedList[]): {
-  relatedCollectionId: string
-  relationshipFieldId: string
-  displayColumns: string
-  sortField?: string
-  sortDirection: string
-  rowLimit: number
-  sortOrder: number
-}[] {
-  return lists
-    .slice()
-    .sort((a, b) => a.sortOrder - b.sortOrder)
-    .map((r) => ({
-      relatedCollectionId: r.relatedCollectionId,
-      relationshipFieldId: r.relationshipFieldId,
-      displayColumns: r.displayColumns,
-      sortField: r.sortField || undefined,
-      sortDirection: r.sortDirection,
-      rowLimit: r.rowLimit,
-      sortOrder: r.sortOrder,
-    }))
-}
-
-// ---------------------------------------------------------------------------
 // PageLayoutForm (modal for create/edit metadata)
 // ---------------------------------------------------------------------------
 
@@ -745,18 +666,193 @@ function LayoutEditorViewInner({ layoutId, onBack }: LayoutEditorViewProps): Rea
     }
   }, [layoutDetail, collectionDetail, setLayout, setAvailableFields])
 
-  // Save mutation
+  // Save mutation — decomposes hierarchical editor state into individual
+  // sub-resource API calls (POST/PUT/DELETE) because the backend
+  // DynamicCollectionRouter only handles flat attribute updates on a
+  // single resource and cannot process nested child arrays.
   const saveMutation = useMutation({
-    mutationFn: () => {
-      const payload = {
+    mutationFn: async () => {
+      const originalSections = layoutDetail?.sections ?? []
+      const originalRelatedLists = layoutDetail?.relatedLists ?? []
+
+      // Build sets of original IDs for diffing against desired state
+      const originalSectionIds = new Set(originalSections.map((s) => s.id))
+      const originalFieldIds = new Set<string>()
+      for (const s of originalSections) {
+        for (const f of s.fields ?? []) {
+          originalFieldIds.add(f.id)
+        }
+      }
+      const originalRelatedListIds = new Set(originalRelatedLists.map((r) => r.id))
+
+      // Desired state from the editor
+      const desiredSections = state.sections
+      const desiredRelatedLists = state.relatedLists
+      const desiredSectionIds = new Set(desiredSections.map((s) => s.id))
+      const desiredFieldIds = new Set<string>()
+      for (const s of desiredSections) {
+        for (const f of s.fields) {
+          desiredFieldIds.add(f.id)
+        }
+      }
+      const desiredRelatedListIds = new Set(desiredRelatedLists.map((r) => r.id))
+
+      // Step 1: PUT parent layout with scalar attributes only
+      await apiClient.putResource(`/api/page-layouts/${layoutId}`, {
         name: layoutDetail!.name,
         description: layoutDetail!.description ?? '',
         layoutType: layoutDetail!.layoutType,
         isDefault: layoutDetail!.isDefault,
-        sections: editorSectionsToApi(state.sections),
-        relatedLists: editorRelatedListsToApi(state.relatedLists),
+      })
+
+      // Step 2: Delete removed fields first (before sections, to handle moves)
+      const fieldIdsToDelete = [...originalFieldIds].filter((id) => !desiredFieldIds.has(id))
+      if (fieldIdsToDelete.length > 0) {
+        await Promise.all(
+          fieldIdsToDelete.map((id) => apiClient.deleteResource(`/api/layout-fields/${id}`))
+        )
       }
-      return apiClient.putResource(`/api/page-layouts/${layoutId}`, payload)
+
+      // Step 3: Delete removed sections
+      const sectionIdsToDelete = [...originalSectionIds].filter((id) => !desiredSectionIds.has(id))
+      if (sectionIdsToDelete.length > 0) {
+        await Promise.all(
+          sectionIdsToDelete.map((id) => apiClient.deleteResource(`/api/layout-sections/${id}`))
+        )
+      }
+
+      // Step 4: Delete removed related lists
+      const relatedListIdsToDelete = [...originalRelatedListIds].filter(
+        (id) => !desiredRelatedListIds.has(id)
+      )
+      if (relatedListIdsToDelete.length > 0) {
+        await Promise.all(
+          relatedListIdsToDelete.map((id) =>
+            apiClient.deleteResource(`/api/layout-related-lists/${id}`)
+          )
+        )
+      }
+
+      // Step 5: Create new sections and map editor UUIDs → server IDs
+      const sectionIdMap = new Map<string, string>()
+      const sectionsToCreate = desiredSections.filter((s) => !originalSectionIds.has(s.id))
+      for (const s of sectionsToCreate) {
+        const created = await apiClient.postResource<{ id: string }>('/api/layout-sections', {
+          layoutId,
+          heading: s.heading,
+          columns: s.columns,
+          sortOrder: s.sortOrder,
+          collapsed: s.collapsed,
+          style: (s.style ?? 'default').toUpperCase(),
+          sectionType: (s.sectionType ?? 'fields').toUpperCase(),
+          tabGroup: s.tabGroup || null,
+          tabLabel: s.tabLabel || null,
+          visibilityRule: s.visibilityRule || null,
+        })
+        sectionIdMap.set(s.id, created.id)
+      }
+
+      // Step 6: Update existing sections (scalar attributes only)
+      const sectionsToUpdate = desiredSections.filter((s) => originalSectionIds.has(s.id))
+      if (sectionsToUpdate.length > 0) {
+        await Promise.all(
+          sectionsToUpdate.map((s) =>
+            apiClient.putResource(`/api/layout-sections/${s.id}`, {
+              heading: s.heading,
+              columns: s.columns,
+              sortOrder: s.sortOrder,
+              collapsed: s.collapsed,
+              style: (s.style ?? 'default').toUpperCase(),
+              sectionType: (s.sectionType ?? 'fields').toUpperCase(),
+              tabGroup: s.tabGroup || null,
+              tabLabel: s.tabLabel || null,
+              visibilityRule: s.visibilityRule || null,
+            })
+          )
+        )
+      }
+
+      // Step 7: Create/update field placements
+      const fieldPromises: Promise<unknown>[] = []
+      for (const section of desiredSections) {
+        const serverSectionId = sectionIdMap.get(section.id) ?? section.id
+        for (const f of section.fields) {
+          const fieldPayload = {
+            fieldId: f.fieldId,
+            columnNumber: f.columnNumber,
+            columnSpan: f.columnSpan && f.columnSpan > 1 ? f.columnSpan : null,
+            sortOrder: f.sortOrder,
+            requiredOnLayout: f.requiredOnLayout,
+            readOnlyOnLayout: f.readOnlyOnLayout,
+            labelOverride: f.labelOverride || null,
+            helpTextOverride: f.helpTextOverride || null,
+            visibilityRule: f.visibilityRule || null,
+          }
+          if (originalFieldIds.has(f.id)) {
+            fieldPromises.push(
+              apiClient.putResource(`/api/layout-fields/${f.id}`, {
+                ...fieldPayload,
+                sectionId: serverSectionId,
+              })
+            )
+          } else {
+            fieldPromises.push(
+              apiClient.postResource('/api/layout-fields', {
+                ...fieldPayload,
+                sectionId: serverSectionId,
+              })
+            )
+          }
+        }
+      }
+      if (fieldPromises.length > 0) {
+        await Promise.all(fieldPromises)
+      }
+
+      // Step 8: Create/update related lists
+      const relatedListPromises: Promise<unknown>[] = []
+      for (const rl of desiredRelatedLists) {
+        // Normalize displayColumns: may be a parsed array (JSONB) or JSON string
+        let normalizedDisplayColumns: unknown = rl.displayColumns
+        if (typeof normalizedDisplayColumns === 'string') {
+          try {
+            normalizedDisplayColumns = JSON.parse(normalizedDisplayColumns)
+          } catch {
+            normalizedDisplayColumns = (normalizedDisplayColumns as string)
+              .split(',')
+              .map((s: string) => s.trim())
+              .filter(Boolean)
+          }
+        }
+        if (!Array.isArray(normalizedDisplayColumns)) {
+          normalizedDisplayColumns = []
+        }
+
+        const rlPayload = {
+          relatedCollectionId: rl.relatedCollectionId,
+          relationshipFieldId: rl.relationshipFieldId,
+          displayColumns: normalizedDisplayColumns,
+          sortField: rl.sortField || null,
+          sortDirection: rl.sortDirection,
+          rowLimit: rl.rowLimit,
+          sortOrder: rl.sortOrder,
+        }
+        if (originalRelatedListIds.has(rl.id)) {
+          relatedListPromises.push(
+            apiClient.putResource(`/api/layout-related-lists/${rl.id}`, rlPayload)
+          )
+        } else {
+          relatedListPromises.push(
+            apiClient.postResource('/api/layout-related-lists', {
+              ...rlPayload,
+              layoutId,
+            })
+          )
+        }
+      }
+      if (relatedListPromises.length > 0) {
+        await Promise.all(relatedListPromises)
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pageLayouts'] })

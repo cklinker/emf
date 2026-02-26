@@ -219,21 +219,12 @@ export function CollectionWizardPage({
   const { data: policiesData } = useQuery({
     queryKey: ['policies'],
     queryFn: () =>
-      apiClient.get<Array<{ id: string; name: string; description?: string }>>(
+      apiClient.getList<{ id: string; name: string; description?: string }>(
         '/api/policies?page[size]=100'
       ),
   })
 
-  const policies = useMemo(() => {
-    if (!policiesData) return []
-    // Handle both array and paginated response
-    if (Array.isArray(policiesData)) return policiesData
-    const pd = policiesData as unknown as {
-      content?: Array<{ id: string; name: string; description?: string }>
-    }
-    if (pd.content) return pd.content
-    return []
-  }, [policiesData])
+  const policies = useMemo(() => policiesData ?? [], [policiesData])
 
   // Basics field handlers
   const handleDisplayNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {

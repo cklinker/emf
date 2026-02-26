@@ -59,7 +59,7 @@ class GovernorLimitsControllerTest {
                     .thenReturn(List.of(tenantLimitsRow("{}")));
             when(jdbcTemplate.queryForObject(contains("FROM platform_user"), eq(Integer.class), eq("tenant-1")))
                     .thenReturn(5);
-            when(jdbcTemplate.queryForObject(contains("FROM collection"), eq(Integer.class)))
+            when(jdbcTemplate.queryForObject(contains("FROM collection"), eq(Integer.class), eq("tenant-1")))
                     .thenReturn(12);
 
             // When
@@ -97,7 +97,7 @@ class GovernorLimitsControllerTest {
                     .thenReturn(List.of(tenantLimitsRow(limitsJson)));
             when(jdbcTemplate.queryForObject(contains("FROM platform_user"), eq(Integer.class), eq("tenant-1")))
                     .thenReturn(25);
-            when(jdbcTemplate.queryForObject(contains("FROM collection"), eq(Integer.class)))
+            when(jdbcTemplate.queryForObject(contains("FROM collection"), eq(Integer.class), eq("tenant-1")))
                     .thenReturn(8);
 
             ResponseEntity<Map<String, Object>> response = controller.getStatus("tenant-1");
@@ -130,7 +130,7 @@ class GovernorLimitsControllerTest {
                     .thenReturn(List.of(tenantLimitsRow(limitsJson)));
             when(jdbcTemplate.queryForObject(contains("FROM platform_user"), eq(Integer.class), eq("tenant-1")))
                     .thenReturn(0);
-            when(jdbcTemplate.queryForObject(contains("FROM collection"), eq(Integer.class)))
+            when(jdbcTemplate.queryForObject(contains("FROM collection"), eq(Integer.class), eq("tenant-1")))
                     .thenReturn(0);
 
             ResponseEntity<Map<String, Object>> response = controller.getStatus("tenant-1");
@@ -150,7 +150,7 @@ class GovernorLimitsControllerTest {
                     .thenReturn(List.of());
             when(jdbcTemplate.queryForObject(contains("FROM platform_user"), eq(Integer.class), eq("nonexistent")))
                     .thenReturn(0);
-            when(jdbcTemplate.queryForObject(contains("FROM collection"), eq(Integer.class)))
+            when(jdbcTemplate.queryForObject(contains("FROM collection"), eq(Integer.class), eq("nonexistent")))
                     .thenReturn(0);
 
             ResponseEntity<Map<String, Object>> response = controller.getStatus("nonexistent");
@@ -169,7 +169,7 @@ class GovernorLimitsControllerTest {
                     .thenReturn(List.of(tenantLimitsRow("{invalid}")));
             when(jdbcTemplate.queryForObject(contains("FROM platform_user"), eq(Integer.class), eq("tenant-1")))
                     .thenReturn(3);
-            when(jdbcTemplate.queryForObject(contains("FROM collection"), eq(Integer.class)))
+            when(jdbcTemplate.queryForObject(contains("FROM collection"), eq(Integer.class), eq("tenant-1")))
                     .thenReturn(5);
 
             ResponseEntity<Map<String, Object>> response = controller.getStatus("tenant-1");
@@ -196,7 +196,7 @@ class GovernorLimitsControllerTest {
                     .thenReturn(List.of(row));
             when(jdbcTemplate.queryForObject(contains("FROM platform_user"), eq(Integer.class), eq("tenant-1")))
                     .thenReturn(10);
-            when(jdbcTemplate.queryForObject(contains("FROM collection"), eq(Integer.class)))
+            when(jdbcTemplate.queryForObject(contains("FROM collection"), eq(Integer.class), eq("tenant-1")))
                     .thenReturn(20);
 
             ResponseEntity<Map<String, Object>> response = controller.getStatus("tenant-1");
@@ -215,7 +215,7 @@ class GovernorLimitsControllerTest {
                     .thenReturn(List.of(tenantLimitsRow("{}")));
             when(jdbcTemplate.queryForObject(contains("FROM platform_user"), eq(Integer.class), eq("tenant-1")))
                     .thenReturn(0);
-            when(jdbcTemplate.queryForObject(contains("FROM collection"), eq(Integer.class)))
+            when(jdbcTemplate.queryForObject(contains("FROM collection"), eq(Integer.class), eq("tenant-1")))
                     .thenReturn(0);
 
             ResponseEntity<Map<String, Object>> response = controller.getStatus("tenant-1");
@@ -230,7 +230,7 @@ class GovernorLimitsControllerTest {
                     .thenReturn(List.of(tenantLimitsRow("{}")));
             when(jdbcTemplate.queryForObject(contains("FROM platform_user"), eq(Integer.class), eq("tenant-1")))
                     .thenReturn(0);
-            when(jdbcTemplate.queryForObject(contains("FROM collection"), eq(Integer.class)))
+            when(jdbcTemplate.queryForObject(contains("FROM collection"), eq(Integer.class), eq("tenant-1")))
                     .thenReturn(0);
 
             // Mock Redis returning a daily count
@@ -249,7 +249,7 @@ class GovernorLimitsControllerTest {
                     .thenReturn(List.of(tenantLimitsRow("{}")));
             when(jdbcTemplate.queryForObject(contains("FROM platform_user"), eq(Integer.class), eq("tenant-1")))
                     .thenReturn(0);
-            when(jdbcTemplate.queryForObject(contains("FROM collection"), eq(Integer.class)))
+            when(jdbcTemplate.queryForObject(contains("FROM collection"), eq(Integer.class), eq("tenant-1")))
                     .thenReturn(0);
 
             // Mock Redis failure
@@ -290,7 +290,7 @@ class GovernorLimitsControllerTest {
                     .thenReturn(List.of(tenantLimitsRow(updatedJson)));
             when(jdbcTemplate.queryForObject(contains("FROM platform_user"), eq(Integer.class), eq("tenant-1")))
                     .thenReturn(50);
-            when(jdbcTemplate.queryForObject(contains("FROM collection"), eq(Integer.class)))
+            when(jdbcTemplate.queryForObject(contains("FROM collection"), eq(Integer.class), eq("tenant-1")))
                     .thenReturn(30);
 
             // When

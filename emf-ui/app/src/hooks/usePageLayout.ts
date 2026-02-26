@@ -112,7 +112,7 @@ export function usePageLayout(
         if (assignments.length > 0) {
           layoutId = assignments[0].layoutId
         } else {
-          // Fall back to default layout for this collection
+          // Fall back to default layout assignment for this collection
           const defaultAssignments = await apiClient.getList<{
             id: string
             collectionId: string
@@ -122,6 +122,22 @@ export function usePageLayout(
           const defaultAssignment = defaultAssignments.find((a) => a.isDefault)
           if (defaultAssignment) {
             layoutId = defaultAssignment.layoutId
+          }
+        }
+
+        // Final fallback: query page-layouts directly for a default layout
+        // matching this collection. This handles the common case where
+        // layouts exist but no layout-assignment records have been created.
+        if (!layoutId) {
+          const defaultLayouts = await apiClient.getList<{
+            id: string
+            collectionId: string
+            isDefault: boolean
+          }>(
+            `/api/page-layouts?filter[collectionId][eq]=${collectionId}&filter[isDefault][eq]=true&page[size]=1`
+          )
+          if (defaultLayouts.length > 0) {
+            layoutId = defaultLayouts[0].id
           }
         }
 

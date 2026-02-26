@@ -51,7 +51,8 @@ public class GovernorLimitsController {
             """;
 
     private static final String COUNT_ACTIVE_COLLECTIONS = """
-            SELECT COUNT(*) FROM collection WHERE active = true
+            SELECT COUNT(*) FROM collection
+            WHERE tenant_id = ? AND active = true AND (system_collection = false OR system_collection IS NULL)
             """;
 
     private static final String UPDATE_TENANT_LIMITS = """
@@ -89,7 +90,7 @@ public class GovernorLimitsController {
 
         // Count current usage
         int usersUsed = countActiveUsers(tenantId);
-        int collectionsUsed = countActiveCollections();
+        int collectionsUsed = countActiveCollections(tenantId);
 
         // Read daily API call count from Redis (tracked by gateway's RateLimitFilter)
         int apiCallsUsed = getDailyApiCallCount(tenantId);
@@ -205,12 +206,12 @@ public class GovernorLimitsController {
         }
     }
 
-    private int countActiveCollections() {
+    private int countActiveCollections(String tenantId) {
         try {
-            Integer count = jdbcTemplate.queryForObject(COUNT_ACTIVE_COLLECTIONS, Integer.class);
+            Integer count = jdbcTemplate.queryForObject(COUNT_ACTIVE_COLLECTIONS, Integer.class, tenantId);
             return count != null ? count : 0;
         } catch (Exception e) {
-            log.warn("Failed to count active collections: {}", e.getMessage());
+            log.warn("Failed to count active collections for tenant {}: {}", tenantId, e.getMessage());
             return 0;
         }
     }

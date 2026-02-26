@@ -472,10 +472,7 @@ export function TenantsPage({ testId = 'tenants-page' }: TenantsPageProps): Reac
     refetch,
   } = useQuery({
     queryKey: ['tenants'],
-    queryFn: () =>
-      apiClient.get<{ content: Tenant[]; totalElements: number }>(
-        '/api/tenants?page[number]=0&page[size]=100'
-      ),
+    queryFn: () => apiClient.getPage<Tenant>('/api/tenants?page[number]=0&page[size]=100'),
   })
 
   const tenants = tenantsPage?.content ?? []

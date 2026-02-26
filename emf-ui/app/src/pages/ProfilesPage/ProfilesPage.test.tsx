@@ -47,7 +47,7 @@ const mockProfiles = [
     id: '1',
     name: 'Standard User',
     description: 'Default profile for standard users',
-    system: true,
+    isSystem: true,
     createdAt: '2024-01-15T10:00:00Z',
     updatedAt: '2024-01-15T10:00:00Z',
   },
@@ -55,7 +55,7 @@ const mockProfiles = [
     id: '2',
     name: 'Admin Profile',
     description: 'Full admin access',
-    system: false,
+    isSystem: false,
     createdAt: '2024-02-01T08:00:00Z',
     updatedAt: '2024-02-01T08:00:00Z',
   },
@@ -181,7 +181,7 @@ describe('ProfilesPage', () => {
         data: {
           type: 'profiles',
           id: '3',
-          attributes: { name: 'New Profile', description: 'Test', system: false },
+          attributes: { name: 'New Profile', description: 'Test', isSystem: false },
         },
       },
     })

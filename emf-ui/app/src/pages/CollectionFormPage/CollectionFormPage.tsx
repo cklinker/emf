@@ -46,14 +46,42 @@ export function CollectionFormPage({
     fields?: Array<{ id: string; name: string; displayName: string; active: boolean }>
   }
 
-  // Fetch existing collection if in edit mode
+  // Fetch existing collection if in edit mode.
+  // Fields are separate records in the "fields" collection, so we use
+  // ?include=fields to fetch them via the JSON:API include mechanism.
   const {
     data: collectionData,
     isLoading,
     error,
   } = useQuery({
     queryKey: ['collection', id],
-    queryFn: () => apiClient.getOne<CollectionWithFields>(`/api/collections/${id}`),
+    queryFn: async () => {
+      const raw = await apiClient.get<{
+        data: { type: string; id: string; attributes: Record<string, unknown> }
+        included?: { type: string; id: string; attributes: Record<string, unknown> }[]
+      }>(`/api/collections/${id}?include=fields`)
+
+      const result: CollectionWithFields = {
+        id: raw.data.id,
+        ...(raw.data.attributes as Omit<CollectionWithFields, 'id' | 'fields'>),
+      } as CollectionWithFields
+
+      if (raw.included && raw.included.length > 0) {
+        result.fields = raw.included
+          .filter((r) => r.type === 'fields')
+          .map(
+            (r) =>
+              ({ id: r.id, ...r.attributes }) as {
+                id: string
+                name: string
+                displayName: string
+                active: boolean
+              }
+          )
+      }
+
+      return result
+    },
     enabled: isEditMode,
   })
 

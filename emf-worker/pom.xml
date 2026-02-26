@@ -27,7 +27,20 @@
         <!-- Testing — override Spring Boot BOM for Java 24 compatibility -->
         <mockito.version>5.21.0</mockito.version>
         <byte-buddy.version>1.17.6</byte-buddy.version>
+        <aws.sdk.version>2.25.16</aws.sdk.version>
     </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>bom</artifactId>
+                <version>${aws.sdk.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <dependencies>
         <!-- EMF Runtime Core -->
@@ -96,6 +109,12 @@
         <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-core</artifactId>
+        </dependency>
+
+        <!-- AWS SDK S3 (for presigned download URLs) -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
         </dependency>
 
         <!-- Jackson -->

@@ -4,8 +4,6 @@
 
 This is the EMF Enterprise Platform monorepo. When working on tasks, follow this workflow exactly.
 
-**Autonomy:** When a task is listed in an EPIC document, proceed through the entire workflow without asking for confirmation. Execute all steps (branch, implement, build, test, PR, auto-merge) end-to-end. Only stop to ask if there is a genuine ambiguity or blocker that cannot be resolved from the EPIC spec.
-
 **All changes require a PR.** Never commit directly to `main`. Always create a feature branch, open a PR, and auto-merge. This applies to EPIC tasks, bug fixes, hotfixes, and any other code changes.
 
 ## Project Structure
@@ -29,15 +27,7 @@ emf-ui/app                          # Admin/builder UI (TypeScript/React/Vite)
 
 When assigned a task (e.g., "implement task A1"), follow these steps **in order**:
 
-### 1. Look Up the Task
-
-- Identify the task ID (e.g., `A1`, `B5`, `D3`) from the request.
-- Determine which phase the task belongs to and read the corresponding EPIC document:
-  - Phase 1 tasks → `EPIC-PHASE1.md`
-  - Phase 2 tasks → `EPIC-PHASE2.md`
-  - Future phases → `EPIC-PHASE<N>.md`
-
-### 2. Create a Feature Branch
+### 1. Create a Feature Branch
 
 Branch from `main` using the task ID in the branch name:
 
@@ -53,9 +43,7 @@ Examples:
 - `feature/b5-picklist-service`
 - `feature/d3-formula-evaluator`
 
-### 3. Implement the Feature
-
-Read the full task specification from the relevant `EPIC-PHASE<N>.md` and implement:
+### 2. Implement the Feature
 
 - **Source code** — Follow existing patterns in the codebase.
 - **Unit tests** — Test all new classes and methods.

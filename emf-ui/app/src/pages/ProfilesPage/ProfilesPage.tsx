@@ -22,7 +22,7 @@ interface SecurityProfile {
   id: string
   name: string
   description: string | null
-  system: boolean
+  isSystem: boolean
   createdAt: string
   updatedAt: string
 }
@@ -247,7 +247,7 @@ export function ProfilesPage({ testId = 'profiles-page' }: ProfilesPageProps): R
     refetch,
   } = useQuery({
     queryKey: ['profiles'],
-    queryFn: () => apiClient.get<SecurityProfile[]>('/api/profiles'),
+    queryFn: () => apiClient.getList<SecurityProfile>('/api/profiles'),
   })
 
   const profileList = profiles ?? []
@@ -467,7 +467,7 @@ export function ProfilesPage({ testId = 'profiles-page' }: ProfilesPageProps): R
                     {profile.description || '\u2014'}
                   </td>
                   <td role="gridcell" className="px-4 py-3 text-sm">
-                    {profile.system && <SystemBadge />}
+                    {profile.isSystem && <SystemBadge />}
                   </td>
                   <td role="gridcell" className="px-4 py-3 text-sm text-muted-foreground">
                     {formatDate(new Date(profile.createdAt), {
@@ -483,7 +483,7 @@ export function ProfilesPage({ testId = 'profiles-page' }: ProfilesPageProps): R
                       onClick={(e) => e.stopPropagation()}
                       onKeyDown={(e) => e.stopPropagation()}
                     >
-                      {!profile.system && (
+                      {!profile.isSystem && (
                         <button
                           type="button"
                           className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-xs font-medium text-primary hover:border-primary hover:bg-muted"
@@ -505,7 +505,7 @@ export function ProfilesPage({ testId = 'profiles-page' }: ProfilesPageProps): R
                         <Copy size={12} />
                         Clone
                       </button>
-                      {!profile.system && (
+                      {!profile.isSystem && (
                         <button
                           type="button"
                           className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-xs font-medium text-destructive hover:border-destructive hover:bg-destructive/10"

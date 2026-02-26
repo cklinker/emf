@@ -240,6 +240,9 @@ public class DefaultQueryEngine implements QueryEngine {
         // Coerce string values to expected types (e.g., "10" → 10.0 for DOUBLE fields)
         TypeCoercionService.coerce(definition, recordData);
 
+        // Apply field defaults for missing fields before validation
+        applyFieldDefaults(definition, recordData);
+
         // Validate data (field-level constraints)
         if (validationEngine != null) {
             ValidationResult validation = validationEngine.validate(definition, recordData, OperationType.CREATE);
@@ -455,6 +458,21 @@ public class DefaultQueryEngine implements QueryEngine {
             return true;
         }
         return definition.getField(fieldName) != null;
+    }
+
+    /**
+     * Applies declared field defaults for fields not already present in the data.
+     *
+     * <p>This must run before validation so that required fields with defaults
+     * (e.g., {@code currentVersion} on the collections system collection) are
+     * populated before the validation engine checks required constraints.
+     */
+    private void applyFieldDefaults(CollectionDefinition definition, Map<String, Object> data) {
+        for (FieldDefinition field : definition.fields()) {
+            if (field.defaultValue() != null && !data.containsKey(field.name())) {
+                data.put(field.name(), field.defaultValue());
+            }
+        }
     }
 
     /**

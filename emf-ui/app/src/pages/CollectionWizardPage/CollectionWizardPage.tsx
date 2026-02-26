@@ -63,13 +63,17 @@ interface FieldData {
 }
 
 /**
- * Authorization step data
+ * Profile permission data for a single profile
  */
-interface AuthData {
-  readPolicyId: string
-  createPolicyId: string
-  updatePolicyId: string
-  deletePolicyId: string
+interface ProfilePermission {
+  profileId: string
+  profileName: string
+  canCreate: boolean
+  canRead: boolean
+  canEdit: boolean
+  canDelete: boolean
+  canViewAll: boolean
+  canModifyAll: boolean
 }
 
 /**
@@ -184,7 +188,7 @@ interface BasicsErrors {
  * A 4-step wizard for creating new collections:
  * 1. Basics - collection name, service, storage mode
  * 2. Fields - template selection and field configuration
- * 3. Authorization - optional policy assignment
+ * 3. Authorization - profile object permissions
  * 4. Review - summary and create
  */
 export function CollectionWizardPage({
@@ -206,25 +210,38 @@ export function CollectionWizardPage({
   })
   const [fields, setFields] = useState<FieldData[]>([])
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null)
-  const [authorization, setAuthorization] = useState<AuthData>({
-    readPolicyId: '',
-    createPolicyId: '',
-    updatePolicyId: '',
-    deletePolicyId: '',
-  })
+  const [profilePermissions, setProfilePermissions] = useState<ProfilePermission[]>([])
   const [isCreating, setIsCreating] = useState(false)
   const [basicsErrors, setBasicsErrors] = useState<BasicsErrors>({})
 
-  // Fetch policies
-  const { data: policiesData } = useQuery({
-    queryKey: ['policies'],
+  // Fetch profiles
+  const { data: profilesData, isLoading: profilesLoading } = useQuery({
+    queryKey: ['profiles'],
     queryFn: () =>
-      apiClient.getList<{ id: string; name: string; description?: string }>(
-        '/api/policies?page[size]=100'
+      apiClient.getList<{ id: string; name: string; description?: string; isSystem?: boolean }>(
+        '/api/profiles?page[size]=100'
       ),
   })
 
-  const policies = useMemo(() => policiesData ?? [], [policiesData])
+  const profiles = useMemo(() => profilesData ?? [], [profilesData])
+
+  // Initialize profile permissions when profiles are loaded
+  useMemo(() => {
+    if (profiles.length > 0 && profilePermissions.length === 0) {
+      setProfilePermissions(
+        profiles.map((p) => ({
+          profileId: p.id,
+          profileName: p.name,
+          canCreate: false,
+          canRead: false,
+          canEdit: false,
+          canDelete: false,
+          canViewAll: false,
+          canModifyAll: false,
+        }))
+      )
+    }
+  }, [profiles, profilePermissions.length])
 
   // Basics field handlers
   const handleDisplayNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -304,18 +321,28 @@ export function CollectionWizardPage({
     []
   )
 
-  // Authorization handlers
-  const handleAuthChange = useCallback((key: keyof AuthData, value: string) => {
-    setAuthorization((prev) => ({ ...prev, [key]: value }))
-  }, [])
+  // Profile permission handlers
+  const handlePermissionToggle = useCallback(
+    (profileId: string, permission: keyof Omit<ProfilePermission, 'profileId' | 'profileName'>) => {
+      setProfilePermissions((prev) =>
+        prev.map((p) => (p.profileId === profileId ? { ...p, [permission]: !p[permission] } : p))
+      )
+    },
+    []
+  )
 
   const handleSkipAuth = useCallback(() => {
-    setAuthorization({
-      readPolicyId: '',
-      createPolicyId: '',
-      updatePolicyId: '',
-      deletePolicyId: '',
-    })
+    setProfilePermissions((prev) =>
+      prev.map((p) => ({
+        ...p,
+        canCreate: false,
+        canRead: false,
+        canEdit: false,
+        canDelete: false,
+        canViewAll: false,
+        canModifyAll: false,
+      }))
+    )
     setCurrentStep(4)
   }, [])
 
@@ -369,7 +396,10 @@ export function CollectionWizardPage({
         updatedAt: string
       }>('/api/collections', {
         name: basics.name,
+        displayName: basics.displayName,
         description: basics.description || '',
+        storageMode: basics.storageMode,
+        active: basics.active,
       })
 
       const collectionId = created.id
@@ -388,47 +418,23 @@ export function CollectionWizardPage({
         }
       }
 
-      // Step 3: Create route policies if authorization is configured
-      const hasAuth =
-        authorization.readPolicyId ||
-        authorization.createPolicyId ||
-        authorization.updatePolicyId ||
-        authorization.deletePolicyId
+      // Step 3: Create profile object permissions for profiles with any permission set
+      const configuredPermissions = profilePermissions.filter(
+        (p) =>
+          p.canCreate || p.canRead || p.canEdit || p.canDelete || p.canViewAll || p.canModifyAll
+      )
 
-      if (hasAuth) {
-        const collectionPath = basics.name
-
-        if (authorization.readPolicyId) {
-          await apiClient.postResource('/api/route-policies', {
-            method: 'GET',
-            pathPattern: `/gateway/${collectionPath}/**`,
-            policyId: authorization.readPolicyId,
-          })
-        }
-
-        if (authorization.createPolicyId) {
-          await apiClient.postResource('/api/route-policies', {
-            method: 'POST',
-            pathPattern: `/gateway/${collectionPath}`,
-            policyId: authorization.createPolicyId,
-          })
-        }
-
-        if (authorization.updatePolicyId) {
-          await apiClient.postResource('/api/route-policies', {
-            method: 'PUT',
-            pathPattern: `/gateway/${collectionPath}/**`,
-            policyId: authorization.updatePolicyId,
-          })
-        }
-
-        if (authorization.deletePolicyId) {
-          await apiClient.postResource('/api/route-policies', {
-            method: 'DELETE',
-            pathPattern: `/gateway/${collectionPath}/**`,
-            policyId: authorization.deletePolicyId,
-          })
-        }
+      for (const perm of configuredPermissions) {
+        await apiClient.postResource('/api/profile-object-permissions', {
+          profileId: perm.profileId,
+          collectionId,
+          canCreate: perm.canCreate,
+          canRead: perm.canRead,
+          canEdit: perm.canEdit,
+          canDelete: perm.canDelete,
+          canViewAll: perm.canViewAll,
+          canModifyAll: perm.canModifyAll,
+        })
       }
 
       showToast(t('success.created', { item: 'Collection' }), 'success')
@@ -439,28 +445,16 @@ export function CollectionWizardPage({
     } finally {
       setIsCreating(false)
     }
-  }, [apiClient, basics, fields, authorization, navigate, showToast, t])
+  }, [apiClient, basics, fields, profilePermissions, navigate, showToast, t])
 
-  // Check if authorization is configured
+  // Check if any profile permissions are configured
   const hasAuthConfigured = useMemo(
     () =>
-      Boolean(
-        authorization.readPolicyId ||
-        authorization.createPolicyId ||
-        authorization.updatePolicyId ||
-        authorization.deletePolicyId
+      profilePermissions.some(
+        (p) =>
+          p.canCreate || p.canRead || p.canEdit || p.canDelete || p.canViewAll || p.canModifyAll
       ),
-    [authorization]
-  )
-
-  // Get policy name by ID
-  const getPolicyName = useCallback(
-    (policyId: string): string => {
-      if (!policyId) return t('common.none')
-      const policy = policies.find((p) => p.id === policyId)
-      return policy ? policy.name : policyId
-    },
-    [policies, t]
+    [profilePermissions]
   )
 
   // Render step indicator
@@ -861,6 +855,20 @@ export function CollectionWizardPage({
     handleFieldChange,
   ])
 
+  // Permission columns for the grid
+  const PERMISSION_COLUMNS = useMemo(
+    () =>
+      [
+        { key: 'canCreate', label: 'Create' },
+        { key: 'canRead', label: 'Read' },
+        { key: 'canEdit', label: 'Edit' },
+        { key: 'canDelete', label: 'Delete' },
+        { key: 'canViewAll', label: 'View All' },
+        { key: 'canModifyAll', label: 'Modify All' },
+      ] as const,
+    []
+  )
+
   // Render Step 3: Authorization
   const renderAuthorizationStep = useCallback(() => {
     return (
@@ -872,7 +880,8 @@ export function CollectionWizardPage({
           Who can access this collection?
         </h3>
         <p className="text-sm text-muted-foreground m-0 mb-6 dark:text-gray-400">
-          Configure policies for each CRUD operation. This is optional and can be configured later.
+          Configure object permissions for each profile. This is optional and can be configured
+          later.
         </p>
 
         <button
@@ -885,106 +894,76 @@ export function CollectionWizardPage({
           Skip — Configure Later
         </button>
 
-        <div className="flex flex-col gap-4 max-w-[500px]">
-          {/* Read Policy */}
-          <div className="flex flex-col gap-1">
-            <label
-              htmlFor="wizard-auth-read"
-              className="text-sm font-medium text-foreground dark:text-gray-100"
-            >
-              {t('authorization.operations.read')} Policy
-            </label>
-            <select
-              id="wizard-auth-read"
-              className="px-3 py-2 text-base leading-normal text-foreground bg-background border border-border rounded-md appearance-none bg-[url('data:image/svg+xml,%3csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20fill=%27none%27%20viewBox=%270%200%2020%2020%27%3e%3cpath%20stroke=%27%236b7280%27%20stroke-linecap=%27round%27%20stroke-linejoin=%27round%27%20stroke-width=%271.5%27%20d=%27M6%208l4%204%204-4%27/%3e%3c/svg%3e')] bg-[position:right_0.5rem_center] bg-no-repeat bg-[length:1.5em_1.5em] pr-10 cursor-pointer transition-all duration-150 motion-reduce:transition-none focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/25 dark:text-gray-100 dark:bg-gray-700 dark:border-gray-600"
-              value={authorization.readPolicyId}
-              onChange={(e) => handleAuthChange('readPolicyId', e.target.value)}
-              data-testid="wizard-auth-read-select"
-            >
-              <option value="">{t('common.none')}</option>
-              {policies.map((policy) => (
-                <option key={policy.id} value={policy.id}>
-                  {policy.name}
-                </option>
-              ))}
-            </select>
+        {profilesLoading ? (
+          <div className="flex items-center justify-center p-8">
+            <LoadingSpinner size="medium" label="Loading profiles..." />
           </div>
-
-          {/* Create Policy */}
-          <div className="flex flex-col gap-1">
-            <label
-              htmlFor="wizard-auth-create"
-              className="text-sm font-medium text-foreground dark:text-gray-100"
-            >
-              {t('authorization.operations.create')} Policy
-            </label>
-            <select
-              id="wizard-auth-create"
-              className="px-3 py-2 text-base leading-normal text-foreground bg-background border border-border rounded-md appearance-none bg-[url('data:image/svg+xml,%3csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20fill=%27none%27%20viewBox=%270%200%2020%2020%27%3e%3cpath%20stroke=%27%236b7280%27%20stroke-linecap=%27round%27%20stroke-linejoin=%27round%27%20stroke-width=%271.5%27%20d=%27M6%208l4%204%204-4%27/%3e%3c/svg%3e')] bg-[position:right_0.5rem_center] bg-no-repeat bg-[length:1.5em_1.5em] pr-10 cursor-pointer transition-all duration-150 motion-reduce:transition-none focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/25 dark:text-gray-100 dark:bg-gray-700 dark:border-gray-600"
-              value={authorization.createPolicyId}
-              onChange={(e) => handleAuthChange('createPolicyId', e.target.value)}
-              data-testid="wizard-auth-create-select"
-            >
-              <option value="">{t('common.none')}</option>
-              {policies.map((policy) => (
-                <option key={policy.id} value={policy.id}>
-                  {policy.name}
-                </option>
-              ))}
-            </select>
+        ) : profilePermissions.length === 0 ? (
+          <div className="p-8 text-center text-muted-foreground text-sm dark:text-gray-400">
+            No profiles found. Permissions can be configured after creation.
           </div>
-
-          {/* Update Policy */}
-          <div className="flex flex-col gap-1">
-            <label
-              htmlFor="wizard-auth-update"
-              className="text-sm font-medium text-foreground dark:text-gray-100"
+        ) : (
+          <div className="overflow-x-auto">
+            <table
+              className="w-full border-collapse border border-border rounded-md overflow-hidden dark:border-gray-700"
+              data-testid="wizard-permissions-table"
             >
-              {t('authorization.operations.update')} Policy
-            </label>
-            <select
-              id="wizard-auth-update"
-              className="px-3 py-2 text-base leading-normal text-foreground bg-background border border-border rounded-md appearance-none bg-[url('data:image/svg+xml,%3csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20fill=%27none%27%20viewBox=%270%200%2020%2020%27%3e%3cpath%20stroke=%27%236b7280%27%20stroke-linecap=%27round%27%20stroke-linejoin=%27round%27%20stroke-width=%271.5%27%20d=%27M6%208l4%204%204-4%27/%3e%3c/svg%3e')] bg-[position:right_0.5rem_center] bg-no-repeat bg-[length:1.5em_1.5em] pr-10 cursor-pointer transition-all duration-150 motion-reduce:transition-none focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/25 dark:text-gray-100 dark:bg-gray-700 dark:border-gray-600"
-              value={authorization.updatePolicyId}
-              onChange={(e) => handleAuthChange('updatePolicyId', e.target.value)}
-              data-testid="wizard-auth-update-select"
-            >
-              <option value="">{t('common.none')}</option>
-              {policies.map((policy) => (
-                <option key={policy.id} value={policy.id}>
-                  {policy.name}
-                </option>
-              ))}
-            </select>
+              <thead>
+                <tr>
+                  <th className="px-3 py-2.5 text-xs font-semibold text-left uppercase tracking-wider text-muted-foreground bg-muted border-b border-border dark:text-gray-400 dark:bg-gray-700 dark:border-gray-600">
+                    Profile
+                  </th>
+                  {PERMISSION_COLUMNS.map((col) => (
+                    <th
+                      key={col.key}
+                      className="px-3 py-2.5 text-xs font-semibold text-center uppercase tracking-wider text-muted-foreground bg-muted border-b border-border dark:text-gray-400 dark:bg-gray-700 dark:border-gray-600"
+                    >
+                      {col.label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {profilePermissions.map((perm) => (
+                  <tr
+                    key={perm.profileId}
+                    className="last:[&>td]:border-b-0"
+                    data-testid={`wizard-perm-row-${perm.profileId}`}
+                  >
+                    <td className="px-3 py-2 text-sm font-medium text-foreground border-b border-border align-middle dark:text-gray-100 dark:border-gray-600">
+                      {perm.profileName}
+                    </td>
+                    {PERMISSION_COLUMNS.map((col) => (
+                      <td
+                        key={col.key}
+                        className="px-3 py-2 text-center border-b border-border align-middle dark:border-gray-600"
+                      >
+                        <input
+                          type="checkbox"
+                          className="w-4 h-4 accent-primary cursor-pointer"
+                          checked={perm[col.key]}
+                          onChange={() => handlePermissionToggle(perm.profileId, col.key)}
+                          aria-label={`${perm.profileName} ${col.label}`}
+                          data-testid={`wizard-perm-${perm.profileId}-${col.key}`}
+                        />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-
-          {/* Delete Policy */}
-          <div className="flex flex-col gap-1">
-            <label
-              htmlFor="wizard-auth-delete"
-              className="text-sm font-medium text-foreground dark:text-gray-100"
-            >
-              {t('authorization.operations.delete')} Policy
-            </label>
-            <select
-              id="wizard-auth-delete"
-              className="px-3 py-2 text-base leading-normal text-foreground bg-background border border-border rounded-md appearance-none bg-[url('data:image/svg+xml,%3csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20fill=%27none%27%20viewBox=%270%200%2020%2020%27%3e%3cpath%20stroke=%27%236b7280%27%20stroke-linecap=%27round%27%20stroke-linejoin=%27round%27%20stroke-width=%271.5%27%20d=%27M6%208l4%204%204-4%27/%3e%3c/svg%3e')] bg-[position:right_0.5rem_center] bg-no-repeat bg-[length:1.5em_1.5em] pr-10 cursor-pointer transition-all duration-150 motion-reduce:transition-none focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/25 dark:text-gray-100 dark:bg-gray-700 dark:border-gray-600"
-              value={authorization.deletePolicyId}
-              onChange={(e) => handleAuthChange('deletePolicyId', e.target.value)}
-              data-testid="wizard-auth-delete-select"
-            >
-              <option value="">{t('common.none')}</option>
-              {policies.map((policy) => (
-                <option key={policy.id} value={policy.id}>
-                  {policy.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
+        )}
       </div>
     )
-  }, [authorization, policies, t, handleAuthChange, handleSkipAuth])
+  }, [
+    profilePermissions,
+    profilesLoading,
+    t,
+    handleSkipAuth,
+    handlePermissionToggle,
+    PERMISSION_COLUMNS,
+  ])
 
   // Render Step 4: Review
   const renderReviewStep = useCallback(() => {
@@ -1149,37 +1128,74 @@ export function CollectionWizardPage({
                   Not configured — will use defaults
                 </span>
               ) : (
-                <div
-                  className="grid grid-cols-[140px_1fr] gap-x-4 gap-y-2 text-sm max-sm:grid-cols-1 max-sm:gap-y-1"
-                  data-testid="wizard-review-auth"
-                >
-                  <span className="font-medium text-muted-foreground dark:text-gray-400">
-                    {t('authorization.operations.read')}
-                  </span>
-                  <span className="text-foreground dark:text-gray-100">
-                    {getPolicyName(authorization.readPolicyId)}
-                  </span>
-
-                  <span className="font-medium text-muted-foreground dark:text-gray-400">
-                    {t('authorization.operations.create')}
-                  </span>
-                  <span className="text-foreground dark:text-gray-100">
-                    {getPolicyName(authorization.createPolicyId)}
-                  </span>
-
-                  <span className="font-medium text-muted-foreground dark:text-gray-400">
-                    {t('authorization.operations.update')}
-                  </span>
-                  <span className="text-foreground dark:text-gray-100">
-                    {getPolicyName(authorization.updatePolicyId)}
-                  </span>
-
-                  <span className="font-medium text-muted-foreground dark:text-gray-400">
-                    {t('authorization.operations.delete')}
-                  </span>
-                  <span className="text-foreground dark:text-gray-100">
-                    {getPolicyName(authorization.deletePolicyId)}
-                  </span>
+                <div className="overflow-x-auto" data-testid="wizard-review-auth">
+                  <table className="w-full border-collapse border border-border rounded-md overflow-hidden dark:border-gray-700">
+                    <thead>
+                      <tr>
+                        <th className="px-3 py-2 text-xs font-semibold text-left uppercase tracking-wider text-muted-foreground bg-muted border-b border-border dark:text-gray-400 dark:bg-gray-700 dark:border-gray-600">
+                          Profile
+                        </th>
+                        <th className="px-3 py-2 text-xs font-semibold text-center uppercase tracking-wider text-muted-foreground bg-muted border-b border-border dark:text-gray-400 dark:bg-gray-700 dark:border-gray-600">
+                          Create
+                        </th>
+                        <th className="px-3 py-2 text-xs font-semibold text-center uppercase tracking-wider text-muted-foreground bg-muted border-b border-border dark:text-gray-400 dark:bg-gray-700 dark:border-gray-600">
+                          Read
+                        </th>
+                        <th className="px-3 py-2 text-xs font-semibold text-center uppercase tracking-wider text-muted-foreground bg-muted border-b border-border dark:text-gray-400 dark:bg-gray-700 dark:border-gray-600">
+                          Edit
+                        </th>
+                        <th className="px-3 py-2 text-xs font-semibold text-center uppercase tracking-wider text-muted-foreground bg-muted border-b border-border dark:text-gray-400 dark:bg-gray-700 dark:border-gray-600">
+                          Delete
+                        </th>
+                        <th className="px-3 py-2 text-xs font-semibold text-center uppercase tracking-wider text-muted-foreground bg-muted border-b border-border dark:text-gray-400 dark:bg-gray-700 dark:border-gray-600">
+                          View All
+                        </th>
+                        <th className="px-3 py-2 text-xs font-semibold text-center uppercase tracking-wider text-muted-foreground bg-muted border-b border-border dark:text-gray-400 dark:bg-gray-700 dark:border-gray-600">
+                          Modify All
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {profilePermissions
+                        .filter(
+                          (p) =>
+                            p.canCreate ||
+                            p.canRead ||
+                            p.canEdit ||
+                            p.canDelete ||
+                            p.canViewAll ||
+                            p.canModifyAll
+                        )
+                        .map((perm) => (
+                          <tr key={perm.profileId} className="last:[&>td]:border-b-0">
+                            <td className="px-3 py-2 text-sm font-medium text-foreground border-b border-border dark:text-gray-100 dark:border-gray-600">
+                              {perm.profileName}
+                            </td>
+                            {(
+                              [
+                                'canCreate',
+                                'canRead',
+                                'canEdit',
+                                'canDelete',
+                                'canViewAll',
+                                'canModifyAll',
+                              ] as const
+                            ).map((key) => (
+                              <td
+                                key={key}
+                                className="px-3 py-2 text-sm text-center border-b border-border dark:border-gray-600"
+                              >
+                                {perm[key] ? (
+                                  <Check size={16} className="inline-block text-green-600" />
+                                ) : (
+                                  <span className="text-muted-foreground">{'\u2014'}</span>
+                                )}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </div>
@@ -1187,7 +1203,7 @@ export function CollectionWizardPage({
         )}
       </div>
     )
-  }, [basics, fields, authorization, hasAuthConfigured, isCreating, t, getPolicyName])
+  }, [basics, fields, profilePermissions, hasAuthConfigured, isCreating, t])
 
   // Render current step content
   const renderCurrentStep = useCallback(() => {

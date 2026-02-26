@@ -40,20 +40,83 @@ vi.mock('react-router-dom', async () => {
   }
 })
 
-const mockProfile = {
+// JSON:API formatted profile response with included permissions
+function makeProfileResponse(
+  profile: { id: string; name: string; description: string; isSystem: boolean },
+  sysPerms: Array<{
+    id: string
+    profileId: string
+    permissionName: string
+    granted: boolean
+  }> = mockSysPerms,
+  objPerms: Array<{
+    id: string
+    profileId: string
+    collectionId: string
+    canCreate: boolean
+    canRead: boolean
+    canEdit: boolean
+    canDelete: boolean
+    canViewAll: boolean
+    canModifyAll: boolean
+  }> = mockObjPerms
+) {
+  return {
+    data: {
+      type: 'profiles',
+      id: profile.id,
+      attributes: {
+        name: profile.name,
+        description: profile.description,
+        isSystem: profile.isSystem,
+        createdAt: '2024-01-15T10:00:00Z',
+        updatedAt: '2024-01-15T10:00:00Z',
+      },
+    },
+    included: [
+      ...sysPerms.map((sp) => ({
+        type: 'profile-system-permissions',
+        id: sp.id,
+        attributes: {
+          permissionName: sp.permissionName,
+          granted: sp.granted,
+        },
+        relationships: {
+          profileId: { data: { type: 'profiles', id: sp.profileId } },
+        },
+      })),
+      ...objPerms.map((op) => ({
+        type: 'profile-object-permissions',
+        id: op.id,
+        attributes: {
+          canCreate: op.canCreate,
+          canRead: op.canRead,
+          canEdit: op.canEdit,
+          canDelete: op.canDelete,
+          canViewAll: op.canViewAll,
+          canModifyAll: op.canModifyAll,
+        },
+        relationships: {
+          profileId: { data: { type: 'profiles', id: op.profileId } },
+          collectionId: { data: { type: 'collections', id: op.collectionId } },
+        },
+      })),
+    ],
+  }
+}
+
+const mockProfileAttrs = {
   id: 'prof1',
   name: 'Standard User',
   description: 'Default profile for standard users',
-  system: false,
-  createdAt: '2024-01-15T10:00:00Z',
-  updatedAt: '2024-01-15T10:00:00Z',
+  isSystem: false,
 }
 
-const mockSystemProfile = {
-  ...mockProfile,
+const mockSystemProfileAttrs = {
   id: 'prof2',
   name: 'System Admin',
-  system: true,
+  description: 'Default profile for standard users',
+  isSystem: true,
 }
 
 const mockSysPerms = [
@@ -84,12 +147,12 @@ const mockCollections = {
   number: 0,
 }
 
-function setupMocks(profile = mockProfile) {
+function setupMocks(profileAttrs = mockProfileAttrs) {
   mockAxios.get.mockImplementation((url: string) => {
-    if (url.includes('/system-permissions')) return Promise.resolve({ data: mockSysPerms })
-    if (url.includes('/object-permissions')) return Promise.resolve({ data: mockObjPerms })
     if (url.includes('/api/collections')) return Promise.resolve({ data: mockCollections })
-    return Promise.resolve({ data: profile })
+    if (url.includes('/api/profiles/'))
+      return Promise.resolve({ data: makeProfileResponse(profileAttrs) })
+    return Promise.resolve({ data: {} })
   })
 }
 
@@ -131,7 +194,7 @@ describe('ProfileDetailPage', () => {
   })
 
   it('renders system badge for system profiles', async () => {
-    setupMocks(mockSystemProfile)
+    setupMocks(mockSystemProfileAttrs)
     render(<ProfileDetailPage />, { wrapper: createTestWrapper() })
     await waitFor(() => {
       expect(screen.getByText('System Admin')).toBeInTheDocument()
@@ -158,7 +221,7 @@ describe('ProfileDetailPage', () => {
   })
 
   it('hides edit permissions button for system profiles', async () => {
-    setupMocks(mockSystemProfile)
+    setupMocks(mockSystemProfileAttrs)
     render(<ProfileDetailPage />, { wrapper: createTestWrapper() })
     await waitFor(() => {
       expect(screen.getByText('System Admin')).toBeInTheDocument()
@@ -203,7 +266,7 @@ describe('ProfileDetailPage', () => {
   })
 
   it('hides delete button for system profiles', async () => {
-    setupMocks(mockSystemProfile)
+    setupMocks(mockSystemProfileAttrs)
     render(<ProfileDetailPage />, { wrapper: createTestWrapper() })
     await waitFor(() => {
       expect(screen.getByText('System Admin')).toBeInTheDocument()

@@ -18,6 +18,8 @@ import { SystemPermissionChecklist } from '@/components/SecurityEditor'
 import { ObjectPermissionMatrix } from '@/components/SecurityEditor'
 import type { ObjectPermission } from '@/components/SecurityEditor'
 import { useCollectionSummaries } from '@/hooks/useCollectionSummaries'
+import { useExtractIncluded } from '@/hooks/useIncludedResources'
+import { unwrapResource } from '@/utils/jsonapi'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 
@@ -25,7 +27,7 @@ interface ProfileDetail {
   id: string
   name: string
   description: string | null
-  system: boolean
+  isSystem: boolean
   createdAt: string
   updatedAt: string
 }
@@ -68,37 +70,36 @@ export function ProfileDetailPage({
   const [isEditingPermissions, setIsEditingPermissions] = useState(false)
   const [localPermissions, setLocalPermissions] = useState<Record<string, boolean>>({})
 
-  // Fetch profile detail
+  // Fetch profile detail with included permissions in a single request
   const {
-    data: profile,
+    data: rawProfileResponse,
     isLoading: isLoadingProfile,
     error: profileError,
     refetch: refetchProfile,
   } = useQuery({
     queryKey: ['profile', id],
-    queryFn: () => apiClient.get<ProfileDetail>(`/api/profiles/${id}`),
+    queryFn: () =>
+      apiClient.get(
+        `/api/profiles/${id}?include=profile-system-permissions,profile-object-permissions`
+      ),
     enabled: !!id,
   })
 
-  // Fetch system permissions
-  const {
-    data: systemPermissions,
-    isLoading: isLoadingSysPerms,
-    error: sysPermsError,
-  } = useQuery({
-    queryKey: ['profile-system-permissions', id],
-    queryFn: () =>
-      apiClient.get<ProfileSystemPermission[]>(`/api/profiles/${id}/system-permissions`),
-    enabled: !!id,
-  })
+  // Unwrap the profile from the JSON:API envelope
+  const profile = useMemo(
+    () => (rawProfileResponse ? unwrapResource<ProfileDetail>(rawProfileResponse) : undefined),
+    [rawProfileResponse]
+  )
 
-  // Fetch object permissions
-  const { data: objectPermissions } = useQuery({
-    queryKey: ['profile-object-permissions', id],
-    queryFn: () =>
-      apiClient.get<ProfileObjectPermission[]>(`/api/profiles/${id}/object-permissions`),
-    enabled: !!id,
-  })
+  // Extract included permissions from the JSON:API response
+  const systemPermissions = useExtractIncluded<ProfileSystemPermission>(
+    rawProfileResponse,
+    'profile-system-permissions'
+  )
+  const objectPermissions = useExtractIncluded<ProfileObjectPermission>(
+    rawProfileResponse,
+    'profile-object-permissions'
+  )
 
   // Fetch collections for name resolution
   const { summaryMap: collectionSummaryMap } = useCollectionSummaries()
@@ -106,11 +107,9 @@ export function ProfileDetailPage({
   // Convert system permissions array → Record<string, boolean> for checklist
   const permissionsMap = useMemo(() => {
     const map: Record<string, boolean> = {}
-    if (systemPermissions) {
-      systemPermissions.forEach((sp) => {
-        map[sp.permissionName] = sp.granted
-      })
-    }
+    systemPermissions.forEach((sp) => {
+      map[sp.permissionName] = sp.granted
+    })
     return map
   }, [systemPermissions])
 
@@ -119,7 +118,6 @@ export function ProfileDetailPage({
 
   // Merge object permissions with collection names
   const objectPermissionsWithNames: ObjectPermission[] = useMemo(() => {
-    if (!objectPermissions) return []
     return objectPermissions.map((op) => ({
       collectionId: op.collectionId,
       collectionName:
@@ -146,12 +144,24 @@ export function ProfileDetailPage({
     return false
   }, [permissionsMap, localPermissions])
 
-  // Save system permissions mutation
+  // Save system permissions mutation — PATCH each changed record individually
   const savePermissionsMutation = useMutation({
-    mutationFn: (permissions: Record<string, boolean>) =>
-      apiClient.putResource(`/api/profiles/${id}/system-permissions`, permissions),
+    mutationFn: async (permissions: Record<string, boolean>) => {
+      const updates = systemPermissions
+        .filter(
+          (sp) =>
+            permissions[sp.permissionName] !== undefined &&
+            permissions[sp.permissionName] !== sp.granted
+        )
+        .map((sp) =>
+          apiClient.patchResource(`/api/profile-system-permissions/${sp.id}`, {
+            granted: permissions[sp.permissionName],
+          })
+        )
+      await Promise.all(updates)
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['profile-system-permissions', id] })
+      queryClient.invalidateQueries({ queryKey: ['profile', id] })
       showToast('System permissions saved successfully', 'success')
       setIsEditingPermissions(false)
     },
@@ -205,8 +215,8 @@ export function ProfileDetailPage({
   }, [])
 
   // Loading state
-  const isLoading = isLoadingProfile || isLoadingSysPerms
-  const error = profileError || sysPermsError
+  const isLoading = isLoadingProfile
+  const error = profileError
 
   if (isLoading) {
     return (
@@ -252,7 +262,7 @@ export function ProfileDetailPage({
       {/* Header */}
       <header className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          {profile.system ? (
+          {profile.isSystem ? (
             <Lock className="h-6 w-6 text-muted-foreground" />
           ) : (
             <Shield className="h-6 w-6 text-muted-foreground" />
@@ -260,7 +270,7 @@ export function ProfileDetailPage({
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-semibold text-foreground">{profile.name}</h1>
-              {profile.system && (
+              {profile.isSystem && (
                 <span
                   className={cn(
                     'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
@@ -277,7 +287,7 @@ export function ProfileDetailPage({
             )}
           </div>
         </div>
-        {!profile.system && (
+        {!profile.isSystem && (
           <div className="flex gap-2">
             <Button variant="destructive" onClick={handleDeleteClick} data-testid="delete-button">
               <Trash2 size={16} className="mr-1" />
@@ -311,7 +321,7 @@ export function ProfileDetailPage({
       <section data-testid="system-permissions-section">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-foreground">System Permissions</h2>
-          {!profile.system && (
+          {!profile.isSystem && (
             <div className="flex gap-2">
               {isEditingPermissions ? (
                 <>
@@ -352,7 +362,7 @@ export function ProfileDetailPage({
         <SystemPermissionChecklist
           permissions={displayedPermissions}
           onChange={handlePermissionChange}
-          readOnly={profile.system || !isEditingPermissions}
+          readOnly={profile.isSystem || !isEditingPermissions}
           testId="system-permissions"
         />
       </section>

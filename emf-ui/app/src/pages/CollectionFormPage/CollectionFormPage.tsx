@@ -53,7 +53,7 @@ export function CollectionFormPage({
     error,
   } = useQuery({
     queryKey: ['collection', id],
-    queryFn: () => apiClient.get<CollectionWithFields>(`/api/collections/${id}`),
+    queryFn: () => apiClient.getOne<CollectionWithFields>(`/api/collections/${id}`),
     enabled: isEditMode,
   })
 

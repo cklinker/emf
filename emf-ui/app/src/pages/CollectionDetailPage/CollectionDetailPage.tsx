@@ -188,7 +188,7 @@ export function CollectionDetailPage({
   } = useQuery({
     queryKey: ['collection', collectionId],
     queryFn: async () => {
-      const response = await apiClient.get<Collection>(`/api/collections/${collectionId}`)
+      const response = await apiClient.getOne<Collection>(`/api/collections/${collectionId}`)
       // Normalize field types from backend canonical form to UI form.
       // The backend stores types as uppercase enums (e.g., "STRING", "DOUBLE", "PICKLIST")
       // but the UI uses lowercase aliases (e.g., "string", "number", "picklist").
@@ -210,36 +210,28 @@ export function CollectionDetailPage({
     error: versionsError,
   } = useQuery({
     queryKey: ['collection-versions', collectionId],
-    queryFn: async () => {
-      const response = await apiClient.get<CollectionVersion[]>(
+    queryFn: () =>
+      apiClient.getList<CollectionVersion>(
         `/api/collection-versions?filter[collectionId][eq]=${collectionId}`
-      )
-      return response
-    },
+      ),
     enabled: !!collectionId && activeTab === 'versions',
   })
 
   // Fetch validation rules
   const { data: validationRules = [], isLoading: isLoadingRules } = useQuery({
     queryKey: ['validation-rules', collectionId],
-    queryFn: async () => {
-      const response = await apiClient.get<CollectionValidationRule[]>(
+    queryFn: () =>
+      apiClient.getList<CollectionValidationRule>(
         `/api/validation-rules?filter[collectionId][eq]=${collectionId}`
-      )
-      return response
-    },
+      ),
     enabled: !!collectionId && activeTab === 'validationRules',
   })
 
   // Fetch record types
   const { data: recordTypes = [], isLoading: isLoadingRecordTypes } = useQuery({
     queryKey: ['record-types', collectionId],
-    queryFn: async () => {
-      const response = await apiClient.get<RecordType[]>(
-        `/api/record-types?filter[collectionId][eq]=${collectionId}`
-      )
-      return response
-    },
+    queryFn: () =>
+      apiClient.getList<RecordType>(`/api/record-types?filter[collectionId][eq]=${collectionId}`),
     enabled: !!collectionId && activeTab === 'recordTypes',
   })
 
@@ -258,9 +250,9 @@ export function CollectionDetailPage({
       const results = await Promise.all(
         picklistFieldIds.map((fieldId) =>
           apiClient
-            .get<
-              PicklistDependency[]
-            >(`/api/picklist-dependencies?filter[controllingFieldId][eq]=${fieldId}`)
+            .getList<PicklistDependency>(
+              `/api/picklist-dependencies?filter[controllingFieldId][eq]=${fieldId}`
+            )
             .catch(() => [] as PicklistDependency[])
         )
       )
@@ -283,15 +275,10 @@ export function CollectionDetailPage({
   // Fetch setup audit trail (filtered to this collection)
   const { data: setupAuditPage, isLoading: isLoadingAudit } = useQuery({
     queryKey: ['setup-audit', collectionId],
-    queryFn: async () => {
-      const response = await apiClient.get<{
-        content: SetupAuditTrailEntry[]
-        totalElements: number
-      }>(
+    queryFn: () =>
+      apiClient.getPage<SetupAuditTrailEntry>(
         `/api/setup-audit-entries?filter[entityType][eq]=Collection&filter[entityId][eq]=${collectionId}&page[size]=50`
-      )
-      return response
-    },
+      ),
     enabled: activeTab === 'setupAudit' && !!collectionId,
   })
 
@@ -305,16 +292,14 @@ export function CollectionDetailPage({
       const results = await Promise.all(
         trackedFields.map((field) =>
           apiClient
-            .get<{
-              content: FieldHistoryEntry[]
-            }>(
+            .getList<FieldHistoryEntry>(
               `/api/field-history?filter[collectionId][eq]=${collectionId}&filter[fieldName][eq]=${field.name}&page[size]=20`
             )
-            .catch(() => ({ content: [] as FieldHistoryEntry[] }))
+            .catch(() => [] as FieldHistoryEntry[])
         )
       )
       // Merge and sort by changedAt descending
-      const allEntries = results.flatMap((r) => r.content || [])
+      const allEntries = results.flatMap((r) => r)
       allEntries.sort((a, b) => new Date(b.changedAt).getTime() - new Date(a.changedAt).getTime())
       return { content: allEntries.slice(0, 50) }
     },

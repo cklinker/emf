@@ -54,6 +54,7 @@ import { FieldRenderer } from '@/components/FieldRenderer'
 import { DetailSection } from '@/components/DetailSection'
 import { RelatedList } from '@/components/RelatedList'
 import { LayoutRelatedLists } from '@/components/LayoutRelatedLists'
+import { LayoutFieldSections } from '@/components/LayoutFieldSections'
 import { InsufficientPrivileges } from '@/components/InsufficientPrivileges'
 import { NotesSection } from '@/components/NotesSection/NotesSection'
 import { AttachmentsSection } from '@/components/AttachmentsSection/AttachmentsSection'
@@ -301,6 +302,7 @@ export function ObjectDetailPage(): React.ReactElement {
   // Discover reverse relationships (fallback when no layout is configured).
   // Fetches all collections and finds those with master_detail fields pointing
   // to the current collection, so we show child records (e.g., Order Items on Orders).
+  const hasLayoutSections = !!(layout && layout.sections && layout.sections.length > 0)
   const hasLayoutRelatedLists = !!(layout && layout.relatedLists.length > 0)
 
   const { data: allCollections } = useQuery({
@@ -504,58 +506,73 @@ export function ObjectDetailPage(): React.ReactElement {
         </div>
       </div>
 
-      {/* Highlights Panel */}
-      {highlightFields.length > 0 && record && (
-        <Card>
-          <CardContent className="py-4">
-            <div className="grid grid-cols-2 gap-x-8 gap-y-3 md:grid-cols-4">
-              {highlightFields.map((field) => {
-                const value = record[field.name]
-                const isRef =
-                  field.type === 'master_detail' ||
-                  field.type === 'lookup' ||
-                  field.type === 'reference'
-                const displayLabel =
-                  isRef && lookupDisplayMap?.[field.name]
-                    ? lookupDisplayMap[field.name][String(value)] || undefined
-                    : undefined
+      {/* Field Sections — use page layout sections when available, otherwise fall back to generic highlights + details */}
+      {hasLayoutSections ? (
+        <>
+          <LayoutFieldSections
+            sections={layout!.sections}
+            schemaFields={fields}
+            record={record}
+            tenantSlug={tenantSlug}
+            lookupDisplayMap={lookupDisplayMap}
+          />
+        </>
+      ) : (
+        <>
+          {/* Highlights Panel (fallback) */}
+          {highlightFields.length > 0 && record && (
+            <Card>
+              <CardContent className="py-4">
+                <div className="grid grid-cols-2 gap-x-8 gap-y-3 md:grid-cols-4">
+                  {highlightFields.map((field) => {
+                    const value = record[field.name]
+                    const isRef =
+                      field.type === 'master_detail' ||
+                      field.type === 'lookup' ||
+                      field.type === 'reference'
+                    const displayLabel =
+                      isRef && lookupDisplayMap?.[field.name]
+                        ? lookupDisplayMap[field.name][String(value)] || undefined
+                        : undefined
 
-                return (
-                  <div key={field.name} className="space-y-1">
-                    <dt className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                      {field.displayName || field.name}
-                    </dt>
-                    <dd className="text-sm font-medium">
-                      <FieldRenderer
-                        type={field.type}
-                        value={value}
-                        fieldName={field.name}
-                        displayName={field.displayName || field.name}
-                        tenantSlug={tenantSlug}
-                        targetCollection={field.referenceTarget}
-                        displayLabel={displayLabel}
-                        truncate
-                      />
-                    </dd>
-                  </div>
-                )
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+                    return (
+                      <div key={field.name} className="space-y-1">
+                        <dt className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                          {field.displayName || field.name}
+                        </dt>
+                        <dd className="text-sm font-medium">
+                          <FieldRenderer
+                            type={field.type}
+                            value={value}
+                            fieldName={field.name}
+                            displayName={field.displayName || field.name}
+                            tenantSlug={tenantSlug}
+                            targetCollection={field.referenceTarget}
+                            displayLabel={displayLabel}
+                            truncate
+                          />
+                        </dd>
+                      </div>
+                    )
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
-      <Separator />
+          <Separator />
 
-      {/* Detail fields section */}
-      {detailFields.length > 0 && (
-        <DetailSection
-          title="Details"
-          fields={detailFields}
-          record={record}
-          tenantSlug={tenantSlug}
-          lookupDisplayMap={lookupDisplayMap}
-        />
+          {/* Detail fields section (fallback) */}
+          {detailFields.length > 0 && (
+            <DetailSection
+              title="Details"
+              fields={detailFields}
+              record={record}
+              tenantSlug={tenantSlug}
+              lookupDisplayMap={lookupDisplayMap}
+            />
+          )}
+        </>
       )}
 
       {/* System Information section */}

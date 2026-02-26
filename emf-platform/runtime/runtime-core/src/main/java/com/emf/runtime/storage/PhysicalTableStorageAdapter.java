@@ -27,6 +27,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -61,7 +62,12 @@ import java.util.stream.Collectors;
 public class PhysicalTableStorageAdapter implements StorageAdapter {
     
     private static final Logger log = LoggerFactory.getLogger(PhysicalTableStorageAdapter.class);
-    
+
+    /** Column names handled as system fields in create/update — skipped in the user-defined field loop. */
+    private static final Set<String> SYSTEM_COLUMNS = Set.of(
+        "id", "created_at", "updated_at", "created_by", "updated_by", "tenant_id"
+    );
+
     private final JdbcTemplate jdbcTemplate;
     private final SchemaMigrationEngine migrationEngine;
     
@@ -302,6 +308,9 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
             }
             if (data.containsKey(field.name())) {
                 String columnName = getColumnName(definition, field);
+                if (SYSTEM_COLUMNS.contains(columnName)) {
+                    continue; // Already handled as a system field above
+                }
                 boolean isJsonb = field.type() == FieldType.JSON || field.type() == FieldType.ARRAY;
                 columns.add(sanitizeIdentifier(columnName));
                 placeholders.add(isJsonb ? "?::jsonb" : "?");
@@ -369,6 +378,9 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         for (FieldDefinition field : definition.fields()) {
             if (data.containsKey(field.name())) {
                 String columnName = getColumnName(definition, field);
+                if (SYSTEM_COLUMNS.contains(columnName)) {
+                    continue; // Already handled as a system field above
+                }
                 boolean isJsonb = field.type() == FieldType.JSON || field.type() == FieldType.ARRAY;
                 setClauses.add(sanitizeIdentifier(columnName) + (isJsonb ? " = ?::jsonb" : " = ?"));
                 values.add(convertValueForStorage(data.get(field.name()), field.type()));

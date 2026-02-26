@@ -3,10 +3,13 @@ package com.emf.worker.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.*;
 
 /**
@@ -55,20 +58,24 @@ public class GovernorLimitsController {
             UPDATE tenant SET limits = ?::jsonb, updated_at = NOW() WHERE id = ?
             """;
 
+    private static final String DAILY_KEY_PREFIX = "api-calls-daily:";
+
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
+    private final StringRedisTemplate redisTemplate;
 
-    public GovernorLimitsController(JdbcTemplate jdbcTemplate, ObjectMapper objectMapper) {
+    public GovernorLimitsController(JdbcTemplate jdbcTemplate, ObjectMapper objectMapper,
+                                     StringRedisTemplate redisTemplate) {
         this.jdbcTemplate = jdbcTemplate;
         this.objectMapper = objectMapper;
+        this.redisTemplate = redisTemplate;
     }
 
     /**
      * Returns the governor limits status for the current tenant.
      *
      * <p>Includes the configured limits and current usage metrics
-     * (user count, collection count). API call usage is returned as 0
-     * because it is tracked in Redis on the gateway, not in the worker DB.
+     * (user count, collection count, daily API call count from Redis).
      *
      * @param tenantId the tenant ID from the gateway's X-Tenant-ID header
      * @return governor limits status with limits and usage metrics
@@ -84,10 +91,13 @@ public class GovernorLimitsController {
         int usersUsed = countActiveUsers(tenantId);
         int collectionsUsed = countActiveCollections();
 
+        // Read daily API call count from Redis (tracked by gateway's RateLimitFilter)
+        int apiCallsUsed = getDailyApiCallCount(tenantId);
+
         // Build response
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("limits", limits);
-        response.put("apiCallsUsed", 0); // Tracked in Redis on gateway
+        response.put("apiCallsUsed", apiCallsUsed);
         response.put("apiCallsLimit", getIntOrDefault(limits, "apiCallsPerDay", DEFAULT_API_CALLS_PER_DAY));
         response.put("usersUsed", usersUsed);
         response.put("usersLimit", getIntOrDefault(limits, "maxUsers", DEFAULT_MAX_USERS));
@@ -203,6 +213,30 @@ public class GovernorLimitsController {
             log.warn("Failed to count active collections: {}", e.getMessage());
             return 0;
         }
+    }
+
+    /**
+     * Reads today's API call count from Redis.
+     *
+     * <p>The gateway's {@code RateLimitFilter} increments a daily counter
+     * in Redis with key {@code api-calls-daily:<tenantId>:<yyyy-MM-dd>}.
+     *
+     * @param tenantId the tenant ID
+     * @return the number of API calls today, or 0 if unavailable
+     */
+    private int getDailyApiCallCount(String tenantId) {
+        try {
+            String today = LocalDate.now(ZoneOffset.UTC).toString();
+            String key = DAILY_KEY_PREFIX + tenantId + ":" + today;
+            String value = redisTemplate.opsForValue().get(key);
+            if (value != null) {
+                return Integer.parseInt(value);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to read daily API call count from Redis for tenant {}: {}",
+                    tenantId, e.getMessage());
+        }
+        return 0;
     }
 
     private int getIntOrDefault(Map<String, Object> map, String key, int defaultValue) {

@@ -8,6 +8,8 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 
 /**
  * Redis-based rate limiter implementation.
@@ -20,6 +22,7 @@ public class RedisRateLimiter {
     
     private static final Logger log = LoggerFactory.getLogger(RedisRateLimiter.class);
     private static final String KEY_PREFIX = "ratelimit:";
+    private static final String DAILY_KEY_PREFIX = "api-calls-daily:";
     
     private final ReactiveRedisTemplate<String, String> redisTemplate;
     
@@ -80,8 +83,40 @@ public class RedisRateLimiter {
     }
     
     /**
+     * Increments the daily API call counter for a tenant.
+     *
+     * <p>Uses a Redis key with today's UTC date: {@code api-calls-daily:<tenantId>:<yyyy-MM-dd>}.
+     * The key has a 48-hour TTL to ensure cleanup after the day ends.
+     * This counter is read by the worker's GovernorLimitsController to display
+     * daily API call usage on the Governor Limits page.
+     *
+     * @param tenantId the tenant ID to track
+     * @return Mono that completes when the counter is incremented
+     */
+    public Mono<Void> incrementDailyCounter(String tenantId) {
+        String today = LocalDate.now(ZoneOffset.UTC).toString();
+        String key = DAILY_KEY_PREFIX + tenantId + ":" + today;
+
+        return redisTemplate.opsForValue()
+                .increment(key)
+                .flatMap(count -> {
+                    if (count == 1) {
+                        // First call today — set TTL to 48 hours for cleanup
+                        return redisTemplate.expire(key, Duration.ofHours(48))
+                                .then();
+                    }
+                    return Mono.empty();
+                })
+                .onErrorResume(error -> {
+                    log.warn("Failed to increment daily API call counter for tenant {}: {}",
+                            tenantId, error.getMessage());
+                    return Mono.empty();
+                });
+    }
+
+    /**
      * Builds the Redis key for rate limiting.
-     * 
+     *
      * @param routeId The route identifier
      * @param principal The authenticated principal
      * @return Redis key in format "ratelimit:{routeId}:{principal}"

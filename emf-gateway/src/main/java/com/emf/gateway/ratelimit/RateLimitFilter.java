@@ -90,6 +90,10 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
                         tenantId, result.getRemainingRequests());
 
                     addRateLimitHeaders(exchange, config, result);
+
+                    // Increment daily API call counter (fire-and-forget for the Governor Limits page)
+                    rateLimiter.incrementDailyCounter(tenantId).subscribe();
+
                     return chain.filter(exchange);
                 } else {
                     // Rate limit exceeded - return 429

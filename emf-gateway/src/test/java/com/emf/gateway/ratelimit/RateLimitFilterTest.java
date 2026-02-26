@@ -46,6 +46,7 @@ class RateLimitFilterTest {
         governorLimitCache = new TenantGovernorLimitCache();
         filter = new RateLimitFilter(rateLimiter, governorLimitCache);
         lenient().when(chain.filter(any())).thenReturn(Mono.empty());
+        lenient().when(rateLimiter.incrementDailyCounter(anyString())).thenReturn(Mono.empty());
     }
 
     @Test

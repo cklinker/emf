@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -996,11 +997,29 @@ public class DynamicCollectionRouter {
     /**
      * Resolves included resources for JSON:API {@code ?include=} parameter.
      *
-     * <p>For each include name, looks up the target collection in the registry and
-     * uses {@link SubResourceResolver} to find an inverse relationship (a field on
-     * the target collection that references the primary collection). If found,
-     * queries the target collection for all records whose reference field matches
-     * any of the primary record IDs.
+     * <p>Supports both direct and transitive (grandchild) includes. Direct includes
+     * are child collections that have a field referencing the primary collection.
+     * Transitive includes are grandchild collections that reference a direct child
+     * collection rather than the primary collection itself.
+     *
+     * <p>Resolution proceeds in two passes:
+     * <ol>
+     *   <li><strong>Direct pass:</strong> Resolve includes that have a direct
+     *       relationship to the primary collection.</li>
+     *   <li><strong>Transitive pass:</strong> For any unresolved includes, check
+     *       whether they reference an already-resolved direct child collection.
+     *       If so, use the direct child records' IDs to query the grandchild
+     *       collection.</li>
+     * </ol>
+     *
+     * <p>Example: When fetching a {@code page-layouts} record with
+     * {@code ?include=layout-sections,layout-fields,layout-related-lists}:
+     * <ul>
+     *   <li>{@code layout-sections} and {@code layout-related-lists} are resolved
+     *       directly (both have {@code layoutId → page-layouts}).</li>
+     *   <li>{@code layout-fields} is resolved transitively via {@code layout-sections}
+     *       (it has {@code sectionId → layout-sections}).</li>
+     * </ul>
      *
      * @param includeNames the requested include relationship names
      * @param primaryData the primary data records
@@ -1028,54 +1047,135 @@ public class DynamicCollectionRouter {
 
         List<Map<String, Object>> allIncluded = new ArrayList<>();
 
+        // Track resolved collections and their raw data for transitive resolution
+        List<String> unresolvedNames = new ArrayList<>();
+        Map<String, List<Map<String, Object>>> resolvedChildData = new LinkedHashMap<>();
+        Map<String, CollectionDefinition> resolvedChildDefs = new LinkedHashMap<>();
+
+        // --- Pass 1: Direct includes ---
         for (String includeName : includeNames) {
-            // Look up the target collection by include name
             CollectionDefinition childDef = resolveCollection(includeName, request);
             if (childDef == null) {
                 logger.debug("Include target collection '{}' not found, skipping", includeName);
                 continue;
             }
 
-            // Use SubResourceResolver to find the inverse relationship
             Optional<SubResourceRelation> relation =
                     SubResourceResolver.resolve(primaryDefinition, childDef);
             if (relation.isEmpty()) {
-                logger.debug("No inverse relationship from '{}' to '{}', skipping include",
-                        primaryCollectionName, includeName);
+                // No direct relationship — defer to transitive pass
+                unresolvedNames.add(includeName);
                 continue;
             }
 
             String parentRefField = relation.get().parentRefFieldName();
-            logger.debug("Resolving include '{}': querying where {}  IN {} parent IDs",
+            logger.debug("Resolving direct include '{}': querying where {} IN {} parent IDs",
                     includeName, parentRefField, parentIds.size());
 
-            // Build a query with IN filter for all parent IDs
-            List<FilterCondition> filters = new ArrayList<>();
-            filters.add(new FilterCondition(parentRefField, FilterOperator.IN, parentIds));
+            List<Map<String, Object>> childRecords =
+                    queryChildRecords(childDef, parentRefField, parentIds, request);
 
-            // Use a large page to fetch all child records
-            QueryRequest childQuery = new QueryRequest(
-                    new Pagination(1, 1000),
-                    List.of(),
-                    List.of(),
-                    filters
-            );
+            for (Map<String, Object> childRecord : childRecords) {
+                allIncluded.add(toJsonApiResourceObject(childRecord, includeName, childDef));
+            }
+            resolvedChildData.put(includeName, childRecords);
+            resolvedChildDefs.put(includeName, childDef);
+            logger.debug("Resolved {} direct included records for '{}'",
+                    childRecords.size(), includeName);
+        }
 
-            // Inject tenant filter if the child collection is tenant-scoped
-            childQuery = injectTenantFilter(childQuery, childDef, request);
+        // --- Pass 2: Transitive (grandchild) includes ---
+        for (String includeName : unresolvedNames) {
+            CollectionDefinition grandchildDef = resolveCollection(includeName, request);
+            if (grandchildDef == null) {
+                continue;
+            }
 
-            try {
-                QueryResult childResult = queryEngine.executeQuery(childDef, childQuery);
-                for (Map<String, Object> childRecord : childResult.data()) {
-                    allIncluded.add(toJsonApiResourceObject(childRecord, includeName, childDef));
+            boolean resolved = false;
+            // Check each already-resolved direct child to see if it's the
+            // intermediate parent for this grandchild
+            for (Map.Entry<String, CollectionDefinition> entry : resolvedChildDefs.entrySet()) {
+                String intermediateCollectionName = entry.getKey();
+                CollectionDefinition intermediateDef = entry.getValue();
+
+                Optional<SubResourceRelation> transitiveRelation =
+                        SubResourceResolver.resolve(intermediateDef, grandchildDef);
+                if (transitiveRelation.isEmpty()) {
+                    continue;
                 }
-                logger.debug("Resolved {} included records for '{}'",
-                        childResult.data().size(), includeName);
-            } catch (Exception e) {
-                logger.warn("Failed to resolve include '{}': {}", includeName, e.getMessage());
+
+                // Found a transitive path: primary → intermediate → grandchild
+                String intermediateRefField = transitiveRelation.get().parentRefFieldName();
+                List<Map<String, Object>> intermediateData =
+                        resolvedChildData.get(intermediateCollectionName);
+
+                List<Object> intermediateIds = intermediateData.stream()
+                        .map(r -> r.get("id"))
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toList());
+
+                if (intermediateIds.isEmpty()) {
+                    logger.debug("No intermediate '{}' records to resolve transitive include '{}'",
+                            intermediateCollectionName, includeName);
+                    resolved = true;
+                    break;
+                }
+
+                logger.debug("Resolving transitive include '{}' via '{}': querying where {} IN {} IDs",
+                        includeName, intermediateCollectionName, intermediateRefField,
+                        intermediateIds.size());
+
+                List<Map<String, Object>> grandchildRecords =
+                        queryChildRecords(grandchildDef, intermediateRefField, intermediateIds,
+                                request);
+
+                for (Map<String, Object> record : grandchildRecords) {
+                    allIncluded.add(toJsonApiResourceObject(record, includeName, grandchildDef));
+                }
+                logger.debug("Resolved {} transitive included records for '{}' via '{}'",
+                        grandchildRecords.size(), includeName, intermediateCollectionName);
+                resolved = true;
+                break;
+            }
+
+            if (!resolved) {
+                logger.debug("No direct or transitive relationship from '{}' to '{}', "
+                        + "skipping include", primaryCollectionName, includeName);
             }
         }
 
         return allIncluded;
+    }
+
+    /**
+     * Queries child records from a collection using an IN filter on the given
+     * reference field.
+     */
+    private List<Map<String, Object>> queryChildRecords(
+            CollectionDefinition childDef,
+            String refField,
+            List<Object> parentIds,
+            HttpServletRequest request) {
+
+        List<FilterCondition> filters = new ArrayList<>();
+        filters.add(new FilterCondition(refField, FilterOperator.IN, parentIds));
+
+        QueryRequest childQuery = new QueryRequest(
+                new Pagination(1, 1000),
+                List.of(),
+                List.of(),
+                filters
+        );
+
+        childQuery = injectTenantFilter(childQuery, childDef, request);
+
+        try {
+            QueryResult childResult = queryEngine.executeQuery(childDef, childQuery);
+            return childResult.data();
+        } catch (Exception e) {
+            logger.warn("Failed to query child records for '{}': {}", childDef.name(),
+                    e.getMessage());
+            return List.of();
+        }
     }
 }

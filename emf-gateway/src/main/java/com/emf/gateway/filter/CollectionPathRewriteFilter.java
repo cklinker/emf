@@ -18,6 +18,12 @@ import java.net.URI;
  * to {@code /api/collections/{collectionName}/...} so the worker's
  * {@code DynamicCollectionRouter} (mapped at {@code /api/collections}) can handle them.
  *
+ * <p>This applies to ALL {@code /api/} paths, including the "collections" system
+ * collection itself (e.g., {@code /api/collections/{uuid}} →
+ * {@code /api/collections/collections/{uuid}}). The DynamicCollectionRouter expects
+ * the collection name as the first path segment after {@code /api/collections/},
+ * so the "collections" collection must also follow this pattern.
+ *
  * <p>This is implemented as a {@link GlobalFilter} rather than a route-level
  * {@link org.springframework.cloud.gateway.filter.GatewayFilter} because route
  * filters execute after Spring Cloud Gateway's {@code RouteToRequestUrlFilter}
@@ -27,10 +33,13 @@ import java.net.URI;
  * update both the request path and the {@code GATEWAY_REQUEST_URL_ATTR} that
  * {@code NettyRoutingFilter} uses to send the actual HTTP request upstream.
  *
- * <p>Example:
+ * <p>Examples:
  * <pre>
  *   Gateway receives: GET /api/product?page=1
  *   Worker expects:   GET /api/collections/product?page=1
+ *
+ *   Gateway receives: GET /api/collections/{uuid}
+ *   Worker expects:   GET /api/collections/collections/{uuid}
  * </pre>
  */
 @Component
@@ -39,14 +48,16 @@ public class CollectionPathRewriteFilter implements GlobalFilter, Ordered {
     private static final Logger log = LoggerFactory.getLogger(CollectionPathRewriteFilter.class);
 
     private static final String API_PREFIX = "/api/";
-    private static final String COLLECTIONS_PREFIX = "/api/collections/";
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         String path = exchange.getRequest().getURI().getRawPath();
 
-        // Only rewrite /api/xxx paths that are NOT already /api/collections/xxx
-        if (path == null || !path.startsWith(API_PREFIX) || path.startsWith(COLLECTIONS_PREFIX)) {
+        // Rewrite ALL /api/xxx paths to /api/collections/xxx.
+        // This includes /api/collections/xxx → /api/collections/collections/xxx
+        // because the "collections" system collection must also go through
+        // DynamicCollectionRouter with collectionName="collections".
+        if (path == null || !path.startsWith(API_PREFIX)) {
             return chain.filter(exchange);
         }
 

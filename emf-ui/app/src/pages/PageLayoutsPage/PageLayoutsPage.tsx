@@ -579,15 +579,33 @@ function LayoutEditorViewInner({ layoutId, onBack }: LayoutEditorViewProps): Rea
   const { data: layoutDetail, isLoading: isLoadingLayout } = useQuery({
     queryKey: ['pageLayout', layoutId],
     queryFn: async () => {
+      type JsonApiResource = {
+        type: string
+        id: string
+        attributes: Record<string, unknown>
+        relationships?: Record<string, { data?: { type: string; id: string } | null }>
+      }
       const raw = await apiClient.get<{
-        data: { type: string; id: string; attributes: Record<string, unknown> }
-        included?: { type: string; id: string; attributes: Record<string, unknown> }[]
+        data: JsonApiResource
+        included?: JsonApiResource[]
       }>(`/api/page-layouts/${layoutId}?include=layout-sections,layout-fields,layout-related-lists`)
 
+      // Helper: flatten a JSON:API resource into a flat object by merging
+      // attributes and extracting relationship IDs (rel.data.id → key).
+      const flatten = (r: JsonApiResource): Record<string, unknown> => {
+        const obj: Record<string, unknown> = { id: r.id, ...r.attributes }
+        if (r.relationships) {
+          for (const [key, rel] of Object.entries(r.relationships)) {
+            obj[key] = rel?.data?.id ?? null
+          }
+        }
+        return obj
+      }
+
       // Build the layout from the primary data
+      const flatLayout = flatten(raw.data)
       const layout: PageLayoutDetail = {
-        id: raw.data.id,
-        ...(raw.data.attributes as Omit<PageLayoutDetail, 'id' | 'sections' | 'relatedLists'>),
+        ...(flatLayout as unknown as Omit<PageLayoutDetail, 'sections' | 'relatedLists'>),
         sections: [],
         relatedLists: [],
       }
@@ -599,16 +617,14 @@ function LayoutEditorViewInner({ layoutId, onBack }: LayoutEditorViewProps): Rea
       // Extract sections, field placements, and related lists from included
       const sectionResources = raw.included
         .filter((r) => r.type === 'layout-sections')
-        .map(
-          (r) => ({ id: r.id, ...r.attributes }) as unknown as ApiSection & { sortOrder: number }
-        )
+        .map((r) => flatten(r) as unknown as ApiSection & { sortOrder: number })
         .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
 
       const fieldResources = raw.included
         .filter((r) => r.type === 'layout-fields')
         .map(
           (r) =>
-            ({ id: r.id, ...r.attributes }) as unknown as ApiFieldPlacement & {
+            flatten(r) as unknown as ApiFieldPlacement & {
               sectionId: string
               sortOrder: number
             }
@@ -617,10 +633,7 @@ function LayoutEditorViewInner({ layoutId, onBack }: LayoutEditorViewProps): Rea
 
       const relatedListResources = raw.included
         .filter((r) => r.type === 'layout-related-lists')
-        .map(
-          (r) =>
-            ({ id: r.id, ...r.attributes }) as unknown as ApiRelatedList & { sortOrder: number }
-        )
+        .map((r) => flatten(r) as unknown as ApiRelatedList & { sortOrder: number })
         .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
 
       // Group field placements by sectionId
@@ -648,28 +661,39 @@ function LayoutEditorViewInner({ layoutId, onBack }: LayoutEditorViewProps): Rea
   const { data: collectionDetail } = useQuery({
     queryKey: ['collection-detail', collectionId],
     queryFn: async () => {
+      type JsonApiResource = {
+        type: string
+        id: string
+        attributes: Record<string, unknown>
+        relationships?: Record<string, { data?: { type: string; id: string } | null }>
+      }
       const raw = await apiClient.get<{
-        data: { type: string; id: string; attributes: Record<string, unknown> }
-        included?: { type: string; id: string; attributes: Record<string, unknown> }[]
+        data: JsonApiResource
+        included?: JsonApiResource[]
       }>(`/api/collections/${collectionId}?include=fields`)
 
+      const flattenRes = (r: JsonApiResource): Record<string, unknown> => {
+        const obj: Record<string, unknown> = { id: r.id, ...r.attributes }
+        if (r.relationships) {
+          for (const [key, rel] of Object.entries(r.relationships)) {
+            obj[key] = rel?.data?.id ?? null
+          }
+        }
+        return obj
+      }
+
+      const flat = flattenRes(raw.data)
       const result: CollectionDetail = {
-        id: raw.data.id,
-        name: raw.data.attributes.name as string,
-        displayName: raw.data.attributes.displayName as string,
+        id: flat.id as string,
+        name: flat.name as string,
+        displayName: flat.displayName as string,
         fields: [],
       }
 
       if (raw.included && raw.included.length > 0) {
         result.fields = raw.included
           .filter((r) => r.type === 'fields')
-          .map(
-            (r) =>
-              ({
-                id: r.id,
-                ...r.attributes,
-              }) as unknown as CollectionField
-          )
+          .map((r) => flattenRes(r) as unknown as CollectionField)
       }
 
       return result

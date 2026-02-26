@@ -264,25 +264,34 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
     public Map<String, Object> create(CollectionDefinition definition, Map<String, Object> data) {
         String tableName = getTableName(definition);
         
-        // Build column names and placeholders
+        // Build column names, placeholders, and values.
+        // JSONB columns need ?::jsonb placeholders so PostgreSQL accepts the
+        // value as JSONB instead of VARCHAR.
         List<String> columns = new ArrayList<>();
+        List<String> placeholders = new ArrayList<>();
         List<Object> values = new ArrayList<>();
-        
+
         // Add system fields
         columns.add("id");
+        placeholders.add("?");
         values.add(data.get("id"));
         columns.add("created_by");
+        placeholders.add("?");
         values.add(data.get("createdBy"));
         columns.add("updated_by");
+        placeholders.add("?");
         values.add(data.get("updatedBy"));
         columns.add("created_at");
+        placeholders.add("?");
         values.add(convertValueForStorage(data.get("createdAt"), FieldType.DATETIME));
         columns.add("updated_at");
+        placeholders.add("?");
         values.add(convertValueForStorage(data.get("updatedAt"), FieldType.DATETIME));
-        
+
         // For tenant-scoped system collections, add tenant_id
         if (definition.systemCollection() && definition.tenantScoped() && data.containsKey("tenantId")) {
             columns.add("tenant_id");
+            placeholders.add("?");
             values.add(data.get("tenantId"));
         }
 
@@ -293,26 +302,30 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
             }
             if (data.containsKey(field.name())) {
                 String columnName = getColumnName(definition, field);
+                boolean isJsonb = field.type() == FieldType.JSON || field.type() == FieldType.ARRAY;
                 columns.add(sanitizeIdentifier(columnName));
+                placeholders.add(isJsonb ? "?::jsonb" : "?");
                 values.add(convertValueForStorage(data.get(field.name()), field.type()));
 
                 // Handle companion columns
                 if (field.type() == FieldType.CURRENCY && data.containsKey(field.name() + "_currency_code")) {
                     columns.add(sanitizeIdentifier(columnName + "_currency_code"));
+                    placeholders.add("?");
                     values.add(data.get(field.name() + "_currency_code"));
                 }
                 if (field.type() == FieldType.GEOLOCATION && data.get(field.name()) instanceof Map<?,?> geo) {
                     columns.add(sanitizeIdentifier(columnName + "_longitude"));
+                    placeholders.add("?");
                     values.add(((Number) geo.get("longitude")).doubleValue());
                 }
             }
         }
 
         String columnList = String.join(", ", columns);
-        String placeholders = columns.stream().map(c -> "?").collect(Collectors.joining(", "));
+        String placeholderList = String.join(", ", placeholders);
         
         String sql = String.format("INSERT INTO %s (%s) VALUES (%s)",
-            sanitizeIdentifier(tableName), columnList, placeholders);
+            sanitizeIdentifier(tableName), columnList, placeholderList);
         
         try {
             jdbcTemplate.update(sql, values.toArray());
@@ -356,7 +369,8 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         for (FieldDefinition field : definition.fields()) {
             if (data.containsKey(field.name())) {
                 String columnName = getColumnName(definition, field);
-                setClauses.add(sanitizeIdentifier(columnName) + " = ?");
+                boolean isJsonb = field.type() == FieldType.JSON || field.type() == FieldType.ARRAY;
+                setClauses.add(sanitizeIdentifier(columnName) + (isJsonb ? " = ?::jsonb" : " = ?"));
                 values.add(convertValueForStorage(data.get(field.name()), field.type()));
             }
         }

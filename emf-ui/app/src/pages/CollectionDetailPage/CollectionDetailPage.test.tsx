@@ -180,6 +180,25 @@ function TestWrapper({
   )
 }
 
+/**
+ * Converts a flat Collection object into a JSON:API response with included fields.
+ * The CollectionDetailPage now uses apiClient.get() with ?include=fields,
+ * so the mock must return proper JSON:API format with the "included" array.
+ */
+function toJsonApiCollectionResponse(collection: Collection) {
+  const { id, fields, ...attributes } = collection
+  const response: Record<string, unknown> = {
+    data: { type: 'collections', id, attributes },
+  }
+  if (fields && fields.length > 0) {
+    response.included = fields.map((f) => {
+      const { id: fieldId, ...fieldAttrs } = f
+      return { type: 'fields', id: fieldId, attributes: fieldAttrs }
+    })
+  }
+  return response
+}
+
 // Default GET handler for all endpoints used by CollectionDetailPage
 function createGetHandler(
   collection: Collection = mockCollection,
@@ -198,9 +217,10 @@ function createGetHandler(
     if (url.match(/\/api\/record-types/)) {
       return Promise.resolve({ data: [] })
     }
-    // Single collection: /api/collections/{id} (raw get)
-    if (url.match(/\/api\/collections\/[^?]+$/) && !url.includes('filter[')) {
-      return Promise.resolve({ data: collection })
+    // Single collection with ?include=fields: /api/collections/{id}?include=fields
+    // Uses apiClient.get() so returns raw JSON:API format with included fields
+    if (url.match(/\/api\/collections\/[^?]+(\?include=|$)/) && !url.includes('filter[')) {
+      return Promise.resolve({ data: toJsonApiCollectionResponse(collection) })
     }
     // Collection list (getList via useCollectionSummaries): /api/collections?filter[...]
     // getList calls unwrapJsonApiList on response.data, so return JSON:API format
@@ -252,7 +272,10 @@ describe('CollectionDetailPage', () => {
     it('should display loading spinner while fetching collection', async () => {
       // Setup a delayed response
       mockAxios.get.mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve({ data: mockCollection }), 100))
+        () =>
+          new Promise((resolve) =>
+            setTimeout(() => resolve({ data: toJsonApiCollectionResponse(mockCollection) }), 100)
+          )
       )
 
       render(
@@ -298,12 +321,12 @@ describe('CollectionDetailPage', () => {
     it('should allow retry on error', async () => {
       let callCount = 0
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.match(/\/api\/collections\/[^?]+$/) && !url.includes('filter[')) {
+        if (url.match(/\/api\/collections\/[^?]+(\?include=|$)/) && !url.includes('filter[')) {
           callCount++
           if (callCount === 1) {
             return Promise.reject(createAxiosError(500))
           }
-          return Promise.resolve({ data: mockCollection })
+          return Promise.resolve({ data: toJsonApiCollectionResponse(mockCollection) })
         }
         // Collection list (getList via useCollectionSummaries) - JSON:API format
         if (url.match(/\/api\/collections/)) {

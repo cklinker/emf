@@ -102,10 +102,31 @@ export function RelatedListPanel(): React.ReactElement {
 
   const currentCollectionName = collectionId ? (collectionNameById.get(collectionId) ?? null) : null
 
-  // Fetch the current layout collection's fields (to find master-side relationships)
+  // Fetch the current layout collection's fields (to find master-side relationships).
+  // Fields are separate records fetched via ?include=fields.
   const { data: currentCollectionDetail } = useQuery({
     queryKey: ['collection-detail-for-rl', collectionId],
-    queryFn: () => apiClient.getOne<CollectionDetailResponse>(`/api/collections/${collectionId}`),
+    queryFn: async () => {
+      const raw = await apiClient.get<{
+        data: { type: string; id: string; attributes: Record<string, unknown> }
+        included?: { type: string; id: string; attributes: Record<string, unknown> }[]
+      }>(`/api/collections/${collectionId}?include=fields`)
+
+      const result: CollectionDetailResponse = {
+        id: raw.data.id,
+        name: raw.data.attributes.name as string,
+        displayName: raw.data.attributes.displayName as string,
+        fields: [],
+      }
+
+      if (raw.included && raw.included.length > 0) {
+        result.fields = raw.included
+          .filter((r) => r.type === 'fields')
+          .map((r) => ({ id: r.id, ...r.attributes }) as unknown as CollectionFieldDetail)
+      }
+
+      return result
+    },
     enabled: !!collectionId,
   })
 
@@ -118,8 +139,27 @@ export function RelatedListPanel(): React.ReactElement {
   const selectedCollectionId = formData.relatedCollectionId
   const { data: relatedCollectionDetail } = useQuery({
     queryKey: ['collection-detail-for-rl', selectedCollectionId],
-    queryFn: () =>
-      apiClient.getOne<CollectionDetailResponse>(`/api/collections/${selectedCollectionId}`),
+    queryFn: async () => {
+      const raw = await apiClient.get<{
+        data: { type: string; id: string; attributes: Record<string, unknown> }
+        included?: { type: string; id: string; attributes: Record<string, unknown> }[]
+      }>(`/api/collections/${selectedCollectionId}?include=fields`)
+
+      const result: CollectionDetailResponse = {
+        id: raw.data.id,
+        name: raw.data.attributes.name as string,
+        displayName: raw.data.attributes.displayName as string,
+        fields: [],
+      }
+
+      if (raw.included && raw.included.length > 0) {
+        result.fields = raw.included
+          .filter((r) => r.type === 'fields')
+          .map((r) => ({ id: r.id, ...r.attributes }) as unknown as CollectionFieldDetail)
+      }
+
+      return result
+    },
     enabled: !!selectedCollectionId,
   })
 

@@ -579,11 +579,38 @@ function LayoutEditorViewInner({ layoutId, onBack }: LayoutEditorViewProps): Rea
     queryFn: () => apiClient.getOne<PageLayoutDetail>(`/api/page-layouts/${layoutId}`),
   })
 
-  // Fetch collection fields when we know the collectionId
+  // Fetch collection fields when we know the collectionId.
+  // Fields are separate records fetched via ?include=fields.
   const collectionId = layoutDetail?.collectionId ?? null
   const { data: collectionDetail } = useQuery({
     queryKey: ['collection-detail', collectionId],
-    queryFn: () => apiClient.getOne<CollectionDetail>(`/api/collections/${collectionId}`),
+    queryFn: async () => {
+      const raw = await apiClient.get<{
+        data: { type: string; id: string; attributes: Record<string, unknown> }
+        included?: { type: string; id: string; attributes: Record<string, unknown> }[]
+      }>(`/api/collections/${collectionId}?include=fields`)
+
+      const result: CollectionDetail = {
+        id: raw.data.id,
+        name: raw.data.attributes.name as string,
+        displayName: raw.data.attributes.displayName as string,
+        fields: [],
+      }
+
+      if (raw.included && raw.included.length > 0) {
+        result.fields = raw.included
+          .filter((r) => r.type === 'fields')
+          .map(
+            (r) =>
+              ({
+                id: r.id,
+                ...r.attributes,
+              }) as unknown as CollectionField
+          )
+      }
+
+      return result
+    },
     enabled: !!collectionId,
   })
 

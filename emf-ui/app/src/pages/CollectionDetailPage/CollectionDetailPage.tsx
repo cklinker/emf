@@ -179,7 +179,11 @@ export function CollectionDetailPage({
     | 'versions'
   >('fields')
 
-  // Fetch collection data
+  // Fetch collection data with included fields.
+  // Fields are stored as separate records in the "fields" collection with a
+  // master-detail relationship to "collections". Using ?include=fields tells
+  // the DynamicCollectionRouter to resolve the inverse relationship and return
+  // field records in the JSON:API "included" array.
   const {
     data: collection,
     isLoading: isLoadingCollection,
@@ -188,17 +192,34 @@ export function CollectionDetailPage({
   } = useQuery({
     queryKey: ['collection', collectionId],
     queryFn: async () => {
-      const response = await apiClient.getOne<Collection>(`/api/collections/${collectionId}`)
+      const raw = await apiClient.get<{
+        data: { type: string; id: string; attributes: Record<string, unknown> }
+        included?: { type: string; id: string; attributes: Record<string, unknown> }[]
+      }>(`/api/collections/${collectionId}?include=fields`)
+
+      // Flatten the primary resource (collection)
+      const result: Collection = {
+        id: raw.data.id,
+        ...(raw.data.attributes as Omit<Collection, 'id' | 'fields'>),
+      } as Collection
+
+      // Merge included "fields" resources into collection.fields
+      if (raw.included && raw.included.length > 0) {
+        result.fields = raw.included
+          .filter((r) => r.type === 'fields')
+          .map((r) => ({ id: r.id, ...r.attributes }) as unknown as FieldDefinition)
+      }
+
       // Normalize field types from backend canonical form to UI form.
       // The backend stores types as uppercase enums (e.g., "STRING", "DOUBLE", "PICKLIST")
       // but the UI uses lowercase aliases (e.g., "string", "number", "picklist").
-      if (response.fields) {
-        response.fields = response.fields.map((f) => ({
+      if (result.fields) {
+        result.fields = result.fields.map((f) => ({
           ...f,
           type: normalizeFieldType(f.type),
         }))
       }
-      return response
+      return result
     },
     enabled: !!collectionId,
   })

@@ -701,18 +701,39 @@ function LayoutEditorViewInner({ layoutId, onBack }: LayoutEditorViewProps): Rea
     enabled: !!collectionId,
   })
 
-  // Populate editor state when layout loads
+  // Populate editor state when both layout and collection fields are loaded.
+  // We need the collection fields to resolve fieldId UUIDs on each field
+  // placement into human-readable fieldName / fieldDisplayName / fieldType.
   useEffect(() => {
-    if (layoutDetail) {
-      const sections = (layoutDetail.sections ?? []).map(apiSectionToEditor)
+    if (layoutDetail && collectionDetail?.fields) {
+      // Build a lookup map: fieldId → CollectionField
+      const fieldMap = new Map<string, CollectionField>()
+      for (const f of collectionDetail.fields) {
+        fieldMap.set(f.id, f)
+      }
+
+      // Map sections and resolve field names on each placement
+      const sections = (layoutDetail.sections ?? []).map((s) => {
+        const editorSection = apiSectionToEditor(s)
+        editorSection.fields = editorSection.fields.map((fp) => {
+          const field = fieldMap.get(fp.fieldId)
+          if (field) {
+            return {
+              ...fp,
+              fieldName: field.name,
+              fieldDisplayName: field.displayName || field.name,
+              fieldType: field.type,
+            }
+          }
+          return fp
+        })
+        return editorSection
+      })
+
       const relatedLists = (layoutDetail.relatedLists ?? []).map(apiRelatedListToEditor)
       setLayout(layoutDetail.collectionId, sections, relatedLists)
-    }
-  }, [layoutDetail, setLayout])
 
-  // Populate available fields when collection loads
-  useEffect(() => {
-    if (collectionDetail?.fields) {
+      // Also populate the available fields palette
       const fields: AvailableField[] = collectionDetail.fields.map((f) => ({
         id: f.id,
         name: f.name,
@@ -722,7 +743,7 @@ function LayoutEditorViewInner({ layoutId, onBack }: LayoutEditorViewProps): Rea
       }))
       setAvailableFields(fields)
     }
-  }, [collectionDetail, setAvailableFields])
+  }, [layoutDetail, collectionDetail, setLayout, setAvailableFields])
 
   // Save mutation
   const saveMutation = useMutation({

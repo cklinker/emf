@@ -5,9 +5,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -24,13 +28,21 @@ class GovernorLimitsControllerTest {
 
     private JdbcTemplate jdbcTemplate;
     private ObjectMapper objectMapper;
+    private StringRedisTemplate redisTemplate;
+    private ValueOperations<String, String> valueOps;
     private GovernorLimitsController controller;
 
+    @SuppressWarnings("unchecked")
     @BeforeEach
     void setUp() {
         jdbcTemplate = mock(JdbcTemplate.class);
         objectMapper = new ObjectMapper();
-        controller = new GovernorLimitsController(jdbcTemplate, objectMapper);
+        redisTemplate = mock(StringRedisTemplate.class);
+        valueOps = mock(ValueOperations.class);
+        when(redisTemplate.opsForValue()).thenReturn(valueOps);
+        // Default: Redis returns null (0 API calls)
+        when(valueOps.get(anyString())).thenReturn(null);
+        controller = new GovernorLimitsController(jdbcTemplate, objectMapper, redisTemplate);
     }
 
     // ==================== GET Tests ====================
@@ -197,14 +209,51 @@ class GovernorLimitsControllerTest {
         }
 
         @Test
-        @DisplayName("Should return zero for apiCallsUsed (tracked in Redis)")
-        void returnsZeroApiCallsUsed() {
+        @DisplayName("Should return zero apiCallsUsed when Redis key is absent")
+        void returnsZeroApiCallsUsedWhenRedisEmpty() {
             when(jdbcTemplate.queryForList(contains("FROM tenant"), eq("tenant-1")))
                     .thenReturn(List.of(tenantLimitsRow("{}")));
             when(jdbcTemplate.queryForObject(contains("FROM platform_user"), eq(Integer.class), eq("tenant-1")))
                     .thenReturn(0);
             when(jdbcTemplate.queryForObject(contains("FROM collection"), eq(Integer.class)))
                     .thenReturn(0);
+
+            ResponseEntity<Map<String, Object>> response = controller.getStatus("tenant-1");
+
+            assertThat(response.getBody().get("apiCallsUsed")).isEqualTo(0);
+        }
+
+        @Test
+        @DisplayName("Should return daily API call count from Redis")
+        void returnsDailyApiCallCountFromRedis() {
+            when(jdbcTemplate.queryForList(contains("FROM tenant"), eq("tenant-1")))
+                    .thenReturn(List.of(tenantLimitsRow("{}")));
+            when(jdbcTemplate.queryForObject(contains("FROM platform_user"), eq(Integer.class), eq("tenant-1")))
+                    .thenReturn(0);
+            when(jdbcTemplate.queryForObject(contains("FROM collection"), eq(Integer.class)))
+                    .thenReturn(0);
+
+            // Mock Redis returning a daily count
+            String today = LocalDate.now(ZoneOffset.UTC).toString();
+            when(valueOps.get("api-calls-daily:tenant-1:" + today)).thenReturn("4523");
+
+            ResponseEntity<Map<String, Object>> response = controller.getStatus("tenant-1");
+
+            assertThat(response.getBody().get("apiCallsUsed")).isEqualTo(4523);
+        }
+
+        @Test
+        @DisplayName("Should return zero when Redis throws exception")
+        void returnsZeroWhenRedisThrows() {
+            when(jdbcTemplate.queryForList(contains("FROM tenant"), eq("tenant-1")))
+                    .thenReturn(List.of(tenantLimitsRow("{}")));
+            when(jdbcTemplate.queryForObject(contains("FROM platform_user"), eq(Integer.class), eq("tenant-1")))
+                    .thenReturn(0);
+            when(jdbcTemplate.queryForObject(contains("FROM collection"), eq(Integer.class)))
+                    .thenReturn(0);
+
+            // Mock Redis failure
+            when(redisTemplate.opsForValue()).thenThrow(new RuntimeException("Redis unavailable"));
 
             ResponseEntity<Map<String, Object>> response = controller.getStatus("tenant-1");
 

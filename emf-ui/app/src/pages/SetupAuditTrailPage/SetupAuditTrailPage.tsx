@@ -24,11 +24,12 @@ interface AuditEntry {
 
 export function SetupAuditTrailPage({ className }: SetupAuditTrailPageProps): React.ReactElement {
   const { t } = useI18n()
-  const { adminClient } = useApi()
+  const { apiClient } = useApi()
 
   const [section, setSection] = useState<string>('')
   const [entityType, setEntityType] = useState<string>('')
   const [page, setPage] = useState(0)
+  const pageSize = 50
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
 
   const {
@@ -37,13 +38,19 @@ export function SetupAuditTrailPage({ className }: SetupAuditTrailPageProps): Re
     error,
   } = useQuery({
     queryKey: ['audit-trail', section, entityType, page],
-    queryFn: () =>
-      adminClient.audit.list({
-        section: section || undefined,
-        entityType: entityType || undefined,
-        page,
-        size: 50,
-      }),
+    queryFn: async () => {
+      const params = new URLSearchParams()
+      params.set('page[number]', String(page))
+      params.set('page[size]', String(pageSize))
+      params.set('sort', '-timestamp')
+      if (section) params.set('filter[section][eq]', section)
+      if (entityType) params.set('filter[entityType][eq]', entityType)
+
+      const entries = await apiClient.getList<AuditEntry>(
+        `/api/setup-audit-entries?${params.toString()}`
+      )
+      return { content: entries, totalPages: entries.length < pageSize ? page + 1 : page + 2 }
+    },
   })
 
   const toggleRow = useCallback((id: string) => {
@@ -59,7 +66,7 @@ export function SetupAuditTrailPage({ className }: SetupAuditTrailPageProps): Re
   }, [])
 
   if (isLoading) return <LoadingSpinner />
-  if (error) return <ErrorMessage message={t('audit.loadError')} />
+  if (error) return <ErrorMessage error={t('audit.loadError')} />
 
   const entries: AuditEntry[] = auditData?.content || []
   const totalPages = auditData?.totalPages || 0

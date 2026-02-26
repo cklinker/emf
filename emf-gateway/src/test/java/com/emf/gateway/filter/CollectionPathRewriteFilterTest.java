@@ -23,7 +23,8 @@ import static org.mockito.Mockito.when;
  *
  * Tests verify that:
  * - /api/xxx paths are rewritten to /api/collections/xxx
- * - /api/collections/xxx paths are NOT rewritten (no double-rewrite)
+ * - /api/collections/xxx paths are rewritten to /api/collections/collections/xxx
+ *   (the "collections" system collection needs this to route correctly)
  * - Non-API paths (e.g. /internal/xxx) pass through unchanged
  * - GATEWAY_REQUEST_URL_ATTR is updated when present
  * - Filter order is correct (after RouteToRequestUrlFilter, before NettyRoutingFilter)
@@ -94,9 +95,13 @@ class CollectionPathRewriteFilterTest {
     }
 
     @Test
-    void shouldNotRewriteAlreadyRewrittenPath() {
+    void shouldRewriteCollectionsCollectionPath() {
+        // The "collections" system collection has API path /api/collections.
+        // When the UI requests /api/collections/{uuid}, it must be rewritten
+        // to /api/collections/collections/{uuid} so DynamicCollectionRouter
+        // resolves collectionName="collections" and id="{uuid}".
         MockServerHttpRequest request = MockServerHttpRequest
-                .get("/api/collections/product")
+                .get("/api/collections/ec000100-0000-0000-0000-000000000003")
                 .build();
         MockServerWebExchange exchange = MockServerWebExchange.from(request);
 
@@ -105,7 +110,40 @@ class CollectionPathRewriteFilterTest {
 
         assertThat(capturedExchange.get()).isNotNull();
         assertThat(capturedExchange.get().getRequest().getURI().getRawPath())
-                .isEqualTo("/api/collections/product");
+                .isEqualTo("/api/collections/collections/ec000100-0000-0000-0000-000000000003");
+    }
+
+    @Test
+    void shouldRewriteCollectionsCollectionListPath() {
+        // Listing all collections: /api/collections → /api/collections/collections
+        MockServerHttpRequest request = MockServerHttpRequest
+                .get("/api/collections")
+                .build();
+        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        StepVerifier.create(filter.filter(exchange, chain))
+                .verifyComplete();
+
+        assertThat(capturedExchange.get()).isNotNull();
+        assertThat(capturedExchange.get().getRequest().getURI().getRawPath())
+                .isEqualTo("/api/collections/collections");
+    }
+
+    @Test
+    void shouldRewriteCollectionsSubResourcePath() {
+        // Sub-resource on "collections" collection:
+        // /api/collections/{uuid}/fields → /api/collections/collections/{uuid}/fields
+        MockServerHttpRequest request = MockServerHttpRequest
+                .get("/api/collections/ec000100-0000-0000-0000-000000000003/fields")
+                .build();
+        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        StepVerifier.create(filter.filter(exchange, chain))
+                .verifyComplete();
+
+        assertThat(capturedExchange.get()).isNotNull();
+        assertThat(capturedExchange.get().getRequest().getURI().getRawPath())
+                .isEqualTo("/api/collections/collections/ec000100-0000-0000-0000-000000000003/fields");
     }
 
     @Test

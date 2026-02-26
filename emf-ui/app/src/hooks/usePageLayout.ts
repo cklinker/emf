@@ -127,9 +127,77 @@ export function usePageLayout(
 
         if (!layoutId) return null
 
-        // Step 2: Fetch the layout itself
-        const result = await apiClient.getOne<PageLayoutDto>(`/api/page-layouts/${layoutId}`)
-        if (!result || !result.sections) {
+        // Step 2: Fetch the layout with all children in a single request.
+        // The backend supports transitive includes: layout-fields are
+        // resolved via layout-sections even though they reference sections
+        // (not page-layouts) directly.
+        type JsonApiResource = {
+          type: string
+          id: string
+          attributes: Record<string, unknown>
+          relationships?: Record<string, { data?: { type: string; id: string } | null }>
+        }
+        const raw = await apiClient.get<{
+          data: JsonApiResource
+          included?: JsonApiResource[]
+        }>(
+          `/api/page-layouts/${layoutId}?include=layout-sections,layout-fields,layout-related-lists`
+        )
+
+        // Flatten a JSON:API resource: merge attributes + relationship IDs
+        const flatten = (r: JsonApiResource): Record<string, unknown> => {
+          const obj: Record<string, unknown> = { id: r.id, ...r.attributes }
+          if (r.relationships) {
+            for (const [key, rel] of Object.entries(r.relationships)) {
+              obj[key] = rel?.data?.id ?? null
+            }
+          }
+          return obj
+        }
+
+        const flatLayout = flatten(raw.data)
+        const included = raw.included ?? []
+
+        // Extract and sort sections
+        const sections: LayoutSectionDto[] = included
+          .filter((r) => r.type === 'layout-sections')
+          .map((r) => {
+            const flat = flatten(r)
+            return { ...flat, fields: [] } as unknown as LayoutSectionDto
+          })
+          .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+
+        // Extract field placements and group by sectionId
+        const fieldPlacements = included
+          .filter((r) => r.type === 'layout-fields')
+          .map((r) => flatten(r) as unknown as LayoutFieldPlacementDto & { sectionId: string })
+          .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+
+        const fieldsBySection = new Map<string, LayoutFieldPlacementDto[]>()
+        for (const fp of fieldPlacements) {
+          const list = fieldsBySection.get(fp.sectionId) ?? []
+          list.push(fp)
+          fieldsBySection.set(fp.sectionId, list)
+        }
+
+        // Attach fields to their sections
+        for (const section of sections) {
+          section.fields = fieldsBySection.get(section.id) ?? []
+        }
+
+        // Extract related lists
+        const relatedLists: LayoutRelatedListDto[] = included
+          .filter((r) => r.type === 'layout-related-lists')
+          .map((r) => flatten(r) as unknown as LayoutRelatedListDto)
+          .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+
+        const result: PageLayoutDto = {
+          ...(flatLayout as unknown as Omit<PageLayoutDto, 'sections' | 'relatedLists'>),
+          sections,
+          relatedLists,
+        }
+
+        if (!result.sections || result.sections.length === 0) {
           return null
         }
         return result

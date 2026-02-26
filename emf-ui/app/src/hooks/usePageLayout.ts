@@ -201,11 +201,61 @@ export function usePageLayout(
           section.fields = fieldsBySection.get(section.id) ?? []
         }
 
-        // Extract related lists
+        // Extract related lists (only have IDs from relationships — names resolved below)
         const relatedLists: LayoutRelatedListDto[] = included
           .filter((r) => r.type === 'layout-related-lists')
           .map((r) => flatten(r) as unknown as LayoutRelatedListDto)
           .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+
+        // Resolve collection names and field names for related lists.
+        // The DB only stores relatedCollectionId / relationshipFieldId (UUIDs),
+        // but the UI needs the collection name (for API URLs) and field name.
+        if (relatedLists.length > 0) {
+          const uniqueCollIds = [
+            ...new Set(relatedLists.map((rl) => rl.relatedCollectionId).filter(Boolean)),
+          ]
+          const uniqueFieldIds = [
+            ...new Set(relatedLists.map((rl) => rl.relationshipFieldId).filter(Boolean)),
+          ]
+
+          // Fetch names in parallel
+          const [collResults, fieldResults] = await Promise.all([
+            Promise.all(
+              uniqueCollIds.map(async (cid) => {
+                try {
+                  const c = await apiClient.getOne<{ id: string; name: string }>(
+                    `/api/collections/${cid}`
+                  )
+                  return { id: cid, name: c?.name }
+                } catch {
+                  return { id: cid, name: undefined }
+                }
+              })
+            ),
+            Promise.all(
+              uniqueFieldIds.map(async (fid) => {
+                try {
+                  const f = await apiClient.getOne<{ id: string; name: string }>(
+                    `/api/fields/${fid}`
+                  )
+                  return { id: fid, name: f?.name }
+                } catch {
+                  return { id: fid, name: undefined }
+                }
+              })
+            ),
+          ])
+
+          const collNameMap = new Map(collResults.map((r) => [r.id, r.name]))
+          const fieldNameMap = new Map(fieldResults.map((r) => [r.id, r.name]))
+
+          for (const rl of relatedLists) {
+            rl.relatedCollectionName =
+              rl.relatedCollectionName || collNameMap.get(rl.relatedCollectionId) || ''
+            rl.relationshipFieldName =
+              rl.relationshipFieldName || fieldNameMap.get(rl.relationshipFieldId) || ''
+          }
+        }
 
         const result: PageLayoutDto = {
           ...(flatLayout as unknown as Omit<PageLayoutDto, 'sections' | 'relatedLists'>),

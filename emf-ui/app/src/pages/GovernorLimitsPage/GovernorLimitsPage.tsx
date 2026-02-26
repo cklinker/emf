@@ -48,13 +48,13 @@ export function GovernorLimitsPage({ className }: GovernorLimitsPageProps): Reac
     error,
   } = useQuery({
     queryKey: ['governor-limits'],
-    queryFn: () => apiClient.getOne<GovernorLimitsStatus>('/api/governor-limits'),
+    queryFn: () => apiClient.get<GovernorLimitsStatus>('/api/governor-limits'),
     refetchInterval: 60000,
   })
 
   const saveMutation = useMutation({
     mutationFn: (limits: GovernorLimits) =>
-      apiClient.putResource<GovernorLimits>('/api/governor-limits', limits),
+      apiClient.put<GovernorLimits>('/api/governor-limits', limits),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['governor-limits'] })
       showToast(t('governorLimits.saveSuccess'), 'success')

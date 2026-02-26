@@ -12,17 +12,21 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
 import java.net.URI;
+import java.util.regex.Pattern;
 
 /**
  * Rewrites collection API request paths from {@code /api/{collectionName}/...}
  * to {@code /api/collections/{collectionName}/...} so the worker's
  * {@code DynamicCollectionRouter} (mapped at {@code /api/collections}) can handle them.
  *
- * <p>This applies to ALL {@code /api/} paths, including the "collections" system
- * collection itself (e.g., {@code /api/collections/{uuid}} →
- * {@code /api/collections/collections/{uuid}}). The DynamicCollectionRouter expects
- * the collection name as the first path segment after {@code /api/collections/},
- * so the "collections" collection must also follow this pattern.
+ * <p>Most {@code /api/} paths are straightforward: {@code /api/product/123} becomes
+ * {@code /api/collections/product/123}. The "collections" system collection requires
+ * special handling because its API path ({@code /api/collections}) collides with the
+ * DynamicCollectionRouter's base path. When the first segment after
+ * {@code /api/collections/} is a UUID, it indicates a record lookup on the
+ * "collections" collection itself and must be rewritten. When it is a non-UUID name
+ * (e.g., {@code products}), the path is already correctly formed for another
+ * collection and must NOT be rewritten.
  *
  * <p>This is implemented as a {@link GlobalFilter} rather than a route-level
  * {@link org.springframework.cloud.gateway.filter.GatewayFilter} because route
@@ -35,11 +39,12 @@ import java.net.URI;
  *
  * <p>Examples:
  * <pre>
- *   Gateway receives: GET /api/product?page=1
- *   Worker expects:   GET /api/collections/product?page=1
- *
- *   Gateway receives: GET /api/collections/{uuid}
- *   Worker expects:   GET /api/collections/collections/{uuid}
+ *   /api/product?page=1                   → /api/collections/product?page=1
+ *   /api/collections                      → /api/collections/collections
+ *   /api/collections/{uuid}               → /api/collections/collections/{uuid}
+ *   /api/collections/{uuid}/fields        → /api/collections/collections/{uuid}/fields
+ *   /api/collections/products             → unchanged (already correct)
+ *   /api/collections/products/123         → unchanged (already correct)
  * </pre>
  */
 @Component
@@ -48,17 +53,31 @@ public class CollectionPathRewriteFilter implements GlobalFilter, Ordered {
     private static final Logger log = LoggerFactory.getLogger(CollectionPathRewriteFilter.class);
 
     private static final String API_PREFIX = "/api/";
+    private static final String COLLECTIONS_PREFIX = "/api/collections/";
+
+    private static final Pattern UUID_PATTERN = Pattern.compile(
+            "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         String path = exchange.getRequest().getURI().getRawPath();
 
-        // Rewrite ALL /api/xxx paths to /api/collections/xxx.
-        // This includes /api/collections/xxx → /api/collections/collections/xxx
-        // because the "collections" system collection must also go through
-        // DynamicCollectionRouter with collectionName="collections".
         if (path == null || !path.startsWith(API_PREFIX)) {
             return chain.filter(exchange);
+        }
+
+        // For paths starting with /api/collections/, only rewrite if the next
+        // segment is a UUID (indicating a record lookup on the "collections"
+        // system collection itself). Non-UUID segments like "products" are
+        // already correctly formed paths for other collections.
+        if (path.startsWith(COLLECTIONS_PREFIX)) {
+            String remainder = path.substring(COLLECTIONS_PREFIX.length());
+            String firstSegment = remainder.contains("/")
+                    ? remainder.substring(0, remainder.indexOf('/'))
+                    : remainder;
+            if (!UUID_PATTERN.matcher(firstSegment).matches()) {
+                return chain.filter(exchange);
+            }
         }
 
         // Rewrite /api/xxx → /api/collections/xxx

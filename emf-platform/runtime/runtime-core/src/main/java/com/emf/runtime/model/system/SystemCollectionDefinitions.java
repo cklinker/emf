@@ -314,7 +314,6 @@ public final class SystemCollectionDefinitions {
             .addField(FieldDefinition.masterDetail("collectionId", "collections", "Collection")
                 .withColumnName("collection_id"))
             .addField(FieldDefinition.requiredString("name", 100))
-            .addField(FieldDefinition.requiredString("createdBy").withColumnName("created_by"))
             .addField(FieldDefinition.string("visibility", 20).withDefault("PRIVATE"))
             .addField(FieldDefinition.bool("isDefault").withColumnName("is_default"))
             .addField(FieldDefinition.requiredJson("columns"))
@@ -487,7 +486,6 @@ public final class SystemCollectionDefinitions {
             .addField(FieldDefinition.requiredText("sourceCode").withColumnName("source_code"))
             .addField(FieldDefinition.bool("active"))
             .addField(FieldDefinition.integer("version"))
-            .addField(FieldDefinition.requiredString("createdBy", 36).withColumnName("created_by"))
             .build();
     }
 
@@ -503,7 +501,6 @@ public final class SystemCollectionDefinitions {
             .addField(FieldDefinition.integer("version").withDefault(1))
             .addField(FieldDefinition.json("triggerConfig").withColumnName("trigger_config"))
             .addField(FieldDefinition.requiredJson("definition"))
-            .addField(FieldDefinition.requiredString("createdBy", 36).withColumnName("created_by"))
             .build();
     }
 
@@ -551,8 +548,6 @@ public final class SystemCollectionDefinitions {
             .addField(FieldDefinition.datetime("lastRunAt").withColumnName("last_run_at"))
             .addField(FieldDefinition.string("lastStatus", 20).withColumnName("last_status"))
             .addField(FieldDefinition.datetime("nextRunAt").withColumnName("next_run_at"))
-            .addField(FieldDefinition.requiredString("createdBy", 36)
-                .withColumnName("created_by"))
             .build();
     }
 
@@ -572,8 +567,6 @@ public final class SystemCollectionDefinitions {
                 .withColumnName("related_collection_id"))
             .addField(FieldDefinition.string("folder"))
             .addField(FieldDefinition.bool("isActive").withColumnName("is_active"))
-            .addField(FieldDefinition.requiredString("createdBy", 36)
-                .withColumnName("created_by"))
             .build();
     }
 
@@ -589,8 +582,6 @@ public final class SystemCollectionDefinitions {
             .addField(FieldDefinition.string("secret", 200))
             .addField(FieldDefinition.bool("active"))
             .addField(FieldDefinition.json("retryPolicy").withColumnName("retry_policy"))
-            .addField(FieldDefinition.requiredString("createdBy", 36)
-                .withColumnName("created_by"))
             .build();
     }
 
@@ -615,8 +606,6 @@ public final class SystemCollectionDefinitions {
                 .withColumnName("rate_limit_per_hour").withDefault(10000))
             .addField(FieldDefinition.bool("active"))
             .addField(FieldDefinition.datetime("lastUsedAt").withColumnName("last_used_at"))
-            .addField(FieldDefinition.requiredString("createdBy", 36)
-                .withColumnName("created_by"))
             .build();
     }
 
@@ -672,8 +661,6 @@ public final class SystemCollectionDefinitions {
                 .withColumnName("folder_id"))
             .addField(FieldDefinition.string("accessLevel", 20)
                 .withColumnName("access_level").withDefault("PRIVATE"))
-            .addField(FieldDefinition.requiredString("createdBy", 36)
-                .withColumnName("created_by"))
             .build();
     }
 
@@ -683,8 +670,6 @@ public final class SystemCollectionDefinitions {
             .addField(FieldDefinition.requiredString("name", 100))
             .addField(FieldDefinition.string("accessLevel", 20)
                 .withColumnName("access_level").withDefault("PRIVATE"))
-            .addField(FieldDefinition.requiredString("createdBy", 36)
-                .withColumnName("created_by"))
             .build();
     }
 
@@ -701,8 +686,6 @@ public final class SystemCollectionDefinitions {
             .addField(FieldDefinition.string("runningUserId", 36)
                 .withColumnName("running_user_id"))
             .addField(FieldDefinition.integer("columnCount").withColumnName("column_count"))
-            .addField(FieldDefinition.requiredString("createdBy", 36)
-                .withColumnName("created_by"))
             .build();
     }
 
@@ -718,8 +701,6 @@ public final class SystemCollectionDefinitions {
                 .withColumnName("collection_id"))
             .addField(FieldDefinition.requiredString("recordId").withColumnName("record_id"))
             .addField(FieldDefinition.requiredText("content"))
-            .addField(FieldDefinition.requiredString("createdBy", 320)
-                .withColumnName("created_by"))
             .build();
     }
 
@@ -767,8 +748,6 @@ public final class SystemCollectionDefinitions {
                 .withColumnName("content_type").withDefault("application/json"))
             .addField(FieldDefinition.integer("batchSize").withColumnName("batch_size")
                 .withDefault(200))
-            .addField(FieldDefinition.requiredString("createdBy", 36)
-                .withColumnName("created_by"))
             .addField(FieldDefinition.datetime("startedAt").withColumnName("started_at"))
             .addField(FieldDefinition.datetime("completedAt").withColumnName("completed_at"))
             .build();
@@ -1451,8 +1430,6 @@ public final class SystemCollectionDefinitions {
             .addField(FieldDefinition.requiredJson("snapshot"))
             .addField(FieldDefinition.string("changeSummary", 500)
                 .withColumnName("change_summary"))
-            .addField(FieldDefinition.string("createdBy", 255)
-                .withColumnName("created_by"))
             .build();
     }
 
@@ -1615,7 +1592,11 @@ public final class SystemCollectionDefinitions {
             .eventsConfig(EventsConfig.allEvents("emf.collections"))
             .systemCollection(true)
             .tenantScoped(true)
-            .readOnly(false);
+            .readOnly(false)
+            .addField(FieldDefinition.datetime("createdAt").withColumnName("created_at"))
+            .addField(FieldDefinition.string("createdBy", 255).withColumnName("created_by"))
+            .addField(FieldDefinition.datetime("updatedAt").withColumnName("updated_at"))
+            .addField(FieldDefinition.string("updatedBy", 255).withColumnName("updated_by"));
     }
 
     /**
@@ -1631,6 +1612,10 @@ public final class SystemCollectionDefinitions {
             .eventsConfig(EventsConfig.disabled())
             .systemCollection(true)
             .tenantScoped(true)
-            .readOnly(true);
+            .readOnly(true)
+            .addField(FieldDefinition.datetime("createdAt").withColumnName("created_at"))
+            .addField(FieldDefinition.string("createdBy", 255).withColumnName("created_by"))
+            .addField(FieldDefinition.datetime("updatedAt").withColumnName("updated_at"))
+            .addField(FieldDefinition.string("updatedBy", 255).withColumnName("updated_by"));
     }
 }

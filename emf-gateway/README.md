@@ -1,278 +1,131 @@
 # EMF API Gateway
 
-The EMF API Gateway is a Spring Cloud Gateway-based service that serves as the main ingress point for all EMF platform applications. It provides centralized authentication, authorization, dynamic routing, JSON:API processing with intelligent caching, and rate limiting capabilities.
+Spring Cloud Gateway service that serves as the main ingress point for the EMF platform. Provides centralized authentication, multi-tenant routing, JSON:API processing, and rate limiting.
 
-## Features
-
-- **Dynamic Routing**: Automatically discovers routes from the EMF control plane
-- **Authentication**: JWT-based authentication using OAuth2 Resource Server
-- **Authorization**: Route-level and field-level authorization policies
-- **JSON:API Processing**: Intelligent include parameter processing with Redis caching
-- **Rate Limiting**: Configurable rate limits per route using Redis
-- **Real-time Configuration**: Updates configuration dynamically via Kafka events
-- **Health Monitoring**: Comprehensive health checks and metrics via Spring Boot Actuator
-
-## Technology Stack
-
-- **Java 21**: Modern Java with latest features
-- **Spring Boot 3.2.1**: Latest Spring Boot framework
-- **Spring Cloud Gateway**: Reactive API gateway
-- **Spring WebFlux**: Reactive, non-blocking web framework
-- **Redis**: Caching and rate limiting
-- **Kafka**: Real-time configuration updates
-- **Spring Security OAuth2**: JWT validation
-- **JUnit QuickCheck**: Property-based testing
-
-## Project Structure
+## Architecture
 
 ```
-emf-gateway/
-├── src/
-│   ├── main/
-│   │   ├── java/com/emf/gateway/
-│   │   │   └── GatewayApplication.java
-│   │   └── resources/
-│   │       └── application.yml
-│   └── test/
-│       ├── java/com/emf/gateway/
-│       │   ├── unit/              # Unit tests
-│       │   └── property/          # Property-based tests
-│       └── resources/
-│           └── application-test.yml
-├── pom.xml
-└── README.md
+Client Request
+  │
+  ├─ TenantSlugExtractionFilter (-300)   Strip tenant slug from URL
+  ├─ JwtAuthenticationFilter (-100)       Validate JWT, extract principal
+  ├─ RateLimitFilter (-50)                Per-tenant rate limiting (Redis)
+  ├─ RouteAuthorizationFilter (0)         Object-level permission checks
+  ├─ CollectionPathRewriteFilter          Rewrite /api/xxx → /api/collections/xxx
+  ├─ Request forwarded to worker
+  ├─ FieldAuthorizationFilter             Filter response fields by permissions
+  └─ IncludeResolutionFilter (10200)      Resolve JSON:API ?include= params
 ```
+
+## Key Packages
+
+| Package | Description |
+|---------|-------------|
+| `auth` | JWT validation, `GatewayPrincipal` extraction, public path matching |
+| `authz` | Route/field authorization filters, permission resolution from worker |
+| `config` | Spring configuration, bootstrap, Kafka/Redis/Security beans |
+| `filter` | Tenant resolution, path rewriting, security headers, request logging |
+| `route` | `DynamicRouteLocator`, `RouteRegistry` (in-memory, thread-safe) |
+| `ratelimit` | `RedisRateLimiter` (sliding window), `TenantGovernorLimitCache` |
+| `jsonapi` | `IncludeResolver` -- fetches related resources from Redis cache with backend fallback |
+| `listener` | Kafka consumers for collection and worker assignment changes |
+| `health` | Health indicators for Redis, Kafka, and worker service |
+| `tenant` | `TenantSlugCache` -- in-memory slug-to-tenant-ID mapping |
 
 ## Configuration
 
-The gateway is configured through `application.yml`. Key configuration properties:
+Key properties from `application.yml`:
 
-### Control Plane
-```yaml
-emf.gateway.control-plane.url: ${CONTROL_PLANE_URL:http://localhost:8080}
-```
-
-### Kafka
 ```yaml
 spring.kafka.bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
-emf.gateway.kafka.topics:
-  collection-changed: emf.config.collection.changed
-  service-changed: emf.config.service.changed
-```
-
-### Redis
-```yaml
 spring.data.redis:
   host: ${REDIS_HOST:localhost}
   port: ${REDIS_PORT:6379}
-```
-
-### JWT
-```yaml
 spring.security.oauth2.resourceserver.jwt:
-  issuer-uri: ${JWT_ISSUER_URI:http://localhost:9000/realms/emf}
+  issuer-uri: ${OIDC_ISSUER_URI:http://localhost:9000/realms/emf}
+
+emf.gateway:
+  worker-service-url: ${WORKER_SERVICE_URL:http://emf-worker:80}
+  tenant-slug:
+    enabled: ${TENANT_SLUG_ENABLED:true}
+    cache-refresh-ms: 60000
+  security:
+    permissions-enabled: ${PERMISSIONS_ENABLED:false}
+    permissions-cache-ttl-minutes: ${PERMISSIONS_CACHE_TTL:5}
+    public-paths: /api/ui-pages,/api/ui-menus,/api/oidc-providers,/api/tenants
+  kafka.topics:
+    collection-changed: emf.config.collection.changed
+    worker-assignment-changed: emf.worker.assignment.changed
+    record-changed: emf.record.changed
 ```
 
-### Rate Limiting
-```yaml
-emf.gateway.rate-limit.default:
-  requests-per-window: 1000
-  window-duration: PT1M  # 1 minute
-```
+## How It Works
+
+**Startup:**
+1. `RouteInitializer` primes the `TenantSlugCache` by calling the worker
+2. Fetches initial routes and governor limits via `POST {worker}/internal/bootstrap`
+3. Populates `RouteRegistry` and publishes `RefreshRoutesEvent`
+
+**Runtime:**
+- Routes are **not** hardcoded -- they are discovered from the worker at startup and updated dynamically via Kafka events without restart
+- JSON:API resources are cached in Redis with a 10-minute TTL
+- Rate limits are enforced per-tenant using Redis sliding windows backed by governor limit configuration
+
+**Kafka topics consumed:**
+- `emf.config.collection.changed` -- updates routes on collection create/update/delete
+- `emf.worker.assignment.changed` -- updates routes on worker assignment changes
+- `emf.record.changed` -- record change events
 
 ## Building
 
-Build the project using Maven:
-
 ```bash
-mvn clean install
+# Build runtime dependencies first
+mvn clean install -DskipTests -f emf-platform/pom.xml \
+  -pl runtime/runtime-core,runtime/runtime-events,runtime/runtime-jsonapi,runtime/runtime-module-core,runtime/runtime-module-integration,runtime/runtime-module-schema \
+  -am -B
+
+# Build and test gateway
+mvn verify -f emf-gateway/pom.xml -B
 ```
 
 ## Running Locally
 
-### Prerequisites
-
-- Java 21
-- Redis running on localhost:6379
-- Kafka running on localhost:9092
-- EMF Control Plane running on localhost:8080
-
-### Run the application
+Requires Redis, Kafka, Keycloak, and the worker service. Start infrastructure via Docker Compose from the repo root:
 
 ```bash
-mvn spring-boot:run
+docker-compose up -d
+mvn spring-boot:run -f emf-gateway/pom.xml
 ```
 
-Or run the JAR:
-
-```bash
-java -jar target/emf-gateway-1.0.0-SNAPSHOT.jar
-```
-
-### Environment Variables
-
-You can override configuration using environment variables:
-
-```bash
-export CONTROL_PLANE_URL=http://control-plane:8080
-export KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-export REDIS_HOST=redis
-export REDIS_PORT=6379
-export JWT_ISSUER_URI=https://auth.example.com/realms/emf
-
-mvn spring-boot:run
-```
+The gateway starts on port **8080**.
 
 ## Testing
 
-### Run all tests
+- **Unit tests** -- JUnit 5 + Mockito, test classes in isolation
+- **Integration tests** -- Testcontainers for Kafka/Redis, MockWebServer for HTTP
+- **Property-based tests** -- JUnit QuickCheck for universal property validation
 
 ```bash
-mvn test
-```
-
-### Run unit tests only
-
-```bash
-mvn test -Dtest="**/unit/**"
-```
-
-### Run property-based tests only
-
-```bash
-mvn test -Dtest="**/property/**"
+mvn verify -f emf-gateway/pom.xml -B
 ```
 
 ## Health Checks
 
-The gateway exposes health check endpoints via Spring Boot Actuator:
+| Endpoint | Description |
+|----------|-------------|
+| `GET /actuator/health` | Overall health |
+| `GET /actuator/health/redis` | Redis connectivity |
+| `GET /actuator/health/kafka` | Kafka connectivity |
+| `GET /actuator/metrics` | Micrometer metrics |
 
-- **Overall Health**: `GET /actuator/health`
-- **Redis Health**: `GET /actuator/health/redis`
-- **Kafka Health**: `GET /actuator/health/kafka`
-- **Metrics**: `GET /actuator/metrics`
+## Docker
 
-## API Endpoints
+Multi-stage build: `maven:3.9-eclipse-temurin-21` (build) -> `eclipse-temurin:21-jre` (runtime). Runs as non-root user `emf` on port 8080 with G1GC and 75% RAM allocation.
 
-The gateway routes all requests based on dynamic configuration from the control plane:
+## Dependencies
 
-- **Control Plane**: `/control/**` → Control plane service
-- **Dynamic Routes**: Configured via control plane bootstrap endpoint
-
-### Bootstrap Endpoint
-
-The gateway fetches initial configuration from:
-
-```
-GET http://control-plane:8080/control/bootstrap
-```
-
-This endpoint returns services, collections, and authorization configuration.
-
-## Development
-
-### Adding New Filters
-
-Filters are implemented as Spring Cloud Gateway `GlobalFilter` beans. Order determines execution sequence:
-
-- `-100`: Authentication (early)
-- `-50`: Rate limiting
-- `0`: Route authorization
-- `50`: Header transformation
-- `100`: Field authorization (after backend response)
-- `200`: JSON:API include processing
-
-### Testing Strategy
-
-The project uses a dual testing approach:
-
-1. **Unit Tests**: Test specific examples and edge cases
-2. **Property-Based Tests**: Test universal properties across all inputs using JUnit QuickCheck
-
-## Deployment
-
-### Docker
-
-Build Docker image:
-
-```bash
-docker build -t emf-gateway:latest .
-```
-
-Run Docker container:
-
-```bash
-docker run -p 8080:8080 \
-  -e CONTROL_PLANE_URL=http://control-plane:8080 \
-  -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
-  -e REDIS_HOST=redis \
-  -e JWT_ISSUER_URI=https://auth.example.com/realms/emf \
-  emf-gateway:latest
-```
-
-### Kubernetes/Helm
-
-Deploy using Helm:
-
-```bash
-helm install emf-gateway ./helm/emf-gateway \
-  --set config.controlPlane.url=http://emf-control-plane:8080 \
-  --set config.kafka.bootstrapServers=kafka:9092 \
-  --set config.redis.host=redis
-```
-
-## Monitoring
-
-### Metrics
-
-The gateway exposes Micrometer metrics:
-
-- `gateway.requests.total`: Total request count
-- `gateway.requests.duration`: Request duration histogram
-- `gateway.auth.failures`: Authentication failures
-- `gateway.authz.denials`: Authorization denials
-- `gateway.ratelimit.exceeded`: Rate limit exceeded count
-- `gateway.cache.hits`: Redis cache hits
-- `gateway.cache.misses`: Redis cache misses
-
-### Logging
-
-Structured JSON logging with fields:
-
-- `timestamp`: ISO 8601 timestamp
-- `level`: Log level
-- `correlationId`: Request correlation ID
-- `path`: Request path
-- `method`: HTTP method
-- `status`: Response status code
-- `duration`: Request duration in milliseconds
-
-## Architecture
-
-The gateway follows a reactive, non-blocking architecture using Spring WebFlux and Project Reactor. Configuration updates are applied dynamically without requiring service restarts.
-
-### Request Flow
-
-1. Client sends request with JWT token
-2. Authentication filter validates JWT
-3. Rate limit filter checks rate limits
-4. Route authorization filter checks route policies
-5. Request forwarded to backend service
-6. Field authorization filter filters response fields
-7. JSON:API include filter processes includes
-8. Response returned to client
-
-### Configuration Updates
-
-1. Control plane publishes configuration change to Kafka
-2. Gateway consumes Kafka event
-3. Gateway updates in-memory registry/cache
-4. New configuration takes effect immediately
-
-## Contributing
-
-See the main EMF documentation for contribution guidelines.
-
-## License
-
-Copyright © 2024 EMF Platform
+- Java 21, Spring Boot 3.2.2, Spring Cloud 2023.0.0
+- `runtime-events`, `runtime-jsonapi` (EMF platform modules)
+- Spring Cloud Gateway, Spring WebFlux (reactive)
+- Spring Security OAuth2 Resource Server
+- Spring Data Redis (reactive), Spring Kafka

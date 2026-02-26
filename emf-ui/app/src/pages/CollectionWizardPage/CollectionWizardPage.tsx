@@ -18,6 +18,7 @@ import {
   ChevronLeft,
   Plus,
   Trash2,
+  Pencil,
   Users,
   Building2,
   CheckSquare,
@@ -30,6 +31,8 @@ import { getTenantSlug } from '../../context/TenantContext'
 import { useApi } from '../../context/ApiContext'
 import { useToast } from '../../components/Toast'
 import { LoadingSpinner } from '../../components'
+import { FieldEditor, type FieldDefinition } from '../../components/FieldEditor'
+import { useCollectionSummaries } from '../../hooks/useCollectionSummaries'
 import { cn } from '@/lib/utils'
 
 /**
@@ -49,17 +52,6 @@ interface BasicsData {
   description: string
   storageMode: 'JSONB' | 'PHYSICAL_TABLE'
   active: boolean
-}
-
-/**
- * Field data for a single field
- */
-interface FieldData {
-  id: string
-  name: string
-  displayName: string
-  type: string
-  required: boolean
 }
 
 /**
@@ -87,45 +79,45 @@ const STEPS = [
 ] as const
 
 /**
- * Available field types in the wizard
+ * Template field type (subset of FieldDefinition for template defaults)
  */
-const FIELD_TYPES = ['STRING', 'INTEGER', 'LONG', 'DOUBLE', 'BOOLEAN', 'DATE', 'DATETIME'] as const
+type TemplateField = Pick<FieldDefinition, 'name' | 'displayName' | 'type' | 'required'>
 
 /**
  * Template definitions
  */
 const TEMPLATES: Record<
   string,
-  { name: string; icon: 'contact' | 'account' | 'task' | 'custom'; fields: Omit<FieldData, 'id'>[] }
+  { name: string; icon: 'contact' | 'account' | 'task' | 'custom'; fields: TemplateField[] }
 > = {
   contact: {
     name: 'Contact',
     icon: 'contact',
     fields: [
-      { name: 'name', displayName: 'Name', type: 'STRING', required: true },
-      { name: 'email', displayName: 'Email', type: 'STRING', required: false },
-      { name: 'phone', displayName: 'Phone', type: 'STRING', required: false },
-      { name: 'company', displayName: 'Company', type: 'STRING', required: false },
+      { name: 'name', displayName: 'Name', type: 'string', required: true },
+      { name: 'email', displayName: 'Email', type: 'email', required: false },
+      { name: 'phone', displayName: 'Phone', type: 'phone', required: false },
+      { name: 'company', displayName: 'Company', type: 'string', required: false },
     ],
   },
   account: {
     name: 'Account',
     icon: 'account',
     fields: [
-      { name: 'name', displayName: 'Name', type: 'STRING', required: true },
-      { name: 'industry', displayName: 'Industry', type: 'STRING', required: false },
-      { name: 'revenue', displayName: 'Revenue', type: 'DOUBLE', required: false },
-      { name: 'website', displayName: 'Website', type: 'STRING', required: false },
+      { name: 'name', displayName: 'Name', type: 'string', required: true },
+      { name: 'industry', displayName: 'Industry', type: 'string', required: false },
+      { name: 'revenue', displayName: 'Revenue', type: 'currency', required: false },
+      { name: 'website', displayName: 'Website', type: 'url', required: false },
     ],
   },
   task: {
     name: 'Task',
     icon: 'task',
     fields: [
-      { name: 'title', displayName: 'Title', type: 'STRING', required: true },
-      { name: 'status', displayName: 'Status', type: 'STRING', required: false },
-      { name: 'priority', displayName: 'Priority', type: 'STRING', required: false },
-      { name: 'due_date', displayName: 'Due Date', type: 'DATE', required: false },
+      { name: 'title', displayName: 'Title', type: 'string', required: true },
+      { name: 'status', displayName: 'Status', type: 'string', required: false },
+      { name: 'priority', displayName: 'Priority', type: 'string', required: false },
+      { name: 'due_date', displayName: 'Due Date', type: 'date', required: false },
     ],
   },
   custom: {
@@ -154,6 +146,22 @@ function toFieldName(displayName: string): string {
     .replace(/^[^a-z]/, '')
     .replace(/_+/g, '_')
     .replace(/_$/, '')
+}
+
+/**
+ * Build a full FieldDefinition from template defaults
+ */
+function templateFieldToDefinition(tf: TemplateField): FieldDefinition {
+  return {
+    id: generateFieldId(),
+    name: tf.name,
+    displayName: tf.displayName,
+    type: tf.type,
+    required: tf.required,
+    unique: false,
+    indexed: false,
+    order: 0,
+  }
 }
 
 /**
@@ -187,7 +195,7 @@ interface BasicsErrors {
  *
  * A 4-step wizard for creating new collections:
  * 1. Basics - collection name, service, storage mode
- * 2. Fields - template selection and field configuration
+ * 2. Fields - template selection and field configuration via FieldEditor dialog
  * 3. Authorization - profile object permissions
  * 4. Review - summary and create
  */
@@ -208,11 +216,25 @@ export function CollectionWizardPage({
     storageMode: 'JSONB',
     active: true,
   })
-  const [fields, setFields] = useState<FieldData[]>([])
+  const [fields, setFields] = useState<FieldDefinition[]>([])
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null)
   const [profilePermissions, setProfilePermissions] = useState<ProfilePermission[]>([])
   const [isCreating, setIsCreating] = useState(false)
   const [basicsErrors, setBasicsErrors] = useState<BasicsErrors>({})
+
+  // Field editor modal state
+  const [fieldEditorOpen, setFieldEditorOpen] = useState(false)
+  const [editingField, setEditingField] = useState<FieldDefinition | undefined>(undefined)
+
+  // Collection summaries for master_detail reference dropdown
+  const { summaries: allCollectionSummaries } = useCollectionSummaries()
+
+  // Global picklists for picklist field dropdown
+  const { data: globalPicklists = [] } = useQuery({
+    queryKey: ['picklists'],
+    queryFn: () => apiClient.getList<{ id: string; name: string }>('/api/global-picklists'),
+    enabled: fieldEditorOpen,
+  })
 
   // Fetch profiles
   const { data: profilesData, isLoading: profilesLoading } = useQuery({
@@ -280,46 +302,50 @@ export function CollectionWizardPage({
     setSelectedTemplate(templateKey)
     const template = TEMPLATES[templateKey]
     if (template) {
-      const templateFields = template.fields.map((f) => ({
-        ...f,
-        id: generateFieldId(),
-      }))
-      setFields(templateFields)
+      setFields(template.fields.map(templateFieldToDefinition))
     }
   }, [])
 
-  // Field handlers
+  // Field editor handlers
   const handleAddField = useCallback(() => {
-    setFields((prev) => [
-      ...prev,
-      {
-        id: generateFieldId(),
-        name: '',
-        displayName: '',
-        type: 'STRING',
-        required: false,
-      },
-    ])
+    setEditingField(undefined)
+    setFieldEditorOpen(true)
   }, [])
+
+  const handleEditField = useCallback(
+    (fieldId: string) => {
+      const field = fields.find((f) => f.id === fieldId)
+      if (field) {
+        setEditingField(field)
+        setFieldEditorOpen(true)
+      }
+    },
+    [fields]
+  )
 
   const handleRemoveField = useCallback((fieldId: string) => {
     setFields((prev) => prev.filter((f) => f.id !== fieldId))
   }, [])
 
-  const handleFieldChange = useCallback(
-    (fieldId: string, key: keyof FieldData, value: string | boolean) => {
-      setFields((prev) =>
-        prev.map((f) => {
-          if (f.id !== fieldId) return f
-          if (key === 'displayName' && typeof value === 'string') {
-            return { ...f, displayName: value, name: toFieldName(value) }
-          }
-          return { ...f, [key]: value }
-        })
-      )
+  const handleFieldSave = useCallback(
+    async (fieldData: FieldDefinition) => {
+      if (editingField) {
+        // Update existing field
+        setFields((prev) => prev.map((f) => (f.id === editingField.id ? fieldData : f)))
+      } else {
+        // Add new field
+        setFields((prev) => [...prev, fieldData])
+      }
+      setFieldEditorOpen(false)
+      setEditingField(undefined)
     },
-    []
+    [editingField]
   )
+
+  const handleFieldCancel = useCallback(() => {
+    setFieldEditorOpen(false)
+    setEditingField(undefined)
+  }, [])
 
   // Profile permission handlers
   const handlePermissionToggle = useCallback(
@@ -406,14 +432,21 @@ export function CollectionWizardPage({
 
       // Step 2: Create fields
       for (const field of fields) {
-        if (field.name && field.displayName) {
+        if (field.name) {
           await apiClient.postResource(`/api/fields`, {
             collectionId,
             name: field.name,
             displayName: field.displayName,
             type: field.type,
             required: field.required,
-            unique: false,
+            unique: field.unique,
+            indexed: field.indexed,
+            defaultValue: field.defaultValue,
+            description: field.description,
+            referenceTarget: field.referenceTarget,
+            fieldTypeConfig: field.fieldTypeConfig,
+            constraints: field.constraints,
+            trackHistory: field.trackHistory,
           })
         }
       }
@@ -729,7 +762,7 @@ export function CollectionWizardPage({
           </div>
         </div>
 
-        {/* Fields Table */}
+        {/* Fields List */}
         <div className="mt-6">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-base font-semibold text-foreground m-0 dark:text-gray-100">
@@ -764,9 +797,6 @@ export function CollectionWizardPage({
                     {t('collections.fieldName')}
                   </th>
                   <th className="px-3 py-2.5 text-xs font-semibold text-left uppercase tracking-wider text-muted-foreground bg-muted border-b border-border dark:text-gray-400 dark:bg-gray-700 dark:border-gray-600">
-                    {t('collections.displayName')}
-                  </th>
-                  <th className="px-3 py-2.5 text-xs font-semibold text-left uppercase tracking-wider text-muted-foreground bg-muted border-b border-border dark:text-gray-400 dark:bg-gray-700 dark:border-gray-600">
                     {t('collections.fieldType')}
                   </th>
                   <th className="px-3 py-2.5 text-xs font-semibold text-left uppercase tracking-wider text-muted-foreground bg-muted border-b border-border dark:text-gray-400 dark:bg-gray-700 dark:border-gray-600">
@@ -783,59 +813,49 @@ export function CollectionWizardPage({
                     data-testid={`wizard-field-row-${field.id}`}
                   >
                     <td className="px-3 py-2 text-sm text-foreground border-b border-border align-middle dark:text-gray-100 dark:border-gray-600">
-                      <input
-                        type="text"
-                        className="px-2 py-1.5 text-sm w-full min-w-[120px] text-foreground bg-background border border-border rounded-md transition-colors duration-150 motion-reduce:transition-none focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25 dark:text-gray-100 dark:bg-gray-700 dark:border-gray-600"
-                        value={field.name}
-                        onChange={(e) => handleFieldChange(field.id, 'name', e.target.value)}
-                        placeholder={t('fieldEditor.namePlaceholder')}
-                        data-testid={`wizard-field-name-${field.id}`}
-                      />
+                      {field.displayName || field.name}
+                      {field.displayName && (
+                        <>
+                          <br />
+                          <small className="text-muted-foreground dark:text-gray-400">
+                            {field.name}
+                          </small>
+                        </>
+                      )}
                     </td>
                     <td className="px-3 py-2 text-sm text-foreground border-b border-border align-middle dark:text-gray-100 dark:border-gray-600">
-                      <input
-                        type="text"
-                        className="px-2 py-1.5 text-sm w-full min-w-[120px] text-foreground bg-background border border-border rounded-md transition-colors duration-150 motion-reduce:transition-none focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25 dark:text-gray-100 dark:bg-gray-700 dark:border-gray-600"
-                        value={field.displayName}
-                        onChange={(e) => handleFieldChange(field.id, 'displayName', e.target.value)}
-                        placeholder={t('fieldEditor.displayNamePlaceholder')}
-                        data-testid={`wizard-field-display-name-${field.id}`}
-                      />
+                      {t(`fields.types.${field.type}`)}
                     </td>
                     <td className="px-3 py-2 text-sm text-foreground border-b border-border align-middle dark:text-gray-100 dark:border-gray-600">
-                      <select
-                        className="px-2 py-1.5 text-sm min-w-[100px] text-foreground bg-background border border-border rounded-md appearance-none bg-[url('data:image/svg+xml,%3csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20fill=%27none%27%20viewBox=%270%200%2020%2020%27%3e%3cpath%20stroke=%27%236b7280%27%20stroke-linecap=%27round%27%20stroke-linejoin=%27round%27%20stroke-width=%271.5%27%20d=%27M6%208l4%204%204-4%27/%3e%3c/svg%3e')] bg-[position:right_0.25rem_center] bg-no-repeat bg-[length:1.25em_1.25em] pr-7 cursor-pointer transition-colors duration-150 motion-reduce:transition-none focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25 dark:text-gray-100 dark:bg-gray-700 dark:border-gray-600"
-                        value={field.type}
-                        onChange={(e) => handleFieldChange(field.id, 'type', e.target.value)}
-                        data-testid={`wizard-field-type-${field.id}`}
-                      >
-                        {FIELD_TYPES.map((ft) => (
-                          <option key={ft} value={ft}>
-                            {ft}
-                          </option>
-                        ))}
-                      </select>
+                      {field.required ? (
+                        <span className="inline-flex items-center px-1.5 py-0.5 text-[0.6875rem] font-medium rounded-full bg-primary/10 text-primary">
+                          {t('fields.validation.required')}
+                        </span>
+                      ) : (
+                        '\u2014'
+                      )}
                     </td>
                     <td className="px-3 py-2 text-sm text-foreground border-b border-border align-middle dark:text-gray-100 dark:border-gray-600">
-                      <input
-                        type="checkbox"
-                        className="w-4 h-4 accent-primary cursor-pointer"
-                        checked={field.required}
-                        onChange={(e) => handleFieldChange(field.id, 'required', e.target.checked)}
-                        aria-label={`${field.displayName || 'Field'} required`}
-                        data-testid={`wizard-field-required-${field.id}`}
-                      />
-                    </td>
-                    <td className="px-3 py-2 text-sm text-foreground border-b border-border align-middle dark:text-gray-100 dark:border-gray-600">
-                      <button
-                        type="button"
-                        className="flex items-center justify-center p-1 border-none bg-transparent text-muted-foreground cursor-pointer rounded transition-colors duration-150 motion-reduce:transition-none hover:text-destructive hover:bg-destructive/10 dark:text-gray-400"
-                        onClick={() => handleRemoveField(field.id)}
-                        aria-label={`Remove field ${field.displayName || field.name}`}
-                        data-testid={`wizard-field-remove-${field.id}`}
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          className="flex items-center justify-center p-1 border-none bg-transparent text-muted-foreground cursor-pointer rounded transition-colors duration-150 motion-reduce:transition-none hover:text-primary hover:bg-primary/10 dark:text-gray-400"
+                          onClick={() => handleEditField(field.id)}
+                          aria-label={`Edit field ${field.displayName || field.name}`}
+                          data-testid={`wizard-field-edit-${field.id}`}
+                        >
+                          <Pencil size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          className="flex items-center justify-center p-1 border-none bg-transparent text-muted-foreground cursor-pointer rounded transition-colors duration-150 motion-reduce:transition-none hover:text-destructive hover:bg-destructive/10 dark:text-gray-400"
+                          onClick={() => handleRemoveField(field.id)}
+                          aria-label={`Remove field ${field.displayName || field.name}`}
+                          data-testid={`wizard-field-remove-${field.id}`}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -851,8 +871,8 @@ export function CollectionWizardPage({
     t,
     handleTemplateSelect,
     handleAddField,
+    handleEditField,
     handleRemoveField,
-    handleFieldChange,
   ])
 
   // Permission columns for the grid
@@ -1077,24 +1097,28 @@ export function CollectionWizardPage({
                   </thead>
                   <tbody>
                     {fields
-                      .filter((f) => f.name && f.displayName)
+                      .filter((f) => f.name)
                       .map((field) => (
                         <tr key={field.id} className="last:[&>td]:border-b-0">
                           <td
                             className="px-3 py-2 text-sm text-foreground border-b border-border dark:text-gray-100 dark:border-gray-600"
                             data-testid={`wizard-review-field-name-${field.id}`}
                           >
-                            {field.displayName}
-                            <br />
-                            <small className="text-muted-foreground dark:text-gray-400">
-                              {field.name}
-                            </small>
+                            {field.displayName || field.name}
+                            {field.displayName && (
+                              <>
+                                <br />
+                                <small className="text-muted-foreground dark:text-gray-400">
+                                  {field.name}
+                                </small>
+                              </>
+                            )}
                           </td>
                           <td
                             className="px-3 py-2 text-sm text-foreground border-b border-border dark:text-gray-100 dark:border-gray-600"
                             data-testid={`wizard-review-field-type-${field.id}`}
                           >
-                            {field.type}
+                            {t(`fields.types.${field.type}`)}
                           </td>
                           <td
                             className="px-3 py-2 text-sm text-foreground border-b border-border dark:text-gray-100 dark:border-gray-600"
@@ -1299,6 +1323,38 @@ export function CollectionWizardPage({
           )}
         </div>
       </div>
+
+      {/* Field Editor Modal */}
+      {fieldEditorOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-[1000] p-4 overflow-y-auto max-sm:p-0 max-sm:items-end"
+          role="presentation"
+          onMouseDown={handleFieldCancel}
+        >
+          {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
+          <div
+            className="bg-card rounded-lg shadow-xl max-w-[600px] w-full max-h-[90vh] overflow-y-auto p-6 dark:shadow-2xl max-sm:max-w-full max-sm:max-h-[95vh] max-sm:rounded-b-none"
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <FieldEditor
+              collectionId=""
+              field={editingField}
+              collections={allCollectionSummaries.map((c) => ({
+                id: c.id,
+                name: c.name,
+                displayName: c.displayName || c.name,
+              }))}
+              picklists={globalPicklists.map((p) => ({
+                id: p.id,
+                name: p.name,
+              }))}
+              onSave={handleFieldSave}
+              onCancel={handleFieldCancel}
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }

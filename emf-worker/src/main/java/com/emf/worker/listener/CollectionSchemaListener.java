@@ -66,20 +66,31 @@ public class CollectionSchemaListener {
             String collectionName = payload.getName();
             ChangeType changeType = payload.getChangeType();
 
-            // Only process updates for collections this worker is managing
-            if (!lifecycleManager.getActiveCollections().contains(collectionId)) {
-                log.debug("Ignoring collection changed event for '{}' (id={}) — not managed by this worker",
-                        collectionName, collectionId);
-                return;
-            }
-
             if (changeType == ChangeType.DELETED) {
                 log.info("Collection '{}' (id={}) was deleted, tearing down", collectionName, collectionId);
                 lifecycleManager.teardownCollection(collectionId);
                 return;
             }
 
-            // CREATED or UPDATED — refresh the collection definition and migrate schema
+            if (changeType == ChangeType.CREATED) {
+                if (lifecycleManager.getActiveCollections().contains(collectionId)) {
+                    log.debug("Collection '{}' (id={}) already active, ignoring CREATED event",
+                            collectionName, collectionId);
+                    return;
+                }
+                log.info("Collection '{}' (id={}) was created, initializing", collectionName, collectionId);
+                lifecycleManager.initializeCollection(collectionId);
+                return;
+            }
+
+            // UPDATED — refresh the collection definition and migrate schema
+            if (!lifecycleManager.getActiveCollections().contains(collectionId)) {
+                log.info("Collection '{}' (id={}) not yet active, initializing on UPDATED event",
+                        collectionName, collectionId);
+                lifecycleManager.initializeCollection(collectionId);
+                return;
+            }
+
             log.info("Collection '{}' (id={}) schema changed (type={}), refreshing definition",
                     collectionName, collectionId, changeType);
             lifecycleManager.refreshCollection(collectionId);

@@ -104,6 +104,11 @@ public class RouteConfigService {
                         logger.warn("No collections found in bootstrap configuration");
                     }
 
+                    // Register static routes for non-collection API endpoints
+                    // that are served by the worker but not returned in the
+                    // bootstrap collection list (e.g., computed/aggregate endpoints).
+                    registerStaticRoutes();
+
                     // Load per-tenant governor limits for rate limiting
                     if (config.getGovernorLimits() != null) {
                         governorLimitCache.loadFromBootstrap(config.getGovernorLimits());
@@ -148,6 +153,36 @@ public class RouteConfigService {
             logger.error("Failed to parse collection to route: {}", collection, e);
             return null;
         }
+    }
+
+    /**
+     * Registers static routes for non-collection API endpoints served by the worker.
+     *
+     * <p>These endpoints are not returned in the bootstrap collection list because
+     * they are not standard CRUD collections. They still need gateway routes so
+     * requests are proxied to the worker instead of returning 404.
+     *
+     * <p>The {@link com.emf.gateway.filter.CollectionPathRewriteFilter} will rewrite
+     * these paths (e.g., {@code /api/governor-limits} → {@code /api/collections/governor-limits})
+     * before they reach the worker.
+     */
+    private void registerStaticRoutes() {
+        String[][] staticRoutes = {
+                {"governor-limits", "/api/governor-limits/**", "governor-limits"},
+        };
+
+        for (String[] routeDef : staticRoutes) {
+            RouteDefinition route = new RouteDefinition(
+                    "static-" + routeDef[0],
+                    routeDef[1],
+                    workerServiceUrl,
+                    routeDef[2]
+            );
+            routeRegistry.addRoute(route);
+            logger.debug("Registered static route: {}", route);
+        }
+
+        logger.info("Registered {} static routes", staticRoutes.length);
     }
 
     private boolean validateRoute(RouteDefinition route) {

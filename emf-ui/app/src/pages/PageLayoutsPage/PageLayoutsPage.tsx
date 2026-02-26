@@ -573,10 +573,49 @@ function LayoutEditorViewInner({ layoutId, onBack }: LayoutEditorViewProps): Rea
   const queryClient = useQueryClient()
   const { state, setLayout, setAvailableFields, markSaved } = useLayoutEditor()
 
-  // Fetch layout detail
+  // Fetch layout detail.
+  // The layout record, sections, fields, and related lists are stored in
+  // separate collections (page-layouts, layout-sections, layout-fields,
+  // layout-related-lists). We assemble them into a single PageLayoutDetail.
   const { data: layoutDetail, isLoading: isLoadingLayout } = useQuery({
     queryKey: ['pageLayout', layoutId],
-    queryFn: () => apiClient.getOne<PageLayoutDetail>(`/api/page-layouts/${layoutId}`),
+    queryFn: async () => {
+      // 1. Fetch the layout record
+      const layout = await apiClient.getOne<PageLayoutDetail>(`/api/page-layouts/${layoutId}`)
+
+      // 2. Fetch sections and related lists in parallel
+      const [sections, relatedLists] = await Promise.all([
+        apiClient.getList<ApiSection & { layoutId?: string }>(
+          `/api/layout-sections?filter[layoutId][eq]=${layoutId}&sort=sortOrder`
+        ),
+        apiClient.getList<ApiRelatedList & { layoutId?: string }>(
+          `/api/layout-related-lists?filter[layoutId][eq]=${layoutId}&sort=sortOrder`
+        ),
+      ])
+
+      // 3. Fetch fields for all sections in parallel
+      if (sections.length > 0) {
+        const fieldResults = await Promise.all(
+          sections.map((section) =>
+            apiClient.getList<ApiFieldPlacement & { sectionId?: string }>(
+              `/api/layout-fields?filter[sectionId][eq]=${section.id}&sort=sortOrder`
+            )
+          )
+        )
+        sections.forEach((section, i) => {
+          section.fields = fieldResults[i]
+        })
+      }
+
+      // Ensure all sections have a fields array
+      for (const section of sections) {
+        if (!section.fields) section.fields = []
+      }
+
+      layout.sections = sections
+      layout.relatedLists = relatedLists
+      return layout
+    },
   })
 
   // Fetch collection fields when we know the collectionId.

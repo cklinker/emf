@@ -318,4 +318,336 @@ class DynamicCollectionRouterIncludeTest {
                     .andExpect(status().isNotFound());
         }
     }
+
+    // =========================================================================
+    // Transitive (grandchild) includes
+    // =========================================================================
+
+    /**
+     * Builds a page-layouts collection (grandparent in layout hierarchy).
+     */
+    private CollectionDefinition buildPageLayoutsCollection() {
+        return new CollectionDefinitionBuilder()
+                .name("page-layouts")
+                .displayName("Page Layouts")
+                .addField(FieldDefinition.requiredString("name", 100))
+                .addField(FieldDefinition.string("layoutType", 20))
+                .systemCollection(true)
+                .tenantScoped(false)
+                .readOnly(false)
+                .build();
+    }
+
+    /**
+     * Builds a layout-sections collection (direct child of page-layouts).
+     */
+    private CollectionDefinition buildLayoutSectionsCollection() {
+        return new CollectionDefinitionBuilder()
+                .name("layout-sections")
+                .displayName("Layout Sections")
+                .addField(new FieldDefinition("layoutId", FieldType.MASTER_DETAIL, false, false, false,
+                        null, null, null,
+                        ReferenceConfig.masterDetail("page-layouts", "Layout"), null))
+                .addField(FieldDefinition.string("heading", 200))
+                .addField(FieldDefinition.integer("sortOrder"))
+                .systemCollection(true)
+                .tenantScoped(false)
+                .readOnly(false)
+                .build();
+    }
+
+    /**
+     * Builds a layout-fields collection (grandchild: references layout-sections, not page-layouts).
+     */
+    private CollectionDefinition buildLayoutFieldsCollection() {
+        return new CollectionDefinitionBuilder()
+                .name("layout-fields")
+                .displayName("Layout Fields")
+                .addField(new FieldDefinition("sectionId", FieldType.MASTER_DETAIL, false, false, false,
+                        null, null, null,
+                        ReferenceConfig.masterDetail("layout-sections", "Section"), null))
+                .addField(FieldDefinition.string("fieldId", 36))
+                .addField(FieldDefinition.integer("sortOrder"))
+                .systemCollection(true)
+                .tenantScoped(false)
+                .readOnly(false)
+                .build();
+    }
+
+    private Map<String, Object> layoutRecord(String id, String name, String type) {
+        Map<String, Object> record = new HashMap<>();
+        record.put("id", id);
+        record.put("name", name);
+        record.put("layoutType", type);
+        return record;
+    }
+
+    private Map<String, Object> sectionRecord(String id, String layoutId, String heading, int order) {
+        Map<String, Object> record = new HashMap<>();
+        record.put("id", id);
+        record.put("layoutId", layoutId);
+        record.put("heading", heading);
+        record.put("sortOrder", order);
+        return record;
+    }
+
+    private Map<String, Object> fieldPlacementRecord(String id, String sectionId,
+                                                      String fieldId, int order) {
+        Map<String, Object> record = new HashMap<>();
+        record.put("id", id);
+        record.put("sectionId", sectionId);
+        record.put("fieldId", fieldId);
+        record.put("sortOrder", order);
+        return record;
+    }
+
+    @Nested
+    @DisplayName("Transitive (grandchild) includes")
+    class TransitiveIncludes {
+
+        @Test
+        @DisplayName("Should resolve grandchild include transitively via direct child")
+        @SuppressWarnings("unchecked")
+        void get_withTransitiveInclude_resolvesGrandchildren() throws Exception {
+            CollectionDefinition layoutDef = buildPageLayoutsCollection();
+            CollectionDefinition sectionDef = buildLayoutSectionsCollection();
+            CollectionDefinition fieldDef = buildLayoutFieldsCollection();
+
+            when(registry.get("page-layouts")).thenReturn(layoutDef);
+            when(registry.get("layout-sections")).thenReturn(sectionDef);
+            when(registry.get("layout-fields")).thenReturn(fieldDef);
+
+            // Primary record: one page layout
+            Map<String, Object> layout = layoutRecord("layout-1", "Detail Layout", "DETAIL");
+            when(queryEngine.getById(layoutDef, "layout-1")).thenReturn(Optional.of(layout));
+
+            // Direct child: two sections
+            Map<String, Object> sec1 = sectionRecord("sec-1", "layout-1", "General", 1);
+            Map<String, Object> sec2 = sectionRecord("sec-2", "layout-1", "Details", 2);
+            QueryResult sectionResult = new QueryResult(
+                    List.of(sec1, sec2),
+                    new PaginationMetadata(2, 1, 1000, 1));
+            when(queryEngine.executeQuery(eq(sectionDef), any(QueryRequest.class)))
+                    .thenReturn(sectionResult);
+
+            // Grandchild: three field placements across the two sections
+            Map<String, Object> fp1 = fieldPlacementRecord("fp-1", "sec-1", "field-a", 1);
+            Map<String, Object> fp2 = fieldPlacementRecord("fp-2", "sec-1", "field-b", 2);
+            Map<String, Object> fp3 = fieldPlacementRecord("fp-3", "sec-2", "field-c", 1);
+            QueryResult fieldResult = new QueryResult(
+                    List.of(fp1, fp2, fp3),
+                    new PaginationMetadata(3, 1, 1000, 1));
+            when(queryEngine.executeQuery(eq(fieldDef), any(QueryRequest.class)))
+                    .thenReturn(fieldResult);
+
+            MvcResult result = mockMvc.perform(
+                            get("/api/collections/page-layouts/layout-1")
+                                    .param("include", "layout-sections,layout-fields"))
+                    .andExpect(status().isOk())
+                    .andReturn();
+
+            String json = result.getResponse().getContentAsString();
+            Map<String, Object> response = objectMapper.readValue(json, Map.class);
+
+            // Verify primary data
+            Map<String, Object> data = (Map<String, Object>) response.get("data");
+            assertNotNull(data);
+            assertEquals("layout-1", data.get("id"));
+
+            // Verify included contains both sections and field placements
+            List<Map<String, Object>> included =
+                    (List<Map<String, Object>>) response.get("included");
+            assertNotNull(included, "Response should have 'included' array");
+            assertEquals(5, included.size(), "Should include 2 sections + 3 field placements");
+
+            long sectionCount = included.stream()
+                    .filter(inc -> "layout-sections".equals(inc.get("type")))
+                    .count();
+            long fieldCount = included.stream()
+                    .filter(inc -> "layout-fields".equals(inc.get("type")))
+                    .count();
+            assertEquals(2, sectionCount, "Should include 2 layout sections");
+            assertEquals(3, fieldCount, "Should include 3 layout fields");
+        }
+
+        @Test
+        @DisplayName("Should use section IDs (not layout IDs) for grandchild query")
+        void get_withTransitiveInclude_usesIntermediateIds() throws Exception {
+            CollectionDefinition layoutDef = buildPageLayoutsCollection();
+            CollectionDefinition sectionDef = buildLayoutSectionsCollection();
+            CollectionDefinition fieldDef = buildLayoutFieldsCollection();
+
+            when(registry.get("page-layouts")).thenReturn(layoutDef);
+            when(registry.get("layout-sections")).thenReturn(sectionDef);
+            when(registry.get("layout-fields")).thenReturn(fieldDef);
+
+            Map<String, Object> layout = layoutRecord("layout-1", "Detail Layout", "DETAIL");
+            when(queryEngine.getById(layoutDef, "layout-1")).thenReturn(Optional.of(layout));
+
+            // Direct child: two sections with specific IDs
+            Map<String, Object> sec1 = sectionRecord("sec-100", "layout-1", "General", 1);
+            Map<String, Object> sec2 = sectionRecord("sec-200", "layout-1", "Details", 2);
+            QueryResult sectionResult = new QueryResult(
+                    List.of(sec1, sec2),
+                    new PaginationMetadata(2, 1, 1000, 1));
+            when(queryEngine.executeQuery(eq(sectionDef), any(QueryRequest.class)))
+                    .thenReturn(sectionResult);
+
+            // Grandchild: empty result (we just need to verify the query)
+            QueryResult emptyFieldResult = new QueryResult(
+                    List.of(),
+                    new PaginationMetadata(0, 1, 1000, 0));
+            when(queryEngine.executeQuery(eq(fieldDef), any(QueryRequest.class)))
+                    .thenReturn(emptyFieldResult);
+
+            mockMvc.perform(get("/api/collections/page-layouts/layout-1")
+                            .param("include", "layout-sections,layout-fields"))
+                    .andExpect(status().isOk());
+
+            // Capture the grandchild query and verify it uses section IDs
+            ArgumentCaptor<QueryRequest> queryCaptor = ArgumentCaptor.forClass(QueryRequest.class);
+            verify(queryEngine).executeQuery(eq(fieldDef), queryCaptor.capture());
+
+            QueryRequest childQuery = queryCaptor.getValue();
+            assertFalse(childQuery.filters().isEmpty(), "Grandchild query should have filters");
+            assertEquals("sectionId", childQuery.filters().get(0).fieldName(),
+                    "Should filter on sectionId, not layoutId");
+            assertEquals(com.emf.runtime.query.FilterOperator.IN,
+                    childQuery.filters().get(0).operator());
+
+            @SuppressWarnings("unchecked")
+            List<Object> ids = (List<Object>) childQuery.filters().get(0).value();
+            assertEquals(2, ids.size());
+            assertTrue(ids.contains("sec-100"), "Should use section ID sec-100");
+            assertTrue(ids.contains("sec-200"), "Should use section ID sec-200");
+        }
+
+        @Test
+        @DisplayName("Should handle transitive include with no intermediate records")
+        @SuppressWarnings("unchecked")
+        void get_withTransitiveInclude_noIntermediateRecords() throws Exception {
+            CollectionDefinition layoutDef = buildPageLayoutsCollection();
+            CollectionDefinition sectionDef = buildLayoutSectionsCollection();
+            CollectionDefinition fieldDef = buildLayoutFieldsCollection();
+
+            when(registry.get("page-layouts")).thenReturn(layoutDef);
+            when(registry.get("layout-sections")).thenReturn(sectionDef);
+            when(registry.get("layout-fields")).thenReturn(fieldDef);
+
+            Map<String, Object> layout = layoutRecord("layout-1", "Empty Layout", "DETAIL");
+            when(queryEngine.getById(layoutDef, "layout-1")).thenReturn(Optional.of(layout));
+
+            // Direct child: no sections
+            QueryResult emptySectionResult = new QueryResult(
+                    List.of(),
+                    new PaginationMetadata(0, 1, 1000, 0));
+            when(queryEngine.executeQuery(eq(sectionDef), any(QueryRequest.class)))
+                    .thenReturn(emptySectionResult);
+
+            MvcResult result = mockMvc.perform(
+                            get("/api/collections/page-layouts/layout-1")
+                                    .param("include", "layout-sections,layout-fields"))
+                    .andExpect(status().isOk())
+                    .andReturn();
+
+            String json = result.getResponse().getContentAsString();
+            Map<String, Object> response = objectMapper.readValue(json, Map.class);
+
+            // Should not query for grandchild records when there are no intermediate records
+            verify(queryEngine, never()).executeQuery(eq(fieldDef), any(QueryRequest.class));
+
+            // included should be absent or empty (no sections and no fields)
+            Object included = response.get("included");
+            assertTrue(included == null || ((List<?>) included).isEmpty(),
+                    "Should have no included resources when no sections exist");
+        }
+
+        @Test
+        @DisplayName("Should work with list endpoint and transitive includes")
+        @SuppressWarnings("unchecked")
+        void list_withTransitiveInclude_resolvesGrandchildren() throws Exception {
+            CollectionDefinition layoutDef = buildPageLayoutsCollection();
+            CollectionDefinition sectionDef = buildLayoutSectionsCollection();
+            CollectionDefinition fieldDef = buildLayoutFieldsCollection();
+
+            when(registry.get("page-layouts")).thenReturn(layoutDef);
+            when(registry.get("layout-sections")).thenReturn(sectionDef);
+            when(registry.get("layout-fields")).thenReturn(fieldDef);
+
+            // Two primary layouts
+            Map<String, Object> layout1 = layoutRecord("layout-1", "Detail Layout", "DETAIL");
+            Map<String, Object> layout2 = layoutRecord("layout-2", "Edit Layout", "EDIT");
+            QueryResult layoutResult = new QueryResult(
+                    List.of(layout1, layout2),
+                    new PaginationMetadata(2, 1, 20, 1));
+            when(queryEngine.executeQuery(eq(layoutDef), any(QueryRequest.class)))
+                    .thenReturn(layoutResult);
+
+            // Sections for both layouts
+            Map<String, Object> sec1 = sectionRecord("sec-1", "layout-1", "General", 1);
+            Map<String, Object> sec2 = sectionRecord("sec-2", "layout-2", "Main", 1);
+            QueryResult sectionResult = new QueryResult(
+                    List.of(sec1, sec2),
+                    new PaginationMetadata(2, 1, 1000, 1));
+            when(queryEngine.executeQuery(eq(sectionDef), any(QueryRequest.class)))
+                    .thenReturn(sectionResult);
+
+            // Fields across sections
+            Map<String, Object> fp1 = fieldPlacementRecord("fp-1", "sec-1", "field-a", 1);
+            Map<String, Object> fp2 = fieldPlacementRecord("fp-2", "sec-2", "field-b", 1);
+            QueryResult fieldResult = new QueryResult(
+                    List.of(fp1, fp2),
+                    new PaginationMetadata(2, 1, 1000, 1));
+            when(queryEngine.executeQuery(eq(fieldDef), any(QueryRequest.class)))
+                    .thenReturn(fieldResult);
+
+            MvcResult result = mockMvc.perform(
+                            get("/api/collections/page-layouts")
+                                    .param("include", "layout-sections,layout-fields"))
+                    .andExpect(status().isOk())
+                    .andReturn();
+
+            String json = result.getResponse().getContentAsString();
+            Map<String, Object> response = objectMapper.readValue(json, Map.class);
+
+            List<Map<String, Object>> data = (List<Map<String, Object>>) response.get("data");
+            assertEquals(2, data.size());
+
+            List<Map<String, Object>> included =
+                    (List<Map<String, Object>>) response.get("included");
+            assertNotNull(included, "Response should have 'included' array");
+            assertEquals(4, included.size(), "Should include 2 sections + 2 field placements");
+        }
+
+        @Test
+        @DisplayName("Should skip unresolvable includes gracefully")
+        @SuppressWarnings("unchecked")
+        void get_withUnresolvableTransitiveInclude_skipsGracefully() throws Exception {
+            CollectionDefinition layoutDef = buildPageLayoutsCollection();
+            CollectionDefinition fieldDef = buildLayoutFieldsCollection();
+
+            when(registry.get("page-layouts")).thenReturn(layoutDef);
+            // Note: layout-sections is NOT registered
+            when(registry.get("layout-sections")).thenReturn(null);
+            when(registry.get("layout-fields")).thenReturn(fieldDef);
+
+            Map<String, Object> layout = layoutRecord("layout-1", "Detail Layout", "DETAIL");
+            when(queryEngine.getById(layoutDef, "layout-1")).thenReturn(Optional.of(layout));
+
+            MvcResult result = mockMvc.perform(
+                            get("/api/collections/page-layouts/layout-1")
+                                    .param("include", "layout-sections,layout-fields"))
+                    .andExpect(status().isOk())
+                    .andReturn();
+
+            String json = result.getResponse().getContentAsString();
+            Map<String, Object> response = objectMapper.readValue(json, Map.class);
+
+            // layout-fields has no direct or transitive path without layout-sections
+            // Should still succeed without errors
+            assertNotNull(response.get("data"));
+            // No grandchild queries should be made
+            verify(queryEngine, never()).executeQuery(eq(fieldDef), any(QueryRequest.class));
+        }
+    }
 }

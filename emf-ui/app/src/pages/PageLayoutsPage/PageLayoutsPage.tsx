@@ -573,47 +573,71 @@ function LayoutEditorViewInner({ layoutId, onBack }: LayoutEditorViewProps): Rea
   const queryClient = useQueryClient()
   const { state, setLayout, setAvailableFields, markSaved } = useLayoutEditor()
 
-  // Fetch layout detail.
-  // The layout record, sections, fields, and related lists are stored in
-  // separate collections (page-layouts, layout-sections, layout-fields,
-  // layout-related-lists). We assemble them into a single PageLayoutDetail.
+  // Fetch layout detail with all children in a single request using
+  // ?include=layout-sections,layout-fields,layout-related-lists.
+  // The backend resolves layout-fields transitively via layout-sections.
   const { data: layoutDetail, isLoading: isLoadingLayout } = useQuery({
     queryKey: ['pageLayout', layoutId],
     queryFn: async () => {
-      // 1. Fetch the layout record
-      const layout = await apiClient.getOne<PageLayoutDetail>(`/api/page-layouts/${layoutId}`)
+      const raw = await apiClient.get<{
+        data: { type: string; id: string; attributes: Record<string, unknown> }
+        included?: { type: string; id: string; attributes: Record<string, unknown> }[]
+      }>(`/api/page-layouts/${layoutId}?include=layout-sections,layout-fields,layout-related-lists`)
 
-      // 2. Fetch sections and related lists in parallel
-      const [sections, relatedLists] = await Promise.all([
-        apiClient.getList<ApiSection & { layoutId?: string }>(
-          `/api/layout-sections?filter[layoutId][eq]=${layoutId}&sort=sortOrder`
-        ),
-        apiClient.getList<ApiRelatedList & { layoutId?: string }>(
-          `/api/layout-related-lists?filter[layoutId][eq]=${layoutId}&sort=sortOrder`
-        ),
-      ])
+      // Build the layout from the primary data
+      const layout: PageLayoutDetail = {
+        id: raw.data.id,
+        ...(raw.data.attributes as Omit<PageLayoutDetail, 'id' | 'sections' | 'relatedLists'>),
+        sections: [],
+        relatedLists: [],
+      }
 
-      // 3. Fetch fields for all sections in parallel
-      if (sections.length > 0) {
-        const fieldResults = await Promise.all(
-          sections.map((section) =>
-            apiClient.getList<ApiFieldPlacement & { sectionId?: string }>(
-              `/api/layout-fields?filter[sectionId][eq]=${section.id}&sort=sortOrder`
-            )
-          )
+      if (!raw.included || raw.included.length === 0) {
+        return layout
+      }
+
+      // Extract sections, field placements, and related lists from included
+      const sectionResources = raw.included
+        .filter((r) => r.type === 'layout-sections')
+        .map(
+          (r) => ({ id: r.id, ...r.attributes }) as unknown as ApiSection & { sortOrder: number }
         )
-        sections.forEach((section, i) => {
-          section.fields = fieldResults[i]
-        })
+        .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+
+      const fieldResources = raw.included
+        .filter((r) => r.type === 'layout-fields')
+        .map(
+          (r) =>
+            ({ id: r.id, ...r.attributes }) as unknown as ApiFieldPlacement & {
+              sectionId: string
+              sortOrder: number
+            }
+        )
+        .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+
+      const relatedListResources = raw.included
+        .filter((r) => r.type === 'layout-related-lists')
+        .map(
+          (r) =>
+            ({ id: r.id, ...r.attributes }) as unknown as ApiRelatedList & { sortOrder: number }
+        )
+        .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+
+      // Group field placements by sectionId
+      const fieldsBySection = new Map<string, ApiFieldPlacement[]>()
+      for (const fp of fieldResources) {
+        const list = fieldsBySection.get(fp.sectionId) ?? []
+        list.push(fp)
+        fieldsBySection.set(fp.sectionId, list)
       }
 
-      // Ensure all sections have a fields array
-      for (const section of sections) {
-        if (!section.fields) section.fields = []
-      }
+      // Assemble sections with their fields
+      layout.sections = sectionResources.map((s) => ({
+        ...s,
+        fields: fieldsBySection.get(s.id) ?? [],
+      }))
+      layout.relatedLists = relatedListResources
 
-      layout.sections = sections
-      layout.relatedLists = relatedLists
       return layout
     },
   })

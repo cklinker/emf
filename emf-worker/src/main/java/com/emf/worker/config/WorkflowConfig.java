@@ -7,6 +7,8 @@ import com.emf.runtime.workflow.*;
 import com.emf.runtime.workflow.module.EmfModule;
 import com.emf.runtime.workflow.module.ModuleContext;
 import com.emf.runtime.workflow.module.ModuleRegistry;
+import com.emf.worker.listener.CollectionConfigEventPublisher;
+import com.emf.worker.listener.FieldConfigEventPublisher;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,6 +17,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.kafka.core.KafkaTemplate;
 
 import java.util.List;
 import java.util.Map;
@@ -74,6 +77,28 @@ public class WorkflowConfig {
         }
 
         return registry;
+    }
+
+    @Bean
+    public CollectionConfigEventPublisher collectionConfigEventPublisher(
+            BeforeSaveHookRegistry hookRegistry,
+            KafkaTemplate<String, String> kafkaTemplate,
+            ObjectMapper objectMapper) {
+        CollectionConfigEventPublisher publisher =
+                new CollectionConfigEventPublisher(kafkaTemplate, objectMapper);
+        hookRegistry.register(publisher);
+        return publisher;
+    }
+
+    @Bean
+    public FieldConfigEventPublisher fieldConfigEventPublisher(
+            BeforeSaveHookRegistry hookRegistry,
+            KafkaTemplate<String, String> kafkaTemplate,
+            ObjectMapper objectMapper) {
+        FieldConfigEventPublisher publisher =
+                new FieldConfigEventPublisher(kafkaTemplate, objectMapper);
+        hookRegistry.register(publisher);
+        return publisher;
     }
 
     @Bean

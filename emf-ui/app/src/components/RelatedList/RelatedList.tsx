@@ -128,7 +128,9 @@ export function RelatedList({
 
   // Display name for the related collection
   const displayLabel =
-    label || schema?.displayName || collectionName.charAt(0).toUpperCase() + collectionName.slice(1)
+    label ||
+    schema?.displayName ||
+    (collectionName ? collectionName.charAt(0).toUpperCase() + collectionName.slice(1) : 'Related')
 
   const isLoading = schemaLoading || recordsLoading
 

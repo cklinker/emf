@@ -3,6 +3,7 @@ package com.emf.worker.listener;
 import com.emf.runtime.event.ChangeType;
 import com.emf.runtime.event.CollectionChangedPayload;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -30,6 +31,7 @@ class FieldConfigEventPublisherTest {
     void setUp() {
         kafkaTemplate = mock(KafkaTemplate.class);
         objectMapper = new ObjectMapper();
+        objectMapper.registerModule(new JavaTimeModule());
         publisher = new FieldConfigEventPublisher(kafkaTemplate, objectMapper);
         when(kafkaTemplate.send(anyString(), anyString(), anyString()))
             .thenReturn(new CompletableFuture<>());
@@ -48,7 +50,7 @@ class FieldConfigEventPublisherTest {
     }
 
     @Test
-    @DisplayName("Should publish collection UPDATED event after field create")
+    @DisplayName("Should publish ConfigEvent-wrapped collection UPDATED event after field create")
     void shouldPublishOnFieldCreate() throws Exception {
         Map<String, Object> record = new HashMap<>(Map.of(
             "id", "field-1",
@@ -66,14 +68,20 @@ class FieldConfigEventPublisherTest {
             payloadCaptor.capture()
         );
 
-        CollectionChangedPayload payload = objectMapper.readValue(
-            payloadCaptor.getValue(), CollectionChangedPayload.class);
+        // Verify ConfigEvent wrapper
+        var tree = objectMapper.readTree(payloadCaptor.getValue());
+        assertNotNull(tree.get("eventId"), "Should be wrapped in ConfigEvent");
+        assertNotNull(tree.get("eventType"));
+        assertNotNull(tree.get("payload"));
+
+        CollectionChangedPayload payload = objectMapper.treeToValue(
+            tree.get("payload"), CollectionChangedPayload.class);
         assertEquals("col-1", payload.getId());
         assertEquals(ChangeType.UPDATED, payload.getChangeType());
     }
 
     @Test
-    @DisplayName("Should publish collection UPDATED event after field update")
+    @DisplayName("Should publish ConfigEvent-wrapped event after field update")
     void shouldPublishOnFieldUpdate() throws Exception {
         Map<String, Object> record = new HashMap<>(Map.of(
             "id", "field-1",
@@ -88,11 +96,15 @@ class FieldConfigEventPublisherTest {
 
         publisher.afterUpdate("field-1", record, previous, "tenant-1");
 
+        ArgumentCaptor<String> payloadCaptor = ArgumentCaptor.forClass(String.class);
         verify(kafkaTemplate).send(
             eq(FieldConfigEventPublisher.TOPIC),
             eq("col-1"),
-            anyString()
+            payloadCaptor.capture()
         );
+
+        var tree = objectMapper.readTree(payloadCaptor.getValue());
+        assertNotNull(tree.get("eventId"), "Should be wrapped in ConfigEvent");
     }
 
     @Test

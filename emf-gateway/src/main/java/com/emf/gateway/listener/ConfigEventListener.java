@@ -4,7 +4,6 @@ import com.emf.gateway.route.RouteDefinition;
 import com.emf.gateway.route.RouteRegistry;
 import com.emf.runtime.event.ChangeType;
 import com.emf.runtime.event.CollectionChangedPayload;
-import com.emf.runtime.event.ConfigEvent;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -26,6 +25,9 @@ import java.util.Map;
  * All event processing is done asynchronously and handles malformed events gracefully
  * by logging errors and continuing to process subsequent events.
  *
+ * <p>Uses {@code recordEventKafkaListenerContainerFactory} (StringDeserializer) because
+ * the worker publishes events as JSON strings via {@code StringSerializer}. Messages are
+ * manually deserialized using {@link ObjectMapper}.
  */
 @Component
 public class ConfigEventListener {
@@ -49,25 +51,28 @@ public class ConfigEventListener {
 
     /**
      * Handles collection changed events from Kafka.
+     *
+     * <p>Accepts raw JSON strings and manually deserializes because the worker
+     * publishes via {@code KafkaTemplate<String, String>} (StringSerializer),
+     * which does not include type headers needed by JsonDeserializer.
      */
     @KafkaListener(
         topics = "${emf.gateway.kafka.topics.collection-changed}",
         groupId = "${spring.kafka.consumer.group-id}",
-        containerFactory = "kafkaListenerContainerFactory"
+        containerFactory = "recordEventKafkaListenerContainerFactory"
     )
-    public void handleCollectionChanged(ConfigEvent<CollectionChangedPayload> event) {
+    public void handleCollectionChanged(String message) {
         try {
-            logger.info("Received collection changed event: eventId={}, correlationId={}",
-                       event.getEventId(), event.getCorrelationId());
+            logger.debug("Received collection changed event: {}", message);
 
-            CollectionChangedPayload payload = event.getPayload();
+            CollectionChangedPayload payload = parseCollectionPayload(message);
 
             if (payload == null) {
-                logger.error("Collection changed event has null payload: eventId={}", event.getEventId());
+                logger.warn("Could not parse collection changed event from message");
                 return;
             }
 
-            logger.debug("Processing collection change: id={}, name={}, changeType={}",
+            logger.info("Processing collection change: id={}, name={}, changeType={}",
                         payload.getId(), payload.getName(), payload.getChangeType());
 
             if (payload.getChangeType() == ChangeType.DELETED) {
@@ -90,8 +95,27 @@ public class ConfigEventListener {
             applicationEventPublisher.publishEvent(new RefreshRoutesEvent(this));
 
         } catch (Exception e) {
-            logger.error("Error processing collection changed event: eventId={}, error={}",
-                        event.getEventId(), e.getMessage(), e);
+            logger.error("Error processing collection changed event: {}", e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Parses the CollectionChangedPayload from the raw Kafka message.
+     * Handles both ConfigEvent wrapper format and flat JSON format.
+     */
+    private CollectionChangedPayload parseCollectionPayload(String message) {
+        try {
+            var tree = objectMapper.readTree(message);
+
+            if (tree.has("payload")) {
+                return objectMapper.treeToValue(tree.get("payload"), CollectionChangedPayload.class);
+            }
+
+            return objectMapper.readValue(message, CollectionChangedPayload.class);
+
+        } catch (Exception e) {
+            logger.error("Failed to parse collection changed event: {}", e.getMessage());
+            return null;
         }
     }
 
@@ -123,30 +147,24 @@ public class ConfigEventListener {
 
     /**
      * Handles worker assignment changed events from Kafka.
+     *
+     * <p>Accepts raw JSON strings and manually deserializes because the worker
+     * publishes via {@code KafkaTemplate<String, String>} (StringSerializer).
      */
-    @SuppressWarnings("unchecked")
     @KafkaListener(
         topics = "${emf.gateway.kafka.topics.worker-assignment-changed:emf.worker.assignment.changed}",
         groupId = "${spring.kafka.consumer.group-id}",
-        containerFactory = "kafkaListenerContainerFactory"
+        containerFactory = "recordEventKafkaListenerContainerFactory"
     )
-    public void handleWorkerAssignmentChanged(ConfigEvent<Object> event) {
+    public void handleWorkerAssignmentChanged(String message) {
         try {
-            logger.info("Received worker assignment event: eventId={}, correlationId={}",
-                        event.getEventId(), event.getCorrelationId());
+            logger.debug("Received worker assignment event: {}", message);
 
-            Object rawPayload = event.getPayload();
+            Map<String, Object> payload = parseWorkerAssignmentPayload(message);
 
-            if (rawPayload == null) {
-                logger.error("Worker assignment event has null payload: eventId={}", event.getEventId());
+            if (payload == null) {
+                logger.warn("Could not parse worker assignment event from message");
                 return;
-            }
-
-            Map<String, Object> payload;
-            if (rawPayload instanceof Map) {
-                payload = (Map<String, Object>) rawPayload;
-            } else {
-                payload = objectMapper.convertValue(rawPayload, new TypeReference<Map<String, Object>>() {});
             }
 
             String workerId = (String) payload.get("workerId");
@@ -187,8 +205,29 @@ public class ConfigEventListener {
             applicationEventPublisher.publishEvent(new RefreshRoutesEvent(this));
 
         } catch (Exception e) {
-            logger.error("Error processing worker assignment event: eventId={}, error={}",
-                        event.getEventId(), e.getMessage(), e);
+            logger.error("Error processing worker assignment event: {}", e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Parses the worker assignment payload from the raw Kafka message.
+     * Handles both ConfigEvent wrapper format and flat JSON format.
+     */
+    private Map<String, Object> parseWorkerAssignmentPayload(String message) {
+        try {
+            var tree = objectMapper.readTree(message);
+
+            if (tree.has("payload")) {
+                return objectMapper.convertValue(tree.get("payload"),
+                        new TypeReference<Map<String, Object>>() {});
+            }
+
+            return objectMapper.readValue(message,
+                    new TypeReference<Map<String, Object>>() {});
+
+        } catch (Exception e) {
+            logger.error("Failed to parse worker assignment event: {}", e.getMessage());
+            return null;
         }
     }
 }

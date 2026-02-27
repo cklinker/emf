@@ -14,7 +14,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.kafka.support.serializer.JsonSerializer;
 import org.springframework.kafka.test.context.EmbeddedKafka;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
@@ -36,6 +35,9 @@ import static org.awaitility.Awaitility.await;
  * - Subscribes to Kafka topics for configuration changes
  * - Processes collection changed events and updates route registry
  * - Handles malformed events gracefully
+ *
+ * <p>Uses {@code StringSerializer} for the producer to match the worker's
+ * serialization format ({@code KafkaTemplate<String, String>}).
  *
  * Validates: Requirements 2.1, 2.2, 2.4, 2.5, 2.7
  */
@@ -60,27 +62,31 @@ class KafkaConfigurationUpdateIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    private KafkaTemplate<String, ConfigEvent<?>> kafkaTemplate;
+    private KafkaTemplate<String, String> kafkaTemplate;
 
     @BeforeEach
     void setUp() {
         // Clear registries
         routeRegistry.clear();
 
-        // Configure Kafka producer for tests
+        // Configure Kafka producer using StringSerializer to match worker's format
         Map<String, Object> producerProps = new HashMap<>();
         producerProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
         producerProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
-        producerProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
+        producerProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
 
-        DefaultKafkaProducerFactory<String, ConfigEvent<?>> producerFactory =
+        DefaultKafkaProducerFactory<String, String> producerFactory =
             new DefaultKafkaProducerFactory<>(producerProps);
 
         kafkaTemplate = new KafkaTemplate<>(producerFactory);
     }
 
+    private String toJson(Object obj) throws Exception {
+        return objectMapper.writeValueAsString(obj);
+    }
+
     @Test
-    void testCollectionChangedEvent_AddsRoute() {
+    void testCollectionChangedEvent_AddsRoute() throws Exception {
         // Arrange - create collection changed event
         CollectionChangedPayload payload = new CollectionChangedPayload();
         payload.setChangeType(ChangeType.CREATED);
@@ -95,8 +101,8 @@ class KafkaConfigurationUpdateIntegrationTest {
         event.setTimestamp(Instant.now());
         event.setPayload(payload);
 
-        // Act - publish event to Kafka
-        kafkaTemplate.send("test.collection.changed", event);
+        // Act - publish event as JSON string to Kafka (matching worker's format)
+        kafkaTemplate.send("test.collection.changed", toJson(event));
 
         // Assert - wait for event to be processed and verify route added
         await().atMost(5, TimeUnit.SECONDS).untilAsserted(() -> {
@@ -107,7 +113,7 @@ class KafkaConfigurationUpdateIntegrationTest {
     }
 
     @Test
-    void testCollectionChangedEvent_UpdatesRoute() {
+    void testCollectionChangedEvent_UpdatesRoute() throws Exception {
         // Arrange - add initial route
         RouteDefinition initialRoute = new RouteDefinition(
                 "existing-collection",
@@ -132,8 +138,8 @@ class KafkaConfigurationUpdateIntegrationTest {
         event.setTimestamp(Instant.now());
         event.setPayload(payload);
 
-        // Act - publish update event
-        kafkaTemplate.send("test.collection.changed", event);
+        // Act - publish update event as JSON string
+        kafkaTemplate.send("test.collection.changed", toJson(event));
 
         // Assert - wait for event to be processed and verify route updated
         await().atMost(5, TimeUnit.SECONDS).untilAsserted(() -> {
@@ -144,15 +150,9 @@ class KafkaConfigurationUpdateIntegrationTest {
     }
 
     @Test
-    void testMalformedEvent_LogsErrorAndContinues() {
-        // Arrange - create malformed event (missing required fields)
-        ConfigEvent<Map<String, Object>> malformedEvent = new ConfigEvent<>();
-        malformedEvent.setEventId(UUID.randomUUID().toString());
-        malformedEvent.setEventType("config.collection.changed");
-        malformedEvent.setPayload(Map.of("invalid", "data"));
-
-        // Act - publish malformed event
-        kafkaTemplate.send("test.collection.changed", malformedEvent);
+    void testMalformedEvent_LogsErrorAndContinues() throws Exception {
+        // Arrange - publish malformed JSON string
+        kafkaTemplate.send("test.collection.changed", "not-valid-json");
 
         // Assert - gateway should continue processing (no crash)
         // We can't easily verify the log, but we can verify the gateway is still responsive
@@ -175,7 +175,7 @@ class KafkaConfigurationUpdateIntegrationTest {
         validEvent.setTimestamp(Instant.now());
         validEvent.setPayload(validPayload);
 
-        kafkaTemplate.send("test.collection.changed", validEvent);
+        kafkaTemplate.send("test.collection.changed", toJson(validEvent));
 
         // Verify the valid event is processed
         await().atMost(5, TimeUnit.SECONDS).untilAsserted(() -> {

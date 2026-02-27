@@ -14,6 +14,7 @@
 import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useApi } from '../context/ApiContext'
+import { fetchCollectionSchema } from './useCollectionSchema'
 import type { FieldDefinition } from './useCollectionSchema'
 
 /** Reference field types that should have their display values resolved */
@@ -60,116 +61,119 @@ export function useLookupDisplayMap(
       const displayMap: Record<string, Record<string, string>> = {}
       const targetNameMap: Record<string, string> = {}
 
-      // Group fields by target collection identifier to minimize API calls.
-      // Use referenceCollectionId when available, otherwise referenceTarget (name).
-      // Track whether each group key is an ID or a name for the fetch path.
-      const targetGroupMap = new Map<string, { fields: FieldDefinition[]; hasId: boolean }>()
+      // Group fields by target collection name to minimize API calls.
+      // Prefer referenceTarget (collection name) for grouping since we need the
+      // name for both schema and records fetches. Fall back to referenceCollectionId.
+      const targetGroupMap = new Map<
+        string,
+        { fields: FieldDefinition[]; targetName?: string; targetId?: string }
+      >()
       for (const field of lookupFields) {
-        const hasId = !!field.referenceCollectionId
-        const target = field.referenceCollectionId || field.referenceTarget!
-        if (!targetGroupMap.has(target)) {
-          targetGroupMap.set(target, { fields: [], hasId })
+        // Use referenceTarget (name) as the preferred group key
+        const groupKey = field.referenceTarget || field.referenceCollectionId!
+        if (!targetGroupMap.has(groupKey)) {
+          targetGroupMap.set(groupKey, {
+            fields: [],
+            targetName: field.referenceTarget || undefined,
+            targetId: field.referenceCollectionId || undefined,
+          })
         }
-        targetGroupMap.get(target)!.fields.push(field)
+        targetGroupMap.get(groupKey)!.fields.push(field)
       }
 
       await Promise.all(
-        Array.from(targetGroupMap.entries()).map(async ([targetKey, { fields: groupFields, hasId }]) => {
-          try {
-            let targetName: string
-            let displayFieldName = 'id'
+        Array.from(targetGroupMap.entries()).map(
+          async ([_groupKey, { fields: groupFields, targetName: knownName, targetId }]) => {
+            try {
+              let targetName: string
+              let displayFieldName = 'id'
 
-            if (hasId) {
-              // Fetch target collection schema by ID to determine display field and name
-              const targetSchema = await apiClient.getOne<{
-                name: string
-                displayFieldName?: string
-                fields?: Array<{ name: string; type: string }>
-              }>(`/api/collections/${targetKey}`)
-              targetName = targetSchema.name
-
-              if (targetSchema.displayFieldName) {
-                displayFieldName = targetSchema.displayFieldName
-              } else if (targetSchema.fields) {
-                const nameField = targetSchema.fields.find(
-                  (f) => f.name.toLowerCase() === 'name'
-                )
-                if (nameField) {
-                  displayFieldName = nameField.name
-                } else {
-                  const firstStringField = targetSchema.fields.find(
-                    (f) => f.type.toUpperCase() === 'STRING'
-                  )
-                  if (firstStringField) {
-                    displayFieldName = firstStringField.name
-                  }
-                }
-              }
-            } else {
-              // We only have the collection name (referenceTarget).
-              // Fetch the schema by name to determine the display field.
-              targetName = targetKey
-              try {
-                const targetSchema = await apiClient.getOne<{
-                  displayFieldName?: string
-                  fields?: Array<{ name: string; type: string }>
-                }>(`/api/collections/collections/${targetKey}`)
-
-                if (targetSchema.displayFieldName) {
-                  displayFieldName = targetSchema.displayFieldName
-                } else if (targetSchema.fields) {
-                  const nameField = targetSchema.fields.find(
-                    (f) => f.name.toLowerCase() === 'name'
-                  )
-                  if (nameField) {
-                    displayFieldName = nameField.name
-                  } else {
-                    const firstStringField = targetSchema.fields.find(
-                      (f) => f.type.toUpperCase() === 'STRING'
+              if (knownName) {
+                // We have the collection name — use fetchCollectionSchema for proper
+                // display field resolution (resolves displayFieldId → displayFieldName)
+                targetName = knownName
+                try {
+                  const schema = await fetchCollectionSchema(apiClient, knownName)
+                  if (schema.displayFieldName) {
+                    displayFieldName = schema.displayFieldName
+                  } else if (schema.fields?.length) {
+                    const nameField = schema.fields.find(
+                      (f) => f.name.toLowerCase() === 'name'
                     )
-                    if (firstStringField) {
-                      displayFieldName = firstStringField.name
+                    if (nameField) {
+                      displayFieldName = nameField.name
+                    } else {
+                      const firstStringField = schema.fields.find((f) => f.type === 'string')
+                      if (firstStringField) {
+                        displayFieldName = firstStringField.name
+                      }
                     }
                   }
+                } catch {
+                  // Schema fetch failed — fall back to "name" field
+                  displayFieldName = 'name'
                 }
-              } catch {
-                // Schema lookup by name failed — fall back to "name" field
-                displayFieldName = 'name'
+              } else {
+                // Only have UUID — fetch collection record to get its name, then schema
+                const collection = await apiClient.getOne<{ name: string }>(
+                  `/api/collections/${targetId}`
+                )
+                targetName = collection.name
+                try {
+                  const schema = await fetchCollectionSchema(apiClient, targetName)
+                  if (schema.displayFieldName) {
+                    displayFieldName = schema.displayFieldName
+                  } else if (schema.fields?.length) {
+                    const nameField = schema.fields.find(
+                      (f) => f.name.toLowerCase() === 'name'
+                    )
+                    if (nameField) {
+                      displayFieldName = nameField.name
+                    } else {
+                      const firstStringField = schema.fields.find((f) => f.type === 'string')
+                      if (firstStringField) {
+                        displayFieldName = firstStringField.name
+                      }
+                    }
+                  }
+                } catch {
+                  displayFieldName = 'name'
+                }
+              }
+
+              // Track target collection name for each field (useful for building links)
+              for (const field of groupFields) {
+                targetNameMap[field.name] = targetName
+              }
+
+              // Fetch records from the target collection
+              const recordsResponse = await apiClient.get<Record<string, unknown>>(
+                `/api/${targetName}?page[size]=200`
+              )
+              const data = recordsResponse?.data
+              const records: Array<Record<string, unknown>> = Array.isArray(data) ? data : []
+
+              // Build id → label map
+              const idToLabel: Record<string, string> = {}
+              for (const record of records) {
+                const attrs = (record.attributes || record) as Record<string, unknown>
+                const id = String(record.id || attrs.id || '')
+                const label = attrs[displayFieldName] ? String(attrs[displayFieldName]) : id
+                idToLabel[id] = label
+              }
+
+              // Assign to all fields targeting this collection
+              for (const field of groupFields) {
+                displayMap[field.name] = idToLabel
+              }
+            } catch {
+              // On error, set empty maps so fields fall back to showing IDs
+              for (const field of groupFields) {
+                displayMap[field.name] = {}
               }
             }
-
-            // Track target collection name for each field (useful for building links)
-            for (const field of groupFields) {
-              targetNameMap[field.name] = targetName
-            }
-
-            // Fetch records from the target collection
-            const recordsResponse = await apiClient.get<Record<string, unknown>>(
-              `/api/${targetName}?page[size]=200`
-            )
-            const data = recordsResponse?.data
-            const records: Array<Record<string, unknown>> = Array.isArray(data) ? data : []
-
-            // Build id → label map
-            const idToLabel: Record<string, string> = {}
-            for (const record of records) {
-              const attrs = (record.attributes || record) as Record<string, unknown>
-              const id = String(record.id || attrs.id || '')
-              const label = attrs[displayFieldName] ? String(attrs[displayFieldName]) : id
-              idToLabel[id] = label
-            }
-
-            // Assign to all fields targeting this collection
-            for (const field of groupFields) {
-              displayMap[field.name] = idToLabel
-            }
-          } catch {
-            // On error, set empty maps so fields fall back to showing IDs
-            for (const field of groupFields) {
-              displayMap[field.name] = {}
-            }
           }
-        })
+        )
       )
 
       return { displayMap, targetNameMap }

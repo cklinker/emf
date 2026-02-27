@@ -28,6 +28,7 @@ import static org.mockito.Mockito.*;
  * Unit tests for ConfigEventListener.
  *
  * Tests the Kafka event listener that updates gateway configuration in real-time.
+ * The listener now accepts raw JSON strings and manually deserializes them.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("ConfigEventListener Tests")
@@ -44,7 +45,16 @@ class ConfigEventListenerTest {
     @BeforeEach
     void setUp() {
         objectMapper = new ObjectMapper();
+        objectMapper.findAndRegisterModules();
         listener = new ConfigEventListener(routeRegistry, objectMapper, event -> {}, WORKER_SERVICE_URL);
+    }
+
+    private String toJson(Object obj) {
+        try {
+            return objectMapper.writeValueAsString(obj);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Nested
@@ -53,7 +63,7 @@ class ConfigEventListenerTest {
 
         @Test
         @DisplayName("Should add route when collection is created")
-        void shouldAddRouteWhenCollectionCreated() {
+        void shouldAddRouteWhenCollectionCreated() throws Exception {
             // Arrange
             CollectionChangedPayload payload = new CollectionChangedPayload();
             payload.setId("collection-1");
@@ -69,7 +79,7 @@ class ConfigEventListenerTest {
             );
 
             // Act
-            listener.handleCollectionChanged(event);
+            listener.handleCollectionChanged(toJson(event));
 
             // Assert
             ArgumentCaptor<RouteDefinition> routeCaptor = ArgumentCaptor.forClass(RouteDefinition.class);
@@ -84,7 +94,7 @@ class ConfigEventListenerTest {
 
         @Test
         @DisplayName("Should update route when collection is updated")
-        void shouldUpdateRouteWhenCollectionUpdated() {
+        void shouldUpdateRouteWhenCollectionUpdated() throws Exception {
             // Arrange
             CollectionChangedPayload payload = new CollectionChangedPayload();
             payload.setId("collection-1");
@@ -100,7 +110,7 @@ class ConfigEventListenerTest {
             );
 
             // Act
-            listener.handleCollectionChanged(event);
+            listener.handleCollectionChanged(toJson(event));
 
             // Assert
             verify(routeRegistry).updateRoute(any(RouteDefinition.class));
@@ -108,7 +118,7 @@ class ConfigEventListenerTest {
 
         @Test
         @DisplayName("Should remove route when collection is deleted")
-        void shouldRemoveRouteWhenCollectionDeleted() {
+        void shouldRemoveRouteWhenCollectionDeleted() throws Exception {
             // Arrange
             CollectionChangedPayload payload = new CollectionChangedPayload();
             payload.setId("collection-1");
@@ -124,7 +134,7 @@ class ConfigEventListenerTest {
             );
 
             // Act
-            listener.handleCollectionChanged(event);
+            listener.handleCollectionChanged(toJson(event));
 
             // Assert
             verify(routeRegistry).removeRoute("collection-1");
@@ -133,25 +143,46 @@ class ConfigEventListenerTest {
 
         @Test
         @DisplayName("Should handle null payload gracefully")
-        void shouldHandleNullPayloadGracefully() {
-            // Arrange
-            ConfigEvent<CollectionChangedPayload> event = new ConfigEvent<>(
-                UUID.randomUUID().toString(),
-                "config.collection.changed",
-                UUID.randomUUID().toString(),
-                Instant.now(),
-                null
-            );
+        void shouldHandleNullPayloadGracefully() throws Exception {
+            // Arrange - JSON with null payload
+            String json = "{\"eventId\":\"" + UUID.randomUUID() + "\",\"payload\":null}";
 
             // Act & Assert - should not throw exception
-            assertDoesNotThrow(() -> listener.handleCollectionChanged(event));
+            assertDoesNotThrow(() -> listener.handleCollectionChanged(json));
             verify(routeRegistry, never()).updateRoute(any());
             verify(routeRegistry, never()).removeRoute(any());
         }
 
         @Test
+        @DisplayName("Should handle malformed JSON gracefully")
+        void shouldHandleMalformedJsonGracefully() {
+            // Act & Assert - should not throw exception
+            assertDoesNotThrow(() -> listener.handleCollectionChanged("not-valid-json"));
+            verify(routeRegistry, never()).updateRoute(any());
+            verify(routeRegistry, never()).removeRoute(any());
+        }
+
+        @Test
+        @DisplayName("Should handle flat payload format (without ConfigEvent wrapper)")
+        void shouldHandleFlatPayloadFormat() {
+            // Arrange - flat JSON without ConfigEvent wrapper
+            String json = "{\"id\":\"collection-flat\",\"name\":\"flat-test\",\"changeType\":\"CREATED\"}";
+
+            // Act
+            listener.handleCollectionChanged(json);
+
+            // Assert
+            ArgumentCaptor<RouteDefinition> routeCaptor = ArgumentCaptor.forClass(RouteDefinition.class);
+            verify(routeRegistry).updateRoute(routeCaptor.capture());
+
+            RouteDefinition capturedRoute = routeCaptor.getValue();
+            assertEquals("collection-flat", capturedRoute.getId());
+            assertEquals("flat-test", capturedRoute.getCollectionName());
+        }
+
+        @Test
         @DisplayName("Should route system collections like users normally")
-        void shouldRouteSystemCollectionsNormally() {
+        void shouldRouteSystemCollectionsNormally() throws Exception {
             // Arrange — system collections (users, profiles, etc.) should be routed to worker
             CollectionChangedPayload payload = new CollectionChangedPayload();
             payload.setId("sys-users-id");
@@ -167,7 +198,7 @@ class ConfigEventListenerTest {
             );
 
             // Act
-            listener.handleCollectionChanged(event);
+            listener.handleCollectionChanged(toJson(event));
 
             // Assert — system collections ARE routed
             ArgumentCaptor<RouteDefinition> routeCaptor = ArgumentCaptor.forClass(RouteDefinition.class);
@@ -186,7 +217,7 @@ class ConfigEventListenerTest {
 
         @Test
         @DisplayName("Should add route using configured service URL, not pod IP from event")
-        void shouldAddRouteUsingConfiguredServiceUrl() {
+        void shouldAddRouteUsingConfiguredServiceUrl() throws Exception {
             // Arrange - event contains pod-specific URL, but gateway should ignore it
             Map<String, Object> payload = new HashMap<>();
             payload.put("workerId", "worker-1");
@@ -204,7 +235,7 @@ class ConfigEventListenerTest {
             );
 
             // Act
-            listener.handleWorkerAssignmentChanged(event);
+            listener.handleWorkerAssignmentChanged(toJson(event));
 
             // Assert - should use configured worker service URL, not pod IP
             ArgumentCaptor<RouteDefinition> routeCaptor = ArgumentCaptor.forClass(RouteDefinition.class);
@@ -219,7 +250,7 @@ class ConfigEventListenerTest {
 
         @Test
         @DisplayName("Should remove route when collection is unassigned from worker")
-        void shouldRemoveRouteWhenCollectionUnassigned() {
+        void shouldRemoveRouteWhenCollectionUnassigned() throws Exception {
             // Arrange
             Map<String, Object> payload = new HashMap<>();
             payload.put("workerId", "worker-1");
@@ -236,7 +267,7 @@ class ConfigEventListenerTest {
             );
 
             // Act
-            listener.handleWorkerAssignmentChanged(event);
+            listener.handleWorkerAssignmentChanged(toJson(event));
 
             // Assert
             verify(routeRegistry).removeRoute("collection-1");
@@ -246,30 +277,24 @@ class ConfigEventListenerTest {
         @Test
         @DisplayName("Should handle null payload gracefully")
         void shouldHandleNullPayloadGracefully() {
-            // Arrange
-            ConfigEvent<Object> event = new ConfigEvent<>(
-                UUID.randomUUID().toString(),
-                "emf.worker.assignment.changed",
-                UUID.randomUUID().toString(),
-                Instant.now(),
-                null
-            );
+            // Arrange - JSON with null payload
+            String json = "{\"eventId\":\"" + UUID.randomUUID() + "\",\"payload\":null}";
 
             // Act & Assert - should not throw exception
-            assertDoesNotThrow(() -> listener.handleWorkerAssignmentChanged(event));
+            assertDoesNotThrow(() -> listener.handleWorkerAssignmentChanged(json));
             verify(routeRegistry, never()).updateRoute(any());
             verify(routeRegistry, never()).removeRoute(any());
         }
 
         @Test
         @DisplayName("Should handle missing required fields gracefully")
-        void shouldHandleMissingRequiredFieldsGracefully() {
-            // Arrange - missing workerBaseUrl and collectionName
+        void shouldHandleMissingRequiredFieldsGracefully() throws Exception {
+            // Arrange - missing collectionName
             Map<String, Object> payload = new HashMap<>();
             payload.put("workerId", "worker-1");
             payload.put("collectionId", "collection-1");
             payload.put("changeType", "CREATED");
-            // workerBaseUrl and collectionName are missing
+            // collectionName is missing
 
             ConfigEvent<Object> event = new ConfigEvent<>(
                 UUID.randomUUID().toString(),
@@ -280,7 +305,7 @@ class ConfigEventListenerTest {
             );
 
             // Act
-            listener.handleWorkerAssignmentChanged(event);
+            listener.handleWorkerAssignmentChanged(toJson(event));
 
             // Assert - should not add route when required fields are missing
             verify(routeRegistry, never()).updateRoute(any());
@@ -288,7 +313,7 @@ class ConfigEventListenerTest {
 
         @Test
         @DisplayName("Should route system collection worker assignment normally")
-        void shouldRouteSystemCollectionWorkerAssignmentNormally() {
+        void shouldRouteSystemCollectionWorkerAssignmentNormally() throws Exception {
             // Arrange — system collections (profiles, etc.) assigned to worker should be routed
             Map<String, Object> payload = new HashMap<>();
             payload.put("workerId", "worker-1");
@@ -306,7 +331,7 @@ class ConfigEventListenerTest {
             );
 
             // Act
-            listener.handleWorkerAssignmentChanged(event);
+            listener.handleWorkerAssignmentChanged(toJson(event));
 
             // Assert — system collections ARE routed
             ArgumentCaptor<RouteDefinition> routeCaptor = ArgumentCaptor.forClass(RouteDefinition.class);

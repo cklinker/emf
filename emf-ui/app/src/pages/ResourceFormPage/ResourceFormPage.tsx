@@ -419,78 +419,87 @@ export function ResourceFormPage({
     queryFn: async () => {
       const optionsMap: Record<string, LookupOption[]> = {}
       const relFieldsMap: Record<string, string> = {}
-      // Group fields by target collection identifier to avoid duplicate requests.
-      // Use referenceCollectionId when available, otherwise referenceTarget (name).
-      // Track whether each group key is an ID or a name for the fetch path.
-      const targetMap = new Map<string, { fields: FieldDefinition[]; hasId: boolean }>()
+      // Group fields by target collection name to minimize API calls.
+      // Prefer referenceTarget (collection name) for grouping since we need the
+      // name for both schema and records fetches. Fall back to referenceCollectionId.
+      const targetMap = new Map<
+        string,
+        { fields: FieldDefinition[]; targetName?: string; targetId?: string }
+      >()
       for (const field of lookupFields) {
-        const hasId = !!field.referenceCollectionId
-        const target = field.referenceCollectionId || field.referenceTarget!
-        if (!targetMap.has(target)) {
-          targetMap.set(target, { fields: [], hasId })
+        const groupKey = field.referenceTarget || field.referenceCollectionId!
+        if (!targetMap.has(groupKey)) {
+          targetMap.set(groupKey, {
+            fields: [],
+            targetName: field.referenceTarget || undefined,
+            targetId: field.referenceCollectionId || undefined,
+          })
         }
-        targetMap.get(target)!.fields.push(field)
+        targetMap.get(groupKey)!.fields.push(field)
       }
 
       await Promise.all(
-        Array.from(targetMap.entries()).map(async ([targetKey, { fields, hasId }]) => {
-          try {
+        Array.from(targetMap.entries()).map(
+          async ([_groupKey, { fields, targetName: knownName, targetId }]) => {
+            try {
+              let targetName: string
+              let displayFieldName = 'id'
 
-            let targetName: string
-            let displayFieldName = 'id'
-
-            if (hasId) {
-              // Fetch the target collection schema by its UUID
-              const targetSchema = await apiClient.getOne<CollectionSchema>(
-                `/api/collections/${targetKey}`
-              )
-              targetName = targetSchema.name
-
-              if (targetSchema.displayFieldName) {
-                displayFieldName = targetSchema.displayFieldName
-              } else if (targetSchema.fields) {
-                const nameField = targetSchema.fields.find(
-                  (f) => f.name.toLowerCase() === 'name'
-                )
-                if (nameField) {
-                  displayFieldName = nameField.name
-                } else {
-                  const firstStringField = targetSchema.fields.find(
-                    (f) => f.type.toUpperCase() === 'STRING'
-                  )
-                  if (firstStringField) {
-                    displayFieldName = firstStringField.name
-                  }
-                }
-              }
-            } else {
-              // Only have the collection name — fetch schema by name
-              targetName = targetKey
-              try {
-                const targetSchema = await apiClient.getOne<CollectionSchema>(
-                  `/api/collections/collections/${targetKey}`
-                )
-                if (targetSchema.displayFieldName) {
-                  displayFieldName = targetSchema.displayFieldName
-                } else if (targetSchema.fields) {
-                  const nameField = targetSchema.fields.find(
-                    (f) => f.name.toLowerCase() === 'name'
-                  )
-                  if (nameField) {
-                    displayFieldName = nameField.name
-                  } else {
-                    const firstStringField = targetSchema.fields.find(
-                      (f) => f.type.toUpperCase() === 'STRING'
+              if (knownName) {
+                // We have the collection name — use fetchCollectionSchema for proper
+                // display field resolution (resolves displayFieldId → displayFieldName)
+                targetName = knownName
+                try {
+                  const targetSchema = await fetchCollectionSchema(apiClient, knownName)
+                  if (targetSchema.displayFieldName) {
+                    displayFieldName = targetSchema.displayFieldName
+                  } else if (targetSchema.fields?.length) {
+                    const nameField = targetSchema.fields.find(
+                      (f) => f.name.toLowerCase() === 'name'
                     )
-                    if (firstStringField) {
-                      displayFieldName = firstStringField.name
+                    if (nameField) {
+                      displayFieldName = nameField.name
+                    } else {
+                      const firstStringField = targetSchema.fields.find(
+                        (f) => f.type === 'string'
+                      )
+                      if (firstStringField) {
+                        displayFieldName = firstStringField.name
+                      }
                     }
                   }
+                } catch {
+                  displayFieldName = 'name'
                 }
-              } catch {
-                displayFieldName = 'name'
+              } else {
+                // Only have UUID — fetch collection record to get its name, then schema
+                const collection = await apiClient.getOne<{ name: string }>(
+                  `/api/collections/${targetId}`
+                )
+                targetName = collection.name
+                try {
+                  const targetSchema = await fetchCollectionSchema(apiClient, targetName)
+                  if (targetSchema.displayFieldName) {
+                    displayFieldName = targetSchema.displayFieldName
+                  } else if (targetSchema.fields?.length) {
+                    const nameField = targetSchema.fields.find(
+                      (f) => f.name.toLowerCase() === 'name'
+                    )
+                    if (nameField) {
+                      displayFieldName = nameField.name
+                    } else {
+                      const firstStringField = targetSchema.fields.find(
+                        (f) => f.type === 'string'
+                      )
+                      if (firstStringField) {
+                        displayFieldName = firstStringField.name
+                      }
+                    }
+                  }
+                } catch {
+                  displayFieldName = 'name'
+                }
               }
-            }
 
             // Record the field name -> target collection name mapping
             for (const field of fields) {

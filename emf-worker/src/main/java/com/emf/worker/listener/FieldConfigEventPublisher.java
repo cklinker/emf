@@ -2,6 +2,8 @@ package com.emf.worker.listener;
 
 import com.emf.runtime.event.ChangeType;
 import com.emf.runtime.event.CollectionChangedPayload;
+import com.emf.runtime.event.ConfigEvent;
+import com.emf.runtime.event.EventFactory;
 import com.emf.runtime.workflow.BeforeSaveHook;
 import com.emf.runtime.workflow.BeforeSaveResult;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -79,7 +81,9 @@ public class FieldConfigEventPublisher implements BeforeSaveHook {
         payload.setChangeType(ChangeType.UPDATED);
 
         try {
-            String json = objectMapper.writeValueAsString(payload);
+            ConfigEvent<CollectionChangedPayload> event =
+                    EventFactory.createEvent(TOPIC, payload);
+            String json = objectMapper.writeValueAsString(event);
             kafkaTemplate.send(TOPIC, collectionId, json)
                 .whenComplete((result, ex) -> {
                     if (ex != null) {

@@ -1,6 +1,9 @@
 package com.emf.worker.config;
 
 import com.emf.runtime.formula.FormulaEvaluator;
+import com.emf.runtime.module.core.CoreActionsModule;
+import com.emf.runtime.module.integration.IntegrationModule;
+import com.emf.runtime.module.schema.SchemaLifecycleModule;
 import com.emf.runtime.query.QueryEngine;
 import com.emf.runtime.registry.CollectionRegistry;
 import com.emf.runtime.workflow.*;
@@ -51,6 +54,28 @@ public class WorkflowConfig {
     @Bean
     public BeforeSaveHookRegistry beforeSaveHookRegistry() {
         return new BeforeSaveHookRegistry();
+    }
+
+    // ---------------------------------------------------------------------------
+    // EMF module beans — must be registered as Spring beans so that the
+    // ModuleRegistry can discover them via @Autowired List<EmfModule>.
+    // These modules live in the runtime-module-* JARs which are outside the
+    // worker's @SpringBootApplication component-scan package.
+    // ---------------------------------------------------------------------------
+
+    @Bean
+    public SchemaLifecycleModule schemaLifecycleModule() {
+        return new SchemaLifecycleModule();
+    }
+
+    @Bean
+    public CoreActionsModule coreActionsModule() {
+        return new CoreActionsModule();
+    }
+
+    @Bean
+    public IntegrationModule integrationModule() {
+        return new IntegrationModule();
     }
 
     @Bean

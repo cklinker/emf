@@ -38,10 +38,10 @@ public class CollectionLifecycleHook implements BeforeSaveHook {
 
         String name = nameObj.toString().trim();
 
-        // Validate name format: lowercase alphanumeric with hyphens
-        if (!name.matches("^[a-z][a-z0-9-]*$")) {
+        // Validate name format: lowercase alphanumeric with hyphens and underscores
+        if (!name.matches("^[a-z][a-z0-9_-]*$")) {
             return BeforeSaveResult.error("name",
-                    "Collection name must start with a lowercase letter and contain only lowercase letters, numbers, and hyphens");
+                    "Collection name must start with a lowercase letter and contain only lowercase letters, numbers, underscores, and hyphens");
         }
 
         // Set defaults

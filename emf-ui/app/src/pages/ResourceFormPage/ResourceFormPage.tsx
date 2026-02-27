@@ -402,10 +402,12 @@ export function ResourceFormPage({
   })
 
   // Identify master_detail fields that need dropdown options.
-  // referenceCollectionId (UUID) is the canonical FK — always set by the backend.
+  // Accept fields with either referenceCollectionId (UUID) or referenceTarget (name).
   const lookupFields = useMemo(() => {
     if (!schema?.fields) return []
-    return schema.fields.filter((f) => f.type === 'master_detail' && f.referenceCollectionId)
+    return schema.fields.filter(
+      (f) => f.type === 'master_detail' && (f.referenceCollectionId || f.referenceTarget)
+    )
   }, [schema])
 
   // Fetch lookup options for all master_detail fields.
@@ -417,47 +419,82 @@ export function ResourceFormPage({
     queryFn: async () => {
       const optionsMap: Record<string, LookupOption[]> = {}
       const relFieldsMap: Record<string, string> = {}
-      // Group fields by referenceCollectionId (UUID) to avoid duplicate requests.
-      const targetMap = new Map<string, FieldDefinition[]>()
+      // Group fields by target collection identifier to avoid duplicate requests.
+      // Use referenceCollectionId when available, otherwise referenceTarget (name).
+      // Track whether each group key is an ID or a name for the fetch path.
+      const targetMap = new Map<string, { fields: FieldDefinition[]; hasId: boolean }>()
       for (const field of lookupFields) {
-        const target = field.referenceCollectionId!
+        const hasId = !!field.referenceCollectionId
+        const target = field.referenceCollectionId || field.referenceTarget!
         if (!targetMap.has(target)) {
-          targetMap.set(target, [])
+          targetMap.set(target, { fields: [], hasId })
         }
-        targetMap.get(target)!.push(field)
+        targetMap.get(target)!.fields.push(field)
       }
 
       await Promise.all(
-        Array.from(targetMap.entries()).map(async ([targetCollectionId, fields]) => {
+        Array.from(targetMap.entries()).map(async ([targetKey, { fields, hasId }]) => {
           try {
-            // Fetch the target collection schema by its UUID to find display field
-            // and resolve the collection name for the /api/ endpoint.
-            const targetSchema = await apiClient.getOne<CollectionSchema>(
-              `/api/collections/${targetCollectionId}`
-            )
-            const targetName = targetSchema.name
+
+            let targetName: string
+            let displayFieldName = 'id'
+
+            if (hasId) {
+              // Fetch the target collection schema by its UUID
+              const targetSchema = await apiClient.getOne<CollectionSchema>(
+                `/api/collections/${targetKey}`
+              )
+              targetName = targetSchema.name
+
+              if (targetSchema.displayFieldName) {
+                displayFieldName = targetSchema.displayFieldName
+              } else if (targetSchema.fields) {
+                const nameField = targetSchema.fields.find(
+                  (f) => f.name.toLowerCase() === 'name'
+                )
+                if (nameField) {
+                  displayFieldName = nameField.name
+                } else {
+                  const firstStringField = targetSchema.fields.find(
+                    (f) => f.type.toUpperCase() === 'STRING'
+                  )
+                  if (firstStringField) {
+                    displayFieldName = firstStringField.name
+                  }
+                }
+              }
+            } else {
+              // Only have the collection name — fetch schema by name
+              targetName = targetKey
+              try {
+                const targetSchema = await apiClient.getOne<CollectionSchema>(
+                  `/api/collections/collections/${targetKey}`
+                )
+                if (targetSchema.displayFieldName) {
+                  displayFieldName = targetSchema.displayFieldName
+                } else if (targetSchema.fields) {
+                  const nameField = targetSchema.fields.find(
+                    (f) => f.name.toLowerCase() === 'name'
+                  )
+                  if (nameField) {
+                    displayFieldName = nameField.name
+                  } else {
+                    const firstStringField = targetSchema.fields.find(
+                      (f) => f.type.toUpperCase() === 'STRING'
+                    )
+                    if (firstStringField) {
+                      displayFieldName = firstStringField.name
+                    }
+                  }
+                }
+              } catch {
+                displayFieldName = 'name'
+              }
+            }
 
             // Record the field name -> target collection name mapping
             for (const field of fields) {
               relFieldsMap[field.name] = targetName
-            }
-
-            // Determine display field: displayFieldName -> 'name' -> first string field -> 'id'
-            let displayFieldName = 'id'
-            if (targetSchema.displayFieldName) {
-              displayFieldName = targetSchema.displayFieldName
-            } else if (targetSchema.fields) {
-              const nameField = targetSchema.fields.find((f) => f.name.toLowerCase() === 'name')
-              if (nameField) {
-                displayFieldName = nameField.name
-              } else {
-                const firstStringField = targetSchema.fields.find(
-                  (f) => f.type.toUpperCase() === 'STRING'
-                )
-                if (firstStringField) {
-                  displayFieldName = firstStringField.name
-                }
-              }
             }
 
             // Fetch records from the target collection

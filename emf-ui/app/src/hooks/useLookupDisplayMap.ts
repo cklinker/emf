@@ -41,10 +41,13 @@ export function useLookupDisplayMap(
 ): UseLookupDisplayMapResult {
   const { apiClient } = useApi()
 
-  // Identify reference fields that need display label resolution
+  // Identify reference fields that need display label resolution.
+  // Accept fields that have either referenceCollectionId (UUID) or referenceTarget (name).
   const lookupFields = useMemo(() => {
     if (!fields) return []
-    return fields.filter((f) => REFERENCE_TYPES.has(f.type) && f.referenceCollectionId)
+    return fields.filter(
+      (f) => REFERENCE_TYPES.has(f.type) && (f.referenceCollectionId || f.referenceTarget)
+    )
   }, [fields])
 
   // Stable query key based on field IDs
@@ -57,48 +60,87 @@ export function useLookupDisplayMap(
       const displayMap: Record<string, Record<string, string>> = {}
       const targetNameMap: Record<string, string> = {}
 
-      // Group fields by referenceCollectionId to minimize API calls
-      const targetGroupMap = new Map<string, FieldDefinition[]>()
+      // Group fields by target collection identifier to minimize API calls.
+      // Use referenceCollectionId when available, otherwise referenceTarget (name).
+      // Track whether each group key is an ID or a name for the fetch path.
+      const targetGroupMap = new Map<string, { fields: FieldDefinition[]; hasId: boolean }>()
       for (const field of lookupFields) {
-        const target = field.referenceCollectionId!
+        const hasId = !!field.referenceCollectionId
+        const target = field.referenceCollectionId || field.referenceTarget!
         if (!targetGroupMap.has(target)) {
-          targetGroupMap.set(target, [])
+          targetGroupMap.set(target, { fields: [], hasId })
         }
-        targetGroupMap.get(target)!.push(field)
+        targetGroupMap.get(target)!.fields.push(field)
       }
 
       await Promise.all(
-        Array.from(targetGroupMap.entries()).map(async ([targetCollectionId, groupFields]) => {
+        Array.from(targetGroupMap.entries()).map(async ([targetKey, { fields: groupFields, hasId }]) => {
           try {
-            // Fetch target collection schema to determine display field and name
-            const targetSchema = await apiClient.getOne<{
-              name: string
-              displayFieldName?: string
-              fields?: Array<{ name: string; type: string }>
-            }>(`/api/collections/${targetCollectionId}`)
-            const targetName = targetSchema.name
+            let targetName: string
+            let displayFieldName = 'id'
+
+            if (hasId) {
+              // Fetch target collection schema by ID to determine display field and name
+              const targetSchema = await apiClient.getOne<{
+                name: string
+                displayFieldName?: string
+                fields?: Array<{ name: string; type: string }>
+              }>(`/api/collections/${targetKey}`)
+              targetName = targetSchema.name
+
+              if (targetSchema.displayFieldName) {
+                displayFieldName = targetSchema.displayFieldName
+              } else if (targetSchema.fields) {
+                const nameField = targetSchema.fields.find(
+                  (f) => f.name.toLowerCase() === 'name'
+                )
+                if (nameField) {
+                  displayFieldName = nameField.name
+                } else {
+                  const firstStringField = targetSchema.fields.find(
+                    (f) => f.type.toUpperCase() === 'STRING'
+                  )
+                  if (firstStringField) {
+                    displayFieldName = firstStringField.name
+                  }
+                }
+              }
+            } else {
+              // We only have the collection name (referenceTarget).
+              // Fetch the schema by name to determine the display field.
+              targetName = targetKey
+              try {
+                const targetSchema = await apiClient.getOne<{
+                  displayFieldName?: string
+                  fields?: Array<{ name: string; type: string }>
+                }>(`/api/collections/collections/${targetKey}`)
+
+                if (targetSchema.displayFieldName) {
+                  displayFieldName = targetSchema.displayFieldName
+                } else if (targetSchema.fields) {
+                  const nameField = targetSchema.fields.find(
+                    (f) => f.name.toLowerCase() === 'name'
+                  )
+                  if (nameField) {
+                    displayFieldName = nameField.name
+                  } else {
+                    const firstStringField = targetSchema.fields.find(
+                      (f) => f.type.toUpperCase() === 'STRING'
+                    )
+                    if (firstStringField) {
+                      displayFieldName = firstStringField.name
+                    }
+                  }
+                }
+              } catch {
+                // Schema lookup by name failed — fall back to "name" field
+                displayFieldName = 'name'
+              }
+            }
 
             // Track target collection name for each field (useful for building links)
             for (const field of groupFields) {
               targetNameMap[field.name] = targetName
-            }
-
-            // Determine the best display field: explicit > "name" > first string > id
-            let displayFieldName = 'id'
-            if (targetSchema.displayFieldName) {
-              displayFieldName = targetSchema.displayFieldName
-            } else if (targetSchema.fields) {
-              const nameField = targetSchema.fields.find((f) => f.name.toLowerCase() === 'name')
-              if (nameField) {
-                displayFieldName = nameField.name
-              } else {
-                const firstStringField = targetSchema.fields.find(
-                  (f) => f.type.toUpperCase() === 'STRING'
-                )
-                if (firstStringField) {
-                  displayFieldName = firstStringField.name
-                }
-              }
             }
 
             // Fetch records from the target collection

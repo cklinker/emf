@@ -540,7 +540,7 @@ export function ObjectFormPage(): React.ReactElement {
   // ---------------------------------------------------------------
   const lookupFields = useMemo(() => {
     return permissionFilteredFields.filter(
-      (f) => REFERENCE_TYPES.has(f.type) && f.referenceCollectionId
+      (f) => REFERENCE_TYPES.has(f.type) && (f.referenceCollectionId || f.referenceTarget)
     )
   }, [permissionFilteredFields])
 

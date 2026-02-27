@@ -70,9 +70,9 @@ describe('useLookupDisplayMap', () => {
     expect(result.current.isLoading).toBe(false)
   })
 
-  it('returns undefined for reference fields without referenceCollectionId', () => {
+  it('returns undefined for reference fields without referenceCollectionId or referenceTarget', () => {
     const fields: FieldDefinition[] = [
-      makeField({ name: 'customer', type: 'master_detail' }), // no referenceCollectionId
+      makeField({ name: 'customer', type: 'master_detail' }), // no referenceCollectionId or referenceTarget
     ]
 
     const { result } = renderHook(() => useLookupDisplayMap(fields), {
@@ -81,6 +81,53 @@ describe('useLookupDisplayMap', () => {
 
     expect(result.current.lookupDisplayMap).toBeUndefined()
     expect(result.current.isLoading).toBe(false)
+  })
+
+  it('resolves display labels using referenceTarget when referenceCollectionId is missing', async () => {
+    const fields: FieldDefinition[] = [
+      makeField({
+        name: 'customer',
+        type: 'master_detail',
+        referenceTarget: 'customers', // only referenceTarget, no referenceCollectionId
+      }),
+    ]
+
+    // Mock: getOne for collection schema by name
+    mockGetOne.mockImplementation((url: string) => {
+      if (url === '/api/collections/collections/customers') {
+        return Promise.resolve({
+          name: 'customers',
+          displayFieldName: 'full_name',
+          fields: [{ name: 'full_name', type: 'STRING' }],
+        })
+      }
+      return Promise.reject(new Error(`Unexpected getOne URL: ${url}`))
+    })
+
+    // Mock: get for records
+    mockGet.mockImplementation((url: string) => {
+      if (url.startsWith('/api/customers')) {
+        return Promise.resolve({
+          data: [
+            { id: 'cust-1', full_name: 'Alice Smith' },
+            { id: 'cust-2', full_name: 'Bob Jones' },
+          ],
+        })
+      }
+      return Promise.reject(new Error(`Unexpected get URL: ${url}`))
+    })
+
+    const { result } = renderHook(() => useLookupDisplayMap(fields), {
+      wrapper: TestWrapper,
+    })
+
+    await waitFor(() => {
+      expect(result.current.lookupDisplayMap).toBeDefined()
+    })
+
+    expect(result.current.lookupDisplayMap!['customer']['cust-1']).toBe('Alice Smith')
+    expect(result.current.lookupDisplayMap!['customer']['cust-2']).toBe('Bob Jones')
+    expect(result.current.lookupTargetNameMap!['customer']).toBe('customers')
   })
 
   it('resolves display labels for master_detail fields', async () => {

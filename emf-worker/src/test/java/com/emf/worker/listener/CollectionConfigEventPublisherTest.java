@@ -3,6 +3,7 @@ package com.emf.worker.listener;
 import com.emf.runtime.event.ChangeType;
 import com.emf.runtime.event.CollectionChangedPayload;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -30,6 +31,7 @@ class CollectionConfigEventPublisherTest {
     void setUp() {
         kafkaTemplate = mock(KafkaTemplate.class);
         objectMapper = new ObjectMapper();
+        objectMapper.registerModule(new JavaTimeModule());
         publisher = new CollectionConfigEventPublisher(kafkaTemplate, objectMapper);
         when(kafkaTemplate.send(anyString(), anyString(), anyString()))
             .thenReturn(new CompletableFuture<>());
@@ -48,7 +50,7 @@ class CollectionConfigEventPublisherTest {
     }
 
     @Test
-    @DisplayName("Should publish CREATED event after create")
+    @DisplayName("Should publish CREATED event wrapped in ConfigEvent")
     void shouldPublishCreatedEvent() throws Exception {
         Map<String, Object> record = new HashMap<>(Map.of(
             "id", "col-1",
@@ -67,8 +69,18 @@ class CollectionConfigEventPublisherTest {
             payloadCaptor.capture()
         );
 
-        CollectionChangedPayload payload = objectMapper.readValue(
-            payloadCaptor.getValue(), CollectionChangedPayload.class);
+        // Verify the message is a ConfigEvent wrapper
+        var tree = objectMapper.readTree(payloadCaptor.getValue());
+        assertNotNull(tree.get("eventId"), "Should have eventId field (ConfigEvent wrapper)");
+        assertNotNull(tree.get("eventType"), "Should have eventType field");
+        assertNotNull(tree.get("timestamp"), "Should have timestamp field");
+        assertNotNull(tree.get("payload"), "Should have payload field");
+
+        assertEquals(CollectionConfigEventPublisher.TOPIC, tree.get("eventType").asText());
+
+        // Verify the nested payload
+        CollectionChangedPayload payload = objectMapper.treeToValue(
+            tree.get("payload"), CollectionChangedPayload.class);
         assertEquals("col-1", payload.getId());
         assertEquals("orders", payload.getName());
         assertEquals(ChangeType.CREATED, payload.getChangeType());
@@ -77,7 +89,7 @@ class CollectionConfigEventPublisherTest {
     }
 
     @Test
-    @DisplayName("Should publish UPDATED event after update")
+    @DisplayName("Should publish UPDATED event wrapped in ConfigEvent")
     void shouldPublishUpdatedEvent() throws Exception {
         Map<String, Object> record = new HashMap<>(Map.of(
             "id", "col-1",
@@ -98,13 +110,16 @@ class CollectionConfigEventPublisherTest {
             payloadCaptor.capture()
         );
 
-        CollectionChangedPayload payload = objectMapper.readValue(
-            payloadCaptor.getValue(), CollectionChangedPayload.class);
+        var tree = objectMapper.readTree(payloadCaptor.getValue());
+        assertNotNull(tree.get("eventId"), "Should be wrapped in ConfigEvent");
+
+        CollectionChangedPayload payload = objectMapper.treeToValue(
+            tree.get("payload"), CollectionChangedPayload.class);
         assertEquals(ChangeType.UPDATED, payload.getChangeType());
     }
 
     @Test
-    @DisplayName("Should publish DELETED event after delete")
+    @DisplayName("Should publish DELETED event wrapped in ConfigEvent")
     void shouldPublishDeletedEvent() throws Exception {
         publisher.afterDelete("col-1", "tenant-1");
 
@@ -115,8 +130,11 @@ class CollectionConfigEventPublisherTest {
             payloadCaptor.capture()
         );
 
-        CollectionChangedPayload payload = objectMapper.readValue(
-            payloadCaptor.getValue(), CollectionChangedPayload.class);
+        var tree = objectMapper.readTree(payloadCaptor.getValue());
+        assertNotNull(tree.get("eventId"), "Should be wrapped in ConfigEvent");
+
+        CollectionChangedPayload payload = objectMapper.treeToValue(
+            tree.get("payload"), CollectionChangedPayload.class);
         assertEquals("col-1", payload.getId());
         assertEquals(ChangeType.DELETED, payload.getChangeType());
     }

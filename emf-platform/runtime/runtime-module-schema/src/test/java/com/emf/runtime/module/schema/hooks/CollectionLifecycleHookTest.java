@@ -57,10 +57,10 @@ class CollectionLifecycleHookTest {
         }
 
         @Test
-        @DisplayName("Should reject name with underscores")
-        void shouldRejectNameWithUnderscores() {
+        @DisplayName("Should accept name with underscores")
+        void shouldAcceptNameWithUnderscores() {
             BeforeSaveResult result = hook.beforeCreate(new HashMap<>(Map.of("name", "my_collection")), "t1");
-            assertFalse(result.isSuccess());
+            assertTrue(result.isSuccess());
         }
 
         @Test
@@ -68,6 +68,14 @@ class CollectionLifecycleHookTest {
         void shouldAcceptValidName() {
             BeforeSaveResult result = hook.beforeCreate(new HashMap<>(Map.of("name", "my-collection")), "t1");
             assertTrue(result.isSuccess());
+        }
+
+        @Test
+        @DisplayName("Should reject name with special characters")
+        void shouldRejectNameWithSpecialChars() {
+            BeforeSaveResult result = hook.beforeCreate(new HashMap<>(Map.of("name", "my.collection")), "t1");
+            assertFalse(result.isSuccess());
+            assertEquals("name", result.getErrors().get(0).field());
         }
 
         @Test

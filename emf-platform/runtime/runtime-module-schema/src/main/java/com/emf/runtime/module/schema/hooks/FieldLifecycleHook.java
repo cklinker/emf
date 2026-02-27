@@ -25,8 +25,15 @@ public class FieldLifecycleHook implements BeforeSaveHook {
     private static final Logger log = LoggerFactory.getLogger(FieldLifecycleHook.class);
 
     static final Set<String> VALID_FIELD_TYPES = Set.of(
+            // Lowercase (UI / FieldService types)
             "string", "number", "boolean", "date", "datetime",
-            "reference", "array", "object",
+            "reference", "array", "object", "json",
+            "picklist", "multi_picklist", "currency", "percent",
+            "auto_number", "phone", "email", "url",
+            "rich_text", "encrypted", "external_id",
+            "geolocation", "lookup", "master_detail",
+            "formula", "rollup_summary",
+            // Uppercase (runtime / canonical types)
             "STRING", "INTEGER", "LONG", "DOUBLE", "BOOLEAN",
             "DATE", "DATETIME", "JSON",
             "PICKLIST", "MULTI_PICKLIST", "CURRENCY", "PERCENT",

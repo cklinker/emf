@@ -88,19 +88,39 @@ public class FlowExecutionController {
         }
 
         // Build initial state
-        Map<String, Object> inputPayload = Map.of();
-        if (body != null && body.containsKey("input")) {
-            Object input = body.get("input");
-            if (input instanceof Map) {
-                inputPayload = (Map<String, Object>) input;
-            }
-        }
-
         boolean isTest = body != null && Boolean.TRUE.equals(body.get("test"));
-
         String executionId = UUID.randomUUID().toString();
-        Map<String, Object> initialState = initialStateBuilder.buildFromApiInvocation(
-                inputPayload, tenantId, userId, flowId, executionId);
+
+        Map<String, Object> initialState;
+
+        // Support a "state" key for providing a pre-built initial state (useful for testing
+        // record-triggered flows via the API, where the state structure differs from API invocations).
+        if (body != null && body.containsKey("state") && body.get("state") instanceof Map) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> customState = new LinkedHashMap<>((Map<String, Object>) body.get("state"));
+            // Ensure context is present
+            if (!customState.containsKey("context")) {
+                Map<String, Object> ctx = new LinkedHashMap<>();
+                ctx.put("tenantId", tenantId);
+                ctx.put("userId", userId);
+                ctx.put("flowId", flowId);
+                ctx.put("executionId", executionId);
+                customState.put("context", ctx);
+            }
+            initialState = customState;
+        } else {
+            Map<String, Object> inputPayload = Map.of();
+            if (body != null && body.containsKey("input")) {
+                Object input = body.get("input");
+                if (input instanceof Map) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> inputMap = (Map<String, Object>) input;
+                    inputPayload = inputMap;
+                }
+            }
+            initialState = initialStateBuilder.buildFromApiInvocation(
+                    inputPayload, tenantId, userId, flowId, executionId);
+        }
 
         String resultExecutionId = flowEngine.startExecution(
                 tenantId, flowId, definitionJson, initialState, userId, isTest);

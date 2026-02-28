@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react'
+import React, { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
@@ -14,6 +14,7 @@ import {
 import type { LogColumn } from '../../components'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { CreateFlowWizard } from './CreateFlowWizard'
 
 interface Flow {
   id: string
@@ -40,287 +41,8 @@ interface FlowExecutionLog {
   completedAt: string | null
 }
 
-interface FlowFormData {
-  name: string
-  description: string
-  flowType: string
-  active: boolean
-  definition: string
-}
-
-interface FormErrors {
-  name?: string
-  description?: string
-  definition?: string
-}
-
 export interface FlowsPageProps {
   testId?: string
-}
-
-function validateForm(data: FlowFormData): FormErrors {
-  const errors: FormErrors = {}
-  if (!data.name.trim()) {
-    errors.name = 'Name is required'
-  } else if (data.name.length > 100) {
-    errors.name = 'Name must be 100 characters or fewer'
-  }
-  if (data.description && data.description.length > 500) {
-    errors.description = 'Description must be 500 characters or fewer'
-  }
-  if (data.definition) {
-    try {
-      JSON.parse(data.definition)
-    } catch {
-      errors.definition = 'Definition must be valid JSON'
-    }
-  }
-  return errors
-}
-
-interface FlowFormProps {
-  flow?: Flow
-  onSubmit: (data: FlowFormData) => void
-  onCancel: () => void
-  isSubmitting: boolean
-}
-
-function FlowForm({ flow, onSubmit, onCancel, isSubmitting }: FlowFormProps): React.ReactElement {
-  const isEditing = !!flow
-  const [formData, setFormData] = useState<FlowFormData>({
-    name: flow?.name ?? '',
-    description: flow?.description ?? '',
-    flowType: flow?.flowType ?? 'AUTOLAUNCHED',
-    active: flow?.active ?? false,
-    definition: flow?.definition ?? '',
-  })
-  const [errors, setErrors] = useState<FormErrors>({})
-  const [touched, setTouched] = useState<Record<string, boolean>>({})
-  const nameInputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    nameInputRef.current?.focus()
-  }, [])
-
-  const handleChange = useCallback(
-    (field: keyof FlowFormData, value: string | boolean) => {
-      setFormData((prev) => ({ ...prev, [field]: value }))
-      if (errors[field as keyof FormErrors]) {
-        setErrors((prev) => ({ ...prev, [field]: undefined }))
-      }
-    },
-    [errors]
-  )
-
-  const handleBlur = useCallback(
-    (field: keyof FormErrors) => {
-      setTouched((prev) => ({ ...prev, [field]: true }))
-      const validationErrors = validateForm(formData)
-      if (validationErrors[field]) {
-        setErrors((prev) => ({ ...prev, [field]: validationErrors[field] }))
-      }
-    },
-    [formData]
-  )
-
-  const handleSubmit = useCallback(
-    (e: React.FormEvent) => {
-      e.preventDefault()
-      const validationErrors = validateForm(formData)
-      setErrors(validationErrors)
-      setTouched({ name: true, description: true, definition: true })
-      if (Object.keys(validationErrors).length === 0) {
-        onSubmit(formData)
-      }
-    },
-    [formData, onSubmit]
-  )
-
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onCancel()
-      }
-    },
-    [onCancel]
-  )
-
-  const title = isEditing ? 'Edit Flow' : 'Create Flow'
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-      onClick={(e) => e.target === e.currentTarget && onCancel()}
-      onKeyDown={handleKeyDown}
-      data-testid="flow-form-overlay"
-      role="presentation"
-    >
-      <div
-        className="w-full max-w-[600px] max-h-[90vh] overflow-y-auto rounded-lg bg-background shadow-xl"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="flow-form-title"
-        data-testid="flow-form-modal"
-      >
-        <div className="flex items-center justify-between border-b border-border p-6">
-          <h2 id="flow-form-title" className="text-lg font-semibold text-foreground">
-            {title}
-          </h2>
-          <button
-            type="button"
-            className="rounded p-2 text-2xl leading-none text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            onClick={onCancel}
-            aria-label="Close"
-            data-testid="flow-form-close"
-          >
-            &times;
-          </button>
-        </div>
-        <div className="p-6">
-          <form className="flex flex-col gap-5" onSubmit={handleSubmit} noValidate>
-            <div className="flex flex-col gap-2">
-              <label htmlFor="flow-name" className="text-sm font-medium text-foreground">
-                Name
-                <span className="ml-1 text-destructive" aria-hidden="true">
-                  *
-                </span>
-              </label>
-              <input
-                ref={nameInputRef}
-                id="flow-name"
-                type="text"
-                className={cn(
-                  'rounded-md border border-border bg-background px-3 py-2.5 text-sm text-foreground transition-colors',
-                  'focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20',
-                  'disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground',
-                  touched.name && errors.name && 'border-destructive'
-                )}
-                value={formData.name}
-                onChange={(e) => handleChange('name', e.target.value)}
-                onBlur={() => handleBlur('name')}
-                placeholder="Enter flow name"
-                aria-required="true"
-                aria-invalid={touched.name && !!errors.name}
-                disabled={isSubmitting}
-                data-testid="flow-name-input"
-              />
-              {touched.name && errors.name && (
-                <span className="text-xs text-destructive" role="alert">
-                  {errors.name}
-                </span>
-              )}
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <label htmlFor="flow-description" className="text-sm font-medium text-foreground">
-                Description
-              </label>
-              <textarea
-                id="flow-description"
-                className={cn(
-                  'min-h-[80px] resize-y rounded-md border border-border bg-background px-3 py-2.5 font-[inherit] text-sm text-foreground transition-colors',
-                  'focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20',
-                  'disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground',
-                  touched.description && errors.description && 'border-destructive'
-                )}
-                value={formData.description}
-                onChange={(e) => handleChange('description', e.target.value)}
-                onBlur={() => handleBlur('description')}
-                placeholder="Enter flow description"
-                disabled={isSubmitting}
-                rows={3}
-                data-testid="flow-description-input"
-              />
-              {touched.description && errors.description && (
-                <span className="text-xs text-destructive" role="alert">
-                  {errors.description}
-                </span>
-              )}
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <label htmlFor="flow-type" className="text-sm font-medium text-foreground">
-                Flow Type
-                <span className="ml-1 text-destructive" aria-hidden="true">
-                  *
-                </span>
-              </label>
-              <select
-                id="flow-type"
-                className="rounded-md border border-border bg-background px-3 py-2.5 text-sm text-foreground transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
-                value={formData.flowType}
-                onChange={(e) => handleChange('flowType', e.target.value)}
-                disabled={isSubmitting}
-                data-testid="flow-type-input"
-              >
-                <option value="RECORD_TRIGGERED">Record Triggered</option>
-                <option value="SCHEDULED">Scheduled</option>
-                <option value="AUTOLAUNCHED">Autolaunched</option>
-                <option value="SCREEN">Screen</option>
-              </select>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <label htmlFor="flow-definition" className="text-sm font-medium text-foreground">
-                Definition
-              </label>
-              <textarea
-                id="flow-definition"
-                className={cn(
-                  'min-h-[80px] resize-y rounded-md border border-border bg-background px-3 py-2.5 font-[inherit] text-sm text-foreground transition-colors',
-                  'focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20',
-                  'disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground',
-                  touched.definition && errors.definition && 'border-destructive'
-                )}
-                value={formData.definition}
-                onChange={(e) => handleChange('definition', e.target.value)}
-                onBlur={() => handleBlur('definition')}
-                placeholder="Enter flow definition (JSON)"
-                disabled={isSubmitting}
-                rows={6}
-                data-testid="flow-definition-input"
-              />
-              {touched.definition && errors.definition && (
-                <span className="text-xs text-destructive" role="alert">
-                  {errors.definition}
-                </span>
-              )}
-            </div>
-
-            <div className="flex items-center gap-2">
-              <input
-                id="flow-active"
-                type="checkbox"
-                className="h-4 w-4 accent-primary"
-                checked={formData.active}
-                onChange={(e) => handleChange('active', e.target.checked)}
-                disabled={isSubmitting}
-                data-testid="flow-active-input"
-              />
-              <label htmlFor="flow-active" className="text-sm font-medium text-foreground">
-                Active
-              </label>
-            </div>
-
-            <div className="mt-2 flex justify-end gap-3 border-t border-border pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={onCancel}
-                disabled={isSubmitting}
-                data-testid="flow-form-cancel"
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isSubmitting} data-testid="flow-form-submit">
-                {isSubmitting ? 'Saving...' : 'Save'}
-              </Button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
-  )
 }
 
 export function FlowsPage({ testId = 'flows-page' }: FlowsPageProps): React.ReactElement {
@@ -330,8 +52,7 @@ export function FlowsPage({ testId = 'flows-page' }: FlowsPageProps): React.Reac
   const { apiClient } = useApi()
   const { showToast } = useToast()
 
-  const [isFormOpen, setIsFormOpen] = useState(false)
-  const [editingFlow, setEditingFlow] = useState<Flow | undefined>(undefined)
+  const [wizardOpen, setWizardOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [flowToDelete, setFlowToDelete] = useState<Flow | null>(null)
   const [execItemId, setExecItemId] = useState<string | null>(null)
@@ -348,31 +69,6 @@ export function FlowsPage({ testId = 'flows-page' }: FlowsPageProps): React.Reac
   })
 
   const flowList: Flow[] = flows ?? []
-
-  const createMutation = useMutation({
-    mutationFn: (data: FlowFormData) => apiClient.postResource<Flow>(`/api/flows`, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['flows'] })
-      showToast('Flow created successfully', 'success')
-      handleCloseForm()
-    },
-    onError: (err: Error) => {
-      showToast(err.message || 'An error occurred', 'error')
-    },
-  })
-
-  const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: FlowFormData }) =>
-      apiClient.putResource<Flow>(`/api/flows/${id}`, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['flows'] })
-      showToast('Flow updated successfully', 'success')
-      handleCloseForm()
-    },
-    onError: (err: Error) => {
-      showToast(err.message || 'An error occurred', 'error')
-    },
-  })
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => apiClient.delete(`/api/flows/${id}`),
@@ -514,32 +210,6 @@ export function FlowsPage({ testId = 'flows-page' }: FlowsPageProps): React.Reac
     },
   ]
 
-  const handleCreate = useCallback(() => {
-    setEditingFlow(undefined)
-    setIsFormOpen(true)
-  }, [])
-
-  const handleEdit = useCallback((flow: Flow) => {
-    setEditingFlow(flow)
-    setIsFormOpen(true)
-  }, [])
-
-  const handleCloseForm = useCallback(() => {
-    setIsFormOpen(false)
-    setEditingFlow(undefined)
-  }, [])
-
-  const handleFormSubmit = useCallback(
-    (data: FlowFormData) => {
-      if (editingFlow) {
-        updateMutation.mutate({ id: editingFlow.id, data })
-      } else {
-        createMutation.mutate(data)
-      }
-    },
-    [editingFlow, createMutation, updateMutation]
-  )
-
   const handleDeleteClick = useCallback((flow: Flow) => {
     setFlowToDelete(flow)
     setDeleteDialogOpen(true)
@@ -577,15 +247,13 @@ export function FlowsPage({ testId = 'flows-page' }: FlowsPageProps): React.Reac
     )
   }
 
-  const isSubmitting = createMutation.isPending || updateMutation.isPending
-
   return (
     <div className="mx-auto max-w-[1400px] space-y-6 p-6 lg:p-8" data-testid={testId}>
       <header className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-foreground">Flows</h1>
         <Button
           type="button"
-          onClick={handleCreate}
+          onClick={() => setWizardOpen(true)}
           aria-label="Create Flow"
           data-testid="add-flow-button"
         >
@@ -722,7 +390,7 @@ export function FlowsPage({ testId = 'flows-page' }: FlowsPageProps): React.Reac
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => handleEdit(flow)}
+                        onClick={() => navigate(`/${getTenantSlug()}/flows/${flow.id}/design`)}
                         aria-label={`Edit ${flow.name}`}
                         data-testid={`edit-button-${index}`}
                       >
@@ -748,14 +416,7 @@ export function FlowsPage({ testId = 'flows-page' }: FlowsPageProps): React.Reac
         </div>
       )}
 
-      {isFormOpen && (
-        <FlowForm
-          flow={editingFlow}
-          onSubmit={handleFormSubmit}
-          onCancel={handleCloseForm}
-          isSubmitting={isSubmitting}
-        />
-      )}
+      <CreateFlowWizard open={wizardOpen} onOpenChange={setWizardOpen} />
 
       <ConfirmDialog
         open={deleteDialogOpen}

@@ -15,6 +15,7 @@ import type { LogColumn } from '../../components'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { CreateFlowWizard } from './CreateFlowWizard'
+import { TestFlowDialog } from '../FlowDesignerPage/components/TestFlowDialog'
 
 interface Flow {
   id: string
@@ -57,6 +58,8 @@ export function FlowsPage({ testId = 'flows-page' }: FlowsPageProps): React.Reac
   const [flowToDelete, setFlowToDelete] = useState<Flow | null>(null)
   const [execItemId, setExecItemId] = useState<string | null>(null)
   const [execItemName, setExecItemName] = useState('')
+  const [runDialogOpen, setRunDialogOpen] = useState(false)
+  const [runFlowTarget, setRunFlowTarget] = useState<Flow | null>(null)
 
   const {
     data: flows,
@@ -94,22 +97,31 @@ export function FlowsPage({ testId = 'flows-page' }: FlowsPageProps): React.Reac
   })
 
   const executeMutation = useMutation({
-    mutationFn: async (flowId: string) => {
-      const resp = await apiClient.fetch(
-        `/api/flows/${flowId}/execute?${new URLSearchParams({ userId: 'system' }).toString()}`,
-        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }
-      )
+    mutationFn: async ({ flowId, state }: { flowId: string; state: Record<string, unknown> }) => {
+      const resp = await apiClient.fetch(`/api/flows/${flowId}/execute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state }),
+      })
       if (!resp.ok) {
         const errBody = await resp.json().catch(() => ({}))
         throw new Error(
           (errBody as Record<string, string>).message || `Execute failed: ${resp.statusText}`
         )
       }
+      return (await resp.json()) as { executionId: string }
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       showToast(t('flows.executionStarted'), 'success')
+      setRunDialogOpen(false)
       if (execItemId) {
         queryClient.invalidateQueries({ queryKey: ['flow-executions', execItemId] })
+      }
+      // Navigate to the debug view in the flow designer
+      if (runFlowTarget && data?.executionId) {
+        navigate(
+          `/${getTenantSlug()}/flows/${runFlowTarget.id}/design?executionId=${data.executionId}`
+        )
       }
     },
     onError: (err: Error) => showToast(err.message, 'error'),
@@ -379,7 +391,10 @@ export function FlowsPage({ testId = 'flows-page' }: FlowsPageProps): React.Reac
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => executeMutation.mutate(flow.id)}
+                        onClick={() => {
+                          setRunFlowTarget(flow)
+                          setRunDialogOpen(true)
+                        }}
                         disabled={!flow.active || executeMutation.isPending}
                         aria-label={`Run ${flow.name}`}
                         data-testid={`run-button-${index}`}
@@ -441,6 +456,18 @@ export function FlowsPage({ testId = 'flows-page' }: FlowsPageProps): React.Reac
           emptyMessage={t('flows.noExecutions')}
         />
       )}
+
+      <TestFlowDialog
+        open={runDialogOpen}
+        onOpenChange={setRunDialogOpen}
+        flowType={runFlowTarget?.flowType ?? 'AUTOLAUNCHED'}
+        onSubmit={(state) => {
+          if (runFlowTarget) {
+            executeMutation.mutate({ flowId: runFlowTarget.id, state })
+          }
+        }}
+        isLoading={executeMutation.isPending}
+      />
     </div>
   )
 }

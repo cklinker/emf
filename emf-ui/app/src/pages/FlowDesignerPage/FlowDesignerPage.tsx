@@ -21,6 +21,7 @@ import {
   nodesToDefinition,
 } from './definitionConverter'
 import { TriggerEditSheet } from './components/TriggerEditSheet'
+import { TestFlowDialog } from './components/TestFlowDialog'
 
 type ActiveTab = 'design' | 'executions' | { type: 'debug'; executionId: string }
 
@@ -48,6 +49,7 @@ export function FlowDesignerPage() {
   const [currentNodes, setCurrentNodes] = useState<Node[]>([])
   const [currentEdges, setCurrentEdges] = useState<Edge[]>([])
   const [triggerSheetOpen, setTriggerSheetOpen] = useState(false)
+  const [testDialogOpen, setTestDialogOpen] = useState(false)
 
   const {
     data: flow,
@@ -143,12 +145,12 @@ export function FlowDesignerPage() {
   }, [])
 
   const testMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (state: Record<string, unknown>) => {
       if (!flowId) return
       const resp = await apiClient.fetch(`/api/flows/${flowId}/execute`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ input: {}, test: true }),
+        body: JSON.stringify({ state, test: true }),
       })
       if (!resp.ok) throw new Error('Failed to start test execution')
       return (await resp.json()) as { executionId: string }
@@ -156,6 +158,7 @@ export function FlowDesignerPage() {
     onSuccess: (data) => {
       if (data?.executionId) {
         showToast('Test execution started', 'success')
+        setTestDialogOpen(false)
         handleViewExecution(data.executionId)
       }
     },
@@ -240,7 +243,7 @@ export function FlowDesignerPage() {
         currentVersion={flow.version}
         onSave={() => saveMutation.mutate()}
         onToggleJson={() => setShowJson((v) => !v)}
-        onTest={() => testMutation.mutate()}
+        onTest={() => setTestDialogOpen(true)}
         onPublish={() => publishMutation.mutate()}
       />
 
@@ -367,6 +370,14 @@ export function FlowDesignerPage() {
       )}
 
       <TriggerEditSheet open={triggerSheetOpen} onOpenChange={setTriggerSheetOpen} flow={flow} />
+
+      <TestFlowDialog
+        open={testDialogOpen}
+        onOpenChange={setTestDialogOpen}
+        flowType={flow.flowType}
+        onSubmit={(state) => testMutation.mutate(state)}
+        isLoading={testMutation.isPending}
+      />
     </div>
   )
 }

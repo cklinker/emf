@@ -8,6 +8,15 @@ import { RetryEditor } from './RetryEditor'
 import { CatchEditor } from './CatchEditor'
 import { QueryRecordsParams } from './QueryRecordsParams'
 import { UpdateRecordParams } from './UpdateRecordParams'
+import { CreateRecordParams } from './CreateRecordParams'
+import { DeleteRecordParams } from './DeleteRecordParams'
+import { FieldUpdateParams } from './FieldUpdateParams'
+import { LogMessageParams } from './LogMessageParams'
+import { HttpCalloutParams } from './HttpCalloutParams'
+import { SendNotificationParams } from './SendNotificationParams'
+import { EmailAlertParams } from './EmailAlertParams'
+import { TriggerFlowParams } from './TriggerFlowParams'
+import { PublishEventParams } from './PublishEventParams'
 
 interface TaskPropertiesProps {
   nodeId: string
@@ -53,6 +62,60 @@ export function TaskProperties({ nodeId, data, allNodeIds, onUpdate }: TaskPrope
       )}
       {resource === 'UPDATE_RECORD' && (
         <UpdateRecordParams
+          parameters={data.parameters as Record<string, unknown> | undefined}
+          onUpdate={(params) => onUpdate({ parameters: params })}
+        />
+      )}
+      {resource === 'CREATE_RECORD' && (
+        <CreateRecordParams
+          parameters={data.parameters as Record<string, unknown> | undefined}
+          onUpdate={(params) => onUpdate({ parameters: params })}
+        />
+      )}
+      {resource === 'DELETE_RECORD' && (
+        <DeleteRecordParams
+          parameters={data.parameters as Record<string, unknown> | undefined}
+          onUpdate={(params) => onUpdate({ parameters: params })}
+        />
+      )}
+      {resource === 'FIELD_UPDATE' && (
+        <FieldUpdateParams
+          parameters={data.parameters as Record<string, unknown> | undefined}
+          onUpdate={(params) => onUpdate({ parameters: params })}
+        />
+      )}
+      {resource === 'LOG_MESSAGE' && (
+        <LogMessageParams
+          parameters={data.parameters as Record<string, unknown> | undefined}
+          onUpdate={(params) => onUpdate({ parameters: params })}
+        />
+      )}
+      {resource === 'HTTP_CALLOUT' && (
+        <HttpCalloutParams
+          parameters={data.parameters as Record<string, unknown> | undefined}
+          onUpdate={(params) => onUpdate({ parameters: params })}
+        />
+      )}
+      {resource === 'SEND_NOTIFICATION' && (
+        <SendNotificationParams
+          parameters={data.parameters as Record<string, unknown> | undefined}
+          onUpdate={(params) => onUpdate({ parameters: params })}
+        />
+      )}
+      {resource === 'EMAIL_ALERT' && (
+        <EmailAlertParams
+          parameters={data.parameters as Record<string, unknown> | undefined}
+          onUpdate={(params) => onUpdate({ parameters: params })}
+        />
+      )}
+      {resource === 'TRIGGER_FLOW' && (
+        <TriggerFlowParams
+          parameters={data.parameters as Record<string, unknown> | undefined}
+          onUpdate={(params) => onUpdate({ parameters: params })}
+        />
+      )}
+      {resource === 'PUBLISH_EVENT' && (
+        <PublishEventParams
           parameters={data.parameters as Record<string, unknown> | undefined}
           onUpdate={(params) => onUpdate({ parameters: params })}
         />

@@ -11,7 +11,6 @@
 -- they inherit isolation through FK cascading from tenant-scoped parent tables.
 -- ============================================================================
 
--- Helper function to avoid repetition
 DO $$
 DECLARE
     tbl TEXT;
@@ -56,23 +55,25 @@ DECLARE
         'note',
         'file_attachment',
         'field_history',
-        'field_type_config',
-        'record_type_picklist',
-        'workflow_action'
+        'field_type_config'
     ];
 BEGIN
     FOREACH tbl IN ARRAY tables_with_tenant_id
     LOOP
-        -- Check if the table exists before enabling RLS
+        -- Check if the table exists AND has a tenant_id column
         IF EXISTS (
-            SELECT 1 FROM information_schema.tables
-            WHERE table_schema = 'public' AND table_name = tbl
+            SELECT 1 FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = tbl AND column_name = 'tenant_id'
         ) THEN
             -- Enable RLS on the table
             EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', tbl);
 
             -- Force RLS even for the table owner (important when app user = table owner)
             EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', tbl);
+
+            -- Drop policies if they already exist (idempotent for partial re-runs)
+            EXECUTE format('DROP POLICY IF EXISTS tenant_isolation ON %I', tbl);
+            EXECUTE format('DROP POLICY IF EXISTS admin_bypass ON %I', tbl);
 
             -- Create tenant isolation policy
             -- current_setting('app.current_tenant_id', true) returns NULL if not set
@@ -92,7 +93,7 @@ BEGIN
 
             RAISE NOTICE 'Enabled RLS on table: %', tbl;
         ELSE
-            RAISE NOTICE 'Skipping RLS for non-existent table: %', tbl;
+            RAISE NOTICE 'Skipping table % (not found or no tenant_id column)', tbl;
         END IF;
     END LOOP;
 END $$;

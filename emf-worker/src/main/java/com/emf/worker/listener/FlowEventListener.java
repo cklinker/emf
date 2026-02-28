@@ -151,6 +151,17 @@ public class FlowEventListener {
                     if (triggerConfigJson != null && !triggerConfigJson.isBlank()) {
                         try {
                             triggerConfig = objectMapper.readValue(triggerConfigJson, Map.class);
+                            // Defensive unwrap: trigger_config may be stored in a JDBC/jsonb
+                            // wrapper format like {"null":false,"type":"jsonb","value":"{...}"}.
+                            // If so, extract and re-parse the inner JSON from the "value" key.
+                            if ("jsonb".equals(triggerConfig.get("type"))
+                                    && triggerConfig.containsKey("value")) {
+                                Object innerValue = triggerConfig.get("value");
+                                if (innerValue instanceof String innerJson) {
+                                    triggerConfig = objectMapper.readValue(innerJson, Map.class);
+                                    log.debug("Unwrapped jsonb wrapper for flow {} trigger_config", flowId);
+                                }
+                            }
                         } catch (Exception e) {
                             log.warn("Failed to parse trigger_config for flow {}: {}", flowId, e.getMessage());
                         }

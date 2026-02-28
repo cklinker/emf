@@ -92,7 +92,12 @@ export function FlowsPage({ testId = 'flows-page' }: FlowsPageProps): React.Reac
     error: execError,
   } = useQuery({
     queryKey: ['flow-executions', execItemId],
-    queryFn: () => apiClient.getList<FlowExecutionLog>(`/api/flows/${execItemId}/flow-executions`),
+    queryFn: async () => {
+      const resp = await apiClient.fetch(`/api/flows/${execItemId}/flow-executions`)
+      if (!resp.ok) throw new Error('Failed to load executions')
+      const json = (await resp.json()) as { executions: FlowExecutionLog[] }
+      return json.executions || []
+    },
     enabled: !!execItemId,
   })
 

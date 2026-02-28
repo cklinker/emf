@@ -174,15 +174,24 @@ public class UpdateRecordActionHandler implements ActionHandler {
     }
 
     private String resolveRecordId(Map<String, Object> config, ActionContext context) {
-        String recordIdField = (String) config.get("recordIdField");
-        if (recordIdField != null && !recordIdField.isBlank()) {
-            Object value = context.data() != null ? context.data().get(recordIdField) : null;
-            return value != null ? value.toString() : null;
-        }
-
+        // "recordId" — literal value (may already be template-resolved by StateDataResolver)
         String recordId = (String) config.get("recordId");
         if (recordId != null && !recordId.isBlank()) {
             return recordId;
+        }
+
+        // "recordIdField" — field name to look up in context data.
+        // After template resolution, this might already be the actual value (e.g., a UUID)
+        // rather than a field name. Fall back to using it as a literal if lookup fails.
+        String recordIdField = (String) config.get("recordIdField");
+        if (recordIdField != null && !recordIdField.isBlank()) {
+            Object value = context.data() != null ? context.data().get(recordIdField) : null;
+            if (value != null) {
+                return value.toString();
+            }
+            // Field lookup failed — use the raw value as a literal record ID.
+            // This handles cases where template resolution already produced the final value.
+            return recordIdField;
         }
 
         return context.recordId();

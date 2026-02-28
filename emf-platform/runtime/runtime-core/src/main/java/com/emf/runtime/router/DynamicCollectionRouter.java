@@ -92,6 +92,12 @@ public class DynamicCollectionRouter {
     private UserIdResolver userIdResolver;
 
     /**
+     * Optional listener notified after successful write operations (create, update, delete).
+     * Used for cross-cutting concerns like audit logging.
+     */
+    private CollectionWriteListener writeListener;
+
+    /**
      * Creates a new DynamicCollectionRouter.
      *
      * @param registry the collection registry
@@ -111,7 +117,12 @@ public class DynamicCollectionRouter {
     public void setUserIdResolver(UserIdResolver userIdResolver) {
         this.userIdResolver = userIdResolver;
     }
-    
+
+    @Autowired(required = false)
+    public void setWriteListener(CollectionWriteListener writeListener) {
+        this.writeListener = writeListener;
+    }
+
     /**
      * Lists records from a collection with pagination, sorting, and filtering.
      *
@@ -256,13 +267,15 @@ public class DynamicCollectionRouter {
             TenantContext.set(tenantIdHeader);
             Map<String, Object> created = queryEngine.create(definition, data);
 
+            notifyAfterCreate(collectionName, tenantIdHeader, userId, created);
+
             // Return in JSON:API format
             return ResponseEntity.status(HttpStatus.CREATED).body(toJsonApiResponse(created, collectionName, definition));
         } finally {
             TenantContext.clear();
         }
     }
-    
+
     /**
      * Updates an existing record in the collection (PUT).
      * 
@@ -348,6 +361,7 @@ public class DynamicCollectionRouter {
         try {
             TenantContext.set(tenantIdHeader);
             Optional<Map<String, Object>> updated = queryEngine.update(definition, id, data);
+            updated.ifPresent(r -> notifyAfterUpdate(collectionName, tenantIdHeader, userId, id, data));
             return updated.map(r -> ResponseEntity.ok(toJsonApiResponse(r, collectionName, definition)))
                           .orElse(ResponseEntity.notFound().build());
         } finally {
@@ -382,9 +396,13 @@ public class DynamicCollectionRouter {
         }
 
         String tenantIdHeader = request.getHeader("X-Tenant-ID");
+        String userId = resolveUserId(request);
         try {
             TenantContext.set(tenantIdHeader);
             boolean deleted = queryEngine.delete(definition, id);
+            if (deleted) {
+                notifyAfterDelete(collectionName, tenantIdHeader, userId, id);
+            }
             return deleted ? ResponseEntity.noContent().build()
                            : ResponseEntity.notFound().build();
         } finally {
@@ -526,6 +544,8 @@ public class DynamicCollectionRouter {
             TenantContext.set(tenantIdHeader);
             Map<String, Object> created = queryEngine.create(relation.childDef(), data);
 
+            notifyAfterCreate(childName, tenantIdHeader, userId, created);
+
             return ResponseEntity.status(HttpStatus.CREATED)
                     .body(toJsonApiResponse(created, childName, relation.childDef()));
         } finally {
@@ -616,6 +636,7 @@ public class DynamicCollectionRouter {
         try {
             TenantContext.set(tenantIdHeader);
             Optional<Map<String, Object>> updated = queryEngine.update(relation.childDef(), childId, data);
+            updated.ifPresent(r -> notifyAfterUpdate(childName, tenantIdHeader, userId, childId, data));
             return updated.map(r -> ResponseEntity.ok(toJsonApiResponse(r, childName, relation.childDef())))
                           .orElse(ResponseEntity.notFound().build());
         } finally {
@@ -654,9 +675,13 @@ public class DynamicCollectionRouter {
         }
 
         String tenantIdHeader = request.getHeader("X-Tenant-ID");
+        String userId = resolveUserId(request);
         try {
             TenantContext.set(tenantIdHeader);
             boolean deleted = queryEngine.delete(relation.childDef(), childId);
+            if (deleted) {
+                notifyAfterDelete(childName, tenantIdHeader, userId, childId);
+            }
             return deleted ? ResponseEntity.noContent().build()
                            : ResponseEntity.notFound().build();
         } finally {
@@ -1244,6 +1269,43 @@ public class DynamicCollectionRouter {
             logger.warn("Failed to query child records for '{}': {}", childDef.name(),
                     e.getMessage());
             return List.of();
+        }
+    }
+
+    // ==================== Write Listener Notifications ====================
+
+    private void notifyAfterCreate(String collectionName, String tenantId, String userId,
+                                    Map<String, Object> created) {
+        if (writeListener == null) return;
+        try {
+            Object id = created.get("id");
+            String recordId = id != null ? id.toString() : null;
+            writeListener.afterCreate(collectionName, tenantId, userId, recordId, created);
+        } catch (Exception e) {
+            logger.warn("Write listener afterCreate failed for collection '{}': {}",
+                    collectionName, e.getMessage());
+        }
+    }
+
+    private void notifyAfterUpdate(String collectionName, String tenantId, String userId,
+                                    String recordId, Map<String, Object> data) {
+        if (writeListener == null) return;
+        try {
+            writeListener.afterUpdate(collectionName, tenantId, userId, recordId, data);
+        } catch (Exception e) {
+            logger.warn("Write listener afterUpdate failed for collection '{}': {}",
+                    collectionName, e.getMessage());
+        }
+    }
+
+    private void notifyAfterDelete(String collectionName, String tenantId, String userId,
+                                    String recordId) {
+        if (writeListener == null) return;
+        try {
+            writeListener.afterDelete(collectionName, tenantId, userId, recordId);
+        } catch (Exception e) {
+            logger.warn("Write listener afterDelete failed for collection '{}': {}",
+                    collectionName, e.getMessage());
         }
     }
 }

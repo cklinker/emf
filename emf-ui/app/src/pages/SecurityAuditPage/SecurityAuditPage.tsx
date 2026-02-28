@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useApi } from '../../context/ApiContext'
 import { useTenant } from '../../context/TenantContext'
 import { cn } from '@/lib/utils'
-import { Shield, AlertTriangle, Activity } from 'lucide-react'
+import { Shield } from 'lucide-react'
 
 interface SecurityAuditEntry {
   id: string
@@ -17,15 +17,6 @@ interface SecurityAuditEntry {
   details: string
   ipAddress: string
   createdAt: string
-}
-
-interface SecurityAuditSummary {
-  totalEventsLast24h: number
-  authEvents: number
-  authzEvents: number
-  configEvents: number
-  dataEvents: number
-  permissionDenials: number
 }
 
 export interface SecurityAuditPageProps {
@@ -67,15 +58,8 @@ export function SecurityAuditPage({ className }: SecurityAuditPageProps): React.
     queryKey: ['security-audit', tenantSlug, page],
     queryFn: async () => {
       return apiClient.getPage<SecurityAuditEntry>(
-        `/api/setup-audit-entries?page[number]=${page}&page[size]=50`
+        `/api/security-audit-logs?page[number]=${page}&page[size]=50&sort=-createdAt`
       )
-    },
-  })
-
-  const { data: summary } = useQuery({
-    queryKey: ['security-audit-summary', tenantSlug],
-    queryFn: async () => {
-      return apiClient.getOne<SecurityAuditSummary>('/api/setup-audit-entries/summary')
     },
   })
 
@@ -104,36 +88,6 @@ export function SecurityAuditPage({ className }: SecurityAuditPageProps): React.
         <Shield className="h-6 w-6 text-muted-foreground" />
         <h1 className="m-0 text-2xl font-semibold">Security Audit Log</h1>
       </header>
-
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-lg border border-border bg-card p-4">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Activity className="h-4 w-4" />
-            <span>Events (24h)</span>
-          </div>
-          <p className="mt-1 text-2xl font-semibold">
-            {isLoading ? '--' : (summary?.totalEventsLast24h ?? 0)}
-          </p>
-        </div>
-        <div className="rounded-lg border border-border bg-card p-4">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Shield className="h-4 w-4" />
-            <span>Auth Events</span>
-          </div>
-          <p className="mt-1 text-2xl font-semibold">
-            {isLoading ? '--' : (summary?.authEvents ?? 0)}
-          </p>
-        </div>
-        <div className="rounded-lg border border-border bg-card p-4">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <AlertTriangle className="h-4 w-4" />
-            <span>Permission Denials</span>
-          </div>
-          <p className="mt-1 text-2xl font-semibold">
-            {isLoading ? '--' : (summary?.permissionDenials ?? 0)}
-          </p>
-        </div>
-      </div>
 
       {isLoading ? (
         <div className="flex flex-col items-center justify-center p-12 text-muted-foreground">

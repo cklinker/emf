@@ -1,6 +1,7 @@
 package com.emf.runtime.module.core.handlers;
 
 import com.emf.runtime.model.CollectionDefinition;
+import com.emf.runtime.query.QueryEngine;
 import com.emf.runtime.registry.CollectionRegistry;
 import com.emf.runtime.workflow.ActionContext;
 import com.emf.runtime.workflow.ActionHandler;
@@ -13,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Action handler that updates a record in any collection (cross-collection).
@@ -37,10 +39,14 @@ public class UpdateRecordActionHandler implements ActionHandler {
 
     private final ObjectMapper objectMapper;
     private final CollectionRegistry collectionRegistry;
+    private final QueryEngine queryEngine;
 
-    public UpdateRecordActionHandler(ObjectMapper objectMapper, CollectionRegistry collectionRegistry) {
+    public UpdateRecordActionHandler(ObjectMapper objectMapper,
+                                     CollectionRegistry collectionRegistry,
+                                     QueryEngine queryEngine) {
         this.objectMapper = objectMapper;
         this.collectionRegistry = collectionRegistry;
+        this.queryEngine = queryEngine;
     }
 
     @Override
@@ -84,7 +90,8 @@ public class UpdateRecordActionHandler implements ActionHandler {
 
                 String sourceField = (String) update.get("sourceField");
                 if (sourceField != null && !sourceField.isBlank()) {
-                    Object value = context.data() != null ? context.data().get(sourceField) : null;
+                    // Support dot-notation for nested access (e.g., "aggregations.total_spent")
+                    Object value = resolveNestedValue(context.data(), sourceField);
                     updateData.put(field, value);
                 } else {
                     updateData.put(field, update.get("value"));
@@ -94,10 +101,20 @@ public class UpdateRecordActionHandler implements ActionHandler {
             log.info("Update record action: collection={}, recordId={}, fields={}",
                 targetCollectionName, targetRecordId, updateData.keySet());
 
+            // Persist the update to the database
+            Optional<Map<String, Object>> updatedRecord =
+                queryEngine.update(targetCollection, targetRecordId, updateData);
+
+            if (updatedRecord.isEmpty()) {
+                return ActionResult.failure("Record not found: " + targetRecordId
+                    + " in collection " + targetCollectionName);
+            }
+
             return ActionResult.success(Map.of(
                 "targetCollectionName", targetCollectionName,
                 "targetRecordId", targetRecordId,
-                "updatedFields", updateData
+                "updatedFields", updateData,
+                "record", updatedRecord.get()
             ));
         } catch (Exception e) {
             log.error("Failed to execute update record action: {}", e.getMessage(), e);
@@ -134,6 +151,26 @@ public class UpdateRecordActionHandler implements ActionHandler {
             return id;
         }
         return null;
+    }
+
+    /**
+     * Resolves a value from a nested data map using dot-notation.
+     * For example, "aggregations.total_spent" resolves to data.get("aggregations").get("total_spent").
+     */
+    @SuppressWarnings("unchecked")
+    private Object resolveNestedValue(Map<String, Object> data, String path) {
+        if (data == null || path == null) return null;
+
+        String[] parts = path.split("\\.");
+        Object current = data;
+        for (String part : parts) {
+            if (current instanceof Map) {
+                current = ((Map<String, Object>) current).get(part);
+            } else {
+                return null;
+            }
+        }
+        return current;
     }
 
     private String resolveRecordId(Map<String, Object> config, ActionContext context) {

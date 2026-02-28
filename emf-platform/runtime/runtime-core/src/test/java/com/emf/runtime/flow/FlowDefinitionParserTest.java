@@ -214,6 +214,74 @@ class FlowDefinitionParserTest {
         }
 
         @Test
+        @DisplayName("parses Task state with Parameters")
+        void parsesTaskWithParameters() {
+            String json = """
+                {
+                    "StartAt": "QueryOrders",
+                    "States": {
+                        "QueryOrders": {
+                            "Type": "Task",
+                            "Resource": "QUERY_RECORDS",
+                            "Parameters": {
+                                "targetCollectionName": "orders",
+                                "filters": [
+                                    { "field": "customer", "operator": "eq", "value": "${$.record.data.customer}" }
+                                ],
+                                "pageSize": 200,
+                                "aggregations": [
+                                    { "function": "SUM", "field": "total_amount", "alias": "total_spent" }
+                                ]
+                            },
+                            "ResultPath": "$.queryResult",
+                            "Next": "UpdateCustomer"
+                        },
+                        "UpdateCustomer": { "Type": "Succeed" }
+                    }
+                }
+                """;
+
+            FlowDefinition def = parser.parse(json);
+            StateDefinition.TaskState task = (StateDefinition.TaskState) def.getState("QueryOrders");
+
+            assertNotNull(task.parameters());
+            assertEquals("orders", task.parameters().get("targetCollectionName"));
+            assertEquals(200, task.parameters().get("pageSize"));
+
+            @SuppressWarnings("unchecked")
+            var filters = (java.util.List<Map<String, Object>>) task.parameters().get("filters");
+            assertEquals(1, filters.size());
+            assertEquals("customer", filters.get(0).get("field"));
+            assertEquals("${$.record.data.customer}", filters.get(0).get("value"));
+
+            @SuppressWarnings("unchecked")
+            var aggregations = (java.util.List<Map<String, Object>>) task.parameters().get("aggregations");
+            assertEquals(1, aggregations.size());
+            assertEquals("SUM", aggregations.get(0).get("function"));
+        }
+
+        @Test
+        @DisplayName("Task state without Parameters has null parameters")
+        void taskWithoutParametersHasNull() {
+            String json = """
+                {
+                    "StartAt": "Simple",
+                    "States": {
+                        "Simple": {
+                            "Type": "Task",
+                            "Resource": "LOG_MESSAGE",
+                            "End": true
+                        }
+                    }
+                }
+                """;
+
+            FlowDefinition def = parser.parse(json);
+            StateDefinition.TaskState task = (StateDefinition.TaskState) def.getState("Simple");
+            assertNull(task.parameters());
+        }
+
+        @Test
         @DisplayName("parses Task state with Name override")
         void parsesTaskWithNameOverride() {
             String json = """

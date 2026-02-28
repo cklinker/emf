@@ -1,6 +1,7 @@
 package com.emf.runtime.module.core.handlers;
 
 import com.emf.runtime.model.CollectionDefinition;
+import com.emf.runtime.query.QueryEngine;
 import com.emf.runtime.registry.CollectionRegistry;
 import com.emf.runtime.workflow.ActionContext;
 import com.emf.runtime.workflow.ActionResult;
@@ -9,8 +10,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @DisplayName("UpdateRecordActionHandler")
@@ -18,7 +21,8 @@ class UpdateRecordActionHandlerTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final CollectionRegistry registry = mock(CollectionRegistry.class);
-    private final UpdateRecordActionHandler handler = new UpdateRecordActionHandler(objectMapper, registry);
+    private final QueryEngine queryEngine = mock(QueryEngine.class);
+    private final UpdateRecordActionHandler handler = new UpdateRecordActionHandler(objectMapper, registry, queryEngine);
 
     @Test
     @DisplayName("Should have correct action type key")
@@ -29,8 +33,10 @@ class UpdateRecordActionHandlerTest {
     @Test
     @DisplayName("Should update with static values")
     void shouldUpdateWithStaticValues() {
-        when(registry.get("orders")).thenReturn(
-            mock(CollectionDefinition.class));
+        CollectionDefinition collDef = mock(CollectionDefinition.class);
+        when(registry.get("orders")).thenReturn(collDef);
+        when(queryEngine.update(eq(collDef), eq("r1"), anyMap()))
+            .thenReturn(Optional.of(Map.of("id", "r1", "status", "Approved")));
 
         String config = """
             {"targetCollectionName": "orders", "updates": [{"field": "status", "value": "Approved"}]}
@@ -45,8 +51,10 @@ class UpdateRecordActionHandlerTest {
     @Test
     @DisplayName("Should resolve record ID from source field")
     void shouldResolveRecordIdFromField() {
-        when(registry.get("tasks")).thenReturn(
-            mock(CollectionDefinition.class));
+        CollectionDefinition collDef = mock(CollectionDefinition.class);
+        when(registry.get("tasks")).thenReturn(collDef);
+        when(queryEngine.update(eq(collDef), eq("task-456"), anyMap()))
+            .thenReturn(Optional.of(Map.of("id", "task-456", "status", "Done")));
 
         String config = """
             {"targetCollectionName": "tasks", "recordIdField": "task_id",
@@ -65,8 +73,10 @@ class UpdateRecordActionHandlerTest {
     @Test
     @DisplayName("Should use source field for update values")
     void shouldUseSourceFieldValues() {
-        when(registry.get("orders")).thenReturn(
-            mock(CollectionDefinition.class));
+        CollectionDefinition collDef = mock(CollectionDefinition.class);
+        when(registry.get("orders")).thenReturn(collDef);
+        when(queryEngine.update(eq(collDef), eq("r1"), anyMap()))
+            .thenReturn(Optional.of(Map.of("id", "r1", "reviewer", "user-123")));
 
         String config = """
             {"targetCollectionName": "orders", "updates": [{"field": "reviewer", "sourceField": "userId"}]}

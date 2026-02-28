@@ -7,6 +7,7 @@ import com.emf.runtime.module.integration.IntegrationModule;
 import com.emf.runtime.module.schema.SchemaLifecycleModule;
 import com.emf.runtime.query.QueryEngine;
 import com.emf.runtime.registry.CollectionRegistry;
+import com.emf.runtime.service.RollupSummaryService;
 import com.emf.runtime.workflow.ActionHandlerRegistry;
 import com.emf.runtime.workflow.BeforeSaveHookRegistry;
 import com.emf.runtime.workflow.module.EmfModule;
@@ -124,13 +125,16 @@ public class FlowConfig {
                                           CollectionRegistry collectionRegistry,
                                           @Autowired(required = false) FormulaEvaluator formulaEvaluator,
                                           ObjectMapper objectMapper,
-                                          FlowEngine flowEngine) {
+                                          FlowEngine flowEngine,
+                                          RollupSummaryService rollupSummaryService) {
         ModuleRegistry registry = new ModuleRegistry(actionHandlerRegistry, beforeSaveHookRegistry);
 
         if (discoveredModules != null && !discoveredModules.isEmpty()) {
             ModuleContext context = new ModuleContext(
                 queryEngine, collectionRegistry, formulaEvaluator, objectMapper,
-                actionHandlerRegistry, Map.of(FlowEngine.class, flowEngine));
+                actionHandlerRegistry, Map.of(
+                    FlowEngine.class, flowEngine,
+                    RollupSummaryService.class, rollupSummaryService));
 
             registry.initialize(discoveredModules, context);
             log.info("Module system initialized with {} modules", discoveredModules.size());

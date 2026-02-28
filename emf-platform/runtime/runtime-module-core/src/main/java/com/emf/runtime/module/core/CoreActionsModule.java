@@ -51,6 +51,7 @@ public class CoreActionsModule implements EmfModule {
     public void onStartup(ModuleContext context) {
         var objectMapper = context.objectMapper();
         var collectionRegistry = context.collectionRegistry();
+        var queryEngine = context.queryEngine();
 
         // Simple handlers (ObjectMapper only)
         handlers.add(new FieldUpdateActionHandler(objectMapper));
@@ -62,8 +63,20 @@ public class CoreActionsModule implements EmfModule {
 
         // Handlers needing CollectionRegistry
         handlers.add(new CreateRecordActionHandler(objectMapper, collectionRegistry));
-        handlers.add(new UpdateRecordActionHandler(objectMapper, collectionRegistry));
+        handlers.add(new UpdateRecordActionHandler(objectMapper, collectionRegistry, queryEngine));
         handlers.add(new DeleteRecordActionHandler(objectMapper, collectionRegistry));
+
+        // Query handler — queries records with optional aggregations
+        var rollupService = context.getExtension(
+            com.emf.runtime.service.RollupSummaryService.class);
+        if (rollupService != null) {
+            handlers.add(new QueryRecordsActionHandler(
+                objectMapper, collectionRegistry, queryEngine, rollupService));
+        } else {
+            // Register without aggregation support — queries still work
+            handlers.add(new QueryRecordsActionHandler(
+                objectMapper, collectionRegistry, queryEngine, null));
+        }
 
         // Handler needing FormulaEvaluator + ActionHandlerRegistry
         handlers.add(new DecisionActionHandler(

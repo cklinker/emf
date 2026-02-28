@@ -195,6 +195,8 @@ public class FlowExecutionController {
             stepMap.put("stateName", step.stateName());
             stepMap.put("stateType", step.stateType());
             stepMap.put("status", step.status());
+            stepMap.put("inputSnapshot", step.inputSnapshot());
+            stepMap.put("outputSnapshot", step.outputSnapshot());
             stepMap.put("errorMessage", step.errorMessage());
             stepMap.put("errorCode", step.errorCode());
             stepMap.put("attemptNumber", step.attemptNumber());
@@ -209,6 +211,90 @@ public class FlowExecutionController {
         response.put("steps", stepList);
         response.put("totalSteps", stepList.size());
 
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Retries a failed or cancelled execution.
+     * <p>
+     * Supports two modes:
+     * <ul>
+     *   <li>{@code mode=full} — re-executes the flow from the beginning with the same initial input</li>
+     *   <li>{@code mode=from-failure} — re-executes starting from the failed step's input state</li>
+     * </ul>
+     *
+     * @param executionId the execution ID to retry
+     * @param mode        retry mode: "full" (default) or "from-failure"
+     * @return new execution ID and status
+     */
+    @PostMapping("/executions/{executionId}/retry")
+    public ResponseEntity<Map<String, Object>> retryExecution(
+            @PathVariable String executionId,
+            @RequestParam(defaultValue = "full") String mode) {
+
+        log.debug("Retry execution request: executionId={}, mode={}", executionId, mode);
+
+        Optional<FlowExecutionData> execution = flowStore.loadExecution(executionId);
+        if (execution.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        FlowExecutionData exec = execution.get();
+        if (!exec.isTerminal()) {
+            Map<String, Object> error = new LinkedHashMap<>();
+            error.put("error", "Can only retry terminal executions. Current status: " + exec.status());
+            return ResponseEntity.badRequest().body(error);
+        }
+
+        // Load the flow definition
+        Map<String, Object> flow = loadFlow(exec.flowId());
+        if (flow == null) {
+            Map<String, Object> error = new LinkedHashMap<>();
+            error.put("error", "Flow not found: " + exec.flowId());
+            return ResponseEntity.badRequest().body(error);
+        }
+
+        String definitionJson = (String) flow.get("definition");
+        if (definitionJson == null || definitionJson.isBlank()) {
+            Map<String, Object> error = new LinkedHashMap<>();
+            error.put("error", "Flow has no definition");
+            return ResponseEntity.badRequest().body(error);
+        }
+
+        Map<String, Object> initialState;
+        if ("from-failure".equals(mode)) {
+            // Find the last failed step and use its input as the starting state
+            List<FlowStepLogData> steps = flowStore.loadStepLogs(executionId);
+            FlowStepLogData failedStep = null;
+            for (int i = steps.size() - 1; i >= 0; i--) {
+                if (FlowStepLogData.STATUS_FAILED.equals(steps.get(i).status())) {
+                    failedStep = steps.get(i);
+                    break;
+                }
+            }
+            if (failedStep == null || failedStep.inputSnapshot() == null) {
+                Map<String, Object> error = new LinkedHashMap<>();
+                error.put("error", "No failed step with input snapshot found. Use mode=full instead.");
+                return ResponseEntity.badRequest().body(error);
+            }
+            initialState = failedStep.inputSnapshot();
+        } else {
+            // Full retry: use the original initial input
+            initialState = exec.initialInput() != null ? exec.initialInput() : Map.of();
+        }
+
+        String newExecutionId = flowEngine.startExecution(
+                exec.tenantId(), exec.flowId(), definitionJson, initialState,
+                exec.startedBy(), exec.isTest());
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("executionId", newExecutionId);
+        response.put("originalExecutionId", executionId);
+        response.put("flowId", exec.flowId());
+        response.put("mode", mode);
+        response.put("status", "RUNNING");
+
+        log.info("Retried execution: original={}, new={}, mode={}", executionId, newExecutionId, mode);
         return ResponseEntity.ok(response);
     }
 
@@ -283,11 +369,14 @@ public class FlowExecutionController {
         map.put("tenantId", exec.tenantId());
         map.put("status", exec.status());
         map.put("startedBy", exec.startedBy());
+        map.put("triggerRecordId", exec.triggerRecordId());
         map.put("currentNodeId", exec.currentNodeId());
         map.put("stepCount", exec.stepCount());
         map.put("durationMs", exec.durationMs());
         map.put("errorMessage", exec.errorMessage());
         map.put("isTest", exec.isTest());
+        map.put("stateData", exec.stateData());
+        map.put("initialInput", exec.initialInput());
         map.put("startedAt", exec.startedAt() != null ? exec.startedAt().toString() : null);
         map.put("completedAt", exec.completedAt() != null ? exec.completedAt().toString() : null);
         return map;

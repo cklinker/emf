@@ -182,6 +182,9 @@ export type { ApprovalProcessesPageProps } from './ApprovalProcessesPage'
 export { FlowsPage } from './FlowsPage'
 export type { FlowsPageProps } from './FlowsPage'
 
+// FlowDesignerPage - Visual flow builder
+export { FlowDesignerPage } from './FlowDesignerPage'
+
 // ScheduledJobsPage - Scheduled jobs management page
 export { ScheduledJobsPage } from './ScheduledJobsPage'
 export type { ScheduledJobsPageProps } from './ScheduledJobsPage'

@@ -1,7 +1,9 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
+import { getTenantSlug } from '../../context/TenantContext'
 import {
   useToast,
   ConfirmDialog,
@@ -323,6 +325,7 @@ function FlowForm({ flow, onSubmit, onCancel, isSubmitting }: FlowFormProps): Re
 
 export function FlowsPage({ testId = 'flows-page' }: FlowsPageProps): React.ReactElement {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const { t, formatDate } = useI18n()
   const { apiClient } = useApi()
   const { showToast } = useToast()
@@ -681,6 +684,16 @@ export function FlowsPage({ testId = 'flows-page' }: FlowsPageProps): React.Reac
                   </td>
                   <td role="gridcell" className="px-4 py-3 text-right text-sm">
                     <div className="flex justify-end gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigate(`/${getTenantSlug()}/flows/${flow.id}/design`)}
+                        aria-label={`Design ${flow.name}`}
+                        data-testid={`design-button-${index}`}
+                      >
+                        Design
+                      </Button>
                       <Button
                         type="button"
                         variant="outline"

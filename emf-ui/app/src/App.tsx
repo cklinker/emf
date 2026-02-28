@@ -87,6 +87,7 @@ import {
   WorkflowActionTypesPage,
   ApprovalProcessesPage,
   FlowsPage,
+  FlowDesignerPage,
   ScheduledJobsPage,
   EmailTemplatesPage,
   ScriptsPage,
@@ -718,6 +719,16 @@ function TenantRoutes(): React.ReactElement {
               <FlowsPage />
             </RequirePermission>
           </AdminPageRoute>
+        }
+      />
+
+      {/* Flow Designer route */}
+      <Route
+        path="flows/:flowId/design"
+        element={
+          <RequirePermission permission="MANAGE_WORKFLOWS">
+            <FlowDesignerPage />
+          </RequirePermission>
         }
       />
 

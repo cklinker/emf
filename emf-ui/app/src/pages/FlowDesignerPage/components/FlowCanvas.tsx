@@ -39,6 +39,41 @@ interface FlowCanvasProps {
 
 let nodeIdCounter = 0
 
+/**
+ * Extract only the definition-relevant fields from a node, ignoring ephemeral
+ * React Flow state (selected, dragging, measured, width, height, resizing, etc.)
+ * that should NOT mark the flow as dirty.
+ */
+function nodeFingerprint(node: Node): string {
+  return JSON.stringify({
+    id: node.id,
+    type: node.type,
+    position: node.position,
+    data: node.data,
+  })
+}
+
+function edgeFingerprint(edge: Edge): string {
+  return JSON.stringify({
+    id: edge.id,
+    source: edge.source,
+    sourceHandle: edge.sourceHandle,
+    target: edge.target,
+    targetHandle: edge.targetHandle,
+    label: edge.label,
+    data: edge.data,
+  })
+}
+
+/** Compare two node/edge arrays using only definition-relevant fields. */
+function hasDefinitionChanged<T>(prev: T[], next: T[], fingerprint: (item: T) => string): boolean {
+  if (prev.length !== next.length) return true
+  for (let i = 0; i < prev.length; i++) {
+    if (fingerprint(prev[i]) !== fingerprint(next[i])) return true
+  }
+  return false
+}
+
 function getNodeType(stateType: string): string {
   switch (stateType) {
     case 'Task':
@@ -83,15 +118,28 @@ function FlowCanvasInner({
     })
   }, [])
 
-  // Sync node state to parent on every change (position moves, deletions, etc.)
+  // Track last-propagated state so we can skip ephemeral-only changes
+  // (e.g. selection, dragging) that don't affect the flow definition.
+  const prevNodesRef = useRef<Node[]>(initialNodes)
+  const prevEdgesRef = useRef<Edge[]>(initialEdges)
+
+  // Sync node state to parent only when definition-relevant fields change
+  // (position, data, type, count). Ephemeral fields like selected/dragging
+  // are ignored so they don't falsely mark the flow dirty.
   useEffect(() => {
     if (!readyRef.current) return
-    onNodesChangeProp?.(nodes)
+    if (hasDefinitionChanged(prevNodesRef.current, nodes, nodeFingerprint)) {
+      prevNodesRef.current = nodes
+      onNodesChangeProp?.(nodes)
+    }
   }, [nodes, onNodesChangeProp])
 
   useEffect(() => {
     if (!readyRef.current) return
-    onEdgesChangeProp?.(edges)
+    if (hasDefinitionChanged(prevEdgesRef.current, edges, edgeFingerprint)) {
+      prevEdgesRef.current = edges
+      onEdgesChangeProp?.(edges)
+    }
   }, [edges, onEdgesChangeProp])
 
   const onConnect: OnConnect = useCallback(

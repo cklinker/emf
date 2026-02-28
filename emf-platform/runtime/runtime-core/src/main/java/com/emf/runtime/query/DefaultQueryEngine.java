@@ -1,5 +1,6 @@
 package com.emf.runtime.query;
 
+import com.emf.runtime.context.TenantContext;
 import com.emf.runtime.event.RecordChangeEvent;
 import com.emf.runtime.events.RecordEventPublisher;
 import com.emf.runtime.model.CollectionDefinition;
@@ -571,11 +572,19 @@ public class DefaultQueryEngine implements QueryEngine {
     }
 
     /**
-     * Extracts the tenant ID from record data, defaulting to "default".
+     * Extracts the tenant ID from record data, falling back to TenantContext,
+     * then defaulting to "default".
      */
     private String extractTenantId(Map<String, Object> data) {
         Object tenantId = data.get("tenantId");
-        return tenantId != null ? tenantId.toString() : "default";
+        if (tenantId != null) {
+            return tenantId.toString();
+        }
+        String contextTenantId = TenantContext.get();
+        if (contextTenantId != null && !contextTenantId.isBlank()) {
+            return contextTenantId;
+        }
+        return "default";
     }
 
     /**

@@ -1,5 +1,6 @@
 package com.emf.runtime.router;
 
+import com.emf.runtime.context.TenantContext;
 import com.emf.runtime.model.CollectionDefinition;
 import com.emf.runtime.model.FieldDefinition;
 import com.emf.runtime.query.FilterCondition;
@@ -250,10 +251,16 @@ public class DynamicCollectionRouter {
         // Inject tenant ID for tenant-scoped system collections
         injectTenantId(data, definition, request);
 
-        Map<String, Object> created = queryEngine.create(definition, data);
+        String tenantIdHeader = request.getHeader("X-Tenant-ID");
+        try {
+            TenantContext.set(tenantIdHeader);
+            Map<String, Object> created = queryEngine.create(definition, data);
 
-        // Return in JSON:API format
-        return ResponseEntity.status(HttpStatus.CREATED).body(toJsonApiResponse(created, collectionName, definition));
+            // Return in JSON:API format
+            return ResponseEntity.status(HttpStatus.CREATED).body(toJsonApiResponse(created, collectionName, definition));
+        } finally {
+            TenantContext.clear();
+        }
     }
     
     /**
@@ -337,11 +344,17 @@ public class DynamicCollectionRouter {
             data.put("updatedBy", userId);
         }
 
-        Optional<Map<String, Object>> updated = queryEngine.update(definition, id, data);
-        return updated.map(r -> ResponseEntity.ok(toJsonApiResponse(r, collectionName, definition)))
-                      .orElse(ResponseEntity.notFound().build());
+        String tenantIdHeader = request.getHeader("X-Tenant-ID");
+        try {
+            TenantContext.set(tenantIdHeader);
+            Optional<Map<String, Object>> updated = queryEngine.update(definition, id, data);
+            return updated.map(r -> ResponseEntity.ok(toJsonApiResponse(r, collectionName, definition)))
+                          .orElse(ResponseEntity.notFound().build());
+        } finally {
+            TenantContext.clear();
+        }
     }
-    
+
     /**
      * Deletes a record from the collection.
      * 
@@ -368,9 +381,15 @@ public class DynamicCollectionRouter {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
 
-        boolean deleted = queryEngine.delete(definition, id);
-        return deleted ? ResponseEntity.noContent().build()
-                       : ResponseEntity.notFound().build();
+        String tenantIdHeader = request.getHeader("X-Tenant-ID");
+        try {
+            TenantContext.set(tenantIdHeader);
+            boolean deleted = queryEngine.delete(definition, id);
+            return deleted ? ResponseEntity.noContent().build()
+                           : ResponseEntity.notFound().build();
+        } finally {
+            TenantContext.clear();
+        }
     }
 
     // ==================== Sub-Resource Endpoints ====================
@@ -502,10 +521,16 @@ public class DynamicCollectionRouter {
         // Inject tenant ID for tenant-scoped system collections
         injectTenantId(data, relation.childDef(), request);
 
-        Map<String, Object> created = queryEngine.create(relation.childDef(), data);
+        String tenantIdHeader = request.getHeader("X-Tenant-ID");
+        try {
+            TenantContext.set(tenantIdHeader);
+            Map<String, Object> created = queryEngine.create(relation.childDef(), data);
 
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(toJsonApiResponse(created, childName, relation.childDef()));
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .body(toJsonApiResponse(created, childName, relation.childDef()));
+        } finally {
+            TenantContext.clear();
+        }
     }
 
     /**
@@ -587,9 +612,15 @@ public class DynamicCollectionRouter {
             data.put("updatedBy", userId);
         }
 
-        Optional<Map<String, Object>> updated = queryEngine.update(relation.childDef(), childId, data);
-        return updated.map(r -> ResponseEntity.ok(toJsonApiResponse(r, childName, relation.childDef())))
-                      .orElse(ResponseEntity.notFound().build());
+        String tenantIdHeader = request.getHeader("X-Tenant-ID");
+        try {
+            TenantContext.set(tenantIdHeader);
+            Optional<Map<String, Object>> updated = queryEngine.update(relation.childDef(), childId, data);
+            return updated.map(r -> ResponseEntity.ok(toJsonApiResponse(r, childName, relation.childDef())))
+                          .orElse(ResponseEntity.notFound().build());
+        } finally {
+            TenantContext.clear();
+        }
     }
 
     /**
@@ -622,9 +653,15 @@ public class DynamicCollectionRouter {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
 
-        boolean deleted = queryEngine.delete(relation.childDef(), childId);
-        return deleted ? ResponseEntity.noContent().build()
-                       : ResponseEntity.notFound().build();
+        String tenantIdHeader = request.getHeader("X-Tenant-ID");
+        try {
+            TenantContext.set(tenantIdHeader);
+            boolean deleted = queryEngine.delete(relation.childDef(), childId);
+            return deleted ? ResponseEntity.noContent().build()
+                           : ResponseEntity.notFound().build();
+        } finally {
+            TenantContext.clear();
+        }
     }
 
     /**

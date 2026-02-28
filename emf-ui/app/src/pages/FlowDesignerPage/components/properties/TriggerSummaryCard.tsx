@@ -22,10 +22,23 @@ const FLOW_TYPE_LABELS: Record<string, string> = {
   KAFKA_TRIGGERED: 'Kafka Event',
 }
 
+function safeParseTriggerConfig(triggerConfig: unknown): Record<string, unknown> | null {
+  if (!triggerConfig) return null
+  if (typeof triggerConfig === 'string') {
+    try {
+      return JSON.parse(triggerConfig) as Record<string, unknown>
+    } catch {
+      return null
+    }
+  }
+  if (typeof triggerConfig === 'object') return triggerConfig as Record<string, unknown>
+  return null
+}
+
 function parseTriggerConfig(flow: Flow): Record<string, string> {
-  if (!flow.triggerConfig) return {}
+  const config = safeParseTriggerConfig(flow.triggerConfig)
+  if (!config) return {}
   try {
-    const config = JSON.parse(flow.triggerConfig) as Record<string, unknown>
     const summary: Record<string, string> = {}
 
     switch (flow.flowType) {

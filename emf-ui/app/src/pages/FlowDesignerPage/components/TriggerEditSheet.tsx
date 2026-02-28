@@ -21,7 +21,10 @@ interface TriggerEditSheetProps {
 function parseTriggerConfig(flow: Flow): Partial<TriggerConfig> {
   if (!flow.triggerConfig) return {}
   try {
-    return JSON.parse(flow.triggerConfig) as Partial<TriggerConfig>
+    const raw = flow.triggerConfig
+    if (typeof raw === 'string') return JSON.parse(raw) as Partial<TriggerConfig>
+    if (typeof raw === 'object') return raw as Partial<TriggerConfig>
+    return {}
   } catch {
     return {}
   }

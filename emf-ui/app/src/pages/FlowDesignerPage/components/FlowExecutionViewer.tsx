@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React, { useCallback, useMemo } from 'react'
 import {
   ReactFlow,
   Background,
@@ -8,6 +8,7 @@ import {
   type Node,
   type Edge,
   type NodeTypes,
+  type NodeMouseHandler,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 
@@ -117,6 +118,20 @@ export function FlowExecutionViewer({
     })
   }, [baseNodes, stepMap, selectedNodeId])
 
+  // Use onNodeClick + onPaneClick instead of onSelectionChange so that
+  // programmatic selection (e.g. timeline click) doesn't get immediately
+  // reset by React Flow firing onSelectionChange with an empty selection.
+  const handleNodeClick: NodeMouseHandler = useCallback(
+    (_event, node) => {
+      onNodeSelect(node.id)
+    },
+    [onNodeSelect]
+  )
+
+  const handlePaneClick = useCallback(() => {
+    onNodeSelect(null)
+  }, [onNodeSelect])
+
   // Decorate edges with traversal status
   const decoratedEdges = useMemo(() => {
     return baseEdges.map((edge) => {
@@ -160,9 +175,8 @@ export function FlowExecutionViewer({
         nodes={decoratedNodes}
         edges={decoratedEdges}
         nodeTypes={NODE_TYPES}
-        onSelectionChange={({ nodes: sel }) => {
-          onNodeSelect(sel.length === 1 ? sel[0].id : null)
-        }}
+        onNodeClick={handleNodeClick}
+        onPaneClick={handlePaneClick}
         fitView
         nodesDraggable={false}
         nodesConnectable={false}

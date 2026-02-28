@@ -1,5 +1,5 @@
 import React from 'react'
-import { ArrowLeft, Save, Code, CheckCircle } from 'lucide-react'
+import { ArrowLeft, Save, Code, CheckCircle, Play, Upload } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 
@@ -10,9 +10,13 @@ interface FlowToolbarProps {
   isDirty: boolean
   isSaving: boolean
   showJson: boolean
+  publishedVersion?: number | null
+  currentVersion?: number | null
   onSave: () => void
   onToggleJson: () => void
   onActivate?: () => void
+  onTest?: () => void
+  onPublish?: () => void
 }
 
 const flowTypeLabels: Record<string, string> = {
@@ -30,9 +34,13 @@ export function FlowToolbar({
   isDirty,
   isSaving,
   showJson,
+  publishedVersion,
+  currentVersion,
   onSave,
   onToggleJson,
   onActivate,
+  onTest,
+  onPublish,
 }: FlowToolbarProps) {
   const navigate = useNavigate()
 
@@ -56,6 +64,12 @@ export function FlowToolbar({
               Active
             </span>
           )}
+          {publishedVersion != null && (
+            <span className="rounded border border-border px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground">
+              v{publishedVersion}
+              {currentVersion != null && currentVersion > publishedVersion && ' (draft)'}
+            </span>
+          )}
           {isDirty && (
             <span className="h-2 w-2 rounded-full bg-amber-500" title="Unsaved changes" />
           )}
@@ -72,10 +86,22 @@ export function FlowToolbar({
           <Code className="mr-1 h-3.5 w-3.5" />
           JSON
         </Button>
+        {onTest && (
+          <Button variant="outline" size="sm" onClick={onTest}>
+            <Play className="mr-1 h-3.5 w-3.5" />
+            Test
+          </Button>
+        )}
         <Button variant="outline" size="sm" onClick={onSave} disabled={isSaving || !isDirty}>
           <Save className="mr-1 h-3.5 w-3.5" />
           {isSaving ? 'Saving...' : 'Save'}
         </Button>
+        {onPublish && (
+          <Button variant="outline" size="sm" onClick={onPublish} disabled={isDirty}>
+            <Upload className="mr-1 h-3.5 w-3.5" />
+            Publish
+          </Button>
+        )}
         {onActivate && !isActive && (
           <Button size="sm" onClick={onActivate}>
             <CheckCircle className="mr-1 h-3.5 w-3.5" />

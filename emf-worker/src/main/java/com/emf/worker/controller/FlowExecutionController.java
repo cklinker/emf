@@ -351,6 +351,115 @@ public class FlowExecutionController {
     }
 
     // -------------------------------------------------------------------------
+    // Flow Versioning
+    // -------------------------------------------------------------------------
+
+    /**
+     * Publishes the current flow definition as a new version.
+     * Creates a version record and updates the flow's published_version.
+     *
+     * @param flowId        the flow ID
+     * @param body          optional body with "changeSummary"
+     * @param userId        user ID from request header
+     * @return the new version info
+     */
+    @PostMapping("/{flowId}/publish")
+    public ResponseEntity<Map<String, Object>> publishVersion(
+            @PathVariable String flowId,
+            @RequestBody(required = false) Map<String, Object> body,
+            @RequestHeader(value = "X-User-ID", required = false) String userId) {
+
+        log.debug("Publish flow version request: flowId={}", flowId);
+
+        Map<String, Object> flow = loadFlow(flowId);
+        if (flow == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        String definition = (String) flow.get("definition");
+        if (definition == null || definition.isBlank()) {
+            Map<String, Object> error = new LinkedHashMap<>();
+            error.put("error", "Flow has no definition to publish");
+            return ResponseEntity.badRequest().body(error);
+        }
+
+        String changeSummary = body != null ? (String) body.get("changeSummary") : null;
+
+        // Get next version number
+        Integer currentVersion = jdbcTemplate.queryForObject(
+                "SELECT COALESCE(MAX(version_number), 0) FROM flow_version WHERE flow_id = ?",
+                Integer.class, flowId);
+        int nextVersion = (currentVersion != null ? currentVersion : 0) + 1;
+
+        String versionId = UUID.randomUUID().toString();
+
+        jdbcTemplate.update(
+                "INSERT INTO flow_version (id, flow_id, version_number, definition, change_summary, created_by) VALUES (?, ?, ?, ?::jsonb, ?, ?)",
+                versionId, flowId, nextVersion, definition,
+                changeSummary, userId != null ? userId : "system");
+
+        jdbcTemplate.update(
+                "UPDATE flow SET published_version = ?, version = ? WHERE id = ?",
+                nextVersion, nextVersion, flowId);
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("flowId", flowId);
+        response.put("versionNumber", nextVersion);
+        response.put("versionId", versionId);
+        response.put("changeSummary", changeSummary);
+
+        log.info("Published flow version: flowId={}, version={}", flowId, nextVersion);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Lists all published versions for a flow.
+     *
+     * @param flowId the flow ID
+     * @return list of versions
+     */
+    @GetMapping("/{flowId}/versions")
+    public ResponseEntity<Map<String, Object>> listVersions(@PathVariable String flowId) {
+        log.debug("List flow versions request: flowId={}", flowId);
+
+        List<Map<String, Object>> versions = jdbcTemplate.queryForList(
+                "SELECT id, version_number, change_summary, created_by, created_at FROM flow_version WHERE flow_id = ? ORDER BY version_number DESC",
+                flowId);
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("flowId", flowId);
+        response.put("versions", versions);
+        response.put("count", versions.size());
+
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Gets a specific version's definition.
+     *
+     * @param flowId        the flow ID
+     * @param versionNumber the version number
+     * @return the version details including definition
+     */
+    @GetMapping("/{flowId}/versions/{versionNumber}")
+    public ResponseEntity<Map<String, Object>> getVersion(
+            @PathVariable String flowId,
+            @PathVariable int versionNumber) {
+
+        log.debug("Get flow version request: flowId={}, version={}", flowId, versionNumber);
+
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT id, version_number, definition, change_summary, created_by, created_at FROM flow_version WHERE flow_id = ? AND version_number = ?",
+                flowId, versionNumber);
+
+        if (rows.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        return ResponseEntity.ok(rows.get(0));
+    }
+
+    // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
 

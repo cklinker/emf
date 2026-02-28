@@ -440,7 +440,7 @@ export function ResourceFormPage({
 
       await Promise.all(
         Array.from(targetMap.entries()).map(
-          async ([_groupKey, { fields, targetName: knownName, targetId }]) => {
+          async ([, { fields, targetName: knownName, targetId }]) => {
             try {
               let targetName: string
               let displayFieldName = 'id'
@@ -460,9 +460,7 @@ export function ResourceFormPage({
                     if (nameField) {
                       displayFieldName = nameField.name
                     } else {
-                      const firstStringField = targetSchema.fields.find(
-                        (f) => f.type === 'string'
-                      )
+                      const firstStringField = targetSchema.fields.find((f) => f.type === 'string')
                       if (firstStringField) {
                         displayFieldName = firstStringField.name
                       }
@@ -488,9 +486,7 @@ export function ResourceFormPage({
                     if (nameField) {
                       displayFieldName = nameField.name
                     } else {
-                      const firstStringField = targetSchema.fields.find(
-                        (f) => f.type === 'string'
-                      )
+                      const firstStringField = targetSchema.fields.find((f) => f.type === 'string')
                       if (firstStringField) {
                         displayFieldName = firstStringField.name
                       }
@@ -501,39 +497,40 @@ export function ResourceFormPage({
                 }
               }
 
-            // Record the field name -> target collection name mapping
-            for (const field of fields) {
-              relFieldsMap[field.name] = targetName
-            }
+              // Record the field name -> target collection name mapping
+              for (const field of fields) {
+                relFieldsMap[field.name] = targetName
+              }
 
-            // Fetch records from the target collection
-            const recordsResponse = await apiClient.get<Record<string, unknown>>(
-              `/api/${targetName}?page[size]=200`
-            )
+              // Fetch records from the target collection
+              const recordsResponse = await apiClient.get<Record<string, unknown>>(
+                `/api/${targetName}?page[size]=200`
+              )
 
-            // Extract records from JSON:API response
-            const data = recordsResponse?.data
-            const records: Array<Record<string, unknown>> = Array.isArray(data) ? data : []
+              // Extract records from JSON:API response
+              const data = recordsResponse?.data
+              const records: Array<Record<string, unknown>> = Array.isArray(data) ? data : []
 
-            // Build options from records
-            const options: LookupOption[] = records.map((record: Record<string, unknown>) => {
-              const attrs = (record.attributes || record) as Record<string, unknown>
-              const id = String(record.id || attrs.id || '')
-              const label = attrs[displayFieldName] ? String(attrs[displayFieldName]) : id
-              return { id, label }
-            })
+              // Build options from records
+              const options: LookupOption[] = records.map((record: Record<string, unknown>) => {
+                const attrs = (record.attributes || record) as Record<string, unknown>
+                const id = String(record.id || attrs.id || '')
+                const label = attrs[displayFieldName] ? String(attrs[displayFieldName]) : id
+                return { id, label }
+              })
 
-            // Assign to all fields targeting this collection
-            for (const field of fields) {
-              optionsMap[field.id] = options
-            }
-          } catch {
-            // If we fail to fetch options, leave the fields empty (graceful degradation)
-            for (const field of fields) {
-              optionsMap[field.id] = []
+              // Assign to all fields targeting this collection
+              for (const field of fields) {
+                optionsMap[field.id] = options
+              }
+            } catch {
+              // If we fail to fetch options, leave the fields empty (graceful degradation)
+              for (const field of fields) {
+                optionsMap[field.id] = []
+              }
             }
           }
-        })
+        )
       )
       return { optionsMap, relFieldsMap }
     },

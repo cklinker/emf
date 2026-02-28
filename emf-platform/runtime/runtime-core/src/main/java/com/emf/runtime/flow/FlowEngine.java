@@ -36,15 +36,25 @@ public class FlowEngine {
     private final StateDataResolver dataResolver;
     private final Map<String, StateExecutor> executors;
     private final ExecutorService threadPool;
+    private final FlowExecutionListener listener;
 
     public FlowEngine(FlowStore flowStore,
                       ActionHandlerRegistry handlerRegistry,
                       ObjectMapper objectMapper,
                       int threadPoolSize) {
+        this(flowStore, handlerRegistry, objectMapper, threadPoolSize, FlowExecutionListener.NOOP);
+    }
+
+    public FlowEngine(FlowStore flowStore,
+                      ActionHandlerRegistry handlerRegistry,
+                      ObjectMapper objectMapper,
+                      int threadPoolSize,
+                      FlowExecutionListener listener) {
         this.flowStore = flowStore;
         this.parser = new FlowDefinitionParser(objectMapper);
         this.dataResolver = new StateDataResolver(objectMapper);
         this.threadPool = Executors.newFixedThreadPool(threadPoolSize);
+        this.listener = listener != null ? listener : FlowExecutionListener.NOOP;
 
         // Register state executors
         ChoiceRuleEvaluator ruleEvaluator = new ChoiceRuleEvaluator(dataResolver);
@@ -85,12 +95,22 @@ public class FlowEngine {
         String executionId = flowStore.createExecution(tenantId, flowId, userId, null, initialInput, isTest);
 
         threadPool.submit(() -> {
+            listener.onExecutionStarted(flowId);
+            long start = System.currentTimeMillis();
             try {
                 executeFlow(executionId, tenantId, flowId, userId, definition, initialInput);
             } catch (Exception e) {
                 log.error("Flow execution {} failed unexpectedly", executionId, e);
                 flowStore.completeExecution(executionId, FlowExecutionData.STATUS_FAILED,
                     initialInput, e.getMessage(), 0, 0);
+                listener.onExecutionError(flowId, e.getClass().getSimpleName());
+            } finally {
+                long duration = System.currentTimeMillis() - start;
+                // Determine final status from the execution store
+                String finalStatus = flowStore.loadExecution(executionId)
+                    .map(FlowExecutionData::status)
+                    .orElse(FlowExecutionData.STATUS_FAILED);
+                listener.onExecutionCompleted(flowId, finalStatus, duration, isTest);
             }
         });
 
@@ -271,6 +291,14 @@ public class FlowEngine {
             // Update step log
             flowStore.updateStepLog(stepLogId, result.updatedData(),
                 result.status(), result.errorMessage(), result.errorCode(), stepDuration);
+
+            // Record step metrics
+            String resource = (currentState instanceof StateDefinition.TaskState t) ? t.resource() : null;
+            listener.onStepCompleted(context.flowId(), stateType, resource, result.status(), stepDuration);
+
+            if ("FAILED".equals(result.status()) && result.errorCode() != null) {
+                listener.onExecutionError(context.flowId(), result.errorCode());
+            }
 
             // Handle result
             if ("WAITING".equals(result.status())) {

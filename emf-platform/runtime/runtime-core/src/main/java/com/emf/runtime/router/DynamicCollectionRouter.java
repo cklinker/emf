@@ -85,6 +85,12 @@ public class DynamicCollectionRouter {
     private CollectionOnDemandLoader onDemandLoader;
 
     /**
+     * Optional resolver that translates user identifiers (e.g., email) to
+     * platform_user UUIDs for audit fields (created_by, updated_by).
+     */
+    private UserIdResolver userIdResolver;
+
+    /**
      * Creates a new DynamicCollectionRouter.
      *
      * @param registry the collection registry
@@ -98,6 +104,11 @@ public class DynamicCollectionRouter {
     @Autowired(required = false)
     public void setOnDemandLoader(CollectionOnDemandLoader onDemandLoader) {
         this.onDemandLoader = onDemandLoader;
+    }
+
+    @Autowired(required = false)
+    public void setUserIdResolver(UserIdResolver userIdResolver) {
+        this.userIdResolver = userIdResolver;
     }
     
     /**
@@ -229,8 +240,8 @@ public class DynamicCollectionRouter {
         Map<String, Object> data = new java.util.HashMap<>(attributes);
         data.putAll(relationships);
 
-        // Inject audit fields from gateway-forwarded user ID
-        String userId = request.getHeader("X-User-Id");
+        // Inject audit fields from gateway-forwarded user ID (resolved to platform_user UUID)
+        String userId = resolveUserId(request);
         if (userId != null) {
             data.put("createdBy", userId);
             data.put("updatedBy", userId);
@@ -320,8 +331,8 @@ public class DynamicCollectionRouter {
         Map<String, Object> data = new java.util.HashMap<>(attributes);
         data.putAll(relationships);
 
-        // Inject audit field from gateway-forwarded user ID
-        String userId = request.getHeader("X-User-Id");
+        // Inject audit field from gateway-forwarded user ID (resolved to platform_user UUID)
+        String userId = resolveUserId(request);
         if (userId != null) {
             data.put("updatedBy", userId);
         }
@@ -481,8 +492,8 @@ public class DynamicCollectionRouter {
         // Auto-set the parent reference field
         data.put(relation.parentRefFieldName(), parentId);
 
-        // Inject audit fields
-        String userId = request.getHeader("X-User-Id");
+        // Inject audit fields (resolved to platform_user UUID)
+        String userId = resolveUserId(request);
         if (userId != null) {
             data.put("createdBy", userId);
             data.put("updatedBy", userId);
@@ -571,7 +582,7 @@ public class DynamicCollectionRouter {
         Map<String, Object> data = new java.util.HashMap<>(attributes);
         data.putAll(relationships);
 
-        String userId = request.getHeader("X-User-Id");
+        String userId = resolveUserId(request);
         if (userId != null) {
             data.put("updatedBy", userId);
         }
@@ -682,6 +693,26 @@ public class DynamicCollectionRouter {
      * @param definition the collection definition
      * @param request the HTTP servlet request (used to extract tenant ID)
      */
+    /**
+     * Resolves the user identifier from the X-User-Id header to a platform_user UUID.
+     * If a resolver is configured and the identifier is not already a UUID, the resolver
+     * is used to translate it. Otherwise, the raw identifier is returned.
+     */
+    private String resolveUserId(HttpServletRequest request) {
+        String userId = request.getHeader("X-User-Id");
+        if (userId == null || userId.isBlank()) {
+            return null;
+        }
+        if (userIdResolver != null && !UUID_PATTERN.matcher(userId).matches()) {
+            String tenantId = request.getHeader("X-Tenant-ID");
+            String resolved = userIdResolver.resolve(userId, tenantId);
+            if (resolved != null) {
+                return resolved;
+            }
+        }
+        return userId;
+    }
+
     private void injectTenantId(Map<String, Object> data, CollectionDefinition definition,
                                  HttpServletRequest request) {
         if (!definition.systemCollection() || !definition.tenantScoped()) {

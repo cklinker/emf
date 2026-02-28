@@ -78,9 +78,18 @@ export function FlowDesignerPage() {
         currentEdges.length > 0 ? currentEdges : initialEdges,
         parsedDefinition
       )
+      // Only send mutable fields; JSON-type fields must be objects (not strings)
       await apiClient.putResource(`/api/flows/${flowId}`, {
-        ...flow,
-        definition: JSON.stringify(definition),
+        name: flow.name,
+        description: flow.description,
+        flowType: flow.flowType,
+        active: flow.active,
+        definition,
+        triggerConfig: flow.triggerConfig
+          ? typeof flow.triggerConfig === 'string'
+            ? JSON.parse(flow.triggerConfig)
+            : flow.triggerConfig
+          : null,
       })
     },
     onSuccess: () => {

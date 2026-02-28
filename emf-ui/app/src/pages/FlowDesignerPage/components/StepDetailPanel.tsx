@@ -69,7 +69,7 @@ export function StepDetailPanel({ step, onClose }: StepDetailPanelProps) {
   ]
 
   return (
-    <div className="flex w-80 shrink-0 flex-col border-l border-border bg-card">
+    <div className="flex w-80 shrink-0 flex-col overflow-hidden border-l border-border bg-card">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
         <div className="flex items-center gap-2">

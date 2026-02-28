@@ -40,7 +40,7 @@ export function PropertiesPanel({
   }
 
   return (
-    <div className="flex w-[320px] shrink-0 flex-col border-l border-border bg-card">
+    <div className="flex w-[320px] shrink-0 flex-col overflow-hidden border-l border-border bg-card">
       <div className="flex items-center justify-between border-b border-border px-4 py-2">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           Properties

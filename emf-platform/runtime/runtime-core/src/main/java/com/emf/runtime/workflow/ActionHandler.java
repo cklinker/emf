@@ -1,5 +1,7 @@
 package com.emf.runtime.workflow;
 
+import com.emf.runtime.flow.ActionHandlerDescriptor;
+
 /**
  * Service Provider Interface (SPI) for workflow action handlers.
  * <p>
@@ -43,5 +45,17 @@ public interface ActionHandler {
      */
     default void validate(String configJson) {
         // Default: no validation — override for strict config checking
+    }
+
+    /**
+     * Returns the UI descriptor for this handler.
+     * <p>
+     * Override to provide rich UI integration in the visual flow builder.
+     * Handlers that return {@code null} get a generic raw JSON config editor.
+     *
+     * @return the handler descriptor, or null for default UI
+     */
+    default ActionHandlerDescriptor getDescriptor() {
+        return null;
     }
 }

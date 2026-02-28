@@ -1,0 +1,268 @@
+package com.emf.runtime.flow;
+
+import com.emf.runtime.event.RecordChangeEvent;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import java.util.List;
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+/**
+ * Tests for {@link InitialStateBuilder}.
+ */
+class InitialStateBuilderTest {
+
+    private InitialStateBuilder builder;
+
+    @BeforeEach
+    void setUp() {
+        builder = new InitialStateBuilder();
+    }
+
+    // -------------------------------------------------------------------------
+    // buildFromRecordEvent
+    // -------------------------------------------------------------------------
+
+    @Test
+    void buildFromRecordEventContainsTriggerMetadata() {
+        RecordChangeEvent event = RecordChangeEvent.created(
+                "tenant-1", "orders", "rec-1",
+                Map.of("status", "ACTIVE"), "user-1");
+
+        Map<String, Object> state = builder.buildFromRecordEvent(event, "flow-1", "exec-1");
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> trigger = (Map<String, Object>) state.get("trigger");
+        assertNotNull(trigger);
+        assertEquals("RECORD_CHANGE", trigger.get("type"));
+        assertEquals("CREATED", trigger.get("changeType"));
+        assertEquals("orders", trigger.get("collectionName"));
+    }
+
+    @Test
+    void buildFromRecordEventContainsRecordData() {
+        RecordChangeEvent event = RecordChangeEvent.created(
+                "tenant-1", "orders", "rec-1",
+                Map.of("status", "ACTIVE", "amount", 100), "user-1");
+
+        Map<String, Object> state = builder.buildFromRecordEvent(event, "flow-1", "exec-1");
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> record = (Map<String, Object>) state.get("record");
+        assertNotNull(record);
+        assertEquals("rec-1", record.get("id"));
+        assertEquals("orders", record.get("collectionName"));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> data = (Map<String, Object>) record.get("data");
+        assertEquals("ACTIVE", data.get("status"));
+        assertEquals(100, data.get("amount"));
+    }
+
+    @Test
+    void buildFromRecordEventContainsChangedFields() {
+        RecordChangeEvent event = RecordChangeEvent.updated(
+                "tenant-1", "orders", "rec-1",
+                Map.of("status", "ACTIVE"),
+                Map.of("status", "DRAFT"),
+                List.of("status"),
+                "user-1");
+
+        Map<String, Object> state = builder.buildFromRecordEvent(event, "flow-1", "exec-1");
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> record = (Map<String, Object>) state.get("record");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> previousData = (Map<String, Object>) record.get("previousData");
+        assertEquals("DRAFT", previousData.get("status"));
+
+        @SuppressWarnings("unchecked")
+        List<String> changedFields = (List<String>) record.get("changedFields");
+        assertEquals(List.of("status"), changedFields);
+    }
+
+    @Test
+    void buildFromRecordEventContainsContext() {
+        RecordChangeEvent event = RecordChangeEvent.created(
+                "tenant-1", "orders", "rec-1",
+                Map.of("status", "ACTIVE"), "user-1");
+
+        Map<String, Object> state = builder.buildFromRecordEvent(event, "flow-1", "exec-1");
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> context = (Map<String, Object>) state.get("context");
+        assertNotNull(context);
+        assertEquals("tenant-1", context.get("tenantId"));
+        assertEquals("user-1", context.get("userId"));
+        assertEquals("flow-1", context.get("flowId"));
+        assertEquals("exec-1", context.get("executionId"));
+    }
+
+    @Test
+    void buildFromRecordEventHandlesNullData() {
+        RecordChangeEvent event = RecordChangeEvent.deleted(
+                "tenant-1", "orders", "rec-1", null, "user-1");
+
+        Map<String, Object> state = builder.buildFromRecordEvent(event, "flow-1", "exec-1");
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> record = (Map<String, Object>) state.get("record");
+        assertNotNull(record.get("data"));
+        assertTrue(((Map<?, ?>) record.get("data")).isEmpty());
+    }
+
+    // -------------------------------------------------------------------------
+    // buildFromApiInvocation
+    // -------------------------------------------------------------------------
+
+    @Test
+    void buildFromApiInvocationContainsTriggerMetadata() {
+        Map<String, Object> input = Map.of("orderId", "ord-123");
+
+        Map<String, Object> state = builder.buildFromApiInvocation(
+                input, "tenant-1", "user-1", "flow-1", "exec-1");
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> trigger = (Map<String, Object>) state.get("trigger");
+        assertEquals("API_INVOCATION", trigger.get("type"));
+    }
+
+    @Test
+    void buildFromApiInvocationContainsInput() {
+        Map<String, Object> input = Map.of("orderId", "ord-123", "priority", "HIGH");
+
+        Map<String, Object> state = builder.buildFromApiInvocation(
+                input, "tenant-1", "user-1", "flow-1", "exec-1");
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> stateInput = (Map<String, Object>) state.get("input");
+        assertEquals("ord-123", stateInput.get("orderId"));
+        assertEquals("HIGH", stateInput.get("priority"));
+    }
+
+    @Test
+    void buildFromApiInvocationHandlesNullInput() {
+        Map<String, Object> state = builder.buildFromApiInvocation(
+                null, "tenant-1", "user-1", "flow-1", "exec-1");
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> stateInput = (Map<String, Object>) state.get("input");
+        assertNotNull(stateInput);
+        assertTrue(stateInput.isEmpty());
+    }
+
+    @Test
+    void buildFromApiInvocationContainsContext() {
+        Map<String, Object> state = builder.buildFromApiInvocation(
+                Map.of(), "tenant-1", "user-1", "flow-1", "exec-1");
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> context = (Map<String, Object>) state.get("context");
+        assertEquals("tenant-1", context.get("tenantId"));
+        assertEquals("user-1", context.get("userId"));
+        assertEquals("flow-1", context.get("flowId"));
+        assertEquals("exec-1", context.get("executionId"));
+    }
+
+    // -------------------------------------------------------------------------
+    // buildFromSchedule
+    // -------------------------------------------------------------------------
+
+    @Test
+    void buildFromScheduleContainsTriggerMetadata() {
+        Map<String, Object> triggerConfig = Map.of(
+                "cronExpression", "0 0 8 * * MON-FRI",
+                "inputData", Map.of("reportType", "daily")
+        );
+
+        Map<String, Object> state = builder.buildFromSchedule(
+                triggerConfig, "tenant-1", "flow-1", "exec-1");
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> trigger = (Map<String, Object>) state.get("trigger");
+        assertEquals("SCHEDULED", trigger.get("type"));
+    }
+
+    @Test
+    void buildFromScheduleExtractsInputData() {
+        Map<String, Object> triggerConfig = Map.of(
+                "inputData", Map.of("reportType", "daily", "recipients", List.of("admin@test.com"))
+        );
+
+        Map<String, Object> state = builder.buildFromSchedule(
+                triggerConfig, "tenant-1", "flow-1", "exec-1");
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> input = (Map<String, Object>) state.get("input");
+        assertEquals("daily", input.get("reportType"));
+    }
+
+    @Test
+    void buildFromScheduleHandlesNullTriggerConfig() {
+        Map<String, Object> state = builder.buildFromSchedule(
+                null, "tenant-1", "flow-1", "exec-1");
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> input = (Map<String, Object>) state.get("input");
+        assertNotNull(input);
+        assertTrue(input.isEmpty());
+    }
+
+    @Test
+    void buildFromScheduleHandlesMissingInputData() {
+        Map<String, Object> triggerConfig = Map.of("cronExpression", "0 0 * * *");
+
+        Map<String, Object> state = builder.buildFromSchedule(
+                triggerConfig, "tenant-1", "flow-1", "exec-1");
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> input = (Map<String, Object>) state.get("input");
+        assertNotNull(input);
+        assertTrue(input.isEmpty());
+    }
+
+    @Test
+    void buildFromScheduleContainsContext() {
+        Map<String, Object> state = builder.buildFromSchedule(
+                Map.of(), "tenant-1", "flow-1", "exec-1");
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> context = (Map<String, Object>) state.get("context");
+        assertEquals("tenant-1", context.get("tenantId"));
+        assertEquals("flow-1", context.get("flowId"));
+        assertEquals("exec-1", context.get("executionId"));
+    }
+
+    // -------------------------------------------------------------------------
+    // State structure verification
+    // -------------------------------------------------------------------------
+
+    @Test
+    void allBuildersProduceThreeTopLevelKeys() {
+        RecordChangeEvent event = RecordChangeEvent.created(
+                "tenant-1", "orders", "rec-1",
+                Map.of("status", "ACTIVE"), "user-1");
+
+        Map<String, Object> recordState = builder.buildFromRecordEvent(event, "flow-1", "exec-1");
+        assertEquals(3, recordState.size());
+        assertTrue(recordState.containsKey("trigger"));
+        assertTrue(recordState.containsKey("record"));
+        assertTrue(recordState.containsKey("context"));
+
+        Map<String, Object> apiState = builder.buildFromApiInvocation(
+                Map.of(), "tenant-1", "user-1", "flow-1", "exec-1");
+        assertEquals(3, apiState.size());
+        assertTrue(apiState.containsKey("trigger"));
+        assertTrue(apiState.containsKey("input"));
+        assertTrue(apiState.containsKey("context"));
+
+        Map<String, Object> schedState = builder.buildFromSchedule(
+                Map.of(), "tenant-1", "flow-1", "exec-1");
+        assertEquals(3, schedState.size());
+        assertTrue(schedState.containsKey("trigger"));
+        assertTrue(schedState.containsKey("input"));
+        assertTrue(schedState.containsKey("context"));
+    }
+}

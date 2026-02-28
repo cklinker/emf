@@ -73,7 +73,11 @@ export function FlowDesignerPage() {
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!flowId || !flow) return
-      const definition = nodesToDefinition(currentNodes, currentEdges, parsedDefinition)
+      const definition = nodesToDefinition(
+        currentNodes.length > 0 ? currentNodes : initialNodes,
+        currentEdges.length > 0 ? currentEdges : initialEdges,
+        parsedDefinition
+      )
       await apiClient.putResource(`/api/flows/${flowId}`, {
         ...flow,
         definition: JSON.stringify(definition),
@@ -294,51 +298,51 @@ export function FlowDesignerPage() {
         })}
       </div>
 
-      {/* Tab Content */}
-      {isDesignTab && (
-        <div className="flex flex-1 overflow-hidden">
-          <StepsPalette
-            collapsed={paletteCollapsed}
-            onToggle={() => setPaletteCollapsed((v) => !v)}
-          />
+      {/* Tab Content — Design tab kept mounted (hidden) to preserve canvas state */}
+      <div className={cn('flex flex-1 overflow-hidden', !isDesignTab && 'hidden')}>
+        <StepsPalette
+          collapsed={paletteCollapsed}
+          onToggle={() => setPaletteCollapsed((v) => !v)}
+        />
 
-          <ReactFlowProvider>
-            {showJson ? (
-              <div className="flex-1 overflow-auto bg-background p-4">
-                <pre className="whitespace-pre-wrap rounded-lg border border-border bg-muted p-4 font-mono text-xs text-foreground">
-                  {JSON.stringify(
-                    nodesToDefinition(
-                      currentNodes.length > 0 ? currentNodes : initialNodes,
-                      currentEdges.length > 0 ? currentEdges : initialEdges,
-                      parsedDefinition
-                    ),
-                    null,
-                    2
-                  )}
-                </pre>
-              </div>
-            ) : (
-              <FlowCanvas
-                initialNodes={initialNodes}
-                initialEdges={initialEdges}
-                onNodesChange={handleNodesChange}
-                onEdgesChange={handleEdgesChange}
-                onNodeSelect={handleNodeSelect}
-              />
-            )}
-          </ReactFlowProvider>
+        <ReactFlowProvider>
+          {/* JSON overlay — canvas stays mounted underneath */}
+          {showJson && (
+            <div className="flex-1 overflow-auto bg-background p-4">
+              <pre className="whitespace-pre-wrap rounded-lg border border-border bg-muted p-4 font-mono text-xs text-foreground">
+                {JSON.stringify(
+                  nodesToDefinition(
+                    currentNodes.length > 0 ? currentNodes : initialNodes,
+                    currentEdges.length > 0 ? currentEdges : initialEdges,
+                    parsedDefinition
+                  ),
+                  null,
+                  2
+                )}
+              </pre>
+            </div>
+          )}
+          <div className={cn('flex-1', showJson && 'hidden')}>
+            <FlowCanvas
+              initialNodes={initialNodes}
+              initialEdges={initialEdges}
+              onNodesChange={handleNodesChange}
+              onEdgesChange={handleEdgesChange}
+              onNodeSelect={handleNodeSelect}
+            />
+          </div>
+        </ReactFlowProvider>
 
-          <PropertiesPanel
-            selectedNode={selectedNode}
-            collapsed={propertiesCollapsed}
-            onToggle={() => setPropertiesCollapsed((v) => !v)}
-            onNodeUpdate={handleNodeUpdate}
-            flow={flow}
-            allNodeIds={allNodeIds}
-            onEditTrigger={() => setTriggerSheetOpen(true)}
-          />
-        </div>
-      )}
+        <PropertiesPanel
+          selectedNode={selectedNode}
+          collapsed={propertiesCollapsed}
+          onToggle={() => setPropertiesCollapsed((v) => !v)}
+          onNodeUpdate={handleNodeUpdate}
+          flow={flow}
+          allNodeIds={allNodeIds}
+          onEditTrigger={() => setTriggerSheetOpen(true)}
+        />
+      </div>
 
       {isExecutionsTab && flowId && (
         <ExecutionsTab flowId={flowId} onViewExecution={handleViewExecution} />

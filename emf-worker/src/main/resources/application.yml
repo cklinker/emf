@@ -10,6 +10,8 @@ spring:
     username: ${SPRING_DATASOURCE_USERNAME:emf}
     password: ${SPRING_DATASOURCE_PASSWORD:emf}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      connection-init-sql: SET app.current_tenant_id = ''
   flyway:
     enabled: true
     baseline-on-migrate: true

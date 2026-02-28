@@ -49,9 +49,19 @@ export function TriggerEditSheet({ open, onOpenChange, flow }: TriggerEditSheetP
 
   const saveMutation = useMutation({
     mutationFn: async () => {
+      // Only send mutable fields; JSON-type fields must be objects (not strings)
+      const definition = flow.definition
+        ? typeof flow.definition === 'string'
+          ? JSON.parse(flow.definition)
+          : flow.definition
+        : null
       await apiClient.putResource(`/api/flows/${flow.id}`, {
-        ...flow,
-        triggerConfig: JSON.stringify(config),
+        name: flow.name,
+        description: flow.description,
+        flowType: flow.flowType,
+        active: flow.active,
+        definition,
+        triggerConfig: config,
       })
     },
     onSuccess: () => {

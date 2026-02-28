@@ -41,6 +41,7 @@ public sealed interface StateDefinition {
         String name,
         String comment,
         String resource,
+        Map<String, Object> parameters,
         String inputPath,
         String outputPath,
         String resultPath,

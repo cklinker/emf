@@ -112,6 +112,7 @@ export interface BaseNodeData {
 export interface TaskNodeData extends BaseNodeData {
   stateType: 'Task'
   resource: string
+  parameters?: Record<string, unknown>
   inputPath?: string
   outputPath?: string
   resultPath?: string
@@ -204,6 +205,7 @@ export interface StateConfig {
   Next?: string
   End?: boolean
   Resource?: string
+  Parameters?: Record<string, unknown>
   InputPath?: string
   OutputPath?: string
   ResultPath?: string

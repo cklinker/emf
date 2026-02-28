@@ -217,6 +217,7 @@ function buildNodeData(stateId: string, state: StateConfig): Record<string, unkn
       return {
         ...base,
         resource: state.Resource || '',
+        parameters: state.Parameters || undefined,
         inputPath: state.InputPath || '',
         outputPath: state.OutputPath || '',
         resultPath: state.ResultPath || '',
@@ -426,6 +427,8 @@ function buildTaskConfig(
   outEdges: Edge[]
 ): StateConfig {
   if (data.resource) state.Resource = data.resource as string
+  const params = data.parameters as Record<string, unknown> | undefined
+  if (params && Object.keys(params).length > 0) state.Parameters = params
   if (data.inputPath) state.InputPath = data.inputPath as string
   if (data.outputPath) state.OutputPath = data.outputPath as string
   if (data.resultPath) state.ResultPath = data.resultPath as string

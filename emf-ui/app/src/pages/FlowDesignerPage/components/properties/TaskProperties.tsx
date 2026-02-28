@@ -6,6 +6,8 @@ import type { RetryRule, CatchRule } from '../../types'
 import { DataPathFields } from './DataPathFields'
 import { RetryEditor } from './RetryEditor'
 import { CatchEditor } from './CatchEditor'
+import { QueryRecordsParams } from './QueryRecordsParams'
+import { UpdateRecordParams } from './UpdateRecordParams'
 
 interface TaskPropertiesProps {
   nodeId: string
@@ -15,6 +17,8 @@ interface TaskPropertiesProps {
 }
 
 export function TaskProperties({ nodeId, data, allNodeIds, onUpdate }: TaskPropertiesProps) {
+  const resource = (data.resource as string) || ''
+
   return (
     <div className="flex flex-col gap-3">
       <div>
@@ -23,7 +27,7 @@ export function TaskProperties({ nodeId, data, allNodeIds, onUpdate }: TaskPrope
         </Label>
         <select
           id={`resource-${nodeId}`}
-          value={(data.resource as string) || ''}
+          value={resource}
           onChange={(e) => onUpdate({ resource: e.target.value })}
           className="mt-1 h-8 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
         >
@@ -39,6 +43,20 @@ export function TaskProperties({ nodeId, data, allNodeIds, onUpdate }: TaskPrope
           ))}
         </select>
       </div>
+
+      {/* Resource-specific parameter editors */}
+      {resource === 'QUERY_RECORDS' && (
+        <QueryRecordsParams
+          parameters={data.parameters as Record<string, unknown> | undefined}
+          onUpdate={(params) => onUpdate({ parameters: params })}
+        />
+      )}
+      {resource === 'UPDATE_RECORD' && (
+        <UpdateRecordParams
+          parameters={data.parameters as Record<string, unknown> | undefined}
+          onUpdate={(params) => onUpdate({ parameters: params })}
+        />
+      )}
 
       <div>
         <Label htmlFor={`timeout-${nodeId}`} className="text-xs">

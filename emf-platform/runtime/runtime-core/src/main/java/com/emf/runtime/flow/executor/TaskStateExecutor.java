@@ -70,8 +70,17 @@ public class TaskStateExecutor implements StateExecutor {
 
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
-                // Build ActionContext from flow state data
-                String configJson = resolveConfigJson(input);
+                // Build ActionContext from flow state data.
+                // When Parameters are defined, resolve template expressions against
+                // the full state data and use the result as the handler config.
+                // Otherwise, fall back to serializing the post-InputPath data.
+                String configJson;
+                if (task.parameters() != null && !task.parameters().isEmpty()) {
+                    Object resolved = dataResolver.resolveDeep(task.parameters(), context.stateData());
+                    configJson = resolveConfigJson(resolved);
+                } else {
+                    configJson = resolveConfigJson(input);
+                }
                 ActionContext actionContext = ActionContext.builder()
                     .tenantId(context.tenantId())
                     .userId(context.userId())
@@ -158,7 +167,7 @@ public class TaskStateExecutor implements StateExecutor {
         return null;
     }
 
-    private String resolveConfigJson(Map<String, Object> input) {
+    private String resolveConfigJson(Object input) {
         try {
             return objectMapper.writeValueAsString(input);
         } catch (Exception e) {

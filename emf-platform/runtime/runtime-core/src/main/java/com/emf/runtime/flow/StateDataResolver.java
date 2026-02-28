@@ -8,7 +8,9 @@ import com.jayway.jsonpath.Option;
 import com.jayway.jsonpath.spi.json.JacksonJsonProvider;
 import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -165,6 +167,52 @@ public class StateDataResolver {
             i++;
         }
         return result.toString();
+    }
+
+    /**
+     * Recursively resolves {@code ${$.path}} template expressions in a nested structure
+     * of Maps, Lists, and Strings. Non-string leaf values are left as-is.
+     *
+     * @param value     the value to resolve (Map, List, String, or other)
+     * @param stateData the state data to resolve paths against
+     * @return the resolved value with all template expressions replaced
+     */
+    @SuppressWarnings("unchecked")
+    public Object resolveDeep(Object value, Map<String, Object> stateData) {
+        if (value == null || stateData == null) {
+            return value;
+        }
+        if (value instanceof String str) {
+            if (!str.contains("${")) {
+                return str;
+            }
+            // If the entire string is a single template expression, return the raw value
+            // (preserving numeric/boolean types rather than converting to String)
+            if (str.startsWith("${") && str.endsWith("}") && str.indexOf("}", 2) == str.length() - 1) {
+                String path = str.substring(2, str.length() - 1);
+                Object resolved = readPath(stateData, path);
+                return resolved != null ? resolved : "";
+            }
+            return resolveTemplate(str, stateData);
+        }
+        if (value instanceof Map) {
+            Map<String, Object> map = (Map<String, Object>) value;
+            Map<String, Object> resolved = new LinkedHashMap<>();
+            for (Map.Entry<String, Object> entry : map.entrySet()) {
+                resolved.put(entry.getKey(), resolveDeep(entry.getValue(), stateData));
+            }
+            return resolved;
+        }
+        if (value instanceof List) {
+            List<Object> list = (List<Object>) value;
+            List<Object> resolved = new ArrayList<>(list.size());
+            for (Object item : list) {
+                resolved.add(resolveDeep(item, stateData));
+            }
+            return resolved;
+        }
+        // Numbers, booleans, etc. — return as-is
+        return value;
     }
 
     private String effectivePath(String path) {

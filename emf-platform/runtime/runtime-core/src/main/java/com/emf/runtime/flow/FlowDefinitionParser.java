@@ -98,9 +98,16 @@ public class FlowDefinitionParser {
     }
 
     private StateDefinition.TaskState parseTaskState(String name, String comment, JsonNode node) {
+        Map<String, Object> parameters = null;
+        JsonNode paramsNode = node.get("Parameters");
+        if (paramsNode != null && paramsNode.isObject()) {
+            parameters = objectMapper.convertValue(paramsNode, new TypeReference<>() {});
+        }
+
         return new StateDefinition.TaskState(
             name, comment,
             requiredText(node, "Resource"),
+            parameters,
             textOrNull(node, "InputPath"),
             textOrNull(node, "OutputPath"),
             textOrNull(node, "ResultPath"),

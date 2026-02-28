@@ -33,14 +33,14 @@ class CoreActionsModuleTest {
     }
 
     @Test
-    @DisplayName("Should provide 8 action handlers after onStartup")
-    void shouldProvide8HandlersAfterStartup() {
+    @DisplayName("Should provide 9 action handlers after onStartup")
+    void shouldProvide9HandlersAfterStartup() {
         ModuleContext context = new ModuleContext(null, null, null, new ObjectMapper(),
             new ActionHandlerRegistry(), null);
         module.onStartup(context);
 
         List<ActionHandler> handlers = module.getActionHandlers();
-        assertEquals(8, handlers.size());
+        assertEquals(9, handlers.size());
     }
 
     @Test
@@ -62,6 +62,7 @@ class CoreActionsModuleTest {
         assertTrue(keys.contains("LOG_MESSAGE"));
         assertTrue(keys.contains("DECISION"));
         assertTrue(keys.contains("TRIGGER_FLOW"));
+        assertTrue(keys.contains("QUERY_RECORDS"));
     }
 
     @Test

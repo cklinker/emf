@@ -294,6 +294,100 @@ class StateDataResolverTest {
     }
 
     @Nested
+    @DisplayName("resolveDeep")
+    class ResolveDeep {
+
+        @Test
+        @DisplayName("resolves templates in nested map")
+        void resolvesNestedMap() {
+            Map<String, Object> template = new LinkedHashMap<>();
+            template.put("targetCollectionName", "orders");
+            template.put("customerId", "${$.customer.name}");
+            template.put("orderId", "${$.orderId}");
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> result = (Map<String, Object>) resolver.resolveDeep(template, stateData());
+
+            assertEquals("orders", result.get("targetCollectionName"));
+            assertEquals("Alice", result.get("customerId"));
+            assertEquals("ord-123", result.get("orderId"));
+        }
+
+        @Test
+        @DisplayName("resolves templates in lists")
+        void resolvesInLists() {
+            Map<String, Object> filter = new LinkedHashMap<>();
+            filter.put("field", "customer");
+            filter.put("operator", "eq");
+            filter.put("value", "${$.customer.name}");
+
+            Map<String, Object> template = new LinkedHashMap<>();
+            template.put("filters", List.of(filter));
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> result = (Map<String, Object>) resolver.resolveDeep(template, stateData());
+
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> filters = (List<Map<String, Object>>) result.get("filters");
+            assertEquals("Alice", filters.get(0).get("value"));
+        }
+
+        @Test
+        @DisplayName("single-expression string preserves original type")
+        void singleExpressionPreservesType() {
+            Map<String, Object> template = new LinkedHashMap<>();
+            template.put("amount", "${$.amount}");
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> result = (Map<String, Object>) resolver.resolveDeep(template, stateData());
+
+            // Should be a number, not a string "250.0"
+            assertEquals(250.0, result.get("amount"));
+        }
+
+        @Test
+        @DisplayName("mixed string with multiple expressions returns string")
+        void mixedStringReturnsString() {
+            Map<String, Object> template = new LinkedHashMap<>();
+            template.put("msg", "Order ${$.orderId} amount ${$.amount}");
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> result = (Map<String, Object>) resolver.resolveDeep(template, stateData());
+
+            assertEquals("Order ord-123 amount 250.0", result.get("msg"));
+        }
+
+        @Test
+        @DisplayName("non-string values pass through unchanged")
+        void nonStringValuesPassThrough() {
+            Map<String, Object> template = new LinkedHashMap<>();
+            template.put("pageSize", 200);
+            template.put("active", true);
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> result = (Map<String, Object>) resolver.resolveDeep(template, stateData());
+
+            assertEquals(200, result.get("pageSize"));
+            assertEquals(true, result.get("active"));
+        }
+
+        @Test
+        @DisplayName("null value returns null")
+        void nullValueReturnsNull() {
+            assertNull(resolver.resolveDeep(null, stateData()));
+        }
+
+        @Test
+        @DisplayName("null state data returns original value")
+        void nullStateReturnsOriginal() {
+            Map<String, Object> template = Map.of("key", "${$.orderId}");
+            @SuppressWarnings("unchecked")
+            Map<String, Object> result = (Map<String, Object>) resolver.resolveDeep(template, null);
+            assertEquals("${$.orderId}", result.get("key"));
+        }
+    }
+
+    @Nested
     @DisplayName("Full Data Flow Pipeline")
     class FullPipeline {
 

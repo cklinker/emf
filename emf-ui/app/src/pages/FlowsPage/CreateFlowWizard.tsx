@@ -26,10 +26,10 @@ interface CreateFlowWizardProps {
 const STEPS = ['Type', 'Trigger', 'Name'] as const
 type Step = (typeof STEPS)[number]
 
-const MINIMAL_DEFINITION = JSON.stringify({
+const MINIMAL_DEFINITION = {
   StartAt: 'Start',
   States: { Start: { Type: 'Succeed' } },
-})
+}
 
 export function CreateFlowWizard({ open, onOpenChange }: CreateFlowWizardProps) {
   const navigate = useNavigate()
@@ -67,7 +67,7 @@ export function CreateFlowWizard({ open, onOpenChange }: CreateFlowWizardProps) 
         flowType,
         active: false,
         definition: MINIMAL_DEFINITION,
-        triggerConfig: Object.keys(triggerConfig).length > 0 ? JSON.stringify(triggerConfig) : null,
+        triggerConfig: Object.keys(triggerConfig).length > 0 ? triggerConfig : null,
       }
       const resp = await apiClient.postResource<{ id: string }>('/api/flows', payload)
       return resp

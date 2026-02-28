@@ -156,9 +156,9 @@ class RouteConfigServiceTest {
         // Give async processing time to complete
         Thread.sleep(500);
 
-        // Assert (2 collection routes + 1 static route for governor-limits)
+        // Assert (2 collection routes + 2 static routes for governor-limits and modules)
         List<RouteDefinition> routes = routeRegistry.getAllRoutes();
-        assertEquals(3, routes.size());
+        assertEquals(4, routes.size());
 
         // Verify first route (path has /** wildcard added)
         RouteDefinition usersRoute = routeRegistry.findByPath("/api/users/**").orElse(null);
@@ -207,9 +207,9 @@ class RouteConfigServiceTest {
         routeConfigService.refreshRoutes();
         Thread.sleep(500);
 
-        // Assert (2 collection routes + 1 static route for governor-limits)
+        // Assert (2 collection routes + 2 static routes for governor-limits and modules)
         List<RouteDefinition> routes = routeRegistry.getAllRoutes();
-        assertEquals(3, routes.size());
+        assertEquals(4, routes.size());
 
         // Even though bootstrap included a pod IP, gateway should use configured service URL
         RouteDefinition productRoute = routeRegistry.findByPath("/api/product/**").orElse(null);
@@ -245,10 +245,11 @@ class RouteConfigServiceTest {
         routeConfigService.refreshRoutes();
         Thread.sleep(500);
 
-        // Assert - invalid route should be skipped (only static route remains)
+        // Assert - invalid route should be skipped (only static routes remain)
         List<RouteDefinition> routes = routeRegistry.getAllRoutes();
-        assertEquals(1, routes.size());
-        assertEquals("static-governor-limits", routes.get(0).getId());
+        assertEquals(2, routes.size());
+        assertTrue(routes.stream().anyMatch(r -> r.getId().equals("static-governor-limits")));
+        assertTrue(routes.stream().anyMatch(r -> r.getId().equals("static-modules")));
     }
 
     @Test
@@ -268,10 +269,11 @@ class RouteConfigServiceTest {
         routeConfigService.refreshRoutes();
         Thread.sleep(500);
 
-        // Assert (only static route remains)
+        // Assert (only static routes remain)
         List<RouteDefinition> routes = routeRegistry.getAllRoutes();
-        assertEquals(1, routes.size());
-        assertEquals("static-governor-limits", routes.get(0).getId());
+        assertEquals(2, routes.size());
+        assertTrue(routes.stream().anyMatch(r -> r.getId().equals("static-governor-limits")));
+        assertTrue(routes.stream().anyMatch(r -> r.getId().equals("static-modules")));
     }
 
     @Test
@@ -303,10 +305,11 @@ class RouteConfigServiceTest {
         routeConfigService.refreshRoutes();
         Thread.sleep(500);
 
-        // Assert - only valid route + static route should be added
+        // Assert - only valid route + static routes should be added
         List<RouteDefinition> routes = routeRegistry.getAllRoutes();
-        assertEquals(2, routes.size());
+        assertEquals(3, routes.size());
         assertTrue(routes.stream().anyMatch(r -> r.getId().equals("valid-collection")));
         assertTrue(routes.stream().anyMatch(r -> r.getId().equals("static-governor-limits")));
+        assertTrue(routes.stream().anyMatch(r -> r.getId().equals("static-modules")));
     }
 }

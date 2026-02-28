@@ -197,6 +197,10 @@ export type { WebhooksPageProps } from './WebhooksPage'
 export { ConnectedAppsPage } from './ConnectedAppsPage'
 export type { ConnectedAppsPageProps } from './ConnectedAppsPage'
 
+// ModulesPage - Runtime module management page
+export { ModulesPage } from './ModulesPage'
+export type { ModulesPageProps } from './ModulesPage'
+
 // BulkJobsPage - Bulk job management page
 export { BulkJobsPage } from './BulkJobsPage'
 export type { BulkJobsPageProps } from './BulkJobsPage'

@@ -194,6 +194,12 @@ const CATEGORIES: SetupCategory[] = [
         description: 'Manage server-side scripts',
         permission: 'MANAGE_CONNECTED_APPS',
       },
+      {
+        name: 'Modules',
+        path: '/modules',
+        description: 'Install and manage runtime modules',
+        permission: 'MANAGE_CONNECTED_APPS',
+      },
     ],
   },
   {

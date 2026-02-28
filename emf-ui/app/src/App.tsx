@@ -91,6 +91,7 @@ import {
   ScriptsPage,
   WebhooksPage,
   ConnectedAppsPage,
+  ModulesPage,
   BulkJobsPage,
   SetupHomePage,
   LoginPage,
@@ -703,6 +704,18 @@ function TenantRoutes(): React.ReactElement {
           <RequirePermission permission="MANAGE_WORKFLOWS">
             <FlowDesignerPage />
           </RequirePermission>
+        }
+      />
+
+      {/* Modules route */}
+      <Route
+        path="modules"
+        element={
+          <AdminPageRoute>
+            <RequirePermission permission="MANAGE_CONNECTED_APPS">
+              <ModulesPage />
+            </RequirePermission>
+          </AdminPageRoute>
         }
       />
 

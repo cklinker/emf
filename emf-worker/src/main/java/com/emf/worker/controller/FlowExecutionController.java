@@ -456,7 +456,10 @@ public class FlowExecutionController {
             return ResponseEntity.notFound().build();
         }
 
-        return ResponseEntity.ok(rows.get(0));
+        // Convert JSONB PGobject to String for consistent JSON serialization
+        Map<String, Object> version = new LinkedHashMap<>(rows.get(0));
+        version.computeIfPresent("definition", (k, v) -> v != null ? v.toString() : null);
+        return ResponseEntity.ok(version);
     }
 
     // -------------------------------------------------------------------------
@@ -468,7 +471,12 @@ public class FlowExecutionController {
         if (rows.isEmpty()) {
             return null;
         }
-        return rows.get(0);
+        // Convert JSONB PGobject values to plain Strings so callers can safely cast.
+        // JdbcTemplate.queryForList() returns JSONB columns as PGobject, not String.
+        Map<String, Object> row = new LinkedHashMap<>(rows.get(0));
+        row.computeIfPresent("definition", (k, v) -> v != null ? v.toString() : null);
+        row.computeIfPresent("trigger_config", (k, v) -> v != null ? v.toString() : null);
+        return row;
     }
 
     private Map<String, Object> executionToMap(FlowExecutionData exec) {

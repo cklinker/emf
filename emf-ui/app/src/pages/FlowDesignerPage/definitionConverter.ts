@@ -37,9 +37,24 @@ export function getNodeType(stateType: string): string {
   }
 }
 
-/** Safely parse a definition JSON string. */
-export function parseFlowDefinition(definition: string | null): FlowDefinition | null {
+/** Safely parse a definition JSON string or object. */
+export function parseFlowDefinition(definition: unknown): FlowDefinition | null {
   if (!definition) return null
+  // Already a parsed object (e.g., from pre-parsed JSON)
+  if (typeof definition === 'object' && definition !== null) {
+    const obj = definition as Record<string, unknown>
+    if (obj.States) return definition as FlowDefinition
+    // Handle JSONB wrapper { type: "jsonb", value: "..." }
+    if (obj.type === 'jsonb' && typeof obj.value === 'string') {
+      try {
+        return JSON.parse(obj.value) as FlowDefinition
+      } catch {
+        return null
+      }
+    }
+    return null
+  }
+  if (typeof definition !== 'string') return null
   try {
     return JSON.parse(definition) as FlowDefinition
   } catch {

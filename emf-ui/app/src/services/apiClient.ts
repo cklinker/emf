@@ -122,14 +122,34 @@ interface JsonApiResourceObject {
 }
 
 /**
+ * Unwrap a PostgreSQL JSONB column value.
+ *
+ * The backend may serialize JSONB columns as wrapper objects:
+ *   { type: "jsonb", value: "<json-string>", null: false }
+ * This helper extracts the inner `value` string so the rest of the
+ * app sees a plain JSON string (or null) instead of the wrapper.
+ */
+function unwrapJsonbValue(val: unknown): unknown {
+  if (val && typeof val === 'object' && !Array.isArray(val)) {
+    const obj = val as Record<string, unknown>
+    if (obj.type === 'jsonb' && 'value' in obj) {
+      return obj.null === true ? null : obj.value
+    }
+  }
+  return val
+}
+
+/**
  * Flatten a JSON:API resource object into a plain object.
  * Merges id + attributes + relationship IDs.
+ * Unwraps JSONB wrapper objects in attribute values.
  */
 function flattenResource(obj: unknown): Record<string, unknown> {
   const resource = obj as JsonApiResourceObject
-  const result: Record<string, unknown> = {
-    id: resource.id,
-    ...(resource.attributes || {}),
+  const attrs = resource.attributes || {}
+  const result: Record<string, unknown> = { id: resource.id }
+  for (const [key, val] of Object.entries(attrs)) {
+    result[key] = unwrapJsonbValue(val)
   }
   if (resource.relationships) {
     for (const [key, rel] of Object.entries(resource.relationships)) {

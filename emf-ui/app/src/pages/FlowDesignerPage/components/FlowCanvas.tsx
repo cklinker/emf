@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useMemo } from 'react'
+import React, { useCallback, useRef, useMemo, useEffect } from 'react'
 import {
   ReactFlow,
   Background,
@@ -7,6 +7,7 @@ import {
   addEdge,
   useNodesState,
   useEdgesState,
+  useReactFlow,
   type OnConnect,
   type Node,
   type Edge,
@@ -57,7 +58,7 @@ function getNodeType(stateType: string): string {
   }
 }
 
-export function FlowCanvas({
+function FlowCanvasInner({
   initialNodes,
   initialEdges,
   onNodesChange: onNodesChangeProp,
@@ -65,24 +66,32 @@ export function FlowCanvas({
   onNodeSelect,
 }: FlowCanvasProps) {
   const reactFlowWrapper = useRef<HTMLDivElement>(null)
+  const reactFlowInstance = useReactFlow()
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
 
-  // Sync external changes
-  const nodesRef = useRef(nodes)
-  nodesRef.current = nodes
-  const edgesRef = useRef(edges)
-  edgesRef.current = edges
+  // Track whether this is the initial render to avoid marking dirty on mount
+  const initialRender = useRef(true)
+
+  // Sync node state to parent on every change (position moves, deletions, etc.)
+  useEffect(() => {
+    if (initialRender.current) {
+      initialRender.current = false
+      return
+    }
+    onNodesChangeProp?.(nodes)
+  }, [nodes, onNodesChangeProp])
+
+  useEffect(() => {
+    if (initialRender.current) return
+    onEdgesChangeProp?.(edges)
+  }, [edges, onEdgesChangeProp])
 
   const onConnect: OnConnect = useCallback(
     (connection: Connection) => {
-      setEdges((eds) => {
-        const updated = addEdge({ ...connection, animated: false, style: { strokeWidth: 2 } }, eds)
-        onEdgesChangeProp?.(updated)
-        return updated
-      })
+      setEdges((eds) => addEdge({ ...connection, animated: false, style: { strokeWidth: 2 } }, eds))
     },
-    [setEdges, onEdgesChangeProp]
+    [setEdges]
   )
 
   const onDragOver = useCallback((event: React.DragEvent) => {
@@ -96,13 +105,14 @@ export function FlowCanvas({
       const stateType = event.dataTransfer.getData('application/reactflow-type')
       if (!stateType) return
 
-      const bounds = reactFlowWrapper.current?.getBoundingClientRect()
-      if (!bounds) return
-
-      const position = {
-        x: event.clientX - bounds.left - 80,
-        y: event.clientY - bounds.top - 20,
-      }
+      // Convert screen coordinates to flow coordinates (accounts for zoom/pan)
+      const position = reactFlowInstance.screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      })
+      // Offset to center node under the cursor
+      position.x -= 80
+      position.y -= 20
 
       const id = `${stateType.toLowerCase()}_${++nodeIdCounter}`
       const newNode: Node = {
@@ -112,17 +122,12 @@ export function FlowCanvas({
         data: {
           label: `${stateType} ${nodeIdCounter}`,
           stateType,
-          ...(stateType === 'Succeed' || stateType === 'Fail' ? { stateType } : {}),
         },
       }
 
-      setNodes((nds) => {
-        const updated = [...nds, newNode]
-        onNodesChangeProp?.(updated)
-        return updated
-      })
+      setNodes((nds) => [...nds, newNode])
     },
-    [setNodes, onNodesChangeProp]
+    [setNodes, reactFlowInstance]
   )
 
   const onSelectionChange = useCallback(
@@ -181,4 +186,11 @@ export function FlowCanvas({
       </ReactFlow>
     </div>
   )
+}
+
+// Wrapper that ensures useReactFlow is called inside ReactFlowProvider context.
+// The ReactFlowProvider is in FlowDesignerPage, so this component is always
+// rendered within that provider. We export this directly.
+export function FlowCanvas(props: FlowCanvasProps) {
+  return <FlowCanvasInner {...props} />
 }

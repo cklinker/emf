@@ -119,6 +119,13 @@ export function FlowDesignerPage() {
     setCurrentNodes((prev) =>
       prev.map((n) => (n.id === nodeId ? { ...n, data: { ...n.data, ...data } } : n))
     )
+    // Keep selectedNode in sync so the properties panel reflects changes
+    setSelectedNode((prev) => {
+      if (prev && prev.id === nodeId) {
+        return { ...prev, data: { ...prev.data, ...data } }
+      }
+      return prev
+    })
     setIsDirty(true)
   }, [])
 

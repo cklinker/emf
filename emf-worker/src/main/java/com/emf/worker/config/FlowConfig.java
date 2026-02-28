@@ -74,9 +74,10 @@ public class FlowConfig {
     public FlowEngine flowEngine(FlowStore flowStore,
                                   ActionHandlerRegistry actionHandlerRegistry,
                                   ObjectMapper objectMapper,
+                                  FlowMetricsConfig flowMetricsConfig,
                                   @Value("${emf.flow.executor.pool-size:10}") int poolSize) {
         log.info("Creating FlowEngine with thread pool size {}", poolSize);
-        return new FlowEngine(flowStore, actionHandlerRegistry, objectMapper, poolSize);
+        return new FlowEngine(flowStore, actionHandlerRegistry, objectMapper, poolSize, flowMetricsConfig);
     }
 
     @Bean

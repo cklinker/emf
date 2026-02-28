@@ -26,6 +26,8 @@ interface Flow {
   createdBy: string
   createdAt: string
   updatedAt: string
+  version: number | null
+  publishedVersion: number | null
 }
 
 interface FlowDefinition {
@@ -245,6 +247,48 @@ export function FlowDesignerPage() {
     setIsDirty(true)
   }, [])
 
+  const testMutation = useMutation({
+    mutationFn: async () => {
+      if (!flowId) return
+      const resp = await apiClient.fetch(`/api/flows/${flowId}/execute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ input: {}, test: true }),
+      })
+      if (!resp.ok) throw new Error('Failed to start test execution')
+      return (await resp.json()) as { executionId: string }
+    },
+    onSuccess: (data) => {
+      if (data?.executionId) {
+        showToast('Test execution started', 'success')
+        handleViewExecution(data.executionId)
+      }
+    },
+    onError: (err: Error) => {
+      showToast(err.message || 'Failed to start test', 'error')
+    },
+  })
+
+  const publishMutation = useMutation({
+    mutationFn: async () => {
+      if (!flowId) return
+      const resp = await apiClient.fetch(`/api/flows/${flowId}/publish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      if (!resp.ok) throw new Error('Failed to publish flow')
+      return (await resp.json()) as { versionNumber: number }
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['flow', flowId] })
+      showToast(`Published as v${data?.versionNumber}`, 'success')
+    },
+    onError: (err: Error) => {
+      showToast(err.message || 'Failed to publish', 'error')
+    },
+  })
+
   const handleViewExecution = useCallback((executionId: string) => {
     setDebugTabs((prev) => (prev.includes(executionId) ? prev : [...prev, executionId]))
     setActiveTab({ type: 'debug', executionId })
@@ -297,8 +341,12 @@ export function FlowDesignerPage() {
         isDirty={isDirty}
         isSaving={saveMutation.isPending}
         showJson={showJson}
+        publishedVersion={flow.publishedVersion}
+        currentVersion={flow.version}
         onSave={() => saveMutation.mutate()}
         onToggleJson={() => setShowJson((v) => !v)}
+        onTest={() => testMutation.mutate()}
+        onPublish={() => publishMutation.mutate()}
       />
 
       {/* Tab Navigation */}

@@ -83,7 +83,7 @@ export function useLookupDisplayMap(
 
       await Promise.all(
         Array.from(targetGroupMap.entries()).map(
-          async ([_groupKey, { fields: groupFields, targetName: knownName, targetId }]) => {
+          async ([, { fields: groupFields, targetName: knownName, targetId }]) => {
             try {
               let targetName: string
               let displayFieldName = 'id'
@@ -97,9 +97,7 @@ export function useLookupDisplayMap(
                   if (schema.displayFieldName) {
                     displayFieldName = schema.displayFieldName
                   } else if (schema.fields?.length) {
-                    const nameField = schema.fields.find(
-                      (f) => f.name.toLowerCase() === 'name'
-                    )
+                    const nameField = schema.fields.find((f) => f.name.toLowerCase() === 'name')
                     if (nameField) {
                       displayFieldName = nameField.name
                     } else {
@@ -124,9 +122,7 @@ export function useLookupDisplayMap(
                   if (schema.displayFieldName) {
                     displayFieldName = schema.displayFieldName
                   } else if (schema.fields?.length) {
-                    const nameField = schema.fields.find(
-                      (f) => f.name.toLowerCase() === 'name'
-                    )
+                    const nameField = schema.fields.find((f) => f.name.toLowerCase() === 'name')
                     if (nameField) {
                       displayFieldName = nameField.name
                     } else {

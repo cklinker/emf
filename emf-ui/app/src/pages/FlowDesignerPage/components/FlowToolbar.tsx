@@ -48,7 +48,7 @@ export function FlowToolbar({
     <div className="flex h-12 shrink-0 items-center justify-between border-b border-border bg-card px-4">
       <div className="flex items-center gap-3">
         <button
-          onClick={() => navigate(-1)}
+          onClick={() => navigate('../..', { relative: 'path' })}
           className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           aria-label="Back to flows"
         >

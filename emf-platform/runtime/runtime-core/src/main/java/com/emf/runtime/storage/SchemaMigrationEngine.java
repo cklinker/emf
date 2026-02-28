@@ -231,38 +231,53 @@ public class SchemaMigrationEngine {
      * @throws StorageException if migration fails
      */
     public void migrateSchema(CollectionDefinition oldDefinition, CollectionDefinition newDefinition) {
-        String tableName = getTableName(newDefinition);
+        migrateSchema(oldDefinition, newDefinition, TableRef.publicSchema(getTableName(newDefinition)));
+    }
+
+    /**
+     * Migrates the schema from an old collection definition to a new one,
+     * using a schema-qualified table reference.
+     *
+     * @param oldDefinition the previous collection definition
+     * @param newDefinition the new collection definition
+     * @param tableRef the schema-qualified table reference
+     * @throws IncompatibleSchemaChangeException if a type change is incompatible
+     * @throws StorageException if migration fails
+     */
+    public void migrateSchema(CollectionDefinition oldDefinition, CollectionDefinition newDefinition,
+                               TableRef tableRef) {
+        String qualifiedName = tableRef.toSql();
         List<MigrationAction> migrations = new ArrayList<>();
-        
+
         // Detect added fields
         for (FieldDefinition newField : newDefinition.fields()) {
             if (oldDefinition.getField(newField.name()) == null) {
-                migrations.add(createAddColumnMigration(tableName, newDefinition.name(), newField));
+                migrations.add(createAddColumnMigration(qualifiedName, newDefinition.name(), newField));
             }
         }
-        
+
         // Detect removed fields (mark as deprecated, don't drop)
         for (FieldDefinition oldField : oldDefinition.fields()) {
             if (newDefinition.getField(oldField.name()) == null) {
-                migrations.add(createDeprecateColumnMigration(tableName, newDefinition.name(), oldField));
+                migrations.add(createDeprecateColumnMigration(qualifiedName, newDefinition.name(), oldField));
             }
         }
-        
+
         // Detect type changes
         for (FieldDefinition newField : newDefinition.fields()) {
             FieldDefinition oldField = oldDefinition.getField(newField.name());
             if (oldField != null && !oldField.type().equals(newField.type())) {
                 validateTypeChange(newDefinition.name(), oldField, newField);
-                migrations.add(createAlterColumnTypeMigration(tableName, newDefinition.name(), oldField, newField));
+                migrations.add(createAlterColumnTypeMigration(qualifiedName, newDefinition.name(), oldField, newField));
             }
         }
-        
+
         // Execute all migrations
         for (MigrationAction migration : migrations) {
             executeMigration(migration);
         }
-        
-        log.info("Schema migration completed for collection '{}': {} changes applied", 
+
+        log.info("Schema migration completed for collection '{}': {} changes applied",
             newDefinition.name(), migrations.size());
     }
     
@@ -279,14 +294,25 @@ public class SchemaMigrationEngine {
      * @param definition the current collection definition
      */
     public void reconcileSchema(CollectionDefinition definition) {
-        String tableName = getTableName(definition);
+        reconcileSchema(definition, TableRef.publicSchema(getTableName(definition)));
+    }
+
+    /**
+     * Reconciles the physical database table schema with the collection definition,
+     * using a schema-qualified table reference.
+     *
+     * @param definition the current collection definition
+     * @param tableRef the schema-qualified table reference
+     */
+    public void reconcileSchema(CollectionDefinition definition, TableRef tableRef) {
+        String qualifiedName = tableRef.toSql();
 
         // Query actual columns in the database table
         Set<String> existingColumns;
         try {
-            existingColumns = getExistingColumns(tableName);
+            existingColumns = getExistingColumns(tableRef.schema(), tableRef.tableName());
         } catch (Exception e) {
-            log.warn("Could not introspect columns for table '{}': {}", tableName, e.getMessage());
+            log.warn("Could not introspect columns for table '{}': {}", qualifiedName, e.getMessage());
             return;
         }
 
@@ -296,7 +322,7 @@ public class SchemaMigrationEngine {
         }
 
         // Reconcile audit columns (owner_id -> created_by/updated_by migration)
-        reconcileAuditColumns(tableName, existingColumns);
+        reconcileAuditColumns(qualifiedName, existingColumns);
 
         // Find fields in the definition that don't have a corresponding column
         List<MigrationAction> migrations = new ArrayList<>();
@@ -306,9 +332,9 @@ public class SchemaMigrationEngine {
             }
 
             if (!existingColumns.contains(field.name().toLowerCase())) {
-                migrations.add(createAddColumnMigration(tableName, definition.name(), field));
+                migrations.add(createAddColumnMigration(qualifiedName, definition.name(), field));
                 log.info("Reconciliation: column '{}' missing from table '{}', will add",
-                    field.name(), tableName);
+                    field.name(), qualifiedName);
             }
 
             // Check companion columns
@@ -353,40 +379,44 @@ public class SchemaMigrationEngine {
      * @param tableName the table name to reconcile
      * @param existingColumns the set of existing lowercase column names
      */
-    void reconcileAuditColumns(String tableName, Set<String> existingColumns) {
+    /**
+     * Reconciles audit columns for a table.
+     * The tableIdentifier parameter may be a bare table name or a schema-qualified SQL expression.
+     */
+    void reconcileAuditColumns(String tableIdentifier, Set<String> existingColumns) {
         boolean hasOwnerIdColumn = existingColumns.contains("owner_id");
         boolean createdByAdded = false;
 
         if (!existingColumns.contains("created_by")) {
-            String sql = "ALTER TABLE " + sanitizeIdentifier(tableName) + " ADD COLUMN created_by VARCHAR(36)";
+            String sql = "ALTER TABLE " + tableIdentifier + " ADD COLUMN created_by VARCHAR(36)";
             try {
                 jdbcTemplate.execute(sql);
-                log.info("Added audit column 'created_by' to table '{}'", tableName);
+                log.info("Added audit column 'created_by' to table '{}'", tableIdentifier);
                 createdByAdded = true;
             } catch (Exception e) {
-                log.warn("Could not add 'created_by' column to table '{}': {}", tableName, e.getMessage());
+                log.warn("Could not add 'created_by' column to table '{}': {}", tableIdentifier, e.getMessage());
             }
         }
 
         if (!existingColumns.contains("updated_by")) {
-            String sql = "ALTER TABLE " + sanitizeIdentifier(tableName) + " ADD COLUMN updated_by VARCHAR(36)";
+            String sql = "ALTER TABLE " + tableIdentifier + " ADD COLUMN updated_by VARCHAR(36)";
             try {
                 jdbcTemplate.execute(sql);
-                log.info("Added audit column 'updated_by' to table '{}'", tableName);
+                log.info("Added audit column 'updated_by' to table '{}'", tableIdentifier);
             } catch (Exception e) {
-                log.warn("Could not add 'updated_by' column to table '{}': {}", tableName, e.getMessage());
+                log.warn("Could not add 'updated_by' column to table '{}': {}", tableIdentifier, e.getMessage());
             }
         }
 
         // Migrate owner_id data into created_by for existing rows
         if (hasOwnerIdColumn && createdByAdded) {
-            String migrateSql = "UPDATE " + sanitizeIdentifier(tableName)
+            String migrateSql = "UPDATE " + tableIdentifier
                     + " SET created_by = owner_id WHERE created_by IS NULL";
             try {
                 int updated = jdbcTemplate.update(migrateSql);
-                log.info("Migrated {} rows: copied owner_id to created_by in table '{}'", updated, tableName);
+                log.info("Migrated {} rows: copied owner_id to created_by in table '{}'", updated, tableIdentifier);
             } catch (Exception e) {
-                log.warn("Could not migrate owner_id to created_by in table '{}': {}", tableName, e.getMessage());
+                log.warn("Could not migrate owner_id to created_by in table '{}': {}", tableIdentifier, e.getMessage());
             }
         }
     }
@@ -399,13 +429,26 @@ public class SchemaMigrationEngine {
      * @return set of lowercase column names, or empty set if table doesn't exist
      */
     Set<String> getExistingColumns(String tableName) {
+        return getExistingColumns("public", tableName);
+    }
+
+    /**
+     * Gets the set of existing column names in a database table within a specific schema.
+     * Uses {@code information_schema.columns} which is supported by PostgreSQL and H2.
+     *
+     * @param schemaName the schema name to look in
+     * @param tableName the table name to introspect
+     * @return set of lowercase column names, or empty set if table doesn't exist
+     */
+    Set<String> getExistingColumns(String schemaName, String tableName) {
         String sql = """
             SELECT column_name FROM information_schema.columns
-            WHERE LOWER(table_name) = LOWER(?)
+            WHERE LOWER(table_schema) = LOWER(?)
+            AND LOWER(table_name) = LOWER(?)
             """;
 
         List<String> columns = jdbcTemplate.query(sql,
-            (rs, rowNum) -> rs.getString("column_name").toLowerCase(), tableName);
+            (rs, rowNum) -> rs.getString("column_name").toLowerCase(), schemaName, tableName);
 
         return new HashSet<>(columns);
     }
@@ -580,7 +623,11 @@ public class SchemaMigrationEngine {
         };
     }
     
-    private MigrationAction createAddColumnMigration(String tableName, String collectionName,
+    /**
+     * Creates an ADD COLUMN migration action.
+     * The tableIdentifier may be a bare name or schema-qualified SQL expression.
+     */
+    private MigrationAction createAddColumnMigration(String tableIdentifier, String collectionName,
             FieldDefinition field) {
         if (!field.type().hasPhysicalColumn()) {
             // FORMULA and ROLLUP_SUMMARY have no physical column
@@ -589,7 +636,7 @@ public class SchemaMigrationEngine {
         }
 
         StringBuilder sql = new StringBuilder("ALTER TABLE ");
-        sql.append(sanitizeIdentifier(tableName));
+        sql.append(tableIdentifier);
         sql.append(" ADD COLUMN ");
         sql.append(sanitizeIdentifier(field.name()));
         sql.append(" ");
@@ -604,47 +651,55 @@ public class SchemaMigrationEngine {
 
         // Companion columns
         if (field.type() == FieldType.CURRENCY) {
-            sql.append("; ALTER TABLE ").append(sanitizeIdentifier(tableName));
+            sql.append("; ALTER TABLE ").append(tableIdentifier);
             sql.append(" ADD COLUMN ").append(sanitizeIdentifier(field.name() + "_currency_code"));
             sql.append(" VARCHAR(3)");
         }
         if (field.type() == FieldType.GEOLOCATION) {
-            sql.append("; ALTER TABLE ").append(sanitizeIdentifier(tableName));
+            sql.append("; ALTER TABLE ").append(tableIdentifier);
             sql.append(" ADD COLUMN ").append(sanitizeIdentifier(field.name() + "_longitude"));
             sql.append(" DOUBLE PRECISION");
         }
 
         return new MigrationAction(collectionName, MigrationType.ADD_COLUMN, sql.toString());
     }
-    
-    private MigrationAction createDeprecateColumnMigration(String tableName, String collectionName, 
+
+    /**
+     * Creates a DEPRECATE COLUMN migration action.
+     * The tableIdentifier may be a bare name or schema-qualified SQL expression.
+     */
+    private MigrationAction createDeprecateColumnMigration(String tableIdentifier, String collectionName,
             FieldDefinition field) {
         // Mark column as deprecated by adding a comment
         // We don't drop the column to preserve data
         String sql = String.format(
             "COMMENT ON COLUMN %s.%s IS 'DEPRECATED: This column is no longer in use as of %s'",
-            sanitizeIdentifier(tableName),
+            tableIdentifier,
             sanitizeIdentifier(field.name()),
             Instant.now().toString()
         );
-        
+
         return new MigrationAction(collectionName, MigrationType.DEPRECATE_COLUMN, sql);
     }
-    
-    private MigrationAction createAlterColumnTypeMigration(String tableName, String collectionName,
+
+    /**
+     * Creates an ALTER COLUMN TYPE migration action.
+     * The tableIdentifier may be a bare name or schema-qualified SQL expression.
+     */
+    private MigrationAction createAlterColumnTypeMigration(String tableIdentifier, String collectionName,
             FieldDefinition oldField, FieldDefinition newField) {
         String newSqlType = mapFieldTypeToSql(newField.type());
-        
+
         // PostgreSQL syntax for changing column type with USING clause for type conversion
         String sql = String.format(
             "ALTER TABLE %s ALTER COLUMN %s TYPE %s USING %s::%s",
-            sanitizeIdentifier(tableName),
+            tableIdentifier,
             sanitizeIdentifier(newField.name()),
             newSqlType,
             sanitizeIdentifier(newField.name()),
             newSqlType
         );
-        
+
         return new MigrationAction(collectionName, MigrationType.ALTER_COLUMN_TYPE, sql);
     }
     

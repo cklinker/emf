@@ -52,7 +52,7 @@ class PhysicalTableStorageAdapterSystemCollectionTest {
     void setUp() {
         jdbcTemplate = mock(JdbcTemplate.class);
         migrationEngine = mock(SchemaMigrationEngine.class);
-        adapter = new PhysicalTableStorageAdapter(jdbcTemplate, migrationEngine);
+        adapter = new PhysicalTableStorageAdapter(jdbcTemplate, migrationEngine, false);
     }
 
     // ==================== Helper Methods ====================
@@ -135,7 +135,8 @@ class PhysicalTableStorageAdapterSystemCollectionTest {
             // Verify that migration engine was not invoked
             verify(migrationEngine, never()).recordMigration(
                     anyString(), any(SchemaMigrationEngine.MigrationType.class), anyString());
-            verify(migrationEngine, never()).reconcileSchema(any());
+            verify(migrationEngine, never()).reconcileSchema(any(CollectionDefinition.class));
+            verify(migrationEngine, never()).reconcileSchema(any(CollectionDefinition.class), any(TableRef.class));
         }
 
         @Test
@@ -154,7 +155,7 @@ class PhysicalTableStorageAdapterSystemCollectionTest {
             verify(migrationEngine).recordMigration(
                     eq("products"), typeCaptor.capture(), anyString());
             assertEquals(SchemaMigrationEngine.MigrationType.CREATE_TABLE, typeCaptor.getValue());
-            verify(migrationEngine).reconcileSchema(nonSystemDef);
+            verify(migrationEngine).reconcileSchema(eq(nonSystemDef), any(TableRef.class));
         }
     }
 

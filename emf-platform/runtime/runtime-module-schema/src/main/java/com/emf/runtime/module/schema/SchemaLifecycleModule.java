@@ -5,6 +5,7 @@ import com.emf.runtime.workflow.BeforeSaveHook;
 import com.emf.runtime.workflow.module.EmfModule;
 
 import java.util.List;
+import java.util.function.Consumer;
 
 /**
  * EMF module that provides lifecycle hooks for schema system collections.
@@ -18,12 +19,32 @@ import java.util.List;
  *   <li><b>profiles</b> — Validates name, defaults system flag</li>
  * </ul>
  *
- * <p>All hooks are stateless with zero external dependencies. They perform pure
- * validation and default-setting logic.
+ * <p>Optionally accepts a schema creation callback that is invoked after a new tenant
+ * is created. When provided, the callback receives the tenant slug and should create
+ * the PostgreSQL schema for tenant-level database isolation.
  *
  * @since 1.0.0
  */
 public class SchemaLifecycleModule implements EmfModule {
+
+    private final Consumer<String> tenantSchemaCallback;
+
+    /**
+     * Creates a module with no tenant schema creation callback.
+     */
+    public SchemaLifecycleModule() {
+        this(null);
+    }
+
+    /**
+     * Creates a module with a callback invoked after tenant creation to create
+     * the PostgreSQL schema for tenant-level database isolation.
+     *
+     * @param tenantSchemaCallback receives the tenant slug; may be {@code null}
+     */
+    public SchemaLifecycleModule(Consumer<String> tenantSchemaCallback) {
+        this.tenantSchemaCallback = tenantSchemaCallback;
+    }
 
     @Override
     public String getId() {
@@ -42,10 +63,14 @@ public class SchemaLifecycleModule implements EmfModule {
 
     @Override
     public List<BeforeSaveHook> getBeforeSaveHooks() {
+        TenantLifecycleHook tenantHook = new TenantLifecycleHook();
+        if (tenantSchemaCallback != null) {
+            tenantHook.setSchemaCreationCallback(tenantSchemaCallback);
+        }
         return List.of(
             new CollectionLifecycleHook(),
             new FieldLifecycleHook(),
-            new TenantLifecycleHook(),
+            tenantHook,
             new UserLifecycleHook(),
             new ProfileLifecycleHook()
         );

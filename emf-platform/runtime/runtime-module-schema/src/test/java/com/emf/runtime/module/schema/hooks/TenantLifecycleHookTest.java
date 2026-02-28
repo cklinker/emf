@@ -98,4 +98,52 @@ class TenantLifecycleHookTest {
             assertFalse(result.hasFieldUpdates());
         }
     }
+
+    @Nested
+    @DisplayName("afterCreate — schema creation callback")
+    class AfterCreate {
+
+        @Test
+        @DisplayName("Should invoke schema creation callback with slug")
+        void shouldInvokeCallbackWithSlug() {
+            var captured = new java.util.ArrayList<String>();
+            hook.setSchemaCreationCallback(captured::add);
+
+            Map<String, Object> record = new HashMap<>(Map.of("slug", "acme-corp"));
+            hook.afterCreate(record, "t1");
+
+            assertEquals(1, captured.size());
+            assertEquals("acme-corp", captured.get(0));
+        }
+
+        @Test
+        @DisplayName("Should not fail when no callback is set")
+        void shouldNotFailWithoutCallback() {
+            Map<String, Object> record = new HashMap<>(Map.of("slug", "acme-corp"));
+            assertDoesNotThrow(() -> hook.afterCreate(record, "t1"));
+        }
+
+        @Test
+        @DisplayName("Should not invoke callback when slug is null")
+        void shouldNotInvokeCallbackWhenSlugNull() {
+            var captured = new java.util.ArrayList<String>();
+            hook.setSchemaCreationCallback(captured::add);
+
+            Map<String, Object> record = new HashMap<>();
+            hook.afterCreate(record, "t1");
+
+            assertTrue(captured.isEmpty());
+        }
+
+        @Test
+        @DisplayName("Should handle callback exception gracefully")
+        void shouldHandleCallbackException() {
+            hook.setSchemaCreationCallback(slug -> {
+                throw new RuntimeException("DB connection failed");
+            });
+
+            Map<String, Object> record = new HashMap<>(Map.of("slug", "acme"));
+            assertDoesNotThrow(() -> hook.afterCreate(record, "t1"));
+        }
+    }
 }

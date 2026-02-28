@@ -264,7 +264,7 @@ public class DynamicCollectionRouter {
 
         String tenantIdHeader = request.getHeader("X-Tenant-ID");
         try {
-            TenantContext.set(tenantIdHeader);
+            setTenantContext(request);
             Map<String, Object> created = queryEngine.create(definition, data);
 
             notifyAfterCreate(collectionName, tenantIdHeader, userId, created);
@@ -359,7 +359,7 @@ public class DynamicCollectionRouter {
 
         String tenantIdHeader = request.getHeader("X-Tenant-ID");
         try {
-            TenantContext.set(tenantIdHeader);
+            setTenantContext(request);
             Optional<Map<String, Object>> updated = queryEngine.update(definition, id, data);
             updated.ifPresent(r -> notifyAfterUpdate(collectionName, tenantIdHeader, userId, id, data));
             return updated.map(r -> ResponseEntity.ok(toJsonApiResponse(r, collectionName, definition)))
@@ -398,7 +398,7 @@ public class DynamicCollectionRouter {
         String tenantIdHeader = request.getHeader("X-Tenant-ID");
         String userId = resolveUserId(request);
         try {
-            TenantContext.set(tenantIdHeader);
+            setTenantContext(request);
             boolean deleted = queryEngine.delete(definition, id);
             if (deleted) {
                 notifyAfterDelete(collectionName, tenantIdHeader, userId, id);
@@ -541,7 +541,7 @@ public class DynamicCollectionRouter {
 
         String tenantIdHeader = request.getHeader("X-Tenant-ID");
         try {
-            TenantContext.set(tenantIdHeader);
+            setTenantContext(request);
             Map<String, Object> created = queryEngine.create(relation.childDef(), data);
 
             notifyAfterCreate(childName, tenantIdHeader, userId, created);
@@ -634,7 +634,7 @@ public class DynamicCollectionRouter {
 
         String tenantIdHeader = request.getHeader("X-Tenant-ID");
         try {
-            TenantContext.set(tenantIdHeader);
+            setTenantContext(request);
             Optional<Map<String, Object>> updated = queryEngine.update(relation.childDef(), childId, data);
             updated.ifPresent(r -> notifyAfterUpdate(childName, tenantIdHeader, userId, childId, data));
             return updated.map(r -> ResponseEntity.ok(toJsonApiResponse(r, childName, relation.childDef())))
@@ -677,7 +677,7 @@ public class DynamicCollectionRouter {
         String tenantIdHeader = request.getHeader("X-Tenant-ID");
         String userId = resolveUserId(request);
         try {
-            TenantContext.set(tenantIdHeader);
+            setTenantContext(request);
             boolean deleted = queryEngine.delete(relation.childDef(), childId);
             if (deleted) {
                 notifyAfterDelete(childName, tenantIdHeader, userId, childId);
@@ -773,6 +773,16 @@ public class DynamicCollectionRouter {
             }
         }
         return userId;
+    }
+
+    /**
+     * Sets the tenant context (ID and slug) from the request headers.
+     */
+    private void setTenantContext(HttpServletRequest request) {
+        String tenantId = request.getHeader("X-Tenant-ID");
+        String tenantSlug = request.getHeader("X-Tenant-Slug");
+        TenantContext.set(tenantId);
+        TenantContext.setSlug(tenantSlug);
     }
 
     private void injectTenantId(Map<String, Object> data, CollectionDefinition definition,

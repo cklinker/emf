@@ -103,7 +103,16 @@ public class FlowConfig {
     // ---------------------------------------------------------------------------
 
     @Bean
-    public SchemaLifecycleModule schemaLifecycleModule() {
+    public SchemaLifecycleModule schemaLifecycleModule(
+            JdbcTemplate jdbcTemplate,
+            @Value("${emf.tenant-isolation.schema-per-tenant:false}") boolean schemaPerTenant) {
+        if (schemaPerTenant) {
+            log.info("Schema-per-tenant enabled — tenant creation will auto-create PostgreSQL schemas");
+            return new SchemaLifecycleModule(slug -> {
+                String safeName = slug.replaceAll("[^a-z0-9_-]", "");
+                jdbcTemplate.execute("CREATE SCHEMA IF NOT EXISTS \"" + safeName + "\"");
+            });
+        }
         return new SchemaLifecycleModule();
     }
 

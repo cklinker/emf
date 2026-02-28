@@ -882,13 +882,19 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
             }
         }
 
-        // Apply remapping to each record
+        // Apply remapping to each record and normalize JDBC types
         for (Map<String, Object> record : records) {
             Map<String, Object> remapped = new HashMap<>();
             for (Map.Entry<String, Object> entry : record.entrySet()) {
                 String columnName = entry.getKey();
                 String fieldName = reverseMap.getOrDefault(columnName, columnName);
-                remapped.put(fieldName, entry.getValue());
+                Object value = entry.getValue();
+                // Convert java.sql.Timestamp to java.time.Instant so downstream
+                // validation (isValidDateTime) and serialization work correctly.
+                if (value instanceof java.sql.Timestamp ts) {
+                    value = ts.toInstant();
+                }
+                remapped.put(fieldName, value);
             }
             record.clear();
             record.putAll(remapped);

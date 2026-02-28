@@ -204,9 +204,8 @@ UPDATE package_item     SET updated_by = m.user_id FROM _user_email_map m WHERE 
 UPDATE platform_user    SET created_by = m.user_id FROM _user_email_map m WHERE platform_user.created_by = m.email;
 UPDATE platform_user    SET updated_by = m.user_id FROM _user_email_map m WHERE platform_user.updated_by = m.email;
 
--- flow_version: no tenant_id column, match on email directly
+-- flow_version: only has created_by (no updated_by column)
 UPDATE flow_version     SET created_by = m.user_id FROM _user_email_map m WHERE flow_version.created_by = m.email;
-UPDATE flow_version     SET updated_by = m.user_id FROM _user_email_map m WHERE flow_version.updated_by = m.email;
 
 -- Audit / log tables
 UPDATE security_audit_log   SET created_by = m.user_id FROM _user_email_map m WHERE security_audit_log.created_by = m.email;

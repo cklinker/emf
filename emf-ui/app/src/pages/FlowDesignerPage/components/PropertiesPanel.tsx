@@ -1,12 +1,29 @@
 import React from 'react'
 import type { Node } from '@xyflow/react'
 import { X } from 'lucide-react'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import type { Flow } from '../types'
+import {
+  CommonFields,
+  TaskProperties,
+  ChoiceProperties,
+  WaitProperties,
+  PassProperties,
+  ParallelProperties,
+  MapProperties,
+  FailProperties,
+  SucceedProperties,
+  TriggerSummaryCard,
+} from './properties'
 
 interface PropertiesPanelProps {
   selectedNode: Node | null
   collapsed?: boolean
   onToggle?: () => void
   onNodeUpdate?: (nodeId: string, data: Record<string, unknown>) => void
+  flow?: Flow
+  allNodeIds?: string[]
+  onEditTrigger?: () => void
 }
 
 export function PropertiesPanel({
@@ -14,6 +31,9 @@ export function PropertiesPanel({
   collapsed,
   onToggle,
   onNodeUpdate,
+  flow,
+  allNodeIds = [],
+  onEditTrigger,
 }: PropertiesPanelProps) {
   if (collapsed) {
     return null
@@ -35,17 +55,48 @@ export function PropertiesPanel({
           </button>
         )}
       </div>
-      <div className="flex-1 overflow-y-auto p-4">
-        {selectedNode ? (
-          <NodeProperties
-            node={selectedNode}
-            onUpdate={(data) => onNodeUpdate?.(selectedNode.id, data)}
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-            Select a step to view its properties
-          </div>
+      <ScrollArea className="flex-1">
+        <div className="p-4">
+          {selectedNode ? (
+            <NodeProperties
+              node={selectedNode}
+              allNodeIds={allNodeIds}
+              onUpdate={(data) => onNodeUpdate?.(selectedNode.id, data)}
+            />
+          ) : flow ? (
+            <FlowOverview flow={flow} onEditTrigger={onEditTrigger} />
+          ) : (
+            <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+              Select a step to view its properties
+            </div>
+          )}
+        </div>
+      </ScrollArea>
+    </div>
+  )
+}
+
+interface FlowOverviewProps {
+  flow: Flow
+  onEditTrigger?: () => void
+}
+
+function FlowOverview({ flow, onEditTrigger }: FlowOverviewProps) {
+  return (
+    <div className="flex flex-col gap-4">
+      <div>
+        <div className="text-sm font-semibold text-foreground">{flow.name}</div>
+        {flow.description && (
+          <div className="mt-1 text-xs text-muted-foreground">{flow.description}</div>
         )}
+      </div>
+
+      <TriggerSummaryCard flow={flow} onEditTrigger={onEditTrigger} />
+
+      <div className="flex flex-col gap-1 border-t border-border pt-3 text-[11px] text-muted-foreground">
+        {flow.version != null && <div>Version: {flow.version}</div>}
+        {flow.publishedVersion != null && <div>Published: v{flow.publishedVersion}</div>}
+        <div>Status: {flow.active ? 'Active' : 'Inactive'}</div>
       </div>
     </div>
   )
@@ -53,118 +104,81 @@ export function PropertiesPanel({
 
 interface NodePropertiesProps {
   node: Node
+  allNodeIds: string[]
   onUpdate: (data: Record<string, unknown>) => void
 }
 
-function NodeProperties({ node, onUpdate }: NodePropertiesProps) {
+function NodeProperties({ node, allNodeIds, onUpdate }: NodePropertiesProps) {
   const data = node.data as Record<string, unknown>
   const stateType = (data.stateType as string) || node.type || 'Unknown'
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <div className="mb-1 text-xs font-medium text-muted-foreground">State Type</div>
-        <div className="text-sm font-semibold text-foreground">{stateType}</div>
-      </div>
-
-      <div>
-        <label
-          htmlFor={`node-name-${node.id}`}
-          className="mb-1 block text-xs font-medium text-muted-foreground"
-        >
-          Name
-        </label>
-        <input
-          id={`node-name-${node.id}`}
-          type="text"
-          value={(data.label as string) || ''}
-          onChange={(e) => onUpdate({ ...data, label: e.target.value })}
-          className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-        />
-      </div>
-
-      {stateType === 'Task' && (
-        <div>
-          <label
-            htmlFor={`node-resource-${node.id}`}
-            className="mb-1 block text-xs font-medium text-muted-foreground"
-          >
-            Resource
-          </label>
-          <select
-            id={`node-resource-${node.id}`}
-            value={(data.resource as string) || ''}
-            onChange={(e) => onUpdate({ ...data, resource: e.target.value })}
-            className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-          >
-            <option value="">Select resource...</option>
-            <optgroup label="Data">
-              <option value="FIELD_UPDATE">Field Update</option>
-              <option value="CREATE_RECORD">Create Record</option>
-              <option value="UPDATE_RECORD">Update Record</option>
-              <option value="DELETE_RECORD">Delete Record</option>
-              <option value="QUERY_RECORDS">Query Records</option>
-            </optgroup>
-            <optgroup label="Communication">
-              <option value="EMAIL_ALERT">Email Alert</option>
-              <option value="SEND_NOTIFICATION">Send Notification</option>
-              <option value="OUTBOUND_MESSAGE">Outbound Message</option>
-            </optgroup>
-            <optgroup label="Integration">
-              <option value="HTTP_CALLOUT">HTTP Callout</option>
-              <option value="PUBLISH_EVENT">Publish Event</option>
-              <option value="INVOKE_SCRIPT">Invoke Script</option>
-            </optgroup>
-            <optgroup label="Utility">
-              <option value="LOG_MESSAGE">Log Message</option>
-              <option value="TRANSFORM_DATA">Transform Data</option>
-            </optgroup>
-          </select>
-        </div>
-      )}
-
-      {stateType === 'Fail' && (
-        <>
-          <div>
-            <label
-              htmlFor={`node-error-${node.id}`}
-              className="mb-1 block text-xs font-medium text-muted-foreground"
-            >
-              Error Code
-            </label>
-            <input
-              id={`node-error-${node.id}`}
-              type="text"
-              value={(data.error as string) || ''}
-              onChange={(e) => onUpdate({ ...data, error: e.target.value })}
-              className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-              placeholder="e.g., ValidationError"
-            />
-          </div>
-          <div>
-            <label
-              htmlFor={`node-cause-${node.id}`}
-              className="mb-1 block text-xs font-medium text-muted-foreground"
-            >
-              Cause
-            </label>
-            <textarea
-              id={`node-cause-${node.id}`}
-              value={(data.cause as string) || ''}
-              onChange={(e) => onUpdate({ ...data, cause: e.target.value })}
-              className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-              rows={2}
-              placeholder="Error message"
-            />
-          </div>
-        </>
-      )}
+      <CommonFields
+        nodeId={node.id}
+        stateType={stateType}
+        label={(data.label as string) || ''}
+        comment={(data.comment as string) || ''}
+        onUpdate={onUpdate}
+      />
 
       <div className="border-t border-border pt-3">
-        <div className="text-xs text-muted-foreground">
-          Node ID: <span className="font-mono">{node.id}</span>
-        </div>
+        <StateTypeProperties
+          stateType={stateType}
+          nodeId={node.id}
+          data={data}
+          allNodeIds={allNodeIds}
+          onUpdate={onUpdate}
+        />
       </div>
     </div>
   )
+}
+
+interface StateTypePropertiesProps {
+  stateType: string
+  nodeId: string
+  data: Record<string, unknown>
+  allNodeIds: string[]
+  onUpdate: (data: Record<string, unknown>) => void
+}
+
+function StateTypeProperties({
+  stateType,
+  nodeId,
+  data,
+  allNodeIds,
+  onUpdate,
+}: StateTypePropertiesProps) {
+  switch (stateType) {
+    case 'Task':
+      return (
+        <TaskProperties nodeId={nodeId} data={data} allNodeIds={allNodeIds} onUpdate={onUpdate} />
+      )
+    case 'Choice':
+      return (
+        <ChoiceProperties nodeId={nodeId} data={data} allNodeIds={allNodeIds} onUpdate={onUpdate} />
+      )
+    case 'Wait':
+      return <WaitProperties nodeId={nodeId} data={data} onUpdate={onUpdate} />
+    case 'Pass':
+      return <PassProperties nodeId={nodeId} data={data} onUpdate={onUpdate} />
+    case 'Parallel':
+      return (
+        <ParallelProperties
+          nodeId={nodeId}
+          data={data}
+          allNodeIds={allNodeIds}
+          onUpdate={onUpdate}
+        />
+      )
+    case 'Map':
+      return <MapProperties nodeId={nodeId} data={data} onUpdate={onUpdate} />
+    case 'Fail':
+      return <FailProperties nodeId={nodeId} data={data} onUpdate={onUpdate} />
+    case 'Succeed':
+      return <SucceedProperties />
+    default:
+      return <div className="text-xs text-muted-foreground">Unknown state type: {stateType}</div>
+  }
 }

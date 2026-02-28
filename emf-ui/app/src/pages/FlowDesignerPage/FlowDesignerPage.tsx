@@ -14,147 +14,15 @@ import { PropertiesPanel } from './components/PropertiesPanel'
 import { ExecutionsTab } from './components/ExecutionsTab'
 import { DebugTab } from './components/DebugTab'
 import { Pencil, List, Bug, X } from 'lucide-react'
-
-interface Flow {
-  id: string
-  name: string
-  description: string | null
-  flowType: string
-  active: boolean
-  definition: string | null
-  triggerConfig: string | null
-  createdBy: string
-  createdAt: string
-  updatedAt: string
-  version: number | null
-  publishedVersion: number | null
-}
-
-interface FlowDefinition {
-  Comment?: string
-  StartAt: string
-  States: Record<string, StateConfig>
-  _metadata?: {
-    nodePositions?: Record<string, { x: number; y: number }>
-  }
-}
-
-interface StateConfig {
-  Type: string
-  Comment?: string
-  Next?: string
-  End?: boolean
-  Resource?: string
-  Choices?: Array<{ Next: string; [key: string]: unknown }>
-  Default?: string
-  Error?: string
-  Cause?: string
-  Branches?: FlowDefinition[]
-  [key: string]: unknown
-}
+import type { Flow } from './types'
+import {
+  parseFlowDefinition,
+  definitionToNodesAndEdges,
+  nodesToDefinition,
+} from './definitionConverter'
+import { TriggerEditSheet } from './components/TriggerEditSheet'
 
 type ActiveTab = 'design' | 'executions' | { type: 'debug'; executionId: string }
-
-function getNodeType(stateType: string): string {
-  switch (stateType) {
-    case 'Task':
-      return 'task'
-    case 'Choice':
-      return 'choice'
-    case 'Succeed':
-    case 'Fail':
-      return 'terminal'
-    case 'Wait':
-    case 'Pass':
-    case 'Parallel':
-    case 'Map':
-      return 'control'
-    default:
-      return 'task'
-  }
-}
-
-function parseFlowDefinition(definition: string | null): FlowDefinition | null {
-  if (!definition) return null
-  try {
-    return JSON.parse(definition) as FlowDefinition
-  } catch {
-    return null
-  }
-}
-
-function definitionToNodesAndEdges(definition: FlowDefinition | null): {
-  nodes: Node[]
-  edges: Edge[]
-} {
-  if (!definition || !definition.States) {
-    return { nodes: [], edges: [] }
-  }
-
-  const positions = definition._metadata?.nodePositions || {}
-  const stateIds = Object.keys(definition.States)
-  const nodes: Node[] = []
-  const edges: Edge[] = []
-
-  stateIds.forEach((stateId, index) => {
-    const state = definition.States[stateId]
-    const pos = positions[stateId] || { x: 250, y: index * 120 }
-
-    nodes.push({
-      id: stateId,
-      type: getNodeType(state.Type),
-      position: pos,
-      data: {
-        label: stateId,
-        stateType: state.Type,
-        resource: state.Resource,
-        ruleCount: state.Choices?.length,
-        error: state.Error,
-        cause: state.Cause,
-        branchCount: state.Branches?.length,
-      },
-    })
-
-    // Normal Next transitions
-    if (state.Next) {
-      edges.push({
-        id: `${stateId}->${state.Next}`,
-        source: stateId,
-        target: state.Next,
-        type: 'smoothstep',
-        style: { strokeWidth: 2 },
-      })
-    }
-
-    // Choice branches
-    if (state.Choices) {
-      state.Choices.forEach((choice, ci) => {
-        if (choice.Next) {
-          edges.push({
-            id: `${stateId}->choice-${ci}->${choice.Next}`,
-            source: stateId,
-            target: choice.Next as string,
-            type: 'smoothstep',
-            label: `Rule ${ci + 1}`,
-            style: { strokeWidth: 2 },
-          })
-        }
-      })
-    }
-    if (state.Default) {
-      edges.push({
-        id: `${stateId}->default->${state.Default}`,
-        source: stateId,
-        target: state.Default,
-        type: 'smoothstep',
-        label: 'Default',
-        style: { strokeWidth: 2, strokeDasharray: '5,5' },
-      })
-    }
-  })
-
-  return { nodes, edges }
-}
 
 export function FlowDesignerPage() {
   const { flowId } = useParams<{ flowId: string }>()
@@ -179,6 +47,7 @@ export function FlowDesignerPage() {
   const [isDirty, setIsDirty] = useState(false)
   const [currentNodes, setCurrentNodes] = useState<Node[]>([])
   const [currentEdges, setCurrentEdges] = useState<Edge[]>([])
+  const [triggerSheetOpen, setTriggerSheetOpen] = useState(false)
 
   const {
     data: flow,
@@ -219,6 +88,12 @@ export function FlowDesignerPage() {
       showToast(err.message || 'Failed to save flow', 'error')
     },
   })
+
+  // Compute all node IDs for dropdown menus in the properties panel
+  const allNodeIds = useMemo(() => {
+    const nodes = currentNodes.length > 0 ? currentNodes : initialNodes
+    return nodes.map((n) => n.id)
+  }, [currentNodes, initialNodes])
 
   const handleNodesChange = useCallback((nodes: Node[]) => {
     setCurrentNodes(nodes)
@@ -451,6 +326,9 @@ export function FlowDesignerPage() {
             collapsed={propertiesCollapsed}
             onToggle={() => setPropertiesCollapsed((v) => !v)}
             onNodeUpdate={handleNodeUpdate}
+            flow={flow}
+            allNodeIds={allNodeIds}
+            onEditTrigger={() => setTriggerSheetOpen(true)}
           />
         </div>
       )}
@@ -467,85 +345,10 @@ export function FlowDesignerPage() {
           edges={initialEdges}
         />
       )}
+
+      <TriggerEditSheet open={triggerSheetOpen} onOpenChange={setTriggerSheetOpen} flow={flow} />
     </div>
   )
-}
-
-/**
- * Converts React Flow nodes and edges back into a FlowDefinition JSON.
- */
-function nodesToDefinition(
-  nodes: Node[],
-  edges: Edge[],
-  existing: FlowDefinition | null
-): FlowDefinition {
-  if (nodes.length === 0) {
-    return existing || { StartAt: '', States: {} }
-  }
-
-  const states: Record<string, StateConfig> = {}
-  const positions: Record<string, { x: number; y: number }> = {}
-
-  // Build edge map: source -> target edges
-  const edgeMap = new Map<string, Edge[]>()
-  for (const edge of edges) {
-    const existing = edgeMap.get(edge.source) || []
-    existing.push(edge)
-    edgeMap.set(edge.source, existing)
-  }
-
-  for (const node of nodes) {
-    const data = node.data as Record<string, unknown>
-    const stateType = (data.stateType as string) || 'Task'
-    positions[node.id] = { x: node.position.x, y: node.position.y }
-
-    const state: StateConfig = { Type: stateType }
-
-    const outEdges = edgeMap.get(node.id) || []
-
-    if (stateType === 'Task') {
-      if (data.resource) state.Resource = data.resource as string
-      const next = outEdges.find((e) => !e.label)
-      if (next) {
-        state.Next = next.target
-      } else if (outEdges.length === 0) {
-        state.End = true
-      }
-    } else if (stateType === 'Choice') {
-      const defaultEdge = outEdges.find((e) => e.label === 'Default')
-      const ruleEdges = outEdges.filter((e) => e.label !== 'Default')
-      state.Choices = ruleEdges.map((e) => ({ Next: e.target }))
-      if (defaultEdge) state.Default = defaultEdge.target
-    } else if (stateType === 'Succeed' || stateType === 'Fail') {
-      state.End = true
-      if (stateType === 'Fail') {
-        if (data.error) state.Error = data.error as string
-        if (data.cause) state.Cause = data.cause as string
-      }
-    } else {
-      // Wait, Pass, Parallel, Map
-      const next = outEdges[0]
-      if (next) {
-        state.Next = next.target
-      } else {
-        state.End = true
-      }
-    }
-
-    states[node.id] = state
-  }
-
-  // Determine StartAt: first node (topmost)
-  const topNode = [...nodes].sort((a, b) => a.position.y - b.position.y)[0]
-  const startAt =
-    existing?.StartAt && states[existing.StartAt] ? existing.StartAt : topNode?.id || ''
-
-  return {
-    Comment: existing?.Comment,
-    StartAt: startAt,
-    States: states,
-    _metadata: { nodePositions: positions },
-  }
 }
 
 export default FlowDesignerPage

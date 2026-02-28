@@ -70,20 +70,26 @@ function FlowCanvasInner({
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
 
-  // Track whether this is the initial render to avoid marking dirty on mount
-  const initialRender = useRef(true)
+  // Track whether this is the initial render to avoid marking dirty on mount.
+  // Separate refs are needed because React fires effects in order — a shared
+  // ref would be consumed by the first effect, causing the second to fire.
+  const initialNodesRender = useRef(true)
+  const initialEdgesRender = useRef(true)
 
   // Sync node state to parent on every change (position moves, deletions, etc.)
   useEffect(() => {
-    if (initialRender.current) {
-      initialRender.current = false
+    if (initialNodesRender.current) {
+      initialNodesRender.current = false
       return
     }
     onNodesChangeProp?.(nodes)
   }, [nodes, onNodesChangeProp])
 
   useEffect(() => {
-    if (initialRender.current) return
+    if (initialEdgesRender.current) {
+      initialEdgesRender.current = false
+      return
+    }
     onEdgesChangeProp?.(edges)
   }, [edges, onEdgesChangeProp])
 

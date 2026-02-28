@@ -195,22 +195,6 @@ class CollectionLifecycleManagerSystemCollectionTest {
                     SystemCollectionDefinitions.profiles().fields().size());
         }
 
-        @Test
-        @DisplayName("Should use canonical definition for workflow-rules")
-        void usesCanonicalDefinitionForWorkflowRules() {
-            Map<String, Object> row = buildSystemCollectionRow("workflow-rules");
-            mockDbForCollection("coll-123", row, List.of());
-
-            lifecycleManager.initializeCollection("coll-123");
-
-            ArgumentCaptor<CollectionDefinition> defCaptor =
-                    ArgumentCaptor.forClass(CollectionDefinition.class);
-            verify(collectionRegistry).register(defCaptor.capture());
-
-            CollectionDefinition registered = defCaptor.getValue();
-            assertThat(registered.name()).isEqualTo("workflow-rules");
-            assertThat(registered.storageConfig().tableName()).isEqualTo("workflow_rule");
-        }
     }
 
     // ==================== User Collection Tests ====================

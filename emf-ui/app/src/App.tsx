@@ -83,8 +83,6 @@ import {
   ListViewsPage,
   ReportsPage,
   DashboardsPage,
-  WorkflowRulesPage,
-  WorkflowActionTypesPage,
   ApprovalProcessesPage,
   FlowsPage,
   FlowDesignerPage,
@@ -669,30 +667,6 @@ function TenantRoutes(): React.ReactElement {
           <AdminPageRoute>
             <RequirePermission permission="MANAGE_REPORTS">
               <DashboardsPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
-
-      {/* Workflow Rules route */}
-      <Route
-        path="workflow-rules"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="MANAGE_WORKFLOWS">
-              <WorkflowRulesPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
-
-      {/* Workflow Action Types route */}
-      <Route
-        path="workflow-action-types"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="MANAGE_WORKFLOWS">
-              <WorkflowActionTypesPage />
             </RequirePermission>
           </AdminPageRoute>
         }

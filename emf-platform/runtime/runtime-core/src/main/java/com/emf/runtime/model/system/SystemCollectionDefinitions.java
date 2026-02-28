@@ -90,10 +90,6 @@ public final class SystemCollectionDefinitions {
         definitions.add(validationRules());
 
         // Workflows & Automation
-        definitions.add(workflowRules());
-        definitions.add(workflowActions());
-        definitions.add(workflowActionTypes());
-        definitions.add(workflowPendingActions());
         definitions.add(scripts());
         definitions.add(scriptTriggers());
         definitions.add(flows());
@@ -132,9 +128,6 @@ public final class SystemCollectionDefinitions {
         definitions.add(securityAuditLogs());
         definitions.add(setupAuditEntries());
         definitions.add(fieldHistory());
-        definitions.add(workflowExecutionLogs());
-        definitions.add(workflowActionLogs());
-        definitions.add(workflowRuleVersions());
         definitions.add(scriptExecutionLogs());
         definitions.add(flowExecutions());
         definitions.add(jobExecutionLogs());
@@ -422,57 +415,8 @@ public final class SystemCollectionDefinitions {
     }
 
     // =========================================================================
-    // Workflow & Automation Collections
+    // Automation Collections
     // =========================================================================
-
-    public static CollectionDefinition workflowRules() {
-        return systemBuilder("workflow-rules", "Workflow Rules", "workflow_rule")
-            .displayFieldName("name")
-            .addField(FieldDefinition.masterDetail("collectionId", "collections", "Collection")
-                .withColumnName("collection_id"))
-            .addField(FieldDefinition.requiredString("name", 200))
-            .addField(FieldDefinition.string("description", 1000))
-            .addField(FieldDefinition.bool("active"))
-            .addField(FieldDefinition.requiredString("triggerType", 30).withColumnName("trigger_type")
-                .withEnumValues(List.of("ON_CREATE", "ON_UPDATE", "ON_DELETE",
-                    "ON_CREATE_OR_UPDATE", "SCHEDULED", "MANUAL",
-                    "BEFORE_CREATE", "BEFORE_UPDATE")))
-            .addField(FieldDefinition.string("filterFormula").withColumnName("filter_formula"))
-            .addField(FieldDefinition.bool("reEvaluateOnUpdate")
-                .withColumnName("re_evaluate_on_update"))
-            .addField(FieldDefinition.integer("executionOrder").withColumnName("execution_order")
-                .withDefault(0))
-            .addField(FieldDefinition.string("errorHandling", 30).withColumnName("error_handling")
-                .withDefault("STOP_ON_ERROR"))
-            .addField(FieldDefinition.json("triggerFields").withColumnName("trigger_fields"))
-            .addField(FieldDefinition.string("cronExpression", 100)
-                .withColumnName("cron_expression"))
-            .addField(FieldDefinition.string("timezone", 50))
-            .addField(FieldDefinition.datetime("lastScheduledRun")
-                .withColumnName("last_scheduled_run"))
-            .addField(FieldDefinition.requiredString("executionMode", 20)
-                .withColumnName("execution_mode")
-                .withDefault("SEQUENTIAL"))
-            .build();
-    }
-
-    public static CollectionDefinition workflowActionTypes() {
-        return systemBuilder("workflow-action-types", "Workflow Action Types", "workflow_action_type")
-            .displayFieldName("key")
-            .tenantScoped(false)
-            .addField(FieldDefinition.requiredString("key", 50).withUnique(true))
-            .addField(FieldDefinition.requiredString("name", 100))
-            .addField(FieldDefinition.string("description", 500))
-            .addField(FieldDefinition.requiredString("category", 50))
-            .addField(FieldDefinition.json("configSchema").withColumnName("config_schema"))
-            .addField(FieldDefinition.string("icon", 50))
-            .addField(FieldDefinition.requiredString("handlerClass", 255)
-                .withColumnName("handler_class"))
-            .addField(FieldDefinition.bool("active").withDefault(true))
-            .addField(FieldDefinition.bool("builtIn").withColumnName("built_in")
-                .withDefault(true))
-            .build();
-    }
 
     public static CollectionDefinition scripts() {
         return systemBuilder("scripts", "Scripts", "script")
@@ -858,25 +802,6 @@ public final class SystemCollectionDefinitions {
             .build();
     }
 
-    public static CollectionDefinition workflowExecutionLogs() {
-        return readOnlySystemBuilder("workflow-execution-logs", "Workflow Execution Logs", "workflow_execution_log")
-            .tenantScoped(true)
-            .addField(FieldDefinition.masterDetail("workflowRuleId", "workflow-rules",
-                "Workflow Rule").withColumnName("workflow_rule_id"))
-            .addField(FieldDefinition.requiredString("recordId", 36)
-                .withColumnName("record_id"))
-            .addField(FieldDefinition.requiredString("triggerType", 30)
-                .withColumnName("trigger_type"))
-            .addField(FieldDefinition.requiredString("status", 20))
-            .addField(FieldDefinition.integer("actionsExecuted")
-                .withColumnName("actions_executed"))
-            .addField(FieldDefinition.text("errorMessage").withColumnName("error_message"))
-            .addField(FieldDefinition.datetime("executedAt").withColumnName("executed_at"))
-            .addField(FieldDefinition.integer("durationMs").withColumnName("duration_ms"))
-            .addField(FieldDefinition.integer("ruleVersion").withColumnName("rule_version"))
-            .build();
-    }
-
     public static CollectionDefinition emailLogs() {
         return readOnlySystemBuilder("email-logs", "Email Logs", "email_log")
             .addField(FieldDefinition.lookup("templateId", "email-templates", "Email Template")
@@ -1210,48 +1135,6 @@ public final class SystemCollectionDefinitions {
             .build();
     }
 
-    public static CollectionDefinition workflowActions() {
-        return systemBuilder("workflow-actions", "Workflow Actions", "workflow_action")
-            .tenantScoped(false)
-            .addField(FieldDefinition.masterDetail("workflowRuleId", "workflow-rules",
-                "Workflow Rule").withColumnName("workflow_rule_id"))
-            .addField(FieldDefinition.requiredString("actionType", 30)
-                .withColumnName("action_type"))
-            .addField(FieldDefinition.integer("executionOrder")
-                .withColumnName("execution_order").withDefault(0))
-            .addField(FieldDefinition.requiredJson("config"))
-            .addField(FieldDefinition.bool("active").withDefault(true))
-            .addField(FieldDefinition.integer("retryCount")
-                .withColumnName("retry_count").withDefault(0)
-                .withNullable(false))
-            .addField(FieldDefinition.integer("retryDelaySeconds")
-                .withColumnName("retry_delay_seconds").withDefault(60)
-                .withNullable(false))
-            .addField(FieldDefinition.requiredString("retryBackoff", 20)
-                .withColumnName("retry_backoff").withDefault("FIXED"))
-            .build();
-    }
-
-    public static CollectionDefinition workflowPendingActions() {
-        return systemBuilder("workflow-pending-actions", "Workflow Pending Actions",
-                "workflow_pending_action")
-            .addField(FieldDefinition.masterDetail("executionLogId",
-                "workflow-execution-logs", "Execution Log")
-                .withColumnName("execution_log_id"))
-            .addField(FieldDefinition.masterDetail("workflowRuleId", "workflow-rules",
-                "Workflow Rule").withColumnName("workflow_rule_id"))
-            .addField(FieldDefinition.requiredInteger("actionIndex")
-                .withColumnName("action_index"))
-            .addField(FieldDefinition.string("recordId", 36)
-                .withColumnName("record_id"))
-            .addField(FieldDefinition.json("recordSnapshot")
-                .withColumnName("record_snapshot"))
-            .addField(FieldDefinition.datetime("scheduledAt")
-                .withColumnName("scheduled_at").withNullable(false))
-            .addField(FieldDefinition.string("status", 20).withDefault("PENDING"))
-            .build();
-    }
-
     public static CollectionDefinition scriptTriggers() {
         return systemBuilder("script-triggers", "Script Triggers", "script_trigger")
             .tenantScoped(false)
@@ -1391,47 +1274,6 @@ public final class SystemCollectionDefinitions {
     // =========================================================================
     // Read-Only: Remaining Log Collections
     // =========================================================================
-
-    public static CollectionDefinition workflowActionLogs() {
-        return readOnlySystemBuilder("workflow-action-logs", "Workflow Action Logs",
-                "workflow_action_log")
-            .tenantScoped(false)
-            .addField(FieldDefinition.masterDetail("executionLogId",
-                "workflow-execution-logs", "Execution Log")
-                .withColumnName("execution_log_id"))
-            .addField(FieldDefinition.lookup("actionId", "workflow-actions", "Action")
-                .withColumnName("action_id"))
-            .addField(FieldDefinition.requiredString("actionType", 50)
-                .withColumnName("action_type"))
-            .addField(FieldDefinition.requiredString("status", 20))
-            .addField(FieldDefinition.text("errorMessage")
-                .withColumnName("error_message"))
-            .addField(FieldDefinition.json("inputSnapshot")
-                .withColumnName("input_snapshot"))
-            .addField(FieldDefinition.json("outputSnapshot")
-                .withColumnName("output_snapshot"))
-            .addField(FieldDefinition.integer("durationMs")
-                .withColumnName("duration_ms"))
-            .addField(FieldDefinition.datetime("executedAt")
-                .withColumnName("executed_at"))
-            .addField(FieldDefinition.requiredInteger("attemptNumber")
-                .withColumnName("attempt_number").withDefault(1))
-            .build();
-    }
-
-    public static CollectionDefinition workflowRuleVersions() {
-        return readOnlySystemBuilder("workflow-rule-versions", "Workflow Rule Versions",
-                "workflow_rule_version")
-            .tenantScoped(false)
-            .addField(FieldDefinition.masterDetail("workflowRuleId", "workflow-rules",
-                "Workflow Rule").withColumnName("workflow_rule_id"))
-            .addField(FieldDefinition.requiredInteger("versionNumber")
-                .withColumnName("version_number"))
-            .addField(FieldDefinition.requiredJson("snapshot"))
-            .addField(FieldDefinition.string("changeSummary", 500)
-                .withColumnName("change_summary"))
-            .build();
-    }
 
     public static CollectionDefinition scriptExecutionLogs() {
         return readOnlySystemBuilder("script-execution-logs", "Script Execution Logs",

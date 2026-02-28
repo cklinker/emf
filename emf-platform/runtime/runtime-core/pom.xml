@@ -61,6 +61,12 @@
             <artifactId>spring-boot-starter-data-redis</artifactId>
         </dependency>
         
+        <!-- Jayway JsonPath for state data path resolution -->
+        <dependency>
+            <groupId>com.jayway.jsonpath</groupId>
+            <artifactId>json-path</artifactId>
+        </dependency>
+
         <!-- Jackson for JSON serialization -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>

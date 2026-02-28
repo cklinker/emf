@@ -1,10 +1,9 @@
 import React from 'react'
-import { useQuery } from '@tanstack/react-query'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
-import { useApi } from '@/context/ApiContext'
+import { useCollectionSummaries } from '@/hooks/useCollectionSummaries'
 import type { RecordTriggerConfig } from '@/pages/FlowDesignerPage/types'
 
 interface RecordTriggerFormProps {
@@ -19,13 +18,7 @@ const EVENT_OPTIONS = [
 ]
 
 export function RecordTriggerForm({ config, onChange }: RecordTriggerFormProps) {
-  const { apiClient } = useApi()
-
-  const { data: collections } = useQuery({
-    queryKey: ['collections-list'],
-    queryFn: () =>
-      apiClient.getAll<{ id: string; name: string; label: string }>('/api/collections'),
-  })
+  const { summaries: collections } = useCollectionSummaries()
 
   const events = config.events || []
 
@@ -47,9 +40,9 @@ export function RecordTriggerForm({ config, onChange }: RecordTriggerFormProps) 
           className="mt-1 h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
         >
           <option value="">Select a collection...</option>
-          {(collections || []).map((c) => (
+          {collections.map((c) => (
             <option key={c.id} value={c.name}>
-              {c.label || c.name}
+              {c.displayName || c.name}
             </option>
           ))}
         </select>

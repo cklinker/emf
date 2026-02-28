@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -61,6 +62,7 @@ public class LoginTrackingFilter extends OncePerRequestFilter {
     /** Maps "tenantId:email" to the epoch-second of the last tracking write. */
     private final Map<String, Long> lastTrackedAt;
 
+    @Autowired
     public LoginTrackingFilter(JdbcTemplate jdbcTemplate) {
         this(jdbcTemplate, new ConcurrentHashMap<>());
     }

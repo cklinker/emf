@@ -322,7 +322,7 @@ export function FlowDesignerPage() {
               </pre>
             </div>
           )}
-          <div className={cn('flex-1', showJson && 'hidden')}>
+          <div className={cn('flex flex-1 flex-col', showJson && 'hidden')}>
             <FlowCanvas
               initialNodes={initialNodes}
               initialEdges={initialEdges}

@@ -16,9 +16,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 /**
  * Spring configuration for the flow execution engine.
  * <p>
- * Wires the {@link FlowEngine} with its dependencies alongside the existing
- * {@link com.emf.runtime.workflow.WorkflowEngine}. Both engines coexist during
- * the migration period (Phase 3 removes the workflow engine).
+ * Wires the {@link FlowEngine} with its dependencies.
+ * The legacy WorkflowEngine has been removed; flows are the sole automation engine.
  * <p>
  * Enabled by default. Disable with {@code emf.flow.enabled=false}.
  *
@@ -52,5 +51,10 @@ public class FlowConfig {
     @Bean
     public InitialStateBuilder initialStateBuilder() {
         return new InitialStateBuilder();
+    }
+
+    @Bean
+    public WorkflowRuleToFlowMigrator workflowRuleToFlowMigrator() {
+        return new WorkflowRuleToFlowMigrator();
     }
 }

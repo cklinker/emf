@@ -82,20 +82,10 @@ class SystemCollectionDefinitionsTest {
     }
 
     @Test
-    @DisplayName("Should define workflow-rules collection correctly")
-    void shouldDefineWorkflowRules() {
-        CollectionDefinition wfRules = SystemCollectionDefinitions.workflowRules();
-        assertNotNull(wfRules);
-        assertEquals("workflow-rules", wfRules.name());
-        assertTrue(wfRules.systemCollection());
-    }
-
-    @Test
     @DisplayName("Should include read-only audit collections")
     void shouldIncludeReadOnlyCollections() {
         Map<String, CollectionDefinition> byName = SystemCollectionDefinitions.byName();
         assertTrue(byName.containsKey("security-audit-logs"));
-        assertTrue(byName.containsKey("workflow-execution-logs"));
         assertTrue(byName.containsKey("login-history"));
         assertTrue(byName.containsKey("field-history"));
 

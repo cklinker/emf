@@ -20,7 +20,6 @@ import com.emf.runtime.validation.ValidationEngine;
 import com.emf.runtime.validation.ValidationRuleEvaluator;
 import com.emf.runtime.validation.ValidationRuleRegistry;
 import com.emf.runtime.workflow.BeforeSaveHookRegistry;
-import com.emf.runtime.workflow.WorkflowEngine;
 import org.apache.coyote.http11.AbstractHttp11Protocol;
 import org.springframework.beans.factory.annotation.Autowired;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -141,8 +140,7 @@ public class EmfRuntimeAutoConfiguration {
      * <p>
      * Optionally wires in:
      * <ul>
-     *   <li>{@link BeforeSaveHookRegistry} — module-provided lifecycle hooks (from WorkflowConfig)</li>
-     *   <li>{@link WorkflowEngine} — before-save workflow rules (from WorkflowConfig)</li>
+     *   <li>{@link BeforeSaveHookRegistry} — module-provided lifecycle hooks</li>
      * </ul>
      */
     @Bean
@@ -151,11 +149,10 @@ public class EmfRuntimeAutoConfiguration {
                                     ValidationEngine validationEngine,
                                     @Autowired(required = false) CustomValidationRuleEngine customValidationRuleEngine,
                                     @Autowired(required = false) RecordEventPublisher recordEventPublisher,
-                                    @Autowired(required = false) BeforeSaveHookRegistry beforeSaveHookRegistry,
-                                    @Autowired(required = false) WorkflowEngine workflowEngine) {
+                                    @Autowired(required = false) BeforeSaveHookRegistry beforeSaveHookRegistry) {
         return new DefaultQueryEngine(storageAdapter, validationEngine,
                 null, null, null, null, customValidationRuleEngine, recordEventPublisher,
-                beforeSaveHookRegistry, workflowEngine);
+                beforeSaveHookRegistry);
     }
 
     /**

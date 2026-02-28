@@ -166,14 +166,6 @@ export type { ReportsPageProps } from './ReportsPage'
 export { DashboardsPage } from './DashboardsPage'
 export type { DashboardsPageProps } from './DashboardsPage'
 
-// WorkflowRulesPage - Workflow rules management page
-export { WorkflowRulesPage } from './WorkflowRulesPage'
-export type { WorkflowRulesPageProps } from './WorkflowRulesPage'
-
-// WorkflowActionTypesPage - Workflow action types management page
-export { WorkflowActionTypesPage } from './WorkflowActionTypesPage'
-export type { WorkflowActionTypesPageProps } from './WorkflowActionTypesPage'
-
 // ApprovalProcessesPage - Approval processes management page
 export { ApprovalProcessesPage } from './ApprovalProcessesPage'
 export type { ApprovalProcessesPageProps } from './ApprovalProcessesPage'

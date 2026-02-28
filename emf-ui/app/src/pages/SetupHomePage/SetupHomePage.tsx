@@ -146,18 +146,6 @@ const CATEGORIES: SetupCategory[] = [
     icon: <Zap size={20} />,
     items: [
       {
-        name: 'Workflow Rules',
-        path: '/workflow-rules',
-        description: 'Automate field updates and actions',
-        permission: 'MANAGE_WORKFLOWS',
-      },
-      {
-        name: 'Workflow Action Types',
-        path: '/workflow-action-types',
-        description: 'Manage available workflow action types',
-        permission: 'MANAGE_WORKFLOWS',
-      },
-      {
         name: 'Approval Processes',
         path: '/approvals',
         description: 'Configure approval workflows',

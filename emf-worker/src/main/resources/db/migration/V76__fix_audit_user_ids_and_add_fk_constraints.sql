@@ -126,21 +126,8 @@ UPDATE record_type_picklist SET updated_by = m.user_id FROM _user_email_map m WH
 UPDATE validation_rule  SET created_by = m.user_id FROM _user_email_map m WHERE validation_rule.created_by = m.email;
 UPDATE validation_rule  SET updated_by = m.user_id FROM _user_email_map m WHERE validation_rule.updated_by = m.email;
 
--- Workflows & automation
-UPDATE workflow_rule    SET created_by = m.user_id FROM _user_email_map m WHERE workflow_rule.created_by = m.email;
-UPDATE workflow_rule    SET updated_by = m.user_id FROM _user_email_map m WHERE workflow_rule.updated_by = m.email;
-
-UPDATE workflow_action_type SET created_by = m.user_id FROM _user_email_map m WHERE workflow_action_type.created_by = m.email;
-UPDATE workflow_action_type SET updated_by = m.user_id FROM _user_email_map m WHERE workflow_action_type.updated_by = m.email;
-
-UPDATE workflow_action  SET created_by = m.user_id FROM _user_email_map m WHERE workflow_action.created_by = m.email;
-UPDATE workflow_action  SET updated_by = m.user_id FROM _user_email_map m WHERE workflow_action.updated_by = m.email;
-
-UPDATE workflow_pending_action SET created_by = m.user_id FROM _user_email_map m WHERE workflow_pending_action.created_by = m.email;
-UPDATE workflow_pending_action SET updated_by = m.user_id FROM _user_email_map m WHERE workflow_pending_action.updated_by = m.email;
-
-UPDATE workflow_rule_version SET created_by = m.user_id FROM _user_email_map m WHERE workflow_rule_version.created_by = m.email;
-UPDATE workflow_rule_version SET updated_by = m.user_id FROM _user_email_map m WHERE workflow_rule_version.updated_by = m.email;
+-- Workflows & automation (workflow_rule, workflow_action_type, workflow_action,
+-- workflow_pending_action, workflow_rule_version tables not yet created — skipped)
 
 UPDATE script           SET created_by = m.user_id FROM _user_email_map m WHERE script.created_by = m.email;
 UPDATE script           SET updated_by = m.user_id FROM _user_email_map m WHERE script.updated_by = m.email;
@@ -231,11 +218,7 @@ UPDATE setup_audit_trail    SET updated_by = m.user_id FROM _user_email_map m WH
 UPDATE field_history        SET created_by = m.user_id FROM _user_email_map m WHERE field_history.created_by = m.email;
 UPDATE field_history        SET updated_by = m.user_id FROM _user_email_map m WHERE field_history.updated_by = m.email;
 
-UPDATE workflow_execution_log SET created_by = m.user_id FROM _user_email_map m WHERE workflow_execution_log.created_by = m.email;
-UPDATE workflow_execution_log SET updated_by = m.user_id FROM _user_email_map m WHERE workflow_execution_log.updated_by = m.email;
-
-UPDATE workflow_action_log  SET created_by = m.user_id FROM _user_email_map m WHERE workflow_action_log.created_by = m.email;
-UPDATE workflow_action_log  SET updated_by = m.user_id FROM _user_email_map m WHERE workflow_action_log.updated_by = m.email;
+-- workflow_execution_log, workflow_action_log tables not yet created — skipped
 
 UPDATE script_execution_log SET created_by = m.user_id FROM _user_email_map m WHERE script_execution_log.created_by = m.email;
 UPDATE script_execution_log SET updated_by = m.user_id FROM _user_email_map m WHERE script_execution_log.updated_by = m.email;
@@ -350,16 +333,8 @@ UPDATE record_type_picklist  SET created_by = NULL WHERE created_by LIKE '%@%';
 UPDATE record_type_picklist  SET updated_by = NULL WHERE updated_by LIKE '%@%';
 UPDATE validation_rule       SET created_by = NULL WHERE created_by LIKE '%@%';
 UPDATE validation_rule       SET updated_by = NULL WHERE updated_by LIKE '%@%';
-UPDATE workflow_rule         SET created_by = NULL WHERE created_by LIKE '%@%';
-UPDATE workflow_rule         SET updated_by = NULL WHERE updated_by LIKE '%@%';
-UPDATE workflow_action_type  SET created_by = NULL WHERE created_by LIKE '%@%';
-UPDATE workflow_action_type  SET updated_by = NULL WHERE updated_by LIKE '%@%';
-UPDATE workflow_action       SET created_by = NULL WHERE created_by LIKE '%@%';
-UPDATE workflow_action       SET updated_by = NULL WHERE updated_by LIKE '%@%';
-UPDATE workflow_pending_action SET created_by = NULL WHERE created_by LIKE '%@%';
-UPDATE workflow_pending_action SET updated_by = NULL WHERE updated_by LIKE '%@%';
-UPDATE workflow_rule_version SET created_by = NULL WHERE created_by LIKE '%@%';
-UPDATE workflow_rule_version SET updated_by = NULL WHERE updated_by LIKE '%@%';
+-- workflow_rule, workflow_action_type, workflow_action, workflow_pending_action,
+-- workflow_rule_version tables not yet created — skipped
 UPDATE script                SET created_by = NULL WHERE created_by LIKE '%@%';
 UPDATE script                SET updated_by = NULL WHERE updated_by LIKE '%@%';
 UPDATE script_trigger        SET created_by = NULL WHERE created_by LIKE '%@%';
@@ -418,10 +393,7 @@ UPDATE setup_audit_trail     SET created_by = NULL WHERE created_by LIKE '%@%';
 UPDATE setup_audit_trail     SET updated_by = NULL WHERE updated_by LIKE '%@%';
 UPDATE field_history         SET created_by = NULL WHERE created_by LIKE '%@%';
 UPDATE field_history         SET updated_by = NULL WHERE updated_by LIKE '%@%';
-UPDATE workflow_execution_log SET created_by = NULL WHERE created_by LIKE '%@%';
-UPDATE workflow_execution_log SET updated_by = NULL WHERE updated_by LIKE '%@%';
-UPDATE workflow_action_log   SET created_by = NULL WHERE created_by LIKE '%@%';
-UPDATE workflow_action_log   SET updated_by = NULL WHERE updated_by LIKE '%@%';
+-- workflow_execution_log, workflow_action_log tables not yet created — skipped
 UPDATE script_execution_log  SET created_by = NULL WHERE created_by LIKE '%@%';
 UPDATE script_execution_log  SET updated_by = NULL WHERE updated_by LIKE '%@%';
 UPDATE email_log             SET created_by = NULL WHERE created_by LIKE '%@%';
@@ -496,8 +468,7 @@ ALTER TABLE validation_rule       ADD CONSTRAINT fk_validation_rule_created_by  
 ALTER TABLE validation_rule       ADD CONSTRAINT fk_validation_rule_updated_by       FOREIGN KEY (updated_by) REFERENCES platform_user(id);
 
 -- Workflows & automation
-ALTER TABLE workflow_rule         ADD CONSTRAINT fk_workflow_rule_created_by         FOREIGN KEY (created_by) REFERENCES platform_user(id);
-ALTER TABLE workflow_rule         ADD CONSTRAINT fk_workflow_rule_updated_by         FOREIGN KEY (updated_by) REFERENCES platform_user(id);
+-- workflow_rule not yet created — FK constraints skipped
 ALTER TABLE script                ADD CONSTRAINT fk_script_created_by               FOREIGN KEY (created_by) REFERENCES platform_user(id);
 ALTER TABLE script                ADD CONSTRAINT fk_script_updated_by               FOREIGN KEY (updated_by) REFERENCES platform_user(id);
 ALTER TABLE flow                  ADD CONSTRAINT fk_flow_created_by                 FOREIGN KEY (created_by) REFERENCES platform_user(id);

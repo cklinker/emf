@@ -70,26 +70,27 @@ function FlowCanvasInner({
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
 
-  // Track whether this is the initial render to avoid marking dirty on mount.
-  // Separate refs are needed because React fires effects in order — a shared
-  // ref would be consumed by the first effect, causing the second to fire.
-  const initialNodesRender = useRef(true)
-  const initialEdgesRender = useRef(true)
+  // Track whether React Flow has fully initialized (including fitView layout).
+  // We suppress dirty-state propagation until init is complete so that the
+  // automatic fitView position adjustments don't falsely mark the flow dirty.
+  const readyRef = useRef(false)
+
+  const handleInit = useCallback(() => {
+    // fitView runs as part of init. Use rAF to let the post-init state settle
+    // before we start tracking user changes.
+    requestAnimationFrame(() => {
+      readyRef.current = true
+    })
+  }, [])
 
   // Sync node state to parent on every change (position moves, deletions, etc.)
   useEffect(() => {
-    if (initialNodesRender.current) {
-      initialNodesRender.current = false
-      return
-    }
+    if (!readyRef.current) return
     onNodesChangeProp?.(nodes)
   }, [nodes, onNodesChangeProp])
 
   useEffect(() => {
-    if (initialEdgesRender.current) {
-      initialEdgesRender.current = false
-      return
-    }
+    if (!readyRef.current) return
     onEdgesChangeProp?.(edges)
   }, [edges, onEdgesChangeProp])
 
@@ -161,6 +162,7 @@ function FlowCanvasInner({
         onConnect={onConnect}
         onDragOver={onDragOver}
         onDrop={onDrop}
+        onInit={handleInit}
         onSelectionChange={onSelectionChange}
         nodeTypes={NODE_TYPES}
         defaultEdgeOptions={defaultEdgeOptions}

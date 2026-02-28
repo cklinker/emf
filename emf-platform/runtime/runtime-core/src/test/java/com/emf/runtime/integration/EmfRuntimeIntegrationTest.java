@@ -49,7 +49,7 @@ class EmfRuntimeIntegrationTest {
         // Initialize components
         registry = new ConcurrentCollectionRegistry();
         SchemaMigrationEngine migrationEngine = new SchemaMigrationEngine(jdbcTemplate);
-        storageAdapter = new PhysicalTableStorageAdapter(jdbcTemplate, migrationEngine);
+        storageAdapter = new PhysicalTableStorageAdapter(jdbcTemplate, migrationEngine, false);
         validationEngine = new DefaultValidationEngine(storageAdapter, registry);
         queryEngine = new DefaultQueryEngine(storageAdapter, validationEngine);
     }

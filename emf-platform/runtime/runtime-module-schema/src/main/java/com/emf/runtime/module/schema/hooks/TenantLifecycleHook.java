@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Consumer;
 
 /**
  * Lifecycle hook for the "tenants" system collection.
@@ -14,7 +15,7 @@ import java.util.Map;
  * <p>Enforces business rules for tenant CRUD operations:
  * <ul>
  *   <li>Before create: Validate slug format, normalize to lowercase, set default status</li>
- *   <li>After create: Log tenant creation</li>
+ *   <li>After create: Create PostgreSQL schema for tenant isolation, log creation</li>
  * </ul>
  *
  * @since 1.0.0
@@ -22,6 +23,18 @@ import java.util.Map;
 public class TenantLifecycleHook implements BeforeSaveHook {
 
     private static final Logger log = LoggerFactory.getLogger(TenantLifecycleHook.class);
+
+    private Consumer<String> schemaCreationCallback;
+
+    /**
+     * Sets a callback that is invoked after a tenant is created to create the
+     * PostgreSQL schema for tenant-level database isolation.
+     *
+     * @param callback a consumer that receives the tenant slug and creates the schema
+     */
+    public void setSchemaCreationCallback(Consumer<String> callback) {
+        this.schemaCreationCallback = callback;
+    }
 
     @Override
     public String getCollectionName() {
@@ -65,6 +78,18 @@ public class TenantLifecycleHook implements BeforeSaveHook {
 
     @Override
     public void afterCreate(Map<String, Object> record, String tenantId) {
-        log.info("Schema lifecycle: tenant '{}' created", record.get("slug"));
+        String slug = (String) record.get("slug");
+        log.info("Schema lifecycle: tenant '{}' created", slug);
+
+        // Create PostgreSQL schema for tenant isolation
+        if (schemaCreationCallback != null && slug != null) {
+            try {
+                schemaCreationCallback.accept(slug);
+                log.info("Created PostgreSQL schema '{}' for new tenant", slug);
+            } catch (Exception e) {
+                log.error("Failed to create PostgreSQL schema '{}' for tenant: {}",
+                        slug, e.getMessage(), e);
+            }
+        }
     }
 }

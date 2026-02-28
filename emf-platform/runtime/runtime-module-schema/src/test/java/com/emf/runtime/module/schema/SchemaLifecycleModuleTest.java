@@ -1,10 +1,15 @@
 package com.emf.runtime.module.schema;
 
+import com.emf.runtime.module.schema.hooks.TenantLifecycleHook;
 import com.emf.runtime.workflow.BeforeSaveHook;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -48,5 +53,43 @@ class SchemaLifecycleModuleTest {
     @DisplayName("Should have no action handlers")
     void shouldHaveNoActionHandlers() {
         assertTrue(module.getActionHandlers().isEmpty());
+    }
+
+    @Nested
+    @DisplayName("tenant schema callback")
+    class TenantSchemaCallback {
+
+        @Test
+        @DisplayName("Should wire callback to TenantLifecycleHook when provided")
+        void shouldWireCallbackToTenantHook() {
+            List<String> captured = new ArrayList<>();
+            SchemaLifecycleModule moduleWithCallback = new SchemaLifecycleModule(captured::add);
+
+            // Find the tenant hook and trigger afterCreate
+            BeforeSaveHook tenantHook = moduleWithCallback.getBeforeSaveHooks().stream()
+                    .filter(h -> "tenants".equals(h.getCollectionName()))
+                    .findFirst()
+                    .orElseThrow();
+
+            tenantHook.afterCreate(new HashMap<>(Map.of("slug", "test-tenant")), "t1");
+
+            assertEquals(1, captured.size());
+            assertEquals("test-tenant", captured.get(0));
+        }
+
+        @Test
+        @DisplayName("Should not wire callback when null")
+        void shouldNotWireCallbackWhenNull() {
+            SchemaLifecycleModule moduleNoCallback = new SchemaLifecycleModule(null);
+
+            BeforeSaveHook tenantHook = moduleNoCallback.getBeforeSaveHooks().stream()
+                    .filter(h -> "tenants".equals(h.getCollectionName()))
+                    .findFirst()
+                    .orElseThrow();
+
+            // Should not throw — no callback set
+            assertDoesNotThrow(() ->
+                    tenantHook.afterCreate(new HashMap<>(Map.of("slug", "test")), "t1"));
+        }
     }
 }

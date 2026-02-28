@@ -1,5 +1,6 @@
 package com.emf.runtime.storage;
 
+import com.emf.runtime.context.TenantContext;
 import com.emf.runtime.model.CollectionDefinition;
 import com.emf.runtime.model.FieldDefinition;
 import com.emf.runtime.model.FieldType;
@@ -13,6 +14,7 @@ import com.emf.runtime.validation.TypeCoercionService;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DuplicateKeyException;
@@ -32,10 +34,15 @@ import java.util.stream.Collectors;
 
 /**
  * Storage adapter implementation for Mode A (Physical Tables).
- * 
+ *
  * <p>Each collection maps to a real PostgreSQL table with columns matching field definitions.
  * This is the default storage mode when no mode is specified.
- * 
+ *
+ * <p>When schema-per-tenant isolation is enabled, tenant collections are stored in
+ * separate PostgreSQL schemas named by the tenant's slug. System collections remain
+ * in the public schema. Schema-qualified table names are used to ensure queries
+ * target the correct schema explicitly.
+ *
  * <h2>SQL Type Mapping</h2>
  * <ul>
  *   <li>STRING → TEXT</li>
@@ -47,11 +54,11 @@ import java.util.stream.Collectors;
  *   <li>DATETIME → TIMESTAMP</li>
  *   <li>JSON → JSONB</li>
  * </ul>
- * 
+ *
  * <h2>Filter Operators</h2>
  * Supports all filter operators including eq, neq, gt, lt, gte, lte, isnull,
  * contains, starts, ends, icontains, istarts, iends, and ieq.
- * 
+ *
  * @see StorageAdapter
  * @see SchemaMigrationEngine
  * @see com.emf.runtime.model.StorageMode#PHYSICAL_TABLES
@@ -60,7 +67,7 @@ import java.util.stream.Collectors;
 @Service
 @ConditionalOnProperty(name = "emf.storage.mode", havingValue = "PHYSICAL_TABLES", matchIfMissing = true)
 public class PhysicalTableStorageAdapter implements StorageAdapter {
-    
+
     private static final Logger log = LoggerFactory.getLogger(PhysicalTableStorageAdapter.class);
 
     /** Column names handled as system fields in create/update — skipped in the user-defined field loop. */
@@ -70,37 +77,49 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
 
     private final JdbcTemplate jdbcTemplate;
     private final SchemaMigrationEngine migrationEngine;
-    
+    private final boolean schemaPerTenantEnabled;
+
     /**
      * Creates a new PhysicalTableStorageAdapter.
-     * 
+     *
      * @param jdbcTemplate the JdbcTemplate for database operations
      * @param migrationEngine the schema migration engine for handling schema changes
+     * @param schemaPerTenantEnabled whether to use separate schemas per tenant
      */
-    public PhysicalTableStorageAdapter(JdbcTemplate jdbcTemplate, SchemaMigrationEngine migrationEngine) {
+    public PhysicalTableStorageAdapter(
+            JdbcTemplate jdbcTemplate,
+            SchemaMigrationEngine migrationEngine,
+            @Value("${emf.tenant-isolation.schema-per-tenant:false}") boolean schemaPerTenantEnabled) {
         this.jdbcTemplate = jdbcTemplate;
         this.migrationEngine = migrationEngine;
+        this.schemaPerTenantEnabled = schemaPerTenantEnabled;
     }
-    
+
     @Override
     public void initializeCollection(CollectionDefinition definition) {
         // System collections use Flyway-managed tables — skip table creation
         if (definition.systemCollection()) {
             log.info("Skipping table creation for system collection '{}' (table '{}' managed by Flyway)",
-                    definition.name(), getTableName(definition));
+                    definition.name(), getBaseTableName(definition));
             return;
         }
 
-        String tableName = getTableName(definition);
+        TableRef tableRef = getTableRef(definition);
+        String qualifiedName = tableRef.toSql();
+
+        // Ensure the tenant schema exists before creating the table
+        if (!tableRef.isPublicSchema()) {
+            jdbcTemplate.execute("CREATE SCHEMA IF NOT EXISTS \"" + tableRef.schema() + "\"");
+        }
 
         StringBuilder sql = new StringBuilder("CREATE TABLE IF NOT EXISTS ");
-        sql.append(sanitizeIdentifier(tableName)).append(" (");
+        sql.append(qualifiedName).append(" (");
         sql.append("id VARCHAR(36) PRIMARY KEY, ");
         sql.append("created_by VARCHAR(36), ");
         sql.append("updated_by VARCHAR(36), ");
         sql.append("created_at TIMESTAMP NOT NULL, ");
         sql.append("updated_at TIMESTAMP NOT NULL");
-        
+
         List<String> postCreateStatements = new ArrayList<>();
 
         for (FieldDefinition field : definition.fields()) {
@@ -133,31 +152,35 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
 
             // Unique index for EXTERNAL_ID
             if (field.type() == FieldType.EXTERNAL_ID) {
-                String tbl = getTableName(definition);
+                String idxName = "idx_" + sanitizeIdentifier(getBaseTableName(definition))
+                    + "_" + sanitizeIdentifier(field.name());
                 postCreateStatements.add(
-                    "CREATE UNIQUE INDEX IF NOT EXISTS idx_" + sanitizeIdentifier(tbl)
-                    + "_" + sanitizeIdentifier(field.name())
-                    + " ON " + sanitizeIdentifier(tbl) + "(" + sanitizeIdentifier(field.name()) + ")"
+                    "CREATE UNIQUE INDEX IF NOT EXISTS " + idxName
+                    + " ON " + qualifiedName + "(" + sanitizeIdentifier(field.name()) + ")"
                 );
             }
 
             // FK constraints for LOOKUP and MASTER_DETAIL
             if ((field.type() == FieldType.LOOKUP || field.type() == FieldType.MASTER_DETAIL)
                     && field.referenceConfig() != null) {
-                String tbl = getTableName(definition);
-                String targetTable = "tbl_" + sanitizeIdentifier(field.referenceConfig().targetCollection());
+                String baseName = getBaseTableName(definition);
+                String targetTableName = "tbl_" + sanitizeIdentifier(field.referenceConfig().targetCollection());
+                // Target table is in the same schema as the source table
+                TableRef targetRef = tableRef.isPublicSchema()
+                        ? TableRef.publicSchema(targetTableName)
+                        : TableRef.tenantSchema(tableRef.schema(), targetTableName);
                 String targetCol = sanitizeIdentifier(field.referenceConfig().targetField());
-                String fkName = "fk_" + sanitizeIdentifier(tbl) + "_" + sanitizeIdentifier(field.name());
+                String fkName = "fk_" + sanitizeIdentifier(baseName) + "_" + sanitizeIdentifier(field.name());
                 String onDelete = field.type() == FieldType.MASTER_DETAIL
                         ? "ON DELETE CASCADE" : "ON DELETE SET NULL";
 
                 postCreateStatements.add(
                     "DO $$ BEGIN " +
                     "IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = '" + fkName + "') THEN " +
-                    "ALTER TABLE " + sanitizeIdentifier(tbl) +
+                    "ALTER TABLE " + qualifiedName +
                     " ADD CONSTRAINT " + fkName +
                     " FOREIGN KEY (" + sanitizeIdentifier(field.name()) + ")" +
-                    " REFERENCES " + targetTable + "(" + targetCol + ") " + onDelete + "; " +
+                    " REFERENCES " + targetRef.toSql() + "(" + targetCol + ") " + onDelete + "; " +
                     "END IF; END $$"
                 );
             }
@@ -179,30 +202,31 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
             // Reconcile schema: if the table already existed, CREATE TABLE IF NOT EXISTS
             // was a no-op and the table may be missing columns added after its creation.
             // This introspects the actual table columns and adds any missing ones.
-            migrationEngine.reconcileSchema(definition);
+            migrationEngine.reconcileSchema(definition, tableRef);
 
-            log.info("Initialized table '{}' for collection '{}'", tableName, definition.name());
+            log.info("Initialized table '{}' for collection '{}'", qualifiedName, definition.name());
         } catch (DataAccessException e) {
             throw new StorageException("Failed to initialize table for collection: " + definition.name(), e);
         }
     }
-    
+
     @Override
     public void updateCollectionSchema(CollectionDefinition oldDefinition, CollectionDefinition newDefinition) {
         // Delegate schema migration to the migration engine
-        migrationEngine.migrateSchema(oldDefinition, newDefinition);
+        TableRef tableRef = getTableRef(newDefinition);
+        migrationEngine.migrateSchema(oldDefinition, newDefinition, tableRef);
         log.info("Schema update completed for collection '{}'", newDefinition.name());
     }
-    
+
     @Override
     public QueryResult query(CollectionDefinition definition, QueryRequest request) {
-        String tableName = getTableName(definition);
+        TableRef tableRef = getTableRef(definition);
         List<Object> params = new ArrayList<>();
 
         // Build SELECT clause
         StringBuilder sql = new StringBuilder("SELECT ");
         sql.append(buildSelectClause(request.fields(), definition));
-        sql.append(" FROM ").append(sanitizeIdentifier(tableName));
+        sql.append(" FROM ").append(tableRef.toSql());
 
         // Build WHERE clause for filters
         List<FilterCondition> allFilters = new ArrayList<>();
@@ -238,7 +262,7 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
             reconstructCompanionColumns(definition, data);
 
             // Get total count
-            long totalCount = getTotalCount(tableName, allFilters, definition);
+            long totalCount = getTotalCount(tableRef, allFilters, definition);
 
             return QueryResult.of(data, totalCount, pagination);
         } catch (DataAccessException e) {
@@ -248,8 +272,8 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
 
     @Override
     public Optional<Map<String, Object>> getById(CollectionDefinition definition, String id) {
-        String tableName = getTableName(definition);
-        String sql = "SELECT * FROM " + sanitizeIdentifier(tableName) + " WHERE id = ?";
+        TableRef tableRef = getTableRef(definition);
+        String sql = "SELECT * FROM " + tableRef.toSql() + " WHERE id = ?";
 
         try {
             List<Map<String, Object>> results = jdbcTemplate.queryForList(sql, id);
@@ -265,11 +289,11 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
             throw new StorageException("Failed to get record by ID from collection: " + definition.name(), e);
         }
     }
-    
+
     @Override
     public Map<String, Object> create(CollectionDefinition definition, Map<String, Object> data) {
-        String tableName = getTableName(definition);
-        
+        TableRef tableRef = getTableRef(definition);
+
         // Build column names, placeholders, and values.
         // JSONB columns need ?::jsonb placeholders so PostgreSQL accepts the
         // value as JSONB instead of VARCHAR.
@@ -332,10 +356,10 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
 
         String columnList = String.join(", ", columns);
         String placeholderList = String.join(", ", placeholders);
-        
+
         String sql = String.format("INSERT INTO %s (%s) VALUES (%s)",
-            sanitizeIdentifier(tableName), columnList, placeholderList);
-        
+            tableRef.toSql(), columnList, placeholderList);
+
         try {
             jdbcTemplate.update(sql, values.toArray());
             log.debug("Created record with ID '{}' in collection '{}'", data.get("id"), definition.name());
@@ -349,21 +373,21 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
             throw new StorageException("Failed to create record in collection: " + definition.name(), e);
         }
     }
-    
+
     @Override
     public Optional<Map<String, Object>> update(CollectionDefinition definition, String id, Map<String, Object> data) {
-        String tableName = getTableName(definition);
-        
+        TableRef tableRef = getTableRef(definition);
+
         // Check if record exists
         Optional<Map<String, Object>> existing = getById(definition, id);
         if (existing.isEmpty()) {
             return Optional.empty();
         }
-        
+
         // Build SET clause
         List<String> setClauses = new ArrayList<>();
         List<Object> values = new ArrayList<>();
-        
+
         // Always update updated_at
         setClauses.add("updated_at = ?");
         values.add(convertValueForStorage(data.get("updatedAt"), FieldType.DATETIME));
@@ -386,21 +410,21 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
                 values.add(convertValueForStorage(data.get(field.name()), field.type()));
             }
         }
-        
+
         // Add ID for WHERE clause
         values.add(id);
-        
+
         String sql = String.format("UPDATE %s SET %s WHERE id = ?",
-            sanitizeIdentifier(tableName), String.join(", ", setClauses));
-        
+            tableRef.toSql(), String.join(", ", setClauses));
+
         try {
             int rowsAffected = jdbcTemplate.update(sql, values.toArray());
             if (rowsAffected == 0) {
                 return Optional.empty();
             }
-            
+
             log.debug("Updated record with ID '{}' in collection '{}'", id, definition.name());
-            
+
             // Return the updated record
             return getById(definition, id);
         } catch (DuplicateKeyException e) {
@@ -411,10 +435,10 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
             throw new StorageException("Failed to update record in collection: " + definition.name(), e);
         }
     }
-    
+
     @Override
     public boolean delete(CollectionDefinition definition, String id) {
-        String tableName = getTableName(definition);
+        TableRef tableRef = getTableRef(definition);
 
         // Log cascade-affected MASTER_DETAIL child records before delete
         for (FieldDefinition field : definition.fields()) {
@@ -425,7 +449,7 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
             }
         }
 
-        String sql = "DELETE FROM " + sanitizeIdentifier(tableName) + " WHERE id = ?";
+        String sql = "DELETE FROM " + tableRef.toSql() + " WHERE id = ?";
 
         try {
             int rowsAffected = jdbcTemplate.update(sql, id);
@@ -437,24 +461,24 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
             throw new StorageException("Failed to delete record from collection: " + definition.name(), e);
         }
     }
-    
+
     @Override
     public boolean isUnique(CollectionDefinition definition, String fieldName, Object value, String excludeId) {
-        String tableName = getTableName(definition);
+        TableRef tableRef = getTableRef(definition);
         String columnName = resolveColumnName(definition, fieldName);
 
         StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM ");
-        sql.append(sanitizeIdentifier(tableName));
+        sql.append(tableRef.toSql());
         sql.append(" WHERE ").append(sanitizeIdentifier(columnName)).append(" = ?");
-        
+
         List<Object> params = new ArrayList<>();
         params.add(value);
-        
+
         if (excludeId != null) {
             sql.append(" AND id != ?");
             params.add(excludeId);
         }
-        
+
         try {
             Integer count = jdbcTemplate.queryForObject(sql.toString(), Integer.class, params.toArray());
             return count == null || count == 0;
@@ -464,24 +488,55 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
     }
 
     // ==================== Helper Methods ====================
-    
+
     /**
-     * Gets the table name for a collection.
-     * 
+     * Resolves the table reference for a collection, applying schema-per-tenant
+     * isolation when enabled.
+     *
+     * <p>System collections always resolve to the public schema. Tenant collections
+     * resolve to the tenant's schema (named by slug) when schema-per-tenant is enabled,
+     * or to the public schema when disabled.
+     *
      * @param definition the collection definition
-     * @return the table name
+     * @return the resolved table reference
      */
-    private String getTableName(CollectionDefinition definition) {
+    TableRef getTableRef(CollectionDefinition definition) {
+        String tableName = getBaseTableName(definition);
+
+        // System collections always in public schema
+        if (definition.systemCollection()) {
+            return TableRef.publicSchema(tableName);
+        }
+
+        // When schema-per-tenant is enabled, use tenant slug as schema
+        if (schemaPerTenantEnabled) {
+            String tenantSlug = TenantContext.getSlug();
+            if (tenantSlug != null && !tenantSlug.isBlank()) {
+                return TableRef.tenantSchema(tenantSlug, tableName);
+            }
+        }
+
+        // Fallback to public schema
+        return TableRef.publicSchema(tableName);
+    }
+
+    /**
+     * Gets the base table name for a collection (without schema qualification).
+     *
+     * @param definition the collection definition
+     * @return the base table name
+     */
+    private String getBaseTableName(CollectionDefinition definition) {
         if (definition.storageConfig() != null && definition.storageConfig().tableName() != null) {
             return definition.storageConfig().tableName();
         }
         return "tbl_" + definition.name();
     }
-    
+
     /**
      * Sanitizes an identifier (table name or column name) to prevent SQL injection.
      * Only allows alphanumeric characters and underscores.
-     * 
+     *
      * @param identifier the identifier to sanitize
      * @return the sanitized identifier
      */
@@ -495,10 +550,10 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         }
         return identifier;
     }
-    
+
     /**
      * Maps a FieldType to the corresponding PostgreSQL SQL type.
-     * 
+     *
      * @param type the field type
      * @return the SQL type string
      */
@@ -531,10 +586,10 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
             case FORMULA, ROLLUP_SUMMARY -> null;
         };
     }
-    
+
     /**
      * Builds the SELECT clause for a query.
-     * 
+     *
      * @param fields the requested fields (empty means all fields)
      * @param definition the collection definition
      * @return the SELECT clause
@@ -543,7 +598,7 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         if (fields == null || fields.isEmpty()) {
             return "*";
         }
-        
+
         // Always include id, created_at, updated_at, created_by, updated_by
         List<String> selectFields = new ArrayList<>();
         selectFields.add("id");
@@ -551,16 +606,16 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         selectFields.add("updated_at");
         selectFields.add("created_by");
         selectFields.add("updated_by");
-        
+
         for (String field : fields) {
             if (!selectFields.contains(field)) {
                 selectFields.add(sanitizeIdentifier(field));
             }
         }
-        
+
         return String.join(", ", selectFields);
     }
-    
+
     /**
      * Builds the WHERE clause from filter conditions.
      *
@@ -575,7 +630,7 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
             .map(filter -> buildFilterCondition(filter, definition, params))
             .collect(Collectors.joining(" AND "));
     }
-    
+
     /**
      * Builds a single filter condition SQL fragment.
      *
@@ -659,13 +714,13 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
                     if (coll.isEmpty()) {
                         yield "1 = 0"; // always false for empty IN list
                     }
-                    String placeholders = coll.stream()
+                    String ph = coll.stream()
                             .map(v -> {
                                 params.add(v);
                                 return "?";
                             })
                             .collect(Collectors.joining(", "));
-                    yield fieldName + " IN (" + placeholders + ")";
+                    yield fieldName + " IN (" + ph + ")";
                 } else {
                     // Single value fallback
                     params.add(value);
@@ -674,7 +729,7 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
             }
         };
     }
-    
+
     /**
      * Builds the ORDER BY clause from sort fields.
      *
@@ -688,19 +743,19 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
                     + " " + sort.direction().name())
             .collect(Collectors.joining(", "));
     }
-    
+
     /**
      * Gets the total count of records matching the filter conditions.
      *
-     * @param tableName the table name
+     * @param tableRef the table reference
      * @param filters the filter conditions
      * @param definition the collection definition (used for column name mapping)
      * @return the total count
      */
-    private long getTotalCount(String tableName, List<FilterCondition> filters,
+    private long getTotalCount(TableRef tableRef, List<FilterCondition> filters,
                                 CollectionDefinition definition) {
         StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM ");
-        sql.append(sanitizeIdentifier(tableName));
+        sql.append(tableRef.toSql());
 
         List<Object> params = new ArrayList<>();
         if (filters != null && !filters.isEmpty()) {
@@ -711,10 +766,10 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         Long count = jdbcTemplate.queryForObject(sql.toString(), Long.class, params.toArray());
         return count != null ? count : 0L;
     }
-    
+
     /**
      * Converts a value for storage based on the field type.
-     * 
+     *
      * @param value the value to convert
      * @param type the field type
      * @return the converted value
@@ -793,7 +848,7 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
             default -> value;
         };
     }
-    
+
     /**
      * Gets the effective column name for a field within a collection.
      * For system collections, fields may have a different physical column name
@@ -887,14 +942,14 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
             Map<String, Object> remapped = new HashMap<>();
             for (Map.Entry<String, Object> entry : record.entrySet()) {
                 String columnName = entry.getKey();
-                String fieldName = reverseMap.getOrDefault(columnName, columnName);
+                String fName = reverseMap.getOrDefault(columnName, columnName);
                 Object value = entry.getValue();
                 // Convert java.sql.Timestamp to java.time.Instant so downstream
                 // validation (isValidDateTime) and serialization work correctly.
                 if (value instanceof java.sql.Timestamp ts) {
                     value = ts.toInstant();
                 }
-                remapped.put(fieldName, value);
+                remapped.put(fName, value);
             }
             record.clear();
             record.putAll(remapped);
@@ -966,7 +1021,7 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
      * @param e the exception
      * @return the field name that likely caused the violation, or "unknown"
      */
-    private String detectUniqueViolationField(CollectionDefinition definition, Map<String, Object> data, 
+    private String detectUniqueViolationField(CollectionDefinition definition, Map<String, Object> data,
             DuplicateKeyException e) {
         // Check each unique field to see which one has a duplicate
         for (FieldDefinition field : definition.fields()) {
@@ -976,12 +1031,12 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
                 }
             }
         }
-        
+
         // Check if it's the primary key
         if (data.containsKey("id")) {
             return "id";
         }
-        
+
         return "unknown";
     }
 }

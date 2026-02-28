@@ -283,6 +283,58 @@ export class ApiClient {
   }
 
   // ---------------------------------------------------------------------------
+  // Low-level fetch — provides a window.fetch-like interface backed by Axios.
+  // Callers that need `.ok`, `.status`, `.json()` should use this method.
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Fetch-like wrapper around Axios.
+   * Returns a response object with `ok`, `status`, `statusText`, `json()`, and `text()`.
+   */
+  async fetch(
+    url: string,
+    init?: { method?: string; headers?: Record<string, string>; body?: string }
+  ): Promise<{ ok: boolean; status: number; statusText: string; json: () => Promise<unknown>; text: () => Promise<string> }> {
+    try {
+      const method = (init?.method ?? 'GET').toLowerCase()
+      const data = init?.body ? JSON.parse(init.body) : undefined
+      const headers = init?.headers
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const response = await (this.axios as any).request({
+        url,
+        method,
+        data,
+        headers,
+        // Don't throw on non-2xx — we want to handle status codes in the caller
+        validateStatus: () => true,
+      })
+
+      const status: number = response.status
+      const statusText: string = response.statusText || ''
+      const responseData = response.data
+
+      return {
+        ok: status >= 200 && status < 300,
+        status,
+        statusText,
+        json: async () => responseData,
+        text: async () => (typeof responseData === 'string' ? responseData : JSON.stringify(responseData)),
+      }
+    } catch (error) {
+      // Network errors or request setup errors — return a failed response
+      const message = error instanceof Error ? error.message : 'Network error'
+      return {
+        ok: false,
+        status: 0,
+        statusText: message,
+        json: async () => ({}),
+        text: async () => message,
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // Base methods — raw response.data, no JSON:API handling
   // ---------------------------------------------------------------------------
 

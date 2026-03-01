@@ -197,7 +197,7 @@ export interface PicklistValue {
   value: string
   label: string
   isDefault: boolean
-  active: boolean
+  isActive: boolean
   sortOrder: number
   color?: string
   description?: string

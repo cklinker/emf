@@ -20,7 +20,7 @@ interface LocalValue {
   label: string
   color: string
   isDefault: boolean
-  active: boolean
+  isActive: boolean
   description: string
 }
 
@@ -41,7 +41,7 @@ function toLocalValues(values: PicklistValue[]): LocalValue[] {
     label: v.label,
     color: v.color ?? '',
     isDefault: v.isDefault,
-    active: v.active,
+    isActive: v.isActive,
     description: v.description ?? '',
   }))
 }
@@ -67,7 +67,7 @@ export function PicklistValuesEditor({
     queryKey: ['picklist-values', picklistId],
     queryFn: () =>
       apiClient.getList<PicklistValue>(
-        `/api/global-picklist-values?filter[picklistId][eq]=${picklistId}`
+        `/api/picklist-values?filter[picklistSourceId][eq]=${picklistId}&filter[picklistSourceType][eq]=GLOBAL`
       ),
   })
 
@@ -81,7 +81,7 @@ export function PicklistValuesEditor({
   const saveMutation = useMutation({
     mutationFn: (values: PicklistValue[]) =>
       apiClient.putResource<PicklistValue[]>(
-        `/api/global-picklist-values?filter[picklistId][eq]=${picklistId}`,
+        `/api/picklist-values?filter[picklistSourceId][eq]=${picklistId}&filter[picklistSourceType][eq]=GLOBAL`,
         values
       ),
     onSuccess: () => {
@@ -129,7 +129,7 @@ export function PicklistValuesEditor({
         label: '',
         color: '',
         isDefault: false,
-        active: true,
+        isActive: true,
         description: '',
       },
     ])
@@ -195,7 +195,7 @@ export function PicklistValuesEditor({
       value: v.value.trim(),
       label: v.label.trim(),
       isDefault: v.isDefault,
-      active: v.active,
+      isActive: v.isActive,
       sortOrder: index,
       color: v.color.trim() || undefined,
       description: v.description.trim() || undefined,
@@ -386,8 +386,8 @@ export function PicklistValuesEditor({
                       id={`active-${v.key}`}
                       type="checkbox"
                       className="w-3.5 h-3.5 accent-primary"
-                      checked={v.active}
-                      onChange={(e) => handleChange(v.key, 'active', e.target.checked)}
+                      checked={v.isActive}
+                      onChange={(e) => handleChange(v.key, 'isActive', e.target.checked)}
                       disabled={isSaving}
                       data-testid={`active-checkbox-${index}`}
                     />

@@ -37,14 +37,18 @@ import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Separator } from '@/components/ui/separator'
 import { LookupSelect } from '@/components/LookupSelect'
+import { useAuth } from '@/context/AuthContext'
 import { useApi } from '@/context/ApiContext'
+import { LayoutFormSections } from '@/components/LayoutFormSections'
 import { useCollectionSchema } from '@/hooks/useCollectionSchema'
 import { useRecord } from '@/hooks/useRecord'
 import { useRecordMutation } from '@/hooks/useRecordMutation'
 import { useCollectionPermissions } from '@/hooks/useCollectionPermissions'
 import { useLookupDisplayMap } from '@/hooks/useLookupDisplayMap'
+import { usePageLayout } from '@/hooks/usePageLayout'
 import { InsufficientPrivileges } from '@/components/InsufficientPrivileges'
 import type { FieldDefinition, FieldType } from '@/hooks/useCollectionSchema'
+import type { PageLayoutDto } from '@/hooks/usePageLayout'
 import type { LookupOption } from '@/components/LookupSelect'
 
 /** Picklist value returned from the API */
@@ -302,6 +306,8 @@ interface ObjectFormBodyProps {
   basePath: string
   /** Check if a field is editable (VISIBLE vs READ_ONLY from field permissions) */
   isFieldEditable?: (fieldName: string) => boolean
+  /** Resolved page layout (null when none configured — falls back to flat grid) */
+  layout?: PageLayoutDto | null
 }
 
 /**
@@ -318,6 +324,7 @@ function ObjectFormBody({
   recordId,
   basePath,
   isFieldEditable,
+  layout,
 }: ObjectFormBodyProps): React.ReactElement {
   const navigate = useNavigate()
   const [formData, setFormData] = useState<Record<string, unknown>>(initialData)
@@ -428,32 +435,53 @@ function ObjectFormBody({
 
       <Separator />
 
-      {/* Form Fields */}
-      <Card>
-        <CardHeader className="py-3">
-          <CardTitle className="text-sm font-medium">{collectionLabel} Information</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {displayFields.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No editable fields in this collection.</p>
-          ) : (
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-              {displayFields.map((field) => {
-                const fieldIsEditable = !isFieldEditable || isFieldEditable(field.name)
-                return (
-                  <FormField
-                    key={field.name}
-                    field={field}
-                    value={formData[field.name]}
-                    onChange={fieldIsEditable ? handleFieldChange : () => {}}
-                    readOnly={!fieldIsEditable}
-                  />
-                )
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* Form Fields — use page layout sections when available, otherwise flat grid */}
+      {layout && layout.sections.length > 0 ? (
+        <LayoutFormSections
+          sections={layout.sections}
+          schemaFields={displayFields}
+          renderField={(field) => {
+            const fieldIsEditable = !isFieldEditable || isFieldEditable(field.name)
+            return (
+              <FormField
+                key={field.name}
+                field={field as FieldDefinition}
+                value={formData[field.name]}
+                onChange={fieldIsEditable ? handleFieldChange : () => {}}
+                readOnly={!fieldIsEditable}
+              />
+            )
+          }}
+        />
+      ) : (
+        <Card>
+          <CardHeader className="py-3">
+            <CardTitle className="text-sm font-medium">{collectionLabel} Information</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {displayFields.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No editable fields in this collection.
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                {displayFields.map((field) => {
+                  const fieldIsEditable = !isFieldEditable || isFieldEditable(field.name)
+                  return (
+                    <FormField
+                      key={field.name}
+                      field={field}
+                      value={formData[field.name]}
+                      onChange={fieldIsEditable ? handleFieldChange : () => {}}
+                      readOnly={!fieldIsEditable}
+                    />
+                  )
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }
@@ -495,6 +523,10 @@ export function ObjectFormPage(): React.ReactElement {
     isFieldEditable,
     isLoading: permissionsLoading,
   } = useCollectionPermissions(collectionName)
+
+  // Resolve page layout for this collection (returns null if none configured)
+  const { user } = useAuth()
+  const { layout, isLoading: layoutLoading } = usePageLayout(schema?.id, user?.id)
 
   // Filter fields by field-level permissions (hidden fields excluded, read-only shown as disabled)
   const permissionFilteredFields = useMemo(() => {
@@ -579,7 +611,8 @@ export function ObjectFormPage(): React.ReactElement {
     })
   }, [permissionFilteredFields, picklistValuesMap, picklistFields, lookupOptionsMap, lookupFields])
 
-  const isLoading = schemaLoading || (!isNew && recordLoading) || permissionsLoading
+  const isLoading =
+    schemaLoading || (!isNew && recordLoading) || permissionsLoading || layoutLoading
 
   // Collection label
   const collectionLabel =
@@ -659,6 +692,7 @@ export function ObjectFormPage(): React.ReactElement {
       recordId={recordId}
       basePath={basePath}
       isFieldEditable={isFieldEditable}
+      layout={layout}
     />
   )
 }

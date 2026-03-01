@@ -76,7 +76,7 @@ export function RecordTypePicklistEditor({
         picklistFields.map(async (field) => {
           try {
             const values = await apiClient.getList<PicklistValue>(
-              `/api/picklist-values?filter[fieldId][eq]=${field.id}&filter[source][eq]=FIELD`
+              `/api/picklist-values?filter[picklistSourceId][eq]=${field.id}&filter[picklistSourceType][eq]=FIELD`
             )
             results[field.id] = values
           } catch {

@@ -547,7 +547,7 @@ export class AdminClient {
 
     getFieldValues: async (fieldId: string): Promise<PicklistValue[]> => {
       const response = await this.axios.get(
-        `/api/picklist-values?filter[fieldId][eq]=${encodeURIComponent(fieldId)}&filter[source][eq]=FIELD`
+        `/api/picklist-values?filter[picklistSourceId][eq]=${encodeURIComponent(fieldId)}&filter[picklistSourceType][eq]=FIELD`
       );
       return unwrapJsonApiList<PicklistValue>(response.data);
     },
@@ -558,7 +558,7 @@ export class AdminClient {
     ): Promise<PicklistValue[]> => {
       // Delete existing field values, then create new ones
       const existingResponse = await this.axios.get(
-        `/api/picklist-values?filter[fieldId][eq]=${encodeURIComponent(fieldId)}&filter[source][eq]=FIELD`
+        `/api/picklist-values?filter[picklistSourceId][eq]=${encodeURIComponent(fieldId)}&filter[picklistSourceType][eq]=FIELD`
       );
       const existing = unwrapJsonApiList<PicklistValue>(existingResponse.data);
       await Promise.all(existing.map((v) => this.axios.delete(`/api/picklist-values/${v.id}`)));
@@ -566,8 +566,8 @@ export class AdminClient {
         values.map((v) => {
           const body = toJsonApiBody('picklist-values', {
             ...(v as unknown as Record<string, unknown>),
-            fieldId,
-            source: 'FIELD',
+            picklistSourceId: fieldId,
+            picklistSourceType: 'FIELD',
           });
           return this.axios.post('/api/picklist-values', body);
         })

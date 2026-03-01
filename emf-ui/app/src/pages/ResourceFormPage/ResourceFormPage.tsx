@@ -385,7 +385,7 @@ export function ResourceFormPage({
           try {
             // Try field-level endpoint which resolves global picklist automatically
             const values = await apiClient.getList<PicklistValueDto>(
-              `/api/picklist-values?filter[fieldId][eq]=${field.id}`
+              `/api/picklist-values?filter[picklistSourceId][eq]=${field.id}&filter[picklistSourceType][eq]=FIELD`
             )
             map[field.id] = values
               .filter((v) => v.active)

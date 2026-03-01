@@ -40,7 +40,7 @@ export function PicklistDependencyEditor({
     queryKey: ['field-picklist-values', controllingFieldId],
     queryFn: () =>
       apiClient.getList<PicklistValue>(
-        `/api/picklist-values?filter[fieldId][eq]=${controllingFieldId}&filter[source][eq]=FIELD`
+        `/api/picklist-values?filter[picklistSourceId][eq]=${controllingFieldId}&filter[picklistSourceType][eq]=FIELD`
       ),
     enabled: !!controllingFieldId,
   })
@@ -49,7 +49,7 @@ export function PicklistDependencyEditor({
     queryKey: ['field-picklist-values', dependentFieldId],
     queryFn: () =>
       apiClient.getList<PicklistValue>(
-        `/api/picklist-values?filter[fieldId][eq]=${dependentFieldId}&filter[source][eq]=FIELD`
+        `/api/picklist-values?filter[picklistSourceId][eq]=${dependentFieldId}&filter[picklistSourceType][eq]=FIELD`
       ),
     enabled: !!dependentFieldId,
   })

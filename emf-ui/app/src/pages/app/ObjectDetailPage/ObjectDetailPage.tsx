@@ -62,6 +62,7 @@ import { QuickActionsMenu } from '@/components/QuickActions'
 import { useAnnounce } from '@/components/LiveRegion'
 import { useAppContext } from '@/context/AppContext'
 import { useAuth } from '@/context/AuthContext'
+import { useApi } from '@/context/ApiContext'
 import { usePageLayout } from '@/hooks/usePageLayout'
 import { useRecordContext } from '@/hooks/useRecordContext'
 import type { FieldDefinition } from '@/hooks/useCollectionSchema'
@@ -135,6 +136,7 @@ export function ObjectDetailPage(): React.ReactElement {
   const navigate = useNavigate()
   const { addRecentItem } = useAppContext()
   const { user } = useAuth()
+  const { apiClient } = useApi()
   const collectionStore = useCollectionStore()
   const basePath = `/${tenantSlug}/app`
 

@@ -1,12 +1,12 @@
 package com.emf.worker.config;
 
 import com.emf.runtime.context.TenantContext;
-import com.zaxxer.hikari.HikariDataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.BeansException;
+import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Primary;
 
 import javax.sql.DataSource;
 import java.io.PrintWriter;
@@ -28,6 +28,10 @@ import java.sql.Statement;
  * <p>When no tenant context is set (e.g., during Flyway migrations or internal operations),
  * the variable is set to an empty string, which matches the {@code admin_bypass} RLS policy.
  *
+ * <p>Uses a {@link BeanPostProcessor} to wrap the auto-configured DataSource, avoiding
+ * circular dependency issues that arise from declaring a {@code @Primary @Bean} DataSource
+ * that injects another DataSource.
+ *
  * @since 1.0.0
  */
 @Configuration
@@ -36,10 +40,18 @@ public class TenantAwareDataSourceConfig {
     private static final Logger log = LoggerFactory.getLogger(TenantAwareDataSourceConfig.class);
 
     @Bean
-    @Primary
-    public DataSource tenantAwareDataSource(HikariDataSource hikariDataSource) {
-        log.info("Wrapping DataSource with tenant-aware RLS support");
-        return new TenantAwareDataSource(hikariDataSource);
+    public static BeanPostProcessor tenantAwareDataSourcePostProcessor() {
+        return new BeanPostProcessor() {
+            @Override
+            public Object postProcessAfterInitialization(Object bean, String beanName)
+                    throws BeansException {
+                if ("dataSource".equals(beanName) && bean instanceof DataSource ds) {
+                    log.info("Wrapping DataSource with tenant-aware RLS support");
+                    return new TenantAwareDataSource(ds);
+                }
+                return bean;
+            }
+        };
     }
 
     /**

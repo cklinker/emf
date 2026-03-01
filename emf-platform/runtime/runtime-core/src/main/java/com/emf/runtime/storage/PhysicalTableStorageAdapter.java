@@ -76,18 +76,22 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
 
     private final JdbcTemplate jdbcTemplate;
     private final SchemaMigrationEngine migrationEngine;
+    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
     /**
      * Creates a new PhysicalTableStorageAdapter.
      *
      * @param jdbcTemplate the JdbcTemplate for database operations
      * @param migrationEngine the schema migration engine for handling schema changes
+     * @param objectMapper Jackson ObjectMapper for JSONB value deserialization
      */
     public PhysicalTableStorageAdapter(
             JdbcTemplate jdbcTemplate,
-            SchemaMigrationEngine migrationEngine) {
+            SchemaMigrationEngine migrationEngine,
+            com.fasterxml.jackson.databind.ObjectMapper objectMapper) {
         this.jdbcTemplate = jdbcTemplate;
         this.migrationEngine = migrationEngine;
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -979,6 +983,19 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
                 // validation (isValidDateTime) and serialization work correctly.
                 if (value instanceof java.sql.Timestamp ts) {
                     value = ts.toInstant();
+                }
+                // Unwrap PostgreSQL PGobject (JSONB columns) so Jackson serializes
+                // the actual JSON value instead of {type:"jsonb", value:"...", null:false}.
+                if (value != null && "org.postgresql.util.PGobject".equals(value.getClass().getName())) {
+                    String jsonStr = value.toString();
+                    if (jsonStr != null && !jsonStr.isEmpty()) {
+                        try {
+                            value = objectMapper.readValue(jsonStr, Object.class);
+                        } catch (Exception e) {
+                            // Fall back to raw string if not valid JSON
+                            value = jsonStr;
+                        }
+                    }
                 }
                 remapped.put(fName, value);
             }

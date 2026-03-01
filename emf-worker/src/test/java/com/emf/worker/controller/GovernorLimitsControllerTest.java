@@ -23,7 +23,7 @@ import static org.mockito.Mockito.*;
  * Tests for {@link GovernorLimitsController}.
  *
  * <p>Verifies the governor-limits endpoint that returns tenant limits
- * and current usage metrics (users, collections, API calls).
+ * and current usage metrics (users, collections, API calls) in JSON:API format.
  */
 class GovernorLimitsControllerTest {
 
@@ -46,11 +46,40 @@ class GovernorLimitsControllerTest {
         controller = new GovernorLimitsController(repository, objectMapper, redisTemplate);
     }
 
+    /** Extracts the attributes map from a JSON:API single-resource response body. */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> getAttributes(Map<String, Object> body) {
+        Map<String, Object> data = (Map<String, Object>) body.get("data");
+        return (Map<String, Object>) data.get("attributes");
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> getData(Map<String, Object> body) {
+        return (Map<String, Object>) body.get("data");
+    }
+
     // ==================== GET Tests ====================
 
     @Nested
     @DisplayName("GET /api/governor-limits")
     class GetStatusTests {
+
+        @Test
+        @DisplayName("Should return JSON:API envelope with type and id")
+        void returnsJsonApiEnvelope() {
+            when(repository.findTenantLimits("tenant-1")).thenReturn(Optional.of("{}"));
+            when(repository.countActiveUsers("tenant-1")).thenReturn(0);
+            when(repository.countActiveCollections("tenant-1")).thenReturn(0);
+
+            ResponseEntity<Map<String, Object>> response = controller.getStatus("tenant-1");
+
+            Map<String, Object> body = response.getBody();
+            assertThat(body).containsKey("data");
+            Map<String, Object> data = getData(body);
+            assertThat(data.get("type")).isEqualTo("governor-limits");
+            assertThat(data.get("id")).isEqualTo("tenant-1");
+            assertThat(data).containsKey("attributes");
+        }
 
         @Test
         @DisplayName("Should return default limits when tenant has empty limits")
@@ -62,11 +91,10 @@ class GovernorLimitsControllerTest {
             ResponseEntity<Map<String, Object>> response = controller.getStatus("tenant-1");
 
             assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
-            Map<String, Object> body = response.getBody();
-            assertThat(body).isNotNull();
+            Map<String, Object> attrs = getAttributes(response.getBody());
 
             @SuppressWarnings("unchecked")
-            Map<String, Object> limits = (Map<String, Object>) body.get("limits");
+            Map<String, Object> limits = (Map<String, Object>) attrs.get("limits");
             assertThat(limits.get("apiCallsPerDay")).isEqualTo(100_000);
             assertThat(limits.get("storageGb")).isEqualTo(10);
             assertThat(limits.get("maxUsers")).isEqualTo(100);
@@ -75,12 +103,12 @@ class GovernorLimitsControllerTest {
             assertThat(limits.get("maxWorkflows")).isEqualTo(50);
             assertThat(limits.get("maxReports")).isEqualTo(200);
 
-            assertThat(body.get("apiCallsUsed")).isEqualTo(0);
-            assertThat(body.get("apiCallsLimit")).isEqualTo(100_000);
-            assertThat(body.get("usersUsed")).isEqualTo(5);
-            assertThat(body.get("usersLimit")).isEqualTo(100);
-            assertThat(body.get("collectionsUsed")).isEqualTo(12);
-            assertThat(body.get("collectionsLimit")).isEqualTo(200);
+            assertThat(attrs.get("apiCallsUsed")).isEqualTo(0);
+            assertThat(attrs.get("apiCallsLimit")).isEqualTo(100_000);
+            assertThat(attrs.get("usersUsed")).isEqualTo(5);
+            assertThat(attrs.get("usersLimit")).isEqualTo(100);
+            assertThat(attrs.get("collectionsUsed")).isEqualTo(12);
+            assertThat(attrs.get("collectionsLimit")).isEqualTo(200);
         }
 
         @Test
@@ -93,20 +121,19 @@ class GovernorLimitsControllerTest {
 
             ResponseEntity<Map<String, Object>> response = controller.getStatus("tenant-1");
 
-            Map<String, Object> body = response.getBody();
-            assertThat(body).isNotNull();
+            Map<String, Object> attrs = getAttributes(response.getBody());
 
             @SuppressWarnings("unchecked")
-            Map<String, Object> limits = (Map<String, Object>) body.get("limits");
+            Map<String, Object> limits = (Map<String, Object>) attrs.get("limits");
             assertThat(limits.get("apiCallsPerDay")).isEqualTo(50_000);
             assertThat(limits.get("storageGb")).isEqualTo(50);
             assertThat(limits.get("maxUsers")).isEqualTo(500);
             assertThat(limits.get("maxCollections")).isEqualTo(100);
 
-            assertThat(body.get("usersUsed")).isEqualTo(25);
-            assertThat(body.get("usersLimit")).isEqualTo(500);
-            assertThat(body.get("collectionsUsed")).isEqualTo(8);
-            assertThat(body.get("collectionsLimit")).isEqualTo(100);
+            assertThat(attrs.get("usersUsed")).isEqualTo(25);
+            assertThat(attrs.get("usersLimit")).isEqualTo(500);
+            assertThat(attrs.get("collectionsUsed")).isEqualTo(8);
+            assertThat(attrs.get("collectionsLimit")).isEqualTo(100);
         }
 
         @Test
@@ -120,7 +147,7 @@ class GovernorLimitsControllerTest {
             ResponseEntity<Map<String, Object>> response = controller.getStatus("tenant-1");
 
             @SuppressWarnings("unchecked")
-            Map<String, Object> limits = (Map<String, Object>) response.getBody().get("limits");
+            Map<String, Object> limits = (Map<String, Object>) getAttributes(response.getBody()).get("limits");
             assertThat(limits.get("apiCallsPerDay")).isEqualTo(75_000);
             assertThat(limits.get("storageGb")).isEqualTo(10);
             assertThat(limits.get("maxUsers")).isEqualTo(100);
@@ -138,7 +165,7 @@ class GovernorLimitsControllerTest {
 
             assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
             @SuppressWarnings("unchecked")
-            Map<String, Object> limits = (Map<String, Object>) response.getBody().get("limits");
+            Map<String, Object> limits = (Map<String, Object>) getAttributes(response.getBody()).get("limits");
             assertThat(limits.get("apiCallsPerDay")).isEqualTo(100_000);
         }
 
@@ -153,7 +180,7 @@ class GovernorLimitsControllerTest {
 
             assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
             @SuppressWarnings("unchecked")
-            Map<String, Object> limits = (Map<String, Object>) response.getBody().get("limits");
+            Map<String, Object> limits = (Map<String, Object>) getAttributes(response.getBody()).get("limits");
             assertThat(limits.get("apiCallsPerDay")).isEqualTo(100_000);
             assertThat(limits.get("maxUsers")).isEqualTo(100);
         }
@@ -172,7 +199,7 @@ class GovernorLimitsControllerTest {
             ResponseEntity<Map<String, Object>> response = controller.getStatus("tenant-1");
 
             @SuppressWarnings("unchecked")
-            Map<String, Object> limits = (Map<String, Object>) response.getBody().get("limits");
+            Map<String, Object> limits = (Map<String, Object>) getAttributes(response.getBody()).get("limits");
             assertThat(limits.get("apiCallsPerDay")).isEqualTo(60_000);
             assertThat(limits.get("maxUsers")).isEqualTo(250);
             assertThat(limits.get("storageGb")).isEqualTo(10);
@@ -187,7 +214,7 @@ class GovernorLimitsControllerTest {
 
             ResponseEntity<Map<String, Object>> response = controller.getStatus("tenant-1");
 
-            assertThat(response.getBody().get("apiCallsUsed")).isEqualTo(0);
+            assertThat(getAttributes(response.getBody()).get("apiCallsUsed")).isEqualTo(0);
         }
 
         @Test
@@ -202,7 +229,7 @@ class GovernorLimitsControllerTest {
 
             ResponseEntity<Map<String, Object>> response = controller.getStatus("tenant-1");
 
-            assertThat(response.getBody().get("apiCallsUsed")).isEqualTo(4523);
+            assertThat(getAttributes(response.getBody()).get("apiCallsUsed")).isEqualTo(4523);
         }
 
         @Test
@@ -216,7 +243,7 @@ class GovernorLimitsControllerTest {
 
             ResponseEntity<Map<String, Object>> response = controller.getStatus("tenant-1");
 
-            assertThat(response.getBody().get("apiCallsUsed")).isEqualTo(0);
+            assertThat(getAttributes(response.getBody()).get("apiCallsUsed")).isEqualTo(0);
         }
     }
 
@@ -250,10 +277,10 @@ class GovernorLimitsControllerTest {
 
             verify(repository).updateTenantLimits(eq("tenant-1"), anyString());
 
-            Map<String, Object> body = response.getBody();
-            assertThat(body).isNotNull();
-            assertThat(body.get("usersUsed")).isEqualTo(50);
-            assertThat(body.get("collectionsUsed")).isEqualTo(30);
+            Map<String, Object> attrs = getAttributes(response.getBody());
+            assertThat(attrs).isNotNull();
+            assertThat(attrs.get("usersUsed")).isEqualTo(50);
+            assertThat(attrs.get("collectionsUsed")).isEqualTo(30);
         }
     }
 }

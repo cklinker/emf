@@ -25,7 +25,7 @@ import java.util.Optional;
  * 
  * <h2>Usage Example</h2>
  * <pre>{@code
- * StorageAdapter adapter = new PhysicalTableStorageAdapter(jdbcTemplate);
+ * StorageAdapter adapter = new PhysicalTableStorageAdapter(jdbcTemplate, migrationEngine, objectMapper);
  * 
  * // Initialize collection storage
  * adapter.initializeCollection(collectionDefinition);

@@ -55,7 +55,7 @@ class AutomaticTableCreationTest {
         // Initialize components
         registry = new ConcurrentCollectionRegistry();
         SchemaMigrationEngine migrationEngine = new SchemaMigrationEngine(jdbcTemplate);
-        storageAdapter = new PhysicalTableStorageAdapter(jdbcTemplate, migrationEngine);
+        storageAdapter = new PhysicalTableStorageAdapter(jdbcTemplate, migrationEngine, new com.fasterxml.jackson.databind.ObjectMapper());
     }
     
     @Nested

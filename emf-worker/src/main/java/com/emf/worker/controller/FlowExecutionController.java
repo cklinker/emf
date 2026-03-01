@@ -1,5 +1,6 @@
 package com.emf.worker.controller;
 
+import com.emf.jsonapi.JsonApiResponseBuilder;
 import com.emf.runtime.flow.*;
 import com.emf.worker.repository.FlowRepository;
 import org.slf4j.Logger;
@@ -14,7 +15,7 @@ import java.util.*;
  * REST endpoints for flow execution management.
  * <p>
  * Provides endpoints to execute flows, cancel executions, view execution
- * details, and retrieve step-level logs.
+ * details, and retrieve step-level logs. Returns JSON:API format.
  *
  * @since 1.0.0
  */
@@ -43,12 +44,6 @@ public class FlowExecutionController {
     /**
      * Executes a flow with optional input payload.
      * Used for AUTOLAUNCHED flows and manual trigger from UI.
-     *
-     * @param flowId   the flow ID to execute
-     * @param body     optional request body containing "input" map
-     * @param tenantId tenant ID from request header
-     * @param userId   user ID from request header
-     * @return execution ID and status
      */
     @PostMapping("/{flowId}/execute")
     @SuppressWarnings("unchecked")
@@ -69,9 +64,8 @@ public class FlowExecutionController {
         Map<String, Object> flow = flowOpt.get();
         String definitionJson = (String) flow.get("definition");
         if (definitionJson == null || definitionJson.isBlank()) {
-            Map<String, Object> error = new LinkedHashMap<>();
-            error.put("error", "Flow has no definition");
-            return ResponseEntity.badRequest().body(error);
+            return ResponseEntity.badRequest().body(
+                    JsonApiResponseBuilder.error("400", "Bad Request", "Flow has no definition"));
         }
 
         // If no tenantId from header, use the flow's tenant
@@ -85,12 +79,10 @@ public class FlowExecutionController {
 
         Map<String, Object> initialState;
 
-        // Support a "state" key for providing a pre-built initial state (useful for testing
-        // record-triggered flows via the API, where the state structure differs from API invocations).
+        // Support a "state" key for providing a pre-built initial state
         if (body != null && body.containsKey("state") && body.get("state") instanceof Map) {
             @SuppressWarnings("unchecked")
             Map<String, Object> customState = new LinkedHashMap<>((Map<String, Object>) body.get("state"));
-            // Ensure context is present
             if (!customState.containsKey("context")) {
                 Map<String, Object> ctx = new LinkedHashMap<>();
                 ctx.put("tenantId", tenantId);
@@ -117,20 +109,17 @@ public class FlowExecutionController {
         String resultExecutionId = flowEngine.startExecution(
                 tenantId, flowId, definitionJson, initialState, userId, isTest);
 
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("executionId", resultExecutionId);
-        response.put("flowId", flowId);
-        response.put("status", "RUNNING");
+        Map<String, Object> attrs = new LinkedHashMap<>();
+        attrs.put("flowId", flowId);
+        attrs.put("status", "RUNNING");
 
         log.info("Started flow execution: flowId={}, executionId={}", flowId, resultExecutionId);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(
+                JsonApiResponseBuilder.single("flow-executions", resultExecutionId, attrs));
     }
 
     /**
      * Cancels a running flow execution.
-     *
-     * @param executionId the execution ID to cancel
-     * @return cancellation status
      */
     @PostMapping("/executions/{executionId}/cancel")
     public ResponseEntity<Map<String, Object>> cancelExecution(
@@ -145,26 +134,23 @@ public class FlowExecutionController {
 
         FlowExecutionData exec = execution.get();
         if (exec.isTerminal()) {
-            Map<String, Object> error = new LinkedHashMap<>();
-            error.put("error", "Execution is already in terminal state: " + exec.status());
-            return ResponseEntity.badRequest().body(error);
+            return ResponseEntity.badRequest().body(
+                    JsonApiResponseBuilder.error("400", "Bad Request",
+                            "Execution is already in terminal state: " + exec.status()));
         }
 
         flowEngine.cancelExecution(executionId);
 
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("executionId", executionId);
-        response.put("status", "CANCELLED");
+        Map<String, Object> attrs = new LinkedHashMap<>();
+        attrs.put("status", "CANCELLED");
 
         log.info("Cancelled flow execution: executionId={}", executionId);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(
+                JsonApiResponseBuilder.single("flow-executions", executionId, attrs));
     }
 
     /**
      * Gets execution details including state data.
-     *
-     * @param executionId the execution ID
-     * @return execution details
      */
     @GetMapping("/executions/{executionId}")
     public ResponseEntity<Map<String, Object>> getExecution(
@@ -177,14 +163,13 @@ public class FlowExecutionController {
             return ResponseEntity.notFound().build();
         }
 
-        return ResponseEntity.ok(executionToMap(execution.get()));
+        Map<String, Object> execMap = executionToMap(execution.get());
+        String id = (String) execMap.remove("id");
+        return ResponseEntity.ok(JsonApiResponseBuilder.single("flow-executions", id, execMap));
     }
 
     /**
      * Gets step-level execution logs for an execution.
-     *
-     * @param executionId the execution ID
-     * @return list of step logs
      */
     @GetMapping("/executions/{executionId}/steps")
     public ResponseEntity<Map<String, Object>> getExecutionSteps(
@@ -218,26 +203,12 @@ public class FlowExecutionController {
             stepList.add(stepMap);
         }
 
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("executionId", executionId);
-        response.put("steps", stepList);
-        response.put("totalSteps", stepList.size());
-
-        return ResponseEntity.ok(response);
+        Map<String, Object> meta = Map.of("executionId", executionId, "totalSteps", stepList.size());
+        return ResponseEntity.ok(JsonApiResponseBuilder.collection("flow-steps", stepList, meta));
     }
 
     /**
      * Retries a failed or cancelled execution.
-     * <p>
-     * Supports two modes:
-     * <ul>
-     *   <li>{@code mode=full} — re-executes the flow from the beginning with the same initial input</li>
-     *   <li>{@code mode=from-failure} — re-executes starting from the failed step's input state</li>
-     * </ul>
-     *
-     * @param executionId the execution ID to retry
-     * @param mode        retry mode: "full" (default) or "from-failure"
-     * @return new execution ID and status
      */
     @PostMapping("/executions/{executionId}/retry")
     public ResponseEntity<Map<String, Object>> retryExecution(
@@ -253,29 +224,26 @@ public class FlowExecutionController {
 
         FlowExecutionData exec = execution.get();
         if (!exec.isTerminal()) {
-            Map<String, Object> error = new LinkedHashMap<>();
-            error.put("error", "Can only retry terminal executions. Current status: " + exec.status());
-            return ResponseEntity.badRequest().body(error);
+            return ResponseEntity.badRequest().body(
+                    JsonApiResponseBuilder.error("400", "Bad Request",
+                            "Can only retry terminal executions. Current status: " + exec.status()));
         }
 
         // Load the flow definition
         Optional<Map<String, Object>> flowOpt = flowRepository.findFlowById(exec.flowId());
         if (flowOpt.isEmpty()) {
-            Map<String, Object> error = new LinkedHashMap<>();
-            error.put("error", "Flow not found: " + exec.flowId());
-            return ResponseEntity.badRequest().body(error);
+            return ResponseEntity.badRequest().body(
+                    JsonApiResponseBuilder.error("400", "Bad Request", "Flow not found: " + exec.flowId()));
         }
 
         String definitionJson = (String) flowOpt.get().get("definition");
         if (definitionJson == null || definitionJson.isBlank()) {
-            Map<String, Object> error = new LinkedHashMap<>();
-            error.put("error", "Flow has no definition");
-            return ResponseEntity.badRequest().body(error);
+            return ResponseEntity.badRequest().body(
+                    JsonApiResponseBuilder.error("400", "Bad Request", "Flow has no definition"));
         }
 
         Map<String, Object> initialState;
         if ("from-failure".equals(mode)) {
-            // Find the last failed step and use its input as the starting state
             List<FlowStepLogData> steps = flowStore.loadStepLogs(executionId);
             FlowStepLogData failedStep = null;
             for (int i = steps.size() - 1; i >= 0; i--) {
@@ -285,13 +253,12 @@ public class FlowExecutionController {
                 }
             }
             if (failedStep == null || failedStep.inputSnapshot() == null) {
-                Map<String, Object> error = new LinkedHashMap<>();
-                error.put("error", "No failed step with input snapshot found. Use mode=full instead.");
-                return ResponseEntity.badRequest().body(error);
+                return ResponseEntity.badRequest().body(
+                        JsonApiResponseBuilder.error("400", "Bad Request",
+                                "No failed step with input snapshot found. Use mode=full instead."));
             }
             initialState = failedStep.inputSnapshot();
         } else {
-            // Full retry: use the original initial input
             initialState = exec.initialInput() != null ? exec.initialInput() : Map.of();
         }
 
@@ -299,24 +266,19 @@ public class FlowExecutionController {
                 exec.tenantId(), exec.flowId(), definitionJson, initialState,
                 exec.startedBy(), exec.isTest());
 
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("executionId", newExecutionId);
-        response.put("originalExecutionId", executionId);
-        response.put("flowId", exec.flowId());
-        response.put("mode", mode);
-        response.put("status", "RUNNING");
+        Map<String, Object> attrs = new LinkedHashMap<>();
+        attrs.put("originalExecutionId", executionId);
+        attrs.put("flowId", exec.flowId());
+        attrs.put("mode", mode);
+        attrs.put("status", "RUNNING");
 
         log.info("Retried execution: original={}, new={}, mode={}", executionId, newExecutionId, mode);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(
+                JsonApiResponseBuilder.single("flow-executions", newExecutionId, attrs));
     }
 
     /**
      * Lists executions for a specific flow.
-     *
-     * @param flowId the flow ID
-     * @param limit  max results (default 50)
-     * @param offset offset for pagination
-     * @return list of executions
      */
     @GetMapping("/{flowId}/flow-executions")
     public ResponseEntity<Map<String, Object>> listExecutions(
@@ -333,33 +295,19 @@ public class FlowExecutionController {
             executionList.add(executionToMap(exec));
         }
 
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("flowId", flowId);
-        response.put("executions", executionList);
-        response.put("count", executionList.size());
-
-        return ResponseEntity.ok(response);
+        Map<String, Object> meta = Map.of("flowId", flowId, "count", executionList.size());
+        return ResponseEntity.ok(JsonApiResponseBuilder.collection("flow-executions", executionList, meta));
     }
 
     /**
-     * Returns all available flow task resources (built-in + runtime modules)
-     * with their descriptors.
-     *
-     * @return list of resource descriptors
+     * Returns all available flow task resources (built-in + runtime modules).
      */
     @GetMapping("/resources")
     public ResponseEntity<Map<String, Object>> getResources() {
         log.debug("Get flow resources request");
 
-        // TODO: Iterate ActionHandlerRegistry and collect descriptors
-        // For now, return empty list — will be populated when descriptors are added to handlers
         List<Map<String, Object>> resources = new ArrayList<>();
-
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("resources", resources);
-        response.put("count", resources.size());
-
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(JsonApiResponseBuilder.collection("flow-resources", resources));
     }
 
     // -------------------------------------------------------------------------
@@ -368,12 +316,6 @@ public class FlowExecutionController {
 
     /**
      * Publishes the current flow definition as a new version.
-     * Creates a version record and updates the flow's published_version.
-     *
-     * @param flowId        the flow ID
-     * @param body          optional body with "changeSummary"
-     * @param userId        user ID from request header
-     * @return the new version info
      */
     @PostMapping("/{flowId}/publish")
     public ResponseEntity<Map<String, Object>> publishVersion(
@@ -390,59 +332,42 @@ public class FlowExecutionController {
 
         String definition = (String) flowOpt.get().get("definition");
         if (definition == null || definition.isBlank()) {
-            Map<String, Object> error = new LinkedHashMap<>();
-            error.put("error", "Flow has no definition to publish");
-            return ResponseEntity.badRequest().body(error);
+            return ResponseEntity.badRequest().body(
+                    JsonApiResponseBuilder.error("400", "Bad Request", "Flow has no definition to publish"));
         }
 
         String changeSummary = body != null ? (String) body.get("changeSummary") : null;
 
-        // Get next version number
         int nextVersion = flowRepository.getMaxVersionNumber(flowId) + 1;
-
         String versionId = UUID.randomUUID().toString();
 
         flowRepository.insertFlowVersion(versionId, flowId, nextVersion, definition,
                 changeSummary, userId != null ? userId : "system");
-
         flowRepository.updateFlowPublishedVersion(flowId, nextVersion);
 
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("flowId", flowId);
-        response.put("versionNumber", nextVersion);
-        response.put("versionId", versionId);
-        response.put("changeSummary", changeSummary);
+        Map<String, Object> attrs = new LinkedHashMap<>();
+        attrs.put("flowId", flowId);
+        attrs.put("versionNumber", nextVersion);
+        attrs.put("changeSummary", changeSummary);
 
         log.info("Published flow version: flowId={}, version={}", flowId, nextVersion);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(JsonApiResponseBuilder.single("flow-versions", versionId, attrs));
     }
 
     /**
      * Lists all published versions for a flow.
-     *
-     * @param flowId the flow ID
-     * @return list of versions
      */
     @GetMapping("/{flowId}/versions")
     public ResponseEntity<Map<String, Object>> listVersions(@PathVariable String flowId) {
         log.debug("List flow versions request: flowId={}", flowId);
 
         List<Map<String, Object>> versions = flowRepository.findFlowVersions(flowId);
-
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("flowId", flowId);
-        response.put("versions", versions);
-        response.put("count", versions.size());
-
-        return ResponseEntity.ok(response);
+        Map<String, Object> meta = Map.of("flowId", flowId, "count", versions.size());
+        return ResponseEntity.ok(JsonApiResponseBuilder.collection("flow-versions", versions, meta));
     }
 
     /**
      * Gets a specific version's definition.
-     *
-     * @param flowId        the flow ID
-     * @param versionNumber the version number
-     * @return the version details including definition
      */
     @GetMapping("/{flowId}/versions/{versionNumber}")
     public ResponseEntity<Map<String, Object>> getVersion(
@@ -456,7 +381,10 @@ public class FlowExecutionController {
             return ResponseEntity.notFound().build();
         }
 
-        return ResponseEntity.ok(versionOpt.get());
+        Map<String, Object> attrs = new LinkedHashMap<>(versionOpt.get());
+        Object idObj = attrs.remove("id");
+        String versionId = idObj != null ? idObj.toString() : flowId + "-v" + versionNumber;
+        return ResponseEntity.ok(JsonApiResponseBuilder.single("flow-versions", versionId, attrs));
     }
 
     // -------------------------------------------------------------------------

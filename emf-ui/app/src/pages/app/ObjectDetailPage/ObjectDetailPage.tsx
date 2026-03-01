@@ -91,6 +91,45 @@ const SYSTEM_FIELDS = new Set([
   'updated_by',
 ])
 
+/**
+ * Synthesized system field definitions for audit fields.
+ * These fields exist as physical columns on every tenant table but are not
+ * in the field table. We define them here so the System Information section
+ * can render them with proper types and lookup resolution.
+ */
+const SYSTEM_FIELD_DEFINITIONS: FieldDefinition[] = [
+  {
+    id: '__sys_createdBy',
+    name: 'createdBy',
+    displayName: 'Created By',
+    type: 'lookup',
+    required: false,
+    referenceTarget: 'users',
+  },
+  {
+    id: '__sys_createdAt',
+    name: 'createdAt',
+    displayName: 'Created',
+    type: 'datetime',
+    required: false,
+  },
+  {
+    id: '__sys_updatedBy',
+    name: 'updatedBy',
+    displayName: 'Updated By',
+    type: 'lookup',
+    required: false,
+    referenceTarget: 'users',
+  },
+  {
+    id: '__sys_updatedAt',
+    name: 'updatedAt',
+    displayName: 'Updated',
+    type: 'datetime',
+    required: false,
+  },
+]
+
 /** Max fields to show in the highlights panel */
 const MAX_HIGHLIGHT_FIELDS = 4
 
@@ -174,6 +213,9 @@ export function ObjectDetailPage(): React.ReactElement {
       includes.add(f.referenceTarget!)
     }
 
+    // Always include users for createdBy/updatedBy display name resolution
+    includes.add('users')
+
     // Reverse includes + nested: collections referencing this collection
     if (collectionName && !collectionStore.isLoading) {
       for (const coll of collectionStore.collections) {
@@ -220,7 +262,7 @@ export function ObjectDetailPage(): React.ReactElement {
 
   // Build lookup display map from included resources using centralized collection store
   const lookupDisplayMap = useMemo(() => {
-    if (!rawResponse || referenceFields.length === 0) return undefined
+    if (!rawResponse) return undefined
 
     const map: Record<string, Record<string, string>> = {}
 
@@ -234,6 +276,15 @@ export function ObjectDetailPage(): React.ReactElement {
         map[field.name] = fieldMap
       }
     })
+
+    // Build display map for system audit fields (createdBy, updatedBy → users)
+    const usersDisplayField =
+      collectionStore.getCollectionByName('users')?.displayFieldName || 'email'
+    const usersMap = buildIncludedDisplayMap(rawResponse, 'users', usersDisplayField)
+    if (Object.keys(usersMap).length > 0) {
+      map['createdBy'] = usersMap
+      map['updatedBy'] = usersMap
+    }
 
     return Object.keys(map).length > 0 ? map : undefined
   }, [rawResponse, referenceFields, collectionStore])
@@ -311,9 +362,12 @@ export function ObjectDetailPage(): React.ReactElement {
     return userFields.slice(MAX_HIGHLIGHT_FIELDS)
   }, [userFields])
 
-  // System fields for the system info section
+  // System fields for the system info section.
+  // For tenant collections, schema fields won't include audit fields (they're
+  // not in the field table), so we always use the synthesized definitions.
   const systemFields = useMemo(() => {
-    return fields.filter((f) => SYSTEM_FIELDS.has(f.name))
+    const fromSchema = fields.filter((f) => SYSTEM_FIELDS.has(f.name))
+    return fromSchema.length > 0 ? fromSchema : SYSTEM_FIELD_DEFINITIONS
   }, [fields])
 
   // Discover reverse relationships (fallback when no layout is configured).
@@ -579,17 +633,6 @@ export function ObjectDetailPage(): React.ReactElement {
         </>
       )}
 
-      {/* System Information section */}
-      {systemFields.length > 0 && (
-        <DetailSection
-          title="System Information"
-          fields={systemFields}
-          record={record}
-          tenantSlug={tenantSlug}
-          defaultCollapsed
-        />
-      )}
-
       {/* Related Lists — use layout when available, otherwise auto-discover reverse relationships */}
       {recordId && hasLayoutRelatedLists ? (
         <div className="space-y-4">
@@ -616,6 +659,20 @@ export function ObjectDetailPage(): React.ReactElement {
           ))}
         </div>
       ) : null}
+
+      {/* System Information section — after related lists, before notes */}
+      {systemFields.length > 0 && record && (
+        <div className="space-y-4">
+          <Separator />
+          <DetailSection
+            title="System Information"
+            fields={systemFields}
+            record={record}
+            tenantSlug={tenantSlug}
+            lookupDisplayMap={lookupDisplayMap}
+          />
+        </div>
+      )}
 
       {/* Notes & Attachments */}
       {schema && recordId && (

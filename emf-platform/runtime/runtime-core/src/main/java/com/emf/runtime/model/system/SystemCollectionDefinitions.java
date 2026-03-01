@@ -1436,9 +1436,9 @@ public final class SystemCollectionDefinitions {
             .tenantScoped(true)
             .readOnly(false)
             .addField(FieldDefinition.datetime("createdAt").withColumnName("created_at"))
-            .addField(FieldDefinition.string("createdBy", 255).withColumnName("created_by"))
+            .addField(FieldDefinition.lookup("createdBy", "users", "Created By").withColumnName("created_by"))
             .addField(FieldDefinition.datetime("updatedAt").withColumnName("updated_at"))
-            .addField(FieldDefinition.string("updatedBy", 255).withColumnName("updated_by"));
+            .addField(FieldDefinition.lookup("updatedBy", "users", "Updated By").withColumnName("updated_by"));
     }
 
     /**
@@ -1456,8 +1456,8 @@ public final class SystemCollectionDefinitions {
             .tenantScoped(true)
             .readOnly(true)
             .addField(FieldDefinition.datetime("createdAt").withColumnName("created_at"))
-            .addField(FieldDefinition.string("createdBy", 255).withColumnName("created_by"))
+            .addField(FieldDefinition.lookup("createdBy", "users", "Created By").withColumnName("created_by"))
             .addField(FieldDefinition.datetime("updatedAt").withColumnName("updated_at"))
-            .addField(FieldDefinition.string("updatedBy", 255).withColumnName("updated_by"));
+            .addField(FieldDefinition.lookup("updatedBy", "users", "Updated By").withColumnName("updated_by"));
     }
 }

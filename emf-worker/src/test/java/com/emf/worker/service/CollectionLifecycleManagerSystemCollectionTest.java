@@ -218,7 +218,8 @@ class CollectionLifecycleManagerSystemCollectionTest {
             CollectionDefinition registered = defCaptor.getValue();
             assertThat(registered.name()).isEqualTo("products");
             assertThat(registered.systemCollection()).isFalse();
-            assertThat(registered.fields()).hasSize(2);
+            // 2 user-defined fields + 4 injected system audit fields
+            assertThat(registered.fields()).hasSize(6);
         }
 
         @Test

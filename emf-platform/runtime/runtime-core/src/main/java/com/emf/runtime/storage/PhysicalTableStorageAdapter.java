@@ -14,7 +14,6 @@ import com.emf.runtime.validation.TypeCoercionService;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DuplicateKeyException;
@@ -77,22 +76,18 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
 
     private final JdbcTemplate jdbcTemplate;
     private final SchemaMigrationEngine migrationEngine;
-    private final boolean schemaPerTenantEnabled;
 
     /**
      * Creates a new PhysicalTableStorageAdapter.
      *
      * @param jdbcTemplate the JdbcTemplate for database operations
      * @param migrationEngine the schema migration engine for handling schema changes
-     * @param schemaPerTenantEnabled whether to use separate schemas per tenant
      */
     public PhysicalTableStorageAdapter(
             JdbcTemplate jdbcTemplate,
-            SchemaMigrationEngine migrationEngine,
-            @Value("${emf.tenant-isolation.schema-per-tenant:false}") boolean schemaPerTenantEnabled) {
+            SchemaMigrationEngine migrationEngine) {
         this.jdbcTemplate = jdbcTemplate;
         this.migrationEngine = migrationEngine;
-        this.schemaPerTenantEnabled = schemaPerTenantEnabled;
     }
 
     @Override
@@ -508,15 +503,13 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
             return TableRef.publicSchema(tableName);
         }
 
-        // When schema-per-tenant is enabled, use tenant slug as schema
-        if (schemaPerTenantEnabled) {
-            String tenantSlug = TenantContext.getSlug();
-            if (tenantSlug != null && !tenantSlug.isBlank()) {
-                return TableRef.tenantSchema(tenantSlug, tableName);
-            }
+        // Non-system (tenant) collections use the tenant's schema
+        String tenantSlug = TenantContext.getSlug();
+        if (tenantSlug != null && !tenantSlug.isBlank()) {
+            return TableRef.tenantSchema(tenantSlug, tableName);
         }
 
-        // Fallback to public schema
+        // Fallback to public schema (e.g., internal operations without tenant context)
         return TableRef.publicSchema(tableName);
     }
 

@@ -22,7 +22,6 @@ import com.emf.runtime.validation.ValidationRuleRegistry;
 import com.emf.runtime.workflow.BeforeSaveHookRegistry;
 import org.apache.coyote.http11.AbstractHttp11Protocol;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -89,9 +88,8 @@ public class EmfRuntimeAutoConfiguration {
     @ConditionalOnProperty(name = "emf.storage.mode", havingValue = "PHYSICAL_TABLES", matchIfMissing = true)
     public StorageAdapter physicalTableStorageAdapter(
             JdbcTemplate jdbcTemplate,
-            SchemaMigrationEngine migrationEngine,
-            @Value("${emf.tenant-isolation.schema-per-tenant:false}") boolean schemaPerTenant) {
-        return new PhysicalTableStorageAdapter(jdbcTemplate, migrationEngine, schemaPerTenant);
+            SchemaMigrationEngine migrationEngine) {
+        return new PhysicalTableStorageAdapter(jdbcTemplate, migrationEngine);
     }
     
     /**

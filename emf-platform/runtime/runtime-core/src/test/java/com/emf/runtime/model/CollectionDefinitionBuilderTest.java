@@ -156,7 +156,7 @@ class CollectionDefinitionBuilderTest {
             assertTrue(collection.apiConfig().createEnabled());
             assertTrue(collection.apiConfig().updateEnabled());
             assertTrue(collection.apiConfig().deleteEnabled());
-            assertEquals("/api/collections/test", collection.apiConfig().basePath());
+            assertEquals("/api/test", collection.apiConfig().basePath());
         }
 
         @Test

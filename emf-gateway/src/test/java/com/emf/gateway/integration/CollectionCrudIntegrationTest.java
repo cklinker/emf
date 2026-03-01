@@ -100,7 +100,7 @@ public class CollectionCrudIntegrationTest extends IntegrationTestBase {
         
         // Act
         ResponseEntity<Map> response = restTemplate.postForEntity(
-            GATEWAY_URL + "/api/collections/projects",
+            GATEWAY_URL + "/api/projects",
             request,
             Map.class
         );
@@ -146,7 +146,7 @@ public class CollectionCrudIntegrationTest extends IntegrationTestBase {
         
         // Act
         ResponseEntity<Map> response = restTemplate.exchange(
-            GATEWAY_URL + "/api/collections/projects/" + projectId,
+            GATEWAY_URL + "/api/projects/" + projectId,
             HttpMethod.GET,
             request,
             Map.class
@@ -203,7 +203,7 @@ public class CollectionCrudIntegrationTest extends IntegrationTestBase {
         
         // Act
         ResponseEntity<Map> response = restTemplate.exchange(
-            GATEWAY_URL + "/api/collections/projects/" + projectId,
+            GATEWAY_URL + "/api/projects/" + projectId,
             HttpMethod.PUT,
             request,
             Map.class
@@ -225,7 +225,7 @@ public class CollectionCrudIntegrationTest extends IntegrationTestBase {
         // Verify the update was persisted by reading the resource again
         HttpEntity<Void> getRequest = new HttpEntity<>(headers);
         ResponseEntity<Map> getResponse = restTemplate.exchange(
-            GATEWAY_URL + "/api/collections/projects/" + projectId,
+            GATEWAY_URL + "/api/projects/" + projectId,
             HttpMethod.GET,
             getRequest,
             Map.class
@@ -260,7 +260,7 @@ public class CollectionCrudIntegrationTest extends IntegrationTestBase {
         
         // Act
         ResponseEntity<Void> response = restTemplate.exchange(
-            GATEWAY_URL + "/api/collections/projects/" + projectId,
+            GATEWAY_URL + "/api/projects/" + projectId,
             HttpMethod.DELETE,
             request,
             Void.class
@@ -272,7 +272,7 @@ public class CollectionCrudIntegrationTest extends IntegrationTestBase {
         // Verify the resource was deleted by trying to read it
         try {
             restTemplate.exchange(
-                GATEWAY_URL + "/api/collections/projects/" + projectId,
+                GATEWAY_URL + "/api/projects/" + projectId,
                 HttpMethod.GET,
                 request,
                 Map.class
@@ -324,7 +324,7 @@ public class CollectionCrudIntegrationTest extends IntegrationTestBase {
         
         // Act
         ResponseEntity<Map> response = restTemplate.exchange(
-            GATEWAY_URL + "/api/collections/projects?page[size]=10",
+            GATEWAY_URL + "/api/projects?page[size]=10",
             HttpMethod.GET,
             request,
             Map.class
@@ -363,7 +363,7 @@ public class CollectionCrudIntegrationTest extends IntegrationTestBase {
         // Act & Assert - GET non-existent resource
         try {
             restTemplate.exchange(
-                GATEWAY_URL + "/api/collections/projects/" + nonExistentId,
+                GATEWAY_URL + "/api/projects/" + nonExistentId,
                 HttpMethod.GET,
                 getRequest,
                 Map.class
@@ -387,7 +387,7 @@ public class CollectionCrudIntegrationTest extends IntegrationTestBase {
         
         try {
             restTemplate.exchange(
-                GATEWAY_URL + "/api/collections/projects/" + nonExistentId,
+                GATEWAY_URL + "/api/projects/" + nonExistentId,
                 HttpMethod.PUT,
                 updateRequest,
                 Map.class
@@ -400,7 +400,7 @@ public class CollectionCrudIntegrationTest extends IntegrationTestBase {
         // Act & Assert - DELETE non-existent resource
         try {
             restTemplate.exchange(
-                GATEWAY_URL + "/api/collections/projects/" + nonExistentId,
+                GATEWAY_URL + "/api/projects/" + nonExistentId,
                 HttpMethod.DELETE,
                 getRequest,
                 Void.class

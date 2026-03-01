@@ -23,7 +23,7 @@ import java.util.*;
  * Migrated flows are created as inactive drafts.
  */
 @RestController
-@RequestMapping("/api/collections/admin/migrate-workflow-rules")
+@RequestMapping("/api/admin/migrate-workflow-rules")
 @ConditionalOnBean(WorkflowRuleToFlowMigrator.class)
 public class WorkflowMigrationController {
 

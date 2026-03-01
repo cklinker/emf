@@ -34,7 +34,7 @@ class LoginTrackingFilterTest {
 
     @Test
     void shouldTrackLoginWhenValidHeadersAndUserFound() throws ServletException, IOException {
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/collections/accounts");
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/accounts");
         request.addHeader("X-User-Id", "alice@example.com");
         request.addHeader("X-Tenant-ID", "tenant-123");
         request.setRemoteAddr("192.168.1.1");
@@ -80,7 +80,7 @@ class LoginTrackingFilterTest {
 
     @Test
     void shouldSkipTrackingWhenUserIdHeaderMissing() throws ServletException, IOException {
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/collections/accounts");
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/accounts");
         request.addHeader("X-Tenant-ID", "tenant-123");
 
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -94,7 +94,7 @@ class LoginTrackingFilterTest {
 
     @Test
     void shouldSkipTrackingWhenTenantIdHeaderMissing() throws ServletException, IOException {
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/collections/accounts");
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/accounts");
         request.addHeader("X-User-Id", "alice@example.com");
 
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -108,7 +108,7 @@ class LoginTrackingFilterTest {
 
     @Test
     void shouldSkipTrackingWhenUserNotFoundInDatabase() throws ServletException, IOException {
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/collections/accounts");
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/accounts");
         request.addHeader("X-User-Id", "unknown@example.com");
         request.addHeader("X-Tenant-ID", "tenant-123");
 
@@ -132,7 +132,7 @@ class LoginTrackingFilterTest {
         long recentTime = java.time.Instant.now().getEpochSecond() - 60; // 1 minute ago
         throttleCache.put("tenant-123:alice@example.com", recentTime);
 
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/collections/accounts");
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/accounts");
         request.addHeader("X-User-Id", "alice@example.com");
         request.addHeader("X-Tenant-ID", "tenant-123");
 
@@ -153,7 +153,7 @@ class LoginTrackingFilterTest {
                 - LoginTrackingFilter.TRACKING_INTERVAL_SECONDS - 60;
         throttleCache.put("tenant-123:alice@example.com", oldTime);
 
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/collections/accounts");
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/accounts");
         request.addHeader("X-User-Id", "alice@example.com");
         request.addHeader("X-Tenant-ID", "tenant-123");
         request.setRemoteAddr("10.0.0.1");
@@ -175,7 +175,7 @@ class LoginTrackingFilterTest {
 
     @Test
     void shouldNeverBlockFilterChainOnException() throws ServletException, IOException {
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/collections/accounts");
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/accounts");
         request.addHeader("X-User-Id", "alice@example.com");
         request.addHeader("X-Tenant-ID", "tenant-123");
 
@@ -231,7 +231,7 @@ class LoginTrackingFilterTest {
 
     @Test
     void shouldSkipTrackingWhenUserIdLooksLikeUuid() throws ServletException, IOException {
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/collections/accounts");
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/accounts");
         request.addHeader("X-User-Id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890");
         request.addHeader("X-Tenant-ID", "tenant-123");
 
@@ -254,13 +254,13 @@ class LoginTrackingFilterTest {
                 .thenReturn("user-2");
 
         // Track alice
-        MockHttpServletRequest req1 = new MockHttpServletRequest("GET", "/api/collections/accounts");
+        MockHttpServletRequest req1 = new MockHttpServletRequest("GET", "/api/accounts");
         req1.addHeader("X-User-Id", "alice@example.com");
         req1.addHeader("X-Tenant-ID", "tenant-123");
         filter.doFilterInternal(req1, new MockHttpServletResponse(), chain);
 
         // Track bob
-        MockHttpServletRequest req2 = new MockHttpServletRequest("GET", "/api/collections/accounts");
+        MockHttpServletRequest req2 = new MockHttpServletRequest("GET", "/api/accounts");
         req2.addHeader("X-User-Id", "bob@example.com");
         req2.addHeader("X-Tenant-ID", "tenant-123");
         filter.doFilterInternal(req2, new MockHttpServletResponse(), chain);

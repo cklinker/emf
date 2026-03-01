@@ -12,8 +12,8 @@
  * 
  * <p>URL patterns supported:
  * <ul>
- *   <li>{@code /api/collections/{collectionName}} - List and create operations</li>
- *   <li>{@code /api/collections/{collectionName}/{id}} - Get, update, and delete operations</li>
+ *   <li>{@code /api/{collectionName}} - List and create operations</li>
+ *   <li>{@code /api/{collectionName}/{id}} - Get, update, and delete operations</li>
  * </ul>
  * 
  * @since 1.0.0

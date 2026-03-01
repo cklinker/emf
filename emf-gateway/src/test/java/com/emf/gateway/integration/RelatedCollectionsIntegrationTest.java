@@ -114,7 +114,7 @@ public class RelatedCollectionsIntegrationTest extends IntegrationTestBase {
         
         // Act
         ResponseEntity<Map> response = restTemplate.postForEntity(
-            GATEWAY_URL + "/api/collections/tasks",
+            GATEWAY_URL + "/api/tasks",
             request,
             Map.class
         );
@@ -182,7 +182,7 @@ public class RelatedCollectionsIntegrationTest extends IntegrationTestBase {
         
         // Act
         ResponseEntity<Map> response = restTemplate.exchange(
-            GATEWAY_URL + "/api/collections/tasks/" + taskId,
+            GATEWAY_URL + "/api/tasks/" + taskId,
             HttpMethod.GET,
             request,
             Map.class
@@ -265,7 +265,7 @@ public class RelatedCollectionsIntegrationTest extends IntegrationTestBase {
         
         // Act
         ResponseEntity<Map> response = restTemplate.exchange(
-            GATEWAY_URL + "/api/collections/tasks/" + taskId,
+            GATEWAY_URL + "/api/tasks/" + taskId,
             HttpMethod.PUT,
             request,
             Map.class
@@ -289,7 +289,7 @@ public class RelatedCollectionsIntegrationTest extends IntegrationTestBase {
         // Verify the update was persisted by reading the resource again
         HttpEntity<Void> getRequest = new HttpEntity<>(headers);
         ResponseEntity<Map> getResponse = restTemplate.exchange(
-            GATEWAY_URL + "/api/collections/tasks/" + taskId,
+            GATEWAY_URL + "/api/tasks/" + taskId,
             HttpMethod.GET,
             getRequest,
             Map.class
@@ -331,7 +331,7 @@ public class RelatedCollectionsIntegrationTest extends IntegrationTestBase {
         
         // Act - delete the task (child resource)
         ResponseEntity<Void> deleteTaskResponse = restTemplate.exchange(
-            GATEWAY_URL + "/api/collections/tasks/" + taskId,
+            GATEWAY_URL + "/api/tasks/" + taskId,
             HttpMethod.DELETE,
             request,
             Void.class
@@ -344,7 +344,7 @@ public class RelatedCollectionsIntegrationTest extends IntegrationTestBase {
         // Verify the task was deleted
         try {
             restTemplate.exchange(
-                GATEWAY_URL + "/api/collections/tasks/" + taskId,
+                GATEWAY_URL + "/api/tasks/" + taskId,
                 HttpMethod.GET,
                 request,
                 Map.class
@@ -356,7 +356,7 @@ public class RelatedCollectionsIntegrationTest extends IntegrationTestBase {
         
         // Verify the project still exists (parent resource should not be affected)
         ResponseEntity<Map> getProjectResponse = restTemplate.exchange(
-            GATEWAY_URL + "/api/collections/projects/" + projectId,
+            GATEWAY_URL + "/api/projects/" + projectId,
             HttpMethod.GET,
             request,
             Map.class
@@ -402,7 +402,7 @@ public class RelatedCollectionsIntegrationTest extends IntegrationTestBase {
         // Act & Assert - should fail with validation error
         try {
             ResponseEntity<Map> response = restTemplate.postForEntity(
-                GATEWAY_URL + "/api/collections/tasks",
+                GATEWAY_URL + "/api/tasks",
                 request,
                 Map.class
             );
@@ -473,7 +473,7 @@ public class RelatedCollectionsIntegrationTest extends IntegrationTestBase {
         
         // Act - query tasks filtered by project relationship
         ResponseEntity<Map> response = restTemplate.exchange(
-            GATEWAY_URL + "/api/collections/tasks?filter[project_id]=" + projectId,
+            GATEWAY_URL + "/api/tasks?filter[project_id]=" + projectId,
             HttpMethod.GET,
             request,
             Map.class

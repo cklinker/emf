@@ -62,7 +62,7 @@ public class TestDataHelper {
         HttpEntity<Map<String, Object>> request = new HttpEntity<>(projectData, headers);
         
         ResponseEntity<Map> response = restTemplate.postForEntity(
-            GATEWAY_URL + "/api/collections/projects",
+            GATEWAY_URL + "/api/projects",
             request,
             Map.class
         );
@@ -110,7 +110,7 @@ public class TestDataHelper {
         HttpEntity<Map<String, Object>> request = new HttpEntity<>(taskData, headers);
         
         ResponseEntity<Map> response = restTemplate.postForEntity(
-            GATEWAY_URL + "/api/collections/tasks",
+            GATEWAY_URL + "/api/tasks",
             request,
             Map.class
         );
@@ -136,7 +136,7 @@ public class TestDataHelper {
         HttpEntity<Void> request = new HttpEntity<>(headers);
         
         restTemplate.exchange(
-            GATEWAY_URL + "/api/collections/projects/" + projectId,
+            GATEWAY_URL + "/api/projects/" + projectId,
             HttpMethod.DELETE,
             request,
             Void.class
@@ -158,7 +158,7 @@ public class TestDataHelper {
         HttpEntity<Void> request = new HttpEntity<>(headers);
         
         restTemplate.exchange(
-            GATEWAY_URL + "/api/collections/tasks/" + taskId,
+            GATEWAY_URL + "/api/tasks/" + taskId,
             HttpMethod.DELETE,
             request,
             Void.class

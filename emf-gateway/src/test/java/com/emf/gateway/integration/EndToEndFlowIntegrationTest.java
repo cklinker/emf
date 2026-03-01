@@ -69,7 +69,7 @@ public class EndToEndFlowIntegrationTest extends IntegrationTestBase {
         HttpEntity<Void> request = new HttpEntity<>(headers);
         
         ResponseEntity<Map> getResponse = restTemplate.exchange(
-            GATEWAY_URL + "/api/collections/projects/" + projectId,
+            GATEWAY_URL + "/api/projects/" + projectId,
             HttpMethod.GET,
             request,
             Map.class
@@ -104,7 +104,7 @@ public class EndToEndFlowIntegrationTest extends IntegrationTestBase {
         HttpEntity<Map<String, Object>> updateRequest = new HttpEntity<>(updateData, headers);
         
         ResponseEntity<Map> updateResponse = restTemplate.exchange(
-            GATEWAY_URL + "/api/collections/projects/" + projectId,
+            GATEWAY_URL + "/api/projects/" + projectId,
             HttpMethod.PATCH,
             updateRequest,
             Map.class
@@ -118,7 +118,7 @@ public class EndToEndFlowIntegrationTest extends IntegrationTestBase {
         
         // 5. Delete project
         ResponseEntity<Void> deleteResponse = restTemplate.exchange(
-            GATEWAY_URL + "/api/collections/projects/" + projectId,
+            GATEWAY_URL + "/api/projects/" + projectId,
             HttpMethod.DELETE,
             request,
             Void.class
@@ -129,7 +129,7 @@ public class EndToEndFlowIntegrationTest extends IntegrationTestBase {
         // 6. Verify project is deleted - should return 404
         try {
             restTemplate.exchange(
-                GATEWAY_URL + "/api/collections/projects/" + projectId,
+                GATEWAY_URL + "/api/projects/" + projectId,
                 HttpMethod.GET,
                 request,
                 Map.class
@@ -185,7 +185,7 @@ public class EndToEndFlowIntegrationTest extends IntegrationTestBase {
         HttpEntity<Void> request = new HttpEntity<>(headers);
         
         ResponseEntity<Map> taskResponse = restTemplate.exchange(
-            GATEWAY_URL + "/api/collections/tasks/" + task1Id,
+            GATEWAY_URL + "/api/tasks/" + task1Id,
             HttpMethod.GET,
             request,
             Map.class
@@ -206,7 +206,7 @@ public class EndToEndFlowIntegrationTest extends IntegrationTestBase {
         
         // 5. Read task with include parameter to embed project
         ResponseEntity<Map> includeResponse = restTemplate.exchange(
-            GATEWAY_URL + "/api/collections/tasks/" + task1Id + "?include=project",
+            GATEWAY_URL + "/api/tasks/" + task1Id + "?include=project",
             HttpMethod.GET,
             request,
             Map.class
@@ -244,7 +244,7 @@ public class EndToEndFlowIntegrationTest extends IntegrationTestBase {
         HttpEntity<Map<String, Object>> updateRequest = new HttpEntity<>(updateData, headers);
         
         ResponseEntity<Map> updateResponse = restTemplate.exchange(
-            GATEWAY_URL + "/api/collections/tasks/" + task1Id,
+            GATEWAY_URL + "/api/tasks/" + task1Id,
             HttpMethod.PATCH,
             updateRequest,
             Map.class
@@ -296,7 +296,7 @@ public class EndToEndFlowIntegrationTest extends IntegrationTestBase {
         HttpEntity<Void> userRequest = new HttpEntity<>(userHeaders);
         
         ResponseEntity<Map> response = restTemplate.exchange(
-            GATEWAY_URL + "/api/collections/projects/" + projectId,
+            GATEWAY_URL + "/api/projects/" + projectId,
             HttpMethod.GET,
             userRequest,
             Map.class
@@ -307,7 +307,7 @@ public class EndToEndFlowIntegrationTest extends IntegrationTestBase {
         // 4. Make request without token - should fail with 401
         try {
             restTemplate.getForEntity(
-                GATEWAY_URL + "/api/collections/projects/" + projectId,
+                GATEWAY_URL + "/api/projects/" + projectId,
                 Map.class
             );
             // Should not reach here
@@ -353,7 +353,7 @@ public class EndToEndFlowIntegrationTest extends IntegrationTestBase {
         HttpEntity<Void> userRequest = new HttpEntity<>(userHeaders);
         
         ResponseEntity<Map> readResponse = restTemplate.exchange(
-            GATEWAY_URL + "/api/collections/projects/" + projectId,
+            GATEWAY_URL + "/api/projects/" + projectId,
             HttpMethod.GET,
             userRequest,
             Map.class
@@ -366,7 +366,7 @@ public class EndToEndFlowIntegrationTest extends IntegrationTestBase {
         // If policies are configured to require ADMIN role for DELETE, it should fail with 403
         try {
             ResponseEntity<Void> deleteResponse = restTemplate.exchange(
-                GATEWAY_URL + "/api/collections/projects/" + projectId,
+                GATEWAY_URL + "/api/projects/" + projectId,
                 HttpMethod.DELETE,
                 userRequest,
                 Void.class
@@ -418,7 +418,7 @@ public class EndToEndFlowIntegrationTest extends IntegrationTestBase {
         
         try {
             restTemplate.postForEntity(
-                GATEWAY_URL + "/api/collections/projects",
+                GATEWAY_URL + "/api/projects",
                 invalidRequest,
                 Map.class
             );
@@ -448,7 +448,7 @@ public class EndToEndFlowIntegrationTest extends IntegrationTestBase {
         
         try {
             restTemplate.postForEntity(
-                GATEWAY_URL + "/api/collections/projects",
+                GATEWAY_URL + "/api/projects",
                 invalidTypeRequest,
                 Map.class
             );
@@ -463,7 +463,7 @@ public class EndToEndFlowIntegrationTest extends IntegrationTestBase {
         
         try {
             restTemplate.exchange(
-                GATEWAY_URL + "/api/collections/projects/non-existent-id",
+                GATEWAY_URL + "/api/projects/non-existent-id",
                 HttpMethod.GET,
                 getRequest,
                 Map.class
@@ -500,7 +500,7 @@ public class EndToEndFlowIntegrationTest extends IntegrationTestBase {
         HttpEntity<Void> request = new HttpEntity<>(headers);
         
         ResponseEntity<Map> response = restTemplate.exchange(
-            GATEWAY_URL + "/api/collections/projects/" + projectId,
+            GATEWAY_URL + "/api/projects/" + projectId,
             HttpMethod.GET,
             request,
             Map.class
@@ -538,7 +538,7 @@ public class EndToEndFlowIntegrationTest extends IntegrationTestBase {
         HttpEntity<Void> request = new HttpEntity<>(headers);
         
         ResponseEntity<Map> response = restTemplate.exchange(
-            GATEWAY_URL + "/api/collections/projects/" + projectId,
+            GATEWAY_URL + "/api/projects/" + projectId,
             HttpMethod.GET,
             request,
             Map.class
@@ -575,7 +575,7 @@ public class EndToEndFlowIntegrationTest extends IntegrationTestBase {
         HttpEntity<Void> request = new HttpEntity<>(headers);
         
         ResponseEntity<Map> response = restTemplate.exchange(
-            GATEWAY_URL + "/api/collections/projects/" + projectId,
+            GATEWAY_URL + "/api/projects/" + projectId,
             HttpMethod.GET,
             request,
             Map.class

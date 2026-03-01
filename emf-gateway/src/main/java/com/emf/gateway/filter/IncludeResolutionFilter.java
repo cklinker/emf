@@ -36,8 +36,7 @@ import java.util.List;
  * <p>This filter applies to both system collections and user-defined collections
  * because all routes go through {@code /api/{collection}}.
  *
- * <p>Runs at order 10200 — after path rewriting (10100) but before
- * {@code NettyRoutingFilter} (MAX_VALUE).
+ * <p>Runs at order 10200 — before {@code NettyRoutingFilter} (MAX_VALUE).
  *
  * @since 1.0.0
  */
@@ -158,7 +157,7 @@ public class IncludeResolutionFilter implements GlobalFilter, Ordered {
 
     @Override
     public int getOrder() {
-        // After CollectionPathRewriteFilter (10100) but before NettyRoutingFilter (MAX_VALUE)
+        // Before NettyRoutingFilter (MAX_VALUE).
         // This filter modifies the RESPONSE, so its order in the filter chain
         // determines when the response decorator is registered.
         return 10200;

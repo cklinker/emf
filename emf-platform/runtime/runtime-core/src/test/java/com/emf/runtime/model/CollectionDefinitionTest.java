@@ -29,7 +29,7 @@ class CollectionDefinitionTest {
             "Product catalog",
             List.of(FieldDefinition.requiredString("name"), FieldDefinition.doubleField("price")),
             StorageConfig.physicalTable("tbl_products"),
-            ApiConfig.allEnabled("/api/collections/products"),
+            ApiConfig.allEnabled("/api/products"),
             AuthzConfig.disabled(),
             EventsConfig.disabled(),
             1L,
@@ -50,7 +50,7 @@ class CollectionDefinitionTest {
                 FieldDefinition.doubleField("price")
             );
             StorageConfig storageConfig = StorageConfig.physicalTable("tbl_products");
-            ApiConfig apiConfig = ApiConfig.allEnabled("/api/collections/products");
+            ApiConfig apiConfig = ApiConfig.allEnabled("/api/products");
             AuthzConfig authzConfig = AuthzConfig.withRoles(List.of("USER"), List.of("ADMIN"));
             EventsConfig eventsConfig = EventsConfig.allEvents("emf.collections");
             

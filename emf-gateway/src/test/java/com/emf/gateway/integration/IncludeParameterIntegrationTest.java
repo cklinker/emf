@@ -104,7 +104,7 @@ public class IncludeParameterIntegrationTest extends IntegrationTestBase {
         
         // Act - request task with include=project
         ResponseEntity<Map> response = restTemplate.exchange(
-            GATEWAY_URL + "/api/collections/tasks/" + taskId + "?include=project",
+            GATEWAY_URL + "/api/tasks/" + taskId + "?include=project",
             HttpMethod.GET,
             request,
             Map.class
@@ -196,7 +196,7 @@ public class IncludeParameterIntegrationTest extends IntegrationTestBase {
         // include=project,assignee or similar. For now, we test that the include
         // parameter is processed correctly for the available relationships.
         ResponseEntity<Map> response = restTemplate.exchange(
-            GATEWAY_URL + "/api/collections/tasks/" + task1Id + "?include=project",
+            GATEWAY_URL + "/api/tasks/" + task1Id + "?include=project",
             HttpMethod.GET,
             request,
             Map.class
@@ -253,7 +253,7 @@ public class IncludeParameterIntegrationTest extends IntegrationTestBase {
         
         // Act - request task with include=project
         ResponseEntity<Map> response = restTemplate.exchange(
-            GATEWAY_URL + "/api/collections/tasks/" + taskId + "?include=project",
+            GATEWAY_URL + "/api/tasks/" + taskId + "?include=project",
             HttpMethod.GET,
             request,
             Map.class
@@ -314,7 +314,7 @@ public class IncludeParameterIntegrationTest extends IntegrationTestBase {
         
         // Act - request task with invalid include parameter
         ResponseEntity<Map> response = restTemplate.exchange(
-            GATEWAY_URL + "/api/collections/tasks/" + taskId + "?include=nonexistent,invalid,project",
+            GATEWAY_URL + "/api/tasks/" + taskId + "?include=nonexistent,invalid,project",
             HttpMethod.GET,
             request,
             Map.class
@@ -381,7 +381,7 @@ public class IncludeParameterIntegrationTest extends IntegrationTestBase {
         
         // Act - request task with include=project
         ResponseEntity<Map> response = restTemplate.exchange(
-            GATEWAY_URL + "/api/collections/tasks/" + taskId + "?include=project",
+            GATEWAY_URL + "/api/tasks/" + taskId + "?include=project",
             HttpMethod.GET,
             request,
             Map.class
@@ -453,7 +453,7 @@ public class IncludeParameterIntegrationTest extends IntegrationTestBase {
         // Since we don't have multi-level relationships in the test schema,
         // we test that the system handles the syntax correctly
         ResponseEntity<Map> response = restTemplate.exchange(
-            GATEWAY_URL + "/api/collections/tasks/" + taskId + "?include=project",
+            GATEWAY_URL + "/api/tasks/" + taskId + "?include=project",
             HttpMethod.GET,
             request,
             Map.class

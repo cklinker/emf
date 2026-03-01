@@ -16,7 +16,7 @@ import java.util.Objects;
  *   "status": 400,
  *   "error": "Bad Request",
  *   "message": "Validation failed",
- *   "path": "/api/collections/products",
+ *   "path": "/api/products",
  *   "errors": [
  *     {"field": "name", "message": "Field is required", "code": "nullable"}
  *   ]

@@ -21,14 +21,14 @@ class ApiConfigTest {
         @Test
         @DisplayName("Should create API config with all parameters")
         void shouldCreateWithAllParameters() {
-            ApiConfig config = new ApiConfig(true, true, true, true, true, "/api/collections/test");
+            ApiConfig config = new ApiConfig(true, true, true, true, true, "/api/test");
             
             assertTrue(config.listEnabled());
             assertTrue(config.getEnabled());
             assertTrue(config.createEnabled());
             assertTrue(config.updateEnabled());
             assertTrue(config.deleteEnabled());
-            assertEquals("/api/collections/test", config.basePath());
+            assertEquals("/api/test", config.basePath());
         }
 
         @Test

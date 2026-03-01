@@ -62,9 +62,6 @@ public class DynamicRouteLocator implements RouteLocator {
      * 3. Configures a path predicate to match incoming requests
      * 4. Preserves the original path when forwarding to the backend
      *
-     * <p>Note: Collection API path rewriting ({@code /api/xxx} → {@code /api/collections/xxx})
-     * is handled by {@link com.emf.gateway.filter.CollectionPathRewriteFilter}, a GlobalFilter
-     * that runs after route URL resolution but before the request is sent upstream.
      *
      * @param routeDefinition The route definition to convert
      * @return A Spring Cloud Gateway Route object

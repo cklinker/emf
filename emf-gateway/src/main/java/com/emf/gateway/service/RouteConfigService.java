@@ -161,10 +161,6 @@ public class RouteConfigService {
      * <p>These endpoints are not returned in the bootstrap collection list because
      * they are not standard CRUD collections. They still need gateway routes so
      * requests are proxied to the worker instead of returning 404.
-     *
-     * <p>The {@link com.emf.gateway.filter.CollectionPathRewriteFilter} will rewrite
-     * these paths (e.g., {@code /api/governor-limits} → {@code /api/collections/governor-limits})
-     * before they reach the worker.
      */
     private void registerStaticRoutes() {
         String[][] staticRoutes = {

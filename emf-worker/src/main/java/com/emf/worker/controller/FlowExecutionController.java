@@ -20,7 +20,7 @@ import java.util.*;
  * @since 1.0.0
  */
 @RestController
-@RequestMapping("/api/collections/flows")
+@RequestMapping("/api/flows")
 @ConditionalOnBean(FlowEngine.class)
 public class FlowExecutionController {
 

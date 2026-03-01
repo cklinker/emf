@@ -59,7 +59,7 @@ class PhysicalTableStorageAdapterTest {
         }
         
         migrationEngine = new SchemaMigrationEngine(jdbcTemplate);
-        adapter = new PhysicalTableStorageAdapter(jdbcTemplate, migrationEngine, false);
+        adapter = new PhysicalTableStorageAdapter(jdbcTemplate, migrationEngine);
         
         // Create a test collection definition
         testCollection = createTestCollection("test_products");

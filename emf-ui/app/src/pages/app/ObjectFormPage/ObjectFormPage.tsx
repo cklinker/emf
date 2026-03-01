@@ -37,6 +37,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Separator } from '@/components/ui/separator'
 import { LookupSelect } from '@/components/LookupSelect'
+import { MultiPicklistSelect, normalizeMultiPicklistValue } from '@/components/MultiPicklistSelect'
 import { useAuth } from '@/context/AuthContext'
 import { useApi } from '@/context/ApiContext'
 import { LayoutFormSections } from '@/components/LayoutFormSections'
@@ -157,8 +158,27 @@ function FormField({
     )
   }
 
-  // Picklist fields use a dropdown select
-  if (field.type === 'picklist' || field.type === 'multi_picklist') {
+  // Multi-picklist fields use a checkbox-based multi-select
+  if (field.type === 'multi_picklist') {
+    const arrayValue = normalizeMultiPicklistValue(value)
+    return (
+      <div className="space-y-2">
+        {labelEl}
+        <MultiPicklistSelect
+          id={fieldId}
+          name={field.name}
+          value={arrayValue}
+          options={field.enumValues || []}
+          onChange={(values) => onChange(field.name, values)}
+          disabled={isReadOnly}
+          required={field.required}
+        />
+      </div>
+    )
+  }
+
+  // Single picklist fields use a dropdown select
+  if (field.type === 'picklist') {
     return (
       <div className="space-y-2">
         {labelEl}

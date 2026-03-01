@@ -84,13 +84,15 @@ function parseCollectionsResponse(response: unknown): CollectionSchema[] {
   const dataArray = Array.isArray(resp.data) ? resp.data : []
   const includedArray = Array.isArray(resp.included) ? resp.included : []
 
-  // Group included fields by collectionId
+  // Group included fields by collectionId.
+  // In JSON:API, collectionId is a relationship (not an attribute):
+  //   field.relationships.collectionId.data.id → parent collection UUID
   const fieldsByCollectionId = new Map<string, RawResource[]>()
   for (const resource of includedArray) {
     if (resource.type !== 'fields') continue
     const collectionId =
-      (resource.attributes?.collectionId as string) ||
-      resource.relationships?.collection?.data?.id
+      resource.relationships?.collectionId?.data?.id ||
+      (resource.attributes?.collectionId as string)
     if (collectionId) {
       const list = fieldsByCollectionId.get(collectionId) ?? []
       list.push(resource)
@@ -103,8 +105,12 @@ function parseCollectionsResponse(response: unknown): CollectionSchema[] {
     const attrs = collResource.attributes ?? {}
     const fieldResources = fieldsByCollectionId.get(collResource.id) ?? []
 
-    // Resolve displayFieldName from displayFieldId
-    const displayFieldId = attrs.displayFieldId as string | undefined
+    // Resolve displayFieldName from displayFieldId.
+    // In JSON:API, displayFieldId is a relationship (not an attribute):
+    //   collection.relationships.displayFieldId.data.id → display field UUID
+    const displayFieldId =
+      collResource.relationships?.displayFieldId?.data?.id ||
+      (attrs.displayFieldId as string | undefined)
     let displayFieldName: string | undefined
     if (displayFieldId) {
       const displayFieldResource = fieldResources.find((f) => f.id === displayFieldId)
@@ -123,6 +129,11 @@ function parseCollectionsResponse(response: unknown): CollectionSchema[] {
       })
       .map((f) => {
         const a = f.attributes ?? {}
+        // referenceCollectionId may be a relationship or attribute
+        const refCollId =
+          f.relationships?.referenceCollectionId?.data?.id ||
+          (a.referenceCollectionId as string) ||
+          undefined
         return {
           id: f.id,
           name: a.name as string,
@@ -130,7 +141,7 @@ function parseCollectionsResponse(response: unknown): CollectionSchema[] {
           type: normalizeFieldType(a.type as string),
           required: !!a.required,
           referenceTarget: (a.referenceTarget as string) || undefined,
-          referenceCollectionId: (a.referenceCollectionId as string) || undefined,
+          referenceCollectionId: refCollId,
         } as FieldDefinition
       })
 

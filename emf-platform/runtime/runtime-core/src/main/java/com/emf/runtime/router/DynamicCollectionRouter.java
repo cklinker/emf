@@ -150,21 +150,26 @@ public class DynamicCollectionRouter {
         // For tenant-scoped system collections, inject tenant_id filter
         queryRequest = injectTenantFilter(queryRequest, definition, request);
 
-        QueryResult result = queryEngine.executeQuery(definition, queryRequest);
+        setTenantContext(request);
+        try {
+            QueryResult result = queryEngine.executeQuery(definition, queryRequest);
 
-        Map<String, Object> response = toJsonApiListResponse(result, collectionName, definition);
+            Map<String, Object> response = toJsonApiListResponse(result, collectionName, definition);
 
-        // Resolve JSON:API ?include= parameter for inverse (has-many) relationships
-        List<String> includeNames = parseIncludeParam(params);
-        if (!includeNames.isEmpty() && !result.data().isEmpty()) {
-            List<Map<String, Object>> included = resolveIncludes(
-                    includeNames, result.data(), collectionName, definition, request);
-            if (!included.isEmpty()) {
-                response.put("included", included);
+            // Resolve JSON:API ?include= parameter for inverse (has-many) relationships
+            List<String> includeNames = parseIncludeParam(params);
+            if (!includeNames.isEmpty() && !result.data().isEmpty()) {
+                List<Map<String, Object>> included = resolveIncludes(
+                        includeNames, result.data(), collectionName, definition, request);
+                if (!included.isEmpty()) {
+                    response.put("included", included);
+                }
             }
-        }
 
-        return ResponseEntity.ok(response);
+            return ResponseEntity.ok(response);
+        } finally {
+            TenantContext.clear();
+        }
     }
 
     /**
@@ -189,30 +194,35 @@ public class DynamicCollectionRouter {
             return ResponseEntity.notFound().build();
         }
 
-        Optional<Map<String, Object>> record = queryEngine.getById(definition, id);
+        setTenantContext(request);
+        try {
+            Optional<Map<String, Object>> record = queryEngine.getById(definition, id);
 
-        // If not found by ID and the value is not a UUID, try display field lookup
-        if (record.isEmpty() && !UUID_PATTERN.matcher(id).matches()) {
-            record = resolveByDisplayField(definition, id, request);
-        }
-
-        if (record.isEmpty()) {
-            return ResponseEntity.notFound().build();
-        }
-
-        Map<String, Object> response = toJsonApiResponse(record.get(), collectionName, definition);
-
-        // Resolve JSON:API ?include= parameter for inverse (has-many) relationships
-        List<String> includeNames = parseIncludeParam(params);
-        if (!includeNames.isEmpty()) {
-            List<Map<String, Object>> included = resolveIncludes(
-                    includeNames, List.of(record.get()), collectionName, definition, request);
-            if (!included.isEmpty()) {
-                response.put("included", included);
+            // If not found by ID and the value is not a UUID, try display field lookup
+            if (record.isEmpty() && !UUID_PATTERN.matcher(id).matches()) {
+                record = resolveByDisplayField(definition, id, request);
             }
-        }
 
-        return ResponseEntity.ok(response);
+            if (record.isEmpty()) {
+                return ResponseEntity.notFound().build();
+            }
+
+            Map<String, Object> response = toJsonApiResponse(record.get(), collectionName, definition);
+
+            // Resolve JSON:API ?include= parameter for inverse (has-many) relationships
+            List<String> includeNames = parseIncludeParam(params);
+            if (!includeNames.isEmpty()) {
+                List<Map<String, Object>> included = resolveIncludes(
+                        includeNames, List.of(record.get()), collectionName, definition, request);
+                if (!included.isEmpty()) {
+                    response.put("included", included);
+                }
+            }
+
+            return ResponseEntity.ok(response);
+        } finally {
+            TenantContext.clear();
+        }
     }
 
     /**
@@ -451,9 +461,14 @@ public class DynamicCollectionRouter {
         // Inject tenant filter if applicable
         queryRequest = injectTenantFilter(queryRequest, relation.childDef(), request);
 
-        QueryResult result = queryEngine.executeQuery(relation.childDef(), queryRequest);
+        setTenantContext(request);
+        try {
+            QueryResult result = queryEngine.executeQuery(relation.childDef(), queryRequest);
 
-        return ResponseEntity.ok(toJsonApiListResponse(result, childName, relation.childDef()));
+            return ResponseEntity.ok(toJsonApiListResponse(result, childName, relation.childDef()));
+        } finally {
+            TenantContext.clear();
+        }
     }
 
     /**
@@ -482,9 +497,14 @@ public class DynamicCollectionRouter {
             return ResponseEntity.notFound().build();
         }
 
-        Optional<Map<String, Object>> record = queryEngine.getById(relation.childDef(), childId);
-        return record.map(r -> ResponseEntity.ok(toJsonApiResponse(r, childName, relation.childDef())))
-                     .orElse(ResponseEntity.notFound().build());
+        setTenantContext(request);
+        try {
+            Optional<Map<String, Object>> record = queryEngine.getById(relation.childDef(), childId);
+            return record.map(r -> ResponseEntity.ok(toJsonApiResponse(r, childName, relation.childDef())))
+                         .orElse(ResponseEntity.notFound().build());
+        } finally {
+            TenantContext.clear();
+        }
     }
 
     /**

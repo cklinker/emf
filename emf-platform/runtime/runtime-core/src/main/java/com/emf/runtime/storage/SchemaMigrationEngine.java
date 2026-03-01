@@ -252,14 +252,14 @@ public class SchemaMigrationEngine {
         // Detect added fields
         for (FieldDefinition newField : newDefinition.fields()) {
             if (oldDefinition.getField(newField.name()) == null) {
-                migrations.add(createAddColumnMigration(qualifiedName, newDefinition.name(), newField));
+                migrations.add(createAddColumnMigration(qualifiedName, newDefinition, newField));
             }
         }
 
         // Detect removed fields (mark as deprecated, don't drop)
         for (FieldDefinition oldField : oldDefinition.fields()) {
             if (newDefinition.getField(oldField.name()) == null) {
-                migrations.add(createDeprecateColumnMigration(qualifiedName, newDefinition.name(), oldField));
+                migrations.add(createDeprecateColumnMigration(qualifiedName, newDefinition, oldField));
             }
         }
 
@@ -268,7 +268,7 @@ public class SchemaMigrationEngine {
             FieldDefinition oldField = oldDefinition.getField(newField.name());
             if (oldField != null && !oldField.type().equals(newField.type())) {
                 validateTypeChange(newDefinition.name(), oldField, newField);
-                migrations.add(createAlterColumnTypeMigration(qualifiedName, newDefinition.name(), oldField, newField));
+                migrations.add(createAlterColumnTypeMigration(qualifiedName, newDefinition, oldField, newField));
             }
         }
 
@@ -331,20 +331,21 @@ public class SchemaMigrationEngine {
                 continue; // Skip FORMULA, ROLLUP_SUMMARY
             }
 
-            if (!existingColumns.contains(field.name().toLowerCase())) {
-                migrations.add(createAddColumnMigration(qualifiedName, definition.name(), field));
+            String expectedColumn = resolvePhysicalColumnName(definition, field).toLowerCase();
+            if (!existingColumns.contains(expectedColumn)) {
+                migrations.add(createAddColumnMigration(qualifiedName, definition, field));
                 log.info("Reconciliation: column '{}' missing from table '{}', will add",
-                    field.name(), qualifiedName);
+                    expectedColumn, qualifiedName);
             }
 
             // Check companion columns
             if (field.type() == FieldType.CURRENCY
-                    && !existingColumns.contains((field.name() + "_currency_code").toLowerCase())) {
+                    && !existingColumns.contains(expectedColumn + "_currency_code")) {
                 // The companion column is included in the ADD COLUMN migration
                 // No separate action needed
             }
             if (field.type() == FieldType.GEOLOCATION
-                    && !existingColumns.contains((field.name() + "_longitude").toLowerCase())) {
+                    && !existingColumns.contains(expectedColumn + "_longitude")) {
                 // The companion column is included in the ADD COLUMN migration
                 // No separate action needed
             }
@@ -580,9 +581,20 @@ public class SchemaMigrationEngine {
         if (definition.storageConfig() != null && definition.storageConfig().tableName() != null) {
             return definition.storageConfig().tableName();
         }
-        return "tbl_" + definition.name();
+        return definition.name();
     }
     
+    /**
+     * Resolves the physical column name for a field, applying snake_case conversion
+     * for non-system collections.
+     */
+    private String resolvePhysicalColumnName(CollectionDefinition definition, FieldDefinition field) {
+        if (definition.systemCollection()) {
+            return field.name();
+        }
+        return PhysicalTableStorageAdapter.toSnakeCase(field.name());
+    }
+
     private String sanitizeIdentifier(String identifier) {
         if (identifier == null || identifier.isBlank()) {
             throw new IllegalArgumentException("Identifier cannot be null or blank");
@@ -627,18 +639,20 @@ public class SchemaMigrationEngine {
      * Creates an ADD COLUMN migration action.
      * The tableIdentifier may be a bare name or schema-qualified SQL expression.
      */
-    private MigrationAction createAddColumnMigration(String tableIdentifier, String collectionName,
+    private MigrationAction createAddColumnMigration(String tableIdentifier, CollectionDefinition definition,
             FieldDefinition field) {
         if (!field.type().hasPhysicalColumn()) {
             // FORMULA and ROLLUP_SUMMARY have no physical column
-            return new MigrationAction(collectionName, MigrationType.ADD_COLUMN,
+            return new MigrationAction(definition.name(), MigrationType.ADD_COLUMN,
                 "-- No physical column for computed field: " + field.name());
         }
+
+        String columnName = resolvePhysicalColumnName(definition, field);
 
         StringBuilder sql = new StringBuilder("ALTER TABLE ");
         sql.append(tableIdentifier);
         sql.append(" ADD COLUMN ");
-        sql.append(sanitizeIdentifier(field.name()));
+        sql.append(sanitizeIdentifier(columnName));
         sql.append(" ");
         sql.append(mapFieldTypeToSql(field.type()));
 
@@ -652,55 +666,57 @@ public class SchemaMigrationEngine {
         // Companion columns
         if (field.type() == FieldType.CURRENCY) {
             sql.append("; ALTER TABLE ").append(tableIdentifier);
-            sql.append(" ADD COLUMN ").append(sanitizeIdentifier(field.name() + "_currency_code"));
+            sql.append(" ADD COLUMN ").append(sanitizeIdentifier(columnName + "_currency_code"));
             sql.append(" VARCHAR(3)");
         }
         if (field.type() == FieldType.GEOLOCATION) {
             sql.append("; ALTER TABLE ").append(tableIdentifier);
-            sql.append(" ADD COLUMN ").append(sanitizeIdentifier(field.name() + "_longitude"));
+            sql.append(" ADD COLUMN ").append(sanitizeIdentifier(columnName + "_longitude"));
             sql.append(" DOUBLE PRECISION");
         }
 
-        return new MigrationAction(collectionName, MigrationType.ADD_COLUMN, sql.toString());
+        return new MigrationAction(definition.name(), MigrationType.ADD_COLUMN, sql.toString());
     }
 
     /**
      * Creates a DEPRECATE COLUMN migration action.
      * The tableIdentifier may be a bare name or schema-qualified SQL expression.
      */
-    private MigrationAction createDeprecateColumnMigration(String tableIdentifier, String collectionName,
+    private MigrationAction createDeprecateColumnMigration(String tableIdentifier, CollectionDefinition definition,
             FieldDefinition field) {
+        String columnName = resolvePhysicalColumnName(definition, field);
         // Mark column as deprecated by adding a comment
         // We don't drop the column to preserve data
         String sql = String.format(
             "COMMENT ON COLUMN %s.%s IS 'DEPRECATED: This column is no longer in use as of %s'",
             tableIdentifier,
-            sanitizeIdentifier(field.name()),
+            sanitizeIdentifier(columnName),
             Instant.now().toString()
         );
 
-        return new MigrationAction(collectionName, MigrationType.DEPRECATE_COLUMN, sql);
+        return new MigrationAction(definition.name(), MigrationType.DEPRECATE_COLUMN, sql);
     }
 
     /**
      * Creates an ALTER COLUMN TYPE migration action.
      * The tableIdentifier may be a bare name or schema-qualified SQL expression.
      */
-    private MigrationAction createAlterColumnTypeMigration(String tableIdentifier, String collectionName,
+    private MigrationAction createAlterColumnTypeMigration(String tableIdentifier, CollectionDefinition definition,
             FieldDefinition oldField, FieldDefinition newField) {
+        String columnName = resolvePhysicalColumnName(definition, newField);
         String newSqlType = mapFieldTypeToSql(newField.type());
 
         // PostgreSQL syntax for changing column type with USING clause for type conversion
         String sql = String.format(
             "ALTER TABLE %s ALTER COLUMN %s TYPE %s USING %s::%s",
             tableIdentifier,
-            sanitizeIdentifier(newField.name()),
+            sanitizeIdentifier(columnName),
             newSqlType,
-            sanitizeIdentifier(newField.name()),
+            sanitizeIdentifier(columnName),
             newSqlType
         );
 
-        return new MigrationAction(collectionName, MigrationType.ALTER_COLUMN_TYPE, sql);
+        return new MigrationAction(definition.name(), MigrationType.ALTER_COLUMN_TYPE, sql);
     }
     
     private void executeMigration(MigrationAction migration) {

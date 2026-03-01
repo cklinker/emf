@@ -16,7 +16,7 @@ import java.util.Set;
  *
  * <p>Sensible defaults are applied for optional configuration:
  * <ul>
- *   <li>Storage: Mode A (Physical Tables) with table name "tbl_{name}"</li>
+ *   <li>Storage: Mode A (Physical Tables) with table name "{name}"</li>
  *   <li>API: All operations enabled</li>
  *   <li>Authorization: Disabled</li>
  *   <li>Events: Disabled</li>
@@ -35,7 +35,7 @@ import java.util.Set;
  *     .addField(FieldDefinition.requiredString("sku"))
  *     .addField(FieldDefinition.requiredString("name"))
  *     .addField(FieldDefinition.doubleField("price"))
- *     .storageConfig(StorageConfig.physicalTable("tbl_products"))
+ *     .storageConfig(StorageConfig.physicalTable("products"))
  *     .build();
  * }</pre>
  *
@@ -293,7 +293,7 @@ public class CollectionDefinitionBuilder {
      *
      * <p>Applies sensible defaults for optional configuration:
      * <ul>
-     *   <li>Storage: Mode A (Physical Tables) with table name "tbl_{name}"</li>
+     *   <li>Storage: Mode A (Physical Tables) with table name "{name}"</li>
      *   <li>API: All operations enabled at "/api/{name}"</li>
      *   <li>Authorization: Disabled</li>
      *   <li>Events: Disabled</li>
@@ -314,7 +314,7 @@ public class CollectionDefinitionBuilder {
 
         // Apply defaults
         if (storageConfig == null) {
-            storageConfig = new StorageConfig(StorageMode.PHYSICAL_TABLES, "tbl_" + name, Map.of());
+            storageConfig = new StorageConfig(StorageMode.PHYSICAL_TABLES, name, Map.of());
         }
         if (apiConfig == null) {
             apiConfig = ApiConfig.allEnabled("/api/" + name);

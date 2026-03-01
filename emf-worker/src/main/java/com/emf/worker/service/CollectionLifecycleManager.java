@@ -442,7 +442,7 @@ public class CollectionLifecycleManager {
             storageMode = "PHYSICAL_TABLES";
         }
         builder.storageConfig(new StorageConfig(
-                StorageMode.valueOf(storageMode), "tbl_" + collectionName, null));
+                StorageMode.valueOf(storageMode), collectionName, null));
 
         // Parse system collection flag
         Boolean systemCollection = (Boolean) data.get("system_collection");

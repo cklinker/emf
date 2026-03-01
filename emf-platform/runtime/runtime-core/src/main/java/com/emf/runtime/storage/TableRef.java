@@ -8,7 +8,7 @@ import java.util.Objects;
  * <p>Encapsulates the schema and table name, rendering the appropriate SQL identifier:
  * <ul>
  *   <li>For the {@code public} schema: returns the bare table name (e.g., {@code platform_user})</li>
- *   <li>For tenant schemas: returns a double-quoted qualified name (e.g., {@code "acme-corp"."tbl_orders"})</li>
+ *   <li>For tenant schemas: returns a double-quoted qualified name (e.g., {@code "acme-corp"."orders"})</li>
  * </ul>
  *
  * <p>Double-quoting is used for tenant schemas because tenant slugs may contain hyphens,

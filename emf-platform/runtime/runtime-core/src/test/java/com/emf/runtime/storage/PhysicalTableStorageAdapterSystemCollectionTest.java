@@ -392,8 +392,8 @@ class PhysicalTableStorageAdapterSystemCollectionTest {
         }
 
         @Test
-        @DisplayName("Should not remap columns for non-system collections")
-        void query_isNoOp_forNonSystemCollections() {
+        @DisplayName("Should remap audit columns for non-system collections")
+        void query_remapsAuditColumns_forNonSystemCollections() {
             CollectionDefinition nonSystemDef = buildNonSystemCollection();
 
             Map<String, Object> row = new HashMap<>();
@@ -414,11 +414,17 @@ class PhysicalTableStorageAdapterSystemCollectionTest {
             assertFalse(result.data().isEmpty(), "Query should return data");
             Map<String, Object> record = result.data().get(0);
 
-            // For non-system collections, columns should NOT be remapped
+            // For non-system collections, single-word fields keep their names
             assertTrue(record.containsKey("name"),
                     "Non-system collection should preserve 'name' as-is");
             assertTrue(record.containsKey("price"),
                     "Non-system collection should preserve 'price' as-is");
+
+            // Audit columns should be remapped to camelCase
+            assertTrue(record.containsKey("createdAt"),
+                    "Audit column 'created_at' should be remapped to 'createdAt'");
+            assertTrue(record.containsKey("updatedAt"),
+                    "Audit column 'updated_at' should be remapped to 'updatedAt'");
         }
     }
 

@@ -11,6 +11,10 @@ export { AuthProvider, useAuth, AuthContext } from './AuthContext'
 // API context
 export { ApiProvider, useApi } from './ApiContext'
 
+// Collection store context
+export { CollectionStoreProvider, useCollectionStore } from './CollectionStoreContext'
+export type { CollectionStoreValue, StoredField } from './CollectionStoreContext'
+
 // Configuration context
 export { ConfigProvider, useConfig, ConfigContext } from './ConfigContext'
 export type { ConfigContextValue, ConfigProviderProps } from './ConfigContext'

@@ -18,6 +18,17 @@ vi.mock('@/context/ApiContext', () => ({
   })),
 }))
 
+// Mock collection store context
+vi.mock('@/context/CollectionStoreContext', () => ({
+  useCollectionStore: vi.fn(() => ({
+    isLoading: false,
+    collections: [],
+    getCollectionByName: vi.fn(() => undefined),
+    getCollectionById: vi.fn(() => undefined),
+    getFieldById: vi.fn(() => undefined),
+  })),
+}))
+
 // Mock object permissions
 vi.mock('@/hooks/useObjectPermissions', () => ({
   useObjectPermissions: vi.fn(() => ({

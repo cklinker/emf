@@ -97,29 +97,22 @@ export function usePageLayout(
     queryKey: ['page-layout-resolve', collectionId, profileId],
     queryFn: async () => {
       try {
-        // Step 1: Find layout assignment for this collection + profile
-        const assignments = await apiClient.getList<{
+        // Step 1: Find layout assignment for this collection (single query)
+        const allAssignments = await apiClient.getList<{
           id: string
           collectionId: string
-          profileId: string
+          profileId?: string
           layoutId: string
-        }>(
-          `/api/layout-assignments?filter[collectionId][eq]=${collectionId}&filter[profileId][eq]=${profileId}&page[size]=1`
-        )
+          isDefault?: boolean
+        }>(`/api/layout-assignments?filter[collectionId][eq]=${collectionId}&page[size]=10`)
 
-        // Try default assignment if no profile-specific one found
+        // Prefer profile-specific assignment, then fall back to default
         let layoutId: string | undefined
-        if (assignments.length > 0) {
-          layoutId = assignments[0].layoutId
+        const profileMatch = allAssignments.find((a) => a.profileId === profileId)
+        if (profileMatch) {
+          layoutId = profileMatch.layoutId
         } else {
-          // Fall back to default layout assignment for this collection
-          const defaultAssignments = await apiClient.getList<{
-            id: string
-            collectionId: string
-            layoutId: string
-            isDefault: boolean
-          }>(`/api/layout-assignments?filter[collectionId][eq]=${collectionId}&page[size]=10`)
-          const defaultAssignment = defaultAssignments.find((a) => a.isDefault)
+          const defaultAssignment = allAssignments.find((a) => a.isDefault)
           if (defaultAssignment) {
             layoutId = defaultAssignment.layoutId
           }

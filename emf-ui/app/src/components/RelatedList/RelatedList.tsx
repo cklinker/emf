@@ -30,8 +30,11 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { FieldRenderer } from '@/components/FieldRenderer'
 import { useRelatedRecords } from '@/hooks/useRelatedRecords'
-import { useCollectionSchema } from '@/hooks/useCollectionSchema'
+import { useCollectionSchema, fetchCollectionSchema } from '@/hooks/useCollectionSchema'
 import { useObjectPermissions } from '@/hooks/useObjectPermissions'
+import { buildIncludedDisplayMap } from '@/utils/jsonapi'
+import { useApi } from '@/context/ApiContext'
+import { useQueries } from '@tanstack/react-query'
 import type { FieldDefinition } from '@/hooks/useCollectionSchema'
 import type { CollectionRecord } from '@/hooks/useCollectionRecords'
 
@@ -46,6 +49,9 @@ const SYSTEM_FIELDS = new Set([
   'created_by',
   'updated_by',
 ])
+
+/** Reference field types that indicate a foreign key to another collection */
+const REFERENCE_FIELD_TYPES = new Set(['master_detail', 'lookup', 'reference'])
 
 /** Maximum number of columns to display in the related list */
 const MAX_COLUMNS = 4
@@ -97,24 +103,13 @@ export function RelatedList({
 }: RelatedListProps): React.ReactElement {
   const navigate = useNavigate()
   const basePath = `/${tenantSlug}/app`
+  const { apiClient } = useApi()
 
   // Fetch schema for the related collection
   const { schema, fields, isLoading: schemaLoading } = useCollectionSchema(collectionName)
 
   // Fetch permissions for the related collection
   const { permissions } = useObjectPermissions(collectionName)
-
-  // Fetch related records
-  const {
-    data: records,
-    total,
-    isLoading: recordsLoading,
-  } = useRelatedRecords({
-    collectionName,
-    foreignKeyField,
-    parentRecordId,
-    limit,
-  })
 
   // Determine visible columns (exclude system fields and FK field, limit to MAX_COLUMNS)
   const visibleFields = useMemo<FieldDefinition[]>(() => {
@@ -125,6 +120,64 @@ export function RelatedList({
       .filter((f) => f.name !== foreignKeyField)
       .slice(0, MAX_COLUMNS)
   }, [fields, foreignKeyField])
+
+  // Identify reference fields among visible columns for include resolution
+  const referenceFields = useMemo(
+    () => visibleFields.filter((f) => REFERENCE_FIELD_TYPES.has(f.type) && f.referenceTarget),
+    [visibleFields]
+  )
+
+  // Build include param from reference target collection names
+  const includeParam = useMemo(() => {
+    if (referenceFields.length === 0) return undefined
+    const uniqueTargets = [...new Set(referenceFields.map((f) => f.referenceTarget!))]
+    return uniqueTargets.join(',')
+  }, [referenceFields])
+
+  // Fetch related records (wait for schema so include param is stable)
+  const {
+    data: records,
+    total,
+    isLoading: recordsLoading,
+    rawResponse,
+  } = useRelatedRecords({
+    collectionName,
+    foreignKeyField,
+    parentRecordId,
+    limit,
+    include: includeParam,
+    enabled: !schemaLoading,
+  })
+
+  // Fetch schemas for referenced collections to determine their display field names
+  const refSchemaQueries = useQueries({
+    queries: referenceFields.map((f) => ({
+      queryKey: ['collection-schema', f.referenceTarget],
+      queryFn: () => fetchCollectionSchema(apiClient, f.referenceTarget!),
+      enabled: !!f.referenceTarget,
+      staleTime: 5 * 60 * 1000,
+    })),
+  })
+
+  // Build lookup display map from included resources
+  const lookupDisplayMap = useMemo(() => {
+    if (!rawResponse || referenceFields.length === 0) return undefined
+
+    const map: Record<string, Record<string, string>> = {}
+
+    referenceFields.forEach((field, idx) => {
+      const refSchema = refSchemaQueries[idx]?.data
+      const displayField = refSchema?.displayFieldName || 'name'
+      const targetType = field.referenceTarget!
+
+      const fieldMap = buildIncludedDisplayMap(rawResponse, targetType, displayField)
+      if (Object.keys(fieldMap).length > 0) {
+        map[field.name] = fieldMap
+      }
+    })
+
+    return Object.keys(map).length > 0 ? map : undefined
+  }, [rawResponse, referenceFields, refSchemaQueries])
 
   // Display name for the related collection
   const displayLabel =
@@ -225,19 +278,29 @@ export function RelatedList({
                     className="cursor-pointer"
                     onClick={() => handleRowClick(record)}
                   >
-                    {visibleFields.map((field) => (
-                      <TableCell key={field.name} className="max-w-[200px] py-2">
-                        <FieldRenderer
-                          type={field.type}
-                          value={record[field.name]}
-                          fieldName={field.name}
-                          displayName={field.displayName || field.name}
-                          tenantSlug={tenantSlug}
-                          targetCollection={field.referenceTarget}
-                          truncate
-                        />
-                      </TableCell>
-                    ))}
+                    {visibleFields.map((field) => {
+                      const value = record[field.name]
+                      const isRef = REFERENCE_FIELD_TYPES.has(field.type)
+                      const displayLabel =
+                        isRef && lookupDisplayMap?.[field.name]
+                          ? lookupDisplayMap[field.name][String(value)] || undefined
+                          : undefined
+
+                      return (
+                        <TableCell key={field.name} className="max-w-[200px] py-2">
+                          <FieldRenderer
+                            type={field.type}
+                            value={value}
+                            fieldName={field.name}
+                            displayName={field.displayName || field.name}
+                            tenantSlug={tenantSlug}
+                            targetCollection={field.referenceTarget}
+                            displayLabel={displayLabel}
+                            truncate
+                          />
+                        </TableCell>
+                      )
+                    })}
                   </TableRow>
                 ))}
               </TableBody>

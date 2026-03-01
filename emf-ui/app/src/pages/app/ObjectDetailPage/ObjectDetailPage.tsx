@@ -100,7 +100,7 @@ const SYSTEM_FIELDS = new Set([
 const SYSTEM_FIELD_DEFINITIONS: FieldDefinition[] = [
   {
     id: '__sys_createdBy',
-    name: 'createdBy',
+    name: 'created_by',
     displayName: 'Created By',
     type: 'lookup',
     required: false,
@@ -108,14 +108,14 @@ const SYSTEM_FIELD_DEFINITIONS: FieldDefinition[] = [
   },
   {
     id: '__sys_createdAt',
-    name: 'createdAt',
+    name: 'created_at',
     displayName: 'Created',
     type: 'datetime',
     required: false,
   },
   {
     id: '__sys_updatedBy',
-    name: 'updatedBy',
+    name: 'updated_by',
     displayName: 'Updated By',
     type: 'lookup',
     required: false,
@@ -123,7 +123,7 @@ const SYSTEM_FIELD_DEFINITIONS: FieldDefinition[] = [
   },
   {
     id: '__sys_updatedAt',
-    name: 'updatedAt',
+    name: 'updated_at',
     displayName: 'Updated',
     type: 'datetime',
     required: false,
@@ -277,13 +277,18 @@ export function ObjectDetailPage(): React.ReactElement {
       }
     })
 
-    // Build display map for system audit fields (createdBy, updatedBy → users)
+    // Build display map for system audit fields (created_by, updated_by → users)
+    // Both camelCase (system collections) and snake_case (tenant collections) keys
+    // are populated so the map works regardless of which naming convention the
+    // backend uses for a given collection.
     const usersDisplayField =
       collectionStore.getCollectionByName('users')?.displayFieldName || 'email'
     const usersMap = buildIncludedDisplayMap(rawResponse, 'users', usersDisplayField)
     if (Object.keys(usersMap).length > 0) {
       map['createdBy'] = usersMap
       map['updatedBy'] = usersMap
+      map['created_by'] = usersMap
+      map['updated_by'] = usersMap
     }
 
     return Object.keys(map).length > 0 ? map : undefined
@@ -384,8 +389,7 @@ export function ObjectDetailPage(): React.ReactElement {
       if (coll.name === collectionName) continue
       for (const field of coll.fields) {
         if (
-          (field.type === 'master_detail' ||
-            field.type === 'lookup') &&
+          (field.type === 'master_detail' || field.type === 'lookup') &&
           field.referenceTarget === collectionName
         ) {
           related.push({
@@ -396,7 +400,12 @@ export function ObjectDetailPage(): React.ReactElement {
       }
     }
     return related
-  }, [hasLayoutRelatedLists, collectionStore.collections, collectionStore.isLoading, collectionName])
+  }, [
+    hasLayoutRelatedLists,
+    collectionStore.collections,
+    collectionStore.isLoading,
+    collectionName,
+  ])
 
   // Handlers
   const handleEdit = useCallback(() => {

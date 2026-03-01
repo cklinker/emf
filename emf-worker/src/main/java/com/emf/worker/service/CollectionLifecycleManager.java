@@ -417,10 +417,13 @@ public class CollectionLifecycleManager {
         // Inject system audit fields — physical columns on every tenant table
         // but not stored in the field table. Needed so DynamicCollectionRouter
         // serializes createdBy/updatedBy as relationships for include resolution.
-        fields.add(FieldDefinition.datetime("createdAt").withColumnName("created_at"));
-        fields.add(FieldDefinition.lookup("createdBy", "users", "Created By").withColumnName("created_by"));
-        fields.add(FieldDefinition.datetime("updatedAt").withColumnName("updated_at"));
-        fields.add(FieldDefinition.lookup("updatedBy", "users", "Updated By").withColumnName("updated_by"));
+        // Use snake_case names matching the physical column names because the
+        // PhysicalTableStorageAdapter only remaps column→field names for system
+        // collections; tenant collection records retain their raw column names.
+        fields.add(FieldDefinition.datetime("created_at"));
+        fields.add(FieldDefinition.lookup("created_by", "users", "Created By"));
+        fields.add(FieldDefinition.datetime("updated_at"));
+        fields.add(FieldDefinition.lookup("updated_by", "users", "Updated By"));
 
         builder.fields(fields);
 

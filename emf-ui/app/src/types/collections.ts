@@ -35,7 +35,7 @@ export interface FieldDefinition {
   indexed: boolean
   defaultValue?: string
   referenceTarget?: string
-  fieldTypeConfig?: string
+  fieldTypeConfig?: string | Record<string, unknown>
   order: number
   active?: boolean
   description?: string

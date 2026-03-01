@@ -52,11 +52,14 @@ public class JdbcModuleStore implements ModuleStore {
             String id = action.id() != null ? action.id() : UUID.randomUUID().toString();
             jdbcTemplate.update("""
                 INSERT INTO tenant_module_action
-                    (id, tenant_module_id, action_key, name, category, description,
-                     config_schema, input_schema, output_schema, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?::jsonb, NOW())
+                    (id, tenant_module_id, tenant_id, action_key, name, category, description,
+                     config_schema, input_schema, output_schema, created_at, updated_at)
+                VALUES (?, ?,
+                    (SELECT tenant_id FROM tenant_module WHERE id = ?),
+                    ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?::jsonb, NOW(), NOW())
                 """,
-                id, action.tenantModuleId(), action.actionKey(), action.name(),
+                id, action.tenantModuleId(), action.tenantModuleId(),
+                action.actionKey(), action.name(),
                 action.category(), action.description(), action.configSchema(),
                 action.inputSchema(), action.outputSchema());
         }

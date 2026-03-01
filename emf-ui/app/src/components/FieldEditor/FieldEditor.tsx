@@ -89,7 +89,7 @@ export interface FieldDefinition {
   defaultValue?: unknown
   validation?: ValidationRule[]
   referenceTarget?: string
-  fieldTypeConfig?: string
+  fieldTypeConfig?: string | Record<string, unknown>
   order: number
   description?: string
   trackHistory?: boolean
@@ -332,11 +332,16 @@ export function FieldEditor({
   const { t } = useI18n()
   const isEditMode = !!field
 
-  // Parse existing fieldTypeConfig for default values
+  // Parse existing fieldTypeConfig for default values.
+  // fieldTypeConfig may arrive as a parsed object (JSONB column) or a
+  // JSON string depending on the serialization path.  Handle both.
   const parsedConfig = useMemo(() => {
-    if (field?.fieldTypeConfig) {
+    const raw = field?.fieldTypeConfig
+    if (!raw) return {}
+    if (typeof raw === 'object') return raw as Record<string, unknown>
+    if (typeof raw === 'string') {
       try {
-        return JSON.parse(field.fieldTypeConfig) as Record<string, unknown>
+        return JSON.parse(raw) as Record<string, unknown>
       } catch {
         return {}
       }

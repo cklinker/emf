@@ -52,6 +52,8 @@ export interface FieldDefinition {
   required: boolean
   referenceTarget?: string
   referenceCollectionId?: string
+  /** Type-specific config (JSONB — may arrive as parsed object or JSON string) */
+  fieldTypeConfig?: string | Record<string, unknown>
   /** Picklist enum values (populated at runtime by form pages) */
   enumValues?: string[]
   /** Lookup options for reference fields (populated at runtime by form pages) */

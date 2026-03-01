@@ -553,17 +553,22 @@ export function ObjectFormPage(): React.ReactElement {
             // falling back to field-level picklist values.
             let sourceId = field.id
             let sourceType = 'FIELD'
-            const rawConfig = (field as Record<string, unknown>).fieldTypeConfig
+            // fieldTypeConfig may arrive as a parsed object (JSONB column) or a
+            // JSON string depending on the serialization path.  Handle both.
+            const rawConfig = field.fieldTypeConfig
+            let config: { globalPicklistId?: string } | null = null
             if (typeof rawConfig === 'string') {
               try {
-                const config = JSON.parse(rawConfig) as { globalPicklistId?: string }
-                if (config.globalPicklistId) {
-                  sourceId = config.globalPicklistId
-                  sourceType = 'GLOBAL'
-                }
+                config = JSON.parse(rawConfig) as { globalPicklistId?: string }
               } catch {
                 /* ignore malformed config */
               }
+            } else if (rawConfig && typeof rawConfig === 'object') {
+              config = rawConfig as { globalPicklistId?: string }
+            }
+            if (config?.globalPicklistId) {
+              sourceId = config.globalPicklistId
+              sourceType = 'GLOBAL'
             }
             const values = await apiClient.getList<PicklistValueDto>(
               `/api/picklist-values?filter[picklistSourceId][eq]=${encodeURIComponent(sourceId)}&filter[picklistSourceType][eq]=${sourceType}`

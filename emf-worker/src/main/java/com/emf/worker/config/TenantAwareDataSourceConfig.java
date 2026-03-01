@@ -1,6 +1,7 @@
 package com.emf.worker.config;
 
 import com.emf.runtime.context.TenantContext;
+import com.zaxxer.hikari.HikariDataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
@@ -36,9 +37,9 @@ public class TenantAwareDataSourceConfig {
 
     @Bean
     @Primary
-    public DataSource tenantAwareDataSource(DataSource dataSource) {
+    public DataSource tenantAwareDataSource(HikariDataSource hikariDataSource) {
         log.info("Wrapping DataSource with tenant-aware RLS support");
-        return new TenantAwareDataSource(dataSource);
+        return new TenantAwareDataSource(hikariDataSource);
     }
 
     /**

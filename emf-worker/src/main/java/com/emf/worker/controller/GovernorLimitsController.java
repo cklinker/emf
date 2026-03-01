@@ -1,5 +1,6 @@
 package com.emf.worker.controller;
 
+import com.emf.jsonapi.JsonApiResponseBuilder;
 import com.emf.worker.repository.GovernorLimitsRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -19,8 +20,7 @@ import java.util.*;
  * Spring MVC's exact-path matching gives this controller priority over
  * {@code DynamicCollectionRouter}'s {@code {collectionName}} path variable.
  *
- * <p>Returns plain JSON (not JSON:API) because this is a computed/aggregate
- * endpoint, not a standard CRUD collection endpoint.
+ * <p>Returns JSON:API format consistent with other collection endpoints.
  *
  * @since 1.0.0
  */
@@ -75,20 +75,20 @@ public class GovernorLimitsController {
         // Read daily API call count from Redis (tracked by gateway's RateLimitFilter)
         int apiCallsUsed = getDailyApiCallCount(tenantId);
 
-        // Build response
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("limits", limits);
-        response.put("apiCallsUsed", apiCallsUsed);
-        response.put("apiCallsLimit", getIntOrDefault(limits, "apiCallsPerDay", DEFAULT_API_CALLS_PER_DAY));
-        response.put("usersUsed", usersUsed);
-        response.put("usersLimit", getIntOrDefault(limits, "maxUsers", DEFAULT_MAX_USERS));
-        response.put("collectionsUsed", collectionsUsed);
-        response.put("collectionsLimit", getIntOrDefault(limits, "maxCollections", DEFAULT_MAX_COLLECTIONS));
+        // Build attributes
+        Map<String, Object> attributes = new LinkedHashMap<>();
+        attributes.put("limits", limits);
+        attributes.put("apiCallsUsed", apiCallsUsed);
+        attributes.put("apiCallsLimit", getIntOrDefault(limits, "apiCallsPerDay", DEFAULT_API_CALLS_PER_DAY));
+        attributes.put("usersUsed", usersUsed);
+        attributes.put("usersLimit", getIntOrDefault(limits, "maxUsers", DEFAULT_MAX_USERS));
+        attributes.put("collectionsUsed", collectionsUsed);
+        attributes.put("collectionsLimit", getIntOrDefault(limits, "maxCollections", DEFAULT_MAX_COLLECTIONS));
 
         log.info("Returning governor-limits for tenant {}: {} users, {} collections",
                 tenantId, usersUsed, collectionsUsed);
 
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(JsonApiResponseBuilder.single("governor-limits", tenantId, attributes));
     }
 
     /**
@@ -114,10 +114,8 @@ public class GovernorLimitsController {
             return getStatus(tenantId);
         } catch (Exception e) {
             log.error("Failed to update governor-limits for tenant {}: {}", tenantId, e.getMessage());
-            Map<String, Object> error = new LinkedHashMap<>();
-            error.put("error", "Failed to update governor limits");
-            error.put("message", e.getMessage());
-            return ResponseEntity.internalServerError().body(error);
+            return ResponseEntity.internalServerError().body(
+                    JsonApiResponseBuilder.error("500", "Failed to update governor limits", e.getMessage()));
         }
     }
 

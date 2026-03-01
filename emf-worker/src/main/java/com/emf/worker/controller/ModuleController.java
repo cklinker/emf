@@ -1,5 +1,6 @@
 package com.emf.worker.controller;
 
+import com.emf.jsonapi.JsonApiResponseBuilder;
 import com.emf.runtime.event.ModuleChangeType;
 import com.emf.runtime.module.TenantModuleData;
 import com.emf.worker.module.ModuleConfigEventPublisher;
@@ -10,6 +11,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -17,7 +19,7 @@ import java.util.Map;
  * REST endpoints for runtime module management.
  * <p>
  * Provides CRUD operations for installing, enabling, disabling,
- * and uninstalling tenant-scoped modules.
+ * and uninstalling tenant-scoped modules. Returns JSON:API format.
  *
  * @since 1.0.0
  */
@@ -41,16 +43,20 @@ public class ModuleController {
      * Lists all installed modules for the current tenant.
      */
     @GetMapping
-    public ResponseEntity<List<TenantModuleData>> listModules(
+    public ResponseEntity<Map<String, Object>> listModules(
             @RequestHeader("X-Tenant-ID") String tenantId) {
-        return ResponseEntity.ok(runtimeModuleManager.listModules(tenantId));
+        List<TenantModuleData> modules = runtimeModuleManager.listModules(tenantId);
+        List<Map<String, Object>> records = modules.stream()
+                .map(this::moduleToMap)
+                .toList();
+        return ResponseEntity.ok(JsonApiResponseBuilder.collection("modules", records));
     }
 
     /**
      * Installs a module from its manifest.
      */
     @PostMapping("/install")
-    public ResponseEntity<?> installModule(
+    public ResponseEntity<Map<String, Object>> installModule(
             @RequestHeader("X-Tenant-ID") String tenantId,
             @RequestHeader(value = "X-User-ID", required = false) String userId,
             @RequestBody Map<String, Object> body) {
@@ -63,7 +69,7 @@ public class ModuleController {
 
             if (manifestJson == null || manifestJson.isBlank()) {
                 return ResponseEntity.badRequest().body(
-                    Map.of("error", "manifest is required"));
+                    JsonApiResponseBuilder.error("400", "Validation Error", "manifest is required"));
             }
 
             TenantModuleData installed = runtimeModuleManager.installModule(
@@ -72,12 +78,15 @@ public class ModuleController {
 
             eventPublisher.publishEvent(installed, ModuleChangeType.INSTALLED);
 
-            return ResponseEntity.ok(installed);
+            return ResponseEntity.ok(
+                    JsonApiResponseBuilder.single("modules", installed.id(), moduleToAttributes(installed)));
         } catch (IllegalStateException e) {
-            return ResponseEntity.status(409).body(Map.of("error", e.getMessage()));
+            return ResponseEntity.status(409).body(
+                    JsonApiResponseBuilder.error("409", "Conflict", e.getMessage()));
         } catch (Exception e) {
             log.error("Failed to install module: {}", e.getMessage(), e);
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest().body(
+                    JsonApiResponseBuilder.error("400", "Bad Request", e.getMessage()));
         }
     }
 
@@ -85,7 +94,7 @@ public class ModuleController {
      * Enables a module, registering its action handlers.
      */
     @PostMapping("/{moduleId}/enable")
-    public ResponseEntity<?> enableModule(
+    public ResponseEntity<Map<String, Object>> enableModule(
             @RequestHeader("X-Tenant-ID") String tenantId,
             @PathVariable String moduleId) {
         try {
@@ -96,12 +105,16 @@ public class ModuleController {
                 .findFirst();
             module.ifPresent(m -> eventPublisher.publishEvent(m, ModuleChangeType.ENABLED));
 
-            return ResponseEntity.ok(Map.of("status", "enabled", "moduleId", moduleId));
+            Map<String, Object> attrs = new LinkedHashMap<>();
+            attrs.put("status", "enabled");
+            attrs.put("moduleId", moduleId);
+            return ResponseEntity.ok(JsonApiResponseBuilder.single("modules", moduleId, attrs));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
         } catch (Exception e) {
             log.error("Failed to enable module '{}': {}", moduleId, e.getMessage(), e);
-            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.internalServerError().body(
+                    JsonApiResponseBuilder.error("500", "Internal Server Error", e.getMessage()));
         }
     }
 
@@ -109,7 +122,7 @@ public class ModuleController {
      * Disables a module, unregistering its action handlers.
      */
     @PostMapping("/{moduleId}/disable")
-    public ResponseEntity<?> disableModule(
+    public ResponseEntity<Map<String, Object>> disableModule(
             @RequestHeader("X-Tenant-ID") String tenantId,
             @PathVariable String moduleId) {
         try {
@@ -121,12 +134,16 @@ public class ModuleController {
 
             module.ifPresent(m -> eventPublisher.publishEvent(m, ModuleChangeType.DISABLED));
 
-            return ResponseEntity.ok(Map.of("status", "disabled", "moduleId", moduleId));
+            Map<String, Object> attrs = new LinkedHashMap<>();
+            attrs.put("status", "disabled");
+            attrs.put("moduleId", moduleId);
+            return ResponseEntity.ok(JsonApiResponseBuilder.single("modules", moduleId, attrs));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
         } catch (Exception e) {
             log.error("Failed to disable module '{}': {}", moduleId, e.getMessage(), e);
-            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.internalServerError().body(
+                    JsonApiResponseBuilder.error("500", "Internal Server Error", e.getMessage()));
         }
     }
 
@@ -134,7 +151,7 @@ public class ModuleController {
      * Uninstalls a module entirely.
      */
     @DeleteMapping("/{moduleId}")
-    public ResponseEntity<?> uninstallModule(
+    public ResponseEntity<Map<String, Object>> uninstallModule(
             @RequestHeader("X-Tenant-ID") String tenantId,
             @PathVariable String moduleId) {
         try {
@@ -146,12 +163,16 @@ public class ModuleController {
 
             module.ifPresent(m -> eventPublisher.publishEvent(m, ModuleChangeType.UNINSTALLED));
 
-            return ResponseEntity.ok(Map.of("status", "uninstalled", "moduleId", moduleId));
+            Map<String, Object> attrs = new LinkedHashMap<>();
+            attrs.put("status", "uninstalled");
+            attrs.put("moduleId", moduleId);
+            return ResponseEntity.ok(JsonApiResponseBuilder.single("modules", moduleId, attrs));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
         } catch (Exception e) {
             log.error("Failed to uninstall module '{}': {}", moduleId, e.getMessage(), e);
-            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.internalServerError().body(
+                    JsonApiResponseBuilder.error("500", "Internal Server Error", e.getMessage()));
         }
     }
 
@@ -159,7 +180,7 @@ public class ModuleController {
      * Gets the actions provided by a specific module.
      */
     @GetMapping("/{moduleId}/actions")
-    public ResponseEntity<?> getModuleActions(
+    public ResponseEntity<Map<String, Object>> getModuleActions(
             @RequestHeader("X-Tenant-ID") String tenantId,
             @PathVariable String moduleId) {
         var module = runtimeModuleManager.listModules(tenantId).stream()
@@ -170,6 +191,48 @@ public class ModuleController {
             return ResponseEntity.notFound().build();
         }
 
-        return ResponseEntity.ok(module.get().actions());
+        List<Map<String, Object>> actionRecords = module.get().actions().stream()
+                .map(a -> {
+                    Map<String, Object> map = new LinkedHashMap<>();
+                    map.put("id", a.id());
+                    map.put("actionKey", a.actionKey());
+                    map.put("name", a.name());
+                    map.put("category", a.category());
+                    map.put("description", a.description());
+                    return map;
+                })
+                .toList();
+        return ResponseEntity.ok(JsonApiResponseBuilder.collection("module-actions", actionRecords));
+    }
+
+    // =========================================================================
+    // Internal helpers
+    // =========================================================================
+
+    private Map<String, Object> moduleToMap(TenantModuleData m) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("id", m.id());
+        map.put("moduleId", m.moduleId());
+        map.put("name", m.name());
+        map.put("version", m.version());
+        map.put("description", m.description());
+        map.put("status", m.status());
+        map.put("installedBy", m.installedBy());
+        map.put("installedAt", m.installedAt() != null ? m.installedAt().toString() : null);
+        map.put("updatedAt", m.updatedAt() != null ? m.updatedAt().toString() : null);
+        return map;
+    }
+
+    private Map<String, Object> moduleToAttributes(TenantModuleData m) {
+        Map<String, Object> attrs = new LinkedHashMap<>();
+        attrs.put("moduleId", m.moduleId());
+        attrs.put("name", m.name());
+        attrs.put("version", m.version());
+        attrs.put("description", m.description());
+        attrs.put("status", m.status());
+        attrs.put("installedBy", m.installedBy());
+        attrs.put("installedAt", m.installedAt() != null ? m.installedAt().toString() : null);
+        attrs.put("updatedAt", m.updatedAt() != null ? m.updatedAt().toString() : null);
+        return attrs;
     }
 }

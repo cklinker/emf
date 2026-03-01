@@ -88,8 +88,9 @@ public class EmfRuntimeAutoConfiguration {
     @ConditionalOnProperty(name = "emf.storage.mode", havingValue = "PHYSICAL_TABLES", matchIfMissing = true)
     public StorageAdapter physicalTableStorageAdapter(
             JdbcTemplate jdbcTemplate,
-            SchemaMigrationEngine migrationEngine) {
-        return new PhysicalTableStorageAdapter(jdbcTemplate, migrationEngine);
+            SchemaMigrationEngine migrationEngine,
+            com.fasterxml.jackson.databind.ObjectMapper objectMapper) {
+        return new PhysicalTableStorageAdapter(jdbcTemplate, migrationEngine, objectMapper);
     }
     
     /**

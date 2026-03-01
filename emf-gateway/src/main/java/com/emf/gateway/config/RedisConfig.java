@@ -20,7 +20,7 @@ public class RedisConfig {
 
     /**
      * Creates a ReactiveRedisTemplate for String key-value operations.
-     * Used by IncludeResolver for caching JSON:API resources.
+     * Used by rate limiting and permission caching.
      * 
      * @param connectionFactory Reactive Redis connection factory (auto-configured by Spring Boot)
      * @return ReactiveRedisTemplate configured for String operations

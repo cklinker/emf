@@ -41,7 +41,6 @@ import static org.mockito.Mockito.when;
  * 3. RouteAuthorizationFilter - enforces authentication
  * 4. HeaderTransformationFilter - transforms headers for backend
  * 5. Backend routing - forwards to backend service
- * 6. FieldAuthorizationFilter - processes include parameters
  *
  * Validates: Complete request flow through all filters
  */

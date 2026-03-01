@@ -8,7 +8,6 @@
  * - Row click navigation to record detail
  * - Row action menu (Edit, Delete)
  * - Keyboard navigation (Arrow keys, Enter, Space, Home, End, Escape)
- * - Prefetch on hover for instant detail page loading
  * - Virtual scrolling for large datasets (>100 rows)
  */
 
@@ -35,7 +34,6 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { FieldRenderer } from '@/components/FieldRenderer'
 import { useTableKeyboardNav } from '@/hooks/useTableKeyboardNav'
-import { usePrefetch } from '@/hooks/usePrefetch'
 import { cn } from '@/lib/utils'
 import type { FieldDefinition } from '@/hooks/useCollectionSchema'
 import type { CollectionRecord, SortState } from '@/hooks/useCollectionRecords'
@@ -124,8 +122,6 @@ function DataRow({
   tenantSlug,
   lookupDisplayMap,
   onRowClick,
-  onMouseEnter,
-  onMouseLeave,
   onSelectRow,
   onEdit,
   onDelete,
@@ -142,8 +138,6 @@ function DataRow({
   tenantSlug: string | undefined
   lookupDisplayMap?: Record<string, Record<string, string>>
   onRowClick: (record: CollectionRecord) => void
-  onMouseEnter: () => void
-  onMouseLeave: () => void
   onSelectRow: (id: string) => void
   onEdit?: (record: CollectionRecord) => void
   onDelete?: (record: CollectionRecord) => void
@@ -157,8 +151,6 @@ function DataRow({
       aria-selected={rowProps['aria-selected']}
       onFocus={rowProps.onFocus}
       onClick={() => onRowClick(record)}
-      onMouseEnter={onMouseEnter}
-      onMouseLeave={onMouseLeave}
     >
       {/* Checkbox */}
       <TableCell className="w-[40px]" onClick={(e) => e.stopPropagation()}>
@@ -268,9 +260,6 @@ export function ObjectDataTable({
     },
     enabled: !isLoading && records.length > 0,
   })
-
-  // Prefetch on hover
-  const { prefetchRecord, cancelPrefetch } = usePrefetch({ collectionName })
 
   // Virtual row virtualizer (only active when useVirtual is true)
   const virtualizer = useVirtualizer({
@@ -430,8 +419,6 @@ export function ObjectDataTable({
                 tenantSlug={tenantSlug}
                 lookupDisplayMap={lookupDisplayMap}
                 onRowClick={handleRowClick}
-                onMouseEnter={() => prefetchRecord(record.id)}
-                onMouseLeave={cancelPrefetch}
                 onSelectRow={handleSelectRow}
                 onEdit={onEdit}
                 onDelete={onDelete}
@@ -468,8 +455,6 @@ export function ObjectDataTable({
           tenantSlug={tenantSlug}
           lookupDisplayMap={lookupDisplayMap}
           onRowClick={handleRowClick}
-          onMouseEnter={() => prefetchRecord(record.id)}
-          onMouseLeave={cancelPrefetch}
           onSelectRow={handleSelectRow}
           onEdit={onEdit}
           onDelete={onDelete}

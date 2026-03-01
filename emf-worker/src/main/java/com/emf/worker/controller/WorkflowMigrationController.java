@@ -1,18 +1,15 @@
 package com.emf.worker.controller;
 
 import com.emf.runtime.flow.WorkflowRuleToFlowMigrator;
-import com.emf.runtime.workflow.WorkflowActionData;
 import com.emf.runtime.workflow.WorkflowRuleData;
-import com.fasterxml.jackson.core.type.TypeReference;
+import com.emf.worker.repository.WorkflowMigrationRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.http.ResponseEntity;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.Instant;
 import java.util.*;
 
 /**
@@ -29,13 +26,14 @@ public class WorkflowMigrationController {
 
     private static final Logger log = LoggerFactory.getLogger(WorkflowMigrationController.class);
 
-    private final JdbcTemplate jdbc;
+    private final WorkflowMigrationRepository repository;
     private final ObjectMapper objectMapper;
     private final WorkflowRuleToFlowMigrator migrator;
 
-    public WorkflowMigrationController(JdbcTemplate jdbc, ObjectMapper objectMapper,
+    public WorkflowMigrationController(WorkflowMigrationRepository repository,
+                                        ObjectMapper objectMapper,
                                         WorkflowRuleToFlowMigrator migrator) {
-        this.jdbc = jdbc;
+        this.repository = repository;
         this.objectMapper = objectMapper;
         this.migrator = migrator;
     }
@@ -54,7 +52,7 @@ public class WorkflowMigrationController {
 
         log.info("Starting workflow rule migration for tenant {} (dryRun={})", tenantId, dryRun);
 
-        List<WorkflowRuleData> rules = loadRulesForTenant(tenantId);
+        List<WorkflowRuleData> rules = repository.findRulesForTenant(tenantId);
 
         List<Map<String, Object>> results = new ArrayList<>();
         int successCount = 0;
@@ -111,11 +109,12 @@ public class WorkflowMigrationController {
             @PathVariable String ruleId,
             @RequestParam(defaultValue = "false") boolean dryRun) {
 
-        WorkflowRuleData rule = loadRuleById(ruleId);
-        if (rule == null) {
+        Optional<WorkflowRuleData> ruleOpt = repository.findRuleById(ruleId);
+        if (ruleOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
 
+        WorkflowRuleData rule = ruleOpt.get();
         var migrationResult = migrator.migrate(rule);
         Map<String, Object> report = new LinkedHashMap<>();
         report.put("ruleId", rule.id());
@@ -137,107 +136,6 @@ public class WorkflowMigrationController {
         return ResponseEntity.ok(report);
     }
 
-    private List<WorkflowRuleData> loadRulesForTenant(String tenantId) {
-        String sql = """
-            SELECT wr.id, wr.tenant_id, wr.collection_id, c.name as collection_name,
-                   wr.name, wr.description, wr.active, wr.trigger_type,
-                   wr.filter_formula, wr.re_evaluate_on_update, wr.execution_order,
-                   wr.error_handling, wr.trigger_fields, wr.cron_expression,
-                   wr.timezone, wr.last_scheduled_run, wr.execution_mode
-            FROM workflow_rule wr
-            LEFT JOIN collection c ON wr.collection_id = c.id
-            WHERE wr.tenant_id = ?
-            ORDER BY wr.execution_order
-            """;
-
-        return jdbc.query(sql, (rs, rowNum) -> {
-            String ruleId = rs.getString("id");
-            List<WorkflowActionData> actions = loadActionsForRule(ruleId);
-            List<String> triggerFields = parseTriggerFields(rs.getString("trigger_fields"));
-            Instant lastRun = rs.getTimestamp("last_scheduled_run") != null
-                    ? rs.getTimestamp("last_scheduled_run").toInstant() : null;
-
-            return new WorkflowRuleData(
-                    ruleId,
-                    rs.getString("tenant_id"),
-                    rs.getString("collection_id"),
-                    rs.getString("collection_name"),
-                    rs.getString("name"),
-                    rs.getString("description"),
-                    rs.getBoolean("active"),
-                    rs.getString("trigger_type"),
-                    rs.getString("filter_formula"),
-                    rs.getBoolean("re_evaluate_on_update"),
-                    rs.getInt("execution_order"),
-                    rs.getString("error_handling"),
-                    triggerFields,
-                    rs.getString("cron_expression"),
-                    rs.getString("timezone"),
-                    lastRun,
-                    rs.getString("execution_mode"),
-                    actions
-            );
-        }, tenantId);
-    }
-
-    private WorkflowRuleData loadRuleById(String ruleId) {
-        String sql = """
-            SELECT wr.id, wr.tenant_id, wr.collection_id, c.name as collection_name,
-                   wr.name, wr.description, wr.active, wr.trigger_type,
-                   wr.filter_formula, wr.re_evaluate_on_update, wr.execution_order,
-                   wr.error_handling, wr.trigger_fields, wr.cron_expression,
-                   wr.timezone, wr.last_scheduled_run, wr.execution_mode
-            FROM workflow_rule wr
-            LEFT JOIN collection c ON wr.collection_id = c.id
-            WHERE wr.id = ?
-            """;
-
-        return jdbc.query(sql, (rs, rowNum) -> {
-            List<WorkflowActionData> actions = loadActionsForRule(ruleId);
-            List<String> triggerFields = parseTriggerFields(rs.getString("trigger_fields"));
-            Instant lastRun = rs.getTimestamp("last_scheduled_run") != null
-                    ? rs.getTimestamp("last_scheduled_run").toInstant() : null;
-
-            return new WorkflowRuleData(
-                    rs.getString("id"),
-                    rs.getString("tenant_id"),
-                    rs.getString("collection_id"),
-                    rs.getString("collection_name"),
-                    rs.getString("name"),
-                    rs.getString("description"),
-                    rs.getBoolean("active"),
-                    rs.getString("trigger_type"),
-                    rs.getString("filter_formula"),
-                    rs.getBoolean("re_evaluate_on_update"),
-                    rs.getInt("execution_order"),
-                    rs.getString("error_handling"),
-                    triggerFields,
-                    rs.getString("cron_expression"),
-                    rs.getString("timezone"),
-                    lastRun,
-                    rs.getString("execution_mode"),
-                    actions
-            );
-        }, ruleId).stream().findFirst().orElse(null);
-    }
-
-    private List<WorkflowActionData> loadActionsForRule(String ruleId) {
-        return jdbc.query(
-                "SELECT * FROM workflow_action WHERE workflow_rule_id = ? ORDER BY execution_order",
-                (rs, rowNum) -> new WorkflowActionData(
-                        rs.getString("id"),
-                        rs.getString("action_type"),
-                        rs.getInt("execution_order"),
-                        rs.getString("config"),
-                        rs.getBoolean("active"),
-                        rs.getInt("retry_count"),
-                        rs.getInt("retry_delay_seconds"),
-                        rs.getString("retry_backoff")
-                ),
-                ruleId
-        );
-    }
-
     private String createFlow(String tenantId, WorkflowRuleData rule,
                                WorkflowRuleToFlowMigrator.MigrationResult migrationResult) {
         String flowId = UUID.randomUUID().toString();
@@ -245,17 +143,11 @@ public class WorkflowMigrationController {
             String definitionJson = objectMapper.writeValueAsString(migrationResult.definition());
             String triggerConfigJson = objectMapper.writeValueAsString(migrationResult.triggerConfig());
 
-            jdbc.update("""
-                INSERT INTO flow (id, tenant_id, name, description, flow_type, active,
-                                  definition, trigger_config, created_by, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, false, ?::jsonb, ?::jsonb, 'system-migration', NOW(), NOW())
-                """,
-                    flowId, tenantId,
+            repository.createFlow(flowId, tenantId,
                     "[Migrated] " + rule.name(),
                     "Migrated from workflow rule: " + rule.id(),
                     migrationResult.flowType(),
-                    definitionJson, triggerConfigJson
-            );
+                    definitionJson, triggerConfigJson);
 
             log.info("Created flow {} from workflow rule {} for tenant {}",
                     flowId, rule.id(), tenantId);
@@ -263,16 +155,5 @@ public class WorkflowMigrationController {
             throw new RuntimeException("Failed to create flow: " + e.getMessage(), e);
         }
         return flowId;
-    }
-
-    private List<String> parseTriggerFields(String json) {
-        if (json == null || json.isBlank()) {
-            return List.of();
-        }
-        try {
-            return objectMapper.readValue(json, new TypeReference<>() {});
-        } catch (Exception e) {
-            return List.of();
-        }
     }
 }

@@ -1,12 +1,11 @@
 package com.emf.worker.controller;
 
 import com.emf.runtime.flow.*;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.emf.worker.repository.FlowRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.http.ResponseEntity;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
@@ -26,27 +25,19 @@ public class FlowExecutionController {
 
     private static final Logger log = LoggerFactory.getLogger(FlowExecutionController.class);
 
-    private static final String SELECT_FLOW_BY_ID = """
-            SELECT id, tenant_id, name, definition, trigger_config, flow_type, active
-            FROM flow WHERE id = ?
-            """;
-
     private final FlowEngine flowEngine;
     private final FlowStore flowStore;
     private final InitialStateBuilder initialStateBuilder;
-    private final JdbcTemplate jdbcTemplate;
-    private final ObjectMapper objectMapper;
+    private final FlowRepository flowRepository;
 
     public FlowExecutionController(FlowEngine flowEngine,
                                     FlowStore flowStore,
                                     InitialStateBuilder initialStateBuilder,
-                                    JdbcTemplate jdbcTemplate,
-                                    ObjectMapper objectMapper) {
+                                    FlowRepository flowRepository) {
         this.flowEngine = flowEngine;
         this.flowStore = flowStore;
         this.initialStateBuilder = initialStateBuilder;
-        this.jdbcTemplate = jdbcTemplate;
-        this.objectMapper = objectMapper;
+        this.flowRepository = flowRepository;
     }
 
     /**
@@ -70,11 +61,12 @@ public class FlowExecutionController {
         log.debug("Execute flow request: flowId={}, tenantId={}", flowId, tenantId);
 
         // Load the flow definition
-        Map<String, Object> flow = loadFlow(flowId);
-        if (flow == null) {
+        Optional<Map<String, Object>> flowOpt = flowRepository.findFlowById(flowId);
+        if (flowOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
 
+        Map<String, Object> flow = flowOpt.get();
         String definitionJson = (String) flow.get("definition");
         if (definitionJson == null || definitionJson.isBlank()) {
             Map<String, Object> error = new LinkedHashMap<>();
@@ -267,14 +259,14 @@ public class FlowExecutionController {
         }
 
         // Load the flow definition
-        Map<String, Object> flow = loadFlow(exec.flowId());
-        if (flow == null) {
+        Optional<Map<String, Object>> flowOpt = flowRepository.findFlowById(exec.flowId());
+        if (flowOpt.isEmpty()) {
             Map<String, Object> error = new LinkedHashMap<>();
             error.put("error", "Flow not found: " + exec.flowId());
             return ResponseEntity.badRequest().body(error);
         }
 
-        String definitionJson = (String) flow.get("definition");
+        String definitionJson = (String) flowOpt.get().get("definition");
         if (definitionJson == null || definitionJson.isBlank()) {
             Map<String, Object> error = new LinkedHashMap<>();
             error.put("error", "Flow has no definition");
@@ -391,12 +383,12 @@ public class FlowExecutionController {
 
         log.debug("Publish flow version request: flowId={}", flowId);
 
-        Map<String, Object> flow = loadFlow(flowId);
-        if (flow == null) {
+        Optional<Map<String, Object>> flowOpt = flowRepository.findFlowById(flowId);
+        if (flowOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
 
-        String definition = (String) flow.get("definition");
+        String definition = (String) flowOpt.get().get("definition");
         if (definition == null || definition.isBlank()) {
             Map<String, Object> error = new LinkedHashMap<>();
             error.put("error", "Flow has no definition to publish");
@@ -406,21 +398,14 @@ public class FlowExecutionController {
         String changeSummary = body != null ? (String) body.get("changeSummary") : null;
 
         // Get next version number
-        Integer currentVersion = jdbcTemplate.queryForObject(
-                "SELECT COALESCE(MAX(version_number), 0) FROM flow_version WHERE flow_id = ?",
-                Integer.class, flowId);
-        int nextVersion = (currentVersion != null ? currentVersion : 0) + 1;
+        int nextVersion = flowRepository.getMaxVersionNumber(flowId) + 1;
 
         String versionId = UUID.randomUUID().toString();
 
-        jdbcTemplate.update(
-                "INSERT INTO flow_version (id, flow_id, version_number, definition, change_summary, created_by) VALUES (?, ?, ?, ?::jsonb, ?, ?)",
-                versionId, flowId, nextVersion, definition,
+        flowRepository.insertFlowVersion(versionId, flowId, nextVersion, definition,
                 changeSummary, userId != null ? userId : "system");
 
-        jdbcTemplate.update(
-                "UPDATE flow SET published_version = ?, version = ? WHERE id = ?",
-                nextVersion, nextVersion, flowId);
+        flowRepository.updateFlowPublishedVersion(flowId, nextVersion);
 
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("flowId", flowId);
@@ -442,9 +427,7 @@ public class FlowExecutionController {
     public ResponseEntity<Map<String, Object>> listVersions(@PathVariable String flowId) {
         log.debug("List flow versions request: flowId={}", flowId);
 
-        List<Map<String, Object>> versions = jdbcTemplate.queryForList(
-                "SELECT id, version_number, change_summary, created_by, created_at FROM flow_version WHERE flow_id = ? ORDER BY version_number DESC",
-                flowId);
+        List<Map<String, Object>> versions = flowRepository.findFlowVersions(flowId);
 
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("flowId", flowId);
@@ -468,36 +451,17 @@ public class FlowExecutionController {
 
         log.debug("Get flow version request: flowId={}, version={}", flowId, versionNumber);
 
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                "SELECT id, version_number, definition, change_summary, created_by, created_at FROM flow_version WHERE flow_id = ? AND version_number = ?",
-                flowId, versionNumber);
-
-        if (rows.isEmpty()) {
+        Optional<Map<String, Object>> versionOpt = flowRepository.findFlowVersion(flowId, versionNumber);
+        if (versionOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
 
-        // Convert JSONB PGobject to String for consistent JSON serialization
-        Map<String, Object> version = new LinkedHashMap<>(rows.get(0));
-        version.computeIfPresent("definition", (k, v) -> v != null ? v.toString() : null);
-        return ResponseEntity.ok(version);
+        return ResponseEntity.ok(versionOpt.get());
     }
 
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
-
-    private Map<String, Object> loadFlow(String flowId) {
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList(SELECT_FLOW_BY_ID, flowId);
-        if (rows.isEmpty()) {
-            return null;
-        }
-        // Convert JSONB PGobject values to plain Strings so callers can safely cast.
-        // JdbcTemplate.queryForList() returns JSONB columns as PGobject, not String.
-        Map<String, Object> row = new LinkedHashMap<>(rows.get(0));
-        row.computeIfPresent("definition", (k, v) -> v != null ? v.toString() : null);
-        row.computeIfPresent("trigger_config", (k, v) -> v != null ? v.toString() : null);
-        return row;
-    }
 
     private Map<String, Object> executionToMap(FlowExecutionData exec) {
         Map<String, Object> map = new LinkedHashMap<>();

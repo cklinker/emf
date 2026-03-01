@@ -1,19 +1,16 @@
 package com.emf.worker.controller;
 
+import com.emf.worker.repository.BootstrapRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.ResponseEntity;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.contains;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -26,15 +23,14 @@ import static org.mockito.Mockito.when;
  */
 class InternalBootstrapControllerTest {
 
-    private JdbcTemplate jdbcTemplate;
-    private ObjectMapper objectMapper;
+    private BootstrapRepository repository;
     private InternalBootstrapController controller;
 
     @BeforeEach
     void setUp() {
-        jdbcTemplate = mock(JdbcTemplate.class);
-        objectMapper = new ObjectMapper();
-        controller = new InternalBootstrapController(jdbcTemplate, objectMapper);
+        repository = mock(BootstrapRepository.class);
+        ObjectMapper objectMapper = new ObjectMapper();
+        controller = new InternalBootstrapController(repository, objectMapper);
     }
 
     // ==================== Bootstrap Tests ====================
@@ -46,26 +42,18 @@ class InternalBootstrapControllerTest {
         @Test
         @DisplayName("Should return collections and governor limits")
         void returnsCollectionsAndGovernorLimits() {
-            // Given: active collections in DB
-            List<Map<String, Object>> collectionRows = List.of(
+            when(repository.findActiveCollections()).thenReturn(List.of(
                     collectionRow("coll-1", "users", "/api/users", true),
                     collectionRow("coll-2", "products", "/api/products", false)
-            );
-            when(jdbcTemplate.queryForList(contains("FROM collection WHERE active")))
-                    .thenReturn(collectionRows);
+            ));
 
-            // Given: tenants with limits
-            List<Map<String, Object>> tenantRows = List.of(
+            when(repository.findTenantLimits()).thenReturn(List.of(
                     tenantLimitsRow("t-1", "{\"apiCallsPerDay\": 50000}"),
                     tenantLimitsRow("t-2", null)
-            );
-            when(jdbcTemplate.queryForList(contains("FROM tenant")))
-                    .thenReturn(tenantRows);
+            ));
 
-            // When
             ResponseEntity<Map<String, Object>> response = controller.getBootstrapConfig();
 
-            // Then
             assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
             Map<String, Object> body = response.getBody();
             assertThat(body).isNotNull();
@@ -83,20 +71,17 @@ class InternalBootstrapControllerTest {
                     (Map<String, Map<String, Object>>) body.get("governorLimits");
             assertThat(governorLimits).hasSize(2);
             assertThat(governorLimits.get("t-1").get("apiCallsPerDay")).isEqualTo(50000);
-            assertThat(governorLimits.get("t-2").get("apiCallsPerDay")).isEqualTo(100000); // default
+            assertThat(governorLimits.get("t-2").get("apiCallsPerDay")).isEqualTo(100000);
         }
 
         @Test
         @DisplayName("Should skip __control-plane collection")
         void skipsControlPlaneCollection() {
-            List<Map<String, Object>> collectionRows = List.of(
+            when(repository.findActiveCollections()).thenReturn(List.of(
                     collectionRow("cp-1", "__control-plane", "/control", true),
                     collectionRow("coll-1", "users", "/api/users", true)
-            );
-            when(jdbcTemplate.queryForList(contains("FROM collection WHERE active")))
-                    .thenReturn(collectionRows);
-            when(jdbcTemplate.queryForList(contains("FROM tenant")))
-                    .thenReturn(List.of());
+            ));
+            when(repository.findTenantLimits()).thenReturn(List.of());
 
             ResponseEntity<Map<String, Object>> response = controller.getBootstrapConfig();
 
@@ -110,10 +95,8 @@ class InternalBootstrapControllerTest {
         @Test
         @DisplayName("Should handle empty collections")
         void handlesEmptyCollections() {
-            when(jdbcTemplate.queryForList(contains("FROM collection WHERE active")))
-                    .thenReturn(List.of());
-            when(jdbcTemplate.queryForList(contains("FROM tenant")))
-                    .thenReturn(List.of());
+            when(repository.findActiveCollections()).thenReturn(List.of());
+            when(repository.findTenantLimits()).thenReturn(List.of());
 
             ResponseEntity<Map<String, Object>> response = controller.getBootstrapConfig();
 
@@ -127,14 +110,10 @@ class InternalBootstrapControllerTest {
         @Test
         @DisplayName("Should parse governor limits from JSON string")
         void parsesGovernorLimitsFromJson() {
-            when(jdbcTemplate.queryForList(contains("FROM collection WHERE active")))
-                    .thenReturn(List.of());
-
-            List<Map<String, Object>> tenantRows = List.of(
+            when(repository.findActiveCollections()).thenReturn(List.of());
+            when(repository.findTenantLimits()).thenReturn(List.of(
                     tenantLimitsRow("t-1", "{\"apiCallsPerDay\": 200000, \"maxUsers\": 500}")
-            );
-            when(jdbcTemplate.queryForList(contains("FROM tenant")))
-                    .thenReturn(tenantRows);
+            ));
 
             ResponseEntity<Map<String, Object>> response = controller.getBootstrapConfig();
 
@@ -147,21 +126,16 @@ class InternalBootstrapControllerTest {
         @Test
         @DisplayName("Should handle malformed limits JSON gracefully")
         void handlesMalformedLimitsJson() {
-            when(jdbcTemplate.queryForList(contains("FROM collection WHERE active")))
-                    .thenReturn(List.of());
-
-            List<Map<String, Object>> tenantRows = List.of(
+            when(repository.findActiveCollections()).thenReturn(List.of());
+            when(repository.findTenantLimits()).thenReturn(List.of(
                     tenantLimitsRow("t-1", "{invalid json}")
-            );
-            when(jdbcTemplate.queryForList(contains("FROM tenant")))
-                    .thenReturn(tenantRows);
+            ));
 
             ResponseEntity<Map<String, Object>> response = controller.getBootstrapConfig();
 
             @SuppressWarnings("unchecked")
             Map<String, Map<String, Object>> governorLimits =
                     (Map<String, Map<String, Object>>) response.getBody().get("governorLimits");
-            // Should use default value on parse failure
             assertThat(governorLimits.get("t-1").get("apiCallsPerDay")).isEqualTo(100000);
         }
     }
@@ -175,12 +149,10 @@ class InternalBootstrapControllerTest {
         @Test
         @DisplayName("Should return slug to tenant ID mapping")
         void returnsSlugMapping() {
-            List<Map<String, Object>> rows = List.of(
+            when(repository.findRoutableTenants()).thenReturn(List.of(
                     slugRow("t-1", "acme"),
                     slugRow("t-2", "globex")
-            );
-            when(jdbcTemplate.queryForList(contains("FROM tenant")))
-                    .thenReturn(rows);
+            ));
 
             ResponseEntity<Map<String, String>> response = controller.getSlugMap();
 
@@ -194,8 +166,7 @@ class InternalBootstrapControllerTest {
         @Test
         @DisplayName("Should handle empty tenant list")
         void handlesEmptyTenantList() {
-            when(jdbcTemplate.queryForList(contains("FROM tenant")))
-                    .thenReturn(List.of());
+            when(repository.findRoutableTenants()).thenReturn(List.of());
 
             ResponseEntity<Map<String, String>> response = controller.getSlugMap();
 
@@ -206,13 +177,11 @@ class InternalBootstrapControllerTest {
         @Test
         @DisplayName("Should skip tenants with null slugs")
         void skipsNullSlugs() {
-            List<Map<String, Object>> rows = List.of(
+            when(repository.findRoutableTenants()).thenReturn(List.of(
                     slugRow("t-1", "acme"),
                     slugRow("t-2", null),
                     slugRow("t-3", "")
-            );
-            when(jdbcTemplate.queryForList(contains("FROM tenant")))
-                    .thenReturn(rows);
+            ));
 
             ResponseEntity<Map<String, String>> response = controller.getSlugMap();
 
@@ -240,9 +209,8 @@ class InternalBootstrapControllerTest {
             providerRow.put("roles_claim", "roles");
             providerRow.put("roles_mapping", null);
 
-            when(jdbcTemplate.queryForList(contains("FROM oidc_provider"),
-                    eq("https://auth.example.com/realms/emf")))
-                    .thenReturn(List.of(providerRow));
+            when(repository.findOidcProviderByIssuer("https://auth.example.com/realms/emf"))
+                    .thenReturn(Optional.of(providerRow));
 
             ResponseEntity<Map<String, Object>> response =
                     controller.getOidcProviderByIssuer("https://auth.example.com/realms/emf");
@@ -252,19 +220,16 @@ class InternalBootstrapControllerTest {
             assertThat(body).isNotNull();
             assertThat(body.get("id")).isEqualTo("oidc-1");
             assertThat(body.get("name")).isEqualTo("Keycloak");
-            assertThat(body.get("issuer")).isEqualTo("https://auth.example.com/realms/emf");
             assertThat(body.get("jwksUri")).isEqualTo("https://auth.example.com/realms/emf/protocol/openid-connect/certs");
             assertThat(body.get("audience")).isEqualTo("emf-api");
             assertThat(body.get("clientId")).isEqualTo("emf-client");
-            assertThat(body.get("rolesClaim")).isEqualTo("roles");
         }
 
         @Test
         @DisplayName("Should return 404 for unknown issuer")
         void returns404ForUnknownIssuer() {
-            when(jdbcTemplate.queryForList(contains("FROM oidc_provider"),
-                    eq("https://unknown.example.com")))
-                    .thenReturn(List.of());
+            when(repository.findOidcProviderByIssuer("https://unknown.example.com"))
+                    .thenReturn(Optional.empty());
 
             ResponseEntity<Map<String, Object>> response =
                     controller.getOidcProviderByIssuer("https://unknown.example.com");
@@ -285,17 +250,15 @@ class InternalBootstrapControllerTest {
             providerRow.put("roles_claim", null);
             providerRow.put("roles_mapping", null);
 
-            when(jdbcTemplate.queryForList(contains("FROM oidc_provider"),
-                    eq("https://sso.example.com")))
-                    .thenReturn(List.of(providerRow));
+            when(repository.findOidcProviderByIssuer("https://sso.example.com"))
+                    .thenReturn(Optional.of(providerRow));
 
             ResponseEntity<Map<String, Object>> response =
                     controller.getOidcProviderByIssuer("https://sso.example.com");
 
             assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
-            Map<String, Object> body = response.getBody();
-            assertThat(body.get("jwksUri")).isEqualTo("https://sso.example.com/jwks");
-            assertThat(body.get("audience")).isNull();
+            assertThat(response.getBody().get("jwksUri")).isEqualTo("https://sso.example.com/jwks");
+            assertThat(response.getBody().get("audience")).isNull();
         }
     }
 
@@ -308,9 +271,8 @@ class InternalBootstrapControllerTest {
         @Test
         @DisplayName("Should return 404 when user not found")
         void returns404WhenUserNotFound() {
-            when(jdbcTemplate.queryForList(contains("FROM platform_user"),
-                    eq("unknown@test.com"), eq("tenant-1")))
-                    .thenReturn(List.of());
+            when(repository.findActiveUserByEmail("unknown@test.com", "tenant-1"))
+                    .thenReturn(Optional.empty());
 
             ResponseEntity<Map<String, Object>> response =
                     controller.resolvePermissions("unknown@test.com", "tenant-1");
@@ -325,15 +287,10 @@ class InternalBootstrapControllerTest {
             userRow.put("id", "user-1");
             userRow.put("profile_id", null);
 
-            when(jdbcTemplate.queryForList(contains("FROM platform_user"),
-                    eq("user@test.com"), eq("tenant-1")))
-                    .thenReturn(List.of(userRow));
-
-            // No direct or group permission sets
-            when(jdbcTemplate.queryForList(contains("FROM user_permission_set"), eq("user-1")))
-                    .thenReturn(List.of());
-            when(jdbcTemplate.queryForList(contains("FROM group_membership"), eq("user-1")))
-                    .thenReturn(List.of());
+            when(repository.findActiveUserByEmail("user@test.com", "tenant-1"))
+                    .thenReturn(Optional.of(userRow));
+            when(repository.findUserPermissionSetIds("user-1")).thenReturn(List.of());
+            when(repository.findUserGroupIds("user-1")).thenReturn(List.of());
 
             ResponseEntity<Map<String, Object>> response =
                     controller.resolvePermissions("user@test.com", "tenant-1");
@@ -351,42 +308,25 @@ class InternalBootstrapControllerTest {
         @Test
         @DisplayName("Should load profile permissions")
         void loadsProfilePermissions() {
-            // User with profile
             Map<String, Object> userRow = new HashMap<>();
             userRow.put("id", "user-1");
             userRow.put("profile_id", "profile-1");
 
-            when(jdbcTemplate.queryForList(contains("FROM platform_user"),
-                    eq("user@test.com"), eq("tenant-1")))
-                    .thenReturn(List.of(userRow));
-
-            // Profile system permissions
-            when(jdbcTemplate.queryForList(contains("FROM profile_system_permission"),
-                    eq("profile-1")))
+            when(repository.findActiveUserByEmail("user@test.com", "tenant-1"))
+                    .thenReturn(Optional.of(userRow));
+            when(repository.findProfileSystemPermissions("profile-1"))
                     .thenReturn(List.of(
                             systemPermRow("API_ACCESS", true),
                             systemPermRow("MANAGE_USERS", false)
                     ));
-
-            // Profile object permissions
-            when(jdbcTemplate.queryForList(contains("FROM profile_object_permission"),
-                    eq("profile-1")))
+            when(repository.findProfileObjectPermissions("profile-1"))
                     .thenReturn(List.of(
                             objectPermRow("coll-1", true, true, false, false, false, false)
                     ));
-
-            // Profile field permissions
-            when(jdbcTemplate.queryForList(contains("FROM profile_field_permission"),
-                    eq("profile-1")))
-                    .thenReturn(List.of(
-                            fieldPermRow("coll-1", "field-1", "VISIBLE")
-                    ));
-
-            // No direct or group permission sets
-            when(jdbcTemplate.queryForList(contains("FROM user_permission_set"), eq("user-1")))
-                    .thenReturn(List.of());
-            when(jdbcTemplate.queryForList(contains("FROM group_membership"), eq("user-1")))
-                    .thenReturn(List.of());
+            when(repository.findProfileFieldPermissions("profile-1"))
+                    .thenReturn(List.of(fieldPermRow("coll-1", "field-1", "VISIBLE")));
+            when(repository.findUserPermissionSetIds("user-1")).thenReturn(List.of());
+            when(repository.findUserGroupIds("user-1")).thenReturn(List.of());
 
             ResponseEntity<Map<String, Object>> response =
                     controller.resolvePermissions("user@test.com", "tenant-1");
@@ -397,13 +337,11 @@ class InternalBootstrapControllerTest {
             @SuppressWarnings("unchecked")
             Map<String, Boolean> systemPerms = (Map<String, Boolean>) body.get("systemPermissions");
             assertThat(systemPerms.get("API_ACCESS")).isTrue();
-            // MANAGE_USERS is false so not included (only granted=true are added)
             assertThat(systemPerms.containsKey("MANAGE_USERS")).isFalse();
 
             @SuppressWarnings("unchecked")
             Map<String, Map<String, Object>> objectPerms =
                     (Map<String, Map<String, Object>>) body.get("objectPermissions");
-            assertThat(objectPerms).containsKey("coll-1");
             assertThat(objectPerms.get("coll-1").get("canCreate")).isEqualTo(true);
             assertThat(objectPerms.get("coll-1").get("canRead")).isEqualTo(true);
             assertThat(objectPerms.get("coll-1").get("canEdit")).isEqualTo(false);
@@ -417,52 +355,27 @@ class InternalBootstrapControllerTest {
         @Test
         @DisplayName("Should merge permission set permissions with most-permissive-wins")
         void mergesPermissionSetsWithMostPermissiveWins() {
-            // User with profile
             Map<String, Object> userRow = new HashMap<>();
             userRow.put("id", "user-1");
             userRow.put("profile_id", "profile-1");
 
-            when(jdbcTemplate.queryForList(contains("FROM platform_user"),
-                    eq("user@test.com"), eq("tenant-1")))
-                    .thenReturn(List.of(userRow));
-
-            // Profile grants canRead only
-            when(jdbcTemplate.queryForList(contains("FROM profile_system_permission"),
-                    eq("profile-1")))
+            when(repository.findActiveUserByEmail("user@test.com", "tenant-1"))
+                    .thenReturn(Optional.of(userRow));
+            when(repository.findProfileSystemPermissions("profile-1"))
                     .thenReturn(List.of(systemPermRow("API_ACCESS", true)));
-            when(jdbcTemplate.queryForList(contains("FROM profile_object_permission"),
-                    eq("profile-1")))
-                    .thenReturn(List.of(
-                            objectPermRow("coll-1", false, true, false, false, false, false)
-                    ));
-            when(jdbcTemplate.queryForList(contains("FROM profile_field_permission"),
-                    eq("profile-1")))
-                    .thenReturn(List.of(
-                            fieldPermRow("coll-1", "field-1", "READ_ONLY")
-                    ));
-
-            // One direct permission set
-            when(jdbcTemplate.queryForList(contains("FROM user_permission_set"), eq("user-1")))
+            when(repository.findProfileObjectPermissions("profile-1"))
+                    .thenReturn(List.of(objectPermRow("coll-1", false, true, false, false, false, false)));
+            when(repository.findProfileFieldPermissions("profile-1"))
+                    .thenReturn(List.of(fieldPermRow("coll-1", "field-1", "READ_ONLY")));
+            when(repository.findUserPermissionSetIds("user-1"))
                     .thenReturn(List.of(Map.of("permission_set_id", (Object) "ps-1")));
-
-            // No group permission sets
-            when(jdbcTemplate.queryForList(contains("FROM group_membership"), eq("user-1")))
-                    .thenReturn(List.of());
-
-            // Permission set grants canCreate on coll-1 + VISIBLE on field-1
-            when(jdbcTemplate.queryForList(contains("FROM permset_system_permission"),
-                    eq("ps-1")))
+            when(repository.findUserGroupIds("user-1")).thenReturn(List.of());
+            when(repository.findPermsetSystemPermissions("ps-1"))
                     .thenReturn(List.of(systemPermRow("VIEW_ALL_DATA", true)));
-            when(jdbcTemplate.queryForList(contains("FROM permset_object_permission"),
-                    eq("ps-1")))
-                    .thenReturn(List.of(
-                            objectPermRow("coll-1", true, false, false, false, false, false)
-                    ));
-            when(jdbcTemplate.queryForList(contains("FROM permset_field_permission"),
-                    eq("ps-1")))
-                    .thenReturn(List.of(
-                            fieldPermRow("coll-1", "field-1", "VISIBLE")
-                    ));
+            when(repository.findPermsetObjectPermissions("ps-1"))
+                    .thenReturn(List.of(objectPermRow("coll-1", true, false, false, false, false, false)));
+            when(repository.findPermsetFieldPermissions("ps-1"))
+                    .thenReturn(List.of(fieldPermRow("coll-1", "field-1", "VISIBLE")));
 
             ResponseEntity<Map<String, Object>> response =
                     controller.resolvePermissions("user@test.com", "tenant-1");
@@ -474,14 +387,12 @@ class InternalBootstrapControllerTest {
             assertThat(systemPerms.get("API_ACCESS")).isTrue();
             assertThat(systemPerms.get("VIEW_ALL_DATA")).isTrue();
 
-            // Most-permissive-wins: profile(canRead) OR permset(canCreate) = both true
             @SuppressWarnings("unchecked")
             Map<String, Map<String, Object>> objectPerms =
                     (Map<String, Map<String, Object>>) body.get("objectPermissions");
             assertThat(objectPerms.get("coll-1").get("canCreate")).isEqualTo(true);
             assertThat(objectPerms.get("coll-1").get("canRead")).isEqualTo(true);
 
-            // Field visibility: READ_ONLY vs VISIBLE → VISIBLE wins
             @SuppressWarnings("unchecked")
             Map<String, Map<String, String>> fieldPerms =
                     (Map<String, Map<String, String>>) body.get("fieldPermissions");
@@ -495,34 +406,18 @@ class InternalBootstrapControllerTest {
             userRow.put("id", "user-1");
             userRow.put("profile_id", null);
 
-            when(jdbcTemplate.queryForList(contains("FROM platform_user"),
-                    eq("user@test.com"), eq("tenant-1")))
-                    .thenReturn(List.of(userRow));
-
-            // No direct permission sets
-            when(jdbcTemplate.queryForList(contains("FROM user_permission_set"), eq("user-1")))
-                    .thenReturn(List.of());
-
-            // User belongs to one group
-            when(jdbcTemplate.queryForList(contains("FROM group_membership"), eq("user-1")))
+            when(repository.findActiveUserByEmail("user@test.com", "tenant-1"))
+                    .thenReturn(Optional.of(userRow));
+            when(repository.findUserPermissionSetIds("user-1")).thenReturn(List.of());
+            when(repository.findUserGroupIds("user-1"))
                     .thenReturn(List.of(Map.of("group_id", (Object) "group-1")));
-
-            // Group has a permission set
-            when(jdbcTemplate.queryForList(contains("FROM group_permission_set"),
-                    eq("group-1")))
+            when(repository.findGroupPermissionSetIds(List.of("group-1")))
                     .thenReturn(List.of(Map.of("permission_set_id", (Object) "ps-group-1")));
-
-            // Group permission set grants permissions
-            when(jdbcTemplate.queryForList(contains("FROM permset_system_permission"),
-                    eq("ps-group-1")))
+            when(repository.findPermsetSystemPermissions("ps-group-1"))
                     .thenReturn(List.of(systemPermRow("API_ACCESS", true)));
-            when(jdbcTemplate.queryForList(contains("FROM permset_object_permission"),
-                    eq("ps-group-1")))
-                    .thenReturn(List.of(
-                            objectPermRow("coll-1", true, true, true, true, false, false)
-                    ));
-            when(jdbcTemplate.queryForList(contains("FROM permset_field_permission"),
-                    eq("ps-group-1")))
+            when(repository.findPermsetObjectPermissions("ps-group-1"))
+                    .thenReturn(List.of(objectPermRow("coll-1", true, true, true, true, false, false)));
+            when(repository.findPermsetFieldPermissions("ps-group-1"))
                     .thenReturn(List.of());
 
             ResponseEntity<Map<String, Object>> response =

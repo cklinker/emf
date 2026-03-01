@@ -1,10 +1,10 @@
 package com.emf.worker.controller;
 
+import com.emf.worker.repository.BootstrapRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -35,81 +35,11 @@ public class InternalBootstrapController {
 
     private static final Logger log = LoggerFactory.getLogger(InternalBootstrapController.class);
 
-    private static final String SELECT_ACTIVE_COLLECTIONS = """
-            SELECT id, name, path, system_collection
-            FROM collection WHERE active = true
-            """;
-
-    private static final String SELECT_ROUTABLE_TENANTS = """
-            SELECT id, slug FROM tenant
-            WHERE status != 'DECOMMISSIONED' AND slug IS NOT NULL
-            """;
-
-    private static final String SELECT_TENANT_LIMITS = """
-            SELECT id, limits FROM tenant
-            WHERE status NOT IN ('DECOMMISSIONED', 'SUSPENDED')
-            """;
-
-    private static final String SELECT_OIDC_PROVIDER_BY_ISSUER = """
-            SELECT id, name, issuer, jwks_uri, audience, active,
-                   client_id, roles_claim, roles_mapping
-            FROM oidc_provider WHERE issuer = ? AND active = true
-            LIMIT 1
-            """;
-
-    // Permission resolution queries
-    private static final String SELECT_USER_BY_EMAIL = """
-            SELECT id, profile_id FROM platform_user
-            WHERE email = ? AND tenant_id = ? AND status = 'ACTIVE'
-            LIMIT 1
-            """;
-
-    private static final String SELECT_PROFILE_SYSTEM_PERMISSIONS = """
-            SELECT permission_name, granted
-            FROM profile_system_permission WHERE profile_id = ?
-            """;
-
-    private static final String SELECT_PROFILE_OBJECT_PERMISSIONS = """
-            SELECT collection_id, can_create, can_read, can_edit,
-                   can_delete, can_view_all, can_modify_all
-            FROM profile_object_permission WHERE profile_id = ?
-            """;
-
-    private static final String SELECT_PROFILE_FIELD_PERMISSIONS = """
-            SELECT collection_id, field_id, visibility
-            FROM profile_field_permission WHERE profile_id = ?
-            """;
-
-    private static final String SELECT_USER_PERMSET_IDS = """
-            SELECT permission_set_id FROM user_permission_set WHERE user_id = ?
-            """;
-
-    private static final String SELECT_USER_GROUP_IDS = """
-            SELECT group_id FROM group_membership
-            WHERE member_type = 'USER' AND member_id = ?
-            """;
-
-    private static final String SELECT_PERMSET_SYSTEM_PERMISSIONS = """
-            SELECT permission_name, granted
-            FROM permset_system_permission WHERE permission_set_id = ? AND granted = true
-            """;
-
-    private static final String SELECT_PERMSET_OBJECT_PERMISSIONS = """
-            SELECT collection_id, can_create, can_read, can_edit,
-                   can_delete, can_view_all, can_modify_all
-            FROM permset_object_permission WHERE permission_set_id = ?
-            """;
-
-    private static final String SELECT_PERMSET_FIELD_PERMISSIONS = """
-            SELECT collection_id, field_id, visibility
-            FROM permset_field_permission WHERE permission_set_id = ?
-            """;
-
-    private final JdbcTemplate jdbcTemplate;
+    private final BootstrapRepository repository;
     private final ObjectMapper objectMapper;
 
-    public InternalBootstrapController(JdbcTemplate jdbcTemplate, ObjectMapper objectMapper) {
-        this.jdbcTemplate = jdbcTemplate;
+    public InternalBootstrapController(BootstrapRepository repository, ObjectMapper objectMapper) {
+        this.repository = repository;
         this.objectMapper = objectMapper;
     }
 
@@ -154,7 +84,7 @@ public class InternalBootstrapController {
     public ResponseEntity<Map<String, String>> getSlugMap() {
         log.debug("REST request to get tenant slug map");
 
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList(SELECT_ROUTABLE_TENANTS);
+        List<Map<String, Object>> rows = repository.findRoutableTenants();
 
         Map<String, String> slugMap = new LinkedHashMap<>();
         for (Map<String, Object> row : rows) {
@@ -186,15 +116,14 @@ public class InternalBootstrapController {
             @RequestParam String issuer) {
         log.debug("Internal lookup: OIDC provider by issuer: {}", issuer);
 
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                SELECT_OIDC_PROVIDER_BY_ISSUER, issuer);
+        Optional<Map<String, Object>> providerOpt = repository.findOidcProviderByIssuer(issuer);
 
-        if (rows.isEmpty()) {
+        if (providerOpt.isEmpty()) {
             log.warn("No active OIDC provider found for issuer: {}", issuer);
             return ResponseEntity.notFound().build();
         }
 
-        Map<String, Object> provider = rows.get(0);
+        Map<String, Object> provider = providerOpt.get();
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("id", provider.get("id"));
         response.put("name", provider.get("name"));
@@ -232,15 +161,14 @@ public class InternalBootstrapController {
         log.debug("Internal permission resolution for email={} tenant={}", email, tenantId);
 
         // 1. Find user
-        List<Map<String, Object>> userRows = jdbcTemplate.queryForList(
-                SELECT_USER_BY_EMAIL, email, tenantId);
+        Optional<Map<String, Object>> userOpt = repository.findActiveUserByEmail(email, tenantId);
 
-        if (userRows.isEmpty()) {
+        if (userOpt.isEmpty()) {
             log.warn("No active user found for email={} tenant={}", email, tenantId);
             return ResponseEntity.notFound().build();
         }
 
-        Map<String, Object> userRow = userRows.get(0);
+        Map<String, Object> userRow = userOpt.get();
         String userId = (String) userRow.get("id");
         String profileId = (String) userRow.get("profile_id");
 
@@ -251,18 +179,16 @@ public class InternalBootstrapController {
 
         // 2. Load profile permissions if user has a profile
         if (profileId != null) {
-            loadSystemPermissions(profileId, SELECT_PROFILE_SYSTEM_PERMISSIONS, systemPerms);
-            loadObjectPermissions(profileId, SELECT_PROFILE_OBJECT_PERMISSIONS, objectPerms);
-            loadFieldPermissions(profileId, SELECT_PROFILE_FIELD_PERMISSIONS, fieldPerms);
+            loadSystemPermissions(repository.findProfileSystemPermissions(profileId), systemPerms);
+            loadObjectPermissions(repository.findProfileObjectPermissions(profileId), objectPerms);
+            loadFieldPermissions(repository.findProfileFieldPermissions(profileId), fieldPerms);
         }
 
         // 3. Collect all applicable permission set IDs
         Set<String> permissionSetIds = new LinkedHashSet<>();
 
         // Direct user assignments
-        List<Map<String, Object>> directPermSets = jdbcTemplate.queryForList(
-                SELECT_USER_PERMSET_IDS, userId);
-        for (Map<String, Object> row : directPermSets) {
+        for (Map<String, Object> row : repository.findUserPermissionSetIds(userId)) {
             String psId = (String) row.get("permission_set_id");
             if (psId != null) {
                 permissionSetIds.add(psId);
@@ -270,8 +196,7 @@ public class InternalBootstrapController {
         }
 
         // Group-inherited assignments
-        List<Map<String, Object>> groupRows = jdbcTemplate.queryForList(
-                SELECT_USER_GROUP_IDS, userId);
+        List<Map<String, Object>> groupRows = repository.findUserGroupIds(userId);
         if (!groupRows.isEmpty()) {
             List<String> groupIds = new ArrayList<>();
             for (Map<String, Object> row : groupRows) {
@@ -281,14 +206,7 @@ public class InternalBootstrapController {
                 }
             }
             if (!groupIds.isEmpty()) {
-                String placeholders = String.join(",",
-                        groupIds.stream().map(id -> "?").toList());
-                String sql = String.format(
-                        "SELECT DISTINCT permission_set_id FROM group_permission_set WHERE group_id IN (%s)",
-                        placeholders);
-                List<Map<String, Object>> groupPermSets = jdbcTemplate.queryForList(
-                        sql, groupIds.toArray());
-                for (Map<String, Object> row : groupPermSets) {
+                for (Map<String, Object> row : repository.findGroupPermissionSetIds(groupIds)) {
                     String psId = (String) row.get("permission_set_id");
                     if (psId != null) {
                         permissionSetIds.add(psId);
@@ -299,9 +217,9 @@ public class InternalBootstrapController {
 
         // 4. Merge permission set permissions (most-permissive-wins)
         for (String permSetId : permissionSetIds) {
-            mergeSystemPermissions(permSetId, systemPerms);
-            mergeObjectPermissions(permSetId, objectPerms);
-            mergeFieldPermissions(permSetId, fieldPerms);
+            loadSystemPermissions(repository.findPermsetSystemPermissions(permSetId), systemPerms);
+            loadObjectPermissions(repository.findPermsetObjectPermissions(permSetId), objectPerms);
+            loadFieldPermissions(repository.findPermsetFieldPermissions(permSetId), fieldPerms);
         }
 
         // Build response
@@ -321,9 +239,8 @@ public class InternalBootstrapController {
     // Permission resolution helpers
     // =========================================================================
 
-    private void loadSystemPermissions(String sourceId, String sql,
+    private void loadSystemPermissions(List<Map<String, Object>> rows,
                                         Map<String, Boolean> systemPerms) {
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, sourceId);
         for (Map<String, Object> row : rows) {
             String name = (String) row.get("permission_name");
             Boolean granted = toBoolean(row.get("granted"));
@@ -333,9 +250,8 @@ public class InternalBootstrapController {
         }
     }
 
-    private void loadObjectPermissions(String sourceId, String sql,
+    private void loadObjectPermissions(List<Map<String, Object>> rows,
                                         Map<String, Map<String, Object>> objectPerms) {
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, sourceId);
         for (Map<String, Object> row : rows) {
             String collectionId = (String) row.get("collection_id");
             if (collectionId == null) continue;
@@ -353,9 +269,8 @@ public class InternalBootstrapController {
         }
     }
 
-    private void loadFieldPermissions(String sourceId, String sql,
+    private void loadFieldPermissions(List<Map<String, Object>> rows,
                                        Map<String, Map<String, String>> fieldPerms) {
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, sourceId);
         for (Map<String, Object> row : rows) {
             String collectionId = (String) row.get("collection_id");
             String fieldId = (String) row.get("field_id");
@@ -371,20 +286,6 @@ public class InternalBootstrapController {
                 collFields.put(fieldId, visibility);
             }
         }
-    }
-
-    private void mergeSystemPermissions(String permSetId, Map<String, Boolean> systemPerms) {
-        loadSystemPermissions(permSetId, SELECT_PERMSET_SYSTEM_PERMISSIONS, systemPerms);
-    }
-
-    private void mergeObjectPermissions(String permSetId,
-                                         Map<String, Map<String, Object>> objectPerms) {
-        loadObjectPermissions(permSetId, SELECT_PERMSET_OBJECT_PERMISSIONS, objectPerms);
-    }
-
-    private void mergeFieldPermissions(String permSetId,
-                                        Map<String, Map<String, String>> fieldPerms) {
-        loadFieldPermissions(permSetId, SELECT_PERMSET_FIELD_PERMISSIONS, fieldPerms);
     }
 
     private Map<String, Object> mergeObjectPermissionMaps(Map<String, Object> existing,
@@ -424,7 +325,7 @@ public class InternalBootstrapController {
     // =========================================================================
 
     private List<Map<String, Object>> loadCollections() {
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList(SELECT_ACTIVE_COLLECTIONS);
+        List<Map<String, Object>> rows = repository.findActiveCollections();
 
         List<Map<String, Object>> collections = new ArrayList<>();
         for (Map<String, Object> row : rows) {
@@ -448,7 +349,7 @@ public class InternalBootstrapController {
 
     @SuppressWarnings("unchecked")
     private Map<String, Map<String, Object>> loadGovernorLimits() {
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList(SELECT_TENANT_LIMITS);
+        List<Map<String, Object>> rows = repository.findTenantLimits();
 
         Map<String, Map<String, Object>> governorLimits = new LinkedHashMap<>();
         for (Map<String, Object> row : rows) {

@@ -1,11 +1,11 @@
 package com.emf.worker.controller;
 
+import com.emf.worker.repository.GovernorLimitsRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.ResponseEntity;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -39,32 +39,15 @@ public class GovernorLimitsController {
     private static final int DEFAULT_MAX_WORKFLOWS = 50;
     private static final int DEFAULT_MAX_REPORTS = 200;
 
-    private static final String SELECT_TENANT_LIMITS = """
-            SELECT limits FROM tenant WHERE id = ?
-            """;
-
-    private static final String COUNT_ACTIVE_USERS = """
-            SELECT COUNT(*) FROM platform_user WHERE tenant_id = ? AND status = 'ACTIVE'
-            """;
-
-    private static final String COUNT_ACTIVE_COLLECTIONS = """
-            SELECT COUNT(*) FROM collection
-            WHERE tenant_id = ? AND active = true AND (system_collection = false OR system_collection IS NULL)
-            """;
-
-    private static final String UPDATE_TENANT_LIMITS = """
-            UPDATE tenant SET limits = ?::jsonb, updated_at = NOW() WHERE id = ?
-            """;
-
     private static final String DAILY_KEY_PREFIX = "api-calls-daily:";
 
-    private final JdbcTemplate jdbcTemplate;
+    private final GovernorLimitsRepository repository;
     private final ObjectMapper objectMapper;
     private final StringRedisTemplate redisTemplate;
 
-    public GovernorLimitsController(JdbcTemplate jdbcTemplate, ObjectMapper objectMapper,
+    public GovernorLimitsController(GovernorLimitsRepository repository, ObjectMapper objectMapper,
                                      StringRedisTemplate redisTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
+        this.repository = repository;
         this.objectMapper = objectMapper;
         this.redisTemplate = redisTemplate;
     }
@@ -86,8 +69,8 @@ public class GovernorLimitsController {
         Map<String, Object> limits = loadLimits(tenantId);
 
         // Count current usage
-        int usersUsed = countActiveUsers(tenantId);
-        int collectionsUsed = countActiveCollections(tenantId);
+        int usersUsed = repository.countActiveUsers(tenantId);
+        int collectionsUsed = repository.countActiveCollections(tenantId);
 
         // Read daily API call count from Redis (tracked by gateway's RateLimitFilter)
         int apiCallsUsed = getDailyApiCallCount(tenantId);
@@ -123,7 +106,7 @@ public class GovernorLimitsController {
 
         try {
             String limitsJson = objectMapper.writeValueAsString(body);
-            jdbcTemplate.update(UPDATE_TENANT_LIMITS, limitsJson, tenantId);
+            repository.updateTenantLimits(tenantId, limitsJson);
 
             log.info("Updated governor-limits for tenant {}", tenantId);
 
@@ -144,12 +127,12 @@ public class GovernorLimitsController {
 
     @SuppressWarnings("unchecked")
     private Map<String, Object> loadLimits(String tenantId) {
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList(SELECT_TENANT_LIMITS, tenantId);
-        if (rows.isEmpty()) {
+        Optional<Object> limitsOpt = repository.findTenantLimits(tenantId);
+        if (limitsOpt.isEmpty()) {
             return buildDefaultLimits();
         }
 
-        Object limitsObj = rows.get(0).get("limits");
+        Object limitsObj = limitsOpt.get();
         Map<String, Object> parsed = null;
 
         if (limitsObj instanceof String limitsStr && !limitsStr.isBlank()) {
@@ -191,26 +174,6 @@ public class GovernorLimitsController {
         limits.put("maxWorkflows", DEFAULT_MAX_WORKFLOWS);
         limits.put("maxReports", DEFAULT_MAX_REPORTS);
         return limits;
-    }
-
-    private int countActiveUsers(String tenantId) {
-        try {
-            Integer count = jdbcTemplate.queryForObject(COUNT_ACTIVE_USERS, Integer.class, tenantId);
-            return count != null ? count : 0;
-        } catch (Exception e) {
-            log.warn("Failed to count active users for tenant {}: {}", tenantId, e.getMessage());
-            return 0;
-        }
-    }
-
-    private int countActiveCollections(String tenantId) {
-        try {
-            Integer count = jdbcTemplate.queryForObject(COUNT_ACTIVE_COLLECTIONS, Integer.class, tenantId);
-            return count != null ? count : 0;
-        } catch (Exception e) {
-            log.warn("Failed to count active collections for tenant {}: {}", tenantId, e.getMessage());
-            return 0;
-        }
     }
 
     /**

@@ -27,6 +27,7 @@ import { AlertTriangle } from 'lucide-react'
 // Context Providers
 import { AuthProvider } from './context/AuthContext'
 import { ApiProvider } from './context/ApiContext'
+import { CollectionStoreProvider } from './context/CollectionStoreContext'
 import { ConfigProvider, useConfig } from './context/ConfigContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { I18nProvider } from './context/I18nContext'
@@ -411,6 +412,7 @@ function TenantScopedApp({ plugins = [] }: { plugins?: Plugin[] }): React.ReactE
       postLogoutRedirectUri={window.location.origin + tenantBasePath}
     >
       <ApiProvider baseUrl={`${apiBaseUrl}/${tenantSlug}`}>
+        <CollectionStoreProvider>
         <ConfigProvider>
           <ThemeProvider>
             <I18nProvider>
@@ -426,6 +428,7 @@ function TenantScopedApp({ plugins = [] }: { plugins?: Plugin[] }): React.ReactE
             </I18nProvider>
           </ThemeProvider>
         </ConfigProvider>
+        </CollectionStoreProvider>
       </ApiProvider>
     </AuthProvider>
   )

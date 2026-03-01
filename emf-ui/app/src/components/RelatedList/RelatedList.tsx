@@ -30,11 +30,10 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { FieldRenderer } from '@/components/FieldRenderer'
 import { useRelatedRecords } from '@/hooks/useRelatedRecords'
-import { useCollectionSchema, fetchCollectionSchema } from '@/hooks/useCollectionSchema'
+import { useCollectionSchema } from '@/hooks/useCollectionSchema'
 import { useObjectPermissions } from '@/hooks/useObjectPermissions'
 import { buildIncludedDisplayMap } from '@/utils/jsonapi'
-import { useApi } from '@/context/ApiContext'
-import { useQueries } from '@tanstack/react-query'
+import { useCollectionStore } from '@/context/CollectionStoreContext'
 import type { FieldDefinition } from '@/hooks/useCollectionSchema'
 import type { CollectionRecord } from '@/hooks/useCollectionRecords'
 
@@ -103,7 +102,7 @@ export function RelatedList({
 }: RelatedListProps): React.ReactElement {
   const navigate = useNavigate()
   const basePath = `/${tenantSlug}/app`
-  const { apiClient } = useApi()
+  const collectionStore = useCollectionStore()
 
   // Fetch schema for the related collection
   const { schema, fields, isLoading: schemaLoading } = useCollectionSchema(collectionName)
@@ -149,26 +148,16 @@ export function RelatedList({
     enabled: !schemaLoading,
   })
 
-  // Fetch schemas for referenced collections to determine their display field names
-  const refSchemaQueries = useQueries({
-    queries: referenceFields.map((f) => ({
-      queryKey: ['collection-schema', f.referenceTarget],
-      queryFn: () => fetchCollectionSchema(apiClient, f.referenceTarget!),
-      enabled: !!f.referenceTarget,
-      staleTime: 5 * 60 * 1000,
-    })),
-  })
-
-  // Build lookup display map from included resources
+  // Build lookup display map from included resources using centralized collection store
   const lookupDisplayMap = useMemo(() => {
     if (!rawResponse || referenceFields.length === 0) return undefined
 
     const map: Record<string, Record<string, string>> = {}
 
-    referenceFields.forEach((field, idx) => {
-      const refSchema = refSchemaQueries[idx]?.data
-      const displayField = refSchema?.displayFieldName || 'name'
+    referenceFields.forEach((field) => {
       const targetType = field.referenceTarget!
+      const refSchema = collectionStore.getCollectionByName(targetType)
+      const displayField = refSchema?.displayFieldName || 'name'
 
       const fieldMap = buildIncludedDisplayMap(rawResponse, targetType, displayField)
       if (Object.keys(fieldMap).length > 0) {
@@ -177,7 +166,7 @@ export function RelatedList({
     })
 
     return Object.keys(map).length > 0 ? map : undefined
-  }, [rawResponse, referenceFields, refSchemaQueries])
+  }, [rawResponse, referenceFields, collectionStore])
 
   // Display name for the related collection
   const displayLabel =

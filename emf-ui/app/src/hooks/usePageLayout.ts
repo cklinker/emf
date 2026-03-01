@@ -11,6 +11,7 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { useApi } from '../context/ApiContext'
+import { useCollectionStore } from '../context/CollectionStoreContext'
 
 // ---- TypeScript interfaces matching backend PageLayoutDto ----
 
@@ -88,6 +89,7 @@ export function usePageLayout(
   profileId: string | undefined
 ): UsePageLayoutResult {
   const { apiClient } = useApi()
+  const collectionStore = useCollectionStore()
 
   const {
     data: layout = null,
@@ -203,50 +205,17 @@ export function usePageLayout(
         // Resolve collection names and field names for related lists.
         // The DB only stores relatedCollectionId / relationshipFieldId (UUIDs),
         // but the UI needs the collection name (for API URLs) and field name.
+        // Uses the centralized collection store for instant lookups (no API calls).
         if (relatedLists.length > 0) {
-          const uniqueCollIds = [
-            ...new Set(relatedLists.map((rl) => rl.relatedCollectionId).filter(Boolean)),
-          ]
-          const uniqueFieldIds = [
-            ...new Set(relatedLists.map((rl) => rl.relationshipFieldId).filter(Boolean)),
-          ]
-
-          // Fetch names in parallel
-          const [collResults, fieldResults] = await Promise.all([
-            Promise.all(
-              uniqueCollIds.map(async (cid) => {
-                try {
-                  const c = await apiClient.getOne<{ id: string; name: string }>(
-                    `/api/collections/${cid}`
-                  )
-                  return { id: cid, name: c?.name }
-                } catch {
-                  return { id: cid, name: undefined }
-                }
-              })
-            ),
-            Promise.all(
-              uniqueFieldIds.map(async (fid) => {
-                try {
-                  const f = await apiClient.getOne<{ id: string; name: string }>(
-                    `/api/fields/${fid}`
-                  )
-                  return { id: fid, name: f?.name }
-                } catch {
-                  return { id: fid, name: undefined }
-                }
-              })
-            ),
-          ])
-
-          const collNameMap = new Map(collResults.map((r) => [r.id, r.name]))
-          const fieldNameMap = new Map(fieldResults.map((r) => [r.id, r.name]))
-
           for (const rl of relatedLists) {
-            rl.relatedCollectionName =
-              rl.relatedCollectionName || collNameMap.get(rl.relatedCollectionId) || ''
-            rl.relationshipFieldName =
-              rl.relationshipFieldName || fieldNameMap.get(rl.relationshipFieldId) || ''
+            if (!rl.relatedCollectionName && rl.relatedCollectionId) {
+              const coll = collectionStore.getCollectionById(rl.relatedCollectionId)
+              rl.relatedCollectionName = coll?.name || ''
+            }
+            if (!rl.relationshipFieldName && rl.relationshipFieldId) {
+              const field = collectionStore.getFieldById(rl.relationshipFieldId)
+              rl.relationshipFieldName = field?.name || ''
+            }
           }
         }
 

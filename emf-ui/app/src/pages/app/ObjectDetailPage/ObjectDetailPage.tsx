@@ -13,7 +13,6 @@
 
 import React, { useState, useCallback, useMemo, useEffect } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
-import { useQuery, useQueries } from '@tanstack/react-query'
 import { Loader2, AlertCircle, Pencil, Copy, Trash2, MoreHorizontal } from 'lucide-react'
 import {
   Breadcrumb,
@@ -45,7 +44,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { useCollectionSchema, fetchCollectionSchema } from '@/hooks/useCollectionSchema'
+import { useCollectionSchema } from '@/hooks/useCollectionSchema'
+import { useCollectionStore } from '@/context/CollectionStoreContext'
 import { useRecord } from '@/hooks/useRecord'
 import { useRecordMutation } from '@/hooks/useRecordMutation'
 import { useCollectionPermissions } from '@/hooks/useCollectionPermissions'
@@ -62,7 +62,6 @@ import { QuickActionsMenu } from '@/components/QuickActions'
 import { useAnnounce } from '@/components/LiveRegion'
 import { useAppContext } from '@/context/AppContext'
 import { useAuth } from '@/context/AuthContext'
-import { useApi } from '@/context/ApiContext'
 import { usePageLayout } from '@/hooks/usePageLayout'
 import { useRecordContext } from '@/hooks/useRecordContext'
 import type { FieldDefinition } from '@/hooks/useCollectionSchema'
@@ -77,20 +76,6 @@ interface RelatedCollection {
   collectionName: string
   /** Field on the related collection that points to this record */
   foreignKeyField: string
-}
-
-/** Collection schema summary for reverse-relationship discovery */
-interface CollectionWithFields {
-  id: string
-  name: string
-  displayName: string
-  fields: {
-    id: string
-    name: string
-    displayName?: string
-    type: string
-    referenceTarget?: string
-  }[]
 }
 
 /** System fields to exclude from detail sections */
@@ -150,7 +135,7 @@ export function ObjectDetailPage(): React.ReactElement {
   const navigate = useNavigate()
   const { addRecentItem } = useAppContext()
   const { user } = useAuth()
-  const { apiClient } = useApi()
+  const collectionStore = useCollectionStore()
   const basePath = `/${tenantSlug}/app`
 
   // Delete confirmation state
@@ -193,26 +178,16 @@ export function ObjectDetailPage(): React.ReactElement {
     enabled: !schemaLoading,
   })
 
-  // Fetch schemas for referenced collections to determine their display field names
-  const refSchemaQueries = useQueries({
-    queries: referenceFields.map((f) => ({
-      queryKey: ['collection-schema', f.referenceTarget],
-      queryFn: () => fetchCollectionSchema(apiClient, f.referenceTarget!),
-      enabled: !!f.referenceTarget,
-      staleTime: 5 * 60 * 1000,
-    })),
-  })
-
-  // Build lookup display map from included resources
+  // Build lookup display map from included resources using centralized collection store
   const lookupDisplayMap = useMemo(() => {
     if (!rawResponse || referenceFields.length === 0) return undefined
 
     const map: Record<string, Record<string, string>> = {}
 
-    referenceFields.forEach((field, idx) => {
-      const refSchema = refSchemaQueries[idx]?.data
-      const displayField = refSchema?.displayFieldName || 'name'
+    referenceFields.forEach((field) => {
       const targetType = field.referenceTarget!
+      const refSchema = collectionStore.getCollectionByName(targetType)
+      const displayField = refSchema?.displayFieldName || 'name'
 
       const fieldMap = buildIncludedDisplayMap(rawResponse, targetType, displayField)
       if (Object.keys(fieldMap).length > 0) {
@@ -221,7 +196,7 @@ export function ObjectDetailPage(): React.ReactElement {
     })
 
     return Object.keys(map).length > 0 ? map : undefined
-  }, [rawResponse, referenceFields, refSchemaQueries])
+  }, [rawResponse, referenceFields, collectionStore])
 
   // Fetch permissions (combined object + field in one call)
   const {
@@ -302,34 +277,21 @@ export function ObjectDetailPage(): React.ReactElement {
   }, [fields])
 
   // Discover reverse relationships (fallback when no layout is configured).
-  // Fetches all collections and finds those with master_detail fields pointing
-  // to the current collection, so we show child records (e.g., Order Items on Orders).
+  // Uses the centralized collection store to find collections with master_detail
+  // fields pointing to the current collection (e.g., Order Items on Orders).
   const hasLayoutSections = !!(layout && layout.sections && layout.sections.length > 0)
   const hasLayoutRelatedLists = !!(layout && layout.relatedLists.length > 0)
 
-  const { data: allCollections } = useQuery({
-    queryKey: ['all-collections-metadata'],
-    queryFn: async () => {
-      const list = await apiClient.getList<CollectionWithFields>('/api/collections?page[size]=1000')
-      return { content: list }
-    },
-    enabled: !!collectionName && !hasLayoutRelatedLists && !layoutLoading,
-    staleTime: 5 * 60 * 1000, // 5 minutes — collection metadata rarely changes
-  })
-
   const relatedCollections = useMemo<RelatedCollection[]>(() => {
-    if (hasLayoutRelatedLists || !allCollections?.content || !collectionName) return []
+    if (hasLayoutRelatedLists || !collectionName || collectionStore.isLoading) return []
 
     const related: RelatedCollection[] = []
-    for (const coll of allCollections.content) {
+    for (const coll of collectionStore.collections) {
       if (coll.name === collectionName) continue
-      const collFields = Array.isArray(coll.fields) ? coll.fields : []
-      for (const field of collFields) {
+      for (const field of coll.fields) {
         if (
           (field.type === 'master_detail' ||
-            field.type === 'MASTER_DETAIL' ||
-            field.type === 'lookup' ||
-            field.type === 'LOOKUP') &&
+            field.type === 'lookup') &&
           field.referenceTarget === collectionName
         ) {
           related.push({
@@ -340,7 +302,7 @@ export function ObjectDetailPage(): React.ReactElement {
       }
     }
     return related
-  }, [hasLayoutRelatedLists, allCollections, collectionName])
+  }, [hasLayoutRelatedLists, collectionStore.collections, collectionStore.isLoading, collectionName])
 
   // Handlers
   const handleEdit = useCallback(() => {

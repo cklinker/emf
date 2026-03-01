@@ -18,7 +18,7 @@
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { useNavigate, useParams, useSearchParams, Link } from 'react-router-dom'
-import { useQueries } from '@tanstack/react-query'
+import { useCollectionStore } from '@/context/CollectionStoreContext'
 import { Loader2, AlertCircle } from 'lucide-react'
 import {
   Breadcrumb,
@@ -40,11 +40,10 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
-import { useCollectionSchema, fetchCollectionSchema } from '@/hooks/useCollectionSchema'
+import { useCollectionSchema } from '@/hooks/useCollectionSchema'
 import { useCollectionRecords } from '@/hooks/useCollectionRecords'
 import { useRecordMutation } from '@/hooks/useRecordMutation'
 import { useCollectionPermissions } from '@/hooks/useCollectionPermissions'
-import { useApi } from '@/context/ApiContext'
 import { buildIncludedDisplayMap } from '@/utils/jsonapi'
 import type { SortState, FilterCondition, CollectionRecord } from '@/hooks/useCollectionRecords'
 import { ObjectDataTable } from '@/components/ObjectDataTable/ObjectDataTable'
@@ -154,7 +153,7 @@ export function ObjectListPage(): React.ReactElement {
   }>()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
-  const { apiClient } = useApi()
+  const collectionStore = useCollectionStore()
   const basePath = `/${tenantSlug}/app`
 
   // Parse list state from URL params (deep linking support)
@@ -225,26 +224,16 @@ export function ObjectListPage(): React.ReactElement {
     include: includeParam,
   })
 
-  // Fetch schemas for referenced collections to determine their display field names
-  const refSchemaQueries = useQueries({
-    queries: referenceFields.map((f) => ({
-      queryKey: ['collection-schema', f.referenceTarget],
-      queryFn: () => fetchCollectionSchema(apiClient, f.referenceTarget!),
-      enabled: !!f.referenceTarget,
-      staleTime: 5 * 60 * 1000,
-    })),
-  })
-
-  // Build lookup display map from included resources
+  // Build lookup display map from included resources using centralized collection store
   const lookupDisplayMap = useMemo(() => {
     if (!rawResponse || referenceFields.length === 0) return undefined
 
     const map: Record<string, Record<string, string>> = {}
 
-    referenceFields.forEach((field, idx) => {
-      const refSchema = refSchemaQueries[idx]?.data
-      const displayField = refSchema?.displayFieldName || 'name'
+    referenceFields.forEach((field) => {
       const targetType = field.referenceTarget!
+      const refSchema = collectionStore.getCollectionByName(targetType)
+      const displayField = refSchema?.displayFieldName || 'name'
 
       const fieldMap = buildIncludedDisplayMap(rawResponse, targetType, displayField)
       if (Object.keys(fieldMap).length > 0) {
@@ -253,7 +242,7 @@ export function ObjectListPage(): React.ReactElement {
     })
 
     return Object.keys(map).length > 0 ? map : undefined
-  }, [rawResponse, referenceFields, refSchemaQueries])
+  }, [rawResponse, referenceFields, collectionStore])
 
   // Screen reader announcements for dynamic state changes
   const { announce } = useAnnounce()

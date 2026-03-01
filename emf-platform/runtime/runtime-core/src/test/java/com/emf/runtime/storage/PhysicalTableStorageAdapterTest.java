@@ -66,7 +66,7 @@ class PhysicalTableStorageAdapterTest {
         
         // Drop table if exists (for clean test runs)
         try {
-            jdbcTemplate.execute("DROP TABLE IF EXISTS tbl_test_products");
+            jdbcTemplate.execute("DROP TABLE IF EXISTS test_products");
         } catch (Exception e) {
             // Ignore
         }
@@ -84,7 +84,7 @@ class PhysicalTableStorageAdapterTest {
         
         StorageConfig storageConfig = new StorageConfig(
             StorageMode.PHYSICAL_TABLES,
-            "tbl_" + name,
+            name,
             Map.of()
         );
         
@@ -114,7 +114,7 @@ class PhysicalTableStorageAdapterTest {
             
             // Verify table exists by querying it
             Integer count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM tbl_test_products", Integer.class);
+                "SELECT COUNT(*) FROM test_products", Integer.class);
             assertEquals(0, count);
         }
         
@@ -130,7 +130,7 @@ class PhysicalTableStorageAdapterTest {
         void shouldReconcileMissingColumns() {
             // Pre-create the table with only 'name' and 'sku' columns (simulating older schema)
             jdbcTemplate.execute(
-                "CREATE TABLE tbl_test_products (id VARCHAR(36) PRIMARY KEY, " +
+                "CREATE TABLE test_products (id VARCHAR(36) PRIMARY KEY, " +
                 "owner_id VARCHAR(36), " +
                 "created_at TIMESTAMP NOT NULL, updated_at TIMESTAMP NOT NULL, " +
                 "name TEXT NOT NULL, sku TEXT UNIQUE)");
@@ -174,13 +174,13 @@ class PhysicalTableStorageAdapterTest {
                 "All Types",
                 "Collection with all field types",
                 fields,
-                StorageConfig.physicalTable("tbl_all_types"),
+                StorageConfig.physicalTable("all_types"),
                 null, null, null,
                 1L, Instant.now(), Instant.now()
             );
             
             try {
-                jdbcTemplate.execute("DROP TABLE IF EXISTS tbl_all_types");
+                jdbcTemplate.execute("DROP TABLE IF EXISTS all_types");
             } catch (Exception e) {
                 // Ignore
             }

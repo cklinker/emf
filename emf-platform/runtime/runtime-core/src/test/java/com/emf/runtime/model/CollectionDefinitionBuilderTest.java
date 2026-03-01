@@ -139,7 +139,7 @@ class CollectionDefinitionBuilderTest {
             
             assertNotNull(collection.storageConfig());
             assertEquals(StorageMode.PHYSICAL_TABLES, collection.storageConfig().mode());
-            assertEquals("tbl_test", collection.storageConfig().tableName());
+            assertEquals("test", collection.storageConfig().tableName());
         }
 
         @Test

@@ -60,7 +60,7 @@ class SchemaMigrationEngineTest {
     private CollectionDefinition createCollection(String name, List<FieldDefinition> fields) {
         StorageConfig storageConfig = new StorageConfig(
             StorageMode.PHYSICAL_TABLES,
-            "tbl_" + name,
+            name,
             Map.of()
         );
         
@@ -130,13 +130,13 @@ class SchemaMigrationEngineTest {
         void shouldRecordMigrationWithAllFields() {
             String sql = "CREATE TABLE test_table (id VARCHAR(36) PRIMARY KEY)";
             
-            migrationEngine.recordMigration("test_collection", MigrationType.CREATE_TABLE, sql);
+            migrationEngine.recordMigration("test_dataection", MigrationType.CREATE_TABLE, sql);
             
-            List<MigrationRecord> history = migrationEngine.getMigrationHistory("test_collection");
+            List<MigrationRecord> history = migrationEngine.getMigrationHistory("test_dataection");
             
             assertEquals(1, history.size());
             MigrationRecord record = history.get(0);
-            assertEquals("test_collection", record.collectionName());
+            assertEquals("test_dataection", record.collectionName());
             assertEquals(MigrationType.CREATE_TABLE, record.migrationType());
             assertEquals(sql, record.sqlStatement());
             assertNotNull(record.executedAt());
@@ -146,11 +146,11 @@ class SchemaMigrationEngineTest {
         @Test
         @DisplayName("Should record multiple migrations in order")
         void shouldRecordMultipleMigrationsInOrder() {
-            migrationEngine.recordMigration("test", MigrationType.CREATE_TABLE, "CREATE TABLE...");
-            migrationEngine.recordMigration("test", MigrationType.ADD_COLUMN, "ALTER TABLE ADD...");
-            migrationEngine.recordMigration("test", MigrationType.DEPRECATE_COLUMN, "COMMENT ON...");
-            
-            List<MigrationRecord> history = migrationEngine.getMigrationHistory("test");
+            migrationEngine.recordMigration("test_data", MigrationType.CREATE_TABLE, "CREATE TABLE...");
+            migrationEngine.recordMigration("test_data", MigrationType.ADD_COLUMN, "ALTER TABLE ADD...");
+            migrationEngine.recordMigration("test_data", MigrationType.DEPRECATE_COLUMN, "COMMENT ON...");
+
+            List<MigrationRecord> history = migrationEngine.getMigrationHistory("test_data");
             
             assertEquals(3, history.size());
             assertEquals(MigrationType.CREATE_TABLE, history.get(0).migrationType());
@@ -200,8 +200,8 @@ class SchemaMigrationEngineTest {
                 new FieldDefinition("description", FieldType.STRING, true, false, false, null, null, null, null, null)
             );
             
-            CollectionDefinition oldDef = createCollection("test", oldFields);
-            CollectionDefinition newDef = createCollection("test", newFields);
+            CollectionDefinition oldDef = createCollection("test_data", oldFields);
+            CollectionDefinition newDef = createCollection("test_data", newFields);
             
             List<SchemaDiff> diffs = migrationEngine.detectDifferences(oldDef, newDef);
             
@@ -224,8 +224,8 @@ class SchemaMigrationEngineTest {
                 new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null, null)
             );
             
-            CollectionDefinition oldDef = createCollection("test", oldFields);
-            CollectionDefinition newDef = createCollection("test", newFields);
+            CollectionDefinition oldDef = createCollection("test_data", oldFields);
+            CollectionDefinition newDef = createCollection("test_data", newFields);
             
             List<SchemaDiff> diffs = migrationEngine.detectDifferences(oldDef, newDef);
             
@@ -247,8 +247,8 @@ class SchemaMigrationEngineTest {
                 new FieldDefinition("count", FieldType.LONG, false, false, false, null, null, null, null, null)
             );
             
-            CollectionDefinition oldDef = createCollection("test", oldFields);
-            CollectionDefinition newDef = createCollection("test", newFields);
+            CollectionDefinition oldDef = createCollection("test_data", oldFields);
+            CollectionDefinition newDef = createCollection("test_data", newFields);
             
             List<SchemaDiff> diffs = migrationEngine.detectDifferences(oldDef, newDef);
             
@@ -274,8 +274,8 @@ class SchemaMigrationEngineTest {
                 new FieldDefinition("new_field", FieldType.BOOLEAN, true, false, false, null, null, null, null, null)
             );
             
-            CollectionDefinition oldDef = createCollection("test", oldFields);
-            CollectionDefinition newDef = createCollection("test", newFields);
+            CollectionDefinition oldDef = createCollection("test_data", oldFields);
+            CollectionDefinition newDef = createCollection("test_data", newFields);
             
             List<SchemaDiff> diffs = migrationEngine.detectDifferences(oldDef, newDef);
             
@@ -294,8 +294,8 @@ class SchemaMigrationEngineTest {
                 new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null, null)
             );
             
-            CollectionDefinition oldDef = createCollection("test", fields);
-            CollectionDefinition newDef = createCollection("test", fields);
+            CollectionDefinition oldDef = createCollection("test_data", fields);
+            CollectionDefinition newDef = createCollection("test_data", fields);
             
             List<SchemaDiff> diffs = migrationEngine.detectDifferences(oldDef, newDef);
             
@@ -398,10 +398,10 @@ class SchemaMigrationEngineTest {
             
             IncompatibleSchemaChangeException exception = assertThrows(
                 IncompatibleSchemaChangeException.class,
-                () -> migrationEngine.validateTypeChange("test_collection", oldField, newField)
+                () -> migrationEngine.validateTypeChange("test_dataection", oldField, newField)
             );
             
-            assertEquals("test_collection", exception.getCollectionName());
+            assertEquals("test_dataection", exception.getCollectionName());
             assertEquals("count", exception.getFieldName());
             assertEquals(FieldType.BOOLEAN, exception.getOldType());
             assertEquals(FieldType.INTEGER, exception.getNewType());
@@ -416,7 +416,7 @@ class SchemaMigrationEngineTest {
                 false, false, false, null, null, null, null, null);
             
             assertDoesNotThrow(() -> 
-                migrationEngine.validateTypeChange("test_collection", oldField, newField));
+                migrationEngine.validateTypeChange("test_dataection", oldField, newField));
         }
     }
     
@@ -427,7 +427,7 @@ class SchemaMigrationEngineTest {
         @BeforeEach
         void cleanupTestTable() {
             try {
-                jdbcTemplate.execute("DROP TABLE IF EXISTS tbl_test");
+                jdbcTemplate.execute("DROP TABLE IF EXISTS test_data");
             } catch (Exception e) {
                 // Ignore
             }
@@ -457,7 +457,7 @@ class SchemaMigrationEngineTest {
             List<FieldDefinition> oldFields = List.of(
                 new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null, null)
             );
-            setupTestTable("tbl_test", oldFields);
+            setupTestTable("test_data", oldFields);
             
             // Define new schema with additional field
             List<FieldDefinition> newFields = List.of(
@@ -465,24 +465,24 @@ class SchemaMigrationEngineTest {
                 new FieldDefinition("description", FieldType.STRING, true, false, false, null, null, null, null, null)
             );
             
-            CollectionDefinition oldDef = createCollection("test", oldFields);
-            CollectionDefinition newDef = createCollection("test", newFields);
+            CollectionDefinition oldDef = createCollection("test_data", oldFields);
+            CollectionDefinition newDef = createCollection("test_data", newFields);
             
             // Execute migration
             migrationEngine.migrateSchema(oldDef, newDef);
             
             // Verify column was added by inserting data
             jdbcTemplate.update(
-                "INSERT INTO tbl_test (id, created_at, updated_at, name, description) VALUES (?, ?, ?, ?, ?)",
+                "INSERT INTO test_data (id, created_at, updated_at, name, description) VALUES (?, ?, ?, ?, ?)",
                 "1", Instant.now(), Instant.now(), "Test", "Test Description"
             );
             
             Integer count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM tbl_test WHERE description = 'Test Description'", Integer.class);
+                "SELECT COUNT(*) FROM test_data WHERE description = 'Test Description'", Integer.class);
             assertEquals(1, count);
             
             // Verify migration was recorded
-            List<MigrationRecord> history = migrationEngine.getMigrationHistory("test");
+            List<MigrationRecord> history = migrationEngine.getMigrationHistory("test_data");
             assertTrue(history.stream().anyMatch(r -> r.migrationType() == MigrationType.ADD_COLUMN));
         }
         
@@ -494,27 +494,27 @@ class SchemaMigrationEngineTest {
                 new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null, null),
                 new FieldDefinition("old_field", FieldType.STRING, true, false, false, null, null, null, null, null)
             );
-            setupTestTable("tbl_test", oldFields);
+            setupTestTable("test_data", oldFields);
             
             // Define new schema without old_field
             List<FieldDefinition> newFields = List.of(
                 new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null, null)
             );
             
-            CollectionDefinition oldDef = createCollection("test", oldFields);
-            CollectionDefinition newDef = createCollection("test", newFields);
+            CollectionDefinition oldDef = createCollection("test_data", oldFields);
+            CollectionDefinition newDef = createCollection("test_data", newFields);
             
             // Execute migration
             migrationEngine.migrateSchema(oldDef, newDef);
             
             // Verify column still exists (not dropped)
             jdbcTemplate.update(
-                "INSERT INTO tbl_test (id, created_at, updated_at, name, old_field) VALUES (?, ?, ?, ?, ?)",
+                "INSERT INTO test_data (id, created_at, updated_at, name, old_field) VALUES (?, ?, ?, ?, ?)",
                 "1", Instant.now(), Instant.now(), "Test", "Old Value"
             );
             
             // Verify migration was recorded as DEPRECATE_COLUMN
-            List<MigrationRecord> history = migrationEngine.getMigrationHistory("test");
+            List<MigrationRecord> history = migrationEngine.getMigrationHistory("test_data");
             assertTrue(history.stream().anyMatch(r -> r.migrationType() == MigrationType.DEPRECATE_COLUMN));
         }
         
@@ -525,11 +525,11 @@ class SchemaMigrationEngineTest {
             List<FieldDefinition> oldFields = List.of(
                 new FieldDefinition("count", FieldType.INTEGER, true, false, false, null, null, null, null, null)
             );
-            setupTestTable("tbl_test", oldFields);
+            setupTestTable("test_data", oldFields);
             
             // Insert some data
             jdbcTemplate.update(
-                "INSERT INTO tbl_test (id, created_at, updated_at, count) VALUES (?, ?, ?, ?)",
+                "INSERT INTO test_data (id, created_at, updated_at, count) VALUES (?, ?, ?, ?)",
                 "1", Instant.now(), Instant.now(), 100
             );
             
@@ -538,24 +538,24 @@ class SchemaMigrationEngineTest {
                 new FieldDefinition("count", FieldType.LONG, true, false, false, null, null, null, null, null)
             );
             
-            CollectionDefinition oldDef = createCollection("test", oldFields);
-            CollectionDefinition newDef = createCollection("test", newFields);
+            CollectionDefinition oldDef = createCollection("test_data", oldFields);
+            CollectionDefinition newDef = createCollection("test_data", newFields);
             
             // Execute migration
             migrationEngine.migrateSchema(oldDef, newDef);
             
             // Verify data is preserved and can hold larger values
             jdbcTemplate.update(
-                "INSERT INTO tbl_test (id, created_at, updated_at, count) VALUES (?, ?, ?, ?)",
+                "INSERT INTO test_data (id, created_at, updated_at, count) VALUES (?, ?, ?, ?)",
                 "2", Instant.now(), Instant.now(), 9999999999L
             );
             
             Long count = jdbcTemplate.queryForObject(
-                "SELECT count FROM tbl_test WHERE id = '2'", Long.class);
+                "SELECT count FROM test_data WHERE id = '2'", Long.class);
             assertEquals(9999999999L, count);
             
             // Verify migration was recorded
-            List<MigrationRecord> history = migrationEngine.getMigrationHistory("test");
+            List<MigrationRecord> history = migrationEngine.getMigrationHistory("test_data");
             assertTrue(history.stream().anyMatch(r -> r.migrationType() == MigrationType.ALTER_COLUMN_TYPE));
         }
         
@@ -565,14 +565,14 @@ class SchemaMigrationEngineTest {
             List<FieldDefinition> oldFields = List.of(
                 new FieldDefinition("flag", FieldType.BOOLEAN, true, false, false, null, null, null, null, null)
             );
-            setupTestTable("tbl_test", oldFields);
+            setupTestTable("test_data", oldFields);
             
             List<FieldDefinition> newFields = List.of(
                 new FieldDefinition("flag", FieldType.INTEGER, true, false, false, null, null, null, null, null)
             );
             
-            CollectionDefinition oldDef = createCollection("test", oldFields);
-            CollectionDefinition newDef = createCollection("test", newFields);
+            CollectionDefinition oldDef = createCollection("test_data", oldFields);
+            CollectionDefinition newDef = createCollection("test_data", newFields);
             
             assertThrows(IncompatibleSchemaChangeException.class,
                 () -> migrationEngine.migrateSchema(oldDef, newDef));
@@ -587,7 +587,7 @@ class SchemaMigrationEngineTest {
                 new FieldDefinition("count", FieldType.INTEGER, true, false, false, null, null, null, null, null),
                 new FieldDefinition("old_field", FieldType.STRING, true, false, false, null, null, null, null, null)
             );
-            setupTestTable("tbl_test", oldFields);
+            setupTestTable("test_data", oldFields);
             
             // Define new schema with multiple changes
             List<FieldDefinition> newFields = List.of(
@@ -596,14 +596,14 @@ class SchemaMigrationEngineTest {
                 new FieldDefinition("new_field", FieldType.BOOLEAN, true, false, false, null, null, null, null, null)
             );
             
-            CollectionDefinition oldDef = createCollection("test", oldFields);
-            CollectionDefinition newDef = createCollection("test", newFields);
+            CollectionDefinition oldDef = createCollection("test_data", oldFields);
+            CollectionDefinition newDef = createCollection("test_data", newFields);
             
             // Execute migration
             migrationEngine.migrateSchema(oldDef, newDef);
             
             // Verify all migrations were recorded
-            List<MigrationRecord> history = migrationEngine.getMigrationHistory("test");
+            List<MigrationRecord> history = migrationEngine.getMigrationHistory("test_data");
             assertEquals(3, history.size());
             
             assertTrue(history.stream().anyMatch(r -> r.migrationType() == MigrationType.ADD_COLUMN));
@@ -617,16 +617,16 @@ class SchemaMigrationEngineTest {
             List<FieldDefinition> fields = List.of(
                 new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null, null)
             );
-            setupTestTable("tbl_test", fields);
+            setupTestTable("test_data", fields);
             
-            CollectionDefinition oldDef = createCollection("test", fields);
-            CollectionDefinition newDef = createCollection("test", fields);
+            CollectionDefinition oldDef = createCollection("test_data", fields);
+            CollectionDefinition newDef = createCollection("test_data", fields);
             
             // Execute migration
             migrationEngine.migrateSchema(oldDef, newDef);
             
             // Verify no migrations were recorded
-            List<MigrationRecord> history = migrationEngine.getMigrationHistory("test");
+            List<MigrationRecord> history = migrationEngine.getMigrationHistory("test_data");
             assertTrue(history.isEmpty());
         }
     }
@@ -638,9 +638,9 @@ class SchemaMigrationEngineTest {
         @Test
         @DisplayName("Should accept string migration type")
         void shouldAcceptStringMigrationType() {
-            migrationEngine.recordMigration("test", "CREATE_TABLE", "CREATE TABLE...");
-            
-            List<MigrationRecord> history = migrationEngine.getMigrationHistory("test");
+            migrationEngine.recordMigration("test_data", "CREATE_TABLE", "CREATE TABLE...");
+
+            List<MigrationRecord> history = migrationEngine.getMigrationHistory("test_data");
             assertEquals(1, history.size());
             assertEquals(MigrationType.CREATE_TABLE, history.get(0).migrationType());
         }
@@ -660,7 +660,7 @@ class SchemaMigrationEngineTest {
         @BeforeEach
         void cleanupTestTable() {
             try {
-                jdbcTemplate.execute("DROP TABLE IF EXISTS tbl_test");
+                jdbcTemplate.execute("DROP TABLE IF EXISTS test_data");
             } catch (Exception e) {
                 // Ignore
             }
@@ -671,7 +671,7 @@ class SchemaMigrationEngineTest {
         void shouldAddMissingColumnsWhenTableExistsWithoutThem() {
             // Create table with only 'name' column
             jdbcTemplate.execute(
-                "CREATE TABLE tbl_test (id VARCHAR(36) PRIMARY KEY, " +
+                "CREATE TABLE test_data (id VARCHAR(36) PRIMARY KEY, " +
                 "created_at TIMESTAMP NOT NULL, updated_at TIMESTAMP NOT NULL, name TEXT)");
 
             // Define collection with 'name' and 'description' columns
@@ -679,23 +679,23 @@ class SchemaMigrationEngineTest {
                 new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null, null),
                 new FieldDefinition("description", FieldType.STRING, true, false, false, null, null, null, null, null)
             );
-            CollectionDefinition def = createCollection("test", fields);
+            CollectionDefinition def = createCollection("test_data", fields);
 
             // Reconcile schema
             migrationEngine.reconcileSchema(def);
 
             // Verify the 'description' column was added
             jdbcTemplate.update(
-                "INSERT INTO tbl_test (id, created_at, updated_at, name, description) VALUES (?, ?, ?, ?, ?)",
+                "INSERT INTO test_data (id, created_at, updated_at, name, description) VALUES (?, ?, ?, ?, ?)",
                 "1", Instant.now(), Instant.now(), "Test", "Test Description"
             );
 
             Integer count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM tbl_test WHERE description = 'Test Description'", Integer.class);
+                "SELECT COUNT(*) FROM test_data WHERE description = 'Test Description'", Integer.class);
             assertEquals(1, count);
 
             // Verify migration was recorded
-            List<MigrationRecord> history = migrationEngine.getMigrationHistory("test");
+            List<MigrationRecord> history = migrationEngine.getMigrationHistory("test_data");
             assertTrue(history.stream().anyMatch(r -> r.migrationType() == MigrationType.ADD_COLUMN));
         }
 
@@ -704,7 +704,7 @@ class SchemaMigrationEngineTest {
         void shouldDoNothingWhenTableHasAllColumns() {
             // Create table with all columns
             jdbcTemplate.execute(
-                "CREATE TABLE tbl_test (id VARCHAR(36) PRIMARY KEY, " +
+                "CREATE TABLE test_data (id VARCHAR(36) PRIMARY KEY, " +
                 "created_at TIMESTAMP NOT NULL, updated_at TIMESTAMP NOT NULL, " +
                 "name TEXT, description TEXT)");
 
@@ -712,13 +712,13 @@ class SchemaMigrationEngineTest {
                 new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null, null),
                 new FieldDefinition("description", FieldType.STRING, true, false, false, null, null, null, null, null)
             );
-            CollectionDefinition def = createCollection("test", fields);
+            CollectionDefinition def = createCollection("test_data", fields);
 
             // Reconcile schema
             migrationEngine.reconcileSchema(def);
 
             // Verify no migrations were recorded
-            List<MigrationRecord> history = migrationEngine.getMigrationHistory("test");
+            List<MigrationRecord> history = migrationEngine.getMigrationHistory("test_data");
             assertTrue(history.isEmpty());
         }
 
@@ -728,13 +728,13 @@ class SchemaMigrationEngineTest {
             List<FieldDefinition> fields = List.of(
                 new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null, null)
             );
-            CollectionDefinition def = createCollection("test", fields);
+            CollectionDefinition def = createCollection("test_data", fields);
 
             // Reconcile schema on a non-existent table
             migrationEngine.reconcileSchema(def);
 
             // No migration should be recorded
-            List<MigrationRecord> history = migrationEngine.getMigrationHistory("test");
+            List<MigrationRecord> history = migrationEngine.getMigrationHistory("test_data");
             assertTrue(history.isEmpty());
         }
 
@@ -743,7 +743,7 @@ class SchemaMigrationEngineTest {
         void shouldAddMultipleMissingColumns() {
             // Create table with only 'name' column
             jdbcTemplate.execute(
-                "CREATE TABLE tbl_test (id VARCHAR(36) PRIMARY KEY, " +
+                "CREATE TABLE test_data (id VARCHAR(36) PRIMARY KEY, " +
                 "created_at TIMESTAMP NOT NULL, updated_at TIMESTAMP NOT NULL, name TEXT)");
 
             // Define collection with 'name', 'price', and 'quantity' columns
@@ -752,23 +752,23 @@ class SchemaMigrationEngineTest {
                 new FieldDefinition("price", FieldType.DOUBLE, true, false, false, null, null, null, null, null),
                 new FieldDefinition("quantity", FieldType.INTEGER, true, false, false, null, null, null, null, null)
             );
-            CollectionDefinition def = createCollection("test", fields);
+            CollectionDefinition def = createCollection("test_data", fields);
 
             // Reconcile schema
             migrationEngine.reconcileSchema(def);
 
             // Verify both columns were added
             jdbcTemplate.update(
-                "INSERT INTO tbl_test (id, created_at, updated_at, name, price, quantity) VALUES (?, ?, ?, ?, ?, ?)",
+                "INSERT INTO test_data (id, created_at, updated_at, name, price, quantity) VALUES (?, ?, ?, ?, ?, ?)",
                 "1", Instant.now(), Instant.now(), "Test", 9.99, 42
             );
 
             Integer count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM tbl_test", Integer.class);
+                "SELECT COUNT(*) FROM test_data", Integer.class);
             assertEquals(1, count);
 
             // Verify two ADD_COLUMN migrations were recorded
-            List<MigrationRecord> history = migrationEngine.getMigrationHistory("test");
+            List<MigrationRecord> history = migrationEngine.getMigrationHistory("test_data");
             long addColumnCount = history.stream()
                 .filter(r -> r.migrationType() == MigrationType.ADD_COLUMN)
                 .count();
@@ -780,20 +780,20 @@ class SchemaMigrationEngineTest {
         void shouldHandleCaseInsensitiveColumnMatching() {
             // Create table with uppercase column name
             jdbcTemplate.execute(
-                "CREATE TABLE tbl_test (id VARCHAR(36) PRIMARY KEY, " +
+                "CREATE TABLE test_data (id VARCHAR(36) PRIMARY KEY, " +
                 "created_at TIMESTAMP NOT NULL, updated_at TIMESTAMP NOT NULL, NAME TEXT)");
 
             // Define collection with lowercase field name
             List<FieldDefinition> fields = List.of(
                 new FieldDefinition("name", FieldType.STRING, false, false, false, null, null, null, null, null)
             );
-            CollectionDefinition def = createCollection("test", fields);
+            CollectionDefinition def = createCollection("test_data", fields);
 
             // Reconcile schema — should not add duplicate column
             migrationEngine.reconcileSchema(def);
 
             // Verify no migrations were recorded (column already exists)
-            List<MigrationRecord> history = migrationEngine.getMigrationHistory("test");
+            List<MigrationRecord> history = migrationEngine.getMigrationHistory("test_data");
             assertTrue(history.isEmpty());
         }
 
@@ -801,10 +801,10 @@ class SchemaMigrationEngineTest {
         @DisplayName("Should return existing columns for a table")
         void shouldReturnExistingColumnsForTable() {
             jdbcTemplate.execute(
-                "CREATE TABLE tbl_test (id VARCHAR(36) PRIMARY KEY, " +
+                "CREATE TABLE test_data (id VARCHAR(36) PRIMARY KEY, " +
                 "created_at TIMESTAMP NOT NULL, name TEXT, price DOUBLE PRECISION)");
 
-            Set<String> columns = migrationEngine.getExistingColumns("tbl_test");
+            Set<String> columns = migrationEngine.getExistingColumns("test_data");
 
             assertTrue(columns.contains("id"));
             assertTrue(columns.contains("created_at"));

@@ -135,23 +135,23 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
                 sql.append(" UNIQUE");
             }
 
-            // Companion columns
+            // Companion columns (use resolved column name for consistency)
             if (field.type() == FieldType.CURRENCY) {
                 sql.append(", ");
-                sql.append(sanitizeIdentifier(field.name() + "_currency_code")).append(" VARCHAR(3)");
+                sql.append(sanitizeIdentifier(columnName + "_currency_code")).append(" VARCHAR(3)");
             }
             if (field.type() == FieldType.GEOLOCATION) {
                 sql.append(", ");
-                sql.append(sanitizeIdentifier(field.name() + "_longitude")).append(" DOUBLE PRECISION");
+                sql.append(sanitizeIdentifier(columnName + "_longitude")).append(" DOUBLE PRECISION");
             }
 
             // Unique index for EXTERNAL_ID
             if (field.type() == FieldType.EXTERNAL_ID) {
                 String idxName = "idx_" + sanitizeIdentifier(getBaseTableName(definition))
-                    + "_" + sanitizeIdentifier(field.name());
+                    + "_" + sanitizeIdentifier(columnName);
                 postCreateStatements.add(
                     "CREATE UNIQUE INDEX IF NOT EXISTS " + idxName
-                    + " ON " + qualifiedName + "(" + sanitizeIdentifier(field.name()) + ")"
+                    + " ON " + qualifiedName + "(" + sanitizeIdentifier(columnName) + ")"
                 );
             }
 
@@ -159,13 +159,13 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
             if ((field.type() == FieldType.LOOKUP || field.type() == FieldType.MASTER_DETAIL)
                     && field.referenceConfig() != null) {
                 String baseName = getBaseTableName(definition);
-                String targetTableName = "tbl_" + sanitizeIdentifier(field.referenceConfig().targetCollection());
+                String targetTableName = sanitizeIdentifier(field.referenceConfig().targetCollection());
                 // Target table is in the same schema as the source table
                 TableRef targetRef = tableRef.isPublicSchema()
                         ? TableRef.publicSchema(targetTableName)
                         : TableRef.tenantSchema(tableRef.schema(), targetTableName);
                 String targetCol = sanitizeIdentifier(field.referenceConfig().targetField());
-                String fkName = "fk_" + sanitizeIdentifier(baseName) + "_" + sanitizeIdentifier(field.name());
+                String fkName = "fk_" + sanitizeIdentifier(baseName) + "_" + sanitizeIdentifier(columnName);
                 String onDelete = field.type() == FieldType.MASTER_DETAIL
                         ? "ON DELETE CASCADE" : "ON DELETE SET NULL";
 
@@ -174,7 +174,7 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
                     "IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = '" + fkName + "') THEN " +
                     "ALTER TABLE " + qualifiedName +
                     " ADD CONSTRAINT " + fkName +
-                    " FOREIGN KEY (" + sanitizeIdentifier(field.name()) + ")" +
+                    " FOREIGN KEY (" + sanitizeIdentifier(columnName) + ")" +
                     " REFERENCES " + targetRef.toSql() + "(" + targetCol + ") " + onDelete + "; " +
                     "END IF; END $$"
                 );
@@ -523,7 +523,31 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         if (definition.storageConfig() != null && definition.storageConfig().tableName() != null) {
             return definition.storageConfig().tableName();
         }
-        return "tbl_" + definition.name();
+        return definition.name();
+    }
+
+    /**
+     * Converts a camelCase string to snake_case.
+     *
+     * <p>Examples:
+     * <ul>
+     *   <li>{@code "firstName"} → {@code "first_name"}</li>
+     *   <li>{@code "emailAddress"} → {@code "email_address"}</li>
+     *   <li>{@code "XMLParser"} → {@code "xml_parser"}</li>
+     *   <li>{@code "name"} → {@code "name"}</li>
+     * </ul>
+     *
+     * @param camelCase the camelCase string
+     * @return the snake_case equivalent
+     */
+    static String toSnakeCase(String camelCase) {
+        if (camelCase == null || camelCase.isBlank()) {
+            return camelCase;
+        }
+        return camelCase
+                .replaceAll("([a-z])([A-Z])", "$1_$2")
+                .replaceAll("([A-Z]+)([A-Z][a-z])", "$1_$2")
+                .toLowerCase();
     }
 
     /**
@@ -601,8 +625,9 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         selectFields.add("updated_by");
 
         for (String field : fields) {
-            if (!selectFields.contains(field)) {
-                selectFields.add(sanitizeIdentifier(field));
+            String columnName = resolveColumnName(definition, field);
+            if (!selectFields.contains(columnName)) {
+                selectFields.add(sanitizeIdentifier(columnName));
             }
         }
 
@@ -863,7 +888,7 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
                 return mapped;
             }
         }
-        return field.name();
+        return toSnakeCase(field.name());
     }
 
     /**
@@ -887,7 +912,7 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
                 if (definition.systemCollection()) {
                     yield definition.getEffectiveColumnName(fieldName);
                 }
-                yield fieldName;
+                yield toSnakeCase(fieldName);
             }
         };
     }
@@ -904,29 +929,42 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
      * @param records the query result records to remap in place
      */
     private void remapColumnNames(CollectionDefinition definition, List<Map<String, Object>> records) {
-        if (!definition.systemCollection()) {
-            return;
-        }
-
         // Build reverse mapping: column name → field name
         Map<String, String> reverseMap = new HashMap<>();
 
-        // System audit fields
+        // System audit fields (for all collections)
         reverseMap.put("created_at", "createdAt");
         reverseMap.put("updated_at", "updatedAt");
         reverseMap.put("created_by", "createdBy");
         reverseMap.put("updated_by", "updatedBy");
         reverseMap.put("tenant_id", "tenantId");
 
-        // Collection-level column mappings
-        for (Map.Entry<String, String> entry : definition.columnMapping().entrySet()) {
-            reverseMap.put(entry.getValue(), entry.getKey());
-        }
+        if (definition.systemCollection()) {
+            // Collection-level column mappings
+            for (Map.Entry<String, String> entry : definition.columnMapping().entrySet()) {
+                reverseMap.put(entry.getValue(), entry.getKey());
+            }
 
-        // Field-level column names
-        for (FieldDefinition field : definition.fields()) {
-            if (field.columnName() != null) {
-                reverseMap.put(field.columnName(), field.name());
+            // Field-level column names
+            for (FieldDefinition field : definition.fields()) {
+                if (field.columnName() != null) {
+                    reverseMap.put(field.columnName(), field.name());
+                }
+            }
+        } else {
+            // For non-system collections, reverse the snake_case → camelCase mapping
+            for (FieldDefinition field : definition.fields()) {
+                String snakeColumn = toSnakeCase(field.name());
+                if (!snakeColumn.equals(field.name())) {
+                    reverseMap.put(snakeColumn, field.name());
+                }
+                // Also map companion columns
+                if (field.type() == FieldType.CURRENCY) {
+                    reverseMap.put(snakeColumn + "_currency_code", field.name() + "_currency_code");
+                }
+                if (field.type() == FieldType.GEOLOCATION) {
+                    reverseMap.put(snakeColumn + "_longitude", field.name() + "_longitude");
+                }
             }
         }
 

@@ -134,6 +134,24 @@ function parseCollectionsResponse(response: unknown): CollectionSchema[] {
           f.relationships?.referenceCollectionId?.data?.id ||
           (a.referenceCollectionId as string) ||
           undefined
+
+        // Unwrap fieldTypeConfig: JSONB columns may arrive as wrapper objects
+        // { type: "jsonb", value: "<json-string>", null: false }
+        let fieldTypeConfig: string | Record<string, unknown> | undefined
+        const rawFtc = a.fieldTypeConfig
+        if (rawFtc && typeof rawFtc === 'object' && !Array.isArray(rawFtc)) {
+          const wrapper = rawFtc as Record<string, unknown>
+          if (wrapper.type === 'jsonb' && 'value' in wrapper) {
+            // JSONB wrapper — extract inner value string
+            fieldTypeConfig = wrapper.null === true ? undefined : (wrapper.value as string)
+          } else {
+            // Already a plain object
+            fieldTypeConfig = rawFtc as Record<string, unknown>
+          }
+        } else if (typeof rawFtc === 'string') {
+          fieldTypeConfig = rawFtc
+        }
+
         return {
           id: f.id,
           name: a.name as string,
@@ -142,6 +160,7 @@ function parseCollectionsResponse(response: unknown): CollectionSchema[] {
           required: !!a.required,
           referenceTarget: (a.referenceTarget as string) || undefined,
           referenceCollectionId: refCollId,
+          fieldTypeConfig,
         } as FieldDefinition
       })
 

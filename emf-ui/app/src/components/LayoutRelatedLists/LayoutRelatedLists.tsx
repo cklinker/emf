@@ -17,12 +17,19 @@ export interface LayoutRelatedListsProps {
   parentRecordId: string
   /** Tenant slug for building URLs */
   tenantSlug: string
+  /**
+   * Optional: raw JSON:API response from the parent record request.
+   * When provided, related records are extracted from the `included` array
+   * instead of making separate API calls per related list.
+   */
+  includedData?: unknown
 }
 
 export function LayoutRelatedLists({
   relatedLists,
   parentRecordId,
   tenantSlug,
+  includedData,
 }: LayoutRelatedListsProps): React.ReactElement {
   const sortedLists = useMemo(
     () => [...relatedLists].sort((a, b) => a.sortOrder - b.sortOrder),
@@ -41,6 +48,7 @@ export function LayoutRelatedLists({
           parentRecordId={parentRecordId}
           tenantSlug={tenantSlug}
           limit={rl.rowLimit}
+          includedData={includedData}
         />
       ))}
     </>

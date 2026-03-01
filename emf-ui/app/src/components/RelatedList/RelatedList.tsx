@@ -142,16 +142,22 @@ export function RelatedList({
   }, [referenceFields])
 
   // Extract pre-loaded records from the parent's included resources when available.
-  // This eliminates a separate API call for each related list — the parent record
-  // fetches reverse includes (e.g., order_items, payments) in a single request.
+  // This eliminates a separate API call when the include data contains records of
+  // this collection type. Returns null if no records of this type are present in the
+  // included data — which triggers the fallback API call. This distinction matters
+  // because the gateway only resolves forward (belongs-to) includes; reverse (has-many)
+  // relationships like order_items won't appear in the included array, so we must
+  // fall back to a separate query.
   const preloadedRecords = useMemo<CollectionRecord[] | null>(() => {
     if (!includedData || !collectionName || !foreignKeyField || !parentRecordId) return null
     const allOfType = extractIncluded<CollectionRecord>(includedData, collectionName)
+    // If no resources of this type exist in the included array, the gateway didn't
+    // resolve this include — return null to trigger the fallback API call.
+    if (allOfType.length === 0) return null
     // Filter to records that reference this parent
-    const filtered = allOfType.filter(
+    return allOfType.filter(
       (r) => String(r[foreignKeyField]) === parentRecordId
     )
-    return filtered
   }, [includedData, collectionName, foreignKeyField, parentRecordId])
 
   // Only fetch via API if no pre-loaded data is available

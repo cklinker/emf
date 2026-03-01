@@ -160,51 +160,17 @@ export function ObjectDetailPage(): React.ReactElement {
     [fields]
   )
 
-  // Build unified include param combining:
-  // 1. Forward includes — reference fields on this collection (e.g., customers, discount_codes)
-  // 2. Reverse includes — collections with FK fields pointing to this collection (e.g., order_items, payments)
-  // 3. Nested includes — reference targets of reverse collections (e.g., products via order_items)
-  // This fetches all related data in a single API call, eliminating per-related-list requests.
+  // Build include param from forward reference fields on this collection.
+  // The gateway's IncludeResolutionFilter resolves forward (belongs-to) relationships
+  // by following relationship IDs — e.g., customers, discount_codes on an order.
+  // Reverse (has-many) relationships like order_items and payments are NOT supported
+  // by the gateway's include resolver, so those are fetched separately by RelatedList.
   const includeParam = useMemo(() => {
-    const includes = new Set<string>()
+    if (referenceFields.length === 0) return undefined
+    return referenceFields.map((f) => f.referenceTarget!).join(',')
+  }, [referenceFields])
 
-    // Forward includes from reference fields on this collection
-    for (const f of referenceFields) {
-      includes.add(f.referenceTarget!)
-    }
-
-    // Reverse includes + nested: collections referencing this collection
-    if (collectionName && !collectionStore.isLoading) {
-      for (const coll of collectionStore.collections) {
-        if (coll.name === collectionName) continue
-        for (const field of coll.fields) {
-          if (
-            (field.type === 'master_detail' || field.type === 'lookup') &&
-            field.referenceTarget === collectionName
-          ) {
-            // Add the reverse collection itself (e.g., order_items)
-            includes.add(coll.name)
-            // Add nested reference targets so the backend resolves them transitively
-            // (e.g., order_items.product → products)
-            for (const nestedField of coll.fields) {
-              if (
-                REFERENCE_FIELD_TYPES.has(nestedField.type) &&
-                nestedField.referenceTarget &&
-                nestedField.referenceTarget !== collectionName
-              ) {
-                includes.add(nestedField.referenceTarget)
-              }
-            }
-          }
-        }
-      }
-    }
-
-    return includes.size > 0 ? [...includes].join(',') : undefined
-  }, [referenceFields, collectionName, collectionStore.collections, collectionStore.isLoading])
-
-  // Fetch record with all includes — wait for both schema and collection store
-  // so the include param is fully computed before the query fires.
+  // Fetch record with forward includes for display labels (e.g., customers, discount_codes)
   const {
     record,
     isLoading: recordLoading,
@@ -214,7 +180,7 @@ export function ObjectDetailPage(): React.ReactElement {
     collectionName,
     recordId,
     include: includeParam,
-    enabled: !schemaLoading && !collectionStore.isLoading,
+    enabled: !schemaLoading,
   })
 
   // Build lookup display map from included resources using centralized collection store
@@ -597,6 +563,7 @@ export function ObjectDetailPage(): React.ReactElement {
             relatedLists={layout!.relatedLists}
             parentRecordId={recordId}
             tenantSlug={tenantSlug || ''}
+            includedData={rawResponse}
           />
         </div>
       ) : relatedCollections.length > 0 && recordId ? (

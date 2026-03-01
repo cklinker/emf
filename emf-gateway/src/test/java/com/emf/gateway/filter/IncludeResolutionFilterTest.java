@@ -242,9 +242,9 @@ class IncludeResolutionFilterTest {
         }
 
         @Test
-        @DisplayName("Should run after CollectionPathRewriteFilter (10100)")
-        void shouldRunAfterPathRewriteFilter() {
-            assertThat(filter.getOrder()).isGreaterThan(10100);
+        @DisplayName("Should run before NettyRoutingFilter (MAX_VALUE)")
+        void shouldRunBeforeNettyRoutingFilter() {
+            assertThat(filter.getOrder()).isLessThan(Integer.MAX_VALUE);
         }
     }
 }

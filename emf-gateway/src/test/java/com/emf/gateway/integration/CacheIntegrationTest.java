@@ -289,7 +289,7 @@ public class CacheIntegrationTest extends IntegrationTestBase {
         HttpEntity<Void> request = new HttpEntity<>(headers);
         
         ResponseEntity<Map> response = restTemplate.exchange(
-            GATEWAY_URL + "/api/collections/tasks/" + taskId + "?include=project",
+            GATEWAY_URL + "/api/tasks/" + taskId + "?include=project",
             HttpMethod.GET,
             request,
             Map.class
@@ -359,7 +359,7 @@ public class CacheIntegrationTest extends IntegrationTestBase {
         HttpEntity<Void> request = new HttpEntity<>(headers);
         
         ResponseEntity<Map> response = restTemplate.exchange(
-            GATEWAY_URL + "/api/collections/tasks/" + taskId + "?include=project",
+            GATEWAY_URL + "/api/tasks/" + taskId + "?include=project",
             HttpMethod.GET,
             request,
             Map.class

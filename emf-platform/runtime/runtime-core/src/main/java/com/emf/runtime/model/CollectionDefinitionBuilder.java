@@ -294,7 +294,7 @@ public class CollectionDefinitionBuilder {
      * <p>Applies sensible defaults for optional configuration:
      * <ul>
      *   <li>Storage: Mode A (Physical Tables) with table name "tbl_{name}"</li>
-     *   <li>API: All operations enabled at "/api/collections/{name}"</li>
+     *   <li>API: All operations enabled at "/api/{name}"</li>
      *   <li>Authorization: Disabled</li>
      *   <li>Events: Disabled</li>
      *   <li>Timestamps: Current time if not set</li>
@@ -317,7 +317,7 @@ public class CollectionDefinitionBuilder {
             storageConfig = new StorageConfig(StorageMode.PHYSICAL_TABLES, "tbl_" + name, Map.of());
         }
         if (apiConfig == null) {
-            apiConfig = ApiConfig.allEnabled("/api/collections/" + name);
+            apiConfig = ApiConfig.allEnabled("/api/" + name);
         }
         if (authzConfig == null) {
             authzConfig = AuthzConfig.disabled();

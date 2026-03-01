@@ -39,20 +39,20 @@ import java.util.stream.Collectors;
  * 
  * <p>Endpoints:
  * <ul>
- *   <li>GET /api/collections/{collectionName} - List records with pagination, sorting, filtering</li>
- *   <li>GET /api/collections/{collectionName}/{id} - Get a single record by ID</li>
- *   <li>POST /api/collections/{collectionName} - Create a new record</li>
- *   <li>PUT /api/collections/{collectionName}/{id} - Update an existing record</li>
- *   <li>DELETE /api/collections/{collectionName}/{id} - Delete a record</li>
+ *   <li>GET /api/{collectionName} - List records with pagination, sorting, filtering</li>
+ *   <li>GET /api/{collectionName}/{id} - Get a single record by ID</li>
+ *   <li>POST /api/{collectionName} - Create a new record</li>
+ *   <li>PUT /api/{collectionName}/{id} - Update an existing record</li>
+ *   <li>DELETE /api/{collectionName}/{id} - Delete a record</li>
  * </ul>
  *
  * <p>Sub-resource endpoints (for parent-child relationships):
  * <ul>
- *   <li>GET /api/collections/{parent}/{parentId}/{child} - List child records for a parent</li>
- *   <li>GET /api/collections/{parent}/{parentId}/{child}/{childId} - Get a child record</li>
- *   <li>POST /api/collections/{parent}/{parentId}/{child} - Create a child record</li>
- *   <li>PUT /api/collections/{parent}/{parentId}/{child}/{childId} - Update a child record</li>
- *   <li>DELETE /api/collections/{parent}/{parentId}/{child}/{childId} - Delete a child record</li>
+ *   <li>GET /api/{parent}/{parentId}/{child} - List child records for a parent</li>
+ *   <li>GET /api/{parent}/{parentId}/{child}/{childId} - Get a child record</li>
+ *   <li>POST /api/{parent}/{parentId}/{child} - Create a child record</li>
+ *   <li>PUT /api/{parent}/{parentId}/{child}/{childId} - Update a child record</li>
+ *   <li>DELETE /api/{parent}/{parentId}/{child}/{childId} - Delete a child record</li>
  * </ul>
  * 
  * <p>Query Parameters for list endpoint:
@@ -67,7 +67,7 @@ import java.util.stream.Collectors;
  * @since 1.0.0
  */
 @RestController
-@RequestMapping("/api/collections")
+@RequestMapping("/api")
 public class DynamicCollectionRouter {
     
     private static final Logger logger = LoggerFactory.getLogger(DynamicCollectionRouter.class);

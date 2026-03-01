@@ -133,7 +133,7 @@ class DynamicCollectionRouterIncludeTest {
             when(queryEngine.executeQuery(eq(menuItemDef), any(QueryRequest.class)))
                     .thenReturn(itemResult);
 
-            MvcResult result = mockMvc.perform(get("/api/collections/ui-menus")
+            MvcResult result = mockMvc.perform(get("/api/ui-menus")
                             .param("include", "ui-menu-items")
                             .header("X-Tenant-ID", "tenant-1"))
                     .andExpect(status().isOk())
@@ -174,7 +174,7 @@ class DynamicCollectionRouterIncludeTest {
             when(queryEngine.executeQuery(eq(menuDef), any(QueryRequest.class)))
                     .thenReturn(menuResult);
 
-            MvcResult result = mockMvc.perform(get("/api/collections/ui-menus")
+            MvcResult result = mockMvc.perform(get("/api/ui-menus")
                             .param("include", "nonexistent")
                             .header("X-Tenant-ID", "tenant-1"))
                     .andExpect(status().isOk())
@@ -201,7 +201,7 @@ class DynamicCollectionRouterIncludeTest {
             when(queryEngine.executeQuery(eq(menuDef), any(QueryRequest.class)))
                     .thenReturn(menuResult);
 
-            MvcResult result = mockMvc.perform(get("/api/collections/ui-menus")
+            MvcResult result = mockMvc.perform(get("/api/ui-menus")
                             .header("X-Tenant-ID", "tenant-1"))
                     .andExpect(status().isOk())
                     .andReturn();
@@ -236,7 +236,7 @@ class DynamicCollectionRouterIncludeTest {
             when(queryEngine.executeQuery(eq(menuItemDef), any(QueryRequest.class)))
                     .thenReturn(emptyItemResult);
 
-            mockMvc.perform(get("/api/collections/ui-menus")
+            mockMvc.perform(get("/api/ui-menus")
                             .param("include", "ui-menu-items")
                             .header("X-Tenant-ID", "tenant-1"))
                     .andExpect(status().isOk());
@@ -286,7 +286,7 @@ class DynamicCollectionRouterIncludeTest {
             when(queryEngine.executeQuery(eq(menuItemDef), any(QueryRequest.class)))
                     .thenReturn(itemResult);
 
-            MvcResult result = mockMvc.perform(get("/api/collections/ui-menus/menu-1")
+            MvcResult result = mockMvc.perform(get("/api/ui-menus/menu-1")
                             .param("include", "ui-menu-items"))
                     .andExpect(status().isOk())
                     .andReturn();
@@ -313,7 +313,7 @@ class DynamicCollectionRouterIncludeTest {
 
             when(queryEngine.getById(menuDef, "nonexistent")).thenReturn(Optional.empty());
 
-            mockMvc.perform(get("/api/collections/ui-menus/nonexistent")
+            mockMvc.perform(get("/api/ui-menus/nonexistent")
                             .param("include", "ui-menu-items"))
                     .andExpect(status().isNotFound());
         }
@@ -441,7 +441,7 @@ class DynamicCollectionRouterIncludeTest {
                     .thenReturn(fieldResult);
 
             MvcResult result = mockMvc.perform(
-                            get("/api/collections/page-layouts/layout-1")
+                            get("/api/page-layouts/layout-1")
                                     .param("include", "layout-sections,layout-fields"))
                     .andExpect(status().isOk())
                     .andReturn();
@@ -500,7 +500,7 @@ class DynamicCollectionRouterIncludeTest {
             when(queryEngine.executeQuery(eq(fieldDef), any(QueryRequest.class)))
                     .thenReturn(emptyFieldResult);
 
-            mockMvc.perform(get("/api/collections/page-layouts/layout-1")
+            mockMvc.perform(get("/api/page-layouts/layout-1")
                             .param("include", "layout-sections,layout-fields"))
                     .andExpect(status().isOk());
 
@@ -545,7 +545,7 @@ class DynamicCollectionRouterIncludeTest {
                     .thenReturn(emptySectionResult);
 
             MvcResult result = mockMvc.perform(
-                            get("/api/collections/page-layouts/layout-1")
+                            get("/api/page-layouts/layout-1")
                                     .param("include", "layout-sections,layout-fields"))
                     .andExpect(status().isOk())
                     .andReturn();
@@ -602,7 +602,7 @@ class DynamicCollectionRouterIncludeTest {
                     .thenReturn(fieldResult);
 
             MvcResult result = mockMvc.perform(
-                            get("/api/collections/page-layouts")
+                            get("/api/page-layouts")
                                     .param("include", "layout-sections,layout-fields"))
                     .andExpect(status().isOk())
                     .andReturn();
@@ -635,7 +635,7 @@ class DynamicCollectionRouterIncludeTest {
             when(queryEngine.getById(layoutDef, "layout-1")).thenReturn(Optional.of(layout));
 
             MvcResult result = mockMvc.perform(
-                            get("/api/collections/page-layouts/layout-1")
+                            get("/api/page-layouts/layout-1")
                                     .param("include", "layout-sections,layout-fields"))
                     .andExpect(status().isOk())
                     .andReturn();

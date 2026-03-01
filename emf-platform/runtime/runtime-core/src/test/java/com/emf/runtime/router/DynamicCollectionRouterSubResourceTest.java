@@ -214,7 +214,7 @@ class DynamicCollectionRouterSubResourceTest {
             when(queryEngine.executeQuery(any(CollectionDefinition.class), any(QueryRequest.class)))
                     .thenReturn(emptyResult);
 
-            mockMvc.perform(get("/api/collections/workflow-rules/rule-1/workflow-actions")
+            mockMvc.perform(get("/api/workflow-rules/rule-1/workflow-actions")
                             .header("X-Tenant-ID", "tenant-123"))
                     .andExpect(status().isOk());
 
@@ -240,7 +240,7 @@ class DynamicCollectionRouterSubResourceTest {
             when(queryEngine.executeQuery(any(CollectionDefinition.class), any(QueryRequest.class)))
                     .thenReturn(emptyResult);
 
-            mockMvc.perform(get("/api/collections/workflow-rules/rule-1/workflow-actions")
+            mockMvc.perform(get("/api/workflow-rules/rule-1/workflow-actions")
                             .header("X-Tenant-ID", "tenant-123"))
                     .andExpect(status().isOk());
 
@@ -261,7 +261,7 @@ class DynamicCollectionRouterSubResourceTest {
         void listChildren_returns404_whenParentNotFound() throws Exception {
             when(registry.get("unknown-parent")).thenReturn(null);
 
-            mockMvc.perform(get("/api/collections/unknown-parent/id-1/workflow-actions"))
+            mockMvc.perform(get("/api/unknown-parent/id-1/workflow-actions"))
                     .andExpect(status().isNotFound());
 
             verifyNoInteractions(queryEngine);
@@ -273,7 +273,7 @@ class DynamicCollectionRouterSubResourceTest {
             when(registry.get("workflow-rules")).thenReturn(buildParentCollection());
             when(registry.get("unknown-child")).thenReturn(null);
 
-            mockMvc.perform(get("/api/collections/workflow-rules/rule-1/unknown-child"))
+            mockMvc.perform(get("/api/workflow-rules/rule-1/unknown-child"))
                     .andExpect(status().isNotFound());
 
             verifyNoInteractions(queryEngine);
@@ -285,7 +285,7 @@ class DynamicCollectionRouterSubResourceTest {
             when(registry.get("workflow-rules")).thenReturn(buildParentCollection());
             when(registry.get("users")).thenReturn(buildUnrelatedCollection());
 
-            mockMvc.perform(get("/api/collections/workflow-rules/rule-1/users"))
+            mockMvc.perform(get("/api/workflow-rules/rule-1/users"))
                     .andExpect(status().isNotFound());
 
             verifyNoInteractions(queryEngine);
@@ -307,7 +307,7 @@ class DynamicCollectionRouterSubResourceTest {
             when(queryEngine.executeQuery(any(CollectionDefinition.class), any(QueryRequest.class)))
                     .thenReturn(result);
 
-            mockMvc.perform(get("/api/collections/workflow-rules/rule-1/workflow-actions")
+            mockMvc.perform(get("/api/workflow-rules/rule-1/workflow-actions")
                             .header("X-Tenant-ID", "tenant-123"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.data").isArray())
@@ -336,7 +336,7 @@ class DynamicCollectionRouterSubResourceTest {
             when(queryEngine.getById(any(CollectionDefinition.class), eq("action-1")))
                     .thenReturn(Optional.of(record));
 
-            mockMvc.perform(get("/api/collections/workflow-rules/rule-1/workflow-actions/action-1")
+            mockMvc.perform(get("/api/workflow-rules/rule-1/workflow-actions/action-1")
                             .header("X-Tenant-ID", "tenant-123"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.data.type").value("workflow-actions"))
@@ -351,7 +351,7 @@ class DynamicCollectionRouterSubResourceTest {
             when(queryEngine.getById(any(CollectionDefinition.class), eq("nonexistent")))
                     .thenReturn(Optional.empty());
 
-            mockMvc.perform(get("/api/collections/workflow-rules/rule-1/workflow-actions/nonexistent"))
+            mockMvc.perform(get("/api/workflow-rules/rule-1/workflow-actions/nonexistent"))
                     .andExpect(status().isNotFound());
         }
     }
@@ -375,7 +375,7 @@ class DynamicCollectionRouterSubResourceTest {
 
             String body = jsonApiBody(Map.of("name", "Send Email", "actionType", "EMAIL"));
 
-            mockMvc.perform(post("/api/collections/workflow-rules/rule-1/workflow-actions")
+            mockMvc.perform(post("/api/workflow-rules/rule-1/workflow-actions")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body)
                             .header("X-Tenant-ID", "tenant-123")
@@ -403,7 +403,7 @@ class DynamicCollectionRouterSubResourceTest {
 
             String body = jsonApiBody(Map.of("message", "test"));
 
-            mockMvc.perform(post("/api/collections/workflow-rules/rule-1/workflow-execution-logs")
+            mockMvc.perform(post("/api/workflow-rules/rule-1/workflow-execution-logs")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body)
                             .header("X-Tenant-ID", "tenant-123"))
@@ -433,7 +433,7 @@ class DynamicCollectionRouterSubResourceTest {
 
             String body = jsonApiBody(Map.of("name", "Updated Action"));
 
-            mockMvc.perform(put("/api/collections/workflow-rules/rule-1/workflow-actions/action-1")
+            mockMvc.perform(put("/api/workflow-rules/rule-1/workflow-actions/action-1")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body)
                             .header("X-Tenant-ID", "tenant-123")
@@ -463,7 +463,7 @@ class DynamicCollectionRouterSubResourceTest {
 
             String body = jsonApiBody(Map.of("name", "Patched Action"));
 
-            mockMvc.perform(patch("/api/collections/workflow-rules/rule-1/workflow-actions/action-1")
+            mockMvc.perform(patch("/api/workflow-rules/rule-1/workflow-actions/action-1")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body)
                             .header("X-Tenant-ID", "tenant-123"))
@@ -480,7 +480,7 @@ class DynamicCollectionRouterSubResourceTest {
 
             String body = jsonApiBody(Map.of("name", "test"));
 
-            mockMvc.perform(put("/api/collections/workflow-rules/rule-1/workflow-actions/nonexistent")
+            mockMvc.perform(put("/api/workflow-rules/rule-1/workflow-actions/nonexistent")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body))
                     .andExpect(status().isNotFound());
@@ -494,7 +494,7 @@ class DynamicCollectionRouterSubResourceTest {
 
             String body = jsonApiBody(Map.of("message", "test"));
 
-            mockMvc.perform(put("/api/collections/workflow-rules/rule-1/workflow-execution-logs/log-1")
+            mockMvc.perform(put("/api/workflow-rules/rule-1/workflow-execution-logs/log-1")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body))
                     .andExpect(status().isForbidden());
@@ -517,7 +517,7 @@ class DynamicCollectionRouterSubResourceTest {
             when(queryEngine.delete(any(CollectionDefinition.class), eq("action-1")))
                     .thenReturn(true);
 
-            mockMvc.perform(delete("/api/collections/workflow-rules/rule-1/workflow-actions/action-1"))
+            mockMvc.perform(delete("/api/workflow-rules/rule-1/workflow-actions/action-1"))
                     .andExpect(status().isNoContent());
 
             verify(queryEngine).delete(any(CollectionDefinition.class), eq("action-1"));
@@ -531,7 +531,7 @@ class DynamicCollectionRouterSubResourceTest {
             when(queryEngine.delete(any(CollectionDefinition.class), eq("nonexistent")))
                     .thenReturn(false);
 
-            mockMvc.perform(delete("/api/collections/workflow-rules/rule-1/workflow-actions/nonexistent"))
+            mockMvc.perform(delete("/api/workflow-rules/rule-1/workflow-actions/nonexistent"))
                     .andExpect(status().isNotFound());
         }
 
@@ -541,7 +541,7 @@ class DynamicCollectionRouterSubResourceTest {
             when(registry.get("workflow-rules")).thenReturn(buildParentCollection());
             when(registry.get("workflow-execution-logs")).thenReturn(buildReadOnlyChildCollection());
 
-            mockMvc.perform(delete("/api/collections/workflow-rules/rule-1/workflow-execution-logs/log-1"))
+            mockMvc.perform(delete("/api/workflow-rules/rule-1/workflow-execution-logs/log-1"))
                     .andExpect(status().isForbidden());
 
             verify(queryEngine, never()).delete(any(), any());

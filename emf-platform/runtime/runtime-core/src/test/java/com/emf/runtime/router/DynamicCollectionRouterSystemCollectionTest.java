@@ -132,7 +132,7 @@ class DynamicCollectionRouterSystemCollectionTest {
             QueryResult emptyResult = QueryResult.empty(Pagination.defaults());
             when(queryEngine.executeQuery(eq(def), any(QueryRequest.class))).thenReturn(emptyResult);
 
-            mockMvc.perform(get("/api/collections/workflow-rules")
+            mockMvc.perform(get("/api/workflow-rules")
                             .header("X-Tenant-ID", "tenant-123"))
                     .andExpect(status().isOk());
 
@@ -169,7 +169,7 @@ class DynamicCollectionRouterSystemCollectionTest {
             QueryResult emptyResult = QueryResult.empty(Pagination.defaults());
             when(queryEngine.executeQuery(eq(def), any(QueryRequest.class))).thenReturn(emptyResult);
 
-            mockMvc.perform(get("/api/collections/global-config")
+            mockMvc.perform(get("/api/global-config")
                             .header("X-Tenant-ID", "tenant-123"))
                     .andExpect(status().isOk());
 
@@ -192,7 +192,7 @@ class DynamicCollectionRouterSystemCollectionTest {
             QueryResult emptyResult = QueryResult.empty(Pagination.defaults());
             when(queryEngine.executeQuery(eq(def), any(QueryRequest.class))).thenReturn(emptyResult);
 
-            mockMvc.perform(get("/api/collections/products")
+            mockMvc.perform(get("/api/products")
                             .header("X-Tenant-ID", "tenant-123"))
                     .andExpect(status().isOk());
 
@@ -222,7 +222,7 @@ class DynamicCollectionRouterSystemCollectionTest {
             Map<String, Object> attributes = Map.of("action", "LOGIN", "details", "User logged in");
             String body = jsonApiBody(attributes);
 
-            mockMvc.perform(post("/api/collections/audit-logs")
+            mockMvc.perform(post("/api/audit-logs")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body)
                             .header("X-Tenant-ID", "tenant-1"))
@@ -244,14 +244,14 @@ class DynamicCollectionRouterSystemCollectionTest {
             Map<String, Object> attributes = Map.of("details", "modified");
             String body = jsonApiBody(attributes);
 
-            mockMvc.perform(put("/api/collections/audit-logs/log-1")
+            mockMvc.perform(put("/api/audit-logs/log-1")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body)
                             .header("X-Tenant-ID", "tenant-1"))
                     .andExpect(status().isForbidden());
 
             // Also test PATCH
-            mockMvc.perform(patch("/api/collections/audit-logs/log-1")
+            mockMvc.perform(patch("/api/audit-logs/log-1")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body)
                             .header("X-Tenant-ID", "tenant-1"))
@@ -266,7 +266,7 @@ class DynamicCollectionRouterSystemCollectionTest {
             CollectionDefinition def = buildReadOnlySystemCollection();
             when(registry.get("audit-logs")).thenReturn(def);
 
-            mockMvc.perform(delete("/api/collections/audit-logs/log-1")
+            mockMvc.perform(delete("/api/audit-logs/log-1")
                             .header("X-Tenant-ID", "tenant-1"))
                     .andExpect(status().isForbidden());
 
@@ -295,7 +295,7 @@ class DynamicCollectionRouterSystemCollectionTest {
             Map<String, Object> attributes = Map.of("name", "Auto-approve", "condition", "amount < 100");
             String body = jsonApiBody(attributes);
 
-            mockMvc.perform(post("/api/collections/workflow-rules")
+            mockMvc.perform(post("/api/workflow-rules")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body)
                             .header("X-Tenant-ID", "tenant-456")
@@ -325,7 +325,7 @@ class DynamicCollectionRouterSystemCollectionTest {
             Map<String, Object> attributes = Map.of("name", "Widget", "price", 9.99);
             String body = jsonApiBody(attributes);
 
-            mockMvc.perform(post("/api/collections/products")
+            mockMvc.perform(post("/api/products")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body)
                             .header("X-Tenant-ID", "tenant-456")

@@ -91,7 +91,7 @@ class DynamicCollectionRouterDisplayFieldTest {
             Map<String, Object> record = Map.of("id", uuid, "name", "Default Tenant", "slug", "default");
             when(queryEngine.getById(def, uuid)).thenReturn(Optional.of(record));
 
-            MvcResult result = mockMvc.perform(get("/api/collections/tenants/" + uuid))
+            MvcResult result = mockMvc.perform(get("/api/tenants/" + uuid))
                     .andExpect(status().isOk())
                     .andReturn();
 
@@ -128,7 +128,7 @@ class DynamicCollectionRouterDisplayFieldTest {
                     new PaginationMetadata(1, 1, 1, 1));
             when(queryEngine.executeQuery(eq(def), any(QueryRequest.class))).thenReturn(queryResult);
 
-            MvcResult result = mockMvc.perform(get("/api/collections/tenants/default"))
+            MvcResult result = mockMvc.perform(get("/api/tenants/default"))
                     .andExpect(status().isOk())
                     .andReturn();
 
@@ -166,7 +166,7 @@ class DynamicCollectionRouterDisplayFieldTest {
                     new PaginationMetadata(0, 1, 1, 0));
             when(queryEngine.executeQuery(eq(def), any(QueryRequest.class))).thenReturn(emptyResult);
 
-            mockMvc.perform(get("/api/collections/tenants/nonexistent"))
+            mockMvc.perform(get("/api/tenants/nonexistent"))
                     .andExpect(status().isNotFound());
         }
 
@@ -178,7 +178,7 @@ class DynamicCollectionRouterDisplayFieldTest {
             when(registry.get("tenants")).thenReturn(def);
             when(queryEngine.getById(def, "default")).thenReturn(Optional.empty());
 
-            mockMvc.perform(get("/api/collections/tenants/default"))
+            mockMvc.perform(get("/api/tenants/default"))
                     .andExpect(status().isNotFound());
 
             // getById is always called first; display field query should NOT happen
@@ -194,7 +194,7 @@ class DynamicCollectionRouterDisplayFieldTest {
             when(registry.get("tenants")).thenReturn(def);
             when(queryEngine.getById(def, "default")).thenReturn(Optional.empty());
 
-            mockMvc.perform(get("/api/collections/tenants/default"))
+            mockMvc.perform(get("/api/tenants/default"))
                     .andExpect(status().isNotFound());
 
             verify(queryEngine).getById(def, "default");
@@ -214,7 +214,7 @@ class DynamicCollectionRouterDisplayFieldTest {
             when(registry.get("tenants")).thenReturn(def);
             when(queryEngine.getById(def, "default")).thenReturn(Optional.empty());
 
-            mockMvc.perform(get("/api/collections/tenants/default"))
+            mockMvc.perform(get("/api/tenants/default"))
                     .andExpect(status().isNotFound());
 
             verify(queryEngine).getById(def, "default");
@@ -257,7 +257,7 @@ class DynamicCollectionRouterDisplayFieldTest {
                     new PaginationMetadata(1, 1, 1, 1));
             when(queryEngine.executeQuery(eq(tenantDef), any(QueryRequest.class))).thenReturn(queryResult);
 
-            MvcResult result = mockMvc.perform(get("/api/collections/tenants/default?include=users"))
+            MvcResult result = mockMvc.perform(get("/api/tenants/default?include=users"))
                     .andExpect(status().isOk())
                     .andReturn();
 

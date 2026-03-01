@@ -11,7 +11,6 @@ Client Request
   ├─ JwtAuthenticationFilter (-100)       Validate JWT, extract principal
   ├─ RateLimitFilter (-50)                Per-tenant rate limiting (Redis)
   ├─ RouteAuthorizationFilter (0)         Object-level permission checks
-  ├─ CollectionPathRewriteFilter          Rewrite /api/xxx → /api/collections/xxx
   ├─ Request forwarded to worker
   ├─ FieldAuthorizationFilter             Filter response fields by permissions
   └─ IncludeResolutionFilter (10200)      Resolve JSON:API ?include= params
@@ -24,7 +23,7 @@ Client Request
 | `auth` | JWT validation, `GatewayPrincipal` extraction, public path matching |
 | `authz` | Route/field authorization filters, permission resolution from worker |
 | `config` | Spring configuration, bootstrap, Kafka/Redis/Security beans |
-| `filter` | Tenant resolution, path rewriting, security headers, request logging |
+| `filter` | Tenant resolution, security headers, request logging |
 | `route` | `DynamicRouteLocator`, `RouteRegistry` (in-memory, thread-safe) |
 | `ratelimit` | `RedisRateLimiter` (sliding window), `TenantGovernorLimitCache` |
 | `jsonapi` | `IncludeResolver` -- fetches related resources from Redis cache with backend fallback |

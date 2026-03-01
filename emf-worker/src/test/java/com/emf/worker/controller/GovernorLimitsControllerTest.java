@@ -48,7 +48,7 @@ class GovernorLimitsControllerTest {
     // ==================== GET Tests ====================
 
     @Nested
-    @DisplayName("GET /api/collections/governor-limits")
+    @DisplayName("GET /api/governor-limits")
     class GetStatusTests {
 
         @Test
@@ -264,7 +264,7 @@ class GovernorLimitsControllerTest {
     // ==================== PUT Tests ====================
 
     @Nested
-    @DisplayName("PUT /api/collections/governor-limits")
+    @DisplayName("PUT /api/governor-limits")
     class UpdateLimitsTests {
 
         @Test

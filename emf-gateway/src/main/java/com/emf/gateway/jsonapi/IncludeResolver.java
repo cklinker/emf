@@ -244,8 +244,8 @@ public class IncludeResolver {
                     
                     RouteDefinition route = routeOpt.get();
                     
-                    // Build the backend URL: {backendUrl}/api/collections/{type}/{id}
-                    String backendUrl = route.getBackendUrl() + "/api/collections/" + collectionName + "/" + identifier.getId();
+                    // Build the backend URL: {backendUrl}/api/{type}/{id}
+                    String backendUrl = route.getBackendUrl() + "/api/" + collectionName + "/" + identifier.getId();
                     
                     log.debug("Fetching resource {}:{} from backend: {}", 
                             identifier.getType(), identifier.getId(), backendUrl);

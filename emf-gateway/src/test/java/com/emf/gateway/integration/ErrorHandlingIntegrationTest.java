@@ -91,7 +91,7 @@ public class ErrorHandlingIntegrationTest extends IntegrationTestBase {
         // Act & Assert - request should be rejected with 400
         assertThatThrownBy(() -> {
             restTemplate.postForEntity(
-                GATEWAY_URL + "/api/collections/projects",
+                GATEWAY_URL + "/api/projects",
                 request,
                 Map.class
             );
@@ -135,7 +135,7 @@ public class ErrorHandlingIntegrationTest extends IntegrationTestBase {
         // Act & Assert - request should be rejected with 400
         assertThatThrownBy(() -> {
             restTemplate.postForEntity(
-                GATEWAY_URL + "/api/collections/projects",
+                GATEWAY_URL + "/api/projects",
                 request,
                 Map.class
             );
@@ -182,7 +182,7 @@ public class ErrorHandlingIntegrationTest extends IntegrationTestBase {
         // Act & Assert - request should be rejected with 400
         assertThatThrownBy(() -> {
             restTemplate.postForEntity(
-                GATEWAY_URL + "/api/collections/projects",
+                GATEWAY_URL + "/api/projects",
                 request,
                 Map.class
             );
@@ -245,7 +245,7 @@ public class ErrorHandlingIntegrationTest extends IntegrationTestBase {
         // Act & Assert - request should be rejected with 400
         assertThatThrownBy(() -> {
             restTemplate.postForEntity(
-                GATEWAY_URL + "/api/collections/tasks",
+                GATEWAY_URL + "/api/tasks",
                 request,
                 Map.class
             );
@@ -283,7 +283,7 @@ public class ErrorHandlingIntegrationTest extends IntegrationTestBase {
         // Act & Assert - backend 404 should be propagated
         assertThatThrownBy(() -> {
             restTemplate.exchange(
-                GATEWAY_URL + "/api/collections/projects/" + nonExistentId,
+                GATEWAY_URL + "/api/projects/" + nonExistentId,
                 HttpMethod.GET,
                 request,
                 Map.class
@@ -330,7 +330,7 @@ public class ErrorHandlingIntegrationTest extends IntegrationTestBase {
         // Act & Assert - verify error response format
         assertThatThrownBy(() -> {
             restTemplate.postForEntity(
-                GATEWAY_URL + "/api/collections/projects",
+                GATEWAY_URL + "/api/projects",
                 request,
                 Map.class
             );
@@ -503,7 +503,7 @@ public class ErrorHandlingIntegrationTest extends IntegrationTestBase {
         // Act & Assert - request should be rejected
         assertThatThrownBy(() -> {
             restTemplate.postForEntity(
-                GATEWAY_URL + "/api/collections/tasks",
+                GATEWAY_URL + "/api/tasks",
                 request,
                 Map.class
             );
@@ -546,7 +546,7 @@ public class ErrorHandlingIntegrationTest extends IntegrationTestBase {
         // Act & Assert - request should be rejected with 400
         assertThatThrownBy(() -> {
             restTemplate.postForEntity(
-                GATEWAY_URL + "/api/collections/projects",
+                GATEWAY_URL + "/api/projects",
                 request,
                 Map.class
             );

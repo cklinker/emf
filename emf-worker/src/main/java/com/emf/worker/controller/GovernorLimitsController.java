@@ -15,12 +15,9 @@ import java.util.*;
 /**
  * REST controller for the Governor Limits page.
  *
- * <p>Serves {@code GET} and {@code PUT} at {@code /api/collections/governor-limits}.
- * The gateway's {@link com.emf.gateway.filter.CollectionPathRewriteFilter} rewrites
- * {@code /api/governor-limits} → {@code /api/collections/governor-limits}, so this
- * controller catches those requests via Spring MVC's exact-path matching (which
- * takes priority over {@code DynamicCollectionRouter}'s {@code {collectionName}}
- * path variable).
+ * <p>Serves {@code GET} and {@code PUT} at {@code /api/governor-limits}.
+ * Spring MVC's exact-path matching gives this controller priority over
+ * {@code DynamicCollectionRouter}'s {@code {collectionName}} path variable.
  *
  * <p>Returns plain JSON (not JSON:API) because this is a computed/aggregate
  * endpoint, not a standard CRUD collection endpoint.
@@ -28,7 +25,7 @@ import java.util.*;
  * @since 1.0.0
  */
 @RestController
-@RequestMapping("/api/collections/governor-limits")
+@RequestMapping("/api/governor-limits")
 public class GovernorLimitsController {
 
     private static final Logger log = LoggerFactory.getLogger(GovernorLimitsController.class);

@@ -30,7 +30,7 @@ import java.util.regex.Pattern;
  *   <li>{@code emf_worker_error_total} (counter) - errors by collection and error type</li>
  * </ul>
  *
- * <p>Only instruments requests matching the {@code /api/collections/{collectionName}} path pattern.
+ * <p>Only instruments requests matching the {@code /api/{collectionName}} path pattern.
  * Non-collection requests (actuator, health, etc.) are passed through without instrumentation.
  */
 @Component
@@ -41,10 +41,10 @@ public class RequestMetricsFilter extends OncePerRequestFilter {
 
     /**
      * Pattern to extract collection name from the request URI.
-     * Matches /api/collections/{collectionName} with optional additional path segments.
+     * Matches /api/{collectionName} with optional additional path segments.
      */
     private static final Pattern COLLECTION_PATH_PATTERN =
-            Pattern.compile("^/api/collections/([^/]+)(?:/.*)?$");
+            Pattern.compile("^/api/([^/]+)(?:/.*)?$");
 
     private final MeterRegistry meterRegistry;
 

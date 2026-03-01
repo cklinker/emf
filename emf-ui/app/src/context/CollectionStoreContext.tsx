@@ -193,7 +193,7 @@ export function CollectionStoreProvider({
     queryKey: ['collection-store'],
     queryFn: async () => {
       const raw = await apiClient.get(
-        '/api/collections/collections?page[size]=1000&include=fields'
+        '/api/collections?page[size]=1000&include=fields'
       )
       const parsed = parseCollectionsResponse(raw)
 

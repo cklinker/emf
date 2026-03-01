@@ -32,7 +32,7 @@ class RequestMetricsFilterTest {
 
     @Test
     void shouldRecordMetricsForCollectionGetRequest() throws ServletException, IOException {
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/collections/accounts");
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/accounts");
         MockHttpServletResponse response = new MockHttpServletResponse();
         response.setStatus(200);
         FilterChain chain = mock(FilterChain.class);
@@ -61,7 +61,7 @@ class RequestMetricsFilterTest {
 
     @Test
     void shouldRecordMetricsForCollectionPostRequest() throws ServletException, IOException {
-        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/collections/contacts");
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/contacts");
         MockHttpServletResponse response = new MockHttpServletResponse();
         response.setStatus(201);
         FilterChain chain = mock(FilterChain.class);
@@ -81,7 +81,7 @@ class RequestMetricsFilterTest {
     @Test
     void shouldRecordMetricsForCollectionWithIdInPath() throws ServletException, IOException {
         MockHttpServletRequest request = new MockHttpServletRequest("PUT",
-                "/api/collections/accounts/abc-123");
+                "/api/accounts/abc-123");
         MockHttpServletResponse response = new MockHttpServletResponse();
         response.setStatus(200);
         FilterChain chain = mock(FilterChain.class);
@@ -98,7 +98,7 @@ class RequestMetricsFilterTest {
 
     @Test
     void shouldRecordErrorMetricsFor4xxResponse() throws ServletException, IOException {
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/collections/accounts");
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/accounts");
         MockHttpServletResponse response = new MockHttpServletResponse();
         response.setStatus(404);
         FilterChain chain = mock(FilterChain.class);
@@ -122,7 +122,7 @@ class RequestMetricsFilterTest {
 
     @Test
     void shouldRecordErrorMetricsFor5xxResponse() throws ServletException, IOException {
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/collections/orders");
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/orders");
         MockHttpServletResponse response = new MockHttpServletResponse();
         response.setStatus(500);
         FilterChain chain = mock(FilterChain.class);
@@ -139,7 +139,7 @@ class RequestMetricsFilterTest {
 
     @Test
     void shouldRecordErrorMetricsForException() throws ServletException, IOException {
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/collections/accounts");
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/accounts");
         MockHttpServletResponse response = new MockHttpServletResponse();
         FilterChain chain = mock(FilterChain.class);
         doThrow(new ServletException("test error")).when(chain).doFilter(request, response);
@@ -172,8 +172,8 @@ class RequestMetricsFilterTest {
     }
 
     @Test
-    void shouldNotInstrumentRootApiRequests() throws ServletException, IOException {
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/other");
+    void shouldNotInstrumentInternalRequests() throws ServletException, IOException {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/internal/bootstrap");
         MockHttpServletResponse response = new MockHttpServletResponse();
         response.setStatus(200);
         FilterChain chain = mock(FilterChain.class);
@@ -181,7 +181,7 @@ class RequestMetricsFilterTest {
         filter.doFilterInternal(request, response, chain);
 
         assertNull(meterRegistry.find("emf_worker_request_total").counter(),
-                "Should not instrument non-collection API requests");
+                "Should not instrument internal API requests");
     }
 
     @Test
@@ -189,19 +189,19 @@ class RequestMetricsFilterTest {
         FilterChain chain = mock(FilterChain.class);
 
         // Request to "accounts"
-        MockHttpServletRequest request1 = new MockHttpServletRequest("GET", "/api/collections/accounts");
+        MockHttpServletRequest request1 = new MockHttpServletRequest("GET", "/api/accounts");
         MockHttpServletResponse response1 = new MockHttpServletResponse();
         response1.setStatus(200);
         filter.doFilterInternal(request1, response1, chain);
 
         // Request to "contacts"
-        MockHttpServletRequest request2 = new MockHttpServletRequest("GET", "/api/collections/contacts");
+        MockHttpServletRequest request2 = new MockHttpServletRequest("GET", "/api/contacts");
         MockHttpServletResponse response2 = new MockHttpServletResponse();
         response2.setStatus(200);
         filter.doFilterInternal(request2, response2, chain);
 
         // Two separate requests to "accounts"
-        MockHttpServletRequest request3 = new MockHttpServletRequest("GET", "/api/collections/accounts");
+        MockHttpServletRequest request3 = new MockHttpServletRequest("GET", "/api/accounts");
         MockHttpServletResponse response3 = new MockHttpServletResponse();
         response3.setStatus(200);
         filter.doFilterInternal(request3, response3, chain);
@@ -222,7 +222,7 @@ class RequestMetricsFilterTest {
     @Test
     void shouldRecordDeleteRequest() throws ServletException, IOException {
         MockHttpServletRequest request = new MockHttpServletRequest("DELETE",
-                "/api/collections/tasks/uuid-123");
+                "/api/tasks/uuid-123");
         MockHttpServletResponse response = new MockHttpServletResponse();
         response.setStatus(204);
         FilterChain chain = mock(FilterChain.class);

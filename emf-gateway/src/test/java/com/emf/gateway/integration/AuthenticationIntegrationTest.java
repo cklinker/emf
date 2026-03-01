@@ -51,7 +51,7 @@ public class AuthenticationIntegrationTest extends IntegrationTestBase {
         // Act & Assert - request should be rejected with 401
         assertThatThrownBy(() -> {
             restTemplate.exchange(
-                GATEWAY_URL + "/api/collections/projects",
+                GATEWAY_URL + "/api/projects",
                 HttpMethod.GET,
                 request,
                 Map.class
@@ -81,7 +81,7 @@ public class AuthenticationIntegrationTest extends IntegrationTestBase {
         // Act & Assert - request should be rejected with 401
         assertThatThrownBy(() -> {
             restTemplate.exchange(
-                GATEWAY_URL + "/api/collections/projects",
+                GATEWAY_URL + "/api/projects",
                 HttpMethod.GET,
                 request,
                 Map.class
@@ -118,7 +118,7 @@ public class AuthenticationIntegrationTest extends IntegrationTestBase {
         // Act & Assert - request should be rejected with 401
         assertThatThrownBy(() -> {
             restTemplate.exchange(
-                GATEWAY_URL + "/api/collections/projects",
+                GATEWAY_URL + "/api/projects",
                 HttpMethod.GET,
                 request,
                 Map.class
@@ -146,7 +146,7 @@ public class AuthenticationIntegrationTest extends IntegrationTestBase {
         
         // Act - make request with valid token
         ResponseEntity<Map> response = restTemplate.exchange(
-            GATEWAY_URL + "/api/collections/projects",
+            GATEWAY_URL + "/api/projects",
             HttpMethod.GET,
             request,
             Map.class
@@ -179,7 +179,7 @@ public class AuthenticationIntegrationTest extends IntegrationTestBase {
         HttpEntity<Void> adminRequest = new HttpEntity<>(adminHeaders);
         
         ResponseEntity<Map> adminResponse = restTemplate.exchange(
-            GATEWAY_URL + "/api/collections/projects",
+            GATEWAY_URL + "/api/projects",
             HttpMethod.GET,
             adminRequest,
             Map.class
@@ -191,7 +191,7 @@ public class AuthenticationIntegrationTest extends IntegrationTestBase {
         HttpEntity<Void> userRequest = new HttpEntity<>(userHeaders);
         
         ResponseEntity<Map> userResponse = restTemplate.exchange(
-            GATEWAY_URL + "/api/collections/projects",
+            GATEWAY_URL + "/api/projects",
             HttpMethod.GET,
             userRequest,
             Map.class
@@ -224,7 +224,7 @@ public class AuthenticationIntegrationTest extends IntegrationTestBase {
         HttpEntity<Void> adminRequest = new HttpEntity<>(adminHeaders);
         
         ResponseEntity<Map> adminResponse = restTemplate.exchange(
-            GATEWAY_URL + "/api/collections/projects",
+            GATEWAY_URL + "/api/projects",
             HttpMethod.GET,
             adminRequest,
             Map.class
@@ -236,7 +236,7 @@ public class AuthenticationIntegrationTest extends IntegrationTestBase {
         HttpEntity<Void> userRequest = new HttpEntity<>(userHeaders);
         
         ResponseEntity<Map> userResponse = restTemplate.exchange(
-            GATEWAY_URL + "/api/collections/projects",
+            GATEWAY_URL + "/api/projects",
             HttpMethod.GET,
             userRequest,
             Map.class
@@ -299,7 +299,7 @@ public class AuthenticationIntegrationTest extends IntegrationTestBase {
         HttpEntity<Void> request = new HttpEntity<>(headers);
         
         ResponseEntity<Map> response = restTemplate.exchange(
-            GATEWAY_URL + "/api/collections/projects",
+            GATEWAY_URL + "/api/projects",
             HttpMethod.GET,
             request,
             Map.class

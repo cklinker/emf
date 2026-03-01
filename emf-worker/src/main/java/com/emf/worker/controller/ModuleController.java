@@ -22,7 +22,7 @@ import java.util.Map;
  * @since 1.0.0
  */
 @RestController
-@RequestMapping("/api/collections/modules")
+@RequestMapping("/api/modules")
 @ConditionalOnBean(RuntimeModuleManager.class)
 public class ModuleController {
 

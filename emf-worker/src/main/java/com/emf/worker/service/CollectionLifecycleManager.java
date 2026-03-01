@@ -1,5 +1,6 @@
 package com.emf.worker.service;
 
+import com.emf.runtime.context.TenantContext;
 import com.emf.runtime.model.*;
 import com.emf.runtime.model.system.SystemCollectionDefinitions;
 import com.emf.runtime.registry.CollectionRegistry;
@@ -74,6 +75,10 @@ public class CollectionLifecycleManager {
             SELECT name, error_condition_formula, error_message, error_field,
                    evaluate_on, active
             FROM validation_rule WHERE collection_id = ? AND active = true
+            """;
+
+    private static final String SELECT_TENANT_SLUG = """
+            SELECT slug FROM tenant WHERE id = ?
             """;
 
     private final CollectionRegistry collectionRegistry;
@@ -166,9 +171,15 @@ public class CollectionLifecycleManager {
             // Register in local registry (makes it available to DynamicCollectionRouter)
             collectionRegistry.register(definition);
 
-            // Initialize storage (creates database table if needed)
-            // System collections have Flyway-managed tables, so initializeCollection is a no-op for them
-            storageAdapter.initializeCollection(definition);
+            // Set tenant context so the storage adapter uses the correct schema
+            setTenantContextFromRow(collectionRow);
+            try {
+                // Initialize storage (creates database table if needed)
+                // System collections have Flyway-managed tables, so initializeCollection is a no-op for them
+                storageAdapter.initializeCollection(definition);
+            } finally {
+                TenantContext.clear();
+            }
 
             // Load and register validation rules from DB
             loadAndRegisterValidationRules(collectionId, collectionName);
@@ -217,20 +228,27 @@ public class CollectionLifecycleManager {
                 return;
             }
 
-            CollectionDefinition newDefinition = buildDefinition(collectionId, collectionName, rows.get(0));
+            Map<String, Object> collectionRow = rows.get(0);
+            CollectionDefinition newDefinition = buildDefinition(collectionId, collectionName, collectionRow);
 
             // Re-register with updated definition
             collectionRegistry.register(newDefinition);
 
-            // Migrate the storage schema
-            if (oldDefinition != null) {
-                storageAdapter.updateCollectionSchema(oldDefinition, newDefinition);
-                log.info("Schema migration completed for collection '{}' (id={})",
-                        collectionName, collectionId);
-            } else {
-                storageAdapter.initializeCollection(newDefinition);
-                log.info("Storage initialized for collection '{}' (id={})",
-                        collectionName, collectionId);
+            // Set tenant context so the storage adapter uses the correct schema
+            setTenantContextFromRow(collectionRow);
+            try {
+                // Migrate the storage schema
+                if (oldDefinition != null) {
+                    storageAdapter.updateCollectionSchema(oldDefinition, newDefinition);
+                    log.info("Schema migration completed for collection '{}' (id={})",
+                            collectionName, collectionId);
+                } else {
+                    storageAdapter.initializeCollection(newDefinition);
+                    log.info("Storage initialized for collection '{}' (id={})",
+                            collectionName, collectionId);
+                }
+            } finally {
+                TenantContext.clear();
             }
 
             // Refresh validation rules
@@ -326,6 +344,30 @@ public class CollectionLifecycleManager {
             log.warn("Failed to load collection '{}' on demand (tenantId={}): {}",
                     collectionName, tenantId, e.getMessage());
             return null;
+        }
+    }
+
+    // =========================================================================
+    // Tenant Context Helpers
+    // =========================================================================
+
+    /**
+     * Sets the TenantContext (tenant ID and slug) from a collection database row.
+     * This is needed during bootstrap and refresh operations where no HTTP request
+     * is in progress, so the storage adapter can resolve the correct tenant schema.
+     */
+    private void setTenantContextFromRow(Map<String, Object> collectionRow) {
+        String tenantId = (String) collectionRow.get("tenant_id");
+        if (tenantId != null && !tenantId.isBlank()) {
+            TenantContext.set(tenantId);
+            try {
+                String slug = jdbcTemplate.queryForObject(SELECT_TENANT_SLUG, String.class, tenantId);
+                if (slug != null && !slug.isBlank()) {
+                    TenantContext.setSlug(slug);
+                }
+            } catch (Exception e) {
+                log.debug("Could not resolve tenant slug for tenant '{}': {}", tenantId, e.getMessage());
+            }
         }
     }
 

@@ -32,7 +32,7 @@ import { FieldRenderer } from '@/components/FieldRenderer'
 import { useRelatedRecords } from '@/hooks/useRelatedRecords'
 import { useCollectionSchema } from '@/hooks/useCollectionSchema'
 import { useObjectPermissions } from '@/hooks/useObjectPermissions'
-import { buildIncludedDisplayMap } from '@/utils/jsonapi'
+import { buildIncludedDisplayMap, extractIncluded } from '@/utils/jsonapi'
 import { useCollectionStore } from '@/context/CollectionStoreContext'
 import type { FieldDefinition } from '@/hooks/useCollectionSchema'
 import type { CollectionRecord } from '@/hooks/useCollectionRecords'
@@ -71,6 +71,13 @@ export interface RelatedListProps {
   label?: string
   /** Optional: number of records to show (default: 5) */
   limit?: number
+  /**
+   * Optional: raw JSON:API response from the parent record request.
+   * When provided, related records are extracted from the `included` array
+   * instead of making a separate API call. This eliminates per-related-list
+   * network requests when the parent fetches with reverse includes.
+   */
+  includedData?: unknown
 }
 
 /**
@@ -99,6 +106,7 @@ export function RelatedList({
   tenantSlug,
   label,
   limit = DEFAULT_LIMIT,
+  includedData,
 }: RelatedListProps): React.ReactElement {
   const navigate = useNavigate()
   const basePath = `/${tenantSlug}/app`
@@ -133,10 +141,24 @@ export function RelatedList({
     return uniqueTargets.join(',')
   }, [referenceFields])
 
-  // Fetch related records (wait for schema so include param is stable)
+  // Extract pre-loaded records from the parent's included resources when available.
+  // This eliminates a separate API call for each related list — the parent record
+  // fetches reverse includes (e.g., order_items, payments) in a single request.
+  const preloadedRecords = useMemo<CollectionRecord[] | null>(() => {
+    if (!includedData || !collectionName || !foreignKeyField || !parentRecordId) return null
+    const allOfType = extractIncluded<CollectionRecord>(includedData, collectionName)
+    // Filter to records that reference this parent
+    const filtered = allOfType.filter(
+      (r) => String(r[foreignKeyField]) === parentRecordId
+    )
+    return filtered
+  }, [includedData, collectionName, foreignKeyField, parentRecordId])
+
+  // Only fetch via API if no pre-loaded data is available
+  const hasPreloadedData = preloadedRecords !== null
   const {
-    data: records,
-    total,
+    data: fetchedRecords,
+    total: fetchedTotal,
     isLoading: recordsLoading,
     rawResponse,
   } = useRelatedRecords({
@@ -145,12 +167,18 @@ export function RelatedList({
     parentRecordId,
     limit,
     include: includeParam,
-    enabled: !schemaLoading,
+    enabled: !schemaLoading && !hasPreloadedData,
   })
+
+  // Use pre-loaded data if available, otherwise fall back to fetched data
+  const records = hasPreloadedData ? preloadedRecords.slice(0, limit) : fetchedRecords
+  const total = hasPreloadedData ? preloadedRecords.length : fetchedTotal
+  // For lookup display maps, use the parent's response (which contains all included resources)
+  const effectiveRawResponse = hasPreloadedData ? includedData : rawResponse
 
   // Build lookup display map from included resources using centralized collection store
   const lookupDisplayMap = useMemo(() => {
-    if (!rawResponse || referenceFields.length === 0) return undefined
+    if (!effectiveRawResponse || referenceFields.length === 0) return undefined
 
     const map: Record<string, Record<string, string>> = {}
 
@@ -159,14 +187,14 @@ export function RelatedList({
       const refSchema = collectionStore.getCollectionByName(targetType)
       const displayField = refSchema?.displayFieldName || 'name'
 
-      const fieldMap = buildIncludedDisplayMap(rawResponse, targetType, displayField)
+      const fieldMap = buildIncludedDisplayMap(effectiveRawResponse, targetType, displayField)
       if (Object.keys(fieldMap).length > 0) {
         map[field.name] = fieldMap
       }
     })
 
     return Object.keys(map).length > 0 ? map : undefined
-  }, [rawResponse, referenceFields, collectionStore])
+  }, [effectiveRawResponse, referenceFields, collectionStore])
 
   // Display name for the related collection
   const displayLabel =
@@ -174,7 +202,7 @@ export function RelatedList({
     schema?.displayName ||
     (collectionName ? collectionName.charAt(0).toUpperCase() + collectionName.slice(1) : 'Related')
 
-  const isLoading = schemaLoading || recordsLoading
+  const isLoading = schemaLoading || (!hasPreloadedData && recordsLoading)
 
   // Handle row click → navigate to record detail
   const handleRowClick = (record: CollectionRecord) => {

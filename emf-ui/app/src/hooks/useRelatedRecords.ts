@@ -23,6 +23,8 @@ export interface RelatedRecordsOptions {
   limit?: number
   /** Whether the query is enabled */
   enabled?: boolean
+  /** Comma-separated list of collection names to include via JSON:API ?include= */
+  include?: string
 }
 
 export interface UseRelatedRecordsReturn {
@@ -36,6 +38,8 @@ export interface UseRelatedRecordsReturn {
   error: Error | null
   /** Refetch the data */
   refetch: () => void
+  /** Raw JSON:API response for building display maps from included resources */
+  rawResponse: unknown
 }
 
 /**
@@ -46,15 +50,20 @@ async function fetchRelatedRecords(
   collectionName: string,
   foreignKeyField: string,
   parentRecordId: string,
-  limit: number
-): Promise<PaginatedResponse> {
+  limit: number,
+  include?: string
+): Promise<{ paginated: PaginatedResponse; rawResponse: unknown }> {
   const queryParams = new URLSearchParams()
   queryParams.set('page[number]', '1')
   queryParams.set('page[size]', String(limit))
   queryParams.set(`filter[${foreignKeyField}][eq]`, parentRecordId)
+  if (include) {
+    queryParams.set('include', include)
+  }
 
-  const response = await apiClient.get(`/api/${collectionName}?${queryParams.toString()}`)
-  return unwrapCollection<CollectionRecord>(response)
+  const rawResponse = await apiClient.get(`/api/${collectionName}?${queryParams.toString()}`)
+  const paginated = unwrapCollection<CollectionRecord>(rawResponse)
+  return { paginated, rawResponse }
 }
 
 /**
@@ -68,7 +77,14 @@ async function fetchRelatedRecords(
  */
 export function useRelatedRecords(options: RelatedRecordsOptions): UseRelatedRecordsReturn {
   const { apiClient } = useApi()
-  const { collectionName, foreignKeyField, parentRecordId, limit = 5, enabled = true } = options
+  const {
+    collectionName,
+    foreignKeyField,
+    parentRecordId,
+    limit = 5,
+    enabled = true,
+    include,
+  } = options
 
   const isEnabled = !!collectionName && !!foreignKeyField && !!parentRecordId && enabled
 
@@ -78,18 +94,26 @@ export function useRelatedRecords(options: RelatedRecordsOptions): UseRelatedRec
     error,
     refetch,
   } = useQuery({
-    queryKey: ['related-records', collectionName, foreignKeyField, parentRecordId, limit],
+    queryKey: ['related-records', collectionName, foreignKeyField, parentRecordId, limit, include],
     queryFn: () =>
-      fetchRelatedRecords(apiClient, collectionName!, foreignKeyField!, parentRecordId!, limit),
+      fetchRelatedRecords(
+        apiClient,
+        collectionName!,
+        foreignKeyField!,
+        parentRecordId!,
+        limit,
+        include
+      ),
     enabled: isEnabled,
     staleTime: 30 * 1000, // 30 seconds
   })
 
   return {
-    data: response?.data ?? [],
-    total: response?.total ?? 0,
+    data: response?.paginated.data ?? [],
+    total: response?.paginated.total ?? 0,
     isLoading: isEnabled && isLoading,
     error: error as Error | null,
     refetch,
+    rawResponse: response?.rawResponse,
   }
 }

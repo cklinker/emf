@@ -1183,28 +1183,56 @@ public class DynamicCollectionRouter {
                 continue;
             }
 
+            // Check has-many: child has FK pointing to primary
             Optional<SubResourceRelation> relation =
                     SubResourceResolver.resolve(primaryDefinition, childDef);
-            if (relation.isEmpty()) {
-                // No direct relationship — defer to transitive pass
-                unresolvedNames.add(includeName);
+            if (relation.isPresent()) {
+                String parentRefField = relation.get().parentRefFieldName();
+                logger.debug("Resolving has-many include '{}': querying where {} IN {} parent IDs",
+                        includeName, parentRefField, parentIds.size());
+
+                List<Map<String, Object>> childRecords =
+                        queryChildRecords(childDef, parentRefField, parentIds, request);
+
+                for (Map<String, Object> childRecord : childRecords) {
+                    allIncluded.add(toJsonApiResourceObject(childRecord, includeName, childDef));
+                }
+                resolvedChildData.put(includeName, childRecords);
+                resolvedChildDefs.put(includeName, childDef);
+                logger.debug("Resolved {} has-many included records for '{}'",
+                        childRecords.size(), includeName);
                 continue;
             }
 
-            String parentRefField = relation.get().parentRefFieldName();
-            logger.debug("Resolving direct include '{}': querying where {} IN {} parent IDs",
-                    includeName, parentRefField, parentIds.size());
+            // Check belongs-to: primary has FK pointing to child
+            Optional<SubResourceRelation> belongsTo =
+                    SubResourceResolver.resolve(childDef, primaryDefinition);
+            if (belongsTo.isPresent()) {
+                String fkField = belongsTo.get().parentRefFieldName();
+                List<Object> fkValues = primaryData.stream()
+                        .map(record -> record.get(fkField))
+                        .filter(Objects::nonNull)
+                        .distinct()
+                        .collect(Collectors.toList());
 
-            List<Map<String, Object>> childRecords =
-                    queryChildRecords(childDef, parentRefField, parentIds, request);
-
-            for (Map<String, Object> childRecord : childRecords) {
-                allIncluded.add(toJsonApiResourceObject(childRecord, includeName, childDef));
+                if (!fkValues.isEmpty()) {
+                    logger.debug("Resolving belongs-to include '{}': querying where id IN {} FK values from field '{}'",
+                            includeName, fkValues.size(), fkField);
+                    List<Map<String, Object>> referencedRecords =
+                            queryChildRecords(childDef, "id", fkValues, request);
+                    for (Map<String, Object> rec : referencedRecords) {
+                        allIncluded.add(toJsonApiResourceObject(rec, includeName, childDef));
+                    }
+                    resolvedChildData.put(includeName, referencedRecords);
+                    resolvedChildDefs.put(includeName, childDef);
+                    logger.debug("Resolved {} belongs-to included records for '{}'",
+                            referencedRecords.size(), includeName);
+                }
+                continue;
             }
-            resolvedChildData.put(includeName, childRecords);
-            resolvedChildDefs.put(includeName, childDef);
-            logger.debug("Resolved {} direct included records for '{}'",
-                    childRecords.size(), includeName);
+
+            // No direct relationship — defer to transitive pass
+            unresolvedNames.add(includeName);
         }
 
         // --- Pass 2: Transitive (grandchild) includes ---

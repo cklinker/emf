@@ -200,10 +200,11 @@ export function ObjectListPage(): React.ReactElement {
     [visibleFields]
   )
 
-  // Build include param from reference field names
+  // Build include param from reference target collection names (deduplicated)
   const includeParam = useMemo(() => {
     if (referenceFields.length === 0) return undefined
-    return referenceFields.map((f) => f.name).join(',')
+    const uniqueTargets = [...new Set(referenceFields.map((f) => f.referenceTarget!))]
+    return uniqueTargets.join(',')
   }, [referenceFields])
 
   // Fetch records with includes for reference fields

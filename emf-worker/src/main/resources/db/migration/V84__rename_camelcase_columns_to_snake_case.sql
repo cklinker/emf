@@ -11,28 +11,28 @@
 
 DO $$
 DECLARE
-    f RECORD;
+    rec RECORD;
     tbl_name TEXT;
     current_col TEXT;
     snake_col TEXT;
 BEGIN
-    FOR f IN
-        SELECT f.id AS field_id,
-               f.name AS field_name,
-               c.name AS collection_name,
-               t.slug
-        FROM field f
-        JOIN collection c ON f.collection_id = c.id
-        JOIN tenant t ON c.tenant_id = t.id
-        WHERE c.system_collection = false
-          AND c.active = true
-          AND t.status != 'DECOMMISSIONED'
-          AND f.name ~ '[A-Z]'  -- Only fields with uppercase letters need conversion
+    FOR rec IN
+        SELECT fld.id AS field_id,
+               fld.name AS field_name,
+               col.name AS collection_name,
+               tnt.slug
+        FROM field fld
+        JOIN collection col ON fld.collection_id = col.id
+        JOIN tenant tnt ON col.tenant_id = tnt.id
+        WHERE col.system_collection = false
+          AND col.active = true
+          AND tnt.status != 'DECOMMISSIONED'
+          AND fld.name ~ '[A-Z]'  -- Only fields with uppercase letters need conversion
     LOOP
-        tbl_name := f.collection_name;
+        tbl_name := rec.collection_name;
 
         -- PostgreSQL folds unquoted identifiers to lowercase
-        current_col := lower(f.field_name);
+        current_col := lower(rec.field_name);
 
         -- Convert camelCase to snake_case:
         -- 1. Insert _ between lowercase and uppercase: "firstName" → "first_Name"
@@ -40,7 +40,7 @@ BEGIN
         -- 3. Lowercase everything
         snake_col := lower(
             regexp_replace(
-                regexp_replace(f.field_name, '([a-z])([A-Z])', '\1_\2', 'g'),
+                regexp_replace(rec.field_name, '([a-z])([A-Z])', '\1_\2', 'g'),
                 '([A-Z]+)([A-Z][a-z])', '\1_\2', 'g'
             )
         );
@@ -50,17 +50,17 @@ BEGIN
             -- Check column exists in the table
             IF EXISTS (
                 SELECT 1 FROM information_schema.columns
-                WHERE table_schema = f.slug
+                WHERE table_schema = rec.slug
                   AND table_name = tbl_name
                   AND column_name = current_col
             ) THEN
                 EXECUTE format('ALTER TABLE %I.%I RENAME COLUMN %I TO %I',
-                    f.slug, tbl_name, current_col, snake_col);
-                RAISE NOTICE 'Renamed column %.%.% to %', f.slug, tbl_name, current_col, snake_col;
+                    rec.slug, tbl_name, current_col, snake_col);
+                RAISE NOTICE 'Renamed column %.%.% to %', rec.slug, tbl_name, current_col, snake_col;
             END IF;
         END IF;
 
         -- Populate field.column_name with the snake_case equivalent
-        UPDATE field SET column_name = snake_col WHERE id = f.field_id AND column_name IS NULL;
+        UPDATE field SET column_name = snake_col WHERE id = rec.field_id AND column_name IS NULL;
     END LOOP;
 END $$;

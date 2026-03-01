@@ -3,6 +3,8 @@ package com.emf.runtime.router;
 import com.emf.runtime.model.CollectionDefinition;
 import com.emf.runtime.model.FieldDefinition;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -66,5 +68,37 @@ public final class SubResourceResolver {
         }
 
         return Optional.empty();
+    }
+
+    /**
+     * Resolves ALL sub-resource relationships between a parent and child collection.
+     *
+     * <p>Unlike {@link #resolve(CollectionDefinition, CollectionDefinition)} which returns
+     * only the first match, this method returns all matching fields. This is needed when
+     * multiple fields reference the same target collection (e.g., both {@code created_by}
+     * and {@code updated_by} reference {@code users}).
+     *
+     * @param parentDef the parent collection definition
+     * @param childDef the child collection definition
+     * @return a list of SubResourceRelation objects for all matching reference fields
+     */
+    public static List<SubResourceRelation> resolveAll(
+            CollectionDefinition parentDef,
+            CollectionDefinition childDef) {
+
+        List<SubResourceRelation> results = new ArrayList<>();
+
+        for (FieldDefinition field : childDef.fields()) {
+            if (field.referenceConfig() != null
+                    && parentDef.name().equals(field.referenceConfig().targetCollection())) {
+                results.add(new SubResourceRelation(
+                        field.name(),
+                        parentDef,
+                        childDef
+                ));
+            }
+        }
+
+        return results;
     }
 }

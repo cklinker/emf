@@ -1204,20 +1204,30 @@ public class DynamicCollectionRouter {
                 continue;
             }
 
-            // Check belongs-to: primary has FK pointing to child
-            Optional<SubResourceRelation> belongsTo =
-                    SubResourceResolver.resolve(childDef, primaryDefinition);
-            if (belongsTo.isPresent()) {
-                String fkField = belongsTo.get().parentRefFieldName();
-                List<Object> fkValues = primaryData.stream()
-                        .map(record -> record.get(fkField))
-                        .filter(Objects::nonNull)
-                        .distinct()
-                        .collect(Collectors.toList());
+            // Check belongs-to: primary has FK pointing to child.
+            // Use resolveAll to collect FK values from ALL fields referencing the
+            // target collection (e.g., both created_by and updated_by → users).
+            List<SubResourceRelation> belongsToAll =
+                    SubResourceResolver.resolveAll(childDef, primaryDefinition);
+            if (!belongsToAll.isEmpty()) {
+                // Collect FK values from all matching fields
+                java.util.Set<Object> fkValueSet = new java.util.LinkedHashSet<>();
+                List<String> fkFieldNames = new java.util.ArrayList<>();
+                for (SubResourceRelation rel : belongsToAll) {
+                    String fkField = rel.parentRefFieldName();
+                    fkFieldNames.add(fkField);
+                    for (Map<String, Object> record : primaryData) {
+                        Object val = record.get(fkField);
+                        if (val != null) {
+                            fkValueSet.add(val);
+                        }
+                    }
+                }
+                List<Object> fkValues = new java.util.ArrayList<>(fkValueSet);
 
                 if (!fkValues.isEmpty()) {
-                    logger.debug("Resolving belongs-to include '{}': querying where id IN {} FK values from field '{}'",
-                            includeName, fkValues.size(), fkField);
+                    logger.debug("Resolving belongs-to include '{}': querying where id IN {} FK values from fields {}",
+                            includeName, fkValues.size(), fkFieldNames);
                     List<Map<String, Object>> referencedRecords =
                             queryChildRecords(childDef, "id", fkValues, request);
                     for (Map<String, Object> rec : referencedRecords) {

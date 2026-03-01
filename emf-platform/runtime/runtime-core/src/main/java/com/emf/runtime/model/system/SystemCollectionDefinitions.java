@@ -359,7 +359,7 @@ public final class SystemCollectionDefinitions {
     public static CollectionDefinition picklistValues() {
         return systemBuilder("picklist-values", "Picklist Values", "picklist_value")
             .displayFieldName("label")
-            .tenantScoped(false)
+            .tenantScoped(true)
             .addField(FieldDefinition.requiredString("picklistSourceType", 20)
                 .withColumnName("picklist_source_type")
                 .withEnumValues(List.of("FIELD", "GLOBAL")))
@@ -869,7 +869,7 @@ public final class SystemCollectionDefinitions {
 
     public static CollectionDefinition groupMemberships() {
         return systemBuilder("group-memberships", "Group Memberships", "group_membership")
-            .tenantScoped(false)
+            .tenantScoped(true)
             .addField(FieldDefinition.masterDetail("groupId", "user-groups", "Group")
                 .withColumnName("group_id"))
             .addField(FieldDefinition.requiredString("memberType", 10)
@@ -887,7 +887,7 @@ public final class SystemCollectionDefinitions {
     public static CollectionDefinition profileSystemPermissions() {
         return systemBuilder("profile-system-permissions", "Profile System Permissions",
                 "profile_system_permission")
-            .tenantScoped(false)
+            .tenantScoped(true)
             .addField(FieldDefinition.masterDetail("profileId", "profiles", "Profile")
                 .withColumnName("profile_id"))
             .addField(FieldDefinition.requiredString("permissionName", 100)
@@ -900,7 +900,7 @@ public final class SystemCollectionDefinitions {
     public static CollectionDefinition profileObjectPermissions() {
         return systemBuilder("profile-object-permissions", "Profile Object Permissions",
                 "profile_object_permission")
-            .tenantScoped(false)
+            .tenantScoped(true)
             .addField(FieldDefinition.masterDetail("profileId", "profiles", "Profile")
                 .withColumnName("profile_id"))
             .addField(FieldDefinition.masterDetail("collectionId", "collections", "Collection")
@@ -923,7 +923,7 @@ public final class SystemCollectionDefinitions {
     public static CollectionDefinition profileFieldPermissions() {
         return systemBuilder("profile-field-permissions", "Profile Field Permissions",
                 "profile_field_permission")
-            .tenantScoped(false)
+            .tenantScoped(true)
             .addField(FieldDefinition.masterDetail("profileId", "profiles", "Profile")
                 .withColumnName("profile_id"))
             .addField(FieldDefinition.masterDetail("collectionId", "collections", "Collection")
@@ -938,7 +938,7 @@ public final class SystemCollectionDefinitions {
     public static CollectionDefinition permsetSystemPermissions() {
         return systemBuilder("permset-system-permissions", "Permission Set System Permissions",
                 "permset_system_permission")
-            .tenantScoped(false)
+            .tenantScoped(true)
             .addField(FieldDefinition.masterDetail("permissionSetId", "permission-sets",
                 "Permission Set").withColumnName("permission_set_id"))
             .addField(FieldDefinition.requiredString("permissionName", 100)
@@ -951,7 +951,7 @@ public final class SystemCollectionDefinitions {
     public static CollectionDefinition permsetObjectPermissions() {
         return systemBuilder("permset-object-permissions", "Permission Set Object Permissions",
                 "permset_object_permission")
-            .tenantScoped(false)
+            .tenantScoped(true)
             .addField(FieldDefinition.masterDetail("permissionSetId", "permission-sets",
                 "Permission Set").withColumnName("permission_set_id"))
             .addField(FieldDefinition.masterDetail("collectionId", "collections", "Collection")
@@ -974,7 +974,7 @@ public final class SystemCollectionDefinitions {
     public static CollectionDefinition permsetFieldPermissions() {
         return systemBuilder("permset-field-permissions", "Permission Set Field Permissions",
                 "permset_field_permission")
-            .tenantScoped(false)
+            .tenantScoped(true)
             .addField(FieldDefinition.masterDetail("permissionSetId", "permission-sets",
                 "Permission Set").withColumnName("permission_set_id"))
             .addField(FieldDefinition.masterDetail("collectionId", "collections", "Collection")
@@ -1004,7 +1004,7 @@ public final class SystemCollectionDefinitions {
     public static CollectionDefinition groupPermissionSets() {
         return systemBuilder("group-permission-sets", "Group Permission Sets",
                 "group_permission_set")
-            .tenantScoped(false)
+            .tenantScoped(true)
             .addField(FieldDefinition.masterDetail("groupId", "user-groups", "Group")
                 .withColumnName("group_id"))
             .addField(FieldDefinition.masterDetail("permissionSetId", "permission-sets",
@@ -1018,7 +1018,7 @@ public final class SystemCollectionDefinitions {
 
     public static CollectionDefinition layoutSections() {
         return systemBuilder("layout-sections", "Layout Sections", "layout_section")
-            .tenantScoped(false)
+            .tenantScoped(true)
             .addField(FieldDefinition.masterDetail("layoutId", "page-layouts", "Layout")
                 .withColumnName("layout_id"))
             .addField(FieldDefinition.string("heading", 200))
@@ -1040,7 +1040,7 @@ public final class SystemCollectionDefinitions {
 
     public static CollectionDefinition layoutFields() {
         return systemBuilder("layout-fields", "Layout Fields", "layout_field")
-            .tenantScoped(false)
+            .tenantScoped(true)
             .addField(FieldDefinition.masterDetail("sectionId", "layout-sections", "Section")
                 .withColumnName("section_id"))
             .addField(FieldDefinition.masterDetail("fieldId", "fields", "Field")
@@ -1067,7 +1067,7 @@ public final class SystemCollectionDefinitions {
     public static CollectionDefinition layoutRelatedLists() {
         return systemBuilder("layout-related-lists", "Layout Related Lists",
                 "layout_related_list")
-            .tenantScoped(false)
+            .tenantScoped(true)
             .addField(FieldDefinition.masterDetail("layoutId", "page-layouts", "Layout")
                 .withColumnName("layout_id"))
             .addField(FieldDefinition.masterDetail("relatedCollectionId", "collections",
@@ -1090,7 +1090,7 @@ public final class SystemCollectionDefinitions {
     public static CollectionDefinition uiMenuItems() {
         return systemBuilder("ui-menu-items", "UI Menu Items", "ui_menu_item")
             .displayFieldName("label")
-            .tenantScoped(false)
+            .tenantScoped(true)
             .addField(FieldDefinition.masterDetail("menuId", "ui-menus", "Menu")
                 .withColumnName("menu_id"))
             .addField(FieldDefinition.requiredString("label", 100))
@@ -1111,7 +1111,7 @@ public final class SystemCollectionDefinitions {
     public static CollectionDefinition picklistDependencies() {
         return systemBuilder("picklist-dependencies", "Picklist Dependencies",
                 "picklist_dependency")
-            .tenantScoped(false)
+            .tenantScoped(true)
             .addField(FieldDefinition.masterDetail("controllingFieldId", "fields",
                 "Controlling Field").withColumnName("controlling_field_id"))
             .addField(FieldDefinition.masterDetail("dependentFieldId", "fields",
@@ -1249,7 +1249,7 @@ public final class SystemCollectionDefinitions {
     public static CollectionDefinition dashboardComponents() {
         return systemBuilder("dashboard-components", "Dashboard Components",
                 "dashboard_component")
-            .tenantScoped(false)
+            .tenantScoped(true)
             .addField(FieldDefinition.masterDetail("dashboardId", "dashboards",
                 "Dashboard").withColumnName("dashboard_id"))
             .addField(FieldDefinition.masterDetail("reportId", "reports", "Report")

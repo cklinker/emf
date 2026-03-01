@@ -51,10 +51,10 @@ const mockBootstrapConfig: BootstrapConfig = {
     fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
     borderRadius: '4px',
   },
-  // These match bootstrapCache DEFAULT_BRANDING
+  // branding.applicationName is overridden by the tenant name from the /api/tenants response
   branding: {
     logoUrl: '/logo.svg',
-    applicationName: 'EMF Platform',
+    applicationName: 'Default Tenant',
     faviconUrl: '/favicon.ico',
   },
   oidcProviders: [
@@ -440,7 +440,7 @@ describe('ConfigContext', () => {
         expect(screen.getByTestId('loading')).toHaveTextContent('not-loading')
       })
 
-      expect(screen.getByTestId('app-name')).toHaveTextContent('EMF Platform')
+      expect(screen.getByTestId('app-name')).toHaveTextContent('Default Tenant')
     })
 
     it('should include logo, app name, and favicon in branding', async () => {
@@ -462,7 +462,7 @@ describe('ConfigContext', () => {
       expect(branding).toBeDefined()
       expect(branding).toMatchObject({
         logoUrl: '/logo.svg',
-        applicationName: 'EMF Platform',
+        applicationName: 'Default Tenant',
         faviconUrl: '/favicon.ico',
       })
     })
@@ -634,7 +634,7 @@ describe('ConfigContext', () => {
       })
 
       expect(configValue?.config?.branding).toBeDefined()
-      expect(configValue?.config?.branding.applicationName).toBe('EMF Platform')
+      expect(configValue?.config?.branding.applicationName).toBe('Default Tenant')
     })
 
     it('should set error when network failure prevents config loading', async () => {

@@ -188,13 +188,17 @@ export function fetchBootstrapConfig(): Promise<unknown> {
       const oidcProviders = unwrapList(providersRes)
       const tenants = unwrapList(tenantsRes)
       const tenantId = tenants.length > 0 ? (tenants[0].id as string) : undefined
+      const tenantName = tenants.length > 0 ? (tenants[0].name as string) : undefined
 
       return {
         pages,
         menus,
         oidcProviders,
         theme: DEFAULT_THEME,
-        branding: DEFAULT_BRANDING,
+        branding: {
+          ...DEFAULT_BRANDING,
+          ...(tenantName ? { applicationName: tenantName } : {}),
+        },
         tenantId,
       }
     })

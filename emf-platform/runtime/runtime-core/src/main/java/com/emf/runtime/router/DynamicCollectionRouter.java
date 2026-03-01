@@ -1236,6 +1236,13 @@ public class DynamicCollectionRouter {
         }
 
         // --- Pass 2: Transitive (grandchild) includes ---
+        // Supports two chain types via an already-resolved intermediate collection:
+        //   Has-many chain:   primary → intermediate (has-many) → grandchild (has-many)
+        //                     e.g., page-layouts → layout-sections → layout-fields
+        //                     grandchild has FK pointing to intermediate
+        //   Belongs-to chain: primary → intermediate (has-many) → grandchild (belongs-to)
+        //                     e.g., orders → order_items → products
+        //                     intermediate has FK pointing to grandchild
         for (String includeName : unresolvedNames) {
             CollectionDefinition grandchildDef = resolveCollection(includeName, request);
             if (grandchildDef == null) {
@@ -1249,44 +1256,82 @@ public class DynamicCollectionRouter {
                 String intermediateCollectionName = entry.getKey();
                 CollectionDefinition intermediateDef = entry.getValue();
 
-                Optional<SubResourceRelation> transitiveRelation =
-                        SubResourceResolver.resolve(intermediateDef, grandchildDef);
-                if (transitiveRelation.isEmpty()) {
-                    continue;
-                }
-
-                // Found a transitive path: primary → intermediate → grandchild
-                String intermediateRefField = transitiveRelation.get().parentRefFieldName();
                 List<Map<String, Object>> intermediateData =
                         resolvedChildData.get(intermediateCollectionName);
 
-                List<Object> intermediateIds = intermediateData.stream()
-                        .map(r -> r.get("id"))
-                        .filter(Objects::nonNull)
-                        .collect(Collectors.toList());
+                // Try has-many direction: grandchild has FK pointing to intermediate
+                // e.g., layout-fields has sectionId FK pointing to layout-sections
+                Optional<SubResourceRelation> hasManyRelation =
+                        SubResourceResolver.resolve(intermediateDef, grandchildDef);
+                if (hasManyRelation.isPresent()) {
+                    String intermediateRefField = hasManyRelation.get().parentRefFieldName();
 
-                if (intermediateIds.isEmpty()) {
-                    logger.debug("No intermediate '{}' records to resolve transitive include '{}'",
-                            intermediateCollectionName, includeName);
+                    List<Object> intermediateIds = intermediateData.stream()
+                            .map(r -> r.get("id"))
+                            .filter(Objects::nonNull)
+                            .collect(Collectors.toList());
+
+                    if (intermediateIds.isEmpty()) {
+                        logger.debug("No intermediate '{}' records to resolve transitive include '{}'",
+                                intermediateCollectionName, includeName);
+                        resolved = true;
+                        break;
+                    }
+
+                    logger.debug("Resolving transitive include '{}' via '{}' (has-many): "
+                                    + "querying where {} IN {} IDs",
+                            includeName, intermediateCollectionName, intermediateRefField,
+                            intermediateIds.size());
+
+                    List<Map<String, Object>> grandchildRecords =
+                            queryChildRecords(grandchildDef, intermediateRefField, intermediateIds,
+                                    request);
+
+                    for (Map<String, Object> record : grandchildRecords) {
+                        allIncluded.add(toJsonApiResourceObject(record, includeName, grandchildDef));
+                    }
+                    logger.debug("Resolved {} transitive included records for '{}' via '{}'",
+                            grandchildRecords.size(), includeName, intermediateCollectionName);
                     resolved = true;
                     break;
                 }
 
-                logger.debug("Resolving transitive include '{}' via '{}': querying where {} IN {} IDs",
-                        includeName, intermediateCollectionName, intermediateRefField,
-                        intermediateIds.size());
+                // Try belongs-to direction: intermediate has FK pointing to grandchild
+                // e.g., order_items has product FK pointing to products
+                Optional<SubResourceRelation> belongsToRelation =
+                        SubResourceResolver.resolve(grandchildDef, intermediateDef);
+                if (belongsToRelation.isPresent()) {
+                    String fkField = belongsToRelation.get().parentRefFieldName();
 
-                List<Map<String, Object>> grandchildRecords =
-                        queryChildRecords(grandchildDef, intermediateRefField, intermediateIds,
-                                request);
+                    // Extract FK values from intermediate records to query grandchild by ID
+                    List<Object> fkValues = intermediateData.stream()
+                            .map(r -> r.get(fkField))
+                            .filter(Objects::nonNull)
+                            .distinct()
+                            .collect(Collectors.toList());
 
-                for (Map<String, Object> record : grandchildRecords) {
-                    allIncluded.add(toJsonApiResourceObject(record, includeName, grandchildDef));
+                    if (fkValues.isEmpty()) {
+                        logger.debug("No FK values in '{}' for transitive include '{}'",
+                                intermediateCollectionName, includeName);
+                        resolved = true;
+                        break;
+                    }
+
+                    logger.debug("Resolving transitive include '{}' via '{}' (belongs-to): "
+                                    + "querying where id IN {} FK values from field '{}'",
+                            includeName, intermediateCollectionName, fkValues.size(), fkField);
+
+                    List<Map<String, Object>> grandchildRecords =
+                            queryChildRecords(grandchildDef, "id", fkValues, request);
+
+                    for (Map<String, Object> record : grandchildRecords) {
+                        allIncluded.add(toJsonApiResourceObject(record, includeName, grandchildDef));
+                    }
+                    logger.debug("Resolved {} transitive included records for '{}' via '{}'",
+                            grandchildRecords.size(), includeName, intermediateCollectionName);
+                    resolved = true;
+                    break;
                 }
-                logger.debug("Resolved {} transitive included records for '{}' via '{}'",
-                        grandchildRecords.size(), includeName, intermediateCollectionName);
-                resolved = true;
-                break;
             }
 
             if (!resolved) {

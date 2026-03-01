@@ -51,12 +51,12 @@ import type { FieldDefinition, FieldType } from '@/hooks/useCollectionSchema'
 import type { PageLayoutDto } from '@/hooks/usePageLayout'
 import type { LookupOption } from '@/components/LookupSelect'
 
-/** Picklist value returned from the API */
+/** Picklist value returned from the API (field names match backend schema) */
 interface PicklistValueDto {
   value: string
   label: string
   isDefault: boolean
-  active: boolean
+  isActive: boolean
   sortOrder: number
 }
 
@@ -549,11 +549,27 @@ export function ObjectFormPage(): React.ReactElement {
       await Promise.all(
         picklistFields.map(async (field) => {
           try {
+            // Resolve the picklist source: global picklist ID from fieldTypeConfig,
+            // falling back to field-level picklist values.
+            let sourceId = field.id
+            let sourceType = 'FIELD'
+            const rawConfig = (field as Record<string, unknown>).fieldTypeConfig
+            if (typeof rawConfig === 'string') {
+              try {
+                const config = JSON.parse(rawConfig) as { globalPicklistId?: string }
+                if (config.globalPicklistId) {
+                  sourceId = config.globalPicklistId
+                  sourceType = 'GLOBAL'
+                }
+              } catch {
+                /* ignore malformed config */
+              }
+            }
             const values = await apiClient.getList<PicklistValueDto>(
-              `/api/picklist-values?filter[picklistSourceId][eq]=${encodeURIComponent(field.id)}&filter[picklistSourceType][eq]=FIELD`
+              `/api/picklist-values?filter[picklistSourceId][eq]=${encodeURIComponent(sourceId)}&filter[picklistSourceType][eq]=${sourceType}`
             )
             map[field.id] = values
-              .filter((v) => v.active)
+              .filter((v) => v.isActive)
               .sort((a, b) => a.sortOrder - b.sortOrder)
               .map((v) => v.value)
           } catch {

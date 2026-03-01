@@ -413,6 +413,15 @@ public class CollectionLifecycleManager {
         if (fields.isEmpty()) {
             fields.add(FieldDefinition.string("name"));
         }
+
+        // Inject system audit fields — physical columns on every tenant table
+        // but not stored in the field table. Needed so DynamicCollectionRouter
+        // serializes createdBy/updatedBy as relationships for include resolution.
+        fields.add(FieldDefinition.datetime("createdAt").withColumnName("created_at"));
+        fields.add(FieldDefinition.lookup("createdBy", "users", "Created By").withColumnName("created_by"));
+        fields.add(FieldDefinition.datetime("updatedAt").withColumnName("updated_at"));
+        fields.add(FieldDefinition.lookup("updatedBy", "users", "Updated By").withColumnName("updated_by"));
+
         builder.fields(fields);
 
         // Resolve display field ID to field name

@@ -107,7 +107,48 @@ class LoginTrackingFilterTest {
     }
 
     @Test
-    void shouldSkipTrackingWhenUserNotFoundInDatabase() throws ServletException, IOException {
+    void shouldAutoProvisionUserWhenNotFoundInDatabase() throws ServletException, IOException {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/accounts");
+        request.addHeader("X-User-Id", "new-user@example.com");
+        request.addHeader("X-Tenant-ID", "tenant-123");
+        request.addHeader("X-Forwarded-User", "new-user");
+        request.setRemoteAddr("192.168.1.1");
+        request.addHeader("User-Agent", "Mozilla/5.0");
+
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+
+        // First lookup returns null (user doesn't exist), then INSERT provisions,
+        // then second lookup returns the new user ID
+        when(jdbcTemplate.queryForObject(
+                eq("SELECT id FROM platform_user WHERE tenant_id = ? AND email = ? LIMIT 1"),
+                eq(String.class), eq("tenant-123"), eq("new-user@example.com")))
+                .thenReturn(null)
+                .thenReturn("provisioned-uuid");
+
+        filter.doFilterInternal(request, response, chain);
+
+        verify(chain).doFilter(request, response);
+
+        // Should have attempted to provision the user
+        verify(jdbcTemplate).update(
+                contains("INSERT INTO platform_user"),
+                any(String.class), eq("tenant-123"), eq("new-user@example.com"), eq("new-user"));
+
+        // Should have proceeded with login tracking after provisioning
+        verify(jdbcTemplate).update(
+                contains("UPDATE platform_user SET last_login_at"),
+                any(), any(), eq("provisioned-uuid"));
+
+        verify(jdbcTemplate).update(
+                contains("INSERT INTO login_history"),
+                any(String.class), eq("provisioned-uuid"), eq("tenant-123"),
+                any(), eq("192.168.1.1"), eq("OAUTH"), eq("SUCCESS"),
+                eq("Mozilla/5.0"), any(), any());
+    }
+
+    @Test
+    void shouldSkipTrackingWhenProvisioningFails() throws ServletException, IOException {
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/accounts");
         request.addHeader("X-User-Id", "unknown@example.com");
         request.addHeader("X-Tenant-ID", "tenant-123");
@@ -115,15 +156,20 @@ class LoginTrackingFilterTest {
         MockHttpServletResponse response = new MockHttpServletResponse();
         FilterChain chain = mock(FilterChain.class);
 
+        // Lookup always returns null (user doesn't exist and provisioning fails to resolve)
         when(jdbcTemplate.queryForObject(anyString(), eq(String.class), any(), any()))
                 .thenReturn(null);
+        // Provisioning INSERT throws
+        when(jdbcTemplate.update(contains("INSERT INTO platform_user"), any(), any(), any(), any()))
+                .thenThrow(new RuntimeException("FK constraint violation"));
 
         filter.doFilterInternal(request, response, chain);
 
         verify(chain).doFilter(request, response);
-        // Only the SELECT query should run, no inserts/updates
-        verify(jdbcTemplate).queryForObject(anyString(), eq(String.class), any(), any());
-        verify(jdbcTemplate, never()).update(anyString(), (Object[]) any());
+        // Should NOT have tracked login (no UPDATE or login_history INSERT)
+        verify(jdbcTemplate, never()).update(contains("UPDATE platform_user SET last_login_at"), any(), any(), any());
+        verify(jdbcTemplate, never()).update(contains("INSERT INTO login_history"),
+                any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test

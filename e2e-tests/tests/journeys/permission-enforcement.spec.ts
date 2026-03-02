@@ -1,10 +1,10 @@
-import { test, expect } from '../../fixtures';
-import { ObjectListPage } from '../../pages/end-user/object-list.page';
+import { test, expect } from "../../fixtures";
+import { ObjectListPage } from "../../pages/end-user/object-list.page";
 
-const tenantSlug = process.env.E2E_TENANT_SLUG || 'default';
+const tenantSlug = process.env.E2E_TENANT_SLUG || "default";
 
-test.describe('Permission Enforcement Journey', () => {
-  test('enforces permissions on collection access', async ({ page }) => {
+test.describe("Permission Enforcement Journey", () => {
+  test("enforces permissions on collection access", async ({ page }) => {
     // Attempt to navigate to a non-existent or restricted collection
     const restrictedCollectionName = `restricted_${Date.now()}`;
     const listPage = new ObjectListPage(
@@ -20,7 +20,7 @@ test.describe('Permission Enforcement Journey', () => {
     const errorIndicator = page.locator(
       '[data-testid="error-page"], [data-testid="access-denied"], [data-testid="not-found"]',
     );
-    const redirectedToHome = page.url().includes('/app/home');
+    const redirectedToHome = page.url().includes("/app/home");
 
     const isErrorVisible = await errorIndicator
       .isVisible({ timeout: 5000 })

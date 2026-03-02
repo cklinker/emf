@@ -1,8 +1,8 @@
-import { test, expect } from '../../../fixtures';
-import { ModulesPage } from '../../../pages/modules.page';
+import { test, expect } from "../../../fixtures";
+import { ModulesPage } from "../../../pages/modules.page";
 
-test.describe('Modules', () => {
-  test('displays modules page', async ({ page }) => {
+test.describe("Modules", () => {
+  test("displays modules page", async ({ page }) => {
     const modulesPage = new ModulesPage(page);
     await modulesPage.goto();
 
@@ -10,21 +10,20 @@ test.describe('Modules', () => {
     await expect(modulesPage.modulesPage).toBeVisible();
   });
 
-  test('shows installed modules or empty state', async ({ page }) => {
+  test("shows installed modules or empty state", async ({ page }) => {
     const modulesPage = new ModulesPage(page);
     await modulesPage.goto();
 
-    const moduleCount = await modulesPage.getModuleCount();
-    if (moduleCount > 0) {
-      await expect(modulesPage.moduleCards).toBeVisible();
-    } else {
-      await expect(modulesPage.emptyState).toBeVisible();
-    }
+    const cardsOrEmpty = modulesPage.moduleCards.or(
+      page.getByTestId("empty-state"),
+    );
+    await expect(cardsOrEmpty).toBeVisible();
   });
 
-  test('has install module button', async ({ page }) => {
+  test("has install module button", async ({ page }) => {
     const modulesPage = new ModulesPage(page);
     await modulesPage.goto();
+    await page.waitForLoadState("networkidle");
 
     await expect(modulesPage.installButton).toBeVisible();
   });

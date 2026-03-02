@@ -1,7 +1,7 @@
-import { test, expect } from '../../../fixtures';
-import { PageBuilderPage } from '../../../pages/page-builder.page';
+import { test, expect } from "../../../fixtures";
+import { PageBuilderPage } from "../../../pages/page-builder.page";
 
-test.describe('Page Builder', () => {
+test.describe("Page Builder", () => {
   let pageBuilderPage: PageBuilderPage;
 
   test.beforeEach(async ({ page }) => {
@@ -9,22 +9,19 @@ test.describe('Page Builder', () => {
     await pageBuilderPage.goto();
   });
 
-  test('displays page builder page', async () => {
+  test("displays page builder page", async () => {
     await expect(pageBuilderPage.pageBuilderPage).toBeVisible();
   });
 
-  test('shows pages table or empty state', async ({ page }) => {
-    const rowCount = await pageBuilderPage.getRowCount();
-    if (rowCount > 0) {
-      await expect(pageBuilderPage.table).toBeVisible();
-    } else {
-      await expect(
-        page.locator('[data-testid="empty-state"], [data-testid="page-builder-table"]'),
-      ).toBeVisible();
-    }
+  test("shows pages table or empty state", async ({ page }) => {
+    const tableOrEmpty = pageBuilderPage.table.or(
+      page.getByTestId("empty-state"),
+    );
+    await expect(tableOrEmpty).toBeVisible();
   });
 
-  test('has create page button', async () => {
+  test("has create page button", async ({ page }) => {
+    await page.waitForLoadState("networkidle");
     await expect(pageBuilderPage.createButton).toBeVisible();
   });
 });

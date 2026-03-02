@@ -1,8 +1,8 @@
-import { test, expect } from '../../../fixtures';
-import { PluginsPage } from '../../../pages/plugins.page';
+import { test, expect } from "../../../fixtures";
+import { PluginsPage } from "../../../pages/plugins.page";
 
-test.describe('Plugins', () => {
-  test('displays plugins page', async ({ page }) => {
+test.describe("Plugins", () => {
+  test("displays plugins page", async ({ page }) => {
     const pluginsPage = new PluginsPage(page);
     await pluginsPage.goto();
 
@@ -10,7 +10,7 @@ test.describe('Plugins', () => {
     await expect(pluginsPage.pluginsPage).toBeVisible();
   });
 
-  test('shows plugin count', async ({ page }) => {
+  test("shows plugin count", async ({ page }) => {
     const pluginsPage = new PluginsPage(page);
     await pluginsPage.goto();
 
@@ -20,17 +20,13 @@ test.describe('Plugins', () => {
     expect(countText).not.toBeNull();
   });
 
-  test('shows plugin cards or empty state', async ({ page }) => {
+  test("shows plugin cards or empty state", async ({ page }) => {
     const pluginsPage = new PluginsPage(page);
     await pluginsPage.goto();
 
-    const countText = await pluginsPage.getPluginCount();
-    const count = parseInt(countText || '0', 10);
-
-    if (count > 0) {
-      await expect(pluginsPage.pluginsPage).toBeVisible();
-    } else {
-      await expect(pluginsPage.emptyState).toBeVisible();
-    }
+    const contentOrEmpty = pluginsPage.pluginsPage.or(
+      page.getByTestId("empty-state"),
+    );
+    await expect(contentOrEmpty).toBeVisible();
   });
 });

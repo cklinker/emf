@@ -192,9 +192,7 @@ export function CollectionStoreProvider({
   const { data: schemas = [], isLoading } = useQuery({
     queryKey: ['collection-store'],
     queryFn: async () => {
-      const raw = await apiClient.get(
-        '/api/collections?page[size]=1000&include=fields'
-      )
+      const raw = await apiClient.get('/api/collections?page[size]=1000&include=fields')
       const parsed = parseCollectionsResponse(raw)
 
       // Pre-populate the React Query cache with individual collection-schema entries.
@@ -240,20 +238,11 @@ export function CollectionStoreProvider({
     return map
   }, [schemas])
 
-  const getCollectionByName = useCallback(
-    (name: string) => byName.get(name),
-    [byName]
-  )
+  const getCollectionByName = useCallback((name: string) => byName.get(name), [byName])
 
-  const getCollectionById = useCallback(
-    (id: string) => byId.get(id),
-    [byId]
-  )
+  const getCollectionById = useCallback((id: string) => byId.get(id), [byId])
 
-  const getFieldById = useCallback(
-    (id: string) => fieldsById.get(id),
-    [fieldsById]
-  )
+  const getFieldById = useCallback((id: string) => fieldsById.get(id), [fieldsById])
 
   const value = useMemo<CollectionStoreValue>(
     () => ({
@@ -266,11 +255,7 @@ export function CollectionStoreProvider({
     [isLoading, schemas, getCollectionByName, getCollectionById, getFieldById]
   )
 
-  return (
-    <CollectionStoreContext.Provider value={value}>
-      {children}
-    </CollectionStoreContext.Provider>
-  )
+  return <CollectionStoreContext.Provider value={value}>{children}</CollectionStoreContext.Provider>
 }
 
 /**

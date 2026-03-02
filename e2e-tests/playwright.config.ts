@@ -15,7 +15,7 @@ export default defineConfig({
   testDir: "./tests",
   fullyParallel: false,
   forbidOnly: CI,
-  retries: 0,
+  retries: CI ? 2 : 0,
   workers: CI ? 1 : 2,
   reporter: CI
     ? [

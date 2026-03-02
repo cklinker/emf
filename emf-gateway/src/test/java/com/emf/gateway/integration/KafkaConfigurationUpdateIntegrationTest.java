@@ -4,7 +4,7 @@ import com.emf.gateway.route.RouteDefinition;
 import com.emf.gateway.route.RouteRegistry;
 import com.emf.runtime.event.ChangeType;
 import com.emf.runtime.event.CollectionChangedPayload;
-import com.emf.runtime.event.ConfigEvent;
+import com.emf.runtime.event.PlatformEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringSerializer;
@@ -94,7 +94,7 @@ class KafkaConfigurationUpdateIntegrationTest {
         payload.setName("new-collection");
         payload.setActive(true);
 
-        ConfigEvent<CollectionChangedPayload> event = new ConfigEvent<>();
+        PlatformEvent<CollectionChangedPayload> event = new PlatformEvent<>();
         event.setEventId(UUID.randomUUID().toString());
         event.setEventType("config.collection.changed");
         event.setCorrelationId(UUID.randomUUID().toString());
@@ -131,7 +131,7 @@ class KafkaConfigurationUpdateIntegrationTest {
         payload.setName("existing-collection");
         payload.setActive(true);
 
-        ConfigEvent<CollectionChangedPayload> event = new ConfigEvent<>();
+        PlatformEvent<CollectionChangedPayload> event = new PlatformEvent<>();
         event.setEventId(UUID.randomUUID().toString());
         event.setEventType("config.collection.changed");
         event.setCorrelationId(UUID.randomUUID().toString());
@@ -168,7 +168,7 @@ class KafkaConfigurationUpdateIntegrationTest {
         validPayload.setName("after-error");
         validPayload.setActive(true);
 
-        ConfigEvent<CollectionChangedPayload> validEvent = new ConfigEvent<>();
+        PlatformEvent<CollectionChangedPayload> validEvent = new PlatformEvent<>();
         validEvent.setEventId(UUID.randomUUID().toString());
         validEvent.setEventType("config.collection.changed");
         validEvent.setCorrelationId(UUID.randomUUID().toString());

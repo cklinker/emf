@@ -1,18 +1,18 @@
 package com.emf.runtime.events;
 
-import com.emf.runtime.event.RecordChangeEvent;
+import com.emf.runtime.event.PlatformEvent;
+import com.emf.runtime.event.RecordChangedPayload;
 
 /**
  * Interface for publishing record-level change events.
  *
- * <p>Implementations publish {@link RecordChangeEvent} instances when records are
- * created, updated, or deleted. These events are consumed by the workflow engine
- * and other downstream services (audit, notifications, etc.).
+ * <p>Implementations publish {@link PlatformEvent} instances wrapping a
+ * {@link RecordChangedPayload} when records are created, updated, or deleted.
+ * These events are consumed by the workflow engine and other downstream
+ * services (audit, notifications, etc.).
  *
- * <p>Unlike {@link EventPublisher} which publishes per-collection lifecycle events
- * gated by collection-level event configuration, this publisher fires for every
- * record mutation unconditionally — workflow triggers and audit trails must always
- * receive events regardless of the collection's {@code eventsConfig}.
+ * <p>This publisher fires for every record mutation unconditionally — workflow
+ * triggers and audit trails must always receive events.
  *
  * <p>This is an optional dependency in {@code DefaultQueryEngine}. When not wired
  * (null), no record change events are published.
@@ -21,14 +21,15 @@ import com.emf.runtime.event.RecordChangeEvent;
  * should be logged but must not cause the main CRUD operation to fail.
  *
  * @since 1.0.0
- * @see RecordChangeEvent
+ * @see PlatformEvent
+ * @see RecordChangedPayload
  */
 public interface RecordEventPublisher {
 
     /**
      * Publishes a record change event.
      *
-     * @param event the record change event to publish
+     * @param event the platform event wrapping a record changed payload
      */
-    void publish(RecordChangeEvent event);
+    void publish(PlatformEvent<RecordChangedPayload> event);
 }

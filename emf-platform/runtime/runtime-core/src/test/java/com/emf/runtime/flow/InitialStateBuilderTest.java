@@ -1,6 +1,8 @@
 package com.emf.runtime.flow;
 
-import com.emf.runtime.event.RecordChangeEvent;
+import com.emf.runtime.event.EventFactory;
+import com.emf.runtime.event.PlatformEvent;
+import com.emf.runtime.event.RecordChangedPayload;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -27,9 +29,10 @@ class InitialStateBuilderTest {
 
     @Test
     void buildFromRecordEventContainsTriggerMetadata() {
-        RecordChangeEvent event = RecordChangeEvent.created(
-                "tenant-1", "orders", "rec-1",
-                Map.of("status", "ACTIVE"), "user-1");
+        PlatformEvent<RecordChangedPayload> event = EventFactory.createRecordEvent(
+                "record.created", "tenant-1", "user-1",
+                RecordChangedPayload.created("orders", "rec-1",
+                        Map.of("status", "ACTIVE")));
 
         Map<String, Object> state = builder.buildFromRecordEvent(event, "flow-1", "exec-1");
 
@@ -43,9 +46,10 @@ class InitialStateBuilderTest {
 
     @Test
     void buildFromRecordEventContainsRecordData() {
-        RecordChangeEvent event = RecordChangeEvent.created(
-                "tenant-1", "orders", "rec-1",
-                Map.of("status", "ACTIVE", "amount", 100), "user-1");
+        PlatformEvent<RecordChangedPayload> event = EventFactory.createRecordEvent(
+                "record.created", "tenant-1", "user-1",
+                RecordChangedPayload.created("orders", "rec-1",
+                        Map.of("status", "ACTIVE", "amount", 100)));
 
         Map<String, Object> state = builder.buildFromRecordEvent(event, "flow-1", "exec-1");
 
@@ -63,12 +67,12 @@ class InitialStateBuilderTest {
 
     @Test
     void buildFromRecordEventContainsChangedFields() {
-        RecordChangeEvent event = RecordChangeEvent.updated(
-                "tenant-1", "orders", "rec-1",
-                Map.of("status", "ACTIVE"),
-                Map.of("status", "DRAFT"),
-                List.of("status"),
-                "user-1");
+        PlatformEvent<RecordChangedPayload> event = EventFactory.createRecordEvent(
+                "record.updated", "tenant-1", "user-1",
+                RecordChangedPayload.updated("orders", "rec-1",
+                        Map.of("status", "ACTIVE"),
+                        Map.of("status", "DRAFT"),
+                        List.of("status")));
 
         Map<String, Object> state = builder.buildFromRecordEvent(event, "flow-1", "exec-1");
 
@@ -85,9 +89,10 @@ class InitialStateBuilderTest {
 
     @Test
     void buildFromRecordEventContainsContext() {
-        RecordChangeEvent event = RecordChangeEvent.created(
-                "tenant-1", "orders", "rec-1",
-                Map.of("status", "ACTIVE"), "user-1");
+        PlatformEvent<RecordChangedPayload> event = EventFactory.createRecordEvent(
+                "record.created", "tenant-1", "user-1",
+                RecordChangedPayload.created("orders", "rec-1",
+                        Map.of("status", "ACTIVE")));
 
         Map<String, Object> state = builder.buildFromRecordEvent(event, "flow-1", "exec-1");
 
@@ -102,8 +107,9 @@ class InitialStateBuilderTest {
 
     @Test
     void buildFromRecordEventHandlesNullData() {
-        RecordChangeEvent event = RecordChangeEvent.deleted(
-                "tenant-1", "orders", "rec-1", null, "user-1");
+        PlatformEvent<RecordChangedPayload> event = EventFactory.createRecordEvent(
+                "record.deleted", "tenant-1", "user-1",
+                RecordChangedPayload.deleted("orders", "rec-1", null));
 
         Map<String, Object> state = builder.buildFromRecordEvent(event, "flow-1", "exec-1");
 
@@ -241,9 +247,10 @@ class InitialStateBuilderTest {
 
     @Test
     void allBuildersProduceThreeTopLevelKeys() {
-        RecordChangeEvent event = RecordChangeEvent.created(
-                "tenant-1", "orders", "rec-1",
-                Map.of("status", "ACTIVE"), "user-1");
+        PlatformEvent<RecordChangedPayload> event = EventFactory.createRecordEvent(
+                "record.created", "tenant-1", "user-1",
+                RecordChangedPayload.created("orders", "rec-1",
+                        Map.of("status", "ACTIVE")));
 
         Map<String, Object> recordState = builder.buildFromRecordEvent(event, "flow-1", "exec-1");
         assertEquals(3, recordState.size());

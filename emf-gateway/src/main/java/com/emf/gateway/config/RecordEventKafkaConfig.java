@@ -16,9 +16,9 @@ import java.util.Map;
  * Kafka consumer configuration for record change events.
  *
  * <p>Uses {@link StringDeserializer} for both key and value because the worker
- * publishes {@code RecordChangeEvent} as JSON strings via {@code StringSerializer}.
- * This is separate from the main {@link KafkaConfig} which uses
- * {@code JsonDeserializer} for {@code ConfigEvent} messages.
+ * publishes {@code PlatformEvent<RecordChangedPayload>} as JSON strings via
+ * {@code StringSerializer}. This is separate from the main {@link KafkaConfig}
+ * which uses {@code JsonDeserializer} for {@code PlatformEvent} messages.
  *
  * @since 1.0.0
  */

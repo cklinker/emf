@@ -1,7 +1,9 @@
 package com.emf.worker.listener;
 
 import com.emf.runtime.event.ChangeType;
-import com.emf.runtime.event.RecordChangeEvent;
+import com.emf.runtime.event.EventFactory;
+import com.emf.runtime.event.PlatformEvent;
+import com.emf.runtime.event.RecordChangedPayload;
 import com.emf.runtime.flow.FlowEngine;
 import com.emf.runtime.flow.FlowTriggerEvaluator;
 import com.emf.runtime.flow.InitialStateBuilder;
@@ -38,6 +40,7 @@ class FlowEventListenerTest {
         initialStateBuilder = mock(InitialStateBuilder.class);
         jdbcTemplate = mock(JdbcTemplate.class);
         objectMapper = new ObjectMapper();
+        objectMapper.findAndRegisterModules();
         listener = new FlowEventListener(flowEngine, triggerEvaluator, initialStateBuilder, jdbcTemplate, objectMapper);
     }
 
@@ -58,7 +61,7 @@ class FlowEventListenerTest {
             when(initialStateBuilder.buildFromRecordEvent(any(), any(), any())).thenReturn(Map.of());
             when(flowEngine.startExecution(any(), any(), any(), any(), any(), anyBoolean())).thenReturn("exec-1");
 
-            listener.handleRecordChanged(buildRecordChangeEvent("tenant-1", "orders", ChangeType.CREATED));
+            listener.handleRecordChanged(buildRecordChangedMessage("tenant-1", "orders", ChangeType.CREATED));
 
             ArgumentCaptor<Map<String, Object>> configCaptor = ArgumentCaptor.forClass(Map.class);
             verify(triggerEvaluator).matchesRecordTrigger(any(), configCaptor.capture());
@@ -83,7 +86,7 @@ class FlowEventListenerTest {
             when(initialStateBuilder.buildFromRecordEvent(any(), any(), any())).thenReturn(Map.of());
             when(flowEngine.startExecution(any(), any(), any(), any(), any(), anyBoolean())).thenReturn("exec-1");
 
-            listener.handleRecordChanged(buildRecordChangeEvent("tenant-1", "orders", ChangeType.CREATED));
+            listener.handleRecordChanged(buildRecordChangedMessage("tenant-1", "orders", ChangeType.CREATED));
 
             ArgumentCaptor<Map<String, Object>> configCaptor = ArgumentCaptor.forClass(Map.class);
             verify(triggerEvaluator).matchesRecordTrigger(any(), configCaptor.capture());
@@ -104,7 +107,7 @@ class FlowEventListenerTest {
             stubJdbcWithTriggerConfig(null);
             when(triggerEvaluator.matchesRecordTrigger(any(), any())).thenReturn(false);
 
-            listener.handleRecordChanged(buildRecordChangeEvent("tenant-1", "orders", ChangeType.CREATED));
+            listener.handleRecordChanged(buildRecordChangedMessage("tenant-1", "orders", ChangeType.CREATED));
 
             ArgumentCaptor<Map<String, Object>> configCaptor = ArgumentCaptor.forClass(Map.class);
             verify(triggerEvaluator).matchesRecordTrigger(any(), configCaptor.capture());
@@ -120,7 +123,7 @@ class FlowEventListenerTest {
             stubJdbcWithTriggerConfig("   ");
             when(triggerEvaluator.matchesRecordTrigger(any(), any())).thenReturn(false);
 
-            listener.handleRecordChanged(buildRecordChangeEvent("tenant-1", "orders", ChangeType.CREATED));
+            listener.handleRecordChanged(buildRecordChangedMessage("tenant-1", "orders", ChangeType.CREATED));
 
             ArgumentCaptor<Map<String, Object>> configCaptor = ArgumentCaptor.forClass(Map.class);
             verify(triggerEvaluator).matchesRecordTrigger(any(), configCaptor.capture());
@@ -141,7 +144,7 @@ class FlowEventListenerTest {
             stubJdbcWithTriggerConfig(configWithType);
             when(triggerEvaluator.matchesRecordTrigger(any(), any())).thenReturn(false);
 
-            listener.handleRecordChanged(buildRecordChangeEvent("tenant-1", "orders", ChangeType.CREATED));
+            listener.handleRecordChanged(buildRecordChangedMessage("tenant-1", "orders", ChangeType.CREATED));
 
             ArgumentCaptor<Map<String, Object>> configCaptor = ArgumentCaptor.forClass(Map.class);
             verify(triggerEvaluator).matchesRecordTrigger(any(), configCaptor.capture());
@@ -164,7 +167,7 @@ class FlowEventListenerTest {
             stubJdbcWithTriggerConfig(configWithTypeOnly);
             when(triggerEvaluator.matchesRecordTrigger(any(), any())).thenReturn(false);
 
-            listener.handleRecordChanged(buildRecordChangeEvent("tenant-1", "orders", ChangeType.CREATED));
+            listener.handleRecordChanged(buildRecordChangedMessage("tenant-1", "orders", ChangeType.CREATED));
 
             ArgumentCaptor<Map<String, Object>> configCaptor = ArgumentCaptor.forClass(Map.class);
             verify(triggerEvaluator).matchesRecordTrigger(any(), configCaptor.capture());
@@ -186,7 +189,7 @@ class FlowEventListenerTest {
             when(triggerEvaluator.matchesRecordTrigger(any(), any())).thenReturn(false);
 
             // Should not throw; the warn log is emitted and an empty config is used
-            listener.handleRecordChanged(buildRecordChangeEvent("tenant-1", "orders", ChangeType.CREATED));
+            listener.handleRecordChanged(buildRecordChangedMessage("tenant-1", "orders", ChangeType.CREATED));
 
             // The trigger evaluator should still be called (with empty map from the catch block)
             verify(triggerEvaluator).matchesRecordTrigger(any(), any());
@@ -208,7 +211,7 @@ class FlowEventListenerTest {
             stubJdbcWithTriggerConfig(plainConfig);
             when(triggerEvaluator.matchesRecordTrigger(any(), any())).thenReturn(false);
 
-            String event = buildRecordChangeEvent("tenant-1", "orders", ChangeType.CREATED);
+            String event = buildRecordChangedMessage("tenant-1", "orders", ChangeType.CREATED);
             listener.handleRecordChanged(event);
             listener.handleRecordChanged(event);
 
@@ -227,7 +230,7 @@ class FlowEventListenerTest {
             stubJdbcWithTriggerConfig(plainConfig);
             when(triggerEvaluator.matchesRecordTrigger(any(), any())).thenReturn(false);
 
-            String event = buildRecordChangeEvent("tenant-1", "orders", ChangeType.CREATED);
+            String event = buildRecordChangedMessage("tenant-1", "orders", ChangeType.CREATED);
             listener.handleRecordChanged(event);
 
             listener.invalidateCache("tenant-1");
@@ -254,16 +257,12 @@ class FlowEventListenerTest {
                 });
     }
 
-    private String buildRecordChangeEvent(String tenantId, String collectionName, ChangeType changeType) throws Exception {
-        RecordChangeEvent event = new RecordChangeEvent();
-        event.setEventId("evt-1");
-        event.setTenantId(tenantId);
-        event.setCollectionName(collectionName);
-        event.setRecordId("rec-1");
-        event.setChangeType(changeType);
-        event.setData(Map.of("name", "test"));
-        event.setChangedFields(List.of());
-        event.setUserId("user-1");
+    private String buildRecordChangedMessage(String tenantId, String collectionName, ChangeType changeType) throws Exception {
+        RecordChangedPayload payload = new RecordChangedPayload(
+                collectionName, "rec-1", changeType,
+                Map.of("name", "test"), null, List.of());
+        PlatformEvent<RecordChangedPayload> event = EventFactory.createRecordEvent(
+                "record." + changeType.name().toLowerCase(), tenantId, "user-1", payload);
         return objectMapper.writeValueAsString(event);
     }
 }

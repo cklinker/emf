@@ -2,7 +2,7 @@ package com.emf.gateway.listener;
 
 import com.emf.gateway.authz.PermissionResolutionService;
 import com.emf.gateway.route.RouteRegistry;
-import com.emf.runtime.event.RecordChangeEvent;
+import com.emf.runtime.event.RecordChangedPayload;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,7 +26,7 @@ import java.util.Set;
  *
  * <p>This listener consumes from the {@code emf.record.changed} topic using the
  * {@code recordEventKafkaListenerContainerFactory} (StringDeserializer) because
- * the worker serializes {@link RecordChangeEvent} as JSON strings.
+ * the worker serializes events as JSON strings.
  *
  * <p>Uses a different consumer group ({@code emf-gateway-record}) from the
  * existing {@link ConfigEventListener} so both listeners receive all messages
@@ -74,8 +74,13 @@ public class SystemCollectionRouteListener {
     )
     public void onRecordChanged(String message) {
         try {
-            RecordChangeEvent event = objectMapper.readValue(message, RecordChangeEvent.class);
-            String collectionName = event.getCollectionName();
+            var tree = objectMapper.readTree(message);
+            String tenantId = tree.path("tenantId").asText(null);
+
+            var payloadNode = tree.has("payload") ? tree.get("payload") : tree;
+            RecordChangedPayload payload = objectMapper.treeToValue(payloadNode, RecordChangedPayload.class);
+
+            String collectionName = payload.getCollectionName();
 
             if (collectionName == null) {
                 return;
@@ -84,13 +89,12 @@ public class SystemCollectionRouteListener {
             // If a collection definition changed, refresh gateway routes
             if ("collections".equals(collectionName)) {
                 log.info("Collection definition changed (recordId={}, changeType={}), refreshing routes",
-                        event.getRecordId(), event.getChangeType());
+                        payload.getRecordId(), payload.getChangeType());
                 applicationEventPublisher.publishEvent(new RefreshRoutesEvent(this));
             }
 
             // Evict permission cache when permission-related collections change
             if (PERMISSION_COLLECTIONS.contains(collectionName) && permissionResolutionService != null) {
-                String tenantId = event.getTenantId();
                 if (tenantId != null) {
                     permissionResolutionService.evictPermissionCache(tenantId)
                             .doOnSuccess(v -> log.info(

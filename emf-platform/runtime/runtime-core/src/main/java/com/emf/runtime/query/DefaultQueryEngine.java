@@ -1,7 +1,9 @@
 package com.emf.runtime.query;
 
 import com.emf.runtime.context.TenantContext;
-import com.emf.runtime.event.RecordChangeEvent;
+import com.emf.runtime.event.EventFactory;
+import com.emf.runtime.event.PlatformEvent;
+import com.emf.runtime.event.RecordChangedPayload;
 import com.emf.runtime.events.RecordEventPublisher;
 import com.emf.runtime.model.CollectionDefinition;
 import com.emf.runtime.model.FieldDefinition;
@@ -253,9 +255,9 @@ public class DefaultQueryEngine implements QueryEngine {
         invokeAfterCreateHooks(definition, created);
 
         // Publish record change event
-        publishRecordEvent(RecordChangeEvent.created(
-                extractTenantId(recordData), definition.name(), id, created,
-                extractUserId(recordData)));
+        publishRecordEvent(EventFactory.createRecordEvent("record.created",
+                extractTenantId(recordData), extractUserId(recordData),
+                RecordChangedPayload.created(definition.name(), id, created)));
 
         return created;
     }
@@ -348,9 +350,10 @@ public class DefaultQueryEngine implements QueryEngine {
             invokeAfterUpdateHooks(definition, id, record, previousData);
 
             // Publish record change event
-            publishRecordEvent(RecordChangeEvent.updated(
-                    extractTenantId(mergedData), definition.name(), id, mergedData,
-                    previousData, changedFields, extractUserId(mergedData)));
+            publishRecordEvent(EventFactory.createRecordEvent("record.updated",
+                    extractTenantId(mergedData), extractUserId(mergedData),
+                    RecordChangedPayload.updated(definition.name(), id, mergedData,
+                            previousData, changedFields)));
         });
 
         return updated;
@@ -382,9 +385,9 @@ public class DefaultQueryEngine implements QueryEngine {
 
             // Publish record change event with the pre-fetched data
             if (recordData != null) {
-                publishRecordEvent(RecordChangeEvent.deleted(
-                        extractTenantId(recordData), definition.name(), id, recordData,
-                        extractUserId(recordData)));
+                publishRecordEvent(EventFactory.createRecordEvent("record.deleted",
+                        extractTenantId(recordData), extractUserId(recordData),
+                        RecordChangedPayload.deleted(definition.name(), id, recordData)));
             }
         }
 
@@ -537,15 +540,16 @@ public class DefaultQueryEngine implements QueryEngine {
      * Failures are handled gracefully — they are logged but do not cause the
      * main CRUD operation to fail.
      */
-    private void publishRecordEvent(RecordChangeEvent event) {
+    private void publishRecordEvent(PlatformEvent<RecordChangedPayload> event) {
         if (recordEventPublisher == null) {
             return;
         }
         try {
             recordEventPublisher.publish(event);
         } catch (Exception e) {
+            RecordChangedPayload payload = event.getPayload();
             logger.error("Failed to publish record change event for record '{}' in collection '{}': {}",
-                event.getRecordId(), event.getCollectionName(), e.getMessage());
+                payload.getRecordId(), payload.getCollectionName(), e.getMessage());
         }
     }
 

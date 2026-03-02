@@ -1,7 +1,8 @@
 package com.emf.worker.event;
 
-import com.emf.runtime.event.ChangeType;
-import com.emf.runtime.event.RecordChangeEvent;
+import com.emf.runtime.event.EventFactory;
+import com.emf.runtime.event.PlatformEvent;
+import com.emf.runtime.event.RecordChangedPayload;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -11,6 +12,7 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
@@ -39,9 +41,10 @@ class KafkaRecordEventPublisherTest {
     @DisplayName("Should publish CREATED event to correct topic with correct key")
     @SuppressWarnings("unchecked")
     void shouldPublishCreatedEvent() {
-        RecordChangeEvent event = RecordChangeEvent.created(
-                "tenant-1", "orders", "record-1",
-                Map.of("id", "record-1", "status", "NEW"), "user-1");
+        PlatformEvent<RecordChangedPayload> event = EventFactory.createRecordEvent(
+                "record.created", "tenant-1", "user-1",
+                RecordChangedPayload.created("orders", "record-1",
+                        Map.of("id", "record-1", "status", "NEW")));
 
         CompletableFuture<SendResult<String, String>> future = CompletableFuture.completedFuture(null);
         when(kafkaTemplate.send(anyString(), anyString(), anyString())).thenReturn(future);
@@ -60,7 +63,6 @@ class KafkaRecordEventPublisherTest {
         // Verify the payload is valid JSON containing expected fields
         String payload = payloadCaptor.getValue();
         assertNotNull(payload);
-        assertTrue(payload.contains("\"changeType\":\"CREATED\""));
         assertTrue(payload.contains("\"collectionName\":\"orders\""));
         assertTrue(payload.contains("\"recordId\":\"record-1\""));
     }
@@ -69,11 +71,12 @@ class KafkaRecordEventPublisherTest {
     @DisplayName("Should publish UPDATED event with previous data and changed fields")
     @SuppressWarnings("unchecked")
     void shouldPublishUpdatedEvent() {
-        RecordChangeEvent event = RecordChangeEvent.updated(
-                "tenant-1", "orders", "record-1",
-                Map.of("id", "record-1", "status", "APPROVED"),
-                Map.of("id", "record-1", "status", "NEW"),
-                java.util.List.of("status"), "user-1");
+        PlatformEvent<RecordChangedPayload> event = EventFactory.createRecordEvent(
+                "record.updated", "tenant-1", "user-1",
+                RecordChangedPayload.updated("orders", "record-1",
+                        Map.of("id", "record-1", "status", "APPROVED"),
+                        Map.of("id", "record-1", "status", "NEW"),
+                        List.of("status")));
 
         CompletableFuture<SendResult<String, String>> future = CompletableFuture.completedFuture(null);
         when(kafkaTemplate.send(anyString(), anyString(), anyString())).thenReturn(future);
@@ -88,9 +91,10 @@ class KafkaRecordEventPublisherTest {
     @DisplayName("Should publish DELETED event")
     @SuppressWarnings("unchecked")
     void shouldPublishDeletedEvent() {
-        RecordChangeEvent event = RecordChangeEvent.deleted(
-                "tenant-1", "orders", "record-1",
-                Map.of("id", "record-1", "status", "NEW"), "user-1");
+        PlatformEvent<RecordChangedPayload> event = EventFactory.createRecordEvent(
+                "record.deleted", "tenant-1", "user-1",
+                RecordChangedPayload.deleted("orders", "record-1",
+                        Map.of("id", "record-1", "status", "NEW")));
 
         CompletableFuture<SendResult<String, String>> future = CompletableFuture.completedFuture(null);
         when(kafkaTemplate.send(anyString(), anyString(), anyString())).thenReturn(future);
@@ -108,9 +112,10 @@ class KafkaRecordEventPublisherTest {
     @DisplayName("Should not throw when Kafka send fails")
     @SuppressWarnings("unchecked")
     void shouldNotThrowWhenKafkaSendFails() {
-        RecordChangeEvent event = RecordChangeEvent.created(
-                "tenant-1", "orders", "record-1",
-                Map.of("id", "record-1"), "user-1");
+        PlatformEvent<RecordChangedPayload> event = EventFactory.createRecordEvent(
+                "record.created", "tenant-1", "user-1",
+                RecordChangedPayload.created("orders", "record-1",
+                        Map.of("id", "record-1")));
 
         CompletableFuture<SendResult<String, String>> future = new CompletableFuture<>();
         future.completeExceptionally(new RuntimeException("Kafka is down"));
@@ -129,9 +134,10 @@ class KafkaRecordEventPublisherTest {
         KafkaRecordEventPublisher failingPublisher =
                 new KafkaRecordEventPublisher(kafkaTemplate, failingMapper);
 
-        RecordChangeEvent event = RecordChangeEvent.created(
-                "tenant-1", "orders", "record-1",
-                Map.of("id", "record-1"), "user-1");
+        PlatformEvent<RecordChangedPayload> event = EventFactory.createRecordEvent(
+                "record.created", "tenant-1", "user-1",
+                RecordChangedPayload.created("orders", "record-1",
+                        Map.of("id", "record-1")));
 
         assertDoesNotThrow(() -> failingPublisher.publish(event));
         verify(kafkaTemplate, never()).send(anyString(), anyString(), anyString());
@@ -141,9 +147,10 @@ class KafkaRecordEventPublisherTest {
     @DisplayName("Should use correct partition key format: tenantId:collectionName")
     @SuppressWarnings("unchecked")
     void shouldUseCorrectPartitionKey() {
-        RecordChangeEvent event = RecordChangeEvent.created(
-                "my-tenant", "customers", "cust-1",
-                Map.of("id", "cust-1"), "user-1");
+        PlatformEvent<RecordChangedPayload> event = EventFactory.createRecordEvent(
+                "record.created", "my-tenant", "user-1",
+                RecordChangedPayload.created("customers", "cust-1",
+                        Map.of("id", "cust-1")));
 
         CompletableFuture<SendResult<String, String>> future = CompletableFuture.completedFuture(null);
         when(kafkaTemplate.send(anyString(), anyString(), anyString())).thenReturn(future);

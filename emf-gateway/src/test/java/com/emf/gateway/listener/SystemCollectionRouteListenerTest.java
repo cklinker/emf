@@ -3,7 +3,9 @@ package com.emf.gateway.listener;
 import com.emf.gateway.authz.PermissionResolutionService;
 import com.emf.gateway.route.RouteRegistry;
 import com.emf.runtime.event.ChangeType;
-import com.emf.runtime.event.RecordChangeEvent;
+import com.emf.runtime.event.EventFactory;
+import com.emf.runtime.event.PlatformEvent;
+import com.emf.runtime.event.RecordChangedPayload;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,9 +56,11 @@ class SystemCollectionRouteListenerTest {
     }
 
     private String createEventMessage(String collectionName, String recordId, ChangeType changeType) throws Exception {
-        RecordChangeEvent event = RecordChangeEvent.created("tenant-1", collectionName, recordId,
-                Map.of("name", "test"), "user-1");
-        event.setChangeType(changeType);
+        RecordChangedPayload payload = new RecordChangedPayload(
+                collectionName, recordId, changeType,
+                Map.of("name", "test"), null, java.util.List.of());
+        PlatformEvent<RecordChangedPayload> event = EventFactory.createRecordEvent(
+                "record." + changeType.name().toLowerCase(), "tenant-1", "user-1", payload);
         return objectMapper.writeValueAsString(event);
     }
 
@@ -219,8 +223,10 @@ class SystemCollectionRouteListenerTest {
         @Test
         @DisplayName("Should handle null collection name gracefully")
         void shouldHandleNullCollectionNameGracefully() throws Exception {
-            RecordChangeEvent event = new RecordChangeEvent();
-            event.setCollectionName(null);
+            RecordChangedPayload payload = new RecordChangedPayload();
+            payload.setCollectionName(null);
+            PlatformEvent<RecordChangedPayload> event = EventFactory.createRecordEvent(
+                    "record.created", "tenant-1", "user-1", payload);
             String message = objectMapper.writeValueAsString(event);
 
             assertDoesNotThrow(() -> listener.onRecordChanged(message));

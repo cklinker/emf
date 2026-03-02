@@ -106,8 +106,8 @@ class CollectionSchemaListenerTest {
     class MessageParsing {
 
         @Test
-        @DisplayName("Should handle ConfigEvent wrapper format")
-        void shouldHandleConfigEventWrapper() throws Exception {
+        @DisplayName("Should handle PlatformEvent wrapper format")
+        void shouldHandlePlatformEventWrapper() throws Exception {
             when(lifecycleManager.getActiveCollections()).thenReturn(Set.of());
 
             String message = """

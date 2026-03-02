@@ -94,7 +94,6 @@ class PhysicalTableStorageAdapterTest {
             storageConfig,
             null,
             null,
-            null,
             1L,
             Instant.now(),
             Instant.now()
@@ -173,7 +172,7 @@ class PhysicalTableStorageAdapterTest {
                 "Collection with all field types",
                 fields,
                 StorageConfig.physicalTable("all_types"),
-                null, null, null,
+                null, null,
                 1L, Instant.now(), Instant.now()
             );
             

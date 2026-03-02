@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * Unit tests for {@link CollectionDefinition} record.
  * 
  * Validates: Requirements 1.1 - Collection definition with field definitions, validation rules,
- * storage mode configuration, API configuration, authorization configuration, and event configuration
+ * storage mode configuration, API configuration, and authorization configuration
  * Validates: Requirements 1.3 - Validation of required properties when created
  */
 @DisplayName("CollectionDefinition Record Tests")
@@ -31,7 +31,6 @@ class CollectionDefinitionTest {
             StorageConfig.physicalTable("tbl_products"),
             ApiConfig.allEnabled("/api/products"),
             AuthzConfig.disabled(),
-            EventsConfig.disabled(),
             1L,
             NOW,
             NOW
@@ -52,8 +51,6 @@ class CollectionDefinitionTest {
             StorageConfig storageConfig = StorageConfig.physicalTable("tbl_products");
             ApiConfig apiConfig = ApiConfig.allEnabled("/api/products");
             AuthzConfig authzConfig = AuthzConfig.withRoles(List.of("USER"), List.of("ADMIN"));
-            EventsConfig eventsConfig = EventsConfig.allEvents("emf.collections");
-            
             CollectionDefinition collection = new CollectionDefinition(
                 "products",
                 "Products",
@@ -62,7 +59,6 @@ class CollectionDefinitionTest {
                 storageConfig,
                 apiConfig,
                 authzConfig,
-                eventsConfig,
                 1L,
                 NOW,
                 NOW
@@ -75,7 +71,6 @@ class CollectionDefinitionTest {
             assertEquals(storageConfig, collection.storageConfig());
             assertEquals(apiConfig, collection.apiConfig());
             assertEquals(authzConfig, collection.authzConfig());
-            assertEquals(eventsConfig, collection.eventsConfig());
             assertEquals(1L, collection.version());
             assertEquals(NOW, collection.createdAt());
             assertEquals(NOW, collection.updatedAt());
@@ -93,7 +88,6 @@ class CollectionDefinitionTest {
                     StorageConfig.physicalTable("tbl"),
                     ApiConfig.allEnabled("/api"),
                     AuthzConfig.disabled(),
-                    EventsConfig.disabled(),
                     1L,
                     NOW,
                     NOW
@@ -114,7 +108,6 @@ class CollectionDefinitionTest {
                     StorageConfig.physicalTable("tbl"),
                     ApiConfig.allEnabled("/api"),
                     AuthzConfig.disabled(),
-                    EventsConfig.disabled(),
                     1L,
                     NOW,
                     NOW
@@ -135,7 +128,6 @@ class CollectionDefinitionTest {
                     StorageConfig.physicalTable("tbl"),
                     ApiConfig.allEnabled("/api"),
                     AuthzConfig.disabled(),
-                    EventsConfig.disabled(),
                     1L,
                     NOW,
                     NOW
@@ -156,7 +148,6 @@ class CollectionDefinitionTest {
                     StorageConfig.physicalTable("tbl"),
                     ApiConfig.allEnabled("/api"),
                     AuthzConfig.disabled(),
-                    EventsConfig.disabled(),
                     1L,
                     NOW,
                     NOW
@@ -184,7 +175,6 @@ class CollectionDefinitionTest {
                 StorageConfig.physicalTable("tbl"),
                 ApiConfig.allEnabled("/api"),
                 AuthzConfig.disabled(),
-                EventsConfig.disabled(),
                 1L,
                 NOW,
                 NOW
@@ -330,7 +320,6 @@ class CollectionDefinitionTest {
                 StorageConfig.physicalTable("tbl"),
                 ApiConfig.allEnabled("/api"),
                 AuthzConfig.disabled(),
-                EventsConfig.disabled(),
                 1L,
                 NOW,
                 NOW
@@ -343,7 +332,6 @@ class CollectionDefinitionTest {
                 StorageConfig.physicalTable("tbl"),
                 ApiConfig.allEnabled("/api"),
                 AuthzConfig.disabled(),
-                EventsConfig.disabled(),
                 1L,
                 NOW,
                 NOW
@@ -364,7 +352,6 @@ class CollectionDefinitionTest {
                 StorageConfig.physicalTable("tbl"),
                 ApiConfig.allEnabled("/api"),
                 AuthzConfig.disabled(),
-                EventsConfig.disabled(),
                 1L,
                 NOW,
                 NOW
@@ -377,7 +364,6 @@ class CollectionDefinitionTest {
                 StorageConfig.physicalTable("tbl"),
                 ApiConfig.allEnabled("/api"),
                 AuthzConfig.disabled(),
-                EventsConfig.disabled(),
                 1L,
                 NOW,
                 NOW

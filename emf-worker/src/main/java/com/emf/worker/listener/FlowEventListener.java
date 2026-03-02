@@ -1,9 +1,11 @@
 package com.emf.worker.listener;
 
-import com.emf.runtime.event.RecordChangeEvent;
+import com.emf.runtime.event.PlatformEvent;
+import com.emf.runtime.event.RecordChangedPayload;
 import com.emf.runtime.flow.FlowEngine;
 import com.emf.runtime.flow.FlowTriggerEvaluator;
 import com.emf.runtime.flow.InitialStateBuilder;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,6 +14,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -79,12 +82,29 @@ public class FlowEventListener {
     )
     public void handleRecordChanged(String message) {
         try {
-            RecordChangeEvent event = objectMapper.readValue(message, RecordChangeEvent.class);
+            var tree = objectMapper.readTree(message);
+            String tenantId = tree.path("tenantId").asText(null);
+            String userId = tree.path("userId").asText(null);
+            Instant timestamp = parseTimestamp(tree.path("timestamp"));
+
+            var payloadNode = tree.has("payload") ? tree.get("payload") : tree;
+            RecordChangedPayload payload = objectMapper.treeToValue(payloadNode, RecordChangedPayload.class);
+
+            // Reconstruct PlatformEvent envelope for downstream consumers
+            PlatformEvent<RecordChangedPayload> event = new PlatformEvent<>(
+                    tree.path("eventId").asText(null),
+                    tree.path("eventType").asText(null),
+                    tenantId,
+                    tree.path("correlationId").asText(null),
+                    userId,
+                    timestamp,
+                    payload
+            );
 
             log.debug("Flow listener received record change: collection={}, recordId={}, changeType={}",
-                    event.getCollectionName(), event.getRecordId(), event.getChangeType());
+                    payload.getCollectionName(), payload.getRecordId(), payload.getChangeType());
 
-            List<FlowTriggerConfig> configs = getActiveFlowConfigs(event.getTenantId());
+            List<FlowTriggerConfig> configs = getActiveFlowConfigs(tenantId);
             if (configs.isEmpty()) {
                 return;
             }
@@ -100,11 +120,11 @@ public class FlowEventListener {
                                 config.flowId(), executionId);
 
                         flowEngine.startExecution(
-                                event.getTenantId(),
+                                tenantId,
                                 config.flowId(),
                                 config.definitionJson(),
                                 initialState,
-                                event.getUserId(),
+                                userId,
                                 false);
                     }
                 } catch (Exception e) {
@@ -174,6 +194,35 @@ public class FlowEventListener {
                 return List.of();
             }
         });
+    }
+
+    /**
+     * Parses a timestamp from a JSON node, handling both ISO-8601 strings
+     * and numeric epoch-seconds values (as produced by Jackson's default
+     * Instant serialization).
+     */
+    private static Instant parseTimestamp(JsonNode node) {
+        if (node == null || node.isMissingNode() || node.isNull()) {
+            return null;
+        }
+        if (node.isNumber()) {
+            return Instant.ofEpochSecond(node.longValue());
+        }
+        String text = node.asText(null);
+        if (text == null || text.isBlank()) {
+            return null;
+        }
+        try {
+            return Instant.parse(text);
+        } catch (Exception e) {
+            // Try parsing as a numeric string (e.g., "1.772421171E9")
+            try {
+                double epochSeconds = Double.parseDouble(text);
+                return Instant.ofEpochSecond((long) epochSeconds);
+            } catch (NumberFormatException nfe) {
+                return null;
+            }
+        }
     }
 
     /**

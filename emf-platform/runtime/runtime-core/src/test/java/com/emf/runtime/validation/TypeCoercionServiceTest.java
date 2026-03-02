@@ -29,7 +29,6 @@ class TypeCoercionServiceTest {
             new StorageConfig("tbl_test", Map.of()),
             new ApiConfig(true, true, true, true, true, "/api/test"),
             new AuthzConfig(false, List.of(), List.of()),
-            new EventsConfig(false, "emf", List.of()),
             1L,
             Instant.now(),
             Instant.now()

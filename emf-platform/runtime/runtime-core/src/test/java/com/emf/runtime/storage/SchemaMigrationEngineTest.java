@@ -70,7 +70,6 @@ class SchemaMigrationEngineTest {
             storageConfig,
             null,
             null,
-            null,
             1L,
             Instant.now(),
             Instant.now()

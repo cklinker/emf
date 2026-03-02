@@ -10,8 +10,7 @@ import java.util.Set;
  * In-memory representation of a collection definition.
  *
  * <p>Contains all configuration for a runtime-defined resource type including fields,
- * validation rules, storage configuration, API configuration, authorization configuration,
- * and event configuration.
+ * validation rules, storage configuration, API configuration, and authorization configuration.
  *
  * <p>This record is immutable and uses defensive copying for collection fields.
  *
@@ -22,7 +21,6 @@ import java.util.Set;
  * @param storageConfig Storage configuration
  * @param apiConfig API configuration (enabled operations, base path)
  * @param authzConfig Authorization configuration (roles)
- * @param eventsConfig Event publishing configuration (Kafka)
  * @param version Version number for optimistic locking
  * @param createdAt Timestamp when the collection was created
  * @param updatedAt Timestamp when the collection was last updated
@@ -45,7 +43,6 @@ public record CollectionDefinition(
     StorageConfig storageConfig,
     ApiConfig apiConfig,
     AuthzConfig authzConfig,
-    EventsConfig eventsConfig,
     long version,
     Instant createdAt,
     Instant updatedAt,
@@ -84,10 +81,10 @@ public record CollectionDefinition(
     public CollectionDefinition(
             String name, String displayName, String description,
             List<FieldDefinition> fields, StorageConfig storageConfig,
-            ApiConfig apiConfig, AuthzConfig authzConfig, EventsConfig eventsConfig,
+            ApiConfig apiConfig, AuthzConfig authzConfig,
             long version, Instant createdAt, Instant updatedAt) {
         this(name, displayName, description, fields, storageConfig, apiConfig,
-             authzConfig, eventsConfig, version, createdAt, updatedAt,
+             authzConfig, version, createdAt, updatedAt,
              false, true, false, Set.of(), Map.of(), null);
     }
 
@@ -97,12 +94,12 @@ public record CollectionDefinition(
     public CollectionDefinition(
             String name, String displayName, String description,
             List<FieldDefinition> fields, StorageConfig storageConfig,
-            ApiConfig apiConfig, AuthzConfig authzConfig, EventsConfig eventsConfig,
+            ApiConfig apiConfig, AuthzConfig authzConfig,
             long version, Instant createdAt, Instant updatedAt,
             boolean systemCollection, boolean tenantScoped, boolean readOnly,
             Set<String> immutableFields, Map<String, String> columnMapping) {
         this(name, displayName, description, fields, storageConfig, apiConfig,
-             authzConfig, eventsConfig, version, createdAt, updatedAt,
+             authzConfig, version, createdAt, updatedAt,
              systemCollection, tenantScoped, readOnly, immutableFields, columnMapping, null);
     }
     
@@ -158,7 +155,7 @@ public record CollectionDefinition(
     public CollectionDefinition withIncrementedVersion() {
         return new CollectionDefinition(
             name, displayName, description, fields,
-            storageConfig, apiConfig, authzConfig, eventsConfig,
+            storageConfig, apiConfig, authzConfig,
             version + 1, createdAt, Instant.now(),
             systemCollection, tenantScoped, readOnly,
             immutableFields, columnMapping, displayFieldName
@@ -174,7 +171,7 @@ public record CollectionDefinition(
     public CollectionDefinition withFields(List<FieldDefinition> newFields) {
         return new CollectionDefinition(
             name, displayName, description, newFields,
-            storageConfig, apiConfig, authzConfig, eventsConfig,
+            storageConfig, apiConfig, authzConfig,
             version + 1, createdAt, Instant.now(),
             systemCollection, tenantScoped, readOnly,
             immutableFields, columnMapping, displayFieldName

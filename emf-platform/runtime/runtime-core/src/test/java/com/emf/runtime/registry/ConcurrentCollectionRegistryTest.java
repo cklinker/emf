@@ -47,7 +47,6 @@ class ConcurrentCollectionRegistryTest {
             StorageConfig.physicalTable("tbl_" + name),
             ApiConfig.allEnabled("/api/" + name),
             AuthzConfig.disabled(),
-            EventsConfig.disabled(),
             1L,
             NOW,
             NOW
@@ -63,7 +62,6 @@ class ConcurrentCollectionRegistryTest {
             StorageConfig.physicalTable("tbl_" + name),
             ApiConfig.allEnabled("/api/" + name),
             AuthzConfig.disabled(),
-            EventsConfig.disabled(),
             version,
             NOW,
             NOW
@@ -106,7 +104,6 @@ class ConcurrentCollectionRegistryTest {
                 StorageConfig.physicalTable("tbl_products"),
                 ApiConfig.allEnabled("/api/products"),
                 AuthzConfig.disabled(),
-                EventsConfig.disabled(),
                 1L,
                 NOW,
                 NOW

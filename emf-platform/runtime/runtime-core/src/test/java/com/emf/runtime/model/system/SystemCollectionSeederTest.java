@@ -227,10 +227,10 @@ class SystemCollectionSeederTest {
             assertThat(args[2]).isEqualTo("tenants");
             // args[3] = display_name
             assertThat(args[3]).isEqualTo("Tenants");
-            // args[8] = current_version = 1
-            assertThat(args[8]).isEqualTo(1);
-            // args[9] = system_collection = true
-            assertThat(args[9]).isEqualTo(true);
+            // args[7] = current_version = 1
+            assertThat(args[7]).isEqualTo(1);
+            // args[8] = system_collection = true
+            assertThat(args[8]).isEqualTo(true);
         }
 
         @Test
@@ -382,7 +382,7 @@ class SystemCollectionSeederTest {
             verify(jdbcTemplate, times(expectedCollections)).update(
                     contains("INSERT INTO collection"),
                     any(), any(), any(), any(), any(), any(), any(), any(),
-                    any(), any(), any(), any());
+                    any(), any(), any());
         }
 
         @Test

@@ -1,7 +1,8 @@
 package com.emf.runtime.query;
 
 import com.emf.runtime.event.ChangeType;
-import com.emf.runtime.event.RecordChangeEvent;
+import com.emf.runtime.event.PlatformEvent;
+import com.emf.runtime.event.RecordChangedPayload;
 import com.emf.runtime.events.RecordEventPublisher;
 import com.emf.runtime.model.*;
 import com.emf.runtime.storage.StorageAdapter;
@@ -631,18 +632,21 @@ class DefaultQueryEngineTest {
 
             engineWithPublisher.create(testCollection, inputData);
 
-            ArgumentCaptor<RecordChangeEvent> eventCaptor = ArgumentCaptor.forClass(RecordChangeEvent.class);
+            @SuppressWarnings("unchecked")
+            ArgumentCaptor<PlatformEvent<RecordChangedPayload>> eventCaptor =
+                    ArgumentCaptor.forClass(PlatformEvent.class);
             verify(recordEventPublisher).publish(eventCaptor.capture());
 
-            RecordChangeEvent event = eventCaptor.getValue();
+            PlatformEvent<RecordChangedPayload> event = eventCaptor.getValue();
             assertNotNull(event.getEventId());
-            assertEquals(ChangeType.CREATED, event.getChangeType());
-            assertEquals("products", event.getCollectionName());
-            assertNotNull(event.getRecordId());
-            assertNotNull(event.getData());
-            assertEquals("Test Product", event.getData().get("name"));
-            assertNull(event.getPreviousData());
-            assertTrue(event.getChangedFields().isEmpty());
+            RecordChangedPayload payload = event.getPayload();
+            assertEquals(ChangeType.CREATED, payload.getChangeType());
+            assertEquals("products", payload.getCollectionName());
+            assertNotNull(payload.getRecordId());
+            assertNotNull(payload.getData());
+            assertEquals("Test Product", payload.getData().get("name"));
+            assertNull(payload.getPreviousData());
+            assertTrue(payload.getChangedFields().isEmpty());
         }
 
         @Test
@@ -689,17 +693,20 @@ class DefaultQueryEngineTest {
 
             engineWithPublisher.update(testCollection, id, updateData);
 
-            ArgumentCaptor<RecordChangeEvent> eventCaptor = ArgumentCaptor.forClass(RecordChangeEvent.class);
+            @SuppressWarnings("unchecked")
+            ArgumentCaptor<PlatformEvent<RecordChangedPayload>> eventCaptor =
+                    ArgumentCaptor.forClass(PlatformEvent.class);
             verify(recordEventPublisher).publish(eventCaptor.capture());
 
-            RecordChangeEvent event = eventCaptor.getValue();
-            assertEquals(ChangeType.UPDATED, event.getChangeType());
-            assertEquals("products", event.getCollectionName());
-            assertEquals(id, event.getRecordId());
-            assertNotNull(event.getData());
-            assertNotNull(event.getPreviousData());
-            assertEquals("Old Name", event.getPreviousData().get("name"));
-            assertTrue(event.getChangedFields().contains("name"));
+            PlatformEvent<RecordChangedPayload> event = eventCaptor.getValue();
+            RecordChangedPayload payload = event.getPayload();
+            assertEquals(ChangeType.UPDATED, payload.getChangeType());
+            assertEquals("products", payload.getCollectionName());
+            assertEquals(id, payload.getRecordId());
+            assertNotNull(payload.getData());
+            assertNotNull(payload.getPreviousData());
+            assertEquals("Old Name", payload.getPreviousData().get("name"));
+            assertTrue(payload.getChangedFields().contains("name"));
         }
 
         @Test
@@ -731,16 +738,19 @@ class DefaultQueryEngineTest {
 
             assertTrue(result);
 
-            ArgumentCaptor<RecordChangeEvent> eventCaptor = ArgumentCaptor.forClass(RecordChangeEvent.class);
+            @SuppressWarnings("unchecked")
+            ArgumentCaptor<PlatformEvent<RecordChangedPayload>> eventCaptor =
+                    ArgumentCaptor.forClass(PlatformEvent.class);
             verify(recordEventPublisher).publish(eventCaptor.capture());
 
-            RecordChangeEvent event = eventCaptor.getValue();
-            assertEquals(ChangeType.DELETED, event.getChangeType());
-            assertEquals("products", event.getCollectionName());
-            assertEquals(id, event.getRecordId());
-            assertNotNull(event.getData());
-            assertEquals("Test Product", event.getData().get("name"));
-            assertNull(event.getPreviousData());
+            PlatformEvent<RecordChangedPayload> event = eventCaptor.getValue();
+            RecordChangedPayload payload = event.getPayload();
+            assertEquals(ChangeType.DELETED, payload.getChangeType());
+            assertEquals("products", payload.getCollectionName());
+            assertEquals(id, payload.getRecordId());
+            assertNotNull(payload.getData());
+            assertEquals("Test Product", payload.getData().get("name"));
+            assertNull(payload.getPreviousData());
         }
 
         @Test
@@ -806,7 +816,9 @@ class DefaultQueryEngineTest {
 
             engineWithPublisher.create(testCollection, inputData);
 
-            ArgumentCaptor<RecordChangeEvent> eventCaptor = ArgumentCaptor.forClass(RecordChangeEvent.class);
+            @SuppressWarnings("unchecked")
+            ArgumentCaptor<PlatformEvent<RecordChangedPayload>> eventCaptor =
+                    ArgumentCaptor.forClass(PlatformEvent.class);
             verify(recordEventPublisher).publish(eventCaptor.capture());
 
             assertEquals("tenant-123", eventCaptor.getValue().getTenantId());
@@ -836,11 +848,13 @@ class DefaultQueryEngineTest {
 
             engineWithPublisher.update(testCollection, id, updateData);
 
-            ArgumentCaptor<RecordChangeEvent> eventCaptor = ArgumentCaptor.forClass(RecordChangeEvent.class);
+            @SuppressWarnings("unchecked")
+            ArgumentCaptor<PlatformEvent<RecordChangedPayload>> eventCaptor =
+                    ArgumentCaptor.forClass(PlatformEvent.class);
             verify(recordEventPublisher).publish(eventCaptor.capture());
 
-            RecordChangeEvent event = eventCaptor.getValue();
-            List<String> changedFields = event.getChangedFields();
+            RecordChangedPayload eventPayload = eventCaptor.getValue().getPayload();
+            List<String> changedFields = eventPayload.getChangedFields();
             assertTrue(changedFields.contains("price"), "price should be in changedFields");
             assertTrue(changedFields.contains("category"), "category should be in changedFields");
             assertFalse(changedFields.contains("name"), "name should NOT be in changedFields (unchanged)");

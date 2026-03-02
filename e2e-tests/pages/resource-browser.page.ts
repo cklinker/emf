@@ -1,5 +1,5 @@
-import type { Page, Locator } from '@playwright/test';
-import { BasePage } from './base.page';
+import type { Page, Locator } from "@playwright/test";
+import { BasePage } from "./base.page";
 
 export class ResourceBrowserPage extends BasePage {
   readonly resourceBrowserPage: Locator;
@@ -11,16 +11,16 @@ export class ResourceBrowserPage extends BasePage {
 
   constructor(page: Page, tenantSlug?: string) {
     super(page, tenantSlug);
-    this.resourceBrowserPage = this.testId('resource-browser-page');
-    this.collectionSearchInput = this.testId('collection-search');
-    this.clearSearchButton = this.testId('clear-search');
-    this.collectionsGrid = this.testId('collections-grid');
-    this.emptyState = this.testId('empty-state');
-    this.resultsCountLabel = this.testId('results-count');
+    this.resourceBrowserPage = this.testId("resource-browser-page");
+    this.collectionSearchInput = this.testId("collection-search");
+    this.clearSearchButton = this.testId("clear-search");
+    this.collectionsGrid = this.testId("collections-grid");
+    this.emptyState = this.testId("empty-state");
+    this.resultsCountLabel = this.testId("results-count");
   }
 
   async goto(): Promise<void> {
-    await this.page.goto(this.tenantUrl('/resources'));
+    await this.page.goto(this.tenantUrl("/resources"));
     await this.waitForLoadingComplete();
   }
 

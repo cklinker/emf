@@ -1,5 +1,5 @@
-import type { Page, Locator } from '@playwright/test';
-import { BasePage } from './base.page';
+import type { Page, Locator } from "@playwright/test";
+import { BasePage } from "./base.page";
 
 export class UsersListPage extends BasePage {
   readonly container: Locator;
@@ -10,17 +10,15 @@ export class UsersListPage extends BasePage {
 
   constructor(page: Page, tenantSlug?: string) {
     super(page, tenantSlug);
-    this.container = this.testId('users-page');
-    this.createButton = this.container
-      .locator('header')
-      .getByRole('button');
-    this.userTable = this.container.locator('table');
+    this.container = this.testId("users-page");
+    this.createButton = this.container.locator("header").getByRole("button");
+    this.userTable = this.container.locator("table");
     this.searchInput = this.container.locator('input[type="text"]');
-    this.statusFilter = this.container.locator('select');
+    this.statusFilter = this.container.locator("select");
   }
 
   async goto(): Promise<void> {
-    await this.page.goto(this.tenantUrl('/users'));
+    await this.page.goto(this.tenantUrl("/users"));
     await this.waitForPageLoad();
   }
 
@@ -33,13 +31,13 @@ export class UsersListPage extends BasePage {
   }
 
   async getRowCount(): Promise<number> {
-    const rows = this.userTable.locator('tbody tr');
+    const rows = this.userTable.locator("tbody tr");
     return rows.count();
   }
 
   async clickRow(index: number): Promise<void> {
-    const row = this.userTable.locator('tbody tr').nth(index);
-    await row.locator('button').first().click();
+    const row = this.userTable.locator("tbody tr").nth(index);
+    await row.locator("button").first().click();
   }
 
   async filterByStatus(status: string): Promise<void> {

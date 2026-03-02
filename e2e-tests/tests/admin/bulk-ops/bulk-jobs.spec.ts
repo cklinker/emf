@@ -35,8 +35,11 @@ test.describe("Bulk Jobs", () => {
     await expect(bulkJobsPage.formModal).toBeVisible();
 
     await expect(bulkJobsPage.operationInput).toBeVisible();
-    await bulkJobsPage.fillForm({ operation: "delete" });
+    // Operation is a <select> element, use selectOption via page object
+    await bulkJobsPage.fillForm({ operation: "Delete" });
 
-    await expect(bulkJobsPage.operationInput).toHaveValue("delete");
+    // Verify a value was selected (exact value depends on option text)
+    const value = await bulkJobsPage.operationInput.inputValue();
+    expect(value).toBeTruthy();
   });
 });

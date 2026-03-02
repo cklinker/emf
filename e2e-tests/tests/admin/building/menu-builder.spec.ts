@@ -1,27 +1,27 @@
 import { test, expect } from "../../../fixtures";
-import { MenuBuilderPage } from "../../../pages/menu-builder.page";
 
 test.describe("Menu Builder", () => {
-  let menuBuilderPage: MenuBuilderPage;
-
   test.beforeEach(async ({ page }) => {
-    menuBuilderPage = new MenuBuilderPage(page);
-    await menuBuilderPage.goto();
+    await page.goto("/default/setup/menus");
+    await page.waitForLoadState("networkidle");
   });
 
-  test("displays menu builder page", async () => {
-    await expect(menuBuilderPage.menuBuilderPage).toBeVisible();
+  test("displays menu builder page", async ({ page }) => {
+    const heading = page.getByRole("heading", { name: /menu/i });
+    await expect(heading).toBeVisible();
   });
 
   test("shows menu list or empty state", async ({ page }) => {
-    const listOrEmpty = menuBuilderPage.menuList.or(
-      page.getByTestId("empty-state"),
-    );
-    await expect(listOrEmpty).toBeVisible();
+    const grid = page.locator("table, [role='grid']");
+    const emptyState = page.getByText(/no.*menu|no.*data/i);
+    const gridOrEmpty = grid.or(emptyState);
+    await expect(gridOrEmpty).toBeVisible();
   });
 
-  test("has add menu item button", async ({ page }) => {
-    await page.waitForLoadState("networkidle");
-    await expect(menuBuilderPage.addItemButton).toBeVisible();
+  test("has create menu button", async ({ page }) => {
+    const createButton = page.getByRole("button", {
+      name: /create menu/i,
+    });
+    await expect(createButton).toBeVisible();
   });
 });

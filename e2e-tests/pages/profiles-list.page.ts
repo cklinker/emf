@@ -1,5 +1,5 @@
-import type { Page, Locator } from '@playwright/test';
-import { BasePage } from './base.page';
+import type { Page, Locator } from "@playwright/test";
+import { BasePage } from "./base.page";
 
 export class ProfilesListPage extends BasePage {
   readonly container: Locator;
@@ -15,20 +15,20 @@ export class ProfilesListPage extends BasePage {
 
   constructor(page: Page, tenantSlug?: string) {
     super(page, tenantSlug);
-    this.container = this.testId('profiles-page');
-    this.createButton = this.testId('new-profile-button');
-    this.profileTable = this.testId('profiles-table');
-    this.emptyState = this.testId('empty-state');
-    this.formModal = this.testId('profile-form-modal');
-    this.formNameInput = this.testId('profile-name-input');
-    this.formDescriptionInput = this.testId('profile-description-input');
-    this.formSubmitButton = this.testId('profile-form-submit');
-    this.formCancelButton = this.testId('profile-form-cancel');
-    this.formCloseButton = this.testId('profile-form-close');
+    this.container = this.testId("profiles-page");
+    this.createButton = this.testId("new-profile-button");
+    this.profileTable = this.testId("profiles-table");
+    this.emptyState = this.testId("empty-state");
+    this.formModal = this.testId("profile-form-modal");
+    this.formNameInput = this.testId("profile-name-input");
+    this.formDescriptionInput = this.testId("profile-description-input");
+    this.formSubmitButton = this.testId("profile-form-submit");
+    this.formCancelButton = this.testId("profile-form-cancel");
+    this.formCloseButton = this.testId("profile-form-close");
   }
 
   async goto(): Promise<void> {
-    await this.page.goto(this.tenantUrl('/profiles'));
+    await this.page.goto(this.tenantUrl("/profiles"));
     await this.waitForPageLoad();
   }
 
@@ -36,10 +36,7 @@ export class ProfilesListPage extends BasePage {
     await this.createButton.click();
   }
 
-  async fillForm(data: {
-    name: string;
-    description?: string;
-  }): Promise<void> {
+  async fillForm(data: { name: string; description?: string }): Promise<void> {
     await this.formNameInput.fill(data.name);
     if (data.description) {
       await this.formDescriptionInput.fill(data.description);

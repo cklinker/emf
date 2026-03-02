@@ -1,5 +1,5 @@
-import type { Page, Locator } from '@playwright/test';
-import { BasePage } from './base.page';
+import type { Page, Locator } from "@playwright/test";
+import { BasePage } from "./base.page";
 
 export class PluginsPage extends BasePage {
   readonly pluginsPage: Locator;
@@ -9,14 +9,14 @@ export class PluginsPage extends BasePage {
 
   constructor(page: Page, tenantSlug?: string) {
     super(page, tenantSlug);
-    this.pluginsPage = this.testId('plugins-page');
-    this.pluginsCount = this.testId('plugins-count');
-    this.detailsPanel = this.testId('plugin-details-panel');
-    this.emptyState = this.testId('empty-state');
+    this.pluginsPage = this.testId("plugins-page");
+    this.pluginsCount = this.testId("plugins-count");
+    this.detailsPanel = this.testId("plugin-details-panel");
+    this.emptyState = this.testId("empty-state");
   }
 
   async goto(): Promise<void> {
-    await this.page.goto(this.tenantUrl('/plugins'));
+    await this.page.goto(this.tenantUrl("/plugins"));
     await this.waitForLoadingComplete();
   }
 
@@ -33,8 +33,6 @@ export class PluginsPage extends BasePage {
   }
 
   async closeDetails(): Promise<void> {
-    await this.detailsPanel
-      .getByRole('button', { name: /close/i })
-      .click();
+    await this.detailsPanel.getByRole("button", { name: /close/i }).click();
   }
 }

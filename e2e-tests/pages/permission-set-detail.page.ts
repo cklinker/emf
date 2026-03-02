@@ -1,5 +1,5 @@
-import type { Page, Locator } from '@playwright/test';
-import { BasePage } from './base.page';
+import type { Page, Locator } from "@playwright/test";
+import { BasePage } from "./base.page";
 
 export class PermissionSetDetailPage extends BasePage {
   readonly detailPage: Locator;
@@ -11,12 +11,12 @@ export class PermissionSetDetailPage extends BasePage {
 
   constructor(page: Page, tenantSlug?: string) {
     super(page, tenantSlug);
-    this.detailPage = this.testId('permission-set-detail-page');
-    this.editButton = this.testId('edit-permissions-button');
-    this.saveButton = this.testId('save-permissions-button');
-    this.deleteButton = this.testId('delete-button');
-    this.systemPermissions = this.testId('system-permissions-section');
-    this.objectPermissions = this.testId('object-permissions-section');
+    this.detailPage = this.testId("permission-set-detail-page");
+    this.editButton = this.testId("edit-permissions-button");
+    this.saveButton = this.testId("save-permissions-button");
+    this.deleteButton = this.testId("delete-button");
+    this.systemPermissions = this.testId("system-permissions-section");
+    this.objectPermissions = this.testId("object-permissions-section");
   }
 
   async goto(id: string): Promise<void> {

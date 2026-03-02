@@ -1,10 +1,10 @@
-import type { Page, Locator } from '@playwright/test';
+import type { Page, Locator } from "@playwright/test";
 
 export abstract class BasePage {
   constructor(
     protected readonly page: Page,
     protected readonly tenantSlug: string = process.env.E2E_TENANT_SLUG ||
-      'default',
+      "default",
   ) {}
 
   abstract goto(...args: unknown[]): Promise<void>;
@@ -18,7 +18,7 @@ export abstract class BasePage {
   }
 
   async waitForPageLoad(): Promise<void> {
-    await this.page.waitForLoadState('networkidle');
+    await this.page.waitForLoadState("networkidle");
   }
 
   async waitForLoadingComplete(): Promise<void> {
@@ -26,12 +26,12 @@ export abstract class BasePage {
       '[data-testid*="loading"], [aria-busy="true"]',
     );
     if (await spinner.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await spinner.waitFor({ state: 'hidden', timeout: 30_000 });
+      await spinner.waitFor({ state: "hidden", timeout: 30_000 });
     }
   }
 
   async getToastMessage(): Promise<string | null> {
-    const toast = this.page.locator('[data-sonner-toast]').first();
+    const toast = this.page.locator("[data-sonner-toast]").first();
     if (await toast.isVisible({ timeout: 5000 }).catch(() => false)) {
       return toast.textContent();
     }
@@ -40,22 +40,24 @@ export abstract class BasePage {
 
   async clickBreadcrumb(text: string): Promise<void> {
     await this.page
-      .getByRole('navigation', { name: /breadcrumb/i })
-      .getByRole('link', { name: text })
+      .getByRole("navigation", { name: /breadcrumb/i })
+      .getByRole("link", { name: text })
       .click();
   }
 
   get header(): Locator {
-    return this.page.locator('header').first();
+    return this.page.locator("header").first();
   }
 
-  async confirmDialog(buttonText: RegExp | string = /delete|confirm|yes/i): Promise<void> {
-    const dialog = this.page.getByRole('dialog');
-    await dialog.getByRole('button', { name: buttonText }).click();
+  async confirmDialog(
+    buttonText: RegExp | string = /delete|confirm|yes/i,
+  ): Promise<void> {
+    const dialog = this.page.getByRole("dialog");
+    await dialog.getByRole("button", { name: buttonText }).click();
   }
 
   async cancelDialog(): Promise<void> {
-    const dialog = this.page.getByRole('dialog');
-    await dialog.getByRole('button', { name: /cancel|no/i }).click();
+    const dialog = this.page.getByRole("dialog");
+    await dialog.getByRole("button", { name: /cancel|no/i }).click();
   }
 }

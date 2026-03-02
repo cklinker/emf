@@ -1,5 +1,5 @@
-import type { Page, Locator } from '@playwright/test';
-import { BasePage } from './base.page';
+import type { Page, Locator } from "@playwright/test";
+import { BasePage } from "./base.page";
 
 export class TenantsPage extends BasePage {
   readonly tenantsPage: Locator;
@@ -15,20 +15,20 @@ export class TenantsPage extends BasePage {
 
   constructor(page: Page, tenantSlug?: string) {
     super(page, tenantSlug);
-    this.tenantsPage = this.testId('tenants-page');
-    this.createButton = this.testId('create-tenant-button');
-    this.table = this.testId('tenants-table');
-    this.formOverlay = this.testId('tenant-form-overlay');
-    this.formModal = this.testId('tenant-form-modal');
-    this.slugInput = this.testId('tenant-slug-input');
-    this.nameInput = this.testId('tenant-name-input');
-    this.editionSelect = this.testId('tenant-edition-select');
-    this.submitButton = this.testId('tenant-form-submit');
-    this.cancelButton = this.testId('tenant-form-cancel');
+    this.tenantsPage = this.testId("tenants-page");
+    this.createButton = this.testId("create-tenant-button");
+    this.table = this.testId("tenants-table");
+    this.formOverlay = this.testId("tenant-form-overlay");
+    this.formModal = this.testId("tenant-form-modal");
+    this.slugInput = this.testId("tenant-slug-input");
+    this.nameInput = this.testId("tenant-name-input");
+    this.editionSelect = this.testId("tenant-edition-select");
+    this.submitButton = this.testId("tenant-form-submit");
+    this.cancelButton = this.testId("tenant-form-cancel");
   }
 
   async goto(): Promise<void> {
-    await this.page.goto(this.tenantUrl('/tenants'));
+    await this.page.goto(this.tenantUrl("/tenants"));
     await this.waitForLoadingComplete();
   }
 
@@ -45,7 +45,7 @@ export class TenantsPage extends BasePage {
     if (data.name) await this.nameInput.fill(data.name);
     if (data.edition) {
       await this.editionSelect.click();
-      await this.page.getByRole('option', { name: data.edition }).click();
+      await this.page.getByRole("option", { name: data.edition }).click();
     }
   }
 
@@ -59,13 +59,13 @@ export class TenantsPage extends BasePage {
 
   async clickEdit(index: number): Promise<void> {
     await this.testId(`tenant-row-${index}`)
-      .getByRole('button', { name: /edit/i })
+      .getByRole("button", { name: /edit/i })
       .click();
   }
 
   async clickSuspend(index: number): Promise<void> {
     await this.testId(`tenant-row-${index}`)
-      .getByRole('button', { name: /suspend/i })
+      .getByRole("button", { name: /suspend/i })
       .click();
   }
 }

@@ -1,5 +1,5 @@
-import type { Page, Locator } from '@playwright/test';
-import { BasePage } from './base.page';
+import type { Page, Locator } from "@playwright/test";
+import { BasePage } from "./base.page";
 
 export class PageBuilderPage extends BasePage {
   readonly pageBuilderPage: Locator;
@@ -11,16 +11,16 @@ export class PageBuilderPage extends BasePage {
 
   constructor(page: Page, tenantSlug?: string) {
     super(page, tenantSlug);
-    this.pageBuilderPage = this.testId('page-builder-page');
-    this.table = this.testId('page-builder-table');
-    this.createButton = this.testId('page-builder-create-button');
-    this.editorCanvas = this.testId('page-builder-editor-canvas');
-    this.componentPalette = this.testId('page-builder-component-palette');
-    this.propertyPanel = this.testId('page-builder-property-panel');
+    this.pageBuilderPage = this.testId("page-builder-page");
+    this.table = this.testId("page-builder-table");
+    this.createButton = this.testId("page-builder-create-button");
+    this.editorCanvas = this.testId("page-builder-editor-canvas");
+    this.componentPalette = this.testId("page-builder-component-palette");
+    this.propertyPanel = this.testId("page-builder-property-panel");
   }
 
   async goto(): Promise<void> {
-    await this.page.goto(this.tenantUrl('/pages'));
+    await this.page.goto(this.tenantUrl("/pages"));
     await this.waitForLoadingComplete();
   }
 
@@ -36,7 +36,7 @@ export class PageBuilderPage extends BasePage {
     await this.table
       .locator('tbody tr, [role="row"]')
       .nth(index)
-      .getByRole('button', { name: /edit/i })
+      .getByRole("button", { name: /edit/i })
       .click();
   }
 
@@ -44,7 +44,7 @@ export class PageBuilderPage extends BasePage {
     await this.table
       .locator('tbody tr, [role="row"]')
       .nth(index)
-      .getByRole('button', { name: /delete/i })
+      .getByRole("button", { name: /delete/i })
       .click();
   }
 }

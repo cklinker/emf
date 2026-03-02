@@ -1,5 +1,5 @@
-import type { Page, Locator } from '@playwright/test';
-import { BasePage } from './base.page';
+import type { Page, Locator } from "@playwright/test";
+import { BasePage } from "./base.page";
 
 export class PicklistsPage extends BasePage {
   readonly createButton: Locator;
@@ -14,19 +14,19 @@ export class PicklistsPage extends BasePage {
 
   constructor(page: Page, tenantSlug?: string) {
     super(page, tenantSlug);
-    this.createButton = this.testId('add-picklist-button');
-    this.table = this.testId('picklists-table');
-    this.formModal = this.testId('picklist-form-modal');
-    this.nameInput = this.testId('picklist-name-input');
-    this.descriptionInput = this.testId('picklist-description-input');
-    this.sortedCheckbox = this.testId('picklist-sorted-input');
-    this.restrictedCheckbox = this.testId('picklist-restricted-input');
-    this.submitButton = this.testId('picklist-form-submit');
-    this.cancelButton = this.testId('picklist-form-cancel');
+    this.createButton = this.testId("add-picklist-button");
+    this.table = this.testId("picklists-table");
+    this.formModal = this.testId("picklist-form-modal");
+    this.nameInput = this.testId("picklist-name-input");
+    this.descriptionInput = this.testId("picklist-description-input");
+    this.sortedCheckbox = this.testId("picklist-sorted-input");
+    this.restrictedCheckbox = this.testId("picklist-restricted-input");
+    this.submitButton = this.testId("picklist-form-submit");
+    this.cancelButton = this.testId("picklist-form-cancel");
   }
 
   async goto(): Promise<void> {
-    await this.page.goto(this.tenantUrl('/picklists'));
+    await this.page.goto(this.tenantUrl("/picklists"));
     await this.waitForLoadingComplete();
   }
 
@@ -80,6 +80,6 @@ export class PicklistsPage extends BasePage {
   }
 
   async closeForm(): Promise<void> {
-    await this.testId('picklist-form-close').click();
+    await this.testId("picklist-form-close").click();
   }
 }

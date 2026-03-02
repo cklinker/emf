@@ -1,5 +1,5 @@
-import type { Page, Locator } from '@playwright/test';
-import { BasePage } from './base.page';
+import type { Page, Locator } from "@playwright/test";
+import { BasePage } from "./base.page";
 
 export class FlowDesignerPage extends BasePage {
   readonly canvas: Locator;
@@ -9,10 +9,10 @@ export class FlowDesignerPage extends BasePage {
 
   constructor(page: Page, tenantSlug?: string) {
     super(page, tenantSlug);
-    this.canvas = this.page.locator('.react-flow');
+    this.canvas = this.page.locator(".react-flow");
     this.toolbar = this.page.locator('[role="toolbar"]');
     this.nodePanel = this.page.locator('.steps-palette, [data-panel="steps"]');
-    this.saveButton = this.page.getByRole('button', { name: /save/i });
+    this.saveButton = this.page.getByRole("button", { name: /save/i });
   }
 
   async goto(flowId: string): Promise<void> {

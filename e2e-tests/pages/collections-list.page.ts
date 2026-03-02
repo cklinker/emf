@@ -1,5 +1,5 @@
-import type { Page, Locator } from '@playwright/test';
-import { BasePage } from './base.page';
+import type { Page, Locator } from "@playwright/test";
+import { BasePage } from "./base.page";
 
 export class CollectionsListPage extends BasePage {
   readonly container: Locator;
@@ -16,21 +16,21 @@ export class CollectionsListPage extends BasePage {
 
   constructor(page: Page, tenantSlug?: string) {
     super(page, tenantSlug);
-    this.container = this.testId('collections-page');
-    this.createCollectionButton = this.testId('create-collection-button');
-    this.nameFilter = this.testId('name-filter');
-    this.statusFilter = this.testId('status-filter');
-    this.showSystemToggle = this.testId('show-system-toggle');
-    this.emptyState = this.testId('empty-state');
-    this.collectionsTable = this.testId('collections-table');
-    this.headerName = this.testId('header-name');
-    this.headerCreated = this.testId('header-created');
-    this.headerUpdated = this.testId('header-updated');
-    this.pagination = this.testId('pagination');
+    this.container = this.testId("collections-page");
+    this.createCollectionButton = this.testId("create-collection-button");
+    this.nameFilter = this.testId("name-filter");
+    this.statusFilter = this.testId("status-filter");
+    this.showSystemToggle = this.testId("show-system-toggle");
+    this.emptyState = this.testId("empty-state");
+    this.collectionsTable = this.testId("collections-table");
+    this.headerName = this.testId("header-name");
+    this.headerCreated = this.testId("header-created");
+    this.headerUpdated = this.testId("header-updated");
+    this.pagination = this.testId("pagination");
   }
 
   async goto(): Promise<void> {
-    await this.page.goto(this.tenantUrl('/collections'));
+    await this.page.goto(this.tenantUrl("/collections"));
     await this.waitForPageLoad();
   }
 
@@ -68,10 +68,10 @@ export class CollectionsListPage extends BasePage {
   }
 
   async confirmDelete(): Promise<void> {
-    await this.testId('confirm-dialog-confirm').click();
+    await this.testId("confirm-dialog-confirm").click();
   }
 
-  async sortByColumn(column: 'name' | 'created' | 'updated'): Promise<void> {
+  async sortByColumn(column: "name" | "created" | "updated"): Promise<void> {
     await this.testId(`header-${column}`).click();
   }
 
@@ -80,7 +80,7 @@ export class CollectionsListPage extends BasePage {
     const count = await rows.count();
     const names: string[] = [];
     for (let i = 0; i < count; i++) {
-      const text = await rows.nth(i).locator('td').first().textContent();
+      const text = await rows.nth(i).locator("td").first().textContent();
       if (text) names.push(text.trim());
     }
     return names;

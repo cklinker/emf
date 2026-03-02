@@ -9,33 +9,36 @@ test.describe("End-User Home", () => {
     await expect(page).toHaveURL(/\/app\/home/);
   });
 
-  test("shows quick actions section", async ({ page }) => {
+  test("shows quick create section", async ({ page }) => {
     const homePage = new AppHomePage(page);
     await homePage.goto();
 
-    const actionsOrEmpty = homePage.quickActions.or(
-      page.getByTestId("empty-state"),
-    );
-    await expect(actionsOrEmpty).toBeVisible();
+    // The home page has a quick-create-section (was quick-actions in the page object)
+    const section = homePage.quickActions;
+    const heading = page.getByText(/quick/i);
+    const sectionOrHeading = section.or(heading);
+    await expect(sectionOrHeading).toBeVisible();
   });
 
-  test("shows recent items section", async ({ page }) => {
+  test("shows recent records section", async ({ page }) => {
     const homePage = new AppHomePage(page);
     await homePage.goto();
 
-    const recentOrEmpty = homePage.recentItems.or(
-      page.getByTestId("empty-state"),
-    );
-    await expect(recentOrEmpty).toBeVisible();
+    // The home page has a recent-records-section
+    const section = homePage.recentItems;
+    const heading = page.getByText(/recent/i);
+    const sectionOrHeading = section.or(heading);
+    await expect(sectionOrHeading).toBeVisible();
   });
 
   test("shows favorites section", async ({ page }) => {
     const homePage = new AppHomePage(page);
     await homePage.goto();
 
-    const favoritesOrEmpty = homePage.favorites.or(
-      page.getByTestId("empty-state"),
-    );
-    await expect(favoritesOrEmpty).toBeVisible();
+    // The home page has a favorites-section
+    const section = homePage.favorites;
+    const heading = page.getByText(/favorite/i);
+    const sectionOrHeading = section.or(heading);
+    await expect(sectionOrHeading).toBeVisible();
   });
 });

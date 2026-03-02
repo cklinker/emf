@@ -1,5 +1,5 @@
-import type { Page, Locator } from '@playwright/test';
-import { BasePage } from './base.page';
+import type { Page, Locator } from "@playwright/test";
+import { BasePage } from "./base.page";
 
 export class SetupHomePage extends BasePage {
   readonly container: Locator;
@@ -10,15 +10,15 @@ export class SetupHomePage extends BasePage {
 
   constructor(page: Page, tenantSlug?: string) {
     super(page, tenantSlug);
-    this.container = this.testId('setup-home-page');
-    this.searchInput = this.testId('setup-search-input');
-    this.searchClear = this.testId('setup-search-clear');
-    this.stats = this.testId('setup-stats');
-    this.noResults = this.testId('setup-no-results');
+    this.container = this.testId("setup-home-page");
+    this.searchInput = this.testId("setup-search-input");
+    this.searchClear = this.testId("setup-search-clear");
+    this.stats = this.testId("setup-stats");
+    this.noResults = this.testId("setup-no-results");
   }
 
   async goto(): Promise<void> {
-    await this.page.goto(this.tenantUrl('/setup'));
+    await this.page.goto(this.tenantUrl("/setup"));
     await this.waitForPageLoad();
   }
 
@@ -36,13 +36,13 @@ export class SetupHomePage extends BasePage {
   }
 
   async clickItem(path: string): Promise<void> {
-    const sanitizedPath = path.replace(/\//g, '').replace(/-/g, '');
+    const sanitizedPath = path.replace(/\//g, "").replace(/-/g, "");
     await this.testId(`setup-item-${sanitizedPath}`).click();
   }
 
   async getStatCards(): Promise<string[]> {
-    await this.stats.waitFor({ state: 'visible' });
-    const cards = this.stats.locator('> *');
+    await this.stats.waitFor({ state: "visible" });
+    const cards = this.stats.locator("> *");
     const count = await cards.count();
     const texts: string[] = [];
     for (let i = 0; i < count; i++) {
@@ -57,7 +57,7 @@ export class SetupHomePage extends BasePage {
   }
 
   item(path: string): Locator {
-    const sanitizedPath = path.replace(/\//g, '').replace(/-/g, '');
+    const sanitizedPath = path.replace(/\//g, "").replace(/-/g, "");
     return this.testId(`setup-item-${sanitizedPath}`);
   }
 }

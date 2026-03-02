@@ -1,30 +1,36 @@
 import { test, expect } from "../../../fixtures";
-import { AuditTrailPage } from "../../../pages/audit-trail.page";
 
 test.describe("Audit Trail", () => {
-  let auditTrailPage: AuditTrailPage;
-
   test.beforeEach(async ({ page }) => {
-    auditTrailPage = new AuditTrailPage(page);
-    await auditTrailPage.goto();
+    await page.goto("/default/setup/audit-trail");
+    await page.waitForLoadState("networkidle");
   });
 
-  test("displays audit trail page", async () => {
-    await expect(auditTrailPage.auditTrailPage).toBeVisible();
+  test("displays audit trail page", async ({ page }) => {
+    // The page renders with a heading containing "Audit Trail"
+    const heading = page.getByRole("heading", { name: /audit trail/i });
+    await expect(heading).toBeVisible();
   });
 
   test("shows audit entries table or empty state", async ({ page }) => {
-    const tableOrEmpty = auditTrailPage.table.or(
-      page.getByTestId("empty-state"),
-    );
+    // The page shows a table or a "no entries" message
+    const table = page.locator("table");
+    const noEntries = page.getByText(/no audit trail entries/i);
+    const tableOrEmpty = table.or(noEntries);
     await expect(tableOrEmpty).toBeVisible();
   });
 
-  test("has date filter", async () => {
-    await expect(auditTrailPage.dateFilter).toBeVisible();
+  test("has section filter", async ({ page }) => {
+    const sectionFilter = page
+      .locator("#section-filter")
+      .or(page.getByRole("combobox", { name: /section/i }));
+    await expect(sectionFilter).toBeVisible();
   });
 
-  test("has type filter", async () => {
-    await expect(auditTrailPage.typeFilter).toBeVisible();
+  test("has entity type filter", async ({ page }) => {
+    const entityFilter = page
+      .locator("#entity-filter")
+      .or(page.getByRole("textbox", { name: /entity type/i }));
+    await expect(entityFilter).toBeVisible();
   });
 });

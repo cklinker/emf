@@ -1,5 +1,5 @@
-import type { Page, Locator } from '@playwright/test';
-import { BasePage } from './base.page';
+import type { Page, Locator } from "@playwright/test";
+import { BasePage } from "./base.page";
 
 export class CollectionDetailPage extends BasePage {
   readonly container: Locator;
@@ -17,18 +17,18 @@ export class CollectionDetailPage extends BasePage {
 
   constructor(page: Page, tenantSlug?: string) {
     super(page, tenantSlug);
-    this.container = this.testId('collection-detail-page');
-    this.fieldsTable = this.testId('fields-table');
-    this.versionHistory = this.testId('versions-panel');
-    this.editButton = this.testId('edit-button');
-    this.deleteButton = this.testId('delete-button');
-    this.backButton = this.testId('back-button');
-    this.collectionTitle = this.testId('collection-title');
-    this.collectionName = this.testId('collection-name');
-    this.collectionStatus = this.testId('collection-status');
-    this.fieldsPanel = this.testId('fields-panel');
-    this.versionsPanel = this.testId('versions-panel');
-    this.addFieldButton = this.testId('add-field-button');
+    this.container = this.testId("collection-detail-page");
+    this.fieldsTable = this.testId("fields-table");
+    this.versionHistory = this.testId("versions-panel");
+    this.editButton = this.testId("edit-button");
+    this.deleteButton = this.testId("delete-button");
+    this.backButton = this.testId("back-button");
+    this.collectionTitle = this.testId("collection-title");
+    this.collectionName = this.testId("collection-name");
+    this.collectionStatus = this.testId("collection-status");
+    this.fieldsPanel = this.testId("fields-panel");
+    this.versionsPanel = this.testId("versions-panel");
+    this.addFieldButton = this.testId("add-field-button");
   }
 
   async goto(id: string): Promise<void> {
@@ -46,7 +46,7 @@ export class CollectionDetailPage extends BasePage {
     const count = await rows.count();
     const names: string[] = [];
     for (let i = 0; i < count; i++) {
-      const text = await rows.nth(i).locator('td').first().textContent();
+      const text = await rows.nth(i).locator("td").first().textContent();
       if (text) names.push(text.trim());
     }
     return names;

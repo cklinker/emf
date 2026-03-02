@@ -1,5 +1,5 @@
-import type { Page, Locator } from '@playwright/test';
-import { BasePage } from './base.page';
+import type { Page, Locator } from "@playwright/test";
+import { BasePage } from "./base.page";
 
 export class CollectionWizardPage extends BasePage {
   readonly container: Locator;
@@ -29,34 +29,34 @@ export class CollectionWizardPage extends BasePage {
 
   constructor(page: Page, tenantSlug?: string) {
     super(page, tenantSlug);
-    this.container = this.testId('collection-wizard-page');
-    this.stepIndicator = this.testId('wizard-step-indicator');
-    this.navigation = this.testId('wizard-navigation');
-    this.cancelButton = this.testId('wizard-cancel-button');
-    this.backButton = this.testId('wizard-back-button');
-    this.nextButton = this.testId('wizard-next-button');
-    this.createButton = this.testId('wizard-create-button');
+    this.container = this.testId("collection-wizard-page");
+    this.stepIndicator = this.testId("wizard-step-indicator");
+    this.navigation = this.testId("wizard-navigation");
+    this.cancelButton = this.testId("wizard-cancel-button");
+    this.backButton = this.testId("wizard-back-button");
+    this.nextButton = this.testId("wizard-next-button");
+    this.createButton = this.testId("wizard-create-button");
 
     // Basics step
-    this.displayNameInput = this.testId('wizard-display-name-input');
-    this.nameInput = this.testId('wizard-name-input');
-    this.descriptionInput = this.testId('wizard-description-input');
-    this.activeCheckbox = this.testId('wizard-active-checkbox');
+    this.displayNameInput = this.testId("wizard-display-name-input");
+    this.nameInput = this.testId("wizard-name-input");
+    this.descriptionInput = this.testId("wizard-description-input");
+    this.activeCheckbox = this.testId("wizard-active-checkbox");
 
     // Fields step
-    this.addFieldButton = this.testId('wizard-add-field-button');
-    this.noFields = this.testId('wizard-no-fields');
-    this.fieldsTable = this.testId('wizard-fields-table');
+    this.addFieldButton = this.testId("wizard-add-field-button");
+    this.noFields = this.testId("wizard-no-fields");
+    this.fieldsTable = this.testId("wizard-fields-table");
 
     // Review step
-    this.reviewDisplayName = this.testId('wizard-review-display-name');
-    this.reviewName = this.testId('wizard-review-name');
-    this.reviewDescription = this.testId('wizard-review-description');
-    this.reviewStatus = this.testId('wizard-review-status');
+    this.reviewDisplayName = this.testId("wizard-review-display-name");
+    this.reviewName = this.testId("wizard-review-name");
+    this.reviewDescription = this.testId("wizard-review-description");
+    this.reviewStatus = this.testId("wizard-review-status");
   }
 
   async goto(): Promise<void> {
-    await this.page.goto(this.tenantUrl('/collections/new'));
+    await this.page.goto(this.tenantUrl("/collections/new"));
     await this.waitForPageLoad();
   }
 
@@ -103,7 +103,7 @@ export class CollectionWizardPage extends BasePage {
     const count = await steps.count();
     for (let i = 0; i < count; i++) {
       const step = steps.nth(i);
-      const classes = await step.getAttribute('class');
+      const classes = await step.getAttribute("class");
       // The current step typically has a distinct style (e.g., filled/active)
       if (classes && /bg-primary|bg-blue/.test(classes)) {
         return i + 1;

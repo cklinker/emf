@@ -34,12 +34,13 @@ test.describe("Scheduled Jobs", () => {
     await scheduledJobsPage.goto();
 
     await scheduledJobsPage.clickCreate();
-    await scheduledJobsPage.fillForm({
-      name: "Test Scheduled Job",
-      type: "data-sync",
-      cronExpression: "0 0 * * *",
-      active: true,
-    });
+
+    // Fill name and cron fields (type is a <select>, use selectOption via page object)
+    await scheduledJobsPage.nameInput.fill("Test Scheduled Job");
+    await scheduledJobsPage.cronInput.fill("0 0 * * *");
+
+    // Select job type from the dropdown (it's a <select> element)
+    await scheduledJobsPage.typeInput.selectOption({ index: 1 });
 
     await expect(scheduledJobsPage.nameInput).toHaveValue("Test Scheduled Job");
     await expect(scheduledJobsPage.cronInput).toHaveValue("0 0 * * *");
@@ -53,6 +54,10 @@ test.describe("Scheduled Jobs", () => {
     await expect(scheduledJobsPage.formModal).toBeVisible();
 
     await scheduledJobsPage.cancelButton.click();
-    await expect(scheduledJobsPage.formModal).not.toBeVisible();
+    // Allow time for the modal to close
+    await page.waitForTimeout(500);
+    await expect(scheduledJobsPage.formModal).not.toBeVisible({
+      timeout: 5000,
+    });
   });
 });

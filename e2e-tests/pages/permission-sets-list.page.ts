@@ -1,5 +1,5 @@
-import type { Page, Locator } from '@playwright/test';
-import { BasePage } from './base.page';
+import type { Page, Locator } from "@playwright/test";
+import { BasePage } from "./base.page";
 
 export class PermissionSetsListPage extends BasePage {
   readonly createButton: Locator;
@@ -11,16 +11,16 @@ export class PermissionSetsListPage extends BasePage {
 
   constructor(page: Page, tenantSlug?: string) {
     super(page, tenantSlug);
-    this.createButton = this.testId('new-permission-set-button');
-    this.table = this.testId('permission-sets-table');
+    this.createButton = this.testId("new-permission-set-button");
+    this.table = this.testId("permission-sets-table");
     this.editButtons = this.page.locator('[data-testid^="edit-button-"]');
     this.deleteButtons = this.page.locator('[data-testid^="delete-button-"]');
     this.cloneButtons = this.page.locator('[data-testid^="clone-button-"]');
-    this.formModal = this.testId('permission-set-form-modal');
+    this.formModal = this.testId("permission-set-form-modal");
   }
 
   async goto(): Promise<void> {
-    await this.page.goto(this.tenantUrl('/permission-sets'));
+    await this.page.goto(this.tenantUrl("/permission-sets"));
     await this.waitForLoadingComplete();
   }
 
@@ -35,14 +35,14 @@ export class PermissionSetsListPage extends BasePage {
     name: string;
     description?: string;
   }): Promise<void> {
-    await this.testId('permission-set-name-input').fill(name);
+    await this.testId("permission-set-name-input").fill(name);
     if (description !== undefined) {
-      await this.testId('permission-set-description-input').fill(description);
+      await this.testId("permission-set-description-input").fill(description);
     }
   }
 
   async submitForm(): Promise<void> {
-    await this.testId('permission-set-form-submit').click();
+    await this.testId("permission-set-form-submit").click();
   }
 
   async getRowCount(): Promise<number> {

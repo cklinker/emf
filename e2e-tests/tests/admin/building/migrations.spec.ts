@@ -7,17 +7,17 @@ test.describe("Migrations", () => {
   });
 
   test("displays migrations page", async ({ page }) => {
-    const heading = page.getByRole("heading", { name: /migration/i });
-    await expect(heading).toBeVisible();
+    // Page has both h1 "Migrations" and h2 "Migration History" — target h1 specifically
+    const heading = page.getByRole("heading", { name: /^Migrations$/i });
+    await expect(heading.first()).toBeVisible();
   });
 
   test("shows migration history section", async ({ page }) => {
-    // The page shows a "Migration History" heading and either a table or empty message
-    const historyHeading = page.getByText(/migration history/i);
-    const noHistory = page.getByText(/no migration/i);
-    const table = page.locator("table");
-    const historyOrEmpty = historyHeading.or(noHistory).or(table);
-    await expect(historyOrEmpty).toBeVisible();
+    // The page shows a "Migration History" h2 heading and either a table or empty message
+    const historyHeading = page.getByRole("heading", {
+      name: /migration history/i,
+    });
+    await expect(historyHeading).toBeVisible();
   });
 
   test("has plan migration button", async ({ page }) => {

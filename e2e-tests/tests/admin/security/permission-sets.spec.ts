@@ -8,23 +8,40 @@ test.describe("Permission Sets", () => {
 
   test("displays permission sets list page", async ({ page }) => {
     await expect(page).toHaveURL(/\/permission-sets/);
-    const heading = page.getByRole("heading", { name: /permission set/i });
-    await expect(heading).toBeVisible();
+    // Page has data-testid="permission-sets-page" and h1 "Permission Sets"
+    const hasPageTestId = await page
+      .getByTestId("permission-sets-page")
+      .isVisible({ timeout: 5000 })
+      .catch(() => false);
+    const hasHeading = await page
+      .getByRole("heading", { name: /permission sets/i })
+      .isVisible({ timeout: 3000 })
+      .catch(() => false);
+    expect(hasPageTestId || hasHeading).toBe(true);
   });
 
   test("shows permission sets table or empty state", async ({ page }) => {
-    const table = page.locator("table, [role='grid']");
-    const emptyState = page.getByText(/no.*permission.*set|no.*results/i);
-    const tableOrEmpty = table.or(emptyState);
-    await expect(tableOrEmpty).toBeVisible();
+    // Table has data-testid="permission-sets-table"; empty state has data-testid="empty-state"
+    const hasTable = await page
+      .getByTestId("permission-sets-table")
+      .isVisible({ timeout: 5000 })
+      .catch(() => false);
+    const hasEmptyState = await page
+      .getByTestId("empty-state")
+      .isVisible({ timeout: 3000 })
+      .catch(() => false);
+    const hasEmptyText = await page
+      .getByText(/no permission sets/i)
+      .first()
+      .isVisible({ timeout: 2000 })
+      .catch(() => false);
+    expect(hasTable || hasEmptyState || hasEmptyText).toBe(true);
   });
 
   test("has create permission set button", async ({ page }) => {
-    const createButton = page.getByRole("button", {
-      name: /create|new|add/i,
-    });
+    // Button has data-testid="new-permission-set-button"
+    const createButton = page.getByTestId("new-permission-set-button");
     const isVisible = await createButton
-      .first()
       .isVisible({ timeout: 5000 })
       .catch(() => false);
     // Button may or may not exist depending on permissions

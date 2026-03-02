@@ -1,5 +1,5 @@
-import type { Page, Locator } from '@playwright/test';
-import { BasePage } from '../base.page';
+import type { Page, Locator } from "@playwright/test";
+import { BasePage } from "../base.page";
 
 export class ObjectListPage extends BasePage {
   readonly newRecordButton: Locator;
@@ -14,17 +14,15 @@ export class ObjectListPage extends BasePage {
     tenantSlug?: string,
   ) {
     super(page, tenantSlug);
-    this.newRecordButton = this.testId('new-record-button');
-    this.dataTable = this.testId('data-table');
-    this.searchInput = this.testId('search-input');
-    this.filterBar = this.testId('filter-bar');
-    this.pagination = this.testId('pagination');
+    this.newRecordButton = this.testId("new-record-button");
+    this.dataTable = this.testId("data-table");
+    this.searchInput = this.testId("search-input");
+    this.filterBar = this.testId("filter-bar");
+    this.pagination = this.testId("pagination");
   }
 
   async goto(): Promise<void> {
-    await this.page.goto(
-      this.tenantUrl(`/app/o/${this.collectionName}`),
-    );
+    await this.page.goto(this.tenantUrl(`/app/o/${this.collectionName}`));
     await this.waitForLoadingComplete();
   }
 
@@ -41,15 +39,10 @@ export class ObjectListPage extends BasePage {
   }
 
   async clickRow(index: number): Promise<void> {
-    await this.dataTable
-      .locator('tbody tr, [role="row"]')
-      .nth(index)
-      .click();
+    await this.dataTable.locator('tbody tr, [role="row"]').nth(index).click();
   }
 
   async sortByColumn(name: string): Promise<void> {
-    await this.dataTable
-      .getByRole('columnheader', { name })
-      .click();
+    await this.dataTable.getByRole("columnheader", { name }).click();
   }
 }

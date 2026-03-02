@@ -1,5 +1,5 @@
-import type { Page, Locator } from '@playwright/test';
-import { BasePage } from './base.page';
+import type { Page, Locator } from "@playwright/test";
+import { BasePage } from "./base.page";
 
 export class SecurityAuditPage extends BasePage {
   readonly securityAuditPage: Locator;
@@ -9,14 +9,14 @@ export class SecurityAuditPage extends BasePage {
 
   constructor(page: Page, tenantSlug?: string) {
     super(page, tenantSlug);
-    this.securityAuditPage = this.testId('security-audit-page');
-    this.table = this.testId('security-audit-table');
-    this.dateFilter = this.testId('security-audit-date-filter');
-    this.typeFilter = this.testId('security-audit-type-filter');
+    this.securityAuditPage = this.testId("security-audit-page");
+    this.table = this.testId("security-audit-table");
+    this.dateFilter = this.testId("security-audit-date-filter");
+    this.typeFilter = this.testId("security-audit-type-filter");
   }
 
   async goto(): Promise<void> {
-    await this.page.goto(this.tenantUrl('/security-audit'));
+    await this.page.goto(this.tenantUrl("/security-audit"));
     await this.waitForLoadingComplete();
   }
 
@@ -30,6 +30,6 @@ export class SecurityAuditPage extends BasePage {
 
   async filterByType(type: string): Promise<void> {
     await this.typeFilter.click();
-    await this.page.getByRole('option', { name: type }).click();
+    await this.page.getByRole("option", { name: type }).click();
   }
 }

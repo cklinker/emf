@@ -1,5 +1,5 @@
-import type { Page, Locator } from '@playwright/test';
-import { BasePage } from './base.page';
+import type { Page, Locator } from "@playwright/test";
+import { BasePage } from "./base.page";
 
 export class ApprovalsPage extends BasePage {
   readonly createButton: Locator;
@@ -13,20 +13,20 @@ export class ApprovalsPage extends BasePage {
 
   constructor(page: Page, tenantSlug?: string) {
     super(page, tenantSlug);
-    this.createButton = this.testId('add-approval-process-button');
-    this.table = this.testId('approval-processes-table');
-    this.formModal = this.testId('approval-process-form-modal');
-    this.nameInput = this.testId('approval-process-name-input');
-    this.descriptionInput = this.testId('approval-process-description-input');
+    this.createButton = this.testId("add-approval-process-button");
+    this.table = this.testId("approval-processes-table");
+    this.formModal = this.testId("approval-process-form-modal");
+    this.nameInput = this.testId("approval-process-name-input");
+    this.descriptionInput = this.testId("approval-process-description-input");
     this.collectionIdInput = this.testId(
-      'approval-process-collection-id-input',
+      "approval-process-collection-id-input",
     );
-    this.submitButton = this.testId('approval-process-form-submit');
-    this.cancelButton = this.testId('approval-process-form-cancel');
+    this.submitButton = this.testId("approval-process-form-submit");
+    this.cancelButton = this.testId("approval-process-form-cancel");
   }
 
   async goto(): Promise<void> {
-    await this.page.goto(this.tenantUrl('/approvals'));
+    await this.page.goto(this.tenantUrl("/approvals"));
     await this.waitForLoadingComplete();
   }
 
@@ -57,9 +57,7 @@ export class ApprovalsPage extends BasePage {
   }
 
   async getRowCount(): Promise<number> {
-    return this.page
-      .locator('[data-testid^="approval-process-row-"]')
-      .count();
+    return this.page.locator('[data-testid^="approval-process-row-"]').count();
   }
 
   async clickEdit(index: number): Promise<void> {

@@ -1,28 +1,29 @@
 import { test, expect } from "../../../fixtures";
-import { MigrationsPage } from "../../../pages/migrations.page";
 
 test.describe("Migrations", () => {
-  let migrationsPage: MigrationsPage;
-
   test.beforeEach(async ({ page }) => {
-    migrationsPage = new MigrationsPage(page);
-    await migrationsPage.goto();
+    await page.goto("/default/setup/migrations");
+    await page.waitForLoadState("networkidle");
   });
 
-  test("displays migrations page", async () => {
-    await expect(migrationsPage.migrationsPage).toBeVisible();
+  test("displays migrations page", async ({ page }) => {
+    const heading = page.getByRole("heading", { name: /migration/i });
+    await expect(heading).toBeVisible();
   });
 
-  test("shows migration history tab", async ({ page }) => {
-    await expect(migrationsPage.historyTab).toBeVisible();
-    const tableOrEmpty = migrationsPage.historyTable.or(
-      page.getByTestId("empty-state"),
-    );
-    await expect(tableOrEmpty).toBeVisible();
+  test("shows migration history section", async ({ page }) => {
+    // The page shows a "Migration History" heading and either a table or empty message
+    const historyHeading = page.getByText(/migration history/i);
+    const noHistory = page.getByText(/no migration/i);
+    const table = page.locator("table");
+    const historyOrEmpty = historyHeading.or(noHistory).or(table);
+    await expect(historyOrEmpty).toBeVisible();
   });
 
-  test("can switch to plan migration tab", async () => {
-    await migrationsPage.clickPlanTab();
-    await expect(migrationsPage.planTab).toBeVisible();
+  test("has plan migration button", async ({ page }) => {
+    const planButton = page.getByRole("button", {
+      name: /plan migration/i,
+    });
+    await expect(planButton).toBeVisible();
   });
 });

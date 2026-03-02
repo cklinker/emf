@@ -1,5 +1,5 @@
-import type { Page, Locator } from '@playwright/test';
-import { BasePage } from './base.page';
+import type { Page, Locator } from "@playwright/test";
+import { BasePage } from "./base.page";
 
 export class PackagesPage extends BasePage {
   readonly packagesPage: Locator;
@@ -13,18 +13,18 @@ export class PackagesPage extends BasePage {
 
   constructor(page: Page, tenantSlug?: string) {
     super(page, tenantSlug);
-    this.packagesPage = this.testId('packages-page');
-    this.tabExport = this.testId('tab-export');
-    this.tabImport = this.testId('tab-import');
-    this.tabHistory = this.testId('tab-history');
-    this.exportButton = this.testId('export-button');
-    this.importButton = this.testId('import-button');
-    this.dropZone = this.testId('drop-zone');
-    this.fileInput = this.testId('file-input');
+    this.packagesPage = this.testId("packages-page");
+    this.tabExport = this.testId("tab-export");
+    this.tabImport = this.testId("tab-import");
+    this.tabHistory = this.testId("tab-history");
+    this.exportButton = this.testId("export-button");
+    this.importButton = this.testId("import-button");
+    this.dropZone = this.testId("drop-zone");
+    this.fileInput = this.testId("file-input");
   }
 
   async goto(): Promise<void> {
-    await this.page.goto(this.tenantUrl('/packages'));
+    await this.page.goto(this.tenantUrl("/packages"));
     await this.waitForLoadingComplete();
   }
 

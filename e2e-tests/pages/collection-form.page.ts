@@ -1,5 +1,5 @@
-import type { Page, Locator } from '@playwright/test';
-import { BasePage } from './base.page';
+import type { Page, Locator } from "@playwright/test";
+import { BasePage } from "./base.page";
 
 export class CollectionFormPage extends BasePage {
   readonly container: Locator;
@@ -11,12 +11,14 @@ export class CollectionFormPage extends BasePage {
 
   constructor(page: Page, tenantSlug?: string) {
     super(page, tenantSlug);
-    this.container = this.testId('collection-form-page');
+    this.container = this.testId("collection-form-page");
     this.nameInput = this.page.getByLabel(/^name$/i);
     this.displayNameInput = this.page.getByLabel(/display name/i);
     this.descriptionInput = this.page.getByLabel(/description/i);
-    this.submitButton = this.page.getByRole('button', { name: /save|submit|update/i });
-    this.cancelButton = this.page.getByRole('button', { name: /cancel/i });
+    this.submitButton = this.page.getByRole("button", {
+      name: /save|submit|update/i,
+    });
+    this.cancelButton = this.page.getByRole("button", { name: /cancel/i });
   }
 
   async goto(id: string): Promise<void> {

@@ -1,5 +1,5 @@
-import type { Page, Locator } from '@playwright/test';
-import { BasePage } from './base.page';
+import type { Page, Locator } from "@playwright/test";
+import { BasePage } from "./base.page";
 
 export class ModulesPage extends BasePage {
   readonly modulesPage: Locator;
@@ -9,14 +9,14 @@ export class ModulesPage extends BasePage {
 
   constructor(page: Page, tenantSlug?: string) {
     super(page, tenantSlug);
-    this.modulesPage = this.testId('modules-page');
-    this.installButton = this.testId('install-button');
-    this.moduleCards = this.testId('module-cards');
-    this.emptyState = this.testId('empty-state');
+    this.modulesPage = this.testId("modules-page");
+    this.installButton = this.testId("install-button");
+    this.moduleCards = this.testId("module-cards");
+    this.emptyState = this.testId("empty-state");
   }
 
   async goto(): Promise<void> {
-    await this.page.goto(this.tenantUrl('/modules'));
+    await this.page.goto(this.tenantUrl("/modules"));
     await this.waitForLoadingComplete();
   }
 
@@ -33,7 +33,7 @@ export class ModulesPage extends BasePage {
   }
 
   async toggleModule(name: string): Promise<void> {
-    const moduleCard = this.modulesPage.getByText(name).locator('..');
-    await moduleCard.getByRole('switch').click();
+    const moduleCard = this.modulesPage.getByText(name).locator("..");
+    await moduleCard.getByRole("switch").click();
   }
 }

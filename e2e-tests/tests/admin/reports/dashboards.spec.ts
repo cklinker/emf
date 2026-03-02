@@ -1,30 +1,32 @@
 import { test, expect } from "../../../fixtures";
-import { DashboardsPage } from "../../../pages/dashboards.page";
 
 test.describe("Dashboards", () => {
   test("displays dashboards page", async ({ page }) => {
-    const dashboardsPage = new DashboardsPage(page);
-    await dashboardsPage.goto();
+    await page.goto("/default/setup/dashboards");
+    await page.waitForLoadState("networkidle");
 
     await expect(page).toHaveURL(/\/dashboards/);
-    await expect(dashboardsPage.dashboardsPage).toBeVisible();
+    const heading = page.getByRole("heading", { name: /dashboards/i });
+    await expect(heading).toBeVisible();
   });
 
   test("has create dashboard button", async ({ page }) => {
-    const dashboardsPage = new DashboardsPage(page);
-    await dashboardsPage.goto();
+    await page.goto("/default/setup/dashboards");
     await page.waitForLoadState("networkidle");
 
-    await expect(dashboardsPage.createButton).toBeVisible();
+    const createButton = page.getByRole("button", {
+      name: /create dashboard/i,
+    });
+    await expect(createButton).toBeVisible();
   });
 
   test("shows dashboards list or empty state", async ({ page }) => {
-    const dashboardsPage = new DashboardsPage(page);
-    await dashboardsPage.goto();
+    await page.goto("/default/setup/dashboards");
+    await page.waitForLoadState("networkidle");
 
-    const listOrEmpty = dashboardsPage.dashboardList.or(
-      page.getByTestId("empty-state"),
-    );
+    const emptyState = page.getByText(/no.*dashboard|no.*data/i);
+    const table = page.locator("table, [role='grid']");
+    const listOrEmpty = table.or(emptyState);
     await expect(listOrEmpty).toBeVisible();
   });
 });

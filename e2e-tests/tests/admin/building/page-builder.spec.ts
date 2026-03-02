@@ -1,27 +1,27 @@
 import { test, expect } from "../../../fixtures";
-import { PageBuilderPage } from "../../../pages/page-builder.page";
 
 test.describe("Page Builder", () => {
-  let pageBuilderPage: PageBuilderPage;
-
   test.beforeEach(async ({ page }) => {
-    pageBuilderPage = new PageBuilderPage(page);
-    await pageBuilderPage.goto();
+    await page.goto("/default/setup/pages");
+    await page.waitForLoadState("networkidle");
   });
 
-  test("displays page builder page", async () => {
-    await expect(pageBuilderPage.pageBuilderPage).toBeVisible();
+  test("displays page builder page", async ({ page }) => {
+    const heading = page.getByRole("heading", { name: /page builder/i });
+    await expect(heading).toBeVisible();
   });
 
   test("shows pages table or empty state", async ({ page }) => {
-    const tableOrEmpty = pageBuilderPage.table.or(
-      page.getByTestId("empty-state"),
-    );
-    await expect(tableOrEmpty).toBeVisible();
+    const grid = page.locator("table, [role='grid']");
+    const emptyState = page.getByText(/no.*page|no.*data/i);
+    const gridOrEmpty = grid.or(emptyState);
+    await expect(gridOrEmpty).toBeVisible();
   });
 
   test("has create page button", async ({ page }) => {
-    await page.waitForLoadState("networkidle");
-    await expect(pageBuilderPage.createButton).toBeVisible();
+    const createButton = page.getByRole("button", {
+      name: /create page/i,
+    });
+    await expect(createButton).toBeVisible();
   });
 });

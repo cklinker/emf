@@ -1,5 +1,5 @@
-import type { Page, Locator } from '@playwright/test';
-import { BasePage } from './base.page';
+import type { Page, Locator } from "@playwright/test";
+import { BasePage } from "./base.page";
 
 export class FlowsListPage extends BasePage {
   readonly createButton: Locator;
@@ -10,15 +10,15 @@ export class FlowsListPage extends BasePage {
 
   constructor(page: Page, tenantSlug?: string) {
     super(page, tenantSlug);
-    this.createButton = this.testId('add-flow-button');
-    this.table = this.testId('flows-table');
+    this.createButton = this.testId("add-flow-button");
+    this.table = this.testId("flows-table");
     this.editButtons = this.page.locator('[data-testid^="edit-button-"]');
     this.deleteButtons = this.page.locator('[data-testid^="delete-button-"]');
     this.runButtons = this.page.locator('[data-testid^="run-button-"]');
   }
 
   async goto(): Promise<void> {
-    await this.page.goto(this.tenantUrl('/flows'));
+    await this.page.goto(this.tenantUrl("/flows"));
     await this.waitForLoadingComplete();
   }
 

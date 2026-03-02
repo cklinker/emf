@@ -1,5 +1,5 @@
-import type { Page, Locator } from '@playwright/test';
-import { BasePage } from './base.page';
+import type { Page, Locator } from "@playwright/test";
+import { BasePage } from "./base.page";
 
 export class ScriptsPage extends BasePage {
   readonly scriptsPage: Locator;
@@ -17,22 +17,22 @@ export class ScriptsPage extends BasePage {
 
   constructor(page: Page, tenantSlug?: string) {
     super(page, tenantSlug);
-    this.scriptsPage = this.testId('scripts-page');
-    this.createButton = this.testId('add-script-button');
-    this.table = this.testId('scripts-table');
-    this.formOverlay = this.testId('script-form-overlay');
-    this.formModal = this.testId('script-form-modal');
-    this.nameInput = this.testId('script-name-input');
-    this.typeInput = this.testId('script-type-input');
-    this.languageInput = this.testId('script-language-input');
-    this.sourceCodeInput = this.testId('script-source-code-input');
-    this.activeCheckbox = this.testId('script-active-input');
-    this.submitButton = this.testId('script-form-submit');
-    this.cancelButton = this.testId('script-form-cancel');
+    this.scriptsPage = this.testId("scripts-page");
+    this.createButton = this.testId("add-script-button");
+    this.table = this.testId("scripts-table");
+    this.formOverlay = this.testId("script-form-overlay");
+    this.formModal = this.testId("script-form-modal");
+    this.nameInput = this.testId("script-name-input");
+    this.typeInput = this.testId("script-type-input");
+    this.languageInput = this.testId("script-language-input");
+    this.sourceCodeInput = this.testId("script-source-code-input");
+    this.activeCheckbox = this.testId("script-active-input");
+    this.submitButton = this.testId("script-form-submit");
+    this.cancelButton = this.testId("script-form-cancel");
   }
 
   async goto(): Promise<void> {
-    await this.page.goto(this.tenantUrl('/scripts'));
+    await this.page.goto(this.tenantUrl("/scripts"));
     await this.waitForLoadingComplete();
   }
 
@@ -62,13 +62,13 @@ export class ScriptsPage extends BasePage {
 
   async clickEdit(index: number): Promise<void> {
     await this.testId(`script-row-${index}`)
-      .getByRole('button', { name: /edit/i })
+      .getByRole("button", { name: /edit/i })
       .click();
   }
 
   async clickDelete(index: number): Promise<void> {
     await this.testId(`script-row-${index}`)
-      .getByRole('button', { name: /delete/i })
+      .getByRole("button", { name: /delete/i })
       .click();
   }
 }

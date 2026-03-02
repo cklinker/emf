@@ -1,5 +1,5 @@
-import type { Page, Locator } from '@playwright/test';
-import { BasePage } from '../base.page';
+import type { Page, Locator } from "@playwright/test";
+import { BasePage } from "../base.page";
 
 export class GlobalSearchPage extends BasePage {
   readonly searchInput: Locator;
@@ -8,13 +8,15 @@ export class GlobalSearchPage extends BasePage {
 
   constructor(page: Page, tenantSlug?: string) {
     super(page, tenantSlug);
-    this.searchInput = this.testId('global-search-input');
-    this.resultsList = this.testId('global-search-results');
-    this.typeFilters = this.testId('global-search-type-filters');
+    this.searchInput = this.page.getByPlaceholder(
+      "Search across all collections",
+    );
+    this.resultsList = this.testId("global-search-results");
+    this.typeFilters = this.testId("global-search-type-filters");
   }
 
   async goto(): Promise<void> {
-    await this.page.goto(this.tenantUrl('/app/search'));
+    await this.page.goto(this.tenantUrl("/app/search"));
     await this.waitForLoadingComplete();
   }
 
@@ -23,9 +25,7 @@ export class GlobalSearchPage extends BasePage {
   }
 
   async getResultCount(): Promise<number> {
-    return this.resultsList
-      .locator('[data-testid^="search-result-"]')
-      .count();
+    return this.resultsList.locator('[data-testid^="search-result-"]').count();
   }
 
   async clickResult(index: number): Promise<void> {

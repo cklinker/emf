@@ -1,5 +1,5 @@
-import type { Page, Locator } from '@playwright/test';
-import { BasePage } from './base.page';
+import type { Page, Locator } from "@playwright/test";
+import { BasePage } from "./base.page";
 
 export class UserDetailPage extends BasePage {
   readonly container: Locator;
@@ -13,20 +13,20 @@ export class UserDetailPage extends BasePage {
 
   constructor(page: Page, tenantSlug?: string) {
     super(page, tenantSlug);
-    this.container = this.testId('user-detail-page');
-    this.editButton = this.container.getByRole('button', {
+    this.container = this.testId("user-detail-page");
+    this.editButton = this.container.getByRole("button", {
       name: /edit|save/i,
     });
-    this.detailsTab = this.page.getByRole('tab', { name: /details/i });
-    this.securityTab = this.page.getByRole('tab', { name: /security/i });
-    this.loginHistoryTab = this.page.getByRole('tab', {
+    this.detailsTab = this.page.getByRole("tab", { name: /details/i });
+    this.securityTab = this.page.getByRole("tab", { name: /security/i });
+    this.loginHistoryTab = this.page.getByRole("tab", {
       name: /login history/i,
     });
-    this.profileSelect = this.testId('profile-select');
+    this.profileSelect = this.testId("profile-select");
     this.assignPermissionSetButton = this.testId(
-      'assign-permission-set-button',
+      "assign-permission-set-button",
     );
-    this.permissionSetsList = this.testId('permission-sets-list');
+    this.permissionSetsList = this.testId("permission-sets-list");
   }
 
   async goto(id: string): Promise<void> {
@@ -34,8 +34,10 @@ export class UserDetailPage extends BasePage {
     await this.waitForPageLoad();
   }
 
-  async clickTab(name: 'Details' | 'Security' | 'Login History'): Promise<void> {
-    await this.page.getByRole('tab', { name: new RegExp(name, 'i') }).click();
+  async clickTab(
+    name: "Details" | "Security" | "Login History",
+  ): Promise<void> {
+    await this.page.getByRole("tab", { name: new RegExp(name, "i") }).click();
   }
 
   async clickEdit(): Promise<void> {
@@ -43,7 +45,7 @@ export class UserDetailPage extends BasePage {
   }
 
   async getDisplayedEmail(): Promise<string | null> {
-    const emailElement = this.container.locator('text=/\\S+@\\S+/').first();
+    const emailElement = this.container.locator("text=/\\S+@\\S+/").first();
     return emailElement.textContent();
   }
 }

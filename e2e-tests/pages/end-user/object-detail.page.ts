@@ -1,5 +1,5 @@
-import type { Page, Locator } from '@playwright/test';
-import { BasePage } from '../base.page';
+import type { Page, Locator } from "@playwright/test";
+import { BasePage } from "../base.page";
 
 export class ObjectDetailPage extends BasePage {
   readonly editButton: Locator;
@@ -14,17 +14,15 @@ export class ObjectDetailPage extends BasePage {
     tenantSlug?: string,
   ) {
     super(page, tenantSlug);
-    this.editButton = this.testId('edit-button');
-    this.deleteButton = this.testId('delete-button');
-    this.fieldValues = this.testId('field-values');
-    this.relatedRecords = this.testId('related-records');
+    this.editButton = this.testId("edit-button");
+    this.deleteButton = this.testId("delete-button");
+    this.fieldValues = this.testId("field-values");
+    this.relatedRecords = this.testId("related-records");
   }
 
   async goto(): Promise<void> {
     await this.page.goto(
-      this.tenantUrl(
-        `/app/o/${this.collectionName}/${this.recordId}`,
-      ),
+      this.tenantUrl(`/app/o/${this.collectionName}/${this.recordId}`),
     );
     await this.waitForLoadingComplete();
   }

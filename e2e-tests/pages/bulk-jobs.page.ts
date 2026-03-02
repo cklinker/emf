@@ -1,5 +1,5 @@
-import type { Page, Locator } from '@playwright/test';
-import { BasePage } from './base.page';
+import type { Page, Locator } from "@playwright/test";
+import { BasePage } from "./base.page";
 
 export class BulkJobsPage extends BasePage {
   readonly bulkJobsPage: Locator;
@@ -15,20 +15,20 @@ export class BulkJobsPage extends BasePage {
 
   constructor(page: Page, tenantSlug?: string) {
     super(page, tenantSlug);
-    this.bulkJobsPage = this.testId('bulk-jobs-page');
-    this.createButton = this.testId('add-bulk-job-button');
-    this.table = this.testId('bulk-jobs-table');
-    this.formOverlay = this.testId('bulk-job-form-overlay');
-    this.formModal = this.testId('bulk-job-form-modal');
-    this.collectionIdInput = this.testId('bulk-job-collection-id-input');
-    this.operationInput = this.testId('bulk-job-operation-input');
-    this.batchSizeInput = this.testId('bulk-job-batch-size-input');
-    this.submitButton = this.testId('bulk-job-form-submit');
-    this.cancelButton = this.testId('bulk-job-form-cancel');
+    this.bulkJobsPage = this.testId("bulk-jobs-page");
+    this.createButton = this.testId("add-bulk-job-button");
+    this.table = this.testId("bulk-jobs-table");
+    this.formOverlay = this.testId("bulk-job-form-overlay");
+    this.formModal = this.testId("bulk-job-form-modal");
+    this.collectionIdInput = this.testId("bulk-job-collection-id-input");
+    this.operationInput = this.testId("bulk-job-operation-input");
+    this.batchSizeInput = this.testId("bulk-job-batch-size-input");
+    this.submitButton = this.testId("bulk-job-form-submit");
+    this.cancelButton = this.testId("bulk-job-form-cancel");
   }
 
   async goto(): Promise<void> {
-    await this.page.goto(this.tenantUrl('/bulk-jobs'));
+    await this.page.goto(this.tenantUrl("/bulk-jobs"));
     await this.waitForLoadingComplete();
   }
 
@@ -41,9 +41,8 @@ export class BulkJobsPage extends BasePage {
     operation?: string;
     batchSize?: string;
   }): Promise<void> {
-    if (data.collectionId)
-      await this.collectionIdInput.fill(data.collectionId);
-    if (data.operation) await this.operationInput.fill(data.operation);
+    if (data.collectionId) await this.collectionIdInput.fill(data.collectionId);
+    if (data.operation) await this.operationInput.selectOption(data.operation);
     if (data.batchSize) await this.batchSizeInput.fill(data.batchSize);
   }
 
@@ -52,14 +51,12 @@ export class BulkJobsPage extends BasePage {
   }
 
   async getRowCount(): Promise<number> {
-    return this.table
-      .locator('[data-testid^="bulk-job-row-"]')
-      .count();
+    return this.table.locator('[data-testid^="bulk-job-row-"]').count();
   }
 
   async clickAbort(index: number): Promise<void> {
     await this.testId(`bulk-job-row-${index}`)
-      .getByRole('button', { name: /abort/i })
+      .getByRole("button", { name: /abort/i })
       .click();
   }
 }

@@ -1,5 +1,5 @@
-import type { Page, Locator } from '@playwright/test';
-import { BasePage } from './base.page';
+import type { Page, Locator } from "@playwright/test";
+import { BasePage } from "./base.page";
 
 export class AuditTrailPage extends BasePage {
   readonly auditTrailPage: Locator;
@@ -10,15 +10,15 @@ export class AuditTrailPage extends BasePage {
 
   constructor(page: Page, tenantSlug?: string) {
     super(page, tenantSlug);
-    this.auditTrailPage = this.testId('audit-trail-page');
-    this.table = this.testId('audit-trail-table');
-    this.dateFilter = this.testId('audit-trail-date-filter');
-    this.typeFilter = this.testId('audit-trail-type-filter');
-    this.pagination = this.testId('audit-trail-pagination');
+    this.auditTrailPage = this.testId("audit-trail-page");
+    this.table = this.testId("audit-trail-table");
+    this.dateFilter = this.testId("audit-trail-date-filter");
+    this.typeFilter = this.testId("audit-trail-type-filter");
+    this.pagination = this.testId("audit-trail-pagination");
   }
 
   async goto(): Promise<void> {
-    await this.page.goto(this.tenantUrl('/audit-trail'));
+    await this.page.goto(this.tenantUrl("/audit-trail"));
     await this.waitForLoadingComplete();
   }
 
@@ -32,6 +32,6 @@ export class AuditTrailPage extends BasePage {
 
   async filterByType(type: string): Promise<void> {
     await this.typeFilter.click();
-    await this.page.getByRole('option', { name: type }).click();
+    await this.page.getByRole("option", { name: type }).click();
   }
 }

@@ -1,5 +1,5 @@
-import type { Page, Locator } from '@playwright/test';
-import { BasePage } from './base.page';
+import type { Page, Locator } from "@playwright/test";
+import { BasePage } from "./base.page";
 
 export class ListViewsPage extends BasePage {
   readonly createButton: Locator;
@@ -8,13 +8,13 @@ export class ListViewsPage extends BasePage {
 
   constructor(page: Page, tenantSlug?: string) {
     super(page, tenantSlug);
-    this.createButton = this.testId('add-listview-button');
-    this.table = this.testId('listviews-table');
-    this.formModal = this.testId('listview-form-modal');
+    this.createButton = this.testId("add-listview-button");
+    this.table = this.testId("listviews-table");
+    this.formModal = this.testId("listview-form-modal");
   }
 
   async goto(): Promise<void> {
-    await this.page.goto(this.tenantUrl('/listviews'));
+    await this.page.goto(this.tenantUrl("/listviews"));
     await this.waitForLoadingComplete();
   }
 
@@ -31,17 +31,17 @@ export class ListViewsPage extends BasePage {
     collectionId?: string;
     visibility?: string;
   }): Promise<void> {
-    await this.testId('listview-name-input').fill(name);
+    await this.testId("listview-name-input").fill(name);
     if (collectionId !== undefined) {
-      await this.testId('listview-collectionId-input').fill(collectionId);
+      await this.testId("listview-collectionId-input").fill(collectionId);
     }
     if (visibility !== undefined) {
-      await this.testId('listview-visibility-input').fill(visibility);
+      await this.testId("listview-visibility-input").fill(visibility);
     }
   }
 
   async submitForm(): Promise<void> {
-    await this.testId('listview-form-submit').click();
+    await this.testId("listview-form-submit").click();
   }
 
   async getRowCount(): Promise<number> {

@@ -24,9 +24,16 @@ test.describe("Plugins", () => {
     const pluginsPage = new PluginsPage(page);
     await pluginsPage.goto();
 
-    const contentOrEmpty = pluginsPage.pluginsPage.or(
-      page.getByTestId("empty-state"),
-    );
-    await expect(contentOrEmpty).toBeVisible();
+    // Check for either plugin cards or the empty state message within the plugins page
+    // Note: both plugins-page and empty-state may exist simultaneously (empty-state inside plugins-page),
+    // so we check for either a plugin card or the empty state text instead of using .or()
+    const hasPluginCards =
+      (await page.locator('[data-testid^="plugin-card-"]').count()) > 0;
+    const hasEmptyState = await page
+      .getByText(/no.*plugin/i)
+      .isVisible()
+      .catch(() => false);
+
+    expect(hasPluginCards || hasEmptyState).toBe(true);
   });
 });

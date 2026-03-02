@@ -1,5 +1,5 @@
-import type { Page, Locator } from '@playwright/test';
-import { BasePage } from './base.page';
+import type { Page, Locator } from "@playwright/test";
+import { BasePage } from "./base.page";
 
 export class EmailTemplatesPage extends BasePage {
   readonly createButton: Locator;
@@ -15,20 +15,20 @@ export class EmailTemplatesPage extends BasePage {
 
   constructor(page: Page, tenantSlug?: string) {
     super(page, tenantSlug);
-    this.createButton = this.testId('add-email-template-button');
-    this.table = this.testId('email-templates-table');
-    this.formModal = this.testId('email-template-form-modal');
-    this.nameInput = this.testId('email-template-name-input');
-    this.subjectInput = this.testId('email-template-subject-input');
-    this.bodyHtmlInput = this.testId('email-template-body-html-input');
-    this.bodyTextInput = this.testId('email-template-body-text-input');
-    this.activeCheckbox = this.testId('email-template-active-input');
-    this.submitButton = this.testId('email-template-form-submit');
-    this.cancelButton = this.testId('email-template-form-cancel');
+    this.createButton = this.testId("add-email-template-button");
+    this.table = this.testId("email-templates-table");
+    this.formModal = this.testId("email-template-form-modal");
+    this.nameInput = this.testId("email-template-name-input");
+    this.subjectInput = this.testId("email-template-subject-input");
+    this.bodyHtmlInput = this.testId("email-template-body-html-input");
+    this.bodyTextInput = this.testId("email-template-body-text-input");
+    this.activeCheckbox = this.testId("email-template-active-input");
+    this.submitButton = this.testId("email-template-form-submit");
+    this.cancelButton = this.testId("email-template-form-cancel");
   }
 
   async goto(): Promise<void> {
-    await this.page.goto(this.tenantUrl('/email-templates'));
+    await this.page.goto(this.tenantUrl("/email-templates"));
     await this.waitForLoadingComplete();
   }
 
@@ -59,9 +59,7 @@ export class EmailTemplatesPage extends BasePage {
   }
 
   async getRowCount(): Promise<number> {
-    return this.page
-      .locator('[data-testid^="email-template-row-"]')
-      .count();
+    return this.page.locator('[data-testid^="email-template-row-"]').count();
   }
 
   async clickEdit(index: number): Promise<void> {

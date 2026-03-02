@@ -1,5 +1,5 @@
-import type { Page, Locator } from '@playwright/test';
-import { BasePage } from '../base.page';
+import type { Page, Locator } from "@playwright/test";
+import { BasePage } from "../base.page";
 
 export class AppHomePage extends BasePage {
   readonly quickActions: Locator;
@@ -9,21 +9,19 @@ export class AppHomePage extends BasePage {
 
   constructor(page: Page, tenantSlug?: string) {
     super(page, tenantSlug);
-    this.quickActions = this.testId('quick-actions');
-    this.recentItems = this.testId('recent-items');
-    this.favorites = this.testId('favorites');
-    this.collectionsGrid = this.testId('collections-grid');
+    this.quickActions = this.testId("quick-create-section");
+    this.recentItems = this.testId("recent-records-section");
+    this.favorites = this.testId("favorites-section");
+    this.collectionsGrid = this.testId("collections-grid");
   }
 
   async goto(): Promise<void> {
-    await this.page.goto(this.tenantUrl('/app/home'));
+    await this.page.goto(this.tenantUrl("/app/home"));
     await this.waitForLoadingComplete();
   }
 
   async getQuickActionCount(): Promise<number> {
-    return this.quickActions
-      .locator('[data-testid^="quick-action-"]')
-      .count();
+    return this.quickActions.locator('[data-testid^="quick-action-"]').count();
   }
 
   async clickQuickAction(name: string): Promise<void> {
@@ -31,9 +29,7 @@ export class AppHomePage extends BasePage {
   }
 
   async getRecentItemCount(): Promise<number> {
-    return this.recentItems
-      .locator('[data-testid^="recent-item-"]')
-      .count();
+    return this.recentItems.locator('[data-testid^="recent-item-"]').count();
   }
 
   async clickRecentItem(index: number): Promise<void> {

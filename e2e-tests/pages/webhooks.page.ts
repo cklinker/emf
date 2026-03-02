@@ -1,5 +1,5 @@
-import type { Page, Locator } from '@playwright/test';
-import { BasePage } from './base.page';
+import type { Page, Locator } from "@playwright/test";
+import { BasePage } from "./base.page";
 
 export class WebhooksPage extends BasePage {
   readonly webhooksPage: Locator;
@@ -16,21 +16,21 @@ export class WebhooksPage extends BasePage {
 
   constructor(page: Page, tenantSlug?: string) {
     super(page, tenantSlug);
-    this.webhooksPage = this.testId('webhooks-page');
-    this.createButton = this.testId('add-webhook-button');
-    this.table = this.testId('webhooks-table');
-    this.formOverlay = this.testId('webhook-form-overlay');
-    this.formModal = this.testId('webhook-form-modal');
-    this.nameInput = this.testId('webhook-name-input');
-    this.urlInput = this.testId('webhook-url-input');
-    this.eventsInput = this.testId('webhook-events-input');
-    this.activeCheckbox = this.testId('webhook-active-input');
-    this.submitButton = this.testId('webhook-form-submit');
-    this.cancelButton = this.testId('webhook-form-cancel');
+    this.webhooksPage = this.testId("webhooks-page");
+    this.createButton = this.testId("add-webhook-button");
+    this.table = this.testId("webhooks-table");
+    this.formOverlay = this.testId("webhook-form-overlay");
+    this.formModal = this.testId("webhook-form-modal");
+    this.nameInput = this.testId("webhook-name-input");
+    this.urlInput = this.testId("webhook-url-input");
+    this.eventsInput = this.testId("webhook-events-input");
+    this.activeCheckbox = this.testId("webhook-active-input");
+    this.submitButton = this.testId("webhook-form-submit");
+    this.cancelButton = this.testId("webhook-form-cancel");
   }
 
   async goto(): Promise<void> {
-    await this.page.goto(this.tenantUrl('/webhooks'));
+    await this.page.goto(this.tenantUrl("/webhooks"));
     await this.waitForLoadingComplete();
   }
 
@@ -58,13 +58,13 @@ export class WebhooksPage extends BasePage {
 
   async clickEdit(index: number): Promise<void> {
     await this.testId(`webhook-row-${index}`)
-      .getByRole('button', { name: /edit/i })
+      .getByRole("button", { name: /edit/i })
       .click();
   }
 
   async clickDelete(index: number): Promise<void> {
     await this.testId(`webhook-row-${index}`)
-      .getByRole('button', { name: /delete/i })
+      .getByRole("button", { name: /delete/i })
       .click();
   }
 }

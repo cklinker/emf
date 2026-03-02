@@ -1,5 +1,5 @@
-import type { Page, Locator } from '@playwright/test';
-import { BasePage } from './base.page';
+import type { Page, Locator } from "@playwright/test";
+import { BasePage } from "./base.page";
 
 export class ScheduledJobsPage extends BasePage {
   readonly createButton: Locator;
@@ -14,19 +14,19 @@ export class ScheduledJobsPage extends BasePage {
 
   constructor(page: Page, tenantSlug?: string) {
     super(page, tenantSlug);
-    this.createButton = this.testId('add-scheduled-job-button');
-    this.table = this.testId('scheduled-jobs-table');
-    this.formModal = this.testId('scheduled-job-form-modal');
-    this.nameInput = this.testId('scheduled-job-name-input');
-    this.cronInput = this.testId('scheduled-job-cron-expression-input');
-    this.typeInput = this.testId('scheduled-job-type-input');
-    this.activeCheckbox = this.testId('scheduled-job-active-input');
-    this.submitButton = this.testId('scheduled-job-form-submit');
-    this.cancelButton = this.testId('scheduled-job-form-cancel');
+    this.createButton = this.testId("add-scheduled-job-button");
+    this.table = this.testId("scheduled-jobs-table");
+    this.formModal = this.testId("scheduled-job-form-modal");
+    this.nameInput = this.testId("scheduled-job-name-input");
+    this.cronInput = this.testId("scheduled-job-cron-expression-input");
+    this.typeInput = this.testId("scheduled-job-type-input");
+    this.activeCheckbox = this.testId("scheduled-job-active-input");
+    this.submitButton = this.testId("scheduled-job-form-submit");
+    this.cancelButton = this.testId("scheduled-job-form-cancel");
   }
 
   async goto(): Promise<void> {
-    await this.page.goto(this.tenantUrl('/scheduled-jobs'));
+    await this.page.goto(this.tenantUrl("/scheduled-jobs"));
     await this.waitForLoadingComplete();
   }
 
@@ -47,7 +47,7 @@ export class ScheduledJobsPage extends BasePage {
   }): Promise<void> {
     await this.nameInput.fill(name);
     if (type !== undefined) {
-      await this.typeInput.fill(type);
+      await this.typeInput.selectOption(type);
     }
     if (cronExpression !== undefined) {
       await this.cronInput.fill(cronExpression);
@@ -65,9 +65,7 @@ export class ScheduledJobsPage extends BasePage {
   }
 
   async getRowCount(): Promise<number> {
-    return this.page
-      .locator('[data-testid^="scheduled-job-row-"]')
-      .count();
+    return this.page.locator('[data-testid^="scheduled-job-row-"]').count();
   }
 
   async clickEdit(index: number): Promise<void> {

@@ -1,5 +1,5 @@
-import type { Page, Locator } from '@playwright/test';
-import { BasePage } from './base.page';
+import type { Page, Locator } from "@playwright/test";
+import { BasePage } from "./base.page";
 
 export class PageLayoutsPage extends BasePage {
   readonly createButton: Locator;
@@ -13,18 +13,18 @@ export class PageLayoutsPage extends BasePage {
 
   constructor(page: Page, tenantSlug?: string) {
     super(page, tenantSlug);
-    this.createButton = this.testId('add-layout-button');
-    this.table = this.testId('page-layouts-table');
+    this.createButton = this.testId("add-layout-button");
+    this.table = this.testId("page-layouts-table");
     this.editButton = this.page.locator('[data-testid^="edit-button-"]');
     this.deleteButton = this.page.locator('[data-testid^="delete-button-"]');
-    this.editorCanvas = this.testId('layout-editor');
+    this.editorCanvas = this.testId("layout-editor");
     this.toolbar = this.page.locator('[data-testid^="design-button-"]');
-    this.fieldPalette = this.page.locator('.field-palette');
-    this.propertyPanel = this.page.locator('.property-panel');
+    this.fieldPalette = this.page.locator(".field-palette");
+    this.propertyPanel = this.page.locator(".property-panel");
   }
 
   async goto(): Promise<void> {
-    await this.page.goto(this.tenantUrl('/layouts'));
+    await this.page.goto(this.tenantUrl("/layouts"));
     await this.waitForLoadingComplete();
   }
 

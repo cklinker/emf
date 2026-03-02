@@ -2,6 +2,7 @@ package com.emf.gateway.ratelimit;
 
 import com.emf.gateway.auth.GatewayPrincipal;
 import com.emf.gateway.auth.JwtAuthenticationFilter;
+import com.emf.gateway.cache.GatewayCacheManager;
 import com.emf.gateway.filter.TenantResolutionFilter;
 import com.emf.gateway.route.RateLimitConfig;
 import org.slf4j.Logger;
@@ -40,18 +41,18 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
     private static final Logger log = LoggerFactory.getLogger(RateLimitFilter.class);
 
     private final RedisRateLimiter rateLimiter;
-    private final TenantGovernorLimitCache governorLimitCache;
+    private final GatewayCacheManager cacheManager;
 
     /**
      * Creates a new RateLimitFilter.
      *
-     * @param rateLimiter the Redis-based rate limiter
-     * @param governorLimitCache the tenant governor limit cache
+     * @param rateLimiter  the Redis-based rate limiter
+     * @param cacheManager the gateway cache manager
      */
     public RateLimitFilter(RedisRateLimiter rateLimiter,
-                          TenantGovernorLimitCache governorLimitCache) {
+                          GatewayCacheManager cacheManager) {
         this.rateLimiter = rateLimiter;
-        this.governorLimitCache = governorLimitCache;
+        this.cacheManager = cacheManager;
     }
 
     @Override
@@ -75,7 +76,7 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
         }
 
         // Get the rate limit config from the tenant's governor limits
-        RateLimitConfig config = governorLimitCache.getRateLimitForTenant(tenantId);
+        RateLimitConfig config = cacheManager.getRateLimitForTenant(tenantId);
         String rateLimitKey = tenantId;
 
         log.debug("Checking rate limit for tenant: {}, principal: {}, limit: {} requests per {}",

@@ -1,7 +1,7 @@
 package com.emf.gateway.service;
 
+import com.emf.gateway.cache.GatewayCacheManager;
 import com.emf.gateway.config.BootstrapConfig;
-import com.emf.gateway.ratelimit.TenantGovernorLimitCache;
 import com.emf.gateway.route.RouteDefinition;
 import com.emf.gateway.route.RouteRegistry;
 import okhttp3.mockwebserver.MockResponse;
@@ -28,7 +28,7 @@ class RouteConfigServiceTest {
     private MockWebServer mockWebServer;
     private RouteConfigService routeConfigService;
     private RouteRegistry routeRegistry;
-    private TenantGovernorLimitCache governorLimitCache;
+    private GatewayCacheManager cacheManager;
 
     private String workerServiceUrl;
 
@@ -39,12 +39,12 @@ class RouteConfigServiceTest {
 
         workerServiceUrl = mockWebServer.url("/").toString().replaceAll("/$", "");
         routeRegistry = new RouteRegistry();
-        governorLimitCache = new TenantGovernorLimitCache();
+        cacheManager = new GatewayCacheManager(WebClient.builder(), workerServiceUrl);
 
         routeConfigService = new RouteConfigService(
             WebClient.builder(),
             routeRegistry,
-            governorLimitCache,
+            cacheManager,
             workerServiceUrl
         );
     }

@@ -1,6 +1,6 @@
 package com.emf.gateway.filter;
 
-import com.emf.gateway.tenant.TenantSlugCache;
+import com.emf.gateway.cache.GatewayCacheManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -44,17 +44,17 @@ public class TenantSlugExtractionFilter implements WebFilter, Ordered {
     /** Tenant slug pattern matching the Tenant entity validation. */
     private static final Pattern SLUG_PATTERN = Pattern.compile("^[a-z][a-z0-9-]{1,61}[a-z0-9]$");
 
-    private final TenantSlugCache slugCache;
+    private final GatewayCacheManager cacheManager;
     private final boolean enabled;
     private final boolean requirePrefix;
     private final List<String> platformPaths;
 
     public TenantSlugExtractionFilter(
-            TenantSlugCache slugCache,
+            GatewayCacheManager cacheManager,
             @Value("${emf.gateway.tenant-slug.enabled:true}") boolean enabled,
             @Value("${emf.gateway.tenant-slug.require-prefix:false}") boolean requirePrefix,
             @Value("${emf.gateway.tenant-slug.platform-paths:/actuator,/platform}") List<String> platformPaths) {
-        this.slugCache = slugCache;
+        this.cacheManager = cacheManager;
         this.enabled = enabled;
         this.requirePrefix = requirePrefix;
         this.platformPaths = platformPaths;
@@ -106,7 +106,7 @@ public class TenantSlugExtractionFilter implements WebFilter, Ordered {
         }
 
         // Resolve slug to tenant ID
-        Optional<String> tenantId = slugCache.resolve(firstSegment);
+        Optional<String> tenantId = cacheManager.resolveTenantSlug(firstSegment);
         if (tenantId.isEmpty()) {
             if (requirePrefix) {
                 return notFound(exchange, "Tenant not found: " + firstSegment);

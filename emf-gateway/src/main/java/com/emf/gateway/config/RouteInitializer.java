@@ -1,8 +1,8 @@
 package com.emf.gateway.config;
 
+import com.emf.gateway.cache.GatewayCacheManager;
 import com.emf.gateway.route.RouteRegistry;
 import com.emf.gateway.service.RouteConfigService;
-import com.emf.gateway.tenant.TenantSlugCache;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
@@ -31,25 +31,25 @@ public class RouteInitializer implements ApplicationRunner {
     private final RouteRegistry routeRegistry;
     private final RouteConfigService routeConfigService;
     private final ApplicationEventPublisher eventPublisher;
-    private final TenantSlugCache tenantSlugCache;
+    private final GatewayCacheManager cacheManager;
 
     /**
      * Creates a new RouteInitializer.
      *
-     * @param routeRegistry The route registry to populate
+     * @param routeRegistry      The route registry to populate
      * @param routeConfigService Service for fetching routes from the worker
-     * @param eventPublisher Event publisher for triggering route refresh
-     * @param tenantSlugCache Tenant slug cache to prime on startup
+     * @param eventPublisher     Event publisher for triggering route refresh
+     * @param cacheManager       Gateway cache manager to prime on startup
      */
     public RouteInitializer(
             RouteRegistry routeRegistry,
             RouteConfigService routeConfigService,
             ApplicationEventPublisher eventPublisher,
-            TenantSlugCache tenantSlugCache) {
+            GatewayCacheManager cacheManager) {
         this.routeRegistry = routeRegistry;
         this.routeConfigService = routeConfigService;
         this.eventPublisher = eventPublisher;
-        this.tenantSlugCache = tenantSlugCache;
+        this.cacheManager = cacheManager;
     }
 
     @Override
@@ -58,7 +58,7 @@ public class RouteInitializer implements ApplicationRunner {
 
         // Prime the tenant slug cache before route loading
         try {
-            tenantSlugCache.refresh();
+            cacheManager.refreshTenantSlugsFromWorker();
         } catch (Exception e) {
             logger.warn("Failed to prime tenant slug cache on startup; will retry on next cache refresh: {}", e.getMessage());
         }

@@ -1,6 +1,7 @@
 package com.emf.gateway.ratelimit;
 
 import com.emf.gateway.auth.GatewayPrincipal;
+import com.emf.gateway.cache.GatewayCacheManager;
 import com.emf.gateway.route.RateLimitConfig;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -12,6 +13,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
 import org.springframework.mock.web.server.MockServerWebExchange;
+import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
@@ -36,15 +38,24 @@ class RateLimitFilterTest {
     @Mock
     private GatewayFilterChain chain;
 
-    private TenantGovernorLimitCache governorLimitCache;
+    @Mock
+    private WebClient.Builder webClientBuilder;
+
+    @Mock
+    private WebClient webClient;
+
+    private GatewayCacheManager cacheManager;
     private RateLimitFilter filter;
 
     private static final String TENANT_ID = "test-tenant-id";
 
     @BeforeEach
     void setUp() {
-        governorLimitCache = new TenantGovernorLimitCache();
-        filter = new RateLimitFilter(rateLimiter, governorLimitCache);
+        when(webClientBuilder.baseUrl(anyString())).thenReturn(webClientBuilder);
+        when(webClientBuilder.build()).thenReturn(webClient);
+
+        cacheManager = new GatewayCacheManager(webClientBuilder, "http://localhost:8080");
+        filter = new RateLimitFilter(rateLimiter, cacheManager);
         lenient().when(chain.filter(any())).thenReturn(Mono.empty());
         lenient().when(rateLimiter.incrementDailyCounter(anyString())).thenReturn(Mono.empty());
     }
@@ -91,9 +102,9 @@ class RateLimitFilterTest {
         exchange.getAttributes().put("gateway.principal", principal);
         exchange.getAttributes().put("tenantId", TENANT_ID);
 
-        // Governor limits: 100,000 per day → ~69 per minute
-        governorLimitCache.updateTenantLimit(TENANT_ID, 100_000);
-        RateLimitConfig expectedConfig = governorLimitCache.getRateLimitForTenant(TENANT_ID);
+        // Governor limits: 100,000 per day -> ~69 per minute
+        cacheManager.updateGovernorLimit(TENANT_ID, 100_000);
+        RateLimitConfig expectedConfig = cacheManager.getRateLimitForTenant(TENANT_ID);
 
         when(rateLimiter.checkRateLimit(eq(TENANT_ID), eq("tenant"), any(RateLimitConfig.class)))
             .thenReturn(Mono.just(RateLimitResult.allowed(50)));
@@ -121,7 +132,7 @@ class RateLimitFilterTest {
         exchange.getAttributes().put("gateway.principal", principal);
         exchange.getAttributes().put("tenantId", TENANT_ID);
 
-        governorLimitCache.updateTenantLimit(TENANT_ID, 100_000);
+        cacheManager.updateGovernorLimit(TENANT_ID, 100_000);
 
         when(rateLimiter.checkRateLimit(eq(TENANT_ID), eq("tenant"), any(RateLimitConfig.class)))
             .thenReturn(Mono.just(RateLimitResult.notAllowed(Duration.ofSeconds(60))));
@@ -150,8 +161,8 @@ class RateLimitFilterTest {
         String tenantId1 = "tenant-1";
         String tenantId2 = "tenant-2";
 
-        governorLimitCache.updateTenantLimit(tenantId1, 50_000);
-        governorLimitCache.updateTenantLimit(tenantId2, 200_000);
+        cacheManager.updateGovernorLimit(tenantId1, 50_000);
+        cacheManager.updateGovernorLimit(tenantId2, 200_000);
 
         // First tenant
         MockServerHttpRequest request1 = MockServerHttpRequest.get("/api/users").build();
@@ -221,7 +232,7 @@ class RateLimitFilterTest {
         exchange.getAttributes().put("gateway.principal", principal);
         exchange.getAttributes().put("tenantId", TENANT_ID);
 
-        governorLimitCache.updateTenantLimit(TENANT_ID, 100_000);
+        cacheManager.updateGovernorLimit(TENANT_ID, 100_000);
 
         when(rateLimiter.checkRateLimit(eq(TENANT_ID), eq("tenant"), any(RateLimitConfig.class)))
             .thenReturn(Mono.just(RateLimitResult.allowed(0)));

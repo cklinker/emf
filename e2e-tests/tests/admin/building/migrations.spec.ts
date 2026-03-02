@@ -2,7 +2,7 @@ import { test, expect } from "../../../fixtures";
 
 test.describe("Migrations", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/default/setup/migrations");
+    await page.goto("/default/migrations");
     await page.waitForLoadState("networkidle");
   });
 

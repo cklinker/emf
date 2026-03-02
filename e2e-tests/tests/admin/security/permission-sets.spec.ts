@@ -2,7 +2,7 @@ import { test, expect } from "../../../fixtures";
 
 test.describe("Permission Sets", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/default/setup/permission-sets");
+    await page.goto("/default/permission-sets");
     await page.waitForLoadState("networkidle");
   });
 

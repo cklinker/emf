@@ -12,9 +12,22 @@ test.describe("Custom Page", () => {
 
     // Custom pages may show content, a loading state, or a "not found" message
     // depending on whether the page slug exists and has a registered component
-    const content = page.getByTestId("custom-page-content");
-    const notFound = page.getByText(/not found|no.*page|loading/i);
-    const contentOrNotFound = content.or(notFound);
-    await expect(contentOrNotFound).toBeVisible({ timeout: 10_000 });
+    const hasContent = await page
+      .getByTestId("custom-page-content")
+      .isVisible({ timeout: 5000 })
+      .catch(() => false);
+    const hasNotFound = await page
+      .getByText(/not found/i)
+      .first()
+      .isVisible({ timeout: 3000 })
+      .catch(() => false);
+    const hasLoading = await page
+      .getByText(/loading/i)
+      .first()
+      .isVisible({ timeout: 2000 })
+      .catch(() => false);
+
+    // Any of these states is acceptable
+    expect(hasContent || hasNotFound || hasLoading).toBe(true);
   });
 });

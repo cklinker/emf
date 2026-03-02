@@ -31,7 +31,8 @@ test.describe("Plugins", () => {
       (await page.locator('[data-testid^="plugin-card-"]').count()) > 0;
     const hasEmptyState = await page
       .getByText(/no.*plugin/i)
-      .isVisible()
+      .first()
+      .isVisible({ timeout: 3000 })
       .catch(() => false);
 
     expect(hasPluginCards || hasEmptyState).toBe(true);

@@ -2,7 +2,7 @@ import { test, expect } from "../../../fixtures";
 
 test.describe("Security Audit", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/default/setup/security-audit");
+    await page.goto("/default/security-audit");
     await page.waitForLoadState("networkidle");
   });
 

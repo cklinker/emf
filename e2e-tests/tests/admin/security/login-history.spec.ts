@@ -2,7 +2,7 @@ import { test, expect } from "../../../fixtures";
 
 test.describe("Login History", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/default/setup/login-history");
+    await page.goto("/default/login-history");
     await page.waitForLoadState("networkidle");
   });
 

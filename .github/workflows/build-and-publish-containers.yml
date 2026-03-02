@@ -114,14 +114,25 @@ jobs:
         run: npm run test
 
   # ===========================================================================
-  # Build and Push Container Images
-  # All services built in a single job to avoid repeated checkouts and
-  # Docker Buildx setup across multiple K8s pods.
+  # Build and Push Container Images (parallel via matrix)
   # ===========================================================================
   build-and-push:
-    name: Build & Push Images
+    name: Build & Push ${{ matrix.service }}
     needs: [test-java, test-frontend]
     runs-on: k8s-runner
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: gateway
+            dockerfile: emf-gateway/Dockerfile
+            image: emf-gateway
+          - service: worker
+            dockerfile: emf-worker/Dockerfile
+            image: emf-worker
+          - service: ui
+            dockerfile: emf-ui/Dockerfile
+            image: emf-ui
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -140,46 +151,17 @@ jobs:
         id: sha
         run: echo "short=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
 
-      # --- Gateway ---
-      - name: Build and push Gateway
+      - name: Build and push ${{ matrix.service }}
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: emf-gateway/Dockerfile
+          file: ${{ matrix.dockerfile }}
           push: ${{ github.event_name != 'workflow_dispatch' || inputs.push_images }}
           tags: |
-            ${{ env.DOCKERHUB_USERNAME }}/emf-gateway:latest
-            ${{ env.DOCKERHUB_USERNAME }}/emf-gateway:main-${{ steps.sha.outputs.short }}
-          cache-from: type=gha,scope=gateway
-          cache-to: type=gha,mode=max,scope=gateway
-          platforms: linux/amd64
-
-      # --- Worker ---
-      - name: Build and push Worker
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: emf-worker/Dockerfile
-          push: ${{ github.event_name != 'workflow_dispatch' || inputs.push_images }}
-          tags: |
-            ${{ env.DOCKERHUB_USERNAME }}/emf-worker:latest
-            ${{ env.DOCKERHUB_USERNAME }}/emf-worker:main-${{ steps.sha.outputs.short }}
-          cache-from: type=gha,scope=worker
-          cache-to: type=gha,mode=max,scope=worker
-          platforms: linux/amd64
-
-      # --- Admin UI ---
-      - name: Build and push Admin UI
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: emf-ui/Dockerfile
-          push: ${{ github.event_name != 'workflow_dispatch' || inputs.push_images }}
-          tags: |
-            ${{ env.DOCKERHUB_USERNAME }}/emf-ui:latest
-            ${{ env.DOCKERHUB_USERNAME }}/emf-ui:main-${{ steps.sha.outputs.short }}
-          cache-from: type=gha,scope=ui
-          cache-to: type=gha,mode=max,scope=ui
+            ${{ env.DOCKERHUB_USERNAME }}/${{ matrix.image }}:latest
+            ${{ env.DOCKERHUB_USERNAME }}/${{ matrix.image }}:main-${{ steps.sha.outputs.short }}
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
           platforms: linux/amd64
 
   # ===========================================================================

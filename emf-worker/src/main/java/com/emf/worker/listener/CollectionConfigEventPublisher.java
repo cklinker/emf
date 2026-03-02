@@ -82,7 +82,6 @@ public class CollectionConfigEventPublisher implements BeforeSaveHook {
         payload.setName(getString(record, "name"));
         payload.setDisplayName(getString(record, "displayName"));
         payload.setDescription(getString(record, "description"));
-        payload.setStorageMode(getString(record, "storageMode"));
         payload.setChangeType(changeType);
 
         Object active = record.get("active");

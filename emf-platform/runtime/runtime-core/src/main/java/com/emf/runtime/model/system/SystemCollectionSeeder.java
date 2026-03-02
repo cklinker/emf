@@ -42,9 +42,9 @@ public class SystemCollectionSeeder {
 
     private static final String INSERT_COLLECTION = """
             INSERT INTO collection (id, tenant_id, name, display_name, description, path,
-                                    storage_mode, active, current_version, system_collection,
+                                    active, current_version, system_collection,
                                     created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """;
 
     private static final String UPDATE_SYSTEM_FLAG =
@@ -138,9 +138,6 @@ public class SystemCollectionSeeder {
         Timestamp now = Timestamp.from(Instant.now());
 
         String path = definition.apiConfig() != null ? definition.apiConfig().basePath() : null;
-        String storageMode = definition.storageConfig() != null
-                ? definition.storageConfig().mode().name()
-                : "PHYSICAL_TABLES";
 
         jdbcTemplate.update(INSERT_COLLECTION,
                 collectionId,
@@ -149,7 +146,6 @@ public class SystemCollectionSeeder {
                 definition.displayName(),
                 definition.description(),
                 path,
-                storageMode,
                 true,   // active
                 1,      // current_version
                 true,   // system_collection

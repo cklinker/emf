@@ -105,11 +105,6 @@
     "collectionName": "Sammlungsname",
     "displayName": "Anzeigename",
     "description": "Beschreibung",
-    "storageMode": "Speichermodus",
-    "storageModes": {
-      "physicalTable": "Physische Tabelle",
-      "jsonb": "JSONB"
-    },
     "status": "Status",
     "active": "Aktiv",
     "inactive": "Inaktiv",
@@ -1007,7 +1002,6 @@
     "displayNamePlaceholder": "z.B. Benutzerprofile",
     "descriptionPlaceholder": "Geben Sie eine Beschreibung für diese Sammlung ein...",
     "nameHint": "Nur Kleinbuchstaben, Zahlen und Unterstriche. Muss mit einem Buchstaben beginnen.",
-    "storageModeHint": "JSONB ist flexibel und für die meisten Anwendungsfälle empfohlen. Physische Tabelle bietet bessere Abfrageleistung für große Datensätze.",
     "activeHint": "Inaktive Sammlungen werden im Ressourcen-Browser ausgeblendet, aber die Daten bleiben erhalten.",
     "validation": {
       "nameRequired": "Sammlungsname ist erforderlich",
@@ -1015,8 +1009,7 @@
       "nameFormat": "Name muss kleingeschrieben sein, mit einem Buchstaben beginnen und darf nur Buchstaben, Zahlen und Unterstriche enthalten",
       "displayNameRequired": "Anzeigename ist erforderlich",
       "displayNameTooLong": "Anzeigename darf maximal 100 Zeichen lang sein",
-      "descriptionTooLong": "Beschreibung darf maximal 500 Zeichen lang sein",
-      "storageModeRequired": "Speichermodus ist erforderlich"
+      "descriptionTooLong": "Beschreibung darf maximal 500 Zeichen lang sein"
     }
   },
   "authorizationPanel": {

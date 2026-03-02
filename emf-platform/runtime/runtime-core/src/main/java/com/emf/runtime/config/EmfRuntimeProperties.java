@@ -7,7 +7,6 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * 
  * <p>Properties are prefixed with {@code emf} and include:
  * <ul>
- *   <li>emf.storage.mode - Storage mode (PHYSICAL_TABLES or JSONB_STORE)</li>
  *   <li>emf.query.default-page-size - Default page size for queries</li>
  *   <li>emf.events.enabled - Whether event publishing is enabled</li>
  *   <li>emf.events.topic-prefix - Kafka topic prefix</li>
@@ -18,18 +17,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "emf")
 public class EmfRuntimeProperties {
     
-    private Storage storage = new Storage();
     private Query query = new Query();
     private Events events = new Events();
-    
-    public Storage getStorage() {
-        return storage;
-    }
-    
-    public void setStorage(Storage storage) {
-        this.storage = storage;
-    }
-    
+
     public Query getQuery() {
         return query;
     }
@@ -44,25 +34,6 @@ public class EmfRuntimeProperties {
     
     public void setEvents(Events events) {
         this.events = events;
-    }
-    
-    /**
-     * Storage configuration properties.
-     */
-    public static class Storage {
-        
-        /**
-         * Storage mode: PHYSICAL_TABLES (default) or JSONB_STORE.
-         */
-        private String mode = "PHYSICAL_TABLES";
-        
-        public String getMode() {
-            return mode;
-        }
-        
-        public void setMode(String mode) {
-            this.mode = mode;
-        }
     }
     
     /**

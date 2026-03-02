@@ -130,15 +130,14 @@ class CollectionDefinitionBuilderTest {
     class DefaultValuesTests {
 
         @Test
-        @DisplayName("Should default to Mode A (PHYSICAL_TABLES) storage")
-        void shouldDefaultToModeAStorage() {
+        @DisplayName("Should default to physical table storage with collection name")
+        void shouldDefaultToPhysicalTableStorage() {
             CollectionDefinition collection = CollectionDefinition.builder()
                 .name("test")
                 .addField(FieldDefinition.string("field"))
                 .build();
-            
+
             assertNotNull(collection.storageConfig());
-            assertEquals(StorageMode.PHYSICAL_TABLES, collection.storageConfig().mode());
             assertEquals("test", collection.storageConfig().tableName());
         }
 
@@ -236,18 +235,18 @@ class CollectionDefinitionBuilderTest {
         @DisplayName("Should use custom storage config when provided")
         void shouldUseCustomStorageConfig() {
             StorageConfig customStorage = new StorageConfig(
-                StorageMode.JSONB_STORE, 
-                null, 
+                "custom_table",
                 Map.of("key", "value")
             );
-            
+
             CollectionDefinition collection = CollectionDefinition.builder()
                 .name("test")
                 .addField(FieldDefinition.string("field"))
                 .storageConfig(customStorage)
                 .build();
-            
-            assertEquals(StorageMode.JSONB_STORE, collection.storageConfig().mode());
+
+            assertEquals("custom_table", collection.storageConfig().tableName());
+            assertEquals(Map.of("key", "value"), collection.storageConfig().adapterConfig());
         }
 
         @Test

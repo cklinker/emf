@@ -10,7 +10,6 @@ import com.emf.runtime.registry.CollectionRegistry;
 import com.emf.runtime.registry.ConcurrentCollectionRegistry;
 import com.emf.runtime.router.DynamicCollectionRouter;
 import com.emf.runtime.router.GlobalExceptionHandler;
-import com.emf.runtime.storage.JsonbStorageAdapter;
 import com.emf.runtime.storage.PhysicalTableStorageAdapter;
 import com.emf.runtime.storage.SchemaMigrationEngine;
 import com.emf.runtime.storage.StorageAdapter;
@@ -40,20 +39,14 @@ import org.springframework.kafka.core.KafkaTemplate;
  * <p>Provides default bean configurations for all EMF runtime components:
  * <ul>
  *   <li>CollectionRegistry - ConcurrentCollectionRegistry</li>
- *   <li>StorageAdapter - PhysicalTableStorageAdapter (Mode A) or JsonbStorageAdapter (Mode B)</li>
+ *   <li>StorageAdapter - PhysicalTableStorageAdapter</li>
  *   <li>ValidationEngine - DefaultValidationEngine</li>
  *   <li>QueryEngine - DefaultQueryEngine</li>
  *   <li>EventPublisher - KafkaEventPublisher or NoOpEventPublisher</li>
  *   <li>DynamicCollectionRouter - REST controller</li>
  *   <li>GlobalExceptionHandler - Exception handling</li>
  * </ul>
- * 
- * <p>Storage mode is controlled by the {@code emf.storage.mode} property:
- * <ul>
- *   <li>PHYSICAL_TABLES (default) - Each collection gets its own database table</li>
- *   <li>JSONB_STORE - All collections share a single table with JSONB storage</li>
- * </ul>
- * 
+ *
  * @since 1.0.0
  */
 @Configuration
@@ -80,27 +73,15 @@ public class EmfRuntimeAutoConfiguration {
     }
     
     /**
-     * Creates the Physical Table storage adapter (Mode A).
-     * This is the default storage mode.
+     * Creates the physical table storage adapter.
      */
     @Bean
     @ConditionalOnMissingBean(StorageAdapter.class)
-    @ConditionalOnProperty(name = "emf.storage.mode", havingValue = "PHYSICAL_TABLES", matchIfMissing = true)
     public StorageAdapter physicalTableStorageAdapter(
             JdbcTemplate jdbcTemplate,
             SchemaMigrationEngine migrationEngine,
             com.fasterxml.jackson.databind.ObjectMapper objectMapper) {
         return new PhysicalTableStorageAdapter(jdbcTemplate, migrationEngine, objectMapper);
-    }
-    
-    /**
-     * Creates the JSONB storage adapter (Mode B).
-     */
-    @Bean
-    @ConditionalOnMissingBean(StorageAdapter.class)
-    @ConditionalOnProperty(name = "emf.storage.mode", havingValue = "JSONB_STORE")
-    public StorageAdapter jsonbStorageAdapter(JdbcTemplate jdbcTemplate, ObjectMapper objectMapper) {
-        return new JsonbStorageAdapter(jdbcTemplate, objectMapper);
     }
     
     /**

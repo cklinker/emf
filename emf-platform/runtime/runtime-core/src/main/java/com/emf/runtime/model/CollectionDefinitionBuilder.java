@@ -16,7 +16,7 @@ import java.util.Set;
  *
  * <p>Sensible defaults are applied for optional configuration:
  * <ul>
- *   <li>Storage: Mode A (Physical Tables) with table name "{name}"</li>
+ *   <li>Storage: Physical tables with table name "{name}"</li>
  *   <li>API: All operations enabled</li>
  *   <li>Authorization: Disabled</li>
  *   <li>Events: Disabled</li>
@@ -293,7 +293,7 @@ public class CollectionDefinitionBuilder {
      *
      * <p>Applies sensible defaults for optional configuration:
      * <ul>
-     *   <li>Storage: Mode A (Physical Tables) with table name "{name}"</li>
+     *   <li>Storage: Physical tables with table name "{name}"</li>
      *   <li>API: All operations enabled at "/api/{name}"</li>
      *   <li>Authorization: Disabled</li>
      *   <li>Events: Disabled</li>
@@ -314,7 +314,7 @@ public class CollectionDefinitionBuilder {
 
         // Apply defaults
         if (storageConfig == null) {
-            storageConfig = new StorageConfig(StorageMode.PHYSICAL_TABLES, name, Map.of());
+            storageConfig = StorageConfig.physicalTable(name);
         }
         if (apiConfig == null) {
             apiConfig = ApiConfig.allEnabled("/api/" + name);

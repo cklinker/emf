@@ -26,7 +26,7 @@ class TypeCoercionServiceTest {
             "Test Collection",
             "A test collection",
             List.of(fields),
-            new StorageConfig(StorageMode.PHYSICAL_TABLES, "tbl_test", Map.of()),
+            new StorageConfig("tbl_test", Map.of()),
             new ApiConfig(true, true, true, true, true, "/api/test"),
             new AuthzConfig(false, List.of(), List.of()),
             new EventsConfig(false, "emf", List.of()),

@@ -19,7 +19,7 @@ import java.util.Set;
  * @param displayName Human-readable display name
  * @param description Description of the collection
  * @param fields List of field definitions (required, must have at least one field)
- * @param storageConfig Storage configuration (Mode A or Mode B)
+ * @param storageConfig Storage configuration
  * @param apiConfig API configuration (enabled operations, base path)
  * @param authzConfig Authorization configuration (roles)
  * @param eventsConfig Event publishing configuration (Kafka)
@@ -106,6 +106,16 @@ public record CollectionDefinition(
              systemCollection, tenantScoped, readOnly, immutableFields, columnMapping, null);
     }
     
+    /**
+     * Returns {@code true} if this collection is virtual (has no physical storage).
+     * A virtual collection has a {@code null} storage configuration.
+     *
+     * @return true if this collection is virtual
+     */
+    public boolean isVirtual() {
+        return storageConfig() == null;
+    }
+
     /**
      * Gets a field definition by name.
      * 

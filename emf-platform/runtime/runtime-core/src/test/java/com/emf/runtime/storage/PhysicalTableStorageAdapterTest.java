@@ -4,7 +4,6 @@ import com.emf.runtime.model.CollectionDefinition;
 import com.emf.runtime.model.FieldDefinition;
 import com.emf.runtime.model.FieldType;
 import com.emf.runtime.model.StorageConfig;
-import com.emf.runtime.model.StorageMode;
 import com.emf.runtime.query.FilterCondition;
 import com.emf.runtime.query.FilterOperator;
 import com.emf.runtime.query.Pagination;
@@ -83,7 +82,6 @@ class PhysicalTableStorageAdapterTest {
         );
         
         StorageConfig storageConfig = new StorageConfig(
-            StorageMode.PHYSICAL_TABLES,
             name,
             Map.of()
         );

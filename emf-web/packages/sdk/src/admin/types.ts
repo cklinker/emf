@@ -12,7 +12,6 @@ export interface CollectionDefinition {
   name: string;
   displayName: string;
   description?: string;
-  storageMode?: 'PHYSICAL_TABLE' | 'JSONB';
   active?: boolean;
   currentVersion?: number;
   fields?: FieldDefinition[];

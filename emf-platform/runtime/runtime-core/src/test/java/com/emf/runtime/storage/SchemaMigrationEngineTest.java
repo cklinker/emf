@@ -4,7 +4,6 @@ import com.emf.runtime.model.CollectionDefinition;
 import com.emf.runtime.model.FieldDefinition;
 import com.emf.runtime.model.FieldType;
 import com.emf.runtime.model.StorageConfig;
-import com.emf.runtime.model.StorageMode;
 import com.emf.runtime.storage.SchemaMigrationEngine.MigrationRecord;
 import com.emf.runtime.storage.SchemaMigrationEngine.MigrationType;
 import com.emf.runtime.storage.SchemaMigrationEngine.SchemaDiff;
@@ -59,7 +58,6 @@ class SchemaMigrationEngineTest {
     
     private CollectionDefinition createCollection(String name, List<FieldDefinition> fields) {
         StorageConfig storageConfig = new StorageConfig(
-            StorageMode.PHYSICAL_TABLES,
             name,
             Map.of()
         );

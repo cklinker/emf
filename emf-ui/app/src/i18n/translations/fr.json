@@ -105,11 +105,6 @@
     "collectionName": "Nom de la collection",
     "displayName": "Nom d'affichage",
     "description": "Description",
-    "storageMode": "Mode de stockage",
-    "storageModes": {
-      "physicalTable": "Table physique",
-      "jsonb": "JSONB"
-    },
     "status": "Statut",
     "active": "Actif",
     "inactive": "Inactif",
@@ -1007,7 +1002,6 @@
     "displayNamePlaceholder": "ex. Profils utilisateurs",
     "descriptionPlaceholder": "Entrez une description pour cette collection...",
     "nameHint": "Lettres minuscules, chiffres et underscores uniquement. Doit commencer par une lettre.",
-    "storageModeHint": "JSONB est flexible et recommandé pour la plupart des cas d'utilisation. La table physique offre de meilleures performances de requête pour les grands ensembles de données.",
     "activeHint": "Les collections inactives sont masquées du navigateur de ressources mais les données sont préservées.",
     "validation": {
       "nameRequired": "Le nom de la collection est obligatoire",
@@ -1015,8 +1009,7 @@
       "nameFormat": "Le nom doit être en minuscules, commencer par une lettre et ne contenir que des lettres, des chiffres et des underscores",
       "displayNameRequired": "Le nom d'affichage est obligatoire",
       "displayNameTooLong": "Le nom d'affichage ne doit pas dépasser 100 caractères",
-      "descriptionTooLong": "La description ne doit pas dépasser 500 caractères",
-      "storageModeRequired": "Le mode de stockage est obligatoire"
+      "descriptionTooLong": "La description ne doit pas dépasser 500 caractères"
     }
   },
   "authorizationPanel": {

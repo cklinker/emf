@@ -47,13 +47,13 @@ public class CollectionLifecycleManager {
     private static final Logger log = LoggerFactory.getLogger(CollectionLifecycleManager.class);
 
     private static final String SELECT_COLLECTION_BY_ID = """
-            SELECT id, name, display_name, description, storage_mode, active,
+            SELECT id, name, display_name, description, active,
                    current_version, system_collection, path, tenant_id, display_field_id
             FROM collection WHERE id = ? AND active = true
             """;
 
     private static final String SELECT_COLLECTION_BY_NAME = """
-            SELECT id, name, display_name, description, storage_mode, active,
+            SELECT id, name, display_name, description, active,
                    current_version, system_collection, path, tenant_id, display_field_id
             FROM collection WHERE name = ? AND active = true
             LIMIT 1
@@ -159,8 +159,7 @@ public class CollectionLifecycleManager {
             CollectionDefinition definition = buildDefinition(collectionId, collectionName, collectionRow);
 
             // Skip VIRTUAL collections — they have no physical storage
-            if (definition.storageConfig() != null
-                    && definition.storageConfig().mode() == StorageMode.VIRTUAL) {
+            if (definition.isVirtual()) {
                 log.info("Skipping VIRTUAL collection '{}' (id={}) — no storage to initialize",
                         collectionName, collectionId);
                 collectionRegistry.register(definition);
@@ -436,13 +435,8 @@ public class CollectionLifecycleManager {
             }
         }
 
-        // Parse storage config
-        String storageMode = getStringOrNull(data, "storage_mode", "PHYSICAL_TABLES");
-        if ("PHYSICAL_TABLE".equals(storageMode)) {
-            storageMode = "PHYSICAL_TABLES";
-        }
-        builder.storageConfig(new StorageConfig(
-                StorageMode.valueOf(storageMode), collectionName, null));
+        // Storage config — all user-defined collections use physical tables
+        builder.storageConfig(StorageConfig.physicalTable(collectionName));
 
         // Parse system collection flag
         Boolean systemCollection = (Boolean) data.get("system_collection");

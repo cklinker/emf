@@ -48,7 +48,6 @@ const mockCollection: Collection = {
   name: 'users',
   displayName: 'Users',
   description: 'User accounts collection',
-  storageMode: 'PHYSICAL_TABLE',
   active: true,
   currentVersion: 3,
   fields: [
@@ -397,18 +396,6 @@ describe('CollectionDetailPage', () => {
 
       await waitFor(() => {
         expect(screen.getByTestId('collection-display-name')).toHaveTextContent('Users')
-      })
-    })
-
-    it('should display collection storage mode', async () => {
-      render(
-        <TestWrapper>
-          <CollectionDetailPage />
-        </TestWrapper>
-      )
-
-      await waitFor(() => {
-        expect(screen.getByTestId('collection-storage-mode')).toHaveTextContent('Physical Table')
       })
     })
 

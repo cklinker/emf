@@ -4,7 +4,7 @@
  * <p>This package provides Spring Boot auto-configuration for:
  * <ul>
  *   <li>Runtime registry bean configuration</li>
- *   <li>Storage adapter selection (Mode A vs Mode B via properties)</li>
+ *   <li>Storage adapter configuration</li>
  *   <li>Query engine configuration</li>
  *   <li>Validation engine configuration</li>
  *   <li>Event publisher configuration (Kafka)</li>
@@ -14,7 +14,6 @@
  * 
  * <p>Configuration properties:
  * <ul>
- *   <li>{@code emf.storage.mode} - PHYSICAL_TABLES (default) or JSONB_STORE</li>
  *   <li>{@code emf.query.default-page-size} - Default page size (20)</li>
  *   <li>{@code emf.events.enabled} - Enable/disable event publishing</li>
  *   <li>{@code emf.events.topic-prefix} - Kafka topic prefix</li>

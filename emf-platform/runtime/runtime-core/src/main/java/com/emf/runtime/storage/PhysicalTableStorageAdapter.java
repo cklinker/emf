@@ -14,7 +14,6 @@ import com.emf.runtime.validation.TypeCoercionService;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -32,10 +31,8 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * Storage adapter implementation for Mode A (Physical Tables).
- *
- * <p>Each collection maps to a real PostgreSQL table with columns matching field definitions.
- * This is the default storage mode when no mode is specified.
+ * Storage adapter that maps each collection to a physical PostgreSQL table
+ * with columns matching field definitions.
  *
  * <p>When schema-per-tenant isolation is enabled, tenant collections are stored in
  * separate PostgreSQL schemas named by the tenant's slug. System collections remain
@@ -60,11 +57,9 @@ import java.util.stream.Collectors;
  *
  * @see StorageAdapter
  * @see SchemaMigrationEngine
- * @see com.emf.runtime.model.StorageMode#PHYSICAL_TABLES
  * @since 1.0.0
  */
 @Service
-@ConditionalOnProperty(name = "emf.storage.mode", havingValue = "PHYSICAL_TABLES", matchIfMissing = true)
 public class PhysicalTableStorageAdapter implements StorageAdapter {
 
     private static final Logger log = LoggerFactory.getLogger(PhysicalTableStorageAdapter.class);

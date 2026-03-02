@@ -10,6 +10,5 @@ export type {
   CollectionFormData,
   CollectionFormSchema,
   Collection,
-  StorageMode,
 } from './CollectionForm'
 export { default } from './CollectionForm'

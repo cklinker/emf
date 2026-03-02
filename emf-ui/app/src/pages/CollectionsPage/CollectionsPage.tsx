@@ -30,7 +30,6 @@ export interface Collection {
   name: string
   displayName: string
   description?: string
-  storageMode: 'PHYSICAL_TABLE' | 'JSONB'
   active: boolean
   systemCollection?: boolean
   currentVersion: number

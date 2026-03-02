@@ -39,7 +39,6 @@ const mockCollection: Collection = {
   name: 'test_collection',
   displayName: 'Test Collection',
   description: 'A test collection for testing',
-  storageMode: 'JSONB',
   active: true,
   currentVersion: 1,
   createdAt: '2024-01-01T00:00:00Z',
@@ -64,7 +63,6 @@ describe('CollectionForm Component', () => {
       expect(screen.getByTestId('collection-name-input')).toBeInTheDocument()
       expect(screen.getByTestId('collection-display-name-input')).toBeInTheDocument()
       expect(screen.getByTestId('collection-description-input')).toBeInTheDocument()
-      expect(screen.getByTestId('collection-storage-mode-select')).toBeInTheDocument()
       expect(screen.getByTestId('collection-active-checkbox')).toBeInTheDocument()
     })
 
@@ -74,7 +72,6 @@ describe('CollectionForm Component', () => {
       expect(screen.getByTestId('collection-name-input')).toHaveValue('')
       expect(screen.getByTestId('collection-display-name-input')).toHaveValue('')
       expect(screen.getByTestId('collection-description-input')).toHaveValue('')
-      expect(screen.getByTestId('collection-storage-mode-select')).toHaveValue('JSONB')
       expect(screen.getByTestId('collection-active-checkbox')).toBeChecked()
     })
 
@@ -97,22 +94,10 @@ describe('CollectionForm Component', () => {
       expect(screen.getByTestId('collection-name-input')).not.toBeDisabled()
     })
 
-    it('should render storage mode field as enabled in create mode', () => {
-      renderWithProviders(<CollectionForm {...defaultProps} />)
-
-      expect(screen.getByTestId('collection-storage-mode-select')).not.toBeDisabled()
-    })
-
     it('should render hint text for name field', () => {
       renderWithProviders(<CollectionForm {...defaultProps} />)
 
       expect(screen.getByTestId('name-hint')).toBeInTheDocument()
-    })
-
-    it('should render hint text for storage mode field', () => {
-      renderWithProviders(<CollectionForm {...defaultProps} />)
-
-      expect(screen.getByTestId('storage-mode-hint')).toBeInTheDocument()
     })
   })
 
@@ -125,7 +110,6 @@ describe('CollectionForm Component', () => {
       expect(screen.getByTestId('collection-description-input')).toHaveValue(
         'A test collection for testing'
       )
-      expect(screen.getByTestId('collection-storage-mode-select')).toHaveValue('JSONB')
       expect(screen.getByTestId('collection-active-checkbox')).toBeChecked()
     })
 
@@ -142,22 +126,10 @@ describe('CollectionForm Component', () => {
       expect(screen.getByTestId('collection-name-input')).toBeDisabled()
     })
 
-    it('should disable storage mode field in edit mode', () => {
-      renderWithProviders(<CollectionForm {...defaultProps} collection={mockCollection} />)
-
-      expect(screen.getByTestId('collection-storage-mode-select')).toBeDisabled()
-    })
-
     it('should not render name hint in edit mode', () => {
       renderWithProviders(<CollectionForm {...defaultProps} collection={mockCollection} />)
 
       expect(screen.queryByTestId('name-hint')).not.toBeInTheDocument()
-    })
-
-    it('should not render storage mode hint in edit mode', () => {
-      renderWithProviders(<CollectionForm {...defaultProps} collection={mockCollection} />)
-
-      expect(screen.queryByTestId('storage-mode-hint')).not.toBeInTheDocument()
     })
 
     it('should disable submit button when form is not dirty in edit mode', () => {
@@ -288,10 +260,6 @@ describe('CollectionForm Component', () => {
       await user.type(screen.getByTestId('collection-name-input'), 'my_collection')
       await user.type(screen.getByTestId('collection-display-name-input'), 'My Collection')
       await user.type(screen.getByTestId('collection-description-input'), 'A description')
-      await user.selectOptions(
-        screen.getByTestId('collection-storage-mode-select'),
-        'PHYSICAL_TABLE'
-      )
 
       await user.click(screen.getByTestId('collection-form-submit'))
 
@@ -301,7 +269,6 @@ describe('CollectionForm Component', () => {
           name: 'my_collection',
           displayName: 'My Collection',
           description: 'A description',
-          storageMode: 'PHYSICAL_TABLE',
           active: true,
         })
       })
@@ -379,7 +346,6 @@ describe('CollectionForm Component', () => {
           name: 'test_collection',
           displayName: 'Updated Collection',
           description: 'A test collection for testing',
-          storageMode: 'JSONB',
           active: true,
         })
       })
@@ -393,7 +359,6 @@ describe('CollectionForm Component', () => {
       expect(screen.getByTestId('collection-name-input')).toBeDisabled()
       expect(screen.getByTestId('collection-display-name-input')).toBeDisabled()
       expect(screen.getByTestId('collection-description-input')).toBeDisabled()
-      expect(screen.getByTestId('collection-storage-mode-select')).toBeDisabled()
       expect(screen.getByTestId('collection-active-checkbox')).toBeDisabled()
     })
 
@@ -431,7 +396,6 @@ describe('CollectionForm Component', () => {
       expect(screen.getByLabelText(/Collection Name/i)).toBeInTheDocument()
       expect(screen.getByLabelText(/Display Name/i)).toBeInTheDocument()
       expect(screen.getByLabelText(/Description/i)).toBeInTheDocument()
-      expect(screen.getByLabelText(/Storage Mode/i)).toBeInTheDocument()
       expect(screen.getByLabelText(/Active/i)).toBeInTheDocument()
     })
 
@@ -443,10 +407,6 @@ describe('CollectionForm Component', () => {
         'aria-required',
         'true'
       )
-      expect(screen.getByTestId('collection-storage-mode-select')).toHaveAttribute(
-        'aria-required',
-        'true'
-      )
     })
 
     it('should have aria-describedby pointing to hint in create mode', () => {
@@ -455,10 +415,6 @@ describe('CollectionForm Component', () => {
       expect(screen.getByTestId('collection-name-input')).toHaveAttribute(
         'aria-describedby',
         'name-hint'
-      )
-      expect(screen.getByTestId('collection-storage-mode-select')).toHaveAttribute(
-        'aria-describedby',
-        'storage-mode-hint'
       )
       expect(screen.getByTestId('collection-active-checkbox')).toHaveAttribute(
         'aria-describedby',
@@ -503,27 +459,7 @@ describe('CollectionForm Component', () => {
       renderWithProviders(<CollectionForm {...defaultProps} />)
 
       expect(screen.getByTestId('name-hint')).toHaveAttribute('id', 'name-hint')
-      expect(screen.getByTestId('storage-mode-hint')).toHaveAttribute('id', 'storage-mode-hint')
       expect(screen.getByTestId('active-hint')).toHaveAttribute('id', 'active-hint')
-    })
-  })
-
-  describe('Storage Mode Options', () => {
-    it('should have JSONB and PHYSICAL_TABLE options', () => {
-      renderWithProviders(<CollectionForm {...defaultProps} />)
-
-      const select = screen.getByTestId('collection-storage-mode-select')
-      const options = select.querySelectorAll('option')
-
-      expect(options).toHaveLength(2)
-      expect(options[0]).toHaveValue('JSONB')
-      expect(options[1]).toHaveValue('PHYSICAL_TABLE')
-    })
-
-    it('should default to JSONB in create mode', () => {
-      renderWithProviders(<CollectionForm {...defaultProps} />)
-
-      expect(screen.getByTestId('collection-storage-mode-select')).toHaveValue('JSONB')
     })
   })
 

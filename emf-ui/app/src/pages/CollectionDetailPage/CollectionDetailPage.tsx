@@ -2,7 +2,7 @@
  * CollectionDetailPage Component
  *
  * Displays detailed information about a single collection including:
- * - Collection metadata (name, displayName, description, storageMode, status)
+ * - Collection metadata (name, displayName, description, status)
  * - Fields list with field details
  * - Version history
  *
@@ -78,20 +78,6 @@ export interface CollectionDetailPageProps {
  */
 function getFieldTypeDisplay(type: FieldDefinition['type'], t: (key: string) => string): string {
   return t(`fields.types.${type.toLowerCase()}`)
-}
-
-/**
- * Get display text for storage mode
- */
-function getStorageModeDisplay(mode: Collection['storageMode']): string {
-  switch (mode) {
-    case 'PHYSICAL_TABLE':
-      return 'Physical Table'
-    case 'JSONB':
-      return 'JSONB'
-    default:
-      return mode
-  }
 }
 
 /** Helper to get action badge color classes */
@@ -1021,17 +1007,6 @@ export function CollectionDetailPage({
               data-testid="collection-display-name"
             >
               {collection.displayName || '-'}
-            </span>
-          </div>
-          <div className="flex flex-col gap-1">
-            <span className="text-sm font-medium text-muted-foreground">
-              {t('collections.storageMode')}
-            </span>
-            <span
-              className="text-base text-foreground break-words"
-              data-testid="collection-storage-mode"
-            >
-              {getStorageModeDisplay(collection.storageMode)}
             </span>
           </div>
           <div className="flex flex-col gap-1">

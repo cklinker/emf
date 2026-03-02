@@ -16,7 +16,6 @@ public class CollectionChangedPayload {
     private String name;
     private String displayName;
     private String description;
-    private String storageMode;
     private boolean active;
     private Integer currentVersion;
     private List<FieldPayload> fields;
@@ -60,14 +59,6 @@ public class CollectionChangedPayload {
 
     public void setDescription(String description) {
         this.description = description;
-    }
-
-    public String getStorageMode() {
-        return storageMode;
-    }
-
-    public void setStorageMode(String storageMode) {
-        this.storageMode = storageMode;
     }
 
     public boolean isActive() {

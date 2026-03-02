@@ -50,7 +50,6 @@ interface BasicsData {
   name: string
   displayName: string
   description: string
-  storageMode: 'JSONB' | 'PHYSICAL_TABLE'
   active: boolean
 }
 
@@ -213,7 +212,6 @@ export function CollectionWizardPage({
     name: '',
     displayName: '',
     description: '',
-    storageMode: 'JSONB',
     active: true,
   })
   const [fields, setFields] = useState<FieldDefinition[]>([])
@@ -284,13 +282,6 @@ export function CollectionWizardPage({
 
   const handleDescriptionChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setBasics((prev) => ({ ...prev, description: e.target.value }))
-  }, [])
-
-  const handleStorageModeChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-    setBasics((prev) => ({
-      ...prev,
-      storageMode: e.target.value as 'JSONB' | 'PHYSICAL_TABLE',
-    }))
   }, [])
 
   const handleActiveChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -424,7 +415,6 @@ export function CollectionWizardPage({
         name: basics.name,
         displayName: basics.displayName,
         description: basics.description || '',
-        storageMode: basics.storageMode,
         active: basics.active,
       })
 
@@ -657,29 +647,6 @@ export function CollectionWizardPage({
             />
           </div>
 
-          {/* Storage Mode */}
-          <div className="flex flex-col gap-1">
-            <label
-              htmlFor="wizard-storage-mode"
-              className="flex items-center gap-1 text-sm font-medium text-foreground dark:text-gray-100"
-            >
-              {t('collections.storageMode')}
-            </label>
-            <select
-              id="wizard-storage-mode"
-              className="px-3 py-2 text-base leading-normal text-foreground bg-background border border-border rounded-md appearance-none bg-[url('data:image/svg+xml,%3csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20fill=%27none%27%20viewBox=%270%200%2020%2020%27%3e%3cpath%20stroke=%27%236b7280%27%20stroke-linecap=%27round%27%20stroke-linejoin=%27round%27%20stroke-width=%271.5%27%20d=%27M6%208l4%204%204-4%27/%3e%3c/svg%3e')] bg-[position:right_0.5rem_center] bg-no-repeat bg-[length:1.5em_1.5em] pr-10 cursor-pointer transition-all duration-150 motion-reduce:transition-none focus:outline-none focus:border-primary focus:ring-[3px] focus:ring-primary/25 disabled:cursor-not-allowed dark:text-gray-100 dark:bg-gray-700 dark:border-gray-600"
-              value={basics.storageMode}
-              onChange={handleStorageModeChange}
-              data-testid="wizard-storage-mode-select"
-            >
-              <option value="JSONB">{t('collections.storageModes.jsonb')}</option>
-              <option value="PHYSICAL_TABLE">{t('collections.storageModes.physicalTable')}</option>
-            </select>
-            <span className="text-xs text-muted-foreground mt-1 dark:text-gray-400">
-              {t('collectionForm.storageModeHint')}
-            </span>
-          </div>
-
           {/* Active Toggle */}
           <div className="flex flex-col gap-1">
             <div className="flex items-center gap-2">
@@ -712,7 +679,6 @@ export function CollectionWizardPage({
     handleDisplayNameChange,
     handleNameChange,
     handleDescriptionChange,
-    handleStorageModeChange,
     handleActiveChange,
   ])
 
@@ -1039,18 +1005,6 @@ export function CollectionWizardPage({
                   data-testid="wizard-review-description"
                 >
                   {basics.description || t('common.none')}
-                </span>
-
-                <span className="font-medium text-muted-foreground max-sm:font-semibold dark:text-gray-400">
-                  {t('collections.storageMode')}
-                </span>
-                <span
-                  className="text-foreground break-words dark:text-gray-100"
-                  data-testid="wizard-review-storage-mode"
-                >
-                  {basics.storageMode === 'JSONB'
-                    ? t('collections.storageModes.jsonb')
-                    : t('collections.storageModes.physicalTable')}
                 </span>
 
                 <span className="font-medium text-muted-foreground max-sm:font-semibold dark:text-gray-400">

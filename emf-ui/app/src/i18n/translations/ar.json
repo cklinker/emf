@@ -100,11 +100,6 @@
     "collectionName": "اسم المجموعة",
     "displayName": "اسم العرض",
     "description": "الوصف",
-    "storageMode": "وضع التخزين",
-    "storageModes": {
-      "physicalTable": "جدول فعلي",
-      "jsonb": "JSONB"
-    },
     "status": "الحالة",
     "active": "نشط",
     "inactive": "غير نشط",
@@ -694,7 +689,6 @@
     "displayNamePlaceholder": "مثال: ملفات المستخدمين",
     "descriptionPlaceholder": "أدخل وصفاً لهذه المجموعة...",
     "nameHint": "أحرف صغيرة وأرقام وشرطات سفلية فقط. يجب أن يبدأ بحرف.",
-    "storageModeHint": "JSONB مرن ومُوصى به لمعظم الحالات. الجدول الفعلي يوفر أداء استعلام أفضل لمجموعات البيانات الكبيرة.",
     "activeHint": "المجموعات غير النشطة مخفية من متصفح الموارد ولكن البيانات محفوظة.",
     "validation": {
       "nameRequired": "اسم المجموعة مطلوب",
@@ -702,8 +696,7 @@
       "nameFormat": "يجب أن يكون الاسم بأحرف صغيرة، يبدأ بحرف، ويحتوي فقط على أحرف وأرقام وشرطات سفلية",
       "displayNameRequired": "اسم العرض مطلوب",
       "displayNameTooLong": "يجب أن يكون اسم العرض 100 حرف أو أقل",
-      "descriptionTooLong": "يجب أن يكون الوصف 500 حرف أو أقل",
-      "storageModeRequired": "وضع التخزين مطلوب"
+      "descriptionTooLong": "يجب أن يكون الوصف 500 حرف أو أقل"
     }
   },
   "authorizationPanel": {

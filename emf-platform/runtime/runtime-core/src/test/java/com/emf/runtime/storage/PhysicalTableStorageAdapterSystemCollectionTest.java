@@ -6,7 +6,6 @@ import com.emf.runtime.model.FieldDefinition;
 import com.emf.runtime.model.FieldDefinitionBuilder;
 import com.emf.runtime.model.FieldType;
 import com.emf.runtime.model.StorageConfig;
-import com.emf.runtime.model.StorageMode;
 import com.emf.runtime.query.FilterCondition;
 import com.emf.runtime.query.FilterOperator;
 import com.emf.runtime.query.Pagination;
@@ -65,7 +64,7 @@ class PhysicalTableStorageAdapterSystemCollectionTest {
         return new CollectionDefinitionBuilder()
                 .name("users")
                 .displayName("Users")
-                .storageConfig(new StorageConfig(StorageMode.PHYSICAL_TABLES, "users", null))
+                .storageConfig(new StorageConfig("users", null))
                 .systemCollection(true)
                 .tenantScoped(true)
                 .addField(new FieldDefinitionBuilder()
@@ -94,7 +93,7 @@ class PhysicalTableStorageAdapterSystemCollectionTest {
         return new CollectionDefinitionBuilder()
                 .name("audit-logs")
                 .displayName("Audit Logs")
-                .storageConfig(new StorageConfig(StorageMode.PHYSICAL_TABLES, "audit_logs", null))
+                .storageConfig(new StorageConfig("audit_logs", null))
                 .systemCollection(true)
                 .tenantScoped(false)
                 .addField(new FieldDefinitionBuilder()

@@ -225,8 +225,6 @@ public final class SystemCollectionDefinitions {
             .addField(FieldDefinition.string("displayName", 100).withColumnName("display_name"))
             .addField(FieldDefinition.string("description", 500))
             .addField(FieldDefinition.string("path", 255))
-            .addField(FieldDefinition.string("storageMode", 50).withColumnName("storage_mode")
-                .withDefault("PHYSICAL_TABLES"))
             .addField(FieldDefinition.bool("active").withDefault(true))
             .addField(FieldDefinition.bool("systemCollection").withColumnName("system_collection")
                 .withDefault(false))

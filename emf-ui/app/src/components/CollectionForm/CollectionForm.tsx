@@ -20,11 +20,6 @@ import { useI18n } from '../../context/I18nContext'
 import { LoadingSpinner } from '../LoadingSpinner'
 
 /**
- * Storage mode options for collections
- */
-export type StorageMode = 'PHYSICAL_TABLE' | 'JSONB'
-
-/**
  * Collection data for the form
  */
 export interface CollectionFormData {
@@ -34,8 +29,6 @@ export interface CollectionFormData {
   displayName: string
   /** Optional description */
   description?: string
-  /** Storage mode for the collection */
-  storageMode: StorageMode
   /** Whether the collection is active */
   active: boolean
   /** ID of the field used as display field in lookup dropdowns */
@@ -59,7 +52,6 @@ export interface Collection {
   name: string
   displayName: string
   description?: string
-  storageMode: StorageMode
   active: boolean
   displayFieldId?: string
   currentVersion: number
@@ -106,9 +98,6 @@ export const collectionFormSchema = z.object({
     .min(1, 'validation.displayNameRequired')
     .max(100, 'validation.displayNameTooLong'),
   description: z.string().max(500, 'validation.descriptionTooLong').optional().or(z.literal('')),
-  storageMode: z.enum(['PHYSICAL_TABLE', 'JSONB'], {
-    errorMap: () => ({ message: 'validation.storageModeRequired' }),
-  }),
   active: z.boolean(),
   displayFieldId: z.string().optional().or(z.literal('')),
 })
@@ -125,7 +114,6 @@ export type CollectionFormSchema = z.infer<typeof collectionFormSchema>
  * - Name validation (alphanumeric, underscores, lowercase)
  * - Display name validation
  * - Optional description
- * - Storage mode selection
  * - Active status toggle
  * - Inline validation errors
  * - Loading state during submission
@@ -153,7 +141,6 @@ export function CollectionForm({
       name: collection?.name ?? '',
       displayName: collection?.displayName ?? '',
       description: collection?.description ?? '',
-      storageMode: collection?.storageMode ?? 'JSONB',
       active: collection?.active ?? true,
       displayFieldId: collection?.displayFieldId ?? '',
     },
@@ -167,7 +154,6 @@ export function CollectionForm({
         name: collection.name,
         displayName: collection.displayName,
         description: collection.description ?? '',
-        storageMode: collection.storageMode,
         active: collection.active,
         displayFieldId: collection.displayFieldId ?? '',
       })
@@ -181,7 +167,6 @@ export function CollectionForm({
         name: data.name,
         displayName: data.displayName,
         description: data.description || undefined,
-        storageMode: data.storageMode,
         active: data.active,
         displayFieldId: data.displayFieldId || undefined,
       }
@@ -343,66 +328,6 @@ export function CollectionForm({
             data-testid="description-error"
           >
             {getErrorMessage(errors.description.message)}
-          </span>
-        )}
-      </div>
-
-      {/* Storage Mode Field */}
-      <div className="flex flex-col gap-1">
-        <label
-          htmlFor="collection-storage-mode"
-          className="flex items-center gap-1 text-sm font-medium text-foreground"
-        >
-          {t('collections.storageMode')}
-          <span className="text-destructive font-semibold" aria-hidden="true">
-            *
-          </span>
-        </label>
-        <select
-          id="collection-storage-mode"
-          className={cn(
-            'px-3 py-2 pr-10 text-base leading-6 text-foreground bg-background border border-input rounded-md',
-            'appearance-none bg-[length:1.5em_1.5em] bg-[right_0.5rem_center] bg-no-repeat cursor-pointer',
-            "bg-[url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e\")]",
-            'transition-colors duration-150 motion-reduce:transition-none',
-            'focus:outline-none focus:border-primary focus:ring-2 focus:ring-ring',
-            'disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed',
-            errors.storageMode &&
-              'border-destructive focus:border-destructive focus:ring-destructive/25'
-          )}
-          disabled={isEditMode || isSubmitting}
-          aria-required="true"
-          aria-invalid={!!errors.storageMode}
-          aria-describedby={
-            errors.storageMode
-              ? 'storage-mode-error'
-              : !isEditMode
-                ? 'storage-mode-hint'
-                : undefined
-          }
-          data-testid="collection-storage-mode-select"
-          {...register('storageMode')}
-        >
-          <option value="JSONB">{t('collections.storageModes.jsonb')}</option>
-          <option value="PHYSICAL_TABLE">{t('collections.storageModes.physicalTable')}</option>
-        </select>
-        {errors.storageMode && (
-          <span
-            id="storage-mode-error"
-            className="flex items-center gap-1 text-sm text-destructive mt-1 before:content-['\u26A0'] before:text-xs"
-            role="alert"
-            data-testid="storage-mode-error"
-          >
-            {getErrorMessage(errors.storageMode.message)}
-          </span>
-        )}
-        {!isEditMode && (
-          <span
-            id="storage-mode-hint"
-            className="text-xs text-muted-foreground mt-1"
-            data-testid="storage-mode-hint"
-          >
-            {t('collectionForm.storageModeHint')}
           </span>
         )}
       </div>

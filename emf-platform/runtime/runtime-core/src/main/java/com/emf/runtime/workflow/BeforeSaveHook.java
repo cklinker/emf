@@ -29,9 +29,12 @@ import java.util.Map;
 public interface BeforeSaveHook {
 
     /**
-     * Returns the collection name this hook manages.
+     * Returns the collection name this hook manages, or {@code "*"} to match all collections.
      *
-     * @return the collection name (e.g., "users", "collections", "fields")
+     * <p>Wildcard hooks (returning {@code "*"}) are invoked for every collection,
+     * after any collection-specific hooks.
+     *
+     * @return the collection name (e.g., "users", "collections", "fields") or "*" for all
      */
     String getCollectionName();
 
@@ -84,6 +87,21 @@ public interface BeforeSaveHook {
     }
 
     /**
+     * Called after a new record is created, with the collection name provided.
+     * This variant is useful for wildcard hooks that need to know which collection
+     * triggered the hook.
+     *
+     * <p>The default implementation delegates to {@link #afterCreate(Map, String)}.
+     *
+     * @param collectionName the collection the record was created in
+     * @param record the created record data
+     * @param tenantId the tenant ID
+     */
+    default void afterCreate(String collectionName, Map<String, Object> record, String tenantId) {
+        afterCreate(record, tenantId);
+    }
+
+    /**
      * Called after an existing record is updated.
      *
      * @param id the record ID
@@ -97,6 +115,24 @@ public interface BeforeSaveHook {
     }
 
     /**
+     * Called after an existing record is updated, with the collection name provided.
+     * This variant is useful for wildcard hooks that need to know which collection
+     * triggered the hook.
+     *
+     * <p>The default implementation delegates to {@link #afterUpdate(String, Map, Map, String)}.
+     *
+     * @param collectionName the collection the record belongs to
+     * @param id the record ID
+     * @param record the updated record data
+     * @param previous the previous record data
+     * @param tenantId the tenant ID
+     */
+    default void afterUpdate(String collectionName, String id, Map<String, Object> record,
+                              Map<String, Object> previous, String tenantId) {
+        afterUpdate(id, record, previous, tenantId);
+    }
+
+    /**
      * Called after a record is deleted.
      *
      * @param id the deleted record ID
@@ -104,5 +140,20 @@ public interface BeforeSaveHook {
      */
     default void afterDelete(String id, String tenantId) {
         // No-op by default
+    }
+
+    /**
+     * Called after a record is deleted, with the collection name provided.
+     * This variant is useful for wildcard hooks that need to know which collection
+     * triggered the hook.
+     *
+     * <p>The default implementation delegates to {@link #afterDelete(String, String)}.
+     *
+     * @param collectionName the collection the record was deleted from
+     * @param id the deleted record ID
+     * @param tenantId the tenant ID
+     */
+    default void afterDelete(String collectionName, String id, String tenantId) {
+        afterDelete(id, tenantId);
     }
 }

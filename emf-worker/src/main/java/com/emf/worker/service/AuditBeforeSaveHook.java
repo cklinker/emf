@@ -1,29 +1,31 @@
 package com.emf.worker.service;
 
-import com.emf.runtime.router.CollectionWriteListener;
+import com.emf.runtime.workflow.BeforeSaveHook;
+import com.emf.runtime.workflow.BeforeSaveHookRegistry;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Component;
 
 import java.util.Map;
 import java.util.Set;
 
 /**
- * Listens for write operations on setup-related collections and records
- * them in the setup audit trail.
+ * Wildcard before-save hook that records configuration changes to the setup audit trail.
  *
- * <p>Only writes to configuration collections (schema, profiles, permissions,
- * users, OIDC, flows, etc.) are audited. User data collections (custom
- * collections managed by end users) are ignored.
+ * <p>Replaces {@code SetupAuditWriteListener} by using the consolidated
+ * {@link BeforeSaveHook} pattern with wildcard collection matching. Only writes
+ * to configuration collections (schema, profiles, permissions, users, OIDC,
+ * flows, etc.) are audited. User data collections are ignored.
+ *
+ * <p>Runs with order {@code 1000} to ensure it executes after all
+ * collection-specific hooks.
  *
  * @since 1.0.0
  */
-@Component
-public class SetupAuditWriteListener implements CollectionWriteListener {
+public class AuditBeforeSaveHook implements BeforeSaveHook {
 
-    private static final Logger log = LoggerFactory.getLogger(SetupAuditWriteListener.class);
+    private static final Logger log = LoggerFactory.getLogger(AuditBeforeSaveHook.class);
 
     /**
      * Maps collection names to their setup section for audit purposes.
@@ -82,53 +84,63 @@ public class SetupAuditWriteListener implements CollectionWriteListener {
     private final SetupAuditService auditService;
     private final ObjectMapper objectMapper;
 
-    public SetupAuditWriteListener(SetupAuditService auditService) {
+    public AuditBeforeSaveHook(SetupAuditService auditService) {
         this.auditService = auditService;
         this.objectMapper = new ObjectMapper();
     }
 
     @Override
-    public void afterCreate(String collectionName, String tenantId, String userId,
-                            String recordId, Map<String, Object> data) {
+    public String getCollectionName() {
+        return BeforeSaveHookRegistry.WILDCARD;
+    }
+
+    @Override
+    public int getOrder() {
+        return 1000;
+    }
+
+    @Override
+    public void afterCreate(String collectionName, Map<String, Object> record, String tenantId) {
         String section = COLLECTION_SECTION_MAP.get(collectionName);
         if (section == null) {
-            return; // Not a setup collection — skip
+            return; // Not a setup collection - skip
         }
 
         String entityType = resolveEntityType(collectionName);
-        String entityName = extractEntityName(data);
+        String entityName = extractEntityName(record);
+        String recordId = extractRecordId(record);
+        String userId = extractUserId(record);
 
         auditService.log(tenantId, userId, "CREATE", section, entityType,
-                recordId, entityName, null, toJson(data));
+                recordId, entityName, null, toJson(record));
     }
 
     @Override
-    public void afterUpdate(String collectionName, String tenantId, String userId,
-                            String recordId, Map<String, Object> data) {
+    public void afterUpdate(String collectionName, String id, Map<String, Object> record,
+                            Map<String, Object> previous, String tenantId) {
         String section = COLLECTION_SECTION_MAP.get(collectionName);
         if (section == null) {
-            return; // Not a setup collection — skip
+            return; // Not a setup collection - skip
         }
 
         String entityType = resolveEntityType(collectionName);
+        String userId = extractUserId(record);
 
-        // We only have the new data — old data would require a pre-fetch
         auditService.log(tenantId, userId, "UPDATE", section, entityType,
-                recordId, null, null, toJson(data));
+                id, null, null, toJson(record));
     }
 
     @Override
-    public void afterDelete(String collectionName, String tenantId, String userId,
-                            String recordId) {
+    public void afterDelete(String collectionName, String id, String tenantId) {
         String section = COLLECTION_SECTION_MAP.get(collectionName);
         if (section == null) {
-            return; // Not a setup collection — skip
+            return; // Not a setup collection - skip
         }
 
         String entityType = resolveEntityType(collectionName);
 
-        auditService.log(tenantId, userId, "DELETE", section, entityType,
-                recordId, null, null, null);
+        auditService.log(tenantId, null, "DELETE", section, entityType,
+                id, null, null, null);
     }
 
     /**
@@ -137,7 +149,7 @@ public class SetupAuditWriteListener implements CollectionWriteListener {
      */
     static String resolveEntityType(String collectionName) {
         if (JUNCTION_COLLECTIONS.contains(collectionName)) {
-            // e.g., "profile-system-permissions" → "system-permission"
+            // e.g., "profile-system-permissions" -> "system-permission"
             return collectionName.substring(collectionName.indexOf('-') + 1);
         }
         // Remove trailing 's' for singular form (simple heuristic)
@@ -151,7 +163,6 @@ public class SetupAuditWriteListener implements CollectionWriteListener {
      * Extracts a display name from record data for audit entries.
      */
     private static String extractEntityName(Map<String, Object> data) {
-        // Try common name fields in priority order
         for (String key : new String[]{"name", "label", "apiName", "entityName", "email"}) {
             Object value = data.get(key);
             if (value != null) {
@@ -162,6 +173,29 @@ public class SetupAuditWriteListener implements CollectionWriteListener {
             }
         }
         return null;
+    }
+
+    /**
+     * Extracts the record ID from the record data.
+     */
+    private static String extractRecordId(Map<String, Object> data) {
+        Object id = data.get("id");
+        return id != null ? id.toString() : null;
+    }
+
+    /**
+     * Extracts the user ID from the record data.
+     * Looks for createdBy or updatedBy fields injected by the router.
+     */
+    private static String extractUserId(Map<String, Object> data) {
+        if (data == null) {
+            return null;
+        }
+        Object userId = data.get("createdBy");
+        if (userId == null) {
+            userId = data.get("updatedBy");
+        }
+        return userId != null ? userId.toString() : null;
     }
 
     private String toJson(Map<String, Object> data) {

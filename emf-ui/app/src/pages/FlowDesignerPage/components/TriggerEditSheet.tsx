@@ -9,6 +9,7 @@ import {
   KafkaTriggerForm,
 } from '@/components/flows'
 import { useApi } from '@/context/ApiContext'
+import type { CreateFlowRequest } from '@emf/sdk'
 import { useToast } from '@/components'
 import type { Flow, TriggerConfig } from '../types'
 
@@ -31,7 +32,7 @@ function parseTriggerConfig(flow: Flow): Partial<TriggerConfig> {
 }
 
 export function TriggerEditSheet({ open, onOpenChange, flow }: TriggerEditSheetProps) {
-  const { apiClient } = useApi()
+  const { emfClient } = useApi()
   const { showToast } = useToast()
   const queryClient = useQueryClient()
   const initialConfig = useMemo(() => parseTriggerConfig(flow), [flow])
@@ -55,14 +56,14 @@ export function TriggerEditSheet({ open, onOpenChange, flow }: TriggerEditSheetP
           ? JSON.parse(flow.definition)
           : flow.definition
         : null
-      await apiClient.putResource(`/api/flows/${flow.id}`, {
+      await emfClient.admin.flows.update(flow.id, {
         name: flow.name,
         description: flow.description,
         flowType: flow.flowType,
         active: flow.active,
         definition,
         triggerConfig: config,
-      })
+      } as Partial<CreateFlowRequest>)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['flow', flow.id] })

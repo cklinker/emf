@@ -819,7 +819,21 @@ describe('MenuBuilderPage', () => {
         }
         return Promise.resolve({ data: mockMenus })
       })
-      mockAxios.put.mockResolvedValueOnce({ data: { ...mockMenus[0], items: [] } })
+      // The SDK's updateMenu uses PATCH with JSON:API envelope
+      mockAxios.patch.mockResolvedValueOnce({
+        data: {
+          data: {
+            type: 'ui-menus',
+            id: mockMenus[0].id,
+            attributes: {
+              name: mockMenus[0].name,
+              items: [],
+              createdAt: mockMenus[0].createdAt,
+              updatedAt: mockMenus[0].updatedAt,
+            },
+          },
+        },
+      })
 
       const user = userEvent.setup()
       render(<MenuBuilderPage />, { wrapper: createTestWrapper() })

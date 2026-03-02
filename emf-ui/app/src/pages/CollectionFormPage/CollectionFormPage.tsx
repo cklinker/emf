@@ -17,6 +17,7 @@ import type {
   CollectionFormData,
   AvailableField,
 } from '../../components/CollectionForm/CollectionForm'
+import type { CollectionDefinition } from '@emf/sdk'
 
 /**
  * Props for CollectionFormPage component
@@ -37,7 +38,7 @@ export function CollectionFormPage({
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { t } = useI18n()
-  const { apiClient } = useApi()
+  const { apiClient, emfClient } = useApi()
 
   const isEditMode = Boolean(id)
 
@@ -107,7 +108,7 @@ export function CollectionFormPage({
         if (data.displayFieldId !== undefined) {
           requestData.displayFieldId = data.displayFieldId || ''
         }
-        await apiClient.putResource(`/api/collections/${id}`, requestData)
+        await emfClient.admin.collections.update(id, requestData as unknown as CollectionDefinition)
         navigate(`/${getTenantSlug()}/collections/${id}`)
       } else {
         // Create new collection
@@ -116,21 +117,15 @@ export function CollectionFormPage({
           description: data.description || '',
         }
 
-        const created = await apiClient.postResource<{
-          id: string
-          name: string
-          description: string
-          active: boolean
-          currentVersion: number
-          createdAt: string
-          updatedAt: string
-        }>('/api/collections', requestData)
+        const created = await emfClient.admin.collections.create(
+          requestData as unknown as CollectionDefinition
+        )
 
         console.log('Created collection:', created)
-        navigate(`/${getTenantSlug()}/collections/${created.id}`)
+        navigate(`/${getTenantSlug()}/collections/${created.id!}`)
       }
     },
-    [apiClient, navigate, isEditMode, id]
+    [emfClient, navigate, isEditMode, id]
   )
 
   // Handle cancel

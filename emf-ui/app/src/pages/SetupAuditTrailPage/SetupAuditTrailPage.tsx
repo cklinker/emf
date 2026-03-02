@@ -24,7 +24,7 @@ interface AuditEntry {
 
 export function SetupAuditTrailPage({ className }: SetupAuditTrailPageProps): React.ReactElement {
   const { t } = useI18n()
-  const { apiClient } = useApi()
+  const { emfClient } = useApi()
 
   const [section, setSection] = useState<string>('')
   const [entityType, setEntityType] = useState<string>('')
@@ -38,19 +38,13 @@ export function SetupAuditTrailPage({ className }: SetupAuditTrailPageProps): Re
     error,
   } = useQuery({
     queryKey: ['audit-trail', section, entityType, page],
-    queryFn: async () => {
-      const params = new URLSearchParams()
-      params.set('page[number]', String(page))
-      params.set('page[size]', String(pageSize))
-      params.set('sort', '-timestamp')
-      if (section) params.set('filter[section][eq]', section)
-      if (entityType) params.set('filter[entityType][eq]', entityType)
-
-      const entries = await apiClient.getList<AuditEntry>(
-        `/api/setup-audit-entries?${params.toString()}`
-      )
-      return { content: entries, totalPages: entries.length < pageSize ? page + 1 : page + 2 }
-    },
+    queryFn: () =>
+      emfClient.admin.audit.list({
+        section: section || undefined,
+        entityType: entityType || undefined,
+        page,
+        size: pageSize,
+      }),
   })
 
   const toggleRow = useCallback((id: string) => {

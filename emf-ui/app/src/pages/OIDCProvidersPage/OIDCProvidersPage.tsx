@@ -665,7 +665,7 @@ export function OIDCProvidersPage({
 }: OIDCProvidersPageProps): React.ReactElement {
   const queryClient = useQueryClient()
   const { t, formatDate } = useI18n()
-  const { apiClient } = useApi()
+  const { emfClient } = useApi()
   const { showToast } = useToast()
 
   // Modal state
@@ -687,7 +687,7 @@ export function OIDCProvidersPage({
     refetch,
   } = useQuery({
     queryKey: ['oidc-providers'],
-    queryFn: () => apiClient.getList<OIDCProvider>('/api/oidc-providers'),
+    queryFn: () => emfClient.admin.oidc.list(),
   })
 
   // Create mutation
@@ -705,7 +705,7 @@ export function OIDCProvidersPage({
       if (data.emailClaim?.trim()) payload.emailClaim = data.emailClaim.trim()
       if (data.usernameClaim?.trim()) payload.usernameClaim = data.usernameClaim.trim()
       if (data.nameClaim?.trim()) payload.nameClaim = data.nameClaim.trim()
-      return apiClient.postResource<OIDCProvider>('/api/oidc-providers', payload)
+      return emfClient.admin.oidc.create(payload as unknown as OIDCProvider)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['oidc-providers'] })
@@ -732,7 +732,7 @@ export function OIDCProvidersPage({
       if (data.emailClaim?.trim()) payload.emailClaim = data.emailClaim.trim()
       if (data.usernameClaim?.trim()) payload.usernameClaim = data.usernameClaim.trim()
       if (data.nameClaim?.trim()) payload.nameClaim = data.nameClaim.trim()
-      return apiClient.putResource<OIDCProvider>(`/api/oidc-providers/${id}`, payload)
+      return emfClient.admin.oidc.update(id, payload as unknown as OIDCProvider)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['oidc-providers'] })
@@ -746,7 +746,7 @@ export function OIDCProvidersPage({
 
   // Delete mutation
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiClient.delete(`/api/oidc-providers/${id}`),
+    mutationFn: (id: string) => emfClient.admin.oidc.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['oidc-providers'] })
       showToast(t('success.deleted', { item: t('navigation.oidcProviders') }), 'success')

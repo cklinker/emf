@@ -10,6 +10,7 @@ import {
   ExecutionLogModal,
 } from '../../components'
 import type { LogColumn } from '../../components'
+import type { CreateEmailTemplateRequest } from '@emf/sdk'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 
@@ -441,7 +442,7 @@ export function EmailTemplatesPage({
 }: EmailTemplatesPageProps): React.ReactElement {
   const queryClient = useQueryClient()
   const { formatDate } = useI18n()
-  const { apiClient } = useApi()
+  const { emfClient } = useApi()
   const { showToast } = useToast()
 
   const [isFormOpen, setIsFormOpen] = useState(false)
@@ -457,7 +458,7 @@ export function EmailTemplatesPage({
     error: logsError,
   } = useQuery({
     queryKey: ['email-template-logs', logsItemId],
-    queryFn: () => apiClient.getList<EmailLog>(`/api/email-logs`),
+    queryFn: () => emfClient.admin.emailTemplates.listLogs(),
     enabled: !!logsItemId,
   })
 
@@ -492,14 +493,14 @@ export function EmailTemplatesPage({
     refetch,
   } = useQuery({
     queryKey: ['email-templates'],
-    queryFn: () => apiClient.getList<EmailTemplate>(`/api/email-templates`),
+    queryFn: () => emfClient.admin.emailTemplates.list(),
   })
 
   const templateList: EmailTemplate[] = templates ?? []
 
   const createMutation = useMutation({
     mutationFn: (data: EmailTemplateFormData) =>
-      apiClient.postResource<EmailTemplate>(`/api/email-templates`, data),
+      emfClient.admin.emailTemplates.create('', '', data as unknown as CreateEmailTemplateRequest),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['email-templates'] })
       showToast('Email template created successfully', 'success')
@@ -512,7 +513,10 @@ export function EmailTemplatesPage({
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: EmailTemplateFormData }) =>
-      apiClient.putResource<EmailTemplate>(`/api/email-templates/${id}`, data),
+      emfClient.admin.emailTemplates.update(
+        id,
+        data as unknown as Partial<CreateEmailTemplateRequest>
+      ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['email-templates'] })
       showToast('Email template updated successfully', 'success')
@@ -524,7 +528,7 @@ export function EmailTemplatesPage({
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiClient.delete(`/api/email-templates/${id}`),
+    mutationFn: (id: string) => emfClient.admin.emailTemplates.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['email-templates'] })
       showToast('Email template deleted successfully', 'success')

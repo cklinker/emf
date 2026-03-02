@@ -1057,7 +1057,7 @@ export function PageBuilderPage({
 }: PageBuilderPageProps): React.ReactElement {
   const queryClient = useQueryClient()
   const { t, formatDate } = useI18n()
-  const { apiClient } = useApi()
+  const { apiClient, emfClient } = useApi()
   const { showToast } = useToast()
 
   // Requirement 12.5: Get custom page components from plugin system
@@ -1092,7 +1092,7 @@ export function PageBuilderPage({
     refetch: refetchPages,
   } = useQuery({
     queryKey: ['ui-pages'],
-    queryFn: () => apiClient.getList<UIPage>('/api/ui-pages'),
+    queryFn: () => emfClient.admin.ui.listPages() as Promise<UIPage[]>,
     enabled: viewMode === 'list',
   })
 
@@ -1114,7 +1114,10 @@ export function PageBuilderPage({
 
   // Create mutation
   const createMutation = useMutation({
-    mutationFn: (data: Partial<UIPage>) => apiClient.postResource<UIPage>('/api/ui-pages', data),
+    mutationFn: (data: Partial<UIPage>) =>
+      emfClient.admin.ui.createPage(
+        data as unknown as import('@emf/sdk').UIPage
+      ) as Promise<UIPage>,
     onSuccess: (newPage) => {
       queryClient.invalidateQueries({ queryKey: ['ui-pages'] })
       showToast(t('success.created', { item: t('builder.pages.page') }), 'success')
@@ -1132,7 +1135,7 @@ export function PageBuilderPage({
   // Update mutation
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: Partial<UIPage> }) =>
-      apiClient.putResource<UIPage>(`/api/ui-pages/${id}`, data),
+      emfClient.admin.ui.updatePage(id, data as unknown as import('@emf/sdk').UIPage),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ui-pages'] })
       queryClient.invalidateQueries({ queryKey: ['ui-page', editingPageId] })

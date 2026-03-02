@@ -10,6 +10,7 @@ import {
   ExecutionLogModal,
 } from '../../components'
 import type { LogColumn } from '../../components'
+import type { CreateScheduledJobRequest } from '@emf/sdk'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 
@@ -381,7 +382,7 @@ export function ScheduledJobsPage({
 }: ScheduledJobsPageProps): React.ReactElement {
   const queryClient = useQueryClient()
   const { formatDate } = useI18n()
-  const { apiClient } = useApi()
+  const { emfClient } = useApi()
   const { showToast } = useToast()
 
   const [isFormOpen, setIsFormOpen] = useState(false)
@@ -399,8 +400,7 @@ export function ScheduledJobsPage({
     error: logsError,
   } = useQuery({
     queryKey: ['scheduled-job-logs', logsItemId],
-    queryFn: () =>
-      apiClient.getList<JobExecutionLog>(`/api/scheduled-jobs/${logsItemId}/job-execution-logs`),
+    queryFn: () => emfClient.admin.scheduledJobs.listLogs(logsItemId!),
     enabled: !!logsItemId,
   })
 
@@ -450,14 +450,14 @@ export function ScheduledJobsPage({
     refetch,
   } = useQuery({
     queryKey: ['scheduled-jobs'],
-    queryFn: () => apiClient.getList<ScheduledJob>(`/api/scheduled-jobs`),
+    queryFn: () => emfClient.admin.scheduledJobs.list(),
   })
 
   const scheduledJobList: ScheduledJob[] = scheduledJobs ?? []
 
   const createMutation = useMutation({
     mutationFn: (data: ScheduledJobFormData) =>
-      apiClient.postResource<ScheduledJob>(`/api/scheduled-jobs`, data),
+      emfClient.admin.scheduledJobs.create('', '', data as CreateScheduledJobRequest),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['scheduled-jobs'] })
       showToast('Scheduled job created successfully', 'success')
@@ -470,7 +470,7 @@ export function ScheduledJobsPage({
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: ScheduledJobFormData }) =>
-      apiClient.putResource<ScheduledJob>(`/api/scheduled-jobs/${id}`, data),
+      emfClient.admin.scheduledJobs.update(id, data as Partial<CreateScheduledJobRequest>),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['scheduled-jobs'] })
       showToast('Scheduled job updated successfully', 'success')
@@ -482,7 +482,7 @@ export function ScheduledJobsPage({
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiClient.delete(`/api/scheduled-jobs/${id}`),
+    mutationFn: (id: string) => emfClient.admin.scheduledJobs.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['scheduled-jobs'] })
       showToast('Scheduled job deleted successfully', 'success')

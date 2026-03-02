@@ -73,7 +73,7 @@ export function CollectionsPage({
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { t, formatDate } = useI18n()
-  const { apiClient } = useApi()
+  const { emfClient } = useApi()
   const { showToast } = useToast()
 
   // Show system collections toggle
@@ -101,28 +101,25 @@ export function CollectionsPage({
 
   // Fetch collections query
   const {
-    data: collectionsPage,
+    data: allCollections,
     isLoading,
     error,
     refetch,
   } = useQuery({
-    queryKey: ['collections', { showSystem }],
-    queryFn: () =>
-      apiClient.getPage<Collection>(
-        showSystem
-          ? '/api/collections?page[size]=1000'
-          : '/api/collections?filter[systemCollection][eq]=false&page[size]=1000'
-      ),
+    queryKey: ['collections'],
+    queryFn: () => emfClient.admin.collections.list(),
   })
 
-  // Extract collections from paginated response
+  // Extract collections, filtering system collections client-side
   const collections = useMemo(() => {
-    return collectionsPage?.content || []
-  }, [collectionsPage])
+    const items = allCollections || []
+    if (showSystem) return items as unknown as Collection[]
+    return (items as unknown as Collection[]).filter((c) => !c.systemCollection)
+  }, [allCollections, showSystem])
 
   // Delete mutation
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiClient.deleteResource(`/api/collections/${id}`),
+    mutationFn: (id: string) => emfClient.admin.collections.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['collections'] })
       showToast(t('success.deleted', { item: t('collections.title') }), 'success')

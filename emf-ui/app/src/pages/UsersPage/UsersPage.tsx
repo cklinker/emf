@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { useApi } from '../../context/ApiContext'
+import type { CreatePlatformUserRequest } from '@emf/sdk'
 import { useI18n } from '../../context/I18nContext'
 import { getTenantSlug } from '../../context/TenantContext'
 import { useToast } from '../../components/Toast'
@@ -206,7 +207,7 @@ function UserForm({
 export function UsersPage({ testId = 'users-page' }: UsersPageProps) {
   const queryClient = useQueryClient()
   const { t, formatDate } = useI18n()
-  const { apiClient } = useApi()
+  const { emfClient } = useApi()
   const { showToast } = useToast()
   const navigate = useNavigate()
 
@@ -224,19 +225,13 @@ export function UsersPage({ testId = 'users-page' }: UsersPageProps) {
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['users', filter, statusFilter, page],
-    queryFn: async () => {
-      const params = new URLSearchParams()
-      if (filter) params.append('filter', filter)
-      if (statusFilter) params.append('status', statusFilter)
-      params.append('page[number]', page.toString())
-      params.append('page[size]', '20')
-      return apiClient.getPage<PlatformUser>(`/api/users?${params}`)
-    },
+    queryFn: () =>
+      emfClient.admin.users.list(filter || undefined, statusFilter || undefined, page, 20),
   })
 
   const createMutation = useMutation({
     mutationFn: (formData: CreateUserFormData) =>
-      apiClient.postResource<PlatformUser>('/api/users', formData),
+      emfClient.admin.users.create(formData as CreatePlatformUserRequest),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] })
       showToast(t('users.createSuccess'), 'success')
@@ -249,9 +244,9 @@ export function UsersPage({ testId = 'users-page' }: UsersPageProps) {
 
   const statusMutation = useMutation({
     mutationFn: ({ userId, action }: { userId: string; action: 'deactivate' | 'activate' }) =>
-      apiClient.patchResource(`/api/users/${userId}`, {
-        status: action === 'activate' ? 'ACTIVE' : 'INACTIVE',
-      }),
+      action === 'activate'
+        ? emfClient.admin.users.activate(userId)
+        : emfClient.admin.users.deactivate(userId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] })
       showToast(

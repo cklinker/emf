@@ -102,21 +102,9 @@ export interface MenuBuilderPageProps {
   testId?: string
 }
 
-// API functions using apiClient
-async function fetchMenus(apiClient: ApiClient): Promise<UIMenu[]> {
-  return apiClient.getList('/api/ui-menus')
-}
-
+// API functions using apiClient (only for endpoints not yet in SDK)
 async function createMenu(apiClient: ApiClient, data: Partial<UIMenu>): Promise<UIMenu> {
   return apiClient.postResource('/api/ui-menus', data)
-}
-
-async function updateMenu(
-  apiClient: ApiClient,
-  id: string,
-  data: Partial<UIMenu>
-): Promise<UIMenu> {
-  return apiClient.putResource(`/api/ui-menus/${id}`, data)
 }
 
 async function deleteMenu(apiClient: ApiClient, id: string): Promise<void> {
@@ -130,18 +118,6 @@ interface Policy {
   id: string
   name: string
   description?: string
-}
-
-/**
- * Fetch available policies for access control
- */
-async function fetchPolicies(apiClient: ApiClient): Promise<Policy[]> {
-  try {
-    return await apiClient.getList('/api/policies')
-  } catch {
-    // Return empty array if policies endpoint fails - policies are optional
-    return []
-  }
 }
 
 /**
@@ -1135,7 +1111,7 @@ export function MenuBuilderPage({
   menuId,
   testId = 'menu-builder-page',
 }: MenuBuilderPageProps): React.ReactElement {
-  const { apiClient } = useApi()
+  const { apiClient, emfClient } = useApi()
   const queryClient = useQueryClient()
   const { t, formatDate } = useI18n()
   const { showToast } = useToast()
@@ -1170,13 +1146,20 @@ export function MenuBuilderPage({
     refetch: refetchMenus,
   } = useQuery({
     queryKey: ['ui-menus'],
-    queryFn: () => fetchMenus(apiClient),
+    queryFn: () => emfClient.admin.ui.listMenus() as Promise<UIMenu[]>,
   })
 
   // Fetch available policies for access control (Requirement 8.6)
   const { data: availablePolicies = [] } = useQuery({
     queryKey: ['policies'],
-    queryFn: () => fetchPolicies(apiClient),
+    queryFn: async () => {
+      try {
+        return (await emfClient.admin.authz.listPolicies()) as Policy[]
+      } catch {
+        // Return empty array if policies endpoint fails - policies are optional
+        return [] as Policy[]
+      }
+    },
     enabled: viewMode === 'editor',
   })
 
@@ -1214,7 +1197,7 @@ export function MenuBuilderPage({
   // Update menu mutation
   const updateMenuMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: Partial<UIMenu> }) =>
-      updateMenu(apiClient, id, data),
+      emfClient.admin.ui.updateMenu(id, data as unknown as import('@emf/sdk').UIMenu),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ui-menus'] })
       queryClient.invalidateQueries({ queryKey: ['ui-menu', editingMenuId] })

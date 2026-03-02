@@ -16,6 +16,7 @@ import { useI18n } from '../../context/I18nContext'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import type { CreatePermissionSetRequest, UpdatePermissionSetRequest } from '@emf/sdk'
 
 interface PermissionSet {
   id: string
@@ -235,7 +236,7 @@ export function PermissionSetsPage({
   testId = 'permission-sets-page',
 }: PermissionSetsPageProps): React.ReactElement {
   const { formatDate } = useI18n()
-  const { apiClient } = useApi()
+  const { apiClient, emfClient } = useApi()
   const { tenantSlug } = useTenant()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -255,7 +256,7 @@ export function PermissionSetsPage({
     refetch,
   } = useQuery({
     queryKey: ['permission-sets'],
-    queryFn: () => apiClient.getList<PermissionSet>('/api/permission-sets'),
+    queryFn: () => emfClient.admin.permissionSets.list() as Promise<PermissionSet[]>,
   })
 
   const permissionSetList = permissionSets ?? []
@@ -263,7 +264,9 @@ export function PermissionSetsPage({
   // Mutations
   const createMutation = useMutation({
     mutationFn: (data: PermissionSetFormData) =>
-      apiClient.postResource<PermissionSet>('/api/permission-sets', data),
+      emfClient.admin.permissionSets.create(
+        data as CreatePermissionSetRequest
+      ) as Promise<PermissionSet>,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['permission-sets'] })
       showToast('Permission set created successfully', 'success')
@@ -276,7 +279,10 @@ export function PermissionSetsPage({
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: PermissionSetFormData }) =>
-      apiClient.putResource<PermissionSet>(`/api/permission-sets/${id}`, data),
+      emfClient.admin.permissionSets.update(
+        id,
+        data as UpdatePermissionSetRequest
+      ) as Promise<PermissionSet>,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['permission-sets'] })
       showToast('Permission set updated successfully', 'success')
@@ -288,7 +294,7 @@ export function PermissionSetsPage({
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiClient.deleteResource(`/api/permission-sets/${id}`),
+    mutationFn: (id: string) => emfClient.admin.permissionSets.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['permission-sets'] })
       showToast('Permission set deleted successfully', 'success')

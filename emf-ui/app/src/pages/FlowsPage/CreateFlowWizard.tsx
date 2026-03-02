@@ -11,6 +11,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { useApi } from '@/context/ApiContext'
 import { useToast } from '@/components'
+import type { CreateFlowRequest } from '@emf/sdk'
 import { getTenantSlug } from '@/context/TenantContext'
 import { cn } from '@/lib/utils'
 import type { FlowType, TriggerConfig } from '@/pages/FlowDesignerPage/types'
@@ -33,7 +34,7 @@ const MINIMAL_DEFINITION = {
 
 export function CreateFlowWizard({ open, onOpenChange }: CreateFlowWizardProps) {
   const navigate = useNavigate()
-  const { apiClient } = useApi()
+  const { emfClient } = useApi()
   const { showToast } = useToast()
   const queryClient = useQueryClient()
 
@@ -69,7 +70,7 @@ export function CreateFlowWizard({ open, onOpenChange }: CreateFlowWizardProps) 
         definition: MINIMAL_DEFINITION,
         triggerConfig: Object.keys(triggerConfig).length > 0 ? triggerConfig : null,
       }
-      const resp = await apiClient.postResource<{ id: string }>('/api/flows', payload)
+      const resp = await emfClient.admin.flows.create('', '', payload as CreateFlowRequest)
       return resp
     },
     onSuccess: (data) => {

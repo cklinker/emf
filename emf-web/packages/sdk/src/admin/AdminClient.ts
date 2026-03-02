@@ -456,12 +456,12 @@ export class AdminClient {
     },
 
     deactivate: async (id: string): Promise<void> => {
-      const body = toJsonApiBody('users', { active: false }, id);
+      const body = toJsonApiBody('users', { status: 'INACTIVE' }, id);
       await this.axios.patch(`/api/users/${id}`, body);
     },
 
     activate: async (id: string): Promise<void> => {
-      const body = toJsonApiBody('users', { active: true }, id);
+      const body = toJsonApiBody('users', { status: 'ACTIVE' }, id);
       await this.axios.patch(`/api/users/${id}`, body);
     },
 

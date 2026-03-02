@@ -5,6 +5,7 @@ import { ReactFlowProvider } from '@xyflow/react'
 import type { Node, Edge } from '@xyflow/react'
 
 import { useApi } from '../../context/ApiContext'
+import type { CreateFlowRequest } from '@emf/sdk'
 import { useToast, LoadingSpinner, ErrorMessage } from '../../components'
 import { cn } from '@/lib/utils'
 import { FlowToolbar } from './components/FlowToolbar'
@@ -14,7 +15,6 @@ import { PropertiesPanel } from './components/PropertiesPanel'
 import { ExecutionsTab } from './components/ExecutionsTab'
 import { DebugTab } from './components/DebugTab'
 import { Pencil, List, Bug, X } from 'lucide-react'
-import type { Flow } from './types'
 import {
   parseFlowDefinition,
   definitionToNodesAndEdges,
@@ -28,7 +28,7 @@ type ActiveTab = 'design' | 'executions' | { type: 'debug'; executionId: string 
 export function FlowDesignerPage() {
   const { flowId } = useParams<{ flowId: string }>()
   const [searchParams] = useSearchParams()
-  const { apiClient } = useApi()
+  const { apiClient, emfClient } = useApi()
   const { showToast } = useToast()
   const queryClient = useQueryClient()
 
@@ -58,7 +58,7 @@ export function FlowDesignerPage() {
     refetch,
   } = useQuery({
     queryKey: ['flow', flowId],
-    queryFn: () => apiClient.getOne<Flow>(`/api/flows/${flowId}`),
+    queryFn: () => emfClient.admin.flows.get(flowId!),
     enabled: !!flowId,
   })
 
@@ -81,7 +81,7 @@ export function FlowDesignerPage() {
         parsedDefinition
       )
       // Only send mutable fields; JSON-type fields must be objects (not strings)
-      await apiClient.putResource(`/api/flows/${flowId}`, {
+      await emfClient.admin.flows.update(flowId, {
         name: flow.name,
         description: flow.description,
         flowType: flow.flowType,
@@ -92,7 +92,7 @@ export function FlowDesignerPage() {
             ? JSON.parse(flow.triggerConfig)
             : flow.triggerConfig
           : null,
-      })
+      } as Partial<CreateFlowRequest>)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['flow', flowId] })

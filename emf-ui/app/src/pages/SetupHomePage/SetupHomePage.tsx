@@ -304,7 +304,7 @@ function extractCount(data: unknown): number {
 
 export function SetupHomePage({ testId = 'setup-home-page' }: SetupHomePageProps): JSX.Element {
   const { t } = useI18n()
-  const { apiClient } = useApi()
+  const { emfClient } = useApi()
   const { tenantSlug } = useTenant()
   const { hasPermission } = useSystemPermissions()
   const [searchQuery, setSearchQuery] = useState('')
@@ -314,19 +314,19 @@ export function SetupHomePage({ testId = 'setup-home-page' }: SetupHomePageProps
 
   const { data: usersData } = useQuery({
     queryKey: ['setup-stats-users'],
-    queryFn: () => apiClient.getPage<unknown>('/api/users?page[size]=1'),
+    queryFn: () => emfClient.admin.users.list(undefined, undefined, 0, 1),
     staleTime: 300000,
   })
 
   const { data: reportsData } = useQuery({
     queryKey: ['setup-stats-reports'],
-    queryFn: () => apiClient.getList<unknown>(`/api/reports`),
+    queryFn: () => emfClient.admin.reports.list(),
     staleTime: 300000,
   })
 
   const { data: dashboardsData } = useQuery({
     queryKey: ['setup-stats-dashboards'],
-    queryFn: () => apiClient.getList<unknown>(`/api/dashboards`),
+    queryFn: () => emfClient.admin.dashboards.list(),
     staleTime: 300000,
   })
 

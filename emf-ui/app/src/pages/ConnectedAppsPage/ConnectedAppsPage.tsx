@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
+import type { CreateConnectedAppRequest } from '@emf/sdk'
 import { cn } from '@/lib/utils'
 
 interface ConnectedApp {
@@ -443,7 +444,7 @@ export function ConnectedAppsPage({
 }: ConnectedAppsPageProps): React.ReactElement {
   const queryClient = useQueryClient()
   const { formatDate } = useI18n()
-  const { apiClient } = useApi()
+  const { emfClient } = useApi()
   const { showToast } = useToast()
 
   const [isFormOpen, setIsFormOpen] = useState(false)
@@ -462,14 +463,14 @@ export function ConnectedAppsPage({
     refetch,
   } = useQuery({
     queryKey: ['connected-apps'],
-    queryFn: () => apiClient.getList<ConnectedApp>(`/api/connected-apps`),
+    queryFn: () => emfClient.admin.connectedApps.list(),
   })
 
   const appList: ConnectedApp[] = connectedApps ?? []
 
   const createMutation = useMutation({
     mutationFn: (data: ConnectedAppFormData) =>
-      apiClient.postResource<ConnectedAppCreatedResponse>(`/api/connected-apps`, data),
+      emfClient.admin.connectedApps.create('', '', data as unknown as CreateConnectedAppRequest),
     onSuccess: (result: ConnectedAppCreatedResponse) => {
       queryClient.invalidateQueries({ queryKey: ['connected-apps'] })
       showToast('Connected app created successfully', 'success')
@@ -483,7 +484,10 @@ export function ConnectedAppsPage({
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: ConnectedAppFormData }) =>
-      apiClient.putResource<ConnectedApp>(`/api/connected-apps/${id}`, data),
+      emfClient.admin.connectedApps.update(
+        id,
+        data as unknown as Partial<CreateConnectedAppRequest>
+      ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['connected-apps'] })
       showToast('Connected app updated successfully', 'success')
@@ -495,7 +499,7 @@ export function ConnectedAppsPage({
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiClient.delete(`/api/connected-apps/${id}`),
+    mutationFn: (id: string) => emfClient.admin.connectedApps.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['connected-apps'] })
       showToast('Connected app deleted successfully', 'success')

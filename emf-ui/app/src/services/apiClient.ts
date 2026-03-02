@@ -71,6 +71,10 @@ export class ApiError extends Error {
 
 /**
  * Parse an Axios error into an ApiError with structured field-level details.
+ *
+ * Supports two error response formats:
+ * 1. JSON:API format: { errors: [{ status, code, title, detail, source, meta }] }
+ * 2. Legacy format: { message, error, errors: [{ field, message, code }] }
  */
 function parseAxiosError(error: unknown): ApiError {
   if (axios.isAxiosError(error) && error.response) {
@@ -80,25 +84,59 @@ function parseAxiosError(error: unknown): ApiError {
 
     if (data && typeof data === 'object') {
       const body = data as Record<string, unknown>
+
+      // Check for JSON:API error format: { errors: [{ detail, source, code }] }
+      if (Array.isArray(body.errors) && body.errors.length > 0) {
+        const firstError = body.errors[0] as Record<string, unknown> | undefined
+        // Detect JSON:API format by checking for 'detail' field (JSON:API uses 'detail', legacy uses 'message')
+        if (firstError && typeof firstError.detail === 'string') {
+          // JSON:API format
+          serverMessage = firstError.detail as string
+          fieldErrors = (body.errors as unknown[])
+            .filter(
+              (e: unknown): e is Record<string, unknown> =>
+                typeof e === 'object' &&
+                e !== null &&
+                typeof (e as Record<string, unknown>).detail === 'string'
+            )
+            .map((e) => {
+              const source = e.source as Record<string, unknown> | undefined
+              let field = ''
+              if (source && typeof source.pointer === 'string') {
+                // Strip /data/attributes/ prefix to get field name
+                field = (source.pointer as string).replace(/^\/data\/attributes\//, '')
+              }
+              return {
+                field,
+                message: e.detail as string,
+                code: typeof e.code === 'string' ? (e.code as string) : undefined,
+              }
+            })
+        } else {
+          // Legacy format: errors array with { field, message, code }
+          fieldErrors = (body.errors as unknown[])
+            .filter(
+              (e: unknown): e is { field: string; message: string; code?: string } =>
+                typeof e === 'object' &&
+                e !== null &&
+                typeof (e as ApiFieldError).message === 'string'
+            )
+            .map((e) => ({
+              field: e.field,
+              message: e.message,
+              code: e.code,
+            }))
+        }
+      }
+
+      // Use top-level message/error as serverMessage fallback
       if (typeof body.message === 'string') {
         serverMessage = body.message
-      }
-      if (typeof body.error === 'string') {
+      } else if (typeof body.error === 'string') {
         serverMessage = body.error
-      }
-      if (Array.isArray(body.errors)) {
-        fieldErrors = (body.errors as unknown[])
-          .filter(
-            (e: unknown): e is { field: string; message: string; code?: string } =>
-              typeof e === 'object' &&
-              e !== null &&
-              typeof (e as ApiFieldError).message === 'string'
-          )
-          .map((e) => ({
-            field: e.field,
-            message: e.message,
-            code: e.code,
-          }))
+      } else if (fieldErrors.length > 0 && !body.message && !body.error) {
+        // For JSON:API errors without top-level message, use first error's detail
+        serverMessage = fieldErrors[0].message
       }
     }
 
@@ -294,7 +332,13 @@ export class ApiClient {
   async fetch(
     url: string,
     init?: { method?: string; headers?: Record<string, string>; body?: string }
-  ): Promise<{ ok: boolean; status: number; statusText: string; json: () => Promise<unknown>; text: () => Promise<string> }> {
+  ): Promise<{
+    ok: boolean
+    status: number
+    statusText: string
+    json: () => Promise<unknown>
+    text: () => Promise<string>
+  }> {
     try {
       const method = (init?.method ?? 'GET').toLowerCase()
       const data = init?.body ? JSON.parse(init.body) : undefined
@@ -319,7 +363,8 @@ export class ApiClient {
         status,
         statusText,
         json: async () => responseData,
-        text: async () => (typeof responseData === 'string' ? responseData : JSON.stringify(responseData)),
+        text: async () =>
+          typeof responseData === 'string' ? responseData : JSON.stringify(responseData),
       }
     } catch (error) {
       // Network errors or request setup errors — return a failed response

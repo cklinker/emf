@@ -1,4 +1,5 @@
 import { test, expect } from "../../../fixtures";
+import { waitForAnyVisible } from "../../../helpers/wait-helpers";
 
 test.describe("Security Audit", () => {
   test.beforeEach(async ({ page }) => {
@@ -12,21 +13,24 @@ test.describe("Security Audit", () => {
   });
 
   test("shows audit entries table or empty state", async ({ page }) => {
-    const anyState = page
-      .locator("table")
-      .or(page.getByTestId("empty-state"))
-      .or(page.getByTestId("error-message"))
-      .or(page.getByRole("heading", { name: /security audit/i }));
-    await expect(anyState).toBeVisible({ timeout: 10000 });
+    const found = await waitForAnyVisible([
+      page.locator("table"),
+      page.getByTestId("empty-state"),
+      page.getByTestId("error-message"),
+      page.getByRole("heading", { name: /security audit/i }),
+    ]);
+    expect(found).toBe(true);
   });
 
   test("has category column in table", async ({ page }) => {
     const table = page.locator("table");
-    const isTableVisible = await table.isVisible().catch(() => false);
-    if (isTableVisible) {
-      const categoryHeader = table.getByText(/category/i);
-      await expect(categoryHeader).toBeVisible();
+    try {
+      await table.waitFor({ state: "visible", timeout: 5000 });
+    } catch {
+      return;
     }
+    const categoryHeader = table.getByText(/category/i);
+    await expect(categoryHeader).toBeVisible();
   });
 
   test("has pagination controls", async ({ page }) => {

@@ -1,5 +1,6 @@
 import { test, expect } from "../../../fixtures";
 import { BulkJobsPage } from "../../../pages/bulk-jobs.page";
+import { waitForAnyVisible } from "../../../helpers/wait-helpers";
 
 test.describe("Bulk Jobs", () => {
   test("displays bulk jobs page", async ({ page }) => {
@@ -14,11 +15,13 @@ test.describe("Bulk Jobs", () => {
     const bulkJobsPage = new BulkJobsPage(page);
     await bulkJobsPage.goto();
 
-    const anyState = bulkJobsPage.table
-      .or(page.getByTestId("empty-state"))
-      .or(page.getByTestId("error-message"))
-      .or(bulkJobsPage.bulkJobsPage);
-    await expect(anyState).toBeVisible({ timeout: 10000 });
+    const found = await waitForAnyVisible([
+      bulkJobsPage.table,
+      page.getByTestId("empty-state"),
+      page.getByTestId("error-message"),
+      bulkJobsPage.bulkJobsPage,
+    ]);
+    expect(found).toBe(true);
   });
 
   test("opens create bulk job form", async ({ page }) => {

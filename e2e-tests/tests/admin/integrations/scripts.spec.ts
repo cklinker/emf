@@ -1,5 +1,6 @@
 import { test, expect } from "../../../fixtures";
 import { ScriptsPage } from "../../../pages/scripts.page";
+import { waitForAnyVisible } from "../../../helpers/wait-helpers";
 
 test.describe("Scripts", () => {
   test("displays scripts page", async ({ page }) => {
@@ -14,11 +15,13 @@ test.describe("Scripts", () => {
     const scriptsPage = new ScriptsPage(page);
     await scriptsPage.goto();
 
-    const anyState = scriptsPage.table
-      .or(page.getByTestId("empty-state"))
-      .or(page.getByTestId("error-message"))
-      .or(scriptsPage.scriptsPage);
-    await expect(anyState).toBeVisible({ timeout: 10000 });
+    const found = await waitForAnyVisible([
+      scriptsPage.table,
+      page.getByTestId("empty-state"),
+      page.getByTestId("error-message"),
+      scriptsPage.scriptsPage,
+    ]);
+    expect(found).toBe(true);
   });
 
   test("opens create script form", async ({ page }) => {

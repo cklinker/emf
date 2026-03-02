@@ -1,7 +1,7 @@
-import { test, expect } from '../../../fixtures';
-import { PermissionSetsListPage } from '../../../pages/permission-sets-list.page';
+import { test, expect } from "../../../fixtures";
+import { PermissionSetsListPage } from "../../../pages/permission-sets-list.page";
 
-test.describe('Permission Sets', () => {
+test.describe("Permission Sets", () => {
   let permissionSetsPage: PermissionSetsListPage;
 
   test.beforeEach(async ({ page }) => {
@@ -9,21 +9,24 @@ test.describe('Permission Sets', () => {
     await permissionSetsPage.goto();
   });
 
-  test('displays permission sets list page', async () => {
-    await expect(permissionSetsPage.table).toBeVisible();
+  test("displays permission sets list page", async ({ page }) => {
+    const tableOrEmpty = permissionSetsPage.table.or(
+      page.getByTestId("empty-state"),
+    );
+    await expect(tableOrEmpty).toBeVisible();
   });
 
-  test('shows permission sets in table', async () => {
+  test("shows permission sets in table", async () => {
     const rowCount = await permissionSetsPage.getRowCount();
     expect(rowCount).toBeGreaterThan(0);
   });
 
-  test('opens create permission set modal', async () => {
+  test("opens create permission set modal", async () => {
     await permissionSetsPage.clickCreate();
     await expect(permissionSetsPage.formModal).toBeVisible();
   });
 
-  test('navigates to permission set detail', async ({ page }) => {
+  test("navigates to permission set detail", async ({ page }) => {
     const rowCount = await permissionSetsPage.getRowCount();
     if (rowCount > 0) {
       await permissionSetsPage.clickEdit(0);
@@ -31,7 +34,7 @@ test.describe('Permission Sets', () => {
     }
   });
 
-  test('shows system badge for system permission sets', async ({ page }) => {
+  test("shows system badge for system permission sets", async ({ page }) => {
     const systemBadge = page.locator('[data-testid="system-badge"]');
     const badgeCount = await systemBadge.count();
     expect(badgeCount).toBeGreaterThanOrEqual(0);

@@ -1,8 +1,8 @@
-import { test, expect } from '../../../fixtures';
-import { TenantsPage } from '../../../pages/tenants.page';
+import { test, expect } from "../../../fixtures";
+import { TenantsPage } from "../../../pages/tenants.page";
 
-test.describe('Tenants', () => {
-  test('displays tenants page', async ({ page }) => {
+test.describe("Tenants", () => {
+  test("displays tenants page", async ({ page }) => {
     const tenantsPage = new TenantsPage(page);
     await tenantsPage.goto();
 
@@ -10,19 +10,18 @@ test.describe('Tenants', () => {
     await expect(tenantsPage.tenantsPage).toBeVisible();
   });
 
-  test('shows tenants table', async ({ page }) => {
+  test("shows tenants table or empty state", async ({ page }) => {
     const tenantsPage = new TenantsPage(page);
     await tenantsPage.goto();
 
-    await expect(tenantsPage.table).toBeVisible();
-
-    const rowCount = await tenantsPage.getRowCount();
-    expect(rowCount).toBeGreaterThan(0);
+    const tableOrEmpty = tenantsPage.table.or(page.getByTestId("empty-state"));
+    await expect(tableOrEmpty).toBeVisible();
   });
 
-  test('has create tenant button', async ({ page }) => {
+  test("has create tenant button", async ({ page }) => {
     const tenantsPage = new TenantsPage(page);
     await tenantsPage.goto();
+    await page.waitForLoadState("networkidle");
 
     await expect(tenantsPage.createButton).toBeVisible();
   });

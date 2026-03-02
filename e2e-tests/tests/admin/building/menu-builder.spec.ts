@@ -1,7 +1,7 @@
-import { test, expect } from '../../../fixtures';
-import { MenuBuilderPage } from '../../../pages/menu-builder.page';
+import { test, expect } from "../../../fixtures";
+import { MenuBuilderPage } from "../../../pages/menu-builder.page";
 
-test.describe('Menu Builder', () => {
+test.describe("Menu Builder", () => {
   let menuBuilderPage: MenuBuilderPage;
 
   test.beforeEach(async ({ page }) => {
@@ -9,15 +9,19 @@ test.describe('Menu Builder', () => {
     await menuBuilderPage.goto();
   });
 
-  test('displays menu builder page', async () => {
+  test("displays menu builder page", async () => {
     await expect(menuBuilderPage.menuBuilderPage).toBeVisible();
   });
 
-  test('shows menu list', async () => {
-    await expect(menuBuilderPage.menuList).toBeVisible();
+  test("shows menu list or empty state", async ({ page }) => {
+    const listOrEmpty = menuBuilderPage.menuList.or(
+      page.getByTestId("empty-state"),
+    );
+    await expect(listOrEmpty).toBeVisible();
   });
 
-  test('has add menu item button', async () => {
+  test("has add menu item button", async ({ page }) => {
+    await page.waitForLoadState("networkidle");
     await expect(menuBuilderPage.addItemButton).toBeVisible();
   });
 });

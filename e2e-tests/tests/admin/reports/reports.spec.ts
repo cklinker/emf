@@ -1,8 +1,8 @@
-import { test, expect } from '../../../fixtures';
-import { ReportsPage } from '../../../pages/reports.page';
+import { test, expect } from "../../../fixtures";
+import { ReportsPage } from "../../../pages/reports.page";
 
-test.describe('Reports', () => {
-  test('displays reports page', async ({ page }) => {
+test.describe("Reports", () => {
+  test("displays reports page", async ({ page }) => {
     const reportsPage = new ReportsPage(page);
     await reportsPage.goto();
 
@@ -10,23 +10,21 @@ test.describe('Reports', () => {
     await expect(reportsPage.reportsPage).toBeVisible();
   });
 
-  test('has create report button', async ({ page }) => {
+  test("has create report button", async ({ page }) => {
     const reportsPage = new ReportsPage(page);
     await reportsPage.goto();
+    await page.waitForLoadState("networkidle");
 
     await expect(reportsPage.createButton).toBeVisible();
   });
 
-  test('shows reports list or empty state', async ({ page }) => {
+  test("shows reports list or empty state", async ({ page }) => {
     const reportsPage = new ReportsPage(page);
     await reportsPage.goto();
 
-    const reportCount = await reportsPage.getReportCount();
-    if (reportCount > 0) {
-      await expect(reportsPage.reportList).toBeVisible();
-    } else {
-      // When no reports exist, the list container should still be present
-      await expect(reportsPage.reportsPage).toBeVisible();
-    }
+    const listOrEmpty = reportsPage.reportList.or(
+      page.getByTestId("empty-state"),
+    );
+    await expect(listOrEmpty).toBeVisible();
   });
 });

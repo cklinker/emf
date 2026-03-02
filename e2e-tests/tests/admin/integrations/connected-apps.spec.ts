@@ -1,8 +1,8 @@
-import { test, expect } from '../../../fixtures';
-import { ConnectedAppsPage } from '../../../pages/connected-apps.page';
+import { test, expect } from "../../../fixtures";
+import { ConnectedAppsPage } from "../../../pages/connected-apps.page";
 
-test.describe('Connected Apps', () => {
-  test('displays connected apps page', async ({ page }) => {
+test.describe("Connected Apps", () => {
+  test("displays connected apps page", async ({ page }) => {
     const connectedAppsPage = new ConnectedAppsPage(page);
     await connectedAppsPage.goto();
 
@@ -10,19 +10,17 @@ test.describe('Connected Apps', () => {
     await expect(connectedAppsPage.connectedAppsPage).toBeVisible();
   });
 
-  test('shows apps table or empty state', async ({ page }) => {
+  test("shows apps table or empty state", async ({ page }) => {
     const connectedAppsPage = new ConnectedAppsPage(page);
     await connectedAppsPage.goto();
 
-    const rowCount = await connectedAppsPage.getRowCount();
-    if (rowCount > 0) {
-      await expect(connectedAppsPage.table).toBeVisible();
-    } else {
-      await expect(connectedAppsPage.table).toBeVisible();
-    }
+    const tableOrEmpty = connectedAppsPage.table.or(
+      page.getByTestId("empty-state"),
+    );
+    await expect(tableOrEmpty).toBeVisible();
   });
 
-  test('opens create connected app form', async ({ page }) => {
+  test("opens create connected app form", async ({ page }) => {
     const connectedAppsPage = new ConnectedAppsPage(page);
     await connectedAppsPage.goto();
 

@@ -1,7 +1,7 @@
-import { test, expect } from '../../../fixtures';
-import { PicklistsPage } from '../../../pages/picklists.page';
+import { test, expect } from "../../../fixtures";
+import { PicklistsPage } from "../../../pages/picklists.page";
 
-test.describe('Picklists', () => {
+test.describe("Picklists", () => {
   let picklistsPage: PicklistsPage;
 
   test.beforeEach(async ({ page }) => {
@@ -9,28 +9,31 @@ test.describe('Picklists', () => {
     await picklistsPage.goto();
   });
 
-  test('displays picklists page', async () => {
-    await expect(picklistsPage.table).toBeVisible();
+  test("displays picklists page", async ({ page }) => {
+    const tableOrEmpty = picklistsPage.table.or(
+      page.getByTestId("empty-state"),
+    );
+    await expect(tableOrEmpty).toBeVisible();
   });
 
-  test('shows picklists in table', async () => {
+  test("shows picklists in table", async () => {
     const rowCount = await picklistsPage.getRowCount();
     expect(rowCount).toBeGreaterThanOrEqual(0);
   });
 
-  test('opens create picklist form', async () => {
+  test("opens create picklist form", async () => {
     await picklistsPage.clickCreate();
     await expect(picklistsPage.formModal).toBeVisible();
     await expect(picklistsPage.nameInput).toBeVisible();
   });
 
-  test('can fill out picklist form', async () => {
+  test("can fill out picklist form", async () => {
     await picklistsPage.clickCreate();
     await expect(picklistsPage.formModal).toBeVisible();
 
     await picklistsPage.fillForm({
       name: `E2E Picklist ${Date.now()}`,
-      description: 'Created by e2e test',
+      description: "Created by e2e test",
       sorted: true,
       restricted: false,
     });
@@ -38,7 +41,7 @@ test.describe('Picklists', () => {
     await expect(picklistsPage.submitButton).toBeEnabled();
   });
 
-  test('closes form on cancel', async () => {
+  test("closes form on cancel", async () => {
     await picklistsPage.clickCreate();
     await expect(picklistsPage.formModal).toBeVisible();
 

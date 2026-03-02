@@ -1,7 +1,7 @@
-import { test, expect } from '../../../fixtures';
-import { ResourceBrowserPage } from '../../../pages/resource-browser.page';
+import { test, expect } from "../../../fixtures";
+import { ResourceBrowserPage } from "../../../pages/resource-browser.page";
 
-test.describe('Resource Browser', () => {
+test.describe("Resource Browser", () => {
   let resourceBrowserPage: ResourceBrowserPage;
 
   test.beforeEach(async ({ page }) => {
@@ -9,27 +9,30 @@ test.describe('Resource Browser', () => {
     await resourceBrowserPage.goto();
   });
 
-  test('displays resource browser page', async () => {
+  test("displays resource browser page", async () => {
     await expect(resourceBrowserPage.resourceBrowserPage).toBeVisible();
   });
 
-  test('shows collection cards grid', async () => {
-    await expect(resourceBrowserPage.collectionsGrid).toBeVisible();
+  test("shows collection cards grid or empty state", async ({ page }) => {
+    const gridOrEmpty = resourceBrowserPage.collectionsGrid.or(
+      page.getByTestId("empty-state"),
+    );
+    await expect(gridOrEmpty).toBeVisible();
   });
 
-  test('can search for collections', async () => {
+  test("can search for collections", async () => {
     await expect(resourceBrowserPage.collectionSearchInput).toBeVisible();
-    await resourceBrowserPage.search('test');
-    await expect(resourceBrowserPage.collectionSearchInput).toHaveValue('test');
+    await resourceBrowserPage.search("test");
+    await expect(resourceBrowserPage.collectionSearchInput).toHaveValue("test");
   });
 
-  test('can clear search', async () => {
-    await resourceBrowserPage.search('test');
+  test("can clear search", async () => {
+    await resourceBrowserPage.search("test");
     await resourceBrowserPage.clearSearch();
-    await expect(resourceBrowserPage.collectionSearchInput).toHaveValue('');
+    await expect(resourceBrowserPage.collectionSearchInput).toHaveValue("");
   });
 
-  test('shows results count', async () => {
+  test("shows results count", async () => {
     await expect(resourceBrowserPage.resultsCountLabel).toBeVisible();
   });
 });

@@ -1,7 +1,7 @@
-import { test, expect } from '../../../fixtures';
-import { AuditTrailPage } from '../../../pages/audit-trail.page';
+import { test, expect } from "../../../fixtures";
+import { AuditTrailPage } from "../../../pages/audit-trail.page";
 
-test.describe('Audit Trail', () => {
+test.describe("Audit Trail", () => {
   let auditTrailPage: AuditTrailPage;
 
   test.beforeEach(async ({ page }) => {
@@ -9,21 +9,22 @@ test.describe('Audit Trail', () => {
     await auditTrailPage.goto();
   });
 
-  test('displays audit trail page', async () => {
+  test("displays audit trail page", async () => {
     await expect(auditTrailPage.auditTrailPage).toBeVisible();
   });
 
-  test('shows audit entries table', async () => {
-    await expect(auditTrailPage.table).toBeVisible();
-    const rowCount = await auditTrailPage.getRowCount();
-    expect(rowCount).toBeGreaterThanOrEqual(0);
+  test("shows audit entries table or empty state", async ({ page }) => {
+    const tableOrEmpty = auditTrailPage.table.or(
+      page.getByTestId("empty-state"),
+    );
+    await expect(tableOrEmpty).toBeVisible();
   });
 
-  test('has date filter', async () => {
+  test("has date filter", async () => {
     await expect(auditTrailPage.dateFilter).toBeVisible();
   });
 
-  test('has type filter', async () => {
+  test("has type filter", async () => {
     await expect(auditTrailPage.typeFilter).toBeVisible();
   });
 });

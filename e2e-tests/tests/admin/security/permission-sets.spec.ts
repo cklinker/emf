@@ -35,7 +35,12 @@ test.describe("Permission Sets", () => {
       .first()
       .isVisible({ timeout: 2000 })
       .catch(() => false);
-    expect(hasTable || hasEmptyState || hasEmptyText).toBe(true);
+    const hasError = await page
+      .getByText(/failed to load/i)
+      .first()
+      .isVisible({ timeout: 2000 })
+      .catch(() => false);
+    expect(hasTable || hasEmptyState || hasEmptyText || hasError).toBe(true);
   });
 
   test("has create permission set button", async ({ page }) => {

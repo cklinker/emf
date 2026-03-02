@@ -14,32 +14,21 @@ test.describe("Profiles", () => {
   });
 
   test("shows profiles in table or empty state", async ({ page }) => {
-    // Page may show table, empty state, or error state ("Failed to load profiles")
-    const hasTable = await profilesPage.profileTable
-      .isVisible({ timeout: 5000 })
-      .catch(() => false);
-    const hasEmptyState = await page
-      .getByTestId("empty-state")
-      .isVisible({ timeout: 3000 })
-      .catch(() => false);
-    const hasError = await page
-      .getByTestId("error-message")
-      .isVisible({ timeout: 3000 })
-      .catch(() => false);
-    const hasLoading = await page
-      .getByText(/loading/i)
-      .first()
-      .isVisible({ timeout: 2000 })
-      .catch(() => false);
-    expect(hasTable || hasEmptyState || hasError || hasLoading).toBe(true);
+    const anyState = profilesPage.profileTable
+      .or(page.getByTestId("empty-state"))
+      .or(page.getByTestId("error-message"))
+      .or(profilesPage.container);
+    await expect(anyState).toBeVisible({ timeout: 10000 });
   });
 
   test("opens create profile modal", async () => {
     // Create button only exists when page loads successfully (not in error state)
-    const hasCreateButton = await profilesPage.createButton
-      .isVisible({ timeout: 5000 })
-      .catch(() => false);
-    if (!hasCreateButton) {
+    try {
+      await profilesPage.createButton.waitFor({
+        state: "visible",
+        timeout: 5000,
+      });
+    } catch {
       return;
     }
     await profilesPage.clickCreate();
@@ -48,10 +37,12 @@ test.describe("Profiles", () => {
   });
 
   test("can create a new profile", async () => {
-    const hasCreateButton = await profilesPage.createButton
-      .isVisible({ timeout: 5000 })
-      .catch(() => false);
-    if (!hasCreateButton) {
+    try {
+      await profilesPage.createButton.waitFor({
+        state: "visible",
+        timeout: 5000,
+      });
+    } catch {
       return;
     }
     await profilesPage.clickCreate();

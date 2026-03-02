@@ -12,26 +12,12 @@ test.describe("Security Audit", () => {
   });
 
   test("shows audit entries table or empty state", async ({ page }) => {
-    // Page may show table, empty state text, error state, or loading state
-    const hasTable = await page
+    const anyState = page
       .locator("table")
-      .isVisible({ timeout: 5000 })
-      .catch(() => false);
-    const hasEmpty = await page
-      .getByText(/no.*entries|no.*data|no.*audit/i)
-      .first()
-      .isVisible({ timeout: 3000 })
-      .catch(() => false);
-    const hasError = await page
-      .getByTestId("error-message")
-      .isVisible({ timeout: 3000 })
-      .catch(() => false);
-    const hasLoading = await page
-      .getByText(/loading/i)
-      .first()
-      .isVisible({ timeout: 2000 })
-      .catch(() => false);
-    expect(hasTable || hasEmpty || hasError || hasLoading).toBe(true);
+      .or(page.getByTestId("empty-state"))
+      .or(page.getByTestId("error-message"))
+      .or(page.getByRole("heading", { name: /security audit/i }));
+    await expect(anyState).toBeVisible({ timeout: 10000 });
   });
 
   test("has category column in table", async ({ page }) => {

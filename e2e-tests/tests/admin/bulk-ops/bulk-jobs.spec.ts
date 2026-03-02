@@ -14,28 +14,11 @@ test.describe("Bulk Jobs", () => {
     const bulkJobsPage = new BulkJobsPage(page);
     await bulkJobsPage.goto();
 
-    const hasTable = await bulkJobsPage.table
-      .isVisible({ timeout: 5000 })
-      .catch(() => false);
-    const hasEmptyState = await page
-      .getByTestId("empty-state")
-      .isVisible({ timeout: 3000 })
-      .catch(() => false);
-    const hasError = await page
-      .getByTestId("error-message")
-      .isVisible({ timeout: 3000 })
-      .catch(() => false);
-    const hasLoading = await page
-      .getByText(/loading/i)
-      .first()
-      .isVisible({ timeout: 2000 })
-      .catch(() => false);
-    const hasPage = await bulkJobsPage.bulkJobsPage
-      .isVisible()
-      .catch(() => false);
-    expect(hasTable || hasEmptyState || hasError || hasLoading || hasPage).toBe(
-      true,
-    );
+    const anyState = bulkJobsPage.table
+      .or(page.getByTestId("empty-state"))
+      .or(page.getByTestId("error-message"))
+      .or(bulkJobsPage.bulkJobsPage);
+    await expect(anyState).toBeVisible({ timeout: 10000 });
   });
 
   test("opens create bulk job form", async ({ page }) => {
@@ -43,11 +26,12 @@ test.describe("Bulk Jobs", () => {
     await bulkJobsPage.goto();
 
     // Create button may not be available in error state
-    const hasCreateButton = await page
-      .getByTestId("add-bulk-job-button")
-      .isVisible({ timeout: 5000 })
-      .catch(() => false);
-    if (!hasCreateButton) {
+    try {
+      await bulkJobsPage.createButton.waitFor({
+        state: "visible",
+        timeout: 5000,
+      });
+    } catch {
       return;
     }
     await bulkJobsPage.clickCreate();
@@ -60,11 +44,12 @@ test.describe("Bulk Jobs", () => {
     await bulkJobsPage.goto();
 
     // Create button may not be available in error state
-    const hasCreateButton = await page
-      .getByTestId("add-bulk-job-button")
-      .isVisible({ timeout: 5000 })
-      .catch(() => false);
-    if (!hasCreateButton) {
+    try {
+      await bulkJobsPage.createButton.waitFor({
+        state: "visible",
+        timeout: 5000,
+      });
+    } catch {
       return;
     }
     await bulkJobsPage.clickCreate();

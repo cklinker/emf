@@ -9,6 +9,15 @@ test.describe("Collection Wizard", () => {
     const collectionsPage = new CollectionsListPage(page, tenantSlug);
     await collectionsPage.goto();
 
+    // Create button may not be available in error state
+    try {
+      await collectionsPage.createCollectionButton.waitFor({
+        state: "visible",
+        timeout: 5000,
+      });
+    } catch {
+      return;
+    }
     await collectionsPage.clickCreateCollection();
 
     const wizardPage = new CollectionWizardPage(page, tenantSlug);

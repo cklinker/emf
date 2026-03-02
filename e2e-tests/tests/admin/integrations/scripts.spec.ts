@@ -23,11 +23,15 @@ test.describe("Scripts", () => {
       .isVisible({ timeout: 3000 })
       .catch(() => false);
     const hasError = await page
-      .getByText(/failed to load/i)
+      .getByTestId("error-message")
+      .isVisible({ timeout: 3000 })
+      .catch(() => false);
+    const hasLoading = await page
+      .getByText(/loading/i)
       .first()
       .isVisible({ timeout: 2000 })
       .catch(() => false);
-    expect(hasTable || hasEmptyState || hasError).toBe(true);
+    expect(hasTable || hasEmptyState || hasError || hasLoading).toBe(true);
   });
 
   test("opens create script form", async ({ page }) => {

@@ -38,7 +38,11 @@ export async function loginViaAuthentik(
   // Playwright pierces open shadow DOM by default.
   const usernameInput = page.locator('input[name="uidField"]');
   await usernameInput.waitFor({ state: "visible", timeout: 30_000 });
-  await usernameInput.fill(options.username);
+  await usernameInput.click();
+  // Use pressSequentially instead of fill — Authentik uses Lit web components
+  // whose reactive properties don't update from programmatic .fill() value changes.
+  // pressSequentially fires individual key events that Lit's event listeners detect.
+  await usernameInput.pressSequentially(options.username, { delay: 20 });
 
   // Submit the identification stage — pressing Enter is more reliable
   // than clicking the submit button through shadow DOM layers.
@@ -49,7 +53,11 @@ export async function loginViaAuthentik(
   // so we need to wait for the new password input to appear.
   const passwordInput = page.locator('input[name="password"]');
   await passwordInput.waitFor({ state: "visible", timeout: 15_000 });
-  await passwordInput.fill(options.password);
+  await passwordInput.click();
+  await passwordInput.pressSequentially(options.password, { delay: 20 });
+
+  // Small delay to let Lit process the input events before submitting
+  await page.waitForTimeout(200);
 
   // Submit the password stage
   await passwordInput.press("Enter");

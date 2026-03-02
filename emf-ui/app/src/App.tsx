@@ -413,21 +413,21 @@ function TenantScopedApp({ plugins = [] }: { plugins?: Plugin[] }): React.ReactE
     >
       <ApiProvider baseUrl={`${apiBaseUrl}/${tenantSlug}`}>
         <CollectionStoreProvider>
-        <ConfigProvider>
-          <ThemeProvider>
-            <I18nProvider>
-              <PluginProvider plugins={plugins}>
-                <AppContextProvider>
-                  <ToastProvider>
-                    <LiveRegionProvider>
-                      <TenantRoutes />
-                    </LiveRegionProvider>
-                  </ToastProvider>
-                </AppContextProvider>
-              </PluginProvider>
-            </I18nProvider>
-          </ThemeProvider>
-        </ConfigProvider>
+          <ConfigProvider>
+            <ThemeProvider>
+              <I18nProvider>
+                <PluginProvider plugins={plugins}>
+                  <AppContextProvider>
+                    <ToastProvider>
+                      <LiveRegionProvider>
+                        <TenantRoutes />
+                      </LiveRegionProvider>
+                    </ToastProvider>
+                  </AppContextProvider>
+                </PluginProvider>
+              </I18nProvider>
+            </ThemeProvider>
+          </ConfigProvider>
         </CollectionStoreProvider>
       </ApiProvider>
     </AuthProvider>

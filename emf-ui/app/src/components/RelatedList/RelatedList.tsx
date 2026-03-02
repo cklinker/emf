@@ -155,9 +155,7 @@ export function RelatedList({
     // resolve this include — return null to trigger the fallback API call.
     if (allOfType.length === 0) return null
     // Filter to records that reference this parent
-    return allOfType.filter(
-      (r) => String(r[foreignKeyField]) === parentRecordId
-    )
+    return allOfType.filter((r) => String(r[foreignKeyField]) === parentRecordId)
   }, [includedData, collectionName, foreignKeyField, parentRecordId])
 
   // Only fetch via API if no pre-loaded data is available

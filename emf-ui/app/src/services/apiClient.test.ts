@@ -211,6 +211,136 @@ describe('ApiClient error handling', () => {
     })
   })
 
+  describe('JSON:API error format', () => {
+    it('should parse JSON:API validation errors with source.pointer', async () => {
+      mockAxios.get.mockRejectedValueOnce(
+        createAxiosError(400, {
+          errors: [
+            {
+              status: '400',
+              code: 'nullable',
+              title: 'Validation Error',
+              detail: 'Name is required',
+              source: { pointer: '/data/attributes/name' },
+              meta: { requestId: 'abc12345' },
+            },
+          ],
+        })
+      )
+
+      try {
+        await client.get('/test')
+        expect.fail('Should have thrown')
+      } catch (error) {
+        expect(error).toBeInstanceOf(ApiError)
+        const apiError = error as ApiError
+        expect(apiError.status).toBe(400)
+        expect(apiError.serverMessage).toBe('Name is required')
+        expect(apiError.fieldErrors).toHaveLength(1)
+        expect(apiError.fieldErrors[0].field).toBe('name')
+        expect(apiError.fieldErrors[0].message).toBe('Name is required')
+        expect(apiError.fieldErrors[0].code).toBe('nullable')
+      }
+    })
+
+    it('should parse multiple JSON:API field errors', async () => {
+      mockAxios.post.mockRejectedValueOnce(
+        createAxiosError(400, {
+          errors: [
+            {
+              status: '400',
+              code: 'nullable',
+              title: 'Validation Error',
+              detail: 'Name is required',
+              source: { pointer: '/data/attributes/name' },
+              meta: { requestId: 'abc12345' },
+            },
+            {
+              status: '400',
+              code: 'validationRule',
+              title: 'Validation Error',
+              detail: 'Quantity must be >= 100',
+              source: { pointer: '/data/attributes/quantity_on_hand' },
+              meta: { requestId: 'abc12345' },
+            },
+          ],
+        })
+      )
+
+      try {
+        await client.post('/test', {})
+        expect.fail('Should have thrown')
+      } catch (error) {
+        expect(error).toBeInstanceOf(ApiError)
+        const apiError = error as ApiError
+        expect(apiError.status).toBe(400)
+        expect(apiError.fieldErrors).toHaveLength(2)
+        expect(apiError.fieldErrors[0].field).toBe('name')
+        expect(apiError.fieldErrors[0].code).toBe('nullable')
+        expect(apiError.fieldErrors[1].field).toBe('quantity_on_hand')
+        expect(apiError.fieldErrors[1].code).toBe('validationRule')
+        expect(apiError.message).toBe('Name is required; Quantity must be >= 100')
+      }
+    })
+
+    it('should parse JSON:API unique constraint error', async () => {
+      mockAxios.put.mockRejectedValueOnce(
+        createAxiosError(409, {
+          errors: [
+            {
+              status: '409',
+              code: 'unique',
+              title: 'Conflict',
+              detail: 'Duplicate value for field name',
+              source: { pointer: '/data/attributes/name' },
+              meta: { requestId: 'def67890' },
+            },
+          ],
+        })
+      )
+
+      try {
+        await client.put('/test', {})
+        expect.fail('Should have thrown')
+      } catch (error) {
+        expect(error).toBeInstanceOf(ApiError)
+        const apiError = error as ApiError
+        expect(apiError.status).toBe(409)
+        expect(apiError.fieldErrors[0].field).toBe('name')
+        expect(apiError.fieldErrors[0].code).toBe('unique')
+      }
+    })
+
+    it('should parse JSON:API non-field error (no source)', async () => {
+      mockAxios.get.mockRejectedValueOnce(
+        createAxiosError(500, {
+          errors: [
+            {
+              status: '500',
+              code: 'internalError',
+              title: 'Internal Server Error',
+              detail: 'An unexpected error occurred',
+              meta: { requestId: 'ghi11111', path: '/api/test' },
+            },
+          ],
+        })
+      )
+
+      try {
+        await client.get('/test')
+        expect.fail('Should have thrown')
+      } catch (error) {
+        expect(error).toBeInstanceOf(ApiError)
+        const apiError = error as ApiError
+        expect(apiError.status).toBe(500)
+        expect(apiError.serverMessage).toBe('An unexpected error occurred')
+        expect(apiError.fieldErrors).toHaveLength(1)
+        expect(apiError.fieldErrors[0].field).toBe('')
+        expect(apiError.fieldErrors[0].message).toBe('An unexpected error occurred')
+      }
+    })
+  })
+
   describe('network errors', () => {
     it('should wrap non-Axios errors into ApiError with status 0', async () => {
       mockAxios.get.mockRejectedValueOnce(new Error('Network error'))

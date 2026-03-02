@@ -24,6 +24,13 @@
             <version>${project.version}</version>
         </dependency>
 
+        <!-- EMF Runtime JSON:API (shared JSON:API model classes) -->
+        <dependency>
+            <groupId>com.emf</groupId>
+            <artifactId>runtime-jsonapi</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <!-- Spring Boot Starters -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

@@ -24,6 +24,7 @@ import { useApi } from '../../context/ApiContext'
 import { useCollectionSummaries } from '../../hooks/useCollectionSummaries'
 import { LoadingSpinner, ErrorMessage } from '../../components'
 import type { ApiClient } from '../../services/apiClient'
+import type { EMFClient } from '@emf/sdk'
 import { cn } from '@/lib/utils'
 
 /**
@@ -113,13 +114,13 @@ export interface MigrationsPageProps {
   testId?: string
 }
 
-// API functions using apiClient
-async function fetchMigrationHistory(apiClient: ApiClient): Promise<MigrationRun[]> {
-  return apiClient.getList('/api/migrations')
+// API functions using apiClient / emfClient
+async function fetchMigrationHistory(emfClient: EMFClient): Promise<MigrationRun[]> {
+  return emfClient.admin.migrations.listRuns() as Promise<MigrationRun[]>
 }
 
-async function fetchMigrationDetails(apiClient: ApiClient, id: string): Promise<MigrationRun> {
-  return apiClient.getOne(`/api/migrations/${id}`)
+async function fetchMigrationDetails(emfClient: EMFClient, id: string): Promise<MigrationRun> {
+  return emfClient.admin.migrations.getRun(id) as Promise<MigrationRun>
 }
 
 async function fetchCollectionVersions(
@@ -189,8 +190,8 @@ async function rollbackMigration(apiClient: ApiClient, runId: string): Promise<M
 /**
  * Get migration run status for polling
  */
-async function getMigrationRunStatus(apiClient: ApiClient, runId: string): Promise<MigrationRun> {
-  return apiClient.getOne(`/api/migrations/${runId}`)
+async function getMigrationRunStatus(emfClient: EMFClient, runId: string): Promise<MigrationRun> {
+  return emfClient.admin.migrations.getRun(runId) as Promise<MigrationRun>
 }
 
 /**
@@ -526,7 +527,7 @@ function MigrationExecutionModal({
   onComplete,
 }: MigrationExecutionModalProps): React.ReactElement {
   const { t } = useI18n()
-  const { apiClient } = useApi()
+  const { apiClient, emfClient } = useApi()
   const queryClient = useQueryClient()
   const [runId, setRunId] = useState<string | null>(null)
   const [currentRun, setCurrentRun] = useState<MigrationRun | null>(null)
@@ -563,7 +564,7 @@ function MigrationExecutionModal({
 
     const pollStatus = async () => {
       try {
-        const run = await getMigrationRunStatus(apiClient, runId)
+        const run = await getMigrationRunStatus(emfClient, runId)
         setCurrentRun(run)
 
         // Stop polling when migration is complete or failed
@@ -587,7 +588,7 @@ function MigrationExecutionModal({
         clearInterval(pollingIntervalRef.current)
       }
     }
-  }, [isPolling, runId, queryClient, apiClient])
+  }, [isPolling, runId, queryClient, emfClient])
 
   // Start execution when modal opens
   useEffect(() => {
@@ -1149,7 +1150,7 @@ function MigrationRunDetails({
   onClose,
 }: MigrationRunDetailsProps): React.ReactElement {
   const { t, formatDate } = useI18n()
-  const { apiClient } = useApi()
+  const { emfClient } = useApi()
 
   const {
     data: migration,
@@ -1157,7 +1158,7 @@ function MigrationRunDetails({
     error,
   } = useQuery({
     queryKey: ['migration-details', migrationId],
-    queryFn: () => fetchMigrationDetails(apiClient, migrationId),
+    queryFn: () => fetchMigrationDetails(emfClient, migrationId),
   })
 
   const handleKeyDown = useCallback(
@@ -1495,7 +1496,7 @@ function MigrationHistoryTable({
  */
 export function MigrationsPage({ testId }: MigrationsPageProps): React.ReactElement {
   const { t } = useI18n()
-  const { apiClient } = useApi()
+  const { emfClient } = useApi()
   const queryClient = useQueryClient()
   const [selectedMigrationId, setSelectedMigrationId] = useState<string | null>(null)
   const [showPlanningForm, setShowPlanningForm] = useState(false)
@@ -1509,7 +1510,7 @@ export function MigrationsPage({ testId }: MigrationsPageProps): React.ReactElem
     refetch,
   } = useQuery({
     queryKey: ['migration-history'],
-    queryFn: () => fetchMigrationHistory(apiClient),
+    queryFn: () => fetchMigrationHistory(emfClient),
   })
 
   const handleViewDetails = useCallback((id: string) => {

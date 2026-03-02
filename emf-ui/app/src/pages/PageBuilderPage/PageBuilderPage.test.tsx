@@ -851,7 +851,7 @@ describe('PageBuilderPage', () => {
         }
         return Promise.resolve({ data: mockPages })
       })
-      mockAxios.put.mockResolvedValueOnce({ data: { ...mockPages[0], components: [] } })
+      mockAxios.patch.mockResolvedValueOnce({ data: { ...mockPages[0], components: [] } })
 
       render(<PageBuilderPage />, { wrapper: createTestWrapper() })
 

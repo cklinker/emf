@@ -12,6 +12,7 @@ import React, { useState, useCallback, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
+import type { CreateTenantRequest, UpdateTenantRequest } from '@emf/sdk'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
 import { cn } from '@/lib/utils'
 
@@ -75,21 +76,6 @@ function parseLimits(limitsJson?: string): GovernorLimitsData {
     }
   } catch {
     return { ...DEFAULT_GOVERNOR_LIMITS }
-  }
-}
-
-/**
- * Convert governor limits to snake_case map for the API.
- */
-function limitsToApiFormat(limits: GovernorLimitsData): Record<string, number> {
-  return {
-    api_calls_per_day: limits.apiCallsPerDay,
-    storage_gb: limits.storageGb,
-    max_users: limits.maxUsers,
-    max_collections: limits.maxCollections,
-    max_fields_per_collection: limits.maxFieldsPerCollection,
-    max_workflows: limits.maxWorkflows,
-    max_reports: limits.maxReports,
   }
 }
 
@@ -455,7 +441,7 @@ function StatusBadge({ status }: { status: string }): React.ReactElement {
 export function TenantsPage({ testId = 'tenants-page' }: TenantsPageProps): React.ReactElement {
   const queryClient = useQueryClient()
   const { formatDate } = useI18n()
-  const { apiClient } = useApi()
+  const { emfClient } = useApi()
   const { showToast } = useToast()
 
   const [isFormOpen, setIsFormOpen] = useState(false)
@@ -472,7 +458,7 @@ export function TenantsPage({ testId = 'tenants-page' }: TenantsPageProps): Reac
     refetch,
   } = useQuery({
     queryKey: ['tenants'],
-    queryFn: () => apiClient.getPage<Tenant>('/api/tenants?page[number]=0&page[size]=100'),
+    queryFn: () => emfClient.admin.tenants.list(0, 100),
   })
 
   const tenants = tenantsPage?.content ?? []
@@ -480,12 +466,12 @@ export function TenantsPage({ testId = 'tenants-page' }: TenantsPageProps): Reac
   // Create mutation
   const createMutation = useMutation({
     mutationFn: (data: TenantFormData) =>
-      apiClient.postResource<Tenant>('/api/tenants', {
+      emfClient.admin.tenants.create({
         slug: data.slug,
         name: data.name,
         edition: data.edition,
-        limits: limitsToApiFormat(data.limits),
-      }),
+        limits: data.limits,
+      } as CreateTenantRequest),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tenants'] })
       showToast('Tenant created successfully.', 'success')
@@ -499,11 +485,11 @@ export function TenantsPage({ testId = 'tenants-page' }: TenantsPageProps): Reac
   // Update mutation
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: TenantFormData }) =>
-      apiClient.putResource<Tenant>(`/api/tenants/${id}`, {
+      emfClient.admin.tenants.update(id, {
         name: data.name,
         edition: data.edition,
-        limits: limitsToApiFormat(data.limits),
-      }),
+        limits: data.limits,
+      } as UpdateTenantRequest),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tenants'] })
       showToast('Tenant updated successfully.', 'success')
@@ -516,8 +502,7 @@ export function TenantsPage({ testId = 'tenants-page' }: TenantsPageProps): Reac
 
   // Suspend mutation
   const suspendMutation = useMutation({
-    mutationFn: (id: string) =>
-      apiClient.patchResource(`/api/tenants/${id}`, { status: 'SUSPENDED' }),
+    mutationFn: (id: string) => emfClient.admin.tenants.suspend(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tenants'] })
       showToast('Tenant suspended.', 'success')
@@ -531,7 +516,7 @@ export function TenantsPage({ testId = 'tenants-page' }: TenantsPageProps): Reac
 
   // Activate mutation
   const activateMutation = useMutation({
-    mutationFn: (id: string) => apiClient.patchResource(`/api/tenants/${id}`, { status: 'ACTIVE' }),
+    mutationFn: (id: string) => emfClient.admin.tenants.activate(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tenants'] })
       showToast('Tenant activated.', 'success')

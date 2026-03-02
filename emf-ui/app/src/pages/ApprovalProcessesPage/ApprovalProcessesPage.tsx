@@ -10,6 +10,7 @@ import {
   ExecutionLogModal,
 } from '../../components'
 import type { LogColumn } from '../../components'
+import type { CreateApprovalProcessRequest } from '@emf/sdk'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 
@@ -458,7 +459,7 @@ export function ApprovalProcessesPage({
 }: ApprovalProcessesPageProps): React.ReactElement {
   const queryClient = useQueryClient()
   const { t, formatDate } = useI18n()
-  const { apiClient } = useApi()
+  const { emfClient } = useApi()
   const { showToast } = useToast()
 
   const [isFormOpen, setIsFormOpen] = useState(false)
@@ -479,14 +480,14 @@ export function ApprovalProcessesPage({
     refetch,
   } = useQuery({
     queryKey: ['approvalProcesses'],
-    queryFn: () => apiClient.getList<ApprovalProcess>(`/api/approval-processes`),
+    queryFn: () => emfClient.admin.approvals.listProcesses(),
   })
 
   const approvalProcessList: ApprovalProcess[] = approvalProcesses ?? []
 
   const createMutation = useMutation({
     mutationFn: (data: ApprovalProcessFormData) =>
-      apiClient.postResource<ApprovalProcess>(`/api/approval-processes`, data),
+      emfClient.admin.approvals.createProcess('', data as unknown as CreateApprovalProcessRequest),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['approvalProcesses'] })
       showToast('Approval process created successfully', 'success')
@@ -499,7 +500,10 @@ export function ApprovalProcessesPage({
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: ApprovalProcessFormData }) =>
-      apiClient.putResource<ApprovalProcess>(`/api/approval-processes/${id}`, data),
+      emfClient.admin.approvals.updateProcess(
+        id,
+        data as unknown as Partial<CreateApprovalProcessRequest>
+      ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['approvalProcesses'] })
       showToast('Approval process updated successfully', 'success')
@@ -511,7 +515,7 @@ export function ApprovalProcessesPage({
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiClient.delete(`/api/approval-processes/${id}`),
+    mutationFn: (id: string) => emfClient.admin.approvals.deleteProcess(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['approvalProcesses'] })
       showToast('Approval process deleted successfully', 'success')
@@ -530,7 +534,7 @@ export function ApprovalProcessesPage({
     error: instancesError,
   } = useQuery({
     queryKey: ['approval-instances'],
-    queryFn: () => apiClient.getList<ApprovalInstance>(`/api/approval-instances`),
+    queryFn: () => emfClient.admin.approvals.listInstances(''),
     enabled: !!instancesItemId,
   })
 

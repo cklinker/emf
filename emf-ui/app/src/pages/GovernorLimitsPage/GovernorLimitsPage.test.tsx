@@ -22,10 +22,35 @@ const mockStatus = {
   collectionsLimit: 200,
 }
 
+/**
+ * Wrap the governor limits status object in a JSON:API list response.
+ * The SDK's `governorLimits.getStatus()` calls `unwrapJsonApiList(response.data)`
+ * and returns `items[0]`, so we need a JSON:API envelope.
+ */
+function toJsonApiGovernorLimitsResponse(status: typeof mockStatus) {
+  return {
+    data: {
+      data: [
+        {
+          type: 'governor-limits',
+          id: 'current',
+          attributes: { ...status },
+        },
+      ],
+      metadata: {
+        totalCount: 1,
+        currentPage: 0,
+        pageSize: 500,
+        totalPages: 1,
+      },
+    },
+  }
+}
+
 function setupAxiosMocks() {
   mockAxios.get.mockImplementation((url: string) => {
     if (url.includes('/api/governor-limits')) {
-      return Promise.resolve({ data: mockStatus })
+      return Promise.resolve(toJsonApiGovernorLimitsResponse(mockStatus))
     }
     return Promise.resolve({ data: {} })
   })

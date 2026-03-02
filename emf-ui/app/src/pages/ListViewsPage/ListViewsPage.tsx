@@ -4,6 +4,7 @@ import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
 import { useCollectionSummaries, type CollectionSummary } from '../../hooks/useCollectionSummaries'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
+import type { CreateListViewRequest } from '@emf/sdk'
 import { cn } from '@/lib/utils'
 
 interface ListView {
@@ -404,7 +405,7 @@ export function ListViewsPage({
 }: ListViewsPageProps): React.ReactElement {
   const queryClient = useQueryClient()
   const { formatDate } = useI18n()
-  const { apiClient } = useApi()
+  const { emfClient } = useApi()
   const { showToast } = useToast()
 
   const [isFormOpen, setIsFormOpen] = useState(false)
@@ -419,7 +420,7 @@ export function ListViewsPage({
     refetch,
   } = useQuery({
     queryKey: ['listviews'],
-    queryFn: () => apiClient.getList<ListView>(`/api/list-views`),
+    queryFn: () => emfClient.admin.listViews.list('', ''),
   })
 
   const { summaries: collections } = useCollectionSummaries()
@@ -437,6 +438,7 @@ export function ListViewsPage({
   const createMutation = useMutation({
     mutationFn: (data: ListViewFormData) => {
       const payload = {
+        collectionId: data.collectionId,
         name: data.name,
         visibility: data.visibility,
         columns: data.columns.trim() || '[]',
@@ -444,10 +446,7 @@ export function ListViewsPage({
         sortField: data.sortField,
         sortDirection: data.sortDirection,
       }
-      return apiClient.postResource<ListView>(
-        `/api/list-views?collectionId=${encodeURIComponent(data.collectionId)}&userId=system`,
-        payload
-      )
+      return emfClient.admin.listViews.create('', '', payload as CreateListViewRequest)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['listviews'] })
@@ -469,7 +468,7 @@ export function ListViewsPage({
         sortField: data.sortField,
         sortDirection: data.sortDirection,
       }
-      return apiClient.putResource<ListView>(`/api/list-views/${id}`, payload)
+      return emfClient.admin.listViews.update(id, payload as Partial<CreateListViewRequest>)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['listviews'] })
@@ -482,7 +481,7 @@ export function ListViewsPage({
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiClient.delete(`/api/list-views/${id}`),
+    mutationFn: (id: string) => emfClient.admin.listViews.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['listviews'] })
       showToast('List view deleted successfully', 'success')

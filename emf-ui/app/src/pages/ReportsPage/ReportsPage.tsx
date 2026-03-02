@@ -23,6 +23,7 @@ import {
   ChevronRight,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import type { CreateReportRequest } from '@emf/sdk'
 
 /* ─────────────────────────── Types ─────────────────────────── */
 
@@ -226,7 +227,7 @@ export interface ReportsPageProps {
 export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): React.ReactElement {
   const queryClient = useQueryClient()
   const { formatDate } = useI18n()
-  const { apiClient } = useApi()
+  const { apiClient, emfClient } = useApi()
   const { showToast } = useToast()
 
   /* ────── Top-level state ────── */
@@ -248,7 +249,7 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
     refetch,
   } = useQuery({
     queryKey: ['reports'],
-    queryFn: () => apiClient.getList<Report>(`/api/reports`),
+    queryFn: () => emfClient.admin.reports.list() as Promise<Report[]>,
   })
 
   const reportList = useMemo<Report[]>(() => reports ?? [], [reports])
@@ -313,7 +314,7 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
   /* ────── Mutations ────── */
   const createMutation = useMutation({
     mutationFn: (data: Record<string, unknown>) =>
-      apiClient.postResource<Report>(`/api/reports`, data),
+      emfClient.admin.reports.create('', '', data as CreateReportRequest) as Promise<Report>,
     onSuccess: (created: Report) => {
       queryClient.invalidateQueries({ queryKey: ['reports'] })
       showToast('Report created successfully', 'success')
@@ -327,7 +328,7 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: Record<string, unknown> }) =>
-      apiClient.putResource<Report>(`/api/reports/${id}`, data),
+      emfClient.admin.reports.update(id, data as Partial<CreateReportRequest>) as Promise<Report>,
     onSuccess: (updated: Report) => {
       queryClient.invalidateQueries({ queryKey: ['reports'] })
       showToast('Report updated successfully', 'success')
@@ -340,7 +341,7 @@ export function ReportsPage({ testId = 'reports-page' }: ReportsPageProps): Reac
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiClient.delete(`/api/reports/${id}`),
+    mutationFn: (id: string) => emfClient.admin.reports.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['reports'] })
       showToast('Report deleted successfully', 'success')

@@ -17,23 +17,13 @@ interface GovernorLimits {
   maxReports: number
 }
 
-interface GovernorLimitsStatus {
-  limits: GovernorLimits
-  apiCallsUsed: number
-  apiCallsLimit: number
-  usersUsed: number
-  usersLimit: number
-  collectionsUsed: number
-  collectionsLimit: number
-}
-
 export interface GovernorLimitsPageProps {
   className?: string
 }
 
 export function GovernorLimitsPage({ className }: GovernorLimitsPageProps): React.ReactElement {
   const { t } = useI18n()
-  const { apiClient } = useApi()
+  const { apiClient, emfClient } = useApi()
   const { user } = useAuth()
   const { showToast } = useToast()
   const queryClient = useQueryClient()
@@ -48,7 +38,7 @@ export function GovernorLimitsPage({ className }: GovernorLimitsPageProps): Reac
     error,
   } = useQuery({
     queryKey: ['governor-limits'],
-    queryFn: () => apiClient.get<GovernorLimitsStatus>('/api/governor-limits'),
+    queryFn: () => emfClient.admin.governorLimits.getStatus(),
     refetchInterval: 60000,
   })
 

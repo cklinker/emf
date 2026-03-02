@@ -76,7 +76,7 @@ export class ApiError extends Error {
  * 1. JSON:API format: { errors: [{ status, code, title, detail, source, meta }] }
  * 2. Legacy format: { message, error, errors: [{ field, message, code }] }
  */
-function parseAxiosError(error: unknown): ApiError {
+export function parseAxiosError(error: unknown): ApiError {
   if (axios.isAxiosError(error) && error.response) {
     const { status, data } = error.response
     let serverMessage = error.response.statusText || 'Request failed'

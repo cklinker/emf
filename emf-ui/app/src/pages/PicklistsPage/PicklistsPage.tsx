@@ -6,6 +6,7 @@ import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../com
 import { PicklistValuesEditor } from '../../components/PicklistValuesEditor'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import type { CreateGlobalPicklistRequest } from '@emf/sdk'
 
 interface GlobalPicklist {
   id: string
@@ -268,7 +269,7 @@ export function PicklistsPage({
 }: PicklistsPageProps): React.ReactElement {
   const queryClient = useQueryClient()
   const { t, formatDate } = useI18n()
-  const { apiClient } = useApi()
+  const { emfClient } = useApi()
   const { showToast } = useToast()
 
   const [isFormOpen, setIsFormOpen] = useState(false)
@@ -285,14 +286,16 @@ export function PicklistsPage({
     refetch,
   } = useQuery({
     queryKey: ['picklists'],
-    queryFn: () => apiClient.getList<GlobalPicklist>('/api/global-picklists'),
+    queryFn: () => emfClient.admin.picklists.listGlobal() as Promise<GlobalPicklist[]>,
   })
 
   const picklistList = picklists ?? []
 
   const createMutation = useMutation({
     mutationFn: (data: PicklistFormData) =>
-      apiClient.postResource<GlobalPicklist>('/api/global-picklists', data),
+      emfClient.admin.picklists.createGlobal(
+        data as CreateGlobalPicklistRequest
+      ) as Promise<GlobalPicklist>,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['picklists'] })
       showToast(t('success.created', { item: t('picklists.title') }), 'success')
@@ -305,7 +308,10 @@ export function PicklistsPage({
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: PicklistFormData }) =>
-      apiClient.putResource<GlobalPicklist>(`/api/global-picklists/${id}`, data),
+      emfClient.admin.picklists.updateGlobal(
+        id,
+        data as Partial<CreateGlobalPicklistRequest>
+      ) as Promise<GlobalPicklist>,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['picklists'] })
       showToast(t('success.updated', { item: t('picklists.title') }), 'success')
@@ -317,7 +323,7 @@ export function PicklistsPage({
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiClient.delete(`/api/global-picklists/${id}`),
+    mutationFn: (id: string) => emfClient.admin.picklists.deleteGlobal(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['picklists'] })
       showToast(t('success.deleted', { item: t('picklists.title') }), 'success')

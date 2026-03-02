@@ -10,6 +10,7 @@ import {
   ExecutionLogModal,
 } from '../../components'
 import type { LogColumn } from '../../components'
+import type { CreateScriptRequest } from '@emf/sdk'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 
@@ -354,7 +355,7 @@ function ScriptForm({
 export function ScriptsPage({ testId = 'scripts-page' }: ScriptsPageProps): React.ReactElement {
   const queryClient = useQueryClient()
   const { formatDate } = useI18n()
-  const { apiClient } = useApi()
+  const { emfClient } = useApi()
   const { showToast } = useToast()
 
   const [isFormOpen, setIsFormOpen] = useState(false)
@@ -370,8 +371,7 @@ export function ScriptsPage({ testId = 'scripts-page' }: ScriptsPageProps): Reac
     error: logsError,
   } = useQuery({
     queryKey: ['script-logs', logsItemId],
-    queryFn: () =>
-      apiClient.getList<ScriptExecutionLog>(`/api/scripts/${logsItemId}/script-execution-logs`),
+    queryFn: () => emfClient.admin.scripts.listLogsByScript(logsItemId!),
     enabled: !!logsItemId,
   })
 
@@ -422,13 +422,14 @@ export function ScriptsPage({ testId = 'scripts-page' }: ScriptsPageProps): Reac
     refetch,
   } = useQuery({
     queryKey: ['scripts'],
-    queryFn: () => apiClient.getList<Script>(`/api/scripts`),
+    queryFn: () => emfClient.admin.scripts.list(),
   })
 
   const scriptList: Script[] = scripts ?? []
 
   const createMutation = useMutation({
-    mutationFn: (data: ScriptFormData) => apiClient.postResource<Script>(`/api/scripts`, data),
+    mutationFn: (data: ScriptFormData) =>
+      emfClient.admin.scripts.create('', '', data as unknown as CreateScriptRequest),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['scripts'] })
       showToast('Script created successfully', 'success')
@@ -441,7 +442,7 @@ export function ScriptsPage({ testId = 'scripts-page' }: ScriptsPageProps): Reac
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: ScriptFormData }) =>
-      apiClient.putResource<Script>(`/api/scripts/${id}`, data),
+      emfClient.admin.scripts.update(id, data as unknown as Partial<CreateScriptRequest>),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['scripts'] })
       showToast('Script updated successfully', 'success')
@@ -453,7 +454,7 @@ export function ScriptsPage({ testId = 'scripts-page' }: ScriptsPageProps): Reac
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiClient.delete(`/api/scripts/${id}`),
+    mutationFn: (id: string) => emfClient.admin.scripts.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['scripts'] })
       showToast('Script deleted successfully', 'success')

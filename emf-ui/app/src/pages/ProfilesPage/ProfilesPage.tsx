@@ -17,6 +17,7 @@ import { useToast, ConfirmDialog } from '../../components'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Lock, Plus, Pencil, Copy, Trash2 } from 'lucide-react'
+import type { CreateProfileRequest, UpdateProfileRequest } from '@emf/sdk'
 
 interface SecurityProfile {
   id: string
@@ -228,7 +229,7 @@ function ProfileFormModal({ profile, onSubmit, onCancel, isSubmitting }: Profile
 }
 
 export function ProfilesPage({ testId = 'profiles-page' }: ProfilesPageProps): React.ReactElement {
-  const { apiClient } = useApi()
+  const { apiClient, emfClient } = useApi()
   const { tenantSlug } = useTenant()
   const { formatDate } = useI18n()
   const navigate = useNavigate()
@@ -247,7 +248,7 @@ export function ProfilesPage({ testId = 'profiles-page' }: ProfilesPageProps): R
     refetch,
   } = useQuery({
     queryKey: ['profiles'],
-    queryFn: () => apiClient.getList<SecurityProfile>('/api/profiles'),
+    queryFn: () => emfClient.admin.profiles.list() as Promise<SecurityProfile[]>,
   })
 
   const profileList = profiles ?? []
@@ -255,7 +256,7 @@ export function ProfilesPage({ testId = 'profiles-page' }: ProfilesPageProps): R
   // Mutations
   const createMutation = useMutation({
     mutationFn: (data: ProfileFormData) =>
-      apiClient.postResource<SecurityProfile>('/api/profiles', data),
+      emfClient.admin.profiles.create(data as CreateProfileRequest) as Promise<SecurityProfile>,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['profiles'] })
       showToast('Profile created successfully', 'success')
@@ -268,7 +269,7 @@ export function ProfilesPage({ testId = 'profiles-page' }: ProfilesPageProps): R
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: ProfileFormData }) =>
-      apiClient.putResource<SecurityProfile>(`/api/profiles/${id}`, data),
+      emfClient.admin.profiles.update(id, data as UpdateProfileRequest) as Promise<SecurityProfile>,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['profiles'] })
       showToast('Profile updated successfully', 'success')
@@ -280,7 +281,7 @@ export function ProfilesPage({ testId = 'profiles-page' }: ProfilesPageProps): R
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiClient.deleteResource(`/api/profiles/${id}`),
+    mutationFn: (id: string) => emfClient.admin.profiles.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['profiles'] })
       showToast('Profile deleted successfully', 'success')

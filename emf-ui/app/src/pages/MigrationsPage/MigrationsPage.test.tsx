@@ -248,6 +248,22 @@ const mockMigrationPlan = {
 // Helper to setup Axios mocks for all endpoints
 function setupAxiosMocks(overrides: Record<string, unknown> = {}) {
   mockAxios.get.mockImplementation((url: string) => {
+    // SDK uses /api/migration-runs/{id} for detail
+    if (url.match(/\/api\/migration-runs\/[^/]+$/)) {
+      const id = url.split('/').pop()
+      if (overrides.details) {
+        return Promise.resolve({ data: overrides.details })
+      }
+      const migration = mockMigrationHistory.find((m) => m.id === id)
+      if (migration) {
+        return Promise.resolve({ data: migration })
+      }
+      return Promise.resolve({ data: mockMigrationDetails })
+    }
+    // SDK uses /api/migration-runs for list
+    if (url.includes('/api/migration-runs')) {
+      return Promise.resolve({ data: overrides.history ?? mockMigrationHistory })
+    }
     if (url.match(/\/api\/migrations\/[^/]+$/) && !url.endsWith('/api/migrations')) {
       const id = url.split('/').pop()
       if (overrides.details) {
@@ -622,7 +638,7 @@ describe('MigrationsPage', () => {
   describe('Error Handling', () => {
     it('handles history fetch error', async () => {
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/api/migrations')) {
+        if (url.includes('/api/migration-runs') || url.includes('/api/migrations')) {
           return Promise.reject(createAxiosError(500))
         }
         if (url.includes('/api/collections')) {
@@ -640,6 +656,14 @@ describe('MigrationsPage', () => {
 
     it('handles details fetch error', async () => {
       mockAxios.get.mockImplementation((url: string) => {
+        // SDK detail: /api/migration-runs/{id}
+        if (url.match(/\/api\/migration-runs\/[^/]+$/)) {
+          return Promise.reject(createAxiosError(500))
+        }
+        // SDK list: /api/migration-runs
+        if (url.includes('/api/migration-runs')) {
+          return Promise.resolve({ data: mockMigrationHistory })
+        }
         if (url.match(/\/api\/migrations\/[^/]+$/) && !url.endsWith('/api/migrations')) {
           return Promise.reject(createAxiosError(500))
         }
@@ -685,7 +709,7 @@ describe('MigrationsPage', () => {
 
     it('displays retry button on error', async () => {
       mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/api/migrations')) {
+        if (url.includes('/api/migration-runs') || url.includes('/api/migrations')) {
           return Promise.reject(createAxiosError(500))
         }
         if (url.includes('/api/collections')) {
@@ -1425,6 +1449,28 @@ describe('MigrationsPage', () => {
       } = {}
     ) {
       mockAxios.get.mockImplementation((url: string) => {
+        // SDK detail: /api/migration-runs/{id}
+        if (url.match(/\/api\/migration-runs\/[^/]+$/)) {
+          const id = url.split('/').pop()
+          if (id === 'run-new-1') {
+            switch (options.runStatus) {
+              case 'completed':
+                return Promise.resolve({ data: mockCompletedMigration })
+              case 'failed':
+                return Promise.resolve({ data: mockFailedMigration })
+              case 'rolled_back':
+                return Promise.resolve({ data: mockRolledBackMigration })
+              default:
+                return Promise.resolve({ data: mockRunningMigration })
+            }
+          }
+          const migration = mockMigrationHistory.find((m) => m.id === id)
+          return Promise.resolve({ data: migration || mockMigrationDetails })
+        }
+        // SDK list: /api/migration-runs
+        if (url.includes('/api/migration-runs')) {
+          return Promise.resolve({ data: mockMigrationHistory })
+        }
         if (url.match(/\/api\/migrations\/[^/]+$/) && !url.endsWith('/api/migrations')) {
           const id = url.split('/').pop()
           if (id === 'run-new-1') {
@@ -1773,6 +1819,22 @@ describe('MigrationsPage', () => {
       let rollbackCalled = false
 
       mockAxios.get.mockImplementation((url: string) => {
+        // SDK detail: /api/migration-runs/{id}
+        if (url.match(/\/api\/migration-runs\/[^/]+$/)) {
+          const id = url.split('/').pop()
+          if (id === 'run-new-1') {
+            if (rollbackCalled) {
+              return Promise.resolve({ data: mockRolledBackMigration })
+            }
+            return Promise.resolve({ data: mockFailedMigration })
+          }
+          const migration = mockMigrationHistory.find((m) => m.id === id)
+          return Promise.resolve({ data: migration || mockMigrationDetails })
+        }
+        // SDK list: /api/migration-runs
+        if (url.includes('/api/migration-runs')) {
+          return Promise.resolve({ data: mockMigrationHistory })
+        }
         if (url.match(/\/api\/migrations\/[^/]+$/) && !url.endsWith('/api/migrations')) {
           const id = url.split('/').pop()
           if (id === 'run-new-1') {

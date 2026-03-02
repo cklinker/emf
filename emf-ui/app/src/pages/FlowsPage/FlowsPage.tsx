@@ -50,7 +50,7 @@ export function FlowsPage({ testId = 'flows-page' }: FlowsPageProps): React.Reac
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const { t, formatDate } = useI18n()
-  const { apiClient } = useApi()
+  const { apiClient, emfClient } = useApi()
   const { showToast } = useToast()
 
   const [wizardOpen, setWizardOpen] = useState(false)
@@ -68,13 +68,13 @@ export function FlowsPage({ testId = 'flows-page' }: FlowsPageProps): React.Reac
     refetch,
   } = useQuery({
     queryKey: ['flows'],
-    queryFn: () => apiClient.getList<Flow>(`/api/flows`),
+    queryFn: () => emfClient.admin.flows.list(),
   })
 
   const flowList: Flow[] = flows ?? []
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiClient.delete(`/api/flows/${id}`),
+    mutationFn: (id: string) => emfClient.admin.flows.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['flows'] })
       showToast('Flow deleted successfully', 'success')

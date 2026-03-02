@@ -756,7 +756,7 @@ describe('OIDCProvidersPage', () => {
       mockAxios.get
         .mockResolvedValueOnce({ data: mockProviders }) // Initial fetch
         .mockResolvedValueOnce({ data: [updatedProvider, ...mockProviders.slice(1)] }) // Refetch
-      mockAxios.put.mockResolvedValueOnce({ data: updatedProvider }) // Update
+      mockAxios.patch.mockResolvedValueOnce({ data: updatedProvider }) // Update
 
       render(<OIDCProvidersPage />, { wrapper: createTestWrapper() })
 
@@ -789,7 +789,7 @@ describe('OIDCProvidersPage', () => {
       mockAxios.get
         .mockResolvedValueOnce({ data: mockProviders }) // Initial fetch
         .mockResolvedValueOnce({ data: [updatedProvider, ...mockProviders.slice(1)] }) // Refetch
-      mockAxios.put.mockResolvedValueOnce({ data: updatedProvider }) // Update
+      mockAxios.patch.mockResolvedValueOnce({ data: updatedProvider }) // Update
 
       render(<OIDCProvidersPage />, { wrapper: createTestWrapper() })
 

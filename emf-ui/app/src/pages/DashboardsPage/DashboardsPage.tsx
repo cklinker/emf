@@ -20,6 +20,7 @@ import {
   Loader2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import type { CreateDashboardRequest } from '@emf/sdk'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -1274,7 +1275,7 @@ function DashboardViewer({
   onBack,
   onEdit,
 }: DashboardViewerProps): React.ReactElement {
-  const { apiClient } = useApi()
+  const { apiClient, emfClient } = useApi()
 
   const {
     data: dashboard,
@@ -1282,7 +1283,7 @@ function DashboardViewer({
     error,
   } = useQuery({
     queryKey: ['dashboard', dashboardId],
-    queryFn: () => apiClient.getOne<Dashboard>(`/api/dashboards/${dashboardId}`),
+    queryFn: () => emfClient.admin.dashboards.get(dashboardId) as Promise<Dashboard>,
     enabled: !!dashboardId,
   })
 
@@ -1408,7 +1409,7 @@ function DashboardEditorInner({
   collections,
   onBack,
 }: DashboardEditorInnerProps): React.ReactElement {
-  const { apiClient } = useApi()
+  const { emfClient } = useApi()
   const { showToast } = useToast()
   const queryClient = useQueryClient()
   const [widgetConfigType, setWidgetConfigType] = useState<WidgetType | null>(null)
@@ -1423,14 +1424,14 @@ function DashboardEditorInner({
 
   const saveMutation = useMutation({
     mutationFn: (components: DashboardComponent[]) =>
-      apiClient.putResource<Dashboard>(`/api/dashboards/${dashboard.id}`, {
+      emfClient.admin.dashboards.update(dashboard.id, {
         name: dashboard.name,
         description: dashboard.description,
         accessLevel: dashboard.accessLevel,
         dynamic: dashboard.dynamic,
         columnCount: dashboard.columnCount,
         components,
-      }),
+      } as Partial<CreateDashboardRequest>) as Promise<Dashboard>,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['dashboard', dashboard.id] })
       queryClient.invalidateQueries({ queryKey: ['dashboards'] })
@@ -1625,7 +1626,7 @@ function DashboardEditorInner({
 }
 
 function DashboardEditor({ dashboardId, onBack }: DashboardEditorProps): React.ReactElement {
-  const { apiClient } = useApi()
+  const { emfClient } = useApi()
 
   const {
     data: dashboard,
@@ -1633,7 +1634,7 @@ function DashboardEditor({ dashboardId, onBack }: DashboardEditorProps): React.R
     error: dashboardError,
   } = useQuery({
     queryKey: ['dashboard', dashboardId],
-    queryFn: () => apiClient.getOne<Dashboard>(`/api/dashboards/${dashboardId}`),
+    queryFn: () => emfClient.admin.dashboards.get(dashboardId) as Promise<Dashboard>,
     enabled: !!dashboardId,
   })
 
@@ -1692,7 +1693,7 @@ export function DashboardsPage({
 }: DashboardsPageProps): React.ReactElement {
   const queryClient = useQueryClient()
   const { formatDate } = useI18n()
-  const { apiClient } = useApi()
+  const { emfClient } = useApi()
   const { showToast } = useToast()
 
   const [viewMode, setViewMode] = useState<ViewMode>('list')
@@ -1710,14 +1711,18 @@ export function DashboardsPage({
     refetch,
   } = useQuery({
     queryKey: ['dashboards'],
-    queryFn: () => apiClient.getList<Dashboard>(`/api/dashboards`),
+    queryFn: () => emfClient.admin.dashboards.list() as Promise<Dashboard[]>,
   })
 
   const dashboardList: Dashboard[] = dashboards ?? []
 
   const createMutation = useMutation({
     mutationFn: (data: DashboardFormData) =>
-      apiClient.postResource<Dashboard>(`/api/dashboards`, data),
+      emfClient.admin.dashboards.create(
+        '',
+        '',
+        data as CreateDashboardRequest
+      ) as Promise<Dashboard>,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['dashboards'] })
       showToast('Dashboard created successfully', 'success')
@@ -1730,7 +1735,10 @@ export function DashboardsPage({
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: DashboardFormData }) =>
-      apiClient.putResource<Dashboard>(`/api/dashboards/${id}`, data),
+      emfClient.admin.dashboards.update(
+        id,
+        data as Partial<CreateDashboardRequest>
+      ) as Promise<Dashboard>,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['dashboards'] })
       showToast('Dashboard updated successfully', 'success')
@@ -1742,7 +1750,7 @@ export function DashboardsPage({
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiClient.delete(`/api/dashboards/${id}`),
+    mutationFn: (id: string) => emfClient.admin.dashboards.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['dashboards'] })
       showToast('Dashboard deleted successfully', 'success')

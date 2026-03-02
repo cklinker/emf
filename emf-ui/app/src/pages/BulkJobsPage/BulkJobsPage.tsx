@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
+import type { CreateBulkJobRequest } from '@emf/sdk'
 import { cn } from '@/lib/utils'
 
 interface BulkJob {
@@ -295,7 +296,7 @@ function BulkJobForm({ onSubmit, onCancel, isSubmitting }: BulkJobFormProps): Re
 export function BulkJobsPage({ testId = 'bulk-jobs-page' }: BulkJobsPageProps): React.ReactElement {
   const queryClient = useQueryClient()
   const { formatDate } = useI18n()
-  const { apiClient } = useApi()
+  const { emfClient } = useApi()
   const { showToast } = useToast()
 
   const [isFormOpen, setIsFormOpen] = useState(false)
@@ -309,14 +310,15 @@ export function BulkJobsPage({ testId = 'bulk-jobs-page' }: BulkJobsPageProps): 
     refetch,
   } = useQuery({
     queryKey: ['bulk-jobs'],
-    queryFn: () => apiClient.getList<BulkJob>(`/api/bulk-jobs`),
+    queryFn: () => emfClient.admin.bulkJobs.list(),
     refetchInterval: 5000,
   })
 
   const jobList: BulkJob[] = bulkJobs ?? []
 
   const createMutation = useMutation({
-    mutationFn: (data: BulkJobFormData) => apiClient.postResource<BulkJob>(`/api/bulk-jobs`, data),
+    mutationFn: (data: BulkJobFormData) =>
+      emfClient.admin.bulkJobs.create('', '', data as CreateBulkJobRequest),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bulk-jobs'] })
       showToast('Bulk job created successfully', 'success')
@@ -328,8 +330,7 @@ export function BulkJobsPage({ testId = 'bulk-jobs-page' }: BulkJobsPageProps): 
   })
 
   const abortMutation = useMutation({
-    mutationFn: (id: string) =>
-      apiClient.patchResource<void>(`/api/bulk-jobs/${id}`, { status: 'ABORTED' }),
+    mutationFn: (id: string) => emfClient.admin.bulkJobs.abort(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bulk-jobs'] })
       showToast('Bulk job aborted successfully', 'success')

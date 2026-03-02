@@ -203,7 +203,7 @@ export function CollectionWizardPage({
 }: CollectionWizardPageProps): React.ReactElement {
   const navigate = useNavigate()
   const { t } = useI18n()
-  const { apiClient } = useApi()
+  const { emfClient } = useApi()
   const { showToast } = useToast()
 
   // Wizard state
@@ -230,17 +230,14 @@ export function CollectionWizardPage({
   // Global picklists for picklist field dropdown
   const { data: globalPicklists = [] } = useQuery({
     queryKey: ['picklists'],
-    queryFn: () => apiClient.getList<{ id: string; name: string }>('/api/global-picklists'),
+    queryFn: () => emfClient.admin.picklists.listGlobal(),
     enabled: fieldEditorOpen,
   })
 
   // Fetch profiles
   const { data: profilesData, isLoading: profilesLoading } = useQuery({
     queryKey: ['profiles'],
-    queryFn: () =>
-      apiClient.getList<{ id: string; name: string; description?: string; isSystem?: boolean }>(
-        '/api/profiles?page[size]=100'
-      ),
+    queryFn: () => emfClient.admin.profiles.list(),
   })
 
   const profiles = useMemo(() => profilesData ?? [], [profilesData])
@@ -403,28 +400,19 @@ export function CollectionWizardPage({
     setIsCreating(true)
     try {
       // Step 1: Create the collection
-      const created = await apiClient.postResource<{
-        id: string
-        name: string
-        description: string
-        active: boolean
-        currentVersion: number
-        createdAt: string
-        updatedAt: string
-      }>('/api/collections', {
+      const created = await emfClient.admin.collections.create({
         name: basics.name,
         displayName: basics.displayName,
         description: basics.description || '',
         active: basics.active,
-      })
+      } as unknown as import('@emf/sdk').CollectionDefinition)
 
-      const collectionId = created.id
+      const collectionId = created.id!
 
       // Step 2: Create fields
       for (const field of fields) {
         if (field.name) {
-          await apiClient.postResource(`/api/fields`, {
-            collectionId,
+          await emfClient.admin.fields.add(collectionId, {
             name: field.name,
             displayName: field.displayName,
             type: field.type,
@@ -437,7 +425,7 @@ export function CollectionWizardPage({
             fieldTypeConfig: field.fieldTypeConfig,
             constraints: field.constraints,
             trackHistory: field.trackHistory,
-          })
+          } as unknown as import('@emf/sdk').FieldDefinition)
         }
       }
 
@@ -448,9 +436,7 @@ export function CollectionWizardPage({
       )
 
       for (const perm of configuredPermissions) {
-        await apiClient.postResource('/api/profile-object-permissions', {
-          profileId: perm.profileId,
-          collectionId,
+        await emfClient.admin.profiles.setObjectPermissions(perm.profileId, collectionId, {
           canCreate: perm.canCreate,
           canRead: perm.canRead,
           canEdit: perm.canEdit,
@@ -468,7 +454,7 @@ export function CollectionWizardPage({
     } finally {
       setIsCreating(false)
     }
-  }, [apiClient, basics, fields, profilePermissions, navigate, showToast, t])
+  }, [emfClient, basics, fields, profilePermissions, navigate, showToast, t])
 
   // Check if any profile permissions are configured
   const hasAuthConfigured = useMemo(

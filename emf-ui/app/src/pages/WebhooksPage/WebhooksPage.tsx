@@ -11,6 +11,7 @@ import {
 } from '../../components'
 import type { LogColumn } from '../../components'
 
+import type { CreateWebhookRequest } from '@emf/sdk'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 
@@ -398,7 +399,7 @@ function WebhookForm({
 export function WebhooksPage({ testId = 'webhooks-page' }: WebhooksPageProps): React.ReactElement {
   const queryClient = useQueryClient()
   const { formatDate } = useI18n()
-  const { apiClient } = useApi()
+  const { emfClient } = useApi()
   const { showToast } = useToast()
 
   const [isFormOpen, setIsFormOpen] = useState(false)
@@ -414,8 +415,7 @@ export function WebhooksPage({ testId = 'webhooks-page' }: WebhooksPageProps): R
     error: deliveriesError,
   } = useQuery({
     queryKey: ['webhook-deliveries', logsItemId],
-    queryFn: () =>
-      apiClient.getList<WebhookDelivery>(`/api/webhooks/${logsItemId}/webhook-deliveries`),
+    queryFn: () => emfClient.admin.webhooks.listDeliveries(logsItemId!),
     enabled: !!logsItemId,
   })
 
@@ -465,7 +465,7 @@ export function WebhooksPage({ testId = 'webhooks-page' }: WebhooksPageProps): R
     refetch,
   } = useQuery({
     queryKey: ['webhooks'],
-    queryFn: () => apiClient.getList<Webhook>(`/api/webhooks`),
+    queryFn: () => emfClient.admin.webhooks.list(),
   })
 
   const webhookList: Webhook[] = webhooks ?? []
@@ -481,7 +481,7 @@ export function WebhooksPage({ testId = 'webhooks-page' }: WebhooksPageProps): R
         secret: data.secret || null,
         active: data.active,
       }
-      return apiClient.postResource<Webhook>(`/api/webhooks`, payload)
+      return emfClient.admin.webhooks.create('', '', payload as unknown as CreateWebhookRequest)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['webhooks'] })
@@ -504,7 +504,10 @@ export function WebhooksPage({ testId = 'webhooks-page' }: WebhooksPageProps): R
         secret: data.secret || null,
         active: data.active,
       }
-      return apiClient.putResource<Webhook>(`/api/webhooks/${id}`, payload)
+      return emfClient.admin.webhooks.update(
+        id,
+        payload as unknown as Partial<CreateWebhookRequest>
+      )
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['webhooks'] })
@@ -517,7 +520,7 @@ export function WebhooksPage({ testId = 'webhooks-page' }: WebhooksPageProps): R
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiClient.delete(`/api/webhooks/${id}`),
+    mutationFn: (id: string) => emfClient.admin.webhooks.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['webhooks'] })
       showToast('Webhook deleted successfully', 'success')

@@ -35,8 +35,14 @@ import java.util.concurrent.ConcurrentHashMap;
  * is designed to be non-blocking — any tracking failures are logged as warnings
  * and never interrupt the request processing.
  *
+ * <p>If no {@code platform_user} record exists for the authenticated email,
+ * this filter auto-provisions one using the available header information.
+ * This ensures that users authenticating via OIDC for the first time are
+ * automatically registered in the platform.
+ *
  * <p>On each tracked request, this filter:
  * <ol>
+ *   <li>Auto-provisions a {@code platform_user} if none exists for the email</li>
  *   <li>Updates {@code platform_user.last_login_at} and increments {@code login_count}</li>
  *   <li>Inserts a row into {@code login_history}</li>
  *   <li>Inserts a {@code LOGIN_SUCCESS} event into {@code security_audit_log}</li>
@@ -108,10 +114,14 @@ public class LoginTrackingFilter extends OncePerRequestFilter {
             return;
         }
 
-        // Resolve user UUID from email
+        // Resolve user UUID from email, auto-provisioning if needed
         String userId = lookupUserId(email, tenantId);
         if (userId == null) {
-            return;
+            String username = request.getHeader("X-Forwarded-User");
+            userId = provisionUser(email, tenantId, username);
+            if (userId == null) {
+                return;
+            }
         }
 
         String sourceIp = extractClientIp(request);
@@ -146,6 +156,34 @@ public class LoginTrackingFilter extends OncePerRequestFilter {
             log.debug("Could not resolve user '{}' in tenant '{}': {}", email, tenantId, e.getMessage());
             return null;
         }
+    }
+
+    /**
+     * Auto-provisions a new {@code platform_user} record for a user authenticating
+     * for the first time. Uses {@code INSERT ... ON CONFLICT DO NOTHING} for thread
+     * safety when multiple concurrent requests arrive for the same new user.
+     *
+     * @return the new user's UUID, or {@code null} if provisioning failed
+     */
+    String provisionUser(String email, String tenantId, String username) {
+        String id = UUID.randomUUID().toString();
+        try {
+            jdbcTemplate.update(
+                    "INSERT INTO platform_user (id, tenant_id, email, username, status, created_at, updated_at) " +
+                            "VALUES (?, ?, ?, ?, 'ACTIVE', NOW(), NOW()) " +
+                            "ON CONFLICT (tenant_id, email) DO NOTHING",
+                    id, tenantId, email, username);
+
+            // Re-query to get the actual ID (handles race condition where another thread inserted first)
+            String resolvedId = lookupUserId(email, tenantId);
+            if (resolvedId != null) {
+                log.info("Auto-provisioned platform_user for '{}' in tenant '{}'", email, tenantId);
+                return resolvedId;
+            }
+        } catch (Exception e) {
+            log.warn("Failed to auto-provision user '{}' in tenant '{}': {}", email, tenantId, e.getMessage());
+        }
+        return null;
     }
 
     private void updateUserLoginInfo(String userId, Timestamp ts) {

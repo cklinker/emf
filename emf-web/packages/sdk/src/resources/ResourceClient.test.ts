@@ -209,13 +209,23 @@ describe('ResourceClient', () => {
       });
     });
 
-    it('should include fields query parameters (Requirement 3.5)', async () => {
+    it('should include JSON:API sparse fieldsets with type bracket notation (Requirement 3.5)', async () => {
       mockAxiosGet.mockResolvedValue({ data: validListResponse });
 
       await resourceClient.list({ fields: ['id', 'name', 'email'] });
 
       expect(mockAxiosGet).toHaveBeenCalledWith('/api/users', {
-        params: { fields: 'id,name,email' },
+        params: { 'fields[users]': 'id,name,email' },
+      });
+    });
+
+    it('should include JSON:API include parameter', async () => {
+      mockAxiosGet.mockResolvedValue({ data: validListResponse });
+
+      await resourceClient.list({ include: ['accounts', 'contacts'] });
+
+      expect(mockAxiosGet).toHaveBeenCalledWith('/api/users', {
+        params: { include: 'accounts,contacts' },
       });
     });
   });
@@ -226,7 +236,7 @@ describe('ResourceClient', () => {
 
       await resourceClient.get('123');
 
-      expect(mockAxiosGet).toHaveBeenCalledWith('/api/users/123');
+      expect(mockAxiosGet).toHaveBeenCalledWith('/api/users/123', undefined);
     });
 
     it('should return the resource data (Requirement 10.2)', async () => {
@@ -236,6 +246,24 @@ describe('ResourceClient', () => {
       const result = await resourceClient.get('123');
 
       expect(result).toEqual(userData);
+    });
+
+    it('should send GET request with include parameter when options provided', async () => {
+      mockAxiosGet.mockResolvedValue({ data: { id: '123', name: 'Alice' } });
+
+      await resourceClient.get('123', { include: ['accounts', 'contacts'] });
+
+      expect(mockAxiosGet).toHaveBeenCalledWith('/api/users/123', {
+        params: { include: 'accounts,contacts' },
+      });
+    });
+
+    it('should send GET request without params when include is empty', async () => {
+      mockAxiosGet.mockResolvedValue({ data: { id: '123', name: 'Alice' } });
+
+      await resourceClient.get('123', { include: [] });
+
+      expect(mockAxiosGet).toHaveBeenCalledWith('/api/users/123', undefined);
     });
 
     it('should throw ValidationError when response is null (Requirement 10.3)', async () => {
@@ -452,6 +480,7 @@ describe('ResourceClient', () => {
       expect(typeof queryBuilder.sort).toBe('function');
       expect(typeof queryBuilder.filter).toBe('function');
       expect(typeof queryBuilder.fields).toBe('function');
+      expect(typeof queryBuilder.include).toBe('function');
       expect(typeof queryBuilder.execute).toBe('function');
     });
   });
@@ -474,6 +503,7 @@ describe('ResourceClient', () => {
         sort: [{ field: 'name', direction: 'asc' }],
         filters: [{ field: 'status', operator: 'eq', value: 'active' }],
         fields: ['id', 'name'],
+        include: ['accounts'],
       });
 
       expect(params).toEqual({
@@ -481,7 +511,8 @@ describe('ResourceClient', () => {
         'page[size]': '25',
         sort: 'name',
         'filter[status][eq]': 'active',
-        fields: 'id,name',
+        'fields[users]': 'id,name',
+        include: 'accounts',
       });
     });
 

@@ -54,9 +54,24 @@ export interface ListOptions {
   filters?: FilterExpression[];
 
   /**
-   * Fields to include in the response
+   * Fields to include in the response (sparse fieldsets)
    */
   fields?: string[];
+
+  /**
+   * Related resources to include via JSON:API ?include= parameter
+   */
+  include?: string[];
+}
+
+/**
+ * Options for get operations
+ */
+export interface GetOptions {
+  /**
+   * Related resources to include via JSON:API ?include= parameter
+   */
+  include?: string[];
 }
 
 /**

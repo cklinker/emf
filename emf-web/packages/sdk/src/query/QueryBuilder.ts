@@ -10,6 +10,7 @@ export class QueryBuilder<T = unknown> {
   private sortCriteria: SortCriteria[] = [];
   private filterExpressions: FilterExpression[] = [];
   private selectedFields: string[] = [];
+  private includeRelationships: string[] = [];
 
   constructor(private readonly resourceClient: ResourceClient<T>) {}
 
@@ -39,10 +40,18 @@ export class QueryBuilder<T = unknown> {
   }
 
   /**
-   * Select specific fields to include in the response
+   * Select specific fields to include in the response (sparse fieldsets)
    */
   fields(...fieldNames: string[]): QueryBuilder<T> {
     this.selectedFields.push(...fieldNames);
+    return this;
+  }
+
+  /**
+   * Include related resources in the response via JSON:API ?include= parameter
+   */
+  include(...relationships: string[]): QueryBuilder<T> {
+    this.includeRelationships.push(...relationships);
     return this;
   }
 
@@ -70,6 +79,10 @@ export class QueryBuilder<T = unknown> {
 
     if (this.selectedFields.length > 0) {
       options.fields = [...this.selectedFields];
+    }
+
+    if (this.includeRelationships.length > 0) {
+      options.include = [...this.includeRelationships];
     }
 
     return options;
@@ -107,7 +120,12 @@ export class QueryBuilder<T = unknown> {
     }
 
     if (options.fields) {
-      params.push(`fields=${options.fields.join(',')}`);
+      const resourceType = this.resourceClient.getName();
+      params.push(`fields[${resourceType}]=${options.fields.join(',')}`);
+    }
+
+    if (options.include) {
+      params.push(`include=${options.include.join(',')}`);
     }
 
     return params.join('&');
@@ -130,6 +148,7 @@ export class QueryBuilder<T = unknown> {
     this.sortCriteria = [];
     this.filterExpressions = [];
     this.selectedFields = [];
+    this.includeRelationships = [];
     return this;
   }
 }

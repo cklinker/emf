@@ -20,7 +20,7 @@ import java.util.Objects;
  * <ul>
  *   <li>Pagination: {@code page[number]=1&page[size]=20}</li>
  *   <li>Sorting: {@code sort=field1,-field2} (prefix with - for descending)</li>
- *   <li>Fields: {@code fields=fieldA,fieldB}</li>
+ *   <li>Fields: {@code fields=fieldA,fieldB} or {@code fields[type]=fieldA,fieldB}</li>
  *   <li>Filtering: {@code filter[field][op]=value}</li>
  * </ul>
  * 
@@ -58,7 +58,7 @@ public record QueryRequest(
      *   <li>{@code page[number]} - Page number (default: 1)</li>
      *   <li>{@code page[size]} - Page size (default: 20)</li>
      *   <li>{@code sort} - Comma-separated sort fields (prefix with - for descending)</li>
-     *   <li>{@code fields} - Comma-separated field names</li>
+     *   <li>{@code fields} or {@code fields[type]} - Comma-separated field names</li>
      *   <li>{@code filter[field][op]} - Filter conditions</li>
      * </ul>
      * 
@@ -68,9 +68,9 @@ public record QueryRequest(
     public static QueryRequest fromParams(Map<String, String> params) {
         Pagination pagination = Pagination.fromParams(params);
         List<SortField> sorting = SortField.fromParams(params.get("sort"));
-        List<String> fields = parseFields(params.get("fields"));
+        List<String> fields = parseFields(resolveFieldsParam(params));
         List<FilterCondition> filters = FilterCondition.fromParams(params);
-        
+
         return new QueryRequest(pagination, sorting, fields, filters);
     }
     
@@ -89,8 +89,31 @@ public record QueryRequest(
     }
     
     /**
+     * Resolves the fields parameter value, supporting both plain {@code fields=...}
+     * and JSON:API spec-compliant {@code fields[type]=...} formats.
+     *
+     * @param params the HTTP query parameters
+     * @return the raw fields parameter value, or null if not present
+     */
+    private static String resolveFieldsParam(Map<String, String> params) {
+        // Check plain format first: fields=a,b
+        String plain = params.get("fields");
+        if (plain != null && !plain.isBlank()) {
+            return plain;
+        }
+        // Check JSON:API sparse fieldsets format: fields[type]=a,b
+        for (Map.Entry<String, String> entry : params.entrySet()) {
+            String key = entry.getKey();
+            if (key.startsWith("fields[") && key.endsWith("]")) {
+                return entry.getValue();
+            }
+        }
+        return null;
+    }
+
+    /**
      * Parses the fields parameter into a list of field names.
-     * 
+     *
      * @param fieldsParam the fields parameter value (comma-separated)
      * @return list of field names, or empty list if null/blank
      */

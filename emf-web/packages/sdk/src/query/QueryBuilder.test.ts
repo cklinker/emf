@@ -23,6 +23,7 @@ describe('QueryBuilder', () => {
   beforeEach(() => {
     mockResourceClient = {
       list: vi.fn().mockResolvedValue(mockListResponse),
+      getName: vi.fn().mockReturnValue('users'),
     } as unknown as ResourceClient<{ id: string; name: string }>;
 
     queryBuilder = new QueryBuilder(mockResourceClient);
@@ -281,6 +282,32 @@ describe('QueryBuilder', () => {
     });
   });
 
+  describe('include()', () => {
+    it('should store include relationships when include is called', () => {
+      queryBuilder.include('accounts', 'contacts');
+
+      const options = queryBuilder.buildOptions();
+      expect(options.include).toEqual(['accounts', 'contacts']);
+    });
+
+    it('should return the QueryBuilder instance for chaining', () => {
+      const result = queryBuilder.include('accounts');
+      expect(result).toBe(queryBuilder);
+    });
+
+    it('should accumulate includes when called multiple times', () => {
+      queryBuilder.include('accounts').include('contacts', 'orders');
+
+      const options = queryBuilder.buildOptions();
+      expect(options.include).toEqual(['accounts', 'contacts', 'orders']);
+    });
+
+    it('should not include in options when no includes set', () => {
+      const options = queryBuilder.buildOptions();
+      expect(options.include).toBeUndefined();
+    });
+  });
+
   describe('Fluent API chaining', () => {
     it('should support full fluent chaining of all methods', async () => {
       const result = await queryBuilder
@@ -290,6 +317,7 @@ describe('QueryBuilder', () => {
         .filter('status', 'eq', 'active')
         .filter('type', 'in', ['user', 'admin'])
         .fields('id', 'name', 'email')
+        .include('accounts')
         .execute();
 
       expect(mockResourceClient.list).toHaveBeenCalledWith({
@@ -304,6 +332,7 @@ describe('QueryBuilder', () => {
           { field: 'type', operator: 'in', value: ['user', 'admin'] },
         ],
         fields: ['id', 'name', 'email'],
+        include: ['accounts'],
       });
       expect(result).toEqual(mockListResponse);
     });
@@ -381,11 +410,18 @@ describe('QueryBuilder', () => {
       expect(params).toContain('filter[status][eq]=active');
     });
 
-    it('should build query params string for fields', () => {
+    it('should build JSON:API sparse fieldsets with type bracket notation', () => {
       queryBuilder.fields('id', 'name', 'email');
 
       const params = queryBuilder.buildQueryParams();
-      expect(params).toContain('fields=id,name,email');
+      expect(params).toContain('fields[users]=id,name,email');
+    });
+
+    it('should build include param with comma-separated relationships', () => {
+      queryBuilder.include('accounts', 'contacts');
+
+      const params = queryBuilder.buildQueryParams();
+      expect(params).toBe('include=accounts,contacts');
     });
 
     it('should return empty string when no options set', () => {
@@ -401,6 +437,7 @@ describe('QueryBuilder', () => {
         .sort('name', 'asc')
         .filter('status', 'eq', 'active')
         .fields('id', 'name')
+        .include('accounts')
         .reset();
 
       const options = queryBuilder.buildOptions();

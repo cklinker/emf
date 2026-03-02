@@ -1,5 +1,5 @@
 import type { EMFClient } from '../client/EMFClient';
-import type { ListOptions, ListResponse } from './types';
+import type { GetOptions, ListOptions, ListResponse } from './types';
 import { QueryBuilder } from '../query/QueryBuilder';
 import { ListResponseSchema } from '../validation/schemas';
 import { ValidationError } from '../errors';
@@ -49,10 +49,19 @@ export class ResourceClient<T = unknown> {
   }
 
   /**
-   * Get a single resource by ID
+   * Get a single resource by ID, with optional include for related resources
    */
-  async get(id: string): Promise<T> {
-    const response = await this.client.getAxiosInstance().get<T>(`/api/${this.resourceName}/${id}`);
+  async get(id: string, options?: GetOptions): Promise<T> {
+    const params: Record<string, string> = {};
+    if (options?.include && options.include.length > 0) {
+      params.include = options.include.join(',');
+    }
+    const response = await this.client
+      .getAxiosInstance()
+      .get<T>(
+        `/api/${this.resourceName}/${id}`,
+        Object.keys(params).length > 0 ? { params } : undefined
+      );
 
     // Validate response if validation is enabled
     if (this.client.isValidationEnabled()) {
@@ -256,7 +265,11 @@ export class ResourceClient<T = unknown> {
     }
 
     if (options.fields && options.fields.length > 0) {
-      params.fields = options.fields.join(',');
+      params[`fields[${this.resourceName}]`] = options.fields.join(',');
+    }
+
+    if (options.include && options.include.length > 0) {
+      params.include = options.include.join(',');
     }
 
     return params;

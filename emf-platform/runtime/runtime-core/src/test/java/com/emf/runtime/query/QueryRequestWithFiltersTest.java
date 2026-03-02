@@ -1,9 +1,12 @@
 package com.emf.runtime.query;
 
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -131,6 +134,55 @@ class QueryRequestWithFiltersTest {
         assertThrows(UnsupportedOperationException.class,
                 () -> modified.filters().add(FilterCondition.eq("extra", "value")),
                 "Filters list should be immutable");
+    }
+
+    @Nested
+    @DisplayName("fromParams - sparse fieldsets")
+    class FromParamsSparseFieldsets {
+
+        @Test
+        @DisplayName("Should parse plain fields parameter")
+        void fromParams_parsesPlainFields() {
+            Map<String, String> params = new HashMap<>();
+            params.put("fields", "name,email,phone");
+
+            QueryRequest request = QueryRequest.fromParams(params);
+
+            assertEquals(List.of("name", "email", "phone"), request.fields());
+        }
+
+        @Test
+        @DisplayName("Should parse JSON:API fields[type] parameter")
+        void fromParams_parsesJsonApiSparseFieldsets() {
+            Map<String, String> params = new HashMap<>();
+            params.put("fields[users]", "name,email");
+
+            QueryRequest request = QueryRequest.fromParams(params);
+
+            assertEquals(List.of("name", "email"), request.fields());
+        }
+
+        @Test
+        @DisplayName("Should prefer plain fields over fields[type] when both present")
+        void fromParams_prefersPlainFields() {
+            Map<String, String> params = new HashMap<>();
+            params.put("fields", "id,name");
+            params.put("fields[users]", "email,phone");
+
+            QueryRequest request = QueryRequest.fromParams(params);
+
+            assertEquals(List.of("id", "name"), request.fields());
+        }
+
+        @Test
+        @DisplayName("Should return empty fields when neither format present")
+        void fromParams_emptyFieldsWhenAbsent() {
+            Map<String, String> params = new HashMap<>();
+
+            QueryRequest request = QueryRequest.fromParams(params);
+
+            assertTrue(request.fields().isEmpty());
+        }
     }
 
     @Test

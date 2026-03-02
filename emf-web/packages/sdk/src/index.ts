@@ -14,6 +14,7 @@ export type { EMFClientConfig, TokenProvider, CacheConfig, RetryConfig } from '.
 export { ResourceClient } from './resources/ResourceClient';
 export type {
   ListOptions,
+  GetOptions,
   ListResponse,
   SortCriteria,
   FilterExpression,

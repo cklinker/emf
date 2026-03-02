@@ -16,6 +16,8 @@ import com.emf.runtime.workflow.module.ModuleRegistry;
 import com.emf.worker.flow.JdbcFlowStore;
 import com.emf.worker.listener.CollectionConfigEventPublisher;
 import com.emf.worker.listener.FieldConfigEventPublisher;
+import com.emf.worker.service.AuditBeforeSaveHook;
+import com.emf.worker.service.SetupAuditService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -173,5 +175,18 @@ public class FlowConfig {
                 new FieldConfigEventPublisher(kafkaTemplate, objectMapper);
         hookRegistry.register(publisher);
         return publisher;
+    }
+
+    // ---------------------------------------------------------------------------
+    // Audit hook — records setup changes to the setup_audit_trail table
+    // ---------------------------------------------------------------------------
+
+    @Bean
+    public AuditBeforeSaveHook auditBeforeSaveHook(
+            BeforeSaveHookRegistry hookRegistry,
+            SetupAuditService auditService) {
+        AuditBeforeSaveHook hook = new AuditBeforeSaveHook(auditService);
+        hookRegistry.register(hook);
+        return hook;
     }
 }

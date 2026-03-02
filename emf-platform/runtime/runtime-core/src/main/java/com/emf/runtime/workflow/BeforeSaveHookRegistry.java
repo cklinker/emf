@@ -12,6 +12,10 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p>Supports multiple hooks per collection, ordered by {@link BeforeSaveHook#getOrder()}.
  * Hooks are registered programmatically by the module system.
  *
+ * <p>Wildcard support: hooks that return {@code "*"} from {@link BeforeSaveHook#getCollectionName()}
+ * are applied to all collections. When looking up hooks for a collection, collection-specific
+ * hooks are returned first (sorted by order), followed by wildcard hooks (sorted by order).
+ *
  * <p>Thread-safe: uses ConcurrentHashMap for the handler registry.
  *
  * @since 1.0.0
@@ -19,6 +23,11 @@ import java.util.concurrent.ConcurrentHashMap;
 public class BeforeSaveHookRegistry {
 
     private static final Logger log = LoggerFactory.getLogger(BeforeSaveHookRegistry.class);
+
+    /**
+     * Wildcard collection name that matches all collections.
+     */
+    public static final String WILDCARD = "*";
 
     private final Map<String, List<BeforeSaveHook>> hooks = new ConcurrentHashMap<>();
 
@@ -61,22 +70,50 @@ public class BeforeSaveHookRegistry {
     /**
      * Gets the ordered list of hooks for the given collection.
      *
+     * <p>Returns collection-specific hooks first, followed by wildcard hooks.
+     * Both groups are individually sorted by {@link BeforeSaveHook#getOrder()}.
+     *
      * @param collectionName the collection name
-     * @return the hooks (sorted by order), or empty list if none registered
+     * @return the hooks (collection-specific first, then wildcard), or empty list if none registered
      */
     public List<BeforeSaveHook> getHooks(String collectionName) {
-        return hooks.getOrDefault(collectionName, List.of());
+        List<BeforeSaveHook> specific = hooks.getOrDefault(collectionName, List.of());
+        List<BeforeSaveHook> wildcard = WILDCARD.equals(collectionName)
+                ? List.of()
+                : hooks.getOrDefault(WILDCARD, List.of());
+
+        if (wildcard.isEmpty()) {
+            return specific;
+        }
+        if (specific.isEmpty()) {
+            return wildcard;
+        }
+
+        // Merge: collection-specific hooks first, then wildcard hooks
+        List<BeforeSaveHook> merged = new ArrayList<>(specific.size() + wildcard.size());
+        merged.addAll(specific);
+        merged.addAll(wildcard);
+        return Collections.unmodifiableList(merged);
     }
 
     /**
-     * Checks if any hooks are registered for the given collection.
+     * Checks if any hooks are registered for the given collection,
+     * including wildcard hooks.
      *
      * @param collectionName the collection name
-     * @return true if hooks are registered
+     * @return true if hooks are registered (collection-specific or wildcard)
      */
     public boolean hasHooks(String collectionName) {
         List<BeforeSaveHook> list = hooks.get(collectionName);
-        return list != null && !list.isEmpty();
+        if (list != null && !list.isEmpty()) {
+            return true;
+        }
+        // Check for wildcard hooks (unless we're already looking up wildcards)
+        if (!WILDCARD.equals(collectionName)) {
+            List<BeforeSaveHook> wildcardList = hooks.get(WILDCARD);
+            return wildcardList != null && !wildcardList.isEmpty();
+        }
+        return false;
     }
 
     /**
@@ -165,7 +202,7 @@ public class BeforeSaveHookRegistry {
     }
 
     /**
-     * Invokes all after-create hooks for a collection.
+     * Invokes all after-create hooks for a collection, including wildcard hooks.
      *
      * @param collectionName the collection name
      * @param record the created record data
@@ -174,7 +211,7 @@ public class BeforeSaveHookRegistry {
     public void invokeAfterCreate(String collectionName, Map<String, Object> record, String tenantId) {
         for (BeforeSaveHook hook : getHooks(collectionName)) {
             try {
-                hook.afterCreate(record, tenantId);
+                hook.afterCreate(collectionName, record, tenantId);
             } catch (Exception e) {
                 log.error("After-create hook failed for collection '{}': {}",
                     collectionName, e.getMessage(), e);
@@ -183,7 +220,7 @@ public class BeforeSaveHookRegistry {
     }
 
     /**
-     * Invokes all after-update hooks for a collection.
+     * Invokes all after-update hooks for a collection, including wildcard hooks.
      *
      * @param collectionName the collection name
      * @param id the record ID
@@ -196,7 +233,7 @@ public class BeforeSaveHookRegistry {
                                    String tenantId) {
         for (BeforeSaveHook hook : getHooks(collectionName)) {
             try {
-                hook.afterUpdate(id, record, previous, tenantId);
+                hook.afterUpdate(collectionName, id, record, previous, tenantId);
             } catch (Exception e) {
                 log.error("After-update hook failed for collection '{}': {}",
                     collectionName, e.getMessage(), e);
@@ -205,7 +242,7 @@ public class BeforeSaveHookRegistry {
     }
 
     /**
-     * Invokes all after-delete hooks for a collection.
+     * Invokes all after-delete hooks for a collection, including wildcard hooks.
      *
      * @param collectionName the collection name
      * @param id the deleted record ID
@@ -214,7 +251,7 @@ public class BeforeSaveHookRegistry {
     public void invokeAfterDelete(String collectionName, String id, String tenantId) {
         for (BeforeSaveHook hook : getHooks(collectionName)) {
             try {
-                hook.afterDelete(id, tenantId);
+                hook.afterDelete(collectionName, id, tenantId);
             } catch (Exception e) {
                 log.error("After-delete hook failed for collection '{}': {}",
                     collectionName, e.getMessage(), e);

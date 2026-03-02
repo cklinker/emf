@@ -295,6 +295,167 @@ class BeforeSaveHookRegistryTest {
         assertTrue(hookCalled.get());
     }
 
+    // ==================== Wildcard Hook Tests ====================
+
+    @Test
+    @DisplayName("Should include wildcard hooks for any collection")
+    void shouldIncludeWildcardHooksForAnyCollection() {
+        BeforeSaveHookRegistry registry = new BeforeSaveHookRegistry();
+        BeforeSaveHook wildcardHook = stubHook("*", 1000);
+        registry.register(wildcardHook);
+
+        assertTrue(registry.hasHooks("users"));
+        assertTrue(registry.hasHooks("collections"));
+        assertTrue(registry.hasHooks("any-collection"));
+
+        assertEquals(1, registry.getHooks("users").size());
+        assertEquals(wildcardHook, registry.getHooks("users").get(0));
+    }
+
+    @Test
+    @DisplayName("Should return collection-specific hooks before wildcard hooks")
+    void shouldReturnSpecificHooksBeforeWildcardHooks() {
+        BeforeSaveHookRegistry registry = new BeforeSaveHookRegistry();
+        BeforeSaveHook specificHook = stubHook("users", 0);
+        BeforeSaveHook wildcardHook = stubHook("*", 1000);
+        registry.register(wildcardHook);
+        registry.register(specificHook);
+
+        List<BeforeSaveHook> hooks = registry.getHooks("users");
+        assertEquals(2, hooks.size());
+        assertEquals(specificHook, hooks.get(0));
+        assertEquals(wildcardHook, hooks.get(1));
+    }
+
+    @Test
+    @DisplayName("Should not include wildcard hooks when looking up wildcard directly")
+    void shouldNotDoubleIncludeWildcardHooks() {
+        BeforeSaveHookRegistry registry = new BeforeSaveHookRegistry();
+        BeforeSaveHook wildcardHook = stubHook("*", 1000);
+        registry.register(wildcardHook);
+
+        // Looking up "*" directly should return exactly the wildcard hooks
+        List<BeforeSaveHook> hooks = registry.getHooks("*");
+        assertEquals(1, hooks.size());
+    }
+
+    @Test
+    @DisplayName("Should invoke wildcard hooks via afterCreate with collection name")
+    void shouldInvokeWildcardAfterCreateWithCollectionName() {
+        BeforeSaveHookRegistry registry = new BeforeSaveHookRegistry();
+        AtomicBoolean hookCalled = new AtomicBoolean(false);
+        var capturedCollection = new String[1];
+
+        registry.register(new BeforeSaveHook() {
+            @Override
+            public String getCollectionName() { return "*"; }
+            @Override
+            public int getOrder() { return 1000; }
+            @Override
+            public void afterCreate(String collectionName, Map<String, Object> record, String tenantId) {
+                hookCalled.set(true);
+                capturedCollection[0] = collectionName;
+            }
+        });
+
+        registry.invokeAfterCreate("users", Map.of("id", "1"), "t1");
+        assertTrue(hookCalled.get());
+        assertEquals("users", capturedCollection[0]);
+    }
+
+    @Test
+    @DisplayName("Should invoke wildcard hooks via afterUpdate with collection name")
+    void shouldInvokeWildcardAfterUpdateWithCollectionName() {
+        BeforeSaveHookRegistry registry = new BeforeSaveHookRegistry();
+        AtomicBoolean hookCalled = new AtomicBoolean(false);
+        var capturedCollection = new String[1];
+
+        registry.register(new BeforeSaveHook() {
+            @Override
+            public String getCollectionName() { return "*"; }
+            @Override
+            public int getOrder() { return 1000; }
+            @Override
+            public void afterUpdate(String collectionName, String id, Map<String, Object> record,
+                                     Map<String, Object> previous, String tenantId) {
+                hookCalled.set(true);
+                capturedCollection[0] = collectionName;
+            }
+        });
+
+        registry.invokeAfterUpdate("fields", "id1", Map.of("name", "New"), Map.of("name", "Old"), "t1");
+        assertTrue(hookCalled.get());
+        assertEquals("fields", capturedCollection[0]);
+    }
+
+    @Test
+    @DisplayName("Should invoke wildcard hooks via afterDelete with collection name")
+    void shouldInvokeWildcardAfterDeleteWithCollectionName() {
+        BeforeSaveHookRegistry registry = new BeforeSaveHookRegistry();
+        AtomicBoolean hookCalled = new AtomicBoolean(false);
+        var capturedCollection = new String[1];
+
+        registry.register(new BeforeSaveHook() {
+            @Override
+            public String getCollectionName() { return "*"; }
+            @Override
+            public int getOrder() { return 1000; }
+            @Override
+            public void afterDelete(String collectionName, String id, String tenantId) {
+                hookCalled.set(true);
+                capturedCollection[0] = collectionName;
+            }
+        });
+
+        registry.invokeAfterDelete("profiles", "id1", "t1");
+        assertTrue(hookCalled.get());
+        assertEquals("profiles", capturedCollection[0]);
+    }
+
+    @Test
+    @DisplayName("Should hasHooks return true when only wildcard hooks exist")
+    void shouldHasHooksReturnTrueForWildcardOnly() {
+        BeforeSaveHookRegistry registry = new BeforeSaveHookRegistry();
+        registry.register(stubHook("*", 1000));
+
+        assertTrue(registry.hasHooks("any-collection"));
+        assertTrue(registry.hasHooks("*")); // hasHooks for "*" checks the direct key
+    }
+
+    @Test
+    @DisplayName("Should evaluate before-create with both specific and wildcard hooks")
+    void shouldEvaluateBeforeCreateWithSpecificAndWildcardHooks() {
+        BeforeSaveHookRegistry registry = new BeforeSaveHookRegistry();
+        registry.register(new BeforeSaveHook() {
+            @Override
+            public String getCollectionName() { return "users"; }
+            @Override
+            public int getOrder() { return 0; }
+            @Override
+            public BeforeSaveResult beforeCreate(Map<String, Object> record, String tenantId) {
+                return BeforeSaveResult.withFieldUpdates(Map.of("status", "ACTIVE"));
+            }
+        });
+        registry.register(new BeforeSaveHook() {
+            @Override
+            public String getCollectionName() { return "*"; }
+            @Override
+            public int getOrder() { return 1000; }
+            @Override
+            public BeforeSaveResult beforeCreate(Map<String, Object> record, String tenantId) {
+                return BeforeSaveResult.withFieldUpdates(Map.of("audit", "tracked"));
+            }
+        });
+
+        Map<String, Object> record = new HashMap<>(Map.of("name", "Test"));
+        BeforeSaveResult result = registry.evaluateBeforeCreate("users", record, "t1");
+
+        assertTrue(result.isSuccess());
+        assertTrue(result.hasFieldUpdates());
+        assertEquals("ACTIVE", result.getFieldUpdates().get("status"));
+        assertEquals("tracked", result.getFieldUpdates().get("audit"));
+    }
+
     private BeforeSaveHook stubHook(String collectionName, int order) {
         return new BeforeSaveHook() {
             @Override

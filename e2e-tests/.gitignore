@@ -4,5 +4,6 @@ playwright-report/
 test-results/
 blob-report/
 auth/storage-state.json
+auth/session-tokens.json
 .env.local
 .env

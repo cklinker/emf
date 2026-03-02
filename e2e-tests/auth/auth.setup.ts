@@ -1,8 +1,10 @@
 import { test as setup, expect } from "@playwright/test";
 import { loginViaAuthentik } from "../helpers/authentik-helper";
+import fs from "fs";
 
 const TENANT_SLUG = process.env.E2E_TENANT_SLUG || "default";
 const AUTH_STATE_PATH = "./auth/storage-state.json";
+const SESSION_TOKENS_PATH = "./auth/session-tokens.json";
 
 setup("authenticate via Authentik", async ({ page }) => {
   setup.setTimeout(90_000);
@@ -64,6 +66,22 @@ setup("authenticate via Authentik", async ({ page }) => {
 
   await expect(page).not.toHaveURL(/\/login/);
 
-  // Save the authenticated browser state for all other test projects
+  // Extract sessionStorage tokens — the app stores auth tokens in sessionStorage
+  // (not localStorage), and Playwright's storageState only captures cookies + localStorage.
+  // We save them separately and inject them via addInitScript in each test.
+  const sessionTokens = await page.evaluate(() => {
+    const result: Record<string, string> = {};
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const key = sessionStorage.key(i);
+      if (key && key.startsWith("emf_auth")) {
+        result[key] = sessionStorage.getItem(key) || "";
+      }
+    }
+    return result;
+  });
+
+  fs.writeFileSync(SESSION_TOKENS_PATH, JSON.stringify(sessionTokens, null, 2));
+
+  // Save the authenticated browser state (cookies + localStorage) for all other test projects
   await page.context().storageState({ path: AUTH_STATE_PATH });
 });

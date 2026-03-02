@@ -1,12 +1,13 @@
 package com.emf.runtime.flow;
 
 import com.emf.runtime.event.ChangeType;
-import com.emf.runtime.event.RecordChangeEvent;
+import com.emf.runtime.event.EventFactory;
+import com.emf.runtime.event.PlatformEvent;
+import com.emf.runtime.event.RecordChangedPayload;
 import com.emf.runtime.formula.FormulaEvaluator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
@@ -30,19 +31,19 @@ class FlowTriggerEvaluatorTest {
 
     @Test
     void nullTriggerConfigReturnsFalse() {
-        RecordChangeEvent event = createEvent(ChangeType.CREATED, "orders");
+        PlatformEvent<RecordChangedPayload> event = createEvent(ChangeType.CREATED, "orders");
         assertFalse(evaluator.matchesRecordTrigger(event, null));
     }
 
     @Test
     void emptyTriggerConfigMatchesAll() {
-        RecordChangeEvent event = createEvent(ChangeType.CREATED, "orders");
+        PlatformEvent<RecordChangedPayload> event = createEvent(ChangeType.CREATED, "orders");
         assertTrue(evaluator.matchesRecordTrigger(event, Map.of()));
     }
 
     @Test
     void collectionMatchesExact() {
-        RecordChangeEvent event = createEvent(ChangeType.CREATED, "orders");
+        PlatformEvent<RecordChangedPayload> event = createEvent(ChangeType.CREATED, "orders");
 
         assertTrue(evaluator.matchesRecordTrigger(event,
                 Map.of("collection", "orders")));
@@ -50,7 +51,7 @@ class FlowTriggerEvaluatorTest {
 
     @Test
     void collectionMismatchReturnsFalse() {
-        RecordChangeEvent event = createEvent(ChangeType.CREATED, "orders");
+        PlatformEvent<RecordChangedPayload> event = createEvent(ChangeType.CREATED, "orders");
 
         assertFalse(evaluator.matchesRecordTrigger(event,
                 Map.of("collection", "contacts")));
@@ -58,7 +59,7 @@ class FlowTriggerEvaluatorTest {
 
     @Test
     void eventTypeMatchesSingleEvent() {
-        RecordChangeEvent event = createEvent(ChangeType.CREATED, "orders");
+        PlatformEvent<RecordChangedPayload> event = createEvent(ChangeType.CREATED, "orders");
 
         assertTrue(evaluator.matchesRecordTrigger(event,
                 Map.of("events", List.of("CREATED"))));
@@ -66,7 +67,7 @@ class FlowTriggerEvaluatorTest {
 
     @Test
     void eventTypeMatchesMultipleEvents() {
-        RecordChangeEvent event = createEvent(ChangeType.UPDATED, "orders");
+        PlatformEvent<RecordChangedPayload> event = createEvent(ChangeType.UPDATED, "orders");
 
         assertTrue(evaluator.matchesRecordTrigger(event,
                 Map.of("events", List.of("CREATED", "UPDATED"))));
@@ -74,7 +75,7 @@ class FlowTriggerEvaluatorTest {
 
     @Test
     void eventTypeMismatchReturnsFalse() {
-        RecordChangeEvent event = createEvent(ChangeType.DELETED, "orders");
+        PlatformEvent<RecordChangedPayload> event = createEvent(ChangeType.DELETED, "orders");
 
         assertFalse(evaluator.matchesRecordTrigger(event,
                 Map.of("events", List.of("CREATED", "UPDATED"))));
@@ -82,7 +83,7 @@ class FlowTriggerEvaluatorTest {
 
     @Test
     void emptyEventsMatchesAll() {
-        RecordChangeEvent event = createEvent(ChangeType.DELETED, "orders");
+        PlatformEvent<RecordChangedPayload> event = createEvent(ChangeType.DELETED, "orders");
 
         assertTrue(evaluator.matchesRecordTrigger(event,
                 Map.of("events", List.of())));
@@ -90,12 +91,13 @@ class FlowTriggerEvaluatorTest {
 
     @Test
     void triggerFieldsMatchOnUpdate() {
-        RecordChangeEvent event = RecordChangeEvent.updated(
-                "tenant-1", "orders", "rec-1",
+        RecordChangedPayload payload = RecordChangedPayload.updated(
+                "orders", "rec-1",
                 Map.of("status", "ACTIVE", "amount", 100),
                 Map.of("status", "DRAFT"),
-                List.of("status"),
-                "user-1");
+                List.of("status"));
+        PlatformEvent<RecordChangedPayload> event = EventFactory.createRecordEvent(
+                "record.updated", "tenant-1", "user-1", payload);
 
         assertTrue(evaluator.matchesRecordTrigger(event,
                 Map.of("triggerFields", List.of("status", "amount"))));
@@ -103,12 +105,13 @@ class FlowTriggerEvaluatorTest {
 
     @Test
     void triggerFieldsMismatchOnUpdateReturnsFalse() {
-        RecordChangeEvent event = RecordChangeEvent.updated(
-                "tenant-1", "orders", "rec-1",
+        RecordChangedPayload payload = RecordChangedPayload.updated(
+                "orders", "rec-1",
                 Map.of("status", "ACTIVE", "amount", 100),
                 Map.of("name", "old"),
-                List.of("name"),
-                "user-1");
+                List.of("name"));
+        PlatformEvent<RecordChangedPayload> event = EventFactory.createRecordEvent(
+                "record.updated", "tenant-1", "user-1", payload);
 
         assertFalse(evaluator.matchesRecordTrigger(event,
                 Map.of("triggerFields", List.of("status", "amount"))));
@@ -116,7 +119,7 @@ class FlowTriggerEvaluatorTest {
 
     @Test
     void triggerFieldsIgnoredForNonUpdateEvents() {
-        RecordChangeEvent event = createEvent(ChangeType.CREATED, "orders");
+        PlatformEvent<RecordChangedPayload> event = createEvent(ChangeType.CREATED, "orders");
 
         // triggerFields only apply to UPDATE events — CREATED should match regardless
         assertTrue(evaluator.matchesRecordTrigger(event,
@@ -125,7 +128,7 @@ class FlowTriggerEvaluatorTest {
 
     @Test
     void filterFormulaMatchesWhenTrue() {
-        RecordChangeEvent event = createEvent(ChangeType.CREATED, "orders");
+        PlatformEvent<RecordChangedPayload> event = createEvent(ChangeType.CREATED, "orders");
         when(formulaEvaluator.evaluateBoolean(eq("status == 'ACTIVE'"), anyMap())).thenReturn(true);
 
         assertTrue(evaluator.matchesRecordTrigger(event,
@@ -134,7 +137,7 @@ class FlowTriggerEvaluatorTest {
 
     @Test
     void filterFormulaMismatchReturnsFalse() {
-        RecordChangeEvent event = createEvent(ChangeType.CREATED, "orders");
+        PlatformEvent<RecordChangedPayload> event = createEvent(ChangeType.CREATED, "orders");
         when(formulaEvaluator.evaluateBoolean(eq("status == 'ACTIVE'"), anyMap())).thenReturn(false);
 
         assertFalse(evaluator.matchesRecordTrigger(event,
@@ -143,7 +146,7 @@ class FlowTriggerEvaluatorTest {
 
     @Test
     void filterFormulaExceptionReturnsFalse() {
-        RecordChangeEvent event = createEvent(ChangeType.CREATED, "orders");
+        PlatformEvent<RecordChangedPayload> event = createEvent(ChangeType.CREATED, "orders");
         when(formulaEvaluator.evaluateBoolean(anyString(), anyMap()))
                 .thenThrow(new RuntimeException("parse error"));
 
@@ -153,7 +156,7 @@ class FlowTriggerEvaluatorTest {
 
     @Test
     void blankFilterFormulaIsIgnored() {
-        RecordChangeEvent event = createEvent(ChangeType.CREATED, "orders");
+        PlatformEvent<RecordChangedPayload> event = createEvent(ChangeType.CREATED, "orders");
 
         assertTrue(evaluator.matchesRecordTrigger(event,
                 Map.of("filterFormula", "   ")));
@@ -161,12 +164,13 @@ class FlowTriggerEvaluatorTest {
 
     @Test
     void combinedConditionsAllMatch() {
-        RecordChangeEvent event = RecordChangeEvent.updated(
-                "tenant-1", "orders", "rec-1",
+        RecordChangedPayload payload = RecordChangedPayload.updated(
+                "orders", "rec-1",
                 Map.of("status", "ACTIVE"),
                 Map.of("status", "DRAFT"),
-                List.of("status"),
-                "user-1");
+                List.of("status"));
+        PlatformEvent<RecordChangedPayload> event = EventFactory.createRecordEvent(
+                "record.updated", "tenant-1", "user-1", payload);
 
         when(formulaEvaluator.evaluateBoolean(eq("status == 'ACTIVE'"), anyMap())).thenReturn(true);
 
@@ -182,7 +186,7 @@ class FlowTriggerEvaluatorTest {
 
     @Test
     void combinedConditionsFailOnCollection() {
-        RecordChangeEvent event = createEvent(ChangeType.UPDATED, "contacts");
+        PlatformEvent<RecordChangedPayload> event = createEvent(ChangeType.UPDATED, "contacts");
 
         Map<String, Object> triggerConfig = Map.of(
                 "collection", "orders",
@@ -196,20 +200,21 @@ class FlowTriggerEvaluatorTest {
     // Helpers
     // -------------------------------------------------------------------------
 
-    private RecordChangeEvent createEvent(ChangeType changeType, String collection) {
-        return switch (changeType) {
-            case CREATED -> RecordChangeEvent.created(
-                    "tenant-1", collection, "rec-1",
-                    Map.of("status", "ACTIVE"), "user-1");
-            case UPDATED -> RecordChangeEvent.updated(
-                    "tenant-1", collection, "rec-1",
+    private PlatformEvent<RecordChangedPayload> createEvent(ChangeType changeType, String collection) {
+        RecordChangedPayload payload = switch (changeType) {
+            case CREATED -> RecordChangedPayload.created(
+                    collection, "rec-1",
+                    Map.of("status", "ACTIVE"));
+            case UPDATED -> RecordChangedPayload.updated(
+                    collection, "rec-1",
                     Map.of("status", "ACTIVE"),
                     Map.of("status", "DRAFT"),
-                    List.of("status"),
-                    "user-1");
-            case DELETED -> RecordChangeEvent.deleted(
-                    "tenant-1", collection, "rec-1",
-                    Map.of("status", "ACTIVE"), "user-1");
+                    List.of("status"));
+            case DELETED -> RecordChangedPayload.deleted(
+                    collection, "rec-1",
+                    Map.of("status", "ACTIVE"));
         };
+        return EventFactory.createRecordEvent(
+                "record." + changeType.name().toLowerCase(), "tenant-1", "user-1", payload);
     }
 }

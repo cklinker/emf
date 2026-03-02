@@ -50,7 +50,7 @@ class CollectionConfigEventPublisherTest {
     }
 
     @Test
-    @DisplayName("Should publish CREATED event wrapped in ConfigEvent")
+    @DisplayName("Should publish CREATED event wrapped in PlatformEvent")
     void shouldPublishCreatedEvent() throws Exception {
         Map<String, Object> record = new HashMap<>(Map.of(
             "id", "col-1",
@@ -69,9 +69,9 @@ class CollectionConfigEventPublisherTest {
             payloadCaptor.capture()
         );
 
-        // Verify the message is a ConfigEvent wrapper
+        // Verify the message is a PlatformEvent wrapper
         var tree = objectMapper.readTree(payloadCaptor.getValue());
-        assertNotNull(tree.get("eventId"), "Should have eventId field (ConfigEvent wrapper)");
+        assertNotNull(tree.get("eventId"), "Should have eventId field (PlatformEvent wrapper)");
         assertNotNull(tree.get("eventType"), "Should have eventType field");
         assertNotNull(tree.get("timestamp"), "Should have timestamp field");
         assertNotNull(tree.get("payload"), "Should have payload field");
@@ -89,7 +89,7 @@ class CollectionConfigEventPublisherTest {
     }
 
     @Test
-    @DisplayName("Should publish UPDATED event wrapped in ConfigEvent")
+    @DisplayName("Should publish UPDATED event wrapped in PlatformEvent")
     void shouldPublishUpdatedEvent() throws Exception {
         Map<String, Object> record = new HashMap<>(Map.of(
             "id", "col-1",
@@ -111,7 +111,7 @@ class CollectionConfigEventPublisherTest {
         );
 
         var tree = objectMapper.readTree(payloadCaptor.getValue());
-        assertNotNull(tree.get("eventId"), "Should be wrapped in ConfigEvent");
+        assertNotNull(tree.get("eventId"), "Should be wrapped in PlatformEvent");
 
         CollectionChangedPayload payload = objectMapper.treeToValue(
             tree.get("payload"), CollectionChangedPayload.class);
@@ -119,7 +119,7 @@ class CollectionConfigEventPublisherTest {
     }
 
     @Test
-    @DisplayName("Should publish DELETED event wrapped in ConfigEvent")
+    @DisplayName("Should publish DELETED event wrapped in PlatformEvent")
     void shouldPublishDeletedEvent() throws Exception {
         publisher.afterDelete("col-1", "tenant-1");
 
@@ -131,7 +131,7 @@ class CollectionConfigEventPublisherTest {
         );
 
         var tree = objectMapper.readTree(payloadCaptor.getValue());
-        assertNotNull(tree.get("eventId"), "Should be wrapped in ConfigEvent");
+        assertNotNull(tree.get("eventId"), "Should be wrapped in PlatformEvent");
 
         CollectionChangedPayload payload = objectMapper.treeToValue(
             tree.get("payload"), CollectionChangedPayload.class);

@@ -1,7 +1,8 @@
 package com.emf.runtime.flow;
 
 import com.emf.runtime.event.ChangeType;
-import com.emf.runtime.event.RecordChangeEvent;
+import com.emf.runtime.event.PlatformEvent;
+import com.emf.runtime.event.RecordChangedPayload;
 import com.emf.runtime.formula.FormulaEvaluator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,36 +31,39 @@ public class FlowTriggerEvaluator {
     /**
      * Evaluates whether a record change event matches a RECORD_TRIGGERED flow's trigger config.
      *
-     * @param event         the record change event
+     * @param event         the platform event wrapping a record changed payload
      * @param triggerConfig the flow's trigger_config JSONB as a map
      * @return true if the event matches the trigger conditions
      */
     @SuppressWarnings("unchecked")
-    public boolean matchesRecordTrigger(RecordChangeEvent event, Map<String, Object> triggerConfig) {
+    public boolean matchesRecordTrigger(PlatformEvent<RecordChangedPayload> event,
+                                         Map<String, Object> triggerConfig) {
         if (triggerConfig == null) {
             return false;
         }
 
+        RecordChangedPayload payload = event.getPayload();
+
         // Check collection
         String collection = (String) triggerConfig.get("collection");
-        if (collection != null && !collection.equals(event.getCollectionName())) {
+        if (collection != null && !collection.equals(payload.getCollectionName())) {
             return false;
         }
 
         // Check events (CREATED, UPDATED, DELETED)
         List<String> events = (List<String>) triggerConfig.get("events");
         if (events != null && !events.isEmpty()) {
-            String changeType = event.getChangeType().name();
+            String changeType = payload.getChangeType().name();
             if (!events.contains(changeType)) {
                 return false;
             }
         }
 
         // Check trigger fields (for UPDATE events only)
-        if (event.getChangeType() == ChangeType.UPDATED) {
+        if (payload.getChangeType() == ChangeType.UPDATED) {
             List<String> triggerFields = (List<String>) triggerConfig.get("triggerFields");
             if (triggerFields != null && !triggerFields.isEmpty()) {
-                List<String> changedFields = event.getChangedFields();
+                List<String> changedFields = payload.getChangedFields();
                 if (changedFields == null || changedFields.stream().noneMatch(triggerFields::contains)) {
                     return false;
                 }
@@ -70,7 +74,7 @@ public class FlowTriggerEvaluator {
         String filterFormula = (String) triggerConfig.get("filterFormula");
         if (filterFormula != null && !filterFormula.isBlank()) {
             try {
-                boolean matches = formulaEvaluator.evaluateBoolean(filterFormula, event.getData());
+                boolean matches = formulaEvaluator.evaluateBoolean(filterFormula, payload.getData());
                 if (!matches) {
                     return false;
                 }

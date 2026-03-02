@@ -31,7 +31,7 @@ class SystemCollectionFieldsTest {
                 List.of(FieldDefinition.requiredString("name")),
                 StorageConfig.physicalTable("tbl_products"),
                 ApiConfig.allEnabled("/api/products"),
-                AuthzConfig.disabled(), EventsConfig.disabled(),
+                AuthzConfig.disabled(),
                 1L, NOW, NOW
             );
 
@@ -53,7 +53,7 @@ class SystemCollectionFieldsTest {
                 List.of(FieldDefinition.requiredString("email")),
                 StorageConfig.physicalTable("platform_user"),
                 ApiConfig.allEnabled("/api/users"),
-                AuthzConfig.disabled(), EventsConfig.allEvents("emf.collections"),
+                AuthzConfig.disabled(),
                 1L, NOW, NOW,
                 true, true, false, immutableFields, columnMapping
             );
@@ -73,7 +73,7 @@ class SystemCollectionFieldsTest {
                 List.of(FieldDefinition.string("action")),
                 StorageConfig.physicalTable("security_audit_log"),
                 ApiConfig.readOnly("/api/audit-logs"),
-                AuthzConfig.disabled(), EventsConfig.disabled(),
+                AuthzConfig.disabled(),
                 1L, NOW, NOW,
                 true, true, true, Set.of(), Map.of()
             );
@@ -90,7 +90,7 @@ class SystemCollectionFieldsTest {
                 List.of(FieldDefinition.requiredString("slug")),
                 StorageConfig.physicalTable("tenant"),
                 ApiConfig.allEnabled("/api/tenants"),
-                AuthzConfig.disabled(), EventsConfig.allEvents("emf.collections"),
+                AuthzConfig.disabled(),
                 1L, NOW, NOW,
                 true, false, false, Set.of(), Map.of()
             );
@@ -109,7 +109,7 @@ class SystemCollectionFieldsTest {
                 "test", "Test", null,
                 List.of(FieldDefinition.string("field")),
                 StorageConfig.physicalTable("tbl"), ApiConfig.allEnabled("/api"),
-                AuthzConfig.disabled(), EventsConfig.disabled(),
+                AuthzConfig.disabled(),
                 1L, NOW, NOW,
                 true, true, false, mutableSet, Map.of()
             );
@@ -128,7 +128,7 @@ class SystemCollectionFieldsTest {
                 "test", "Test", null,
                 List.of(FieldDefinition.string("field")),
                 StorageConfig.physicalTable("tbl"), ApiConfig.allEnabled("/api"),
-                AuthzConfig.disabled(), EventsConfig.disabled(),
+                AuthzConfig.disabled(),
                 1L, NOW, NOW,
                 true, true, false, Set.of(), mutableMap
             );
@@ -144,7 +144,7 @@ class SystemCollectionFieldsTest {
                 "test", "Test", null,
                 List.of(FieldDefinition.string("field")),
                 StorageConfig.physicalTable("tbl"), ApiConfig.allEnabled("/api"),
-                AuthzConfig.disabled(), EventsConfig.disabled(),
+                AuthzConfig.disabled(),
                 1L, NOW, NOW,
                 false, true, false, null, null
             );
@@ -163,7 +163,7 @@ class SystemCollectionFieldsTest {
                 List.of(FieldDefinition.string("email")),
                 StorageConfig.physicalTable("platform_user"),
                 ApiConfig.allEnabled("/api/users"),
-                AuthzConfig.disabled(), EventsConfig.disabled(),
+                AuthzConfig.disabled(),
                 1L, NOW, NOW,
                 true, true, false,
                 Set.of("tenantId"), Map.of("firstName", "first_name")
@@ -186,7 +186,7 @@ class SystemCollectionFieldsTest {
                 List.of(FieldDefinition.string("email")),
                 StorageConfig.physicalTable("platform_user"),
                 ApiConfig.allEnabled("/api/users"),
-                AuthzConfig.disabled(), EventsConfig.disabled(),
+                AuthzConfig.disabled(),
                 1L, NOW, NOW,
                 true, false, true,
                 Set.of("tenantId"), Map.of("firstName", "first_name")
@@ -211,7 +211,7 @@ class SystemCollectionFieldsTest {
                 List.of(FieldDefinition.string("firstName").withColumnName("first_name")),
                 StorageConfig.physicalTable("platform_user"),
                 ApiConfig.allEnabled("/api/users"),
-                AuthzConfig.disabled(), EventsConfig.disabled(),
+                AuthzConfig.disabled(),
                 1L, NOW, NOW,
                 true, true, false, Set.of(),
                 Map.of("firstName", "should_not_use_this")
@@ -228,7 +228,7 @@ class SystemCollectionFieldsTest {
                 List.of(FieldDefinition.string("email")),
                 StorageConfig.physicalTable("platform_user"),
                 ApiConfig.allEnabled("/api/users"),
-                AuthzConfig.disabled(), EventsConfig.disabled(),
+                AuthzConfig.disabled(),
                 1L, NOW, NOW,
                 true, true, false, Set.of(),
                 Map.of("unmappedField", "unmapped_column")
@@ -245,7 +245,7 @@ class SystemCollectionFieldsTest {
                 List.of(FieldDefinition.string("email")),
                 StorageConfig.physicalTable("platform_user"),
                 ApiConfig.allEnabled("/api/users"),
-                AuthzConfig.disabled(), EventsConfig.disabled(),
+                AuthzConfig.disabled(),
                 1L, NOW, NOW,
                 true, true, false, Set.of(), Map.of()
             );

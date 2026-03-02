@@ -19,7 +19,6 @@ import java.util.Set;
  *   <li>Storage: Physical tables with table name "{name}"</li>
  *   <li>API: All operations enabled</li>
  *   <li>Authorization: Disabled</li>
- *   <li>Events: Disabled</li>
  *   <li>Version: 1</li>
  *   <li>System collection: false</li>
  *   <li>Tenant scoped: true</li>
@@ -50,7 +49,6 @@ public class CollectionDefinitionBuilder {
     private StorageConfig storageConfig;
     private ApiConfig apiConfig;
     private AuthzConfig authzConfig;
-    private EventsConfig eventsConfig;
     private long version = 1L;
     private Instant createdAt;
     private Instant updatedAt;
@@ -152,17 +150,6 @@ public class CollectionDefinitionBuilder {
      */
     public CollectionDefinitionBuilder authzConfig(AuthzConfig authzConfig) {
         this.authzConfig = authzConfig;
-        return this;
-    }
-
-    /**
-     * Sets the events configuration.
-     *
-     * @param eventsConfig the events configuration
-     * @return this builder for method chaining
-     */
-    public CollectionDefinitionBuilder eventsConfig(EventsConfig eventsConfig) {
-        this.eventsConfig = eventsConfig;
         return this;
     }
 
@@ -296,7 +283,6 @@ public class CollectionDefinitionBuilder {
      *   <li>Storage: Physical tables with table name "{name}"</li>
      *   <li>API: All operations enabled at "/api/{name}"</li>
      *   <li>Authorization: Disabled</li>
-     *   <li>Events: Disabled</li>
      *   <li>Timestamps: Current time if not set</li>
      * </ul>
      *
@@ -322,9 +308,6 @@ public class CollectionDefinitionBuilder {
         if (authzConfig == null) {
             authzConfig = AuthzConfig.disabled();
         }
-        if (eventsConfig == null) {
-            eventsConfig = EventsConfig.disabled();
-        }
 
         Instant now = Instant.now();
         if (createdAt == null) {
@@ -342,7 +325,6 @@ public class CollectionDefinitionBuilder {
             storageConfig,
             apiConfig,
             authzConfig,
-            eventsConfig,
             version,
             createdAt,
             updatedAt,

@@ -1,6 +1,7 @@
 package com.emf.runtime.flow;
 
-import com.emf.runtime.event.RecordChangeEvent;
+import com.emf.runtime.event.PlatformEvent;
+import com.emf.runtime.event.RecordChangedPayload;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -24,30 +25,31 @@ public class InitialStateBuilder {
     /**
      * Builds initial state from a record change event.
      *
-     * @param event       the record change event
+     * @param event       the platform event wrapping a record changed payload
      * @param flowId      the flow being executed
      * @param executionId the execution ID
      * @return the initial state envelope
      */
-    public Map<String, Object> buildFromRecordEvent(RecordChangeEvent event,
+    public Map<String, Object> buildFromRecordEvent(PlatformEvent<RecordChangedPayload> event,
                                                      String flowId, String executionId) {
         Map<String, Object> state = new LinkedHashMap<>();
+        RecordChangedPayload payload = event.getPayload();
 
         // Trigger metadata
         Map<String, Object> trigger = new LinkedHashMap<>();
         trigger.put("type", "RECORD_CHANGE");
-        trigger.put("changeType", event.getChangeType().name());
-        trigger.put("collectionName", event.getCollectionName());
+        trigger.put("changeType", payload.getChangeType().name());
+        trigger.put("collectionName", payload.getCollectionName());
         trigger.put("timestamp", event.getTimestamp() != null ? event.getTimestamp().toString() : null);
         state.put("trigger", trigger);
 
         // Record data
         Map<String, Object> record = new LinkedHashMap<>();
-        record.put("id", event.getRecordId());
-        record.put("collectionName", event.getCollectionName());
-        record.put("data", event.getData() != null ? event.getData() : Map.of());
-        record.put("previousData", event.getPreviousData() != null ? event.getPreviousData() : Map.of());
-        record.put("changedFields", event.getChangedFields() != null ? event.getChangedFields() : java.util.List.of());
+        record.put("id", payload.getRecordId());
+        record.put("collectionName", payload.getCollectionName());
+        record.put("data", payload.getData() != null ? payload.getData() : Map.of());
+        record.put("previousData", payload.getPreviousData() != null ? payload.getPreviousData() : Map.of());
+        record.put("changedFields", payload.getChangedFields() != null ? payload.getChangedFields() : java.util.List.of());
         state.put("record", record);
 
         // Context

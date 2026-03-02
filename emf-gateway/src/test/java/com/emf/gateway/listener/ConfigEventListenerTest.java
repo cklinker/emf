@@ -4,7 +4,7 @@ import com.emf.gateway.route.RouteDefinition;
 import com.emf.gateway.route.RouteRegistry;
 import com.emf.runtime.event.ChangeType;
 import com.emf.runtime.event.CollectionChangedPayload;
-import com.emf.runtime.event.ConfigEvent;
+import com.emf.runtime.event.PlatformEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -70,10 +70,12 @@ class ConfigEventListenerTest {
             payload.setName("users");
             payload.setChangeType(ChangeType.CREATED);
 
-            ConfigEvent<CollectionChangedPayload> event = new ConfigEvent<>(
+            PlatformEvent<CollectionChangedPayload> event = new PlatformEvent<>(
                 UUID.randomUUID().toString(),
                 "config.collection.changed",
+                null,
                 UUID.randomUUID().toString(),
+                null,
                 Instant.now(),
                 payload
             );
@@ -101,10 +103,12 @@ class ConfigEventListenerTest {
             payload.setName("users");
             payload.setChangeType(ChangeType.UPDATED);
 
-            ConfigEvent<CollectionChangedPayload> event = new ConfigEvent<>(
+            PlatformEvent<CollectionChangedPayload> event = new PlatformEvent<>(
                 UUID.randomUUID().toString(),
                 "config.collection.changed",
+                null,
                 UUID.randomUUID().toString(),
+                null,
                 Instant.now(),
                 payload
             );
@@ -125,10 +129,12 @@ class ConfigEventListenerTest {
             payload.setName("users");
             payload.setChangeType(ChangeType.DELETED);
 
-            ConfigEvent<CollectionChangedPayload> event = new ConfigEvent<>(
+            PlatformEvent<CollectionChangedPayload> event = new PlatformEvent<>(
                 UUID.randomUUID().toString(),
                 "config.collection.changed",
+                null,
                 UUID.randomUUID().toString(),
+                null,
                 Instant.now(),
                 payload
             );
@@ -189,10 +195,12 @@ class ConfigEventListenerTest {
             payload.setName("users");
             payload.setChangeType(ChangeType.CREATED);
 
-            ConfigEvent<CollectionChangedPayload> event = new ConfigEvent<>(
+            PlatformEvent<CollectionChangedPayload> event = new PlatformEvent<>(
                 UUID.randomUUID().toString(),
                 "config.collection.changed",
+                null,
                 UUID.randomUUID().toString(),
+                null,
                 Instant.now(),
                 payload
             );
@@ -226,10 +234,12 @@ class ConfigEventListenerTest {
             payload.put("collectionName", "accounts");
             payload.put("changeType", "CREATED");
 
-            ConfigEvent<Object> event = new ConfigEvent<>(
+            PlatformEvent<Object> event = new PlatformEvent<>(
                 UUID.randomUUID().toString(),
                 "emf.worker.assignment.changed",
+                null,
                 UUID.randomUUID().toString(),
+                null,
                 Instant.now(),
                 payload
             );
@@ -258,10 +268,12 @@ class ConfigEventListenerTest {
             payload.put("collectionName", "accounts");
             payload.put("changeType", "DELETED");
 
-            ConfigEvent<Object> event = new ConfigEvent<>(
+            PlatformEvent<Object> event = new PlatformEvent<>(
                 UUID.randomUUID().toString(),
                 "emf.worker.assignment.changed",
+                null,
                 UUID.randomUUID().toString(),
+                null,
                 Instant.now(),
                 payload
             );
@@ -296,10 +308,12 @@ class ConfigEventListenerTest {
             payload.put("changeType", "CREATED");
             // collectionName is missing
 
-            ConfigEvent<Object> event = new ConfigEvent<>(
+            PlatformEvent<Object> event = new PlatformEvent<>(
                 UUID.randomUUID().toString(),
                 "emf.worker.assignment.changed",
+                null,
                 UUID.randomUUID().toString(),
+                null,
                 Instant.now(),
                 payload
             );
@@ -322,10 +336,12 @@ class ConfigEventListenerTest {
             payload.put("collectionName", "profiles");
             payload.put("changeType", "CREATED");
 
-            ConfigEvent<Object> event = new ConfigEvent<>(
+            PlatformEvent<Object> event = new PlatformEvent<>(
                 UUID.randomUUID().toString(),
                 "emf.worker.assignment.changed",
+                null,
                 UUID.randomUUID().toString(),
+                null,
                 Instant.now(),
                 payload
             );

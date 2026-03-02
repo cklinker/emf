@@ -8,8 +8,6 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * <p>Properties are prefixed with {@code emf} and include:
  * <ul>
  *   <li>emf.query.default-page-size - Default page size for queries</li>
- *   <li>emf.events.enabled - Whether event publishing is enabled</li>
- *   <li>emf.events.topic-prefix - Kafka topic prefix</li>
  * </ul>
  * 
  * @since 1.0.0
@@ -18,85 +16,44 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class EmfRuntimeProperties {
     
     private Query query = new Query();
-    private Events events = new Events();
 
     public Query getQuery() {
         return query;
     }
-    
+
     public void setQuery(Query query) {
         this.query = query;
     }
-    
-    public Events getEvents() {
-        return events;
-    }
-    
-    public void setEvents(Events events) {
-        this.events = events;
-    }
-    
+
     /**
      * Query configuration properties.
      */
     public static class Query {
-        
+
         /**
          * Default page size for queries.
          */
         private int defaultPageSize = 20;
-        
+
         /**
          * Maximum allowed page size.
          */
         private int maxPageSize = 1000;
-        
+
         public int getDefaultPageSize() {
             return defaultPageSize;
         }
-        
+
         public void setDefaultPageSize(int defaultPageSize) {
             this.defaultPageSize = defaultPageSize;
         }
-        
+
         public int getMaxPageSize() {
             return maxPageSize;
         }
-        
+
         public void setMaxPageSize(int maxPageSize) {
             this.maxPageSize = maxPageSize;
-        }
-    }
-    
-    /**
-     * Events configuration properties.
-     */
-    public static class Events {
-        
-        /**
-         * Whether event publishing is enabled.
-         */
-        private boolean enabled = false;
-        
-        /**
-         * Kafka topic prefix for events.
-         */
-        private String topicPrefix = "emf.events";
-        
-        public boolean isEnabled() {
-            return enabled;
-        }
-        
-        public void setEnabled(boolean enabled) {
-            this.enabled = enabled;
-        }
-        
-        public String getTopicPrefix() {
-            return topicPrefix;
-        }
-        
-        public void setTopicPrefix(String topicPrefix) {
-            this.topicPrefix = topicPrefix;
         }
     }
 }

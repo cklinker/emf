@@ -1,8 +1,5 @@
 package com.emf.runtime.config;
 
-import com.emf.runtime.events.EventPublisher;
-import com.emf.runtime.events.KafkaEventPublisher;
-import com.emf.runtime.events.NoOpEventPublisher;
 import com.emf.runtime.events.RecordEventPublisher;
 import com.emf.runtime.query.DefaultQueryEngine;
 import com.emf.runtime.query.QueryEngine;
@@ -21,9 +18,7 @@ import com.emf.runtime.validation.ValidationRuleRegistry;
 import com.emf.runtime.workflow.BeforeSaveHookRegistry;
 import org.apache.coyote.http11.AbstractHttp11Protocol;
 import org.springframework.beans.factory.annotation.Autowired;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.web.embedded.tomcat.TomcatServletWebServerFactory;
 import org.springframework.boot.web.server.WebServerFactoryCustomizer;
@@ -31,7 +26,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.kafka.core.KafkaTemplate;
 
 /**
  * Spring Boot auto-configuration for EMF Runtime.
@@ -42,7 +36,6 @@ import org.springframework.kafka.core.KafkaTemplate;
  *   <li>StorageAdapter - PhysicalTableStorageAdapter</li>
  *   <li>ValidationEngine - DefaultValidationEngine</li>
  *   <li>QueryEngine - DefaultQueryEngine</li>
- *   <li>EventPublisher - KafkaEventPublisher or NoOpEventPublisher</li>
  *   <li>DynamicCollectionRouter - REST controller</li>
  *   <li>GlobalExceptionHandler - Exception handling</li>
  * </ul>
@@ -138,28 +131,6 @@ public class EmfRuntimeAutoConfiguration {
                 beforeSaveHookRegistry);
     }
 
-    /**
-     * Creates the Kafka event publisher bean.
-     * Only created when Kafka is enabled.
-     */
-    @Bean
-    @ConditionalOnMissingBean(EventPublisher.class)
-    @ConditionalOnProperty(name = "emf.events.enabled", havingValue = "true")
-    public EventPublisher kafkaEventPublisher(KafkaTemplate<String, String> kafkaTemplate,
-                                               ObjectMapper objectMapper,
-                                               EmfRuntimeProperties properties) {
-        return new KafkaEventPublisher(kafkaTemplate, objectMapper, properties.getEvents().getTopicPrefix());
-    }
-    
-    /**
-     * Creates a no-op event publisher when events are disabled.
-     */
-    @Bean
-    @ConditionalOnMissingBean(EventPublisher.class)
-    public EventPublisher noOpEventPublisher() {
-        return new NoOpEventPublisher();
-    }
-    
     /**
      * Creates the global exception handler bean.
      * Only created if no other GlobalExceptionHandler bean exists.

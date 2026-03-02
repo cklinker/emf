@@ -101,7 +101,7 @@ public class ConfigEventListener {
 
     /**
      * Parses the CollectionChangedPayload from the raw Kafka message.
-     * Handles both ConfigEvent wrapper format and flat JSON format.
+     * Handles both PlatformEvent wrapper format and flat JSON format.
      */
     private CollectionChangedPayload parseCollectionPayload(String message) {
         try {
@@ -211,7 +211,7 @@ public class ConfigEventListener {
 
     /**
      * Parses the worker assignment payload from the raw Kafka message.
-     * Handles both ConfigEvent wrapper format and flat JSON format.
+     * Handles both PlatformEvent wrapper format and flat JSON format.
      */
     private Map<String, Object> parseWorkerAssignmentPayload(String message) {
         try {

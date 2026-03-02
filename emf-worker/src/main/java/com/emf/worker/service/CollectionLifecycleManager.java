@@ -26,7 +26,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <p>For system collections (those in {@link SystemCollectionDefinitions}), the canonical
  * in-memory definition is used directly, ensuring complete metadata (StorageConfig, ApiConfig,
- * EventsConfig, immutableFields, columnMapping, etc.) is always available.
+ * immutableFields, columnMapping, etc.) is always available.
  *
  * <p>For user-defined collections, definitions are built from database records.
  *
@@ -379,7 +379,7 @@ public class CollectionLifecycleManager {
      *
      * <p>For system collections, uses the canonical definition from
      * {@link SystemCollectionDefinitions} which includes complete metadata
-     * (StorageConfig with table name, ApiConfig, EventsConfig, immutableFields,
+     * (StorageConfig with table name, ApiConfig, immutableFields,
      * columnMapping, etc.).
      *
      * <p>For user-defined collections, builds the definition from database records.

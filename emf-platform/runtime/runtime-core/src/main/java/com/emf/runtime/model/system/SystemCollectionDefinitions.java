@@ -1429,7 +1429,6 @@ public final class SystemCollectionDefinitions {
             .displayName(displayName)
             .storageConfig(StorageConfig.physicalTable(tableName))
             .apiConfig(ApiConfig.allEnabled("/api/" + name))
-            .eventsConfig(EventsConfig.allEvents("emf.collections"))
             .systemCollection(true)
             .tenantScoped(true)
             .readOnly(false)
@@ -1441,7 +1440,7 @@ public final class SystemCollectionDefinitions {
 
     /**
      * Creates a builder pre-configured for a read-only system collection.
-     * Default: tenant-scoped, read-only API, events disabled, system=true.
+     * Default: tenant-scoped, read-only API, system=true.
      */
     private static CollectionDefinitionBuilder readOnlySystemBuilder(String name, String displayName, String tableName) {
         return CollectionDefinition.builder()
@@ -1449,7 +1448,6 @@ public final class SystemCollectionDefinitions {
             .displayName(displayName)
             .storageConfig(StorageConfig.physicalTable(tableName))
             .apiConfig(ApiConfig.readOnly("/api/" + name))
-            .eventsConfig(EventsConfig.disabled())
             .systemCollection(true)
             .tenantScoped(true)
             .readOnly(true)

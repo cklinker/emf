@@ -39,7 +39,6 @@ class CollectionDefinitionBuilderTest {
             assertSame(builder, builder.storageConfig(StorageConfig.physicalTable("tbl")));
             assertSame(builder, builder.apiConfig(ApiConfig.allEnabled("/api")));
             assertSame(builder, builder.authzConfig(AuthzConfig.disabled()));
-            assertSame(builder, builder.eventsConfig(EventsConfig.disabled()));
             assertSame(builder, builder.version(1L));
             assertSame(builder, builder.createdAt(Instant.now()));
             assertSame(builder, builder.updatedAt(Instant.now()));
@@ -57,7 +56,6 @@ class CollectionDefinitionBuilderTest {
                 .storageConfig(StorageConfig.physicalTable("tbl_products"))
                 .apiConfig(ApiConfig.allEnabled("/api/products"))
                 .authzConfig(AuthzConfig.withRoles(List.of("USER"), List.of("ADMIN")))
-                .eventsConfig(EventsConfig.allEvents("emf.products"))
                 .build();
             
             assertEquals("products", collection.name());
@@ -173,18 +171,6 @@ class CollectionDefinitionBuilderTest {
         }
 
         @Test
-        @DisplayName("Should default to events disabled")
-        void shouldDefaultToEventsDisabled() {
-            CollectionDefinition collection = CollectionDefinition.builder()
-                .name("test")
-                .addField(FieldDefinition.string("field"))
-                .build();
-            
-            assertNotNull(collection.eventsConfig());
-            assertFalse(collection.eventsConfig().enabled());
-        }
-
-        @Test
         @DisplayName("Should default displayName to name when not set")
         void shouldDefaultDisplayNameToName() {
             CollectionDefinition collection = CollectionDefinition.builder()
@@ -285,21 +271,6 @@ class CollectionDefinitionBuilderTest {
             assertTrue(collection.authzConfig().enabled());
             assertEquals(List.of("READER", "VIEWER"), collection.authzConfig().readRoles());
             assertEquals(List.of("WRITER", "ADMIN"), collection.authzConfig().writeRoles());
-        }
-
-        @Test
-        @DisplayName("Should use custom events config when provided")
-        void shouldUseCustomEventsConfig() {
-            EventsConfig customEvents = EventsConfig.allEvents("custom.prefix");
-            
-            CollectionDefinition collection = CollectionDefinition.builder()
-                .name("test")
-                .addField(FieldDefinition.string("field"))
-                .eventsConfig(customEvents)
-                .build();
-            
-            assertTrue(collection.eventsConfig().enabled());
-            assertEquals("custom.prefix", collection.eventsConfig().topicPrefix());
         }
 
         @Test

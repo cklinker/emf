@@ -50,7 +50,7 @@ class FieldConfigEventPublisherTest {
     }
 
     @Test
-    @DisplayName("Should publish ConfigEvent-wrapped collection UPDATED event after field create")
+    @DisplayName("Should publish PlatformEvent-wrapped collection UPDATED event after field create")
     void shouldPublishOnFieldCreate() throws Exception {
         Map<String, Object> record = new HashMap<>(Map.of(
             "id", "field-1",
@@ -68,9 +68,9 @@ class FieldConfigEventPublisherTest {
             payloadCaptor.capture()
         );
 
-        // Verify ConfigEvent wrapper
+        // Verify PlatformEvent wrapper
         var tree = objectMapper.readTree(payloadCaptor.getValue());
-        assertNotNull(tree.get("eventId"), "Should be wrapped in ConfigEvent");
+        assertNotNull(tree.get("eventId"), "Should be wrapped in PlatformEvent");
         assertNotNull(tree.get("eventType"));
         assertNotNull(tree.get("payload"));
 
@@ -81,7 +81,7 @@ class FieldConfigEventPublisherTest {
     }
 
     @Test
-    @DisplayName("Should publish ConfigEvent-wrapped event after field update")
+    @DisplayName("Should publish PlatformEvent-wrapped event after field update")
     void shouldPublishOnFieldUpdate() throws Exception {
         Map<String, Object> record = new HashMap<>(Map.of(
             "id", "field-1",
@@ -104,7 +104,7 @@ class FieldConfigEventPublisherTest {
         );
 
         var tree = objectMapper.readTree(payloadCaptor.getValue());
-        assertNotNull(tree.get("eventId"), "Should be wrapped in ConfigEvent");
+        assertNotNull(tree.get("eventId"), "Should be wrapped in PlatformEvent");
     }
 
     @Test

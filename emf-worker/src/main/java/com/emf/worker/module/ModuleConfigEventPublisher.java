@@ -1,7 +1,7 @@
 package com.emf.worker.module;
 
-import com.emf.runtime.event.ConfigEvent;
 import com.emf.runtime.event.EventFactory;
+import com.emf.runtime.event.PlatformEvent;
 import com.emf.runtime.event.ModuleChangeType;
 import com.emf.runtime.event.ModuleChangedPayload;
 import com.emf.runtime.module.TenantModuleData;
@@ -50,7 +50,7 @@ public class ModuleConfigEventPublisher {
         );
 
         try {
-            ConfigEvent<ModuleChangedPayload> event = EventFactory.createEvent(TOPIC, payload);
+            PlatformEvent<ModuleChangedPayload> event = EventFactory.createEvent(TOPIC, payload);
             String json = objectMapper.writeValueAsString(event);
             String key = module.tenantId() + ":" + module.moduleId();
 

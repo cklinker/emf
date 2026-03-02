@@ -1,5 +1,6 @@
 import { test, expect } from "../../../fixtures";
 import { ConnectedAppsPage } from "../../../pages/connected-apps.page";
+import { waitForAnyVisible } from "../../../helpers/wait-helpers";
 
 test.describe("Connected Apps", () => {
   test("displays connected apps page", async ({ page }) => {
@@ -16,11 +17,13 @@ test.describe("Connected Apps", () => {
     await connectedAppsPage.goto();
     await page.waitForLoadState("networkidle");
 
-    const anyState = connectedAppsPage.table
-      .or(page.getByTestId("empty-state"))
-      .or(page.getByTestId("error-message"))
-      .or(connectedAppsPage.connectedAppsPage);
-    await expect(anyState).toBeVisible({ timeout: 10000 });
+    const found = await waitForAnyVisible([
+      connectedAppsPage.table,
+      page.getByTestId("empty-state"),
+      page.getByTestId("error-message"),
+      connectedAppsPage.connectedAppsPage,
+    ]);
+    expect(found).toBe(true);
   });
 
   test("opens create connected app form", async ({ page }) => {

@@ -1,5 +1,6 @@
 import { test, expect } from "../../../fixtures";
 import { WebhooksPage } from "../../../pages/webhooks.page";
+import { waitForAnyVisible } from "../../../helpers/wait-helpers";
 
 test.describe("Webhooks", () => {
   test("displays webhooks page", async ({ page }) => {
@@ -14,11 +15,13 @@ test.describe("Webhooks", () => {
     const webhooksPage = new WebhooksPage(page);
     await webhooksPage.goto();
 
-    const anyState = webhooksPage.table
-      .or(page.getByTestId("empty-state"))
-      .or(page.getByTestId("error-message"))
-      .or(webhooksPage.webhooksPage);
-    await expect(anyState).toBeVisible({ timeout: 10000 });
+    const found = await waitForAnyVisible([
+      webhooksPage.table,
+      page.getByTestId("empty-state"),
+      page.getByTestId("error-message"),
+      webhooksPage.webhooksPage,
+    ]);
+    expect(found).toBe(true);
   });
 
   test("opens create webhook form", async ({ page }) => {

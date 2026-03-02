@@ -1,4 +1,5 @@
 import { test, expect } from "../../../fixtures";
+import { waitForAnyVisible } from "../../../helpers/wait-helpers";
 
 test.describe("Login History", () => {
   test.beforeEach(async ({ page }) => {
@@ -12,12 +13,13 @@ test.describe("Login History", () => {
   });
 
   test("shows login history table or empty state", async ({ page }) => {
-    const anyState = page
-      .locator("table")
-      .or(page.getByTestId("empty-state"))
-      .or(page.getByTestId("error-message"))
-      .or(page.getByTestId("login-history-page"));
-    await expect(anyState).toBeVisible({ timeout: 10000 });
+    const found = await waitForAnyVisible([
+      page.locator("table"),
+      page.getByTestId("empty-state"),
+      page.getByTestId("error-message"),
+      page.getByTestId("login-history-page"),
+    ]);
+    expect(found).toBe(true);
   });
 
   test.skip("displays pagination controls", async () => {

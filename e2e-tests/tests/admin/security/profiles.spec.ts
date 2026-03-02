@@ -1,5 +1,6 @@
 import { test, expect } from "../../../fixtures";
 import { ProfilesListPage } from "../../../pages/profiles-list.page";
+import { waitForAnyVisible } from "../../../helpers/wait-helpers";
 
 test.describe("Profiles", () => {
   let profilesPage: ProfilesListPage;
@@ -14,11 +15,13 @@ test.describe("Profiles", () => {
   });
 
   test("shows profiles in table or empty state", async ({ page }) => {
-    const anyState = profilesPage.profileTable
-      .or(page.getByTestId("empty-state"))
-      .or(page.getByTestId("error-message"))
-      .or(profilesPage.container);
-    await expect(anyState).toBeVisible({ timeout: 10000 });
+    const found = await waitForAnyVisible([
+      profilesPage.profileTable,
+      page.getByTestId("empty-state"),
+      page.getByTestId("error-message"),
+      profilesPage.container,
+    ]);
+    expect(found).toBe(true);
   });
 
   test("opens create profile modal", async () => {

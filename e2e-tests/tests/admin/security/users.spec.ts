@@ -1,5 +1,6 @@
 import { test, expect } from "../../../fixtures";
 import { UsersListPage } from "../../../pages/users-list.page";
+import { waitForAnyVisible } from "../../../helpers/wait-helpers";
 
 test.describe("Users", () => {
   let usersPage: UsersListPage;
@@ -14,12 +15,13 @@ test.describe("Users", () => {
   });
 
   test("shows users in table or empty state", async ({ page }) => {
-    // UsersPage uses custom error rendering (not ErrorMessage component)
-    const anyState = usersPage.userTable
-      .or(page.getByTestId("empty-state"))
-      .or(page.getByTestId("error-message"))
-      .or(usersPage.container);
-    await expect(anyState).toBeVisible({ timeout: 10000 });
+    const found = await waitForAnyVisible([
+      usersPage.userTable,
+      page.getByTestId("empty-state"),
+      page.getByTestId("error-message"),
+      usersPage.container,
+    ]);
+    expect(found).toBe(true);
   });
 
   test("can search for users", async () => {
@@ -45,7 +47,10 @@ test.describe("Users", () => {
 
   test("shows create user button", async ({ page }) => {
     await page.waitForLoadState("networkidle");
-    const anyState = usersPage.createButton.or(usersPage.container);
-    await expect(anyState).toBeVisible({ timeout: 10000 });
+    const found = await waitForAnyVisible([
+      usersPage.createButton,
+      usersPage.container,
+    ]);
+    expect(found).toBe(true);
   });
 });

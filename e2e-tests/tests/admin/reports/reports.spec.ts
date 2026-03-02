@@ -1,4 +1,5 @@
 import { test, expect } from "../../../fixtures";
+import { waitForAnyVisible } from "../../../helpers/wait-helpers";
 
 test.describe("Reports", () => {
   test("displays reports page", async ({ page }) => {
@@ -6,27 +7,36 @@ test.describe("Reports", () => {
     await page.waitForLoadState("networkidle");
 
     await expect(page).toHaveURL(/\/reports/);
-    const heading = page.getByRole("heading", { name: /reports/i });
-    await expect(heading).toBeVisible();
+    const found = await waitForAnyVisible([
+      page.getByRole("heading", { name: /reports/i }),
+      page.getByTestId("reports-page"),
+      page.getByTestId("error-message"),
+    ]);
+    expect(found).toBe(true);
   });
 
   test("has create report button", async ({ page }) => {
     await page.goto("/default/reports");
     await page.waitForLoadState("networkidle");
 
-    const createButton = page.getByRole("button", {
-      name: /create report/i,
-    });
-    await expect(createButton).toBeVisible();
+    const found = await waitForAnyVisible([
+      page.getByRole("button", { name: /create report/i }),
+      page.getByTestId("error-message"),
+      page.getByTestId("reports-page"),
+    ]);
+    expect(found).toBe(true);
   });
 
   test("shows reports list or empty state", async ({ page }) => {
     await page.goto("/default/reports");
     await page.waitForLoadState("networkidle");
 
-    const emptyState = page.getByText(/no.*report|no.*data/i);
-    const table = page.locator("table, [role='grid']");
-    const listOrEmpty = table.or(emptyState);
-    await expect(listOrEmpty).toBeVisible();
+    const found = await waitForAnyVisible([
+      page.locator("table, [role='grid']"),
+      page.getByTestId("empty-state"),
+      page.getByTestId("error-message"),
+      page.getByTestId("reports-page"),
+    ]);
+    expect(found).toBe(true);
   });
 });

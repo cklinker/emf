@@ -14,30 +14,11 @@ test.describe("Scripts", () => {
     const scriptsPage = new ScriptsPage(page);
     await scriptsPage.goto();
 
-    // Page may show table, empty state, or error state ("Failed to load")
-    const hasTable = await scriptsPage.table
-      .isVisible({ timeout: 5000 })
-      .catch(() => false);
-    const hasEmptyState = await page
-      .getByTestId("empty-state")
-      .isVisible({ timeout: 3000 })
-      .catch(() => false);
-    const hasError = await page
-      .getByTestId("error-message")
-      .isVisible({ timeout: 3000 })
-      .catch(() => false);
-    const hasLoading = await page
-      .getByText(/loading/i)
-      .first()
-      .isVisible({ timeout: 2000 })
-      .catch(() => false);
-    // Page container is always rendered regardless of state
-    const hasPage = await scriptsPage.scriptsPage
-      .isVisible()
-      .catch(() => false);
-    expect(hasTable || hasEmptyState || hasError || hasLoading || hasPage).toBe(
-      true,
-    );
+    const anyState = scriptsPage.table
+      .or(page.getByTestId("empty-state"))
+      .or(page.getByTestId("error-message"))
+      .or(scriptsPage.scriptsPage);
+    await expect(anyState).toBeVisible({ timeout: 10000 });
   });
 
   test("opens create script form", async ({ page }) => {
@@ -45,10 +26,12 @@ test.describe("Scripts", () => {
     await scriptsPage.goto();
 
     // Create button may not be available in error state
-    const hasCreateButton = await scriptsPage.createButton
-      .isVisible({ timeout: 5000 })
-      .catch(() => false);
-    if (!hasCreateButton) {
+    try {
+      await scriptsPage.createButton.waitFor({
+        state: "visible",
+        timeout: 5000,
+      });
+    } catch {
       return;
     }
     await scriptsPage.clickCreate();
@@ -62,10 +45,12 @@ test.describe("Scripts", () => {
     await scriptsPage.goto();
 
     // Create button may not be available in error state
-    const hasCreateButton = await scriptsPage.createButton
-      .isVisible({ timeout: 5000 })
-      .catch(() => false);
-    if (!hasCreateButton) {
+    try {
+      await scriptsPage.createButton.waitFor({
+        state: "visible",
+        timeout: 5000,
+      });
+    } catch {
       return;
     }
     await scriptsPage.clickCreate();

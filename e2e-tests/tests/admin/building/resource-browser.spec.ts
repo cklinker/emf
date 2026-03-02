@@ -14,28 +14,21 @@ test.describe("Resource Browser", () => {
   });
 
   test("shows collection cards grid or empty state", async ({ page }) => {
-    const hasGrid = await resourceBrowserPage.collectionsGrid
-      .isVisible({ timeout: 5000 })
-      .catch(() => false);
-    const hasEmptyState = await page
-      .getByTestId("empty-state")
-      .isVisible({ timeout: 3000 })
-      .catch(() => false);
-    const hasError = await page
-      .getByTestId("error-message")
-      .isVisible({ timeout: 3000 })
-      .catch(() => false);
-    const hasPage = await resourceBrowserPage.resourceBrowserPage
-      .isVisible()
-      .catch(() => false);
-    expect(hasGrid || hasEmptyState || hasError || hasPage).toBe(true);
+    const anyState = resourceBrowserPage.collectionsGrid
+      .or(page.getByTestId("empty-state"))
+      .or(page.getByTestId("error-message"))
+      .or(resourceBrowserPage.resourceBrowserPage);
+    await expect(anyState).toBeVisible({ timeout: 10000 });
   });
 
-  test("can search for collections", async () => {
-    const hasSearch = await resourceBrowserPage.collectionSearchInput
-      .isVisible({ timeout: 5000 })
-      .catch(() => false);
-    if (!hasSearch) {
+  test("can search for collections", async ({ page }) => {
+    // Search input may not be available if API failed (error state)
+    try {
+      await resourceBrowserPage.collectionSearchInput.waitFor({
+        state: "visible",
+        timeout: 5000,
+      });
+    } catch {
       return;
     }
     await resourceBrowserPage.search("test");
@@ -44,10 +37,12 @@ test.describe("Resource Browser", () => {
 
   test("can clear search", async () => {
     // Search input may not be available if API failed (error state)
-    const hasSearch = await resourceBrowserPage.collectionSearchInput
-      .isVisible({ timeout: 5000 })
-      .catch(() => false);
-    if (!hasSearch) {
+    try {
+      await resourceBrowserPage.collectionSearchInput.waitFor({
+        state: "visible",
+        timeout: 5000,
+      });
+    } catch {
       return;
     }
     await resourceBrowserPage.search("test");
@@ -58,28 +53,10 @@ test.describe("Resource Browser", () => {
   test("shows results count when collections exist", async ({ page }) => {
     // Results count label may not be visible when there are no collections
     // Page may also show error state if API fails
-    const hasResults = await resourceBrowserPage.resultsCountLabel
-      .isVisible({ timeout: 5000 })
-      .catch(() => false);
-    const hasEmptyState = await page
-      .getByTestId("empty-state")
-      .isVisible({ timeout: 3000 })
-      .catch(() => false);
-    const hasError = await page
-      .getByTestId("error-message")
-      .isVisible({ timeout: 3000 })
-      .catch(() => false);
-    const hasLoading = await page
-      .getByText(/loading/i)
-      .first()
-      .isVisible({ timeout: 2000 })
-      .catch(() => false);
-    // Also accept the page being rendered at all
-    const hasPage = await resourceBrowserPage.resourceBrowserPage
-      .isVisible({ timeout: 3000 })
-      .catch(() => false);
-    expect(
-      hasResults || hasEmptyState || hasError || hasLoading || hasPage,
-    ).toBe(true);
+    const anyState = resourceBrowserPage.resultsCountLabel
+      .or(page.getByTestId("empty-state"))
+      .or(page.getByTestId("error-message"))
+      .or(resourceBrowserPage.resourceBrowserPage);
+    await expect(anyState).toBeVisible({ timeout: 10000 });
   });
 });

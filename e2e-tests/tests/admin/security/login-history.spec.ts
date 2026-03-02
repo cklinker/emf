@@ -12,35 +12,12 @@ test.describe("Login History", () => {
   });
 
   test("shows login history table or empty state", async ({ page }) => {
-    // Table uses semantic <table> element; empty state says "No login events found."
-    const table = page.locator("table");
-    const noEntries = page.getByText(
-      /no.*login.*event|no.*entries|no.*data|no.*history/i,
-    );
-    const hasTable = await table
-      .isVisible({ timeout: 5000 })
-      .catch(() => false);
-    const hasEmpty = await noEntries
-      .first()
-      .isVisible({ timeout: 3000 })
-      .catch(() => false);
-    const hasError = await page
-      .getByTestId("error-message")
-      .isVisible({ timeout: 3000 })
-      .catch(() => false);
-    const hasLoading = await page
-      .getByText(/loading/i)
-      .first()
-      .isVisible({ timeout: 2000 })
-      .catch(() => false);
-    // Also check for the page testid as fallback
-    const hasPage = await page
-      .getByTestId("login-history-page")
-      .isVisible()
-      .catch(() => false);
-    expect(hasTable || hasEmpty || hasError || hasLoading || hasPage).toBe(
-      true,
-    );
+    const anyState = page
+      .locator("table")
+      .or(page.getByTestId("empty-state"))
+      .or(page.getByTestId("error-message"))
+      .or(page.getByTestId("login-history-page"));
+    await expect(anyState).toBeVisible({ timeout: 10000 });
   });
 
   test.skip("displays pagination controls", async () => {
@@ -49,16 +26,16 @@ test.describe("Login History", () => {
 
   test("navigates between pages", async ({ page }) => {
     const nextButton = page.getByRole("button", { name: /next/i });
-    const isNextVisible = await nextButton
-      .isVisible({ timeout: 2000 })
-      .catch(() => false);
+    try {
+      await nextButton.waitFor({ state: "visible", timeout: 5000 });
+    } catch {
+      return;
+    }
 
-    if (isNextVisible) {
-      const isNextEnabled = await nextButton.isEnabled();
-      if (isNextEnabled) {
-        await nextButton.click();
-        await page.waitForLoadState("networkidle");
-      }
+    const isNextEnabled = await nextButton.isEnabled();
+    if (isNextEnabled) {
+      await nextButton.click();
+      await page.waitForLoadState("networkidle");
     }
   });
 });

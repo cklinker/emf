@@ -1,0 +1,25 @@
+{
+  "name": "emf-e2e-tests",
+  "private": true,
+  "version": "0.0.1",
+  "description": "End-to-end tests for the EMF platform",
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "test:chromium": "playwright test --project=chromium",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug",
+    "test:ui": "playwright test --ui",
+    "test:auth": "playwright test tests/auth/",
+    "test:admin": "playwright test tests/admin/",
+    "test:end-user": "playwright test tests/end-user/",
+    "test:journeys": "playwright test tests/journeys/",
+    "report": "playwright show-report",
+    "codegen": "playwright codegen"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.50.0",
+    "@types/node": "^25.3.3",
+    "dotenv": "^16.4.0"
+  }
+}

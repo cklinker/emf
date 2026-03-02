@@ -9,6 +9,7 @@ on:
       - 'emf-worker/**'
       - 'emf-web/**'
       - 'emf-ui/**'
+      - 'e2e-tests/**'
       - '.github/workflows/build-and-publish-containers.yml'
   workflow_dispatch:
     inputs:
@@ -277,3 +278,70 @@ jobs:
           done
           echo "Worker health check failed"
           exit 1
+
+  # ===========================================================================
+  # E2E Tests (Playwright) — post-deployment UI verification
+  # ===========================================================================
+  e2e-test:
+    name: E2E Tests
+    needs: smoke-test
+    runs-on: k8s-runner
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Cache npm dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: e2e-npm-${{ runner.os }}-${{ hashFiles('e2e-tests/package-lock.json') }}
+          restore-keys: |
+            e2e-npm-${{ runner.os }}-
+
+      - name: Install dependencies
+        working-directory: e2e-tests
+        run: npm ci
+
+      - name: Install Playwright browsers
+        working-directory: e2e-tests
+        run: npx playwright install --with-deps chromium firefox
+
+      - name: Wait for services to stabilize
+        run: sleep 30
+
+      - name: Run E2E tests
+        working-directory: e2e-tests
+        env:
+          E2E_BASE_URL: https://emf-ui.rzware.com
+          E2E_API_BASE_URL: https://emf.rzware.com
+          E2E_TENANT_SLUG: default
+          E2E_AUTHENTIK_URL: ${{ secrets.E2E_AUTHENTIK_URL }}
+          E2E_CLIENT_ID: ${{ secrets.E2E_CLIENT_ID }}
+          E2E_OIDC_PROVIDER_ID: ${{ secrets.E2E_OIDC_PROVIDER_ID }}
+          E2E_TEST_USERNAME: ${{ secrets.E2E_TEST_USERNAME }}
+          E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
+        run: npx playwright test
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-results
+          path: |
+            e2e-tests/playwright-report/
+            e2e-tests/test-results/
+          retention-days: 14
+
+      - name: Upload trace files
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-traces
+          path: e2e-tests/test-results/**/*.zip
+          retention-days: 7

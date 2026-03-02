@@ -76,7 +76,7 @@ emf:
     
     # Rate limiting is driven by per-tenant governor limits (apiCallsPerDay)
     # fetched from the worker during bootstrap.
-    # See TenantGovernorLimitCache for details.
+    # See GatewayCacheManager for details.
 
     # Security settings
     security:

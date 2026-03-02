@@ -25,11 +25,11 @@ Client Request
 | `config` | Spring configuration, bootstrap, Kafka/Redis/Security beans |
 | `filter` | Tenant resolution, security headers, request logging |
 | `route` | `DynamicRouteLocator`, `RouteRegistry` (in-memory, thread-safe) |
-| `ratelimit` | `RedisRateLimiter` (sliding window), `TenantGovernorLimitCache` |
+| `cache` | `GatewayCacheManager` -- Caffeine-backed tenant slug and governor limit caches |
+| `ratelimit` | `RedisRateLimiter` (sliding window) |
 | `jsonapi` | `IncludeResolver` -- fetches related resources from Redis cache with backend fallback |
 | `listener` | Kafka consumers for collection and worker assignment changes |
 | `health` | Health indicators for Redis, Kafka, and worker service |
-| `tenant` | `TenantSlugCache` -- in-memory slug-to-tenant-ID mapping |
 
 ## Configuration
 
@@ -61,7 +61,7 @@ emf.gateway:
 ## How It Works
 
 **Startup:**
-1. `RouteInitializer` primes the `TenantSlugCache` by calling the worker
+1. `RouteInitializer` primes the `GatewayCacheManager` tenant slug cache by calling the worker
 2. Fetches initial routes and governor limits via `POST {worker}/internal/bootstrap`
 3. Populates `RouteRegistry` and publishes `RefreshRoutesEvent`
 

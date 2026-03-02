@@ -1,6 +1,6 @@
 package com.emf.gateway.filter;
 
-import com.emf.gateway.tenant.TenantSlugCache;
+import com.emf.gateway.cache.GatewayCacheManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -55,7 +55,7 @@ class TenantSlugExtractionFilterTest {
     @Mock
     private WebFilterChain chain;
 
-    private TenantSlugCache slugCache;
+    private GatewayCacheManager cacheManager;
 
     private static final List<String> PLATFORM_PATHS = List.of("/actuator", "/platform", "/internal");
 
@@ -64,7 +64,7 @@ class TenantSlugExtractionFilterTest {
         when(webClientBuilder.baseUrl(anyString())).thenReturn(webClientBuilder);
         when(webClientBuilder.build()).thenReturn(webClient);
 
-        slugCache = new TenantSlugCache(webClientBuilder, "http://localhost:8080");
+        cacheManager = new GatewayCacheManager(webClientBuilder, "http://localhost:8080");
 
         lenient().when(chain.filter(any(ServerWebExchange.class))).thenReturn(Mono.empty());
     }
@@ -165,7 +165,7 @@ class TenantSlugExtractionFilterTest {
         StepVerifier.create(filter.filter(exchange, chain))
                 .verifyComplete();
 
-        // Should pass through without slug extraction — original exchange, not mutated
+        // Should pass through without slug extraction -- original exchange, not mutated
         verify(chain).filter(exchange);
     }
 
@@ -179,7 +179,7 @@ class TenantSlugExtractionFilterTest {
         StepVerifier.create(filter.filter(exchange, chain))
                 .verifyComplete();
 
-        // Should pass through without slug extraction — original exchange, not mutated
+        // Should pass through without slug extraction -- original exchange, not mutated
         verify(chain).filter(exchange);
     }
 
@@ -193,7 +193,7 @@ class TenantSlugExtractionFilterTest {
         StepVerifier.create(filter.filter(exchange, chain))
                 .verifyComplete();
 
-        // Should pass through without slug extraction — "internal" is a platform path, not a slug
+        // Should pass through without slug extraction -- "internal" is a platform path, not a slug
         verify(chain).filter(exchange);
     }
 
@@ -278,7 +278,7 @@ class TenantSlugExtractionFilterTest {
     void shouldPassThroughInvalidSlugPatternWhenRequirePrefixFalse() {
         TenantSlugExtractionFilter filter = createFilter(true, false);
 
-        // "UPPER" is uppercase, not a valid slug — passes through in migration mode
+        // "UPPER" is uppercase, not a valid slug -- passes through in migration mode
         MockServerHttpRequest request = MockServerHttpRequest.get("/UPPER/api/users").build();
         MockServerWebExchange exchange = MockServerWebExchange.from(request);
 
@@ -426,7 +426,7 @@ class TenantSlugExtractionFilterTest {
     // --- Helpers ---
 
     private TenantSlugExtractionFilter createFilter(boolean enabled, boolean requirePrefix) {
-        return new TenantSlugExtractionFilter(slugCache, enabled, requirePrefix, PLATFORM_PATHS);
+        return new TenantSlugExtractionFilter(cacheManager, enabled, requirePrefix, PLATFORM_PATHS);
     }
 
     @SuppressWarnings("unchecked")
@@ -437,6 +437,6 @@ class TenantSlugExtractionFilterTest {
         when(responseSpec.bodyToMono(any(ParameterizedTypeReference.class)))
                 .thenReturn(Mono.just(slugMap));
 
-        slugCache.refresh();
+        cacheManager.refreshTenantSlugsFromWorker();
     }
 }

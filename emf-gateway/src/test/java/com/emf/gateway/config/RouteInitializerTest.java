@@ -1,8 +1,8 @@
 package com.emf.gateway.config;
 
+import com.emf.gateway.cache.GatewayCacheManager;
 import com.emf.gateway.route.RouteRegistry;
 import com.emf.gateway.service.RouteConfigService;
-import com.emf.gateway.tenant.TenantSlugCache;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,7 +19,7 @@ import static org.mockito.Mockito.*;
  *
  * <p>Tests verify that on startup:
  * <ul>
- *   <li>Tenant slug cache is primed</li>
+ *   <li>Tenant slug cache is primed via GatewayCacheManager</li>
  *   <li>Dynamic routes are fetched from the worker service</li>
  *   <li>A RefreshRoutesEvent is published</li>
  * </ul>
@@ -37,7 +37,7 @@ class RouteInitializerTest {
     private ApplicationEventPublisher eventPublisher;
 
     @Mock
-    private TenantSlugCache tenantSlugCache;
+    private GatewayCacheManager cacheManager;
 
     @Mock
     private ApplicationArguments applicationArguments;
@@ -50,7 +50,7 @@ class RouteInitializerTest {
             routeRegistry,
             routeConfigService,
             eventPublisher,
-            tenantSlugCache
+            cacheManager
         );
     }
 
@@ -65,7 +65,7 @@ class RouteInitializerTest {
     void testRun_PrimesTenantSlugCache() {
         routeInitializer.run(applicationArguments);
 
-        verify(tenantSlugCache).refresh();
+        verify(cacheManager).refreshTenantSlugsFromWorker();
     }
 
     @Test
@@ -77,7 +77,7 @@ class RouteInitializerTest {
 
     @Test
     void testRun_ContinuesWhenSlugCacheFails() {
-        doThrow(new RuntimeException("Redis down")).when(tenantSlugCache).refresh();
+        doThrow(new RuntimeException("Redis down")).when(cacheManager).refreshTenantSlugsFromWorker();
 
         routeInitializer.run(applicationArguments);
 

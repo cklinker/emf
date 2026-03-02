@@ -1,8 +1,8 @@
 package com.emf.gateway.service;
 
+import com.emf.gateway.cache.GatewayCacheManager;
 import com.emf.gateway.config.BootstrapConfig;
 import com.emf.gateway.config.CollectionConfig;
-import com.emf.gateway.ratelimit.TenantGovernorLimitCache;
 import com.emf.gateway.route.RouteDefinition;
 import com.emf.gateway.route.RouteRegistry;
 import org.slf4j.Logger;
@@ -38,17 +38,17 @@ public class RouteConfigService {
 
     private final WebClient webClient;
     private final RouteRegistry routeRegistry;
-    private final TenantGovernorLimitCache governorLimitCache;
+    private final GatewayCacheManager cacheManager;
     private final String workerServiceUrl;
 
     public RouteConfigService(
             WebClient.Builder webClientBuilder,
             RouteRegistry routeRegistry,
-            TenantGovernorLimitCache governorLimitCache,
+            GatewayCacheManager cacheManager,
             @Value("${emf.gateway.worker-service-url:http://emf-worker:80}") String workerServiceUrl) {
         this.webClient = webClientBuilder.baseUrl(workerServiceUrl).build();
         this.routeRegistry = routeRegistry;
-        this.governorLimitCache = governorLimitCache;
+        this.cacheManager = cacheManager;
         this.workerServiceUrl = workerServiceUrl;
 
         logger.info("RouteConfigService initialized with worker URL: {}", workerServiceUrl);
@@ -111,7 +111,7 @@ public class RouteConfigService {
 
                     // Load per-tenant governor limits for rate limiting
                     if (config.getGovernorLimits() != null) {
-                        governorLimitCache.loadFromBootstrap(config.getGovernorLimits());
+                        cacheManager.loadGovernorLimits(config.getGovernorLimits());
                         logger.info("Loaded governor limits for {} tenants",
                                 config.getGovernorLimits().size());
                     } else {

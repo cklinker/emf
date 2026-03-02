@@ -13,32 +13,50 @@ test.describe("End-User Home", () => {
     const homePage = new AppHomePage(page);
     await homePage.goto();
 
-    // The home page has a quick-create-section (was quick-actions in the page object)
+    // Check for the data-testid section or a heading with "Quick Create"
     const section = homePage.quickActions;
-    const heading = page.getByText(/quick/i);
-    const sectionOrHeading = section.or(heading);
-    await expect(sectionOrHeading).toBeVisible();
+    const isSectionVisible = await section
+      .isVisible({ timeout: 5000 })
+      .catch(() => false);
+    const heading = page.getByRole("heading", { name: /quick/i });
+    const isHeadingVisible = await heading
+      .first()
+      .isVisible({ timeout: 2000 })
+      .catch(() => false);
+    expect(isSectionVisible || isHeadingVisible).toBe(true);
   });
 
   test("shows recent records section", async ({ page }) => {
     const homePage = new AppHomePage(page);
     await homePage.goto();
 
-    // The home page has a recent-records-section
+    // Check for the data-testid section or a heading with "Recent"
     const section = homePage.recentItems;
-    const heading = page.getByText(/recent/i);
-    const sectionOrHeading = section.or(heading);
-    await expect(sectionOrHeading).toBeVisible();
+    const isSectionVisible = await section
+      .isVisible({ timeout: 5000 })
+      .catch(() => false);
+    const heading = page.getByRole("heading", { name: /recent/i });
+    const isHeadingVisible = await heading
+      .first()
+      .isVisible({ timeout: 2000 })
+      .catch(() => false);
+    expect(isSectionVisible || isHeadingVisible).toBe(true);
   });
 
   test("shows favorites section", async ({ page }) => {
     const homePage = new AppHomePage(page);
     await homePage.goto();
 
-    // The home page has a favorites-section
+    // Check for the data-testid section or a heading with "Favorite"
     const section = homePage.favorites;
-    const heading = page.getByText(/favorite/i);
-    const sectionOrHeading = section.or(heading);
-    await expect(sectionOrHeading).toBeVisible();
+    const isSectionVisible = await section
+      .isVisible({ timeout: 5000 })
+      .catch(() => false);
+    const heading = page.getByRole("heading", { name: /favorite/i });
+    const isHeadingVisible = await heading
+      .first()
+      .isVisible({ timeout: 2000 })
+      .catch(() => false);
+    expect(isSectionVisible || isHeadingVisible).toBe(true);
   });
 });

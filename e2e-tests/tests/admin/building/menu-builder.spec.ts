@@ -2,7 +2,7 @@ import { test, expect } from "../../../fixtures";
 
 test.describe("Menu Builder", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/default/setup/menus");
+    await page.goto("/default/menus");
     await page.waitForLoadState("networkidle");
   });
 

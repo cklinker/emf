@@ -2,7 +2,7 @@ import { test, expect } from "../../../fixtures";
 
 test.describe("Dashboards", () => {
   test("displays dashboards page", async ({ page }) => {
-    await page.goto("/default/setup/dashboards");
+    await page.goto("/default/dashboards");
     await page.waitForLoadState("networkidle");
 
     await expect(page).toHaveURL(/\/dashboards/);
@@ -11,7 +11,7 @@ test.describe("Dashboards", () => {
   });
 
   test("has create dashboard button", async ({ page }) => {
-    await page.goto("/default/setup/dashboards");
+    await page.goto("/default/dashboards");
     await page.waitForLoadState("networkidle");
 
     const createButton = page.getByRole("button", {
@@ -21,7 +21,7 @@ test.describe("Dashboards", () => {
   });
 
   test("shows dashboards list or empty state", async ({ page }) => {
-    await page.goto("/default/setup/dashboards");
+    await page.goto("/default/dashboards");
     await page.waitForLoadState("networkidle");
 
     const emptyState = page.getByText(/no.*dashboard|no.*data/i);

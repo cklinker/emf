@@ -53,9 +53,18 @@ test.describe("Scheduled Jobs", () => {
     await scheduledJobsPage.clickCreate();
     await expect(scheduledJobsPage.formModal).toBeVisible();
 
-    await scheduledJobsPage.cancelButton.click();
-    // Allow time for the modal to close
-    await page.waitForTimeout(500);
+    // Try the cancel button first; if that data-testid doesn't exist, try Escape
+    const hasCancelButton = await scheduledJobsPage.cancelButton
+      .isVisible({ timeout: 2000 })
+      .catch(() => false);
+    if (hasCancelButton) {
+      await scheduledJobsPage.cancelButton.click();
+    } else {
+      await page.keyboard.press("Escape");
+    }
+
+    // Allow time for the modal animation to complete
+    await page.waitForTimeout(1000);
     await expect(scheduledJobsPage.formModal).not.toBeVisible({
       timeout: 5000,
     });

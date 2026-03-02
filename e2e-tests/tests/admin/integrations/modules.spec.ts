@@ -2,7 +2,7 @@ import { test, expect } from "../../../fixtures";
 
 test.describe("Modules", () => {
   test("displays modules page", async ({ page }) => {
-    await page.goto("/default/setup/modules");
+    await page.goto("/default/modules");
     await page.waitForLoadState("networkidle");
 
     await expect(page).toHaveURL(/\/modules/);
@@ -11,7 +11,7 @@ test.describe("Modules", () => {
   });
 
   test("shows installed modules or description text", async ({ page }) => {
-    await page.goto("/default/setup/modules");
+    await page.goto("/default/modules");
     await page.waitForLoadState("networkidle");
 
     // The page shows either module cards or a description about modules
@@ -20,7 +20,7 @@ test.describe("Modules", () => {
   });
 
   test("has install module button", async ({ page }) => {
-    await page.goto("/default/setup/modules");
+    await page.goto("/default/modules");
     await page.waitForLoadState("networkidle");
 
     const installButton = page.getByRole("button", {

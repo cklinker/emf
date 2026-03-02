@@ -4,6 +4,6 @@ import { test, expect } from "../../../fixtures";
 // when limit data is missing from the API response
 test.describe.skip("Governor Limits", () => {
   test("displays governor limits page", async ({ page }) => {
-    await page.goto("/default/setup/governor-limits");
+    await page.goto("/default/governor-limits");
   });
 });

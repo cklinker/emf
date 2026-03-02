@@ -2,7 +2,7 @@ import { test, expect } from "../../../fixtures";
 
 test.describe("Audit Trail", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/default/setup/audit-trail");
+    await page.goto("/default/audit-trail");
     await page.waitForLoadState("networkidle");
   });
 

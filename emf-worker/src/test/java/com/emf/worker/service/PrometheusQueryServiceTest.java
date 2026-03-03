@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.client.RestTemplate;
 
+import java.net.URI;
 import java.time.Instant;
 import java.util.List;
 
@@ -31,7 +32,7 @@ class PrometheusQueryServiceTest {
     void setUp() {
         restTemplate = mock(RestTemplate.class);
         ObjectMapper objectMapper = new ObjectMapper();
-        service = new PrometheusQueryService(restTemplate, objectMapper);
+        service = new PrometheusQueryService(restTemplate, objectMapper, "http://localhost:9090");
     }
 
     // ==================== Range Query Tests ====================
@@ -62,7 +63,7 @@ class PrometheusQueryServiceTest {
                     }
                     """;
 
-            when(restTemplate.getForObject(anyString(), eq(String.class)))
+            when(restTemplate.getForObject(any(URI.class), eq(String.class)))
                     .thenReturn(promResponse);
 
             List<TimeSeries> result = service.queryRange(
@@ -84,7 +85,7 @@ class PrometheusQueryServiceTest {
         @Test
         @DisplayName("Should construct correct URL with query params")
         void constructsCorrectUrl() {
-            when(restTemplate.getForObject(anyString(), eq(String.class)))
+            when(restTemplate.getForObject(any(URI.class), eq(String.class)))
                     .thenReturn("{\"status\":\"success\",\"data\":{\"resultType\":\"matrix\",\"result\":[]}}");
 
             service.queryRange(
@@ -92,18 +93,21 @@ class PrometheusQueryServiceTest {
                     Instant.ofEpochSecond(1704067320), "60s");
 
             verify(restTemplate).getForObject(
-                    argThat((String url) -> url.contains("/api/v1/query_range")
-                            && url.contains("query=")
-                            && url.contains("start=1704067200")
-                            && url.contains("end=1704067320")
-                            && url.contains("step=60s")),
+                    argThat((URI uri) -> {
+                        String url = uri.toString();
+                        return url.contains("/api/v1/query_range")
+                                && url.contains("query=")
+                                && url.contains("start=1704067200")
+                                && url.contains("end=1704067320")
+                                && url.contains("step=60s");
+                    }),
                     eq(String.class));
         }
 
         @Test
         @DisplayName("Should return empty list on RestTemplate error")
         void returnsEmptyOnError() {
-            when(restTemplate.getForObject(anyString(), eq(String.class)))
+            when(restTemplate.getForObject(any(URI.class), eq(String.class)))
                     .thenThrow(new RuntimeException("Connection refused"));
 
             List<TimeSeries> result = service.queryRange(
@@ -116,7 +120,7 @@ class PrometheusQueryServiceTest {
         @Test
         @DisplayName("Should return empty list on null response")
         void returnsEmptyOnNullResponse() {
-            when(restTemplate.getForObject(anyString(), eq(String.class)))
+            when(restTemplate.getForObject(any(URI.class), eq(String.class)))
                     .thenReturn(null);
 
             List<TimeSeries> result = service.queryRange(
@@ -130,7 +134,7 @@ class PrometheusQueryServiceTest {
         @DisplayName("Should return empty list on error status")
         void returnsEmptyOnErrorStatus() {
             String errorResponse = "{\"status\":\"error\",\"error\":\"parse error\"}";
-            when(restTemplate.getForObject(anyString(), eq(String.class)))
+            when(restTemplate.getForObject(any(URI.class), eq(String.class)))
                     .thenReturn(errorResponse);
 
             List<TimeSeries> result = service.queryRange(
@@ -165,7 +169,7 @@ class PrometheusQueryServiceTest {
                     }
                     """;
 
-            when(restTemplate.getForObject(anyString(), eq(String.class)))
+            when(restTemplate.getForObject(any(URI.class), eq(String.class)))
                     .thenReturn(promResponse);
 
             List<TimeSeries> result = service.queryInstant("emf_gateway_requests_active{tenant=\"tenant-1\"}");
@@ -179,15 +183,18 @@ class PrometheusQueryServiceTest {
         @Test
         @DisplayName("Should construct correct URL for instant query")
         void constructsCorrectUrl() {
-            when(restTemplate.getForObject(anyString(), eq(String.class)))
+            when(restTemplate.getForObject(any(URI.class), eq(String.class)))
                     .thenReturn("{\"status\":\"success\",\"data\":{\"resultType\":\"vector\",\"result\":[]}}");
 
             service.queryInstant("test_query");
 
             verify(restTemplate).getForObject(
-                    argThat((String url) -> url.contains("/api/v1/query")
-                            && url.contains("query=")
-                            && !url.contains("query_range")),
+                    argThat((URI uri) -> {
+                        String url = uri.toString();
+                        return url.contains("/api/v1/query")
+                                && url.contains("query=")
+                                && !url.contains("query_range");
+                    }),
                     eq(String.class));
         }
 
@@ -209,7 +216,7 @@ class PrometheusQueryServiceTest {
                     }
                     """;
 
-            when(restTemplate.getForObject(anyString(), eq(String.class)))
+            when(restTemplate.getForObject(any(URI.class), eq(String.class)))
                     .thenReturn(promResponse);
 
             List<TimeSeries> result = service.queryInstant("test_query");
@@ -221,7 +228,7 @@ class PrometheusQueryServiceTest {
         @Test
         @DisplayName("Should return empty list on connection error")
         void returnsEmptyOnConnectionError() {
-            when(restTemplate.getForObject(anyString(), eq(String.class)))
+            when(restTemplate.getForObject(any(URI.class), eq(String.class)))
                     .thenThrow(new RuntimeException("Connection refused"));
 
             List<TimeSeries> result = service.queryInstant("test_query");
@@ -249,7 +256,7 @@ class PrometheusQueryServiceTest {
                     }
                     """;
 
-            when(restTemplate.getForObject(anyString(), eq(String.class)))
+            when(restTemplate.getForObject(any(URI.class), eq(String.class)))
                     .thenReturn(promResponse);
 
             List<TimeSeries> result = service.queryRange(
@@ -277,7 +284,7 @@ class PrometheusQueryServiceTest {
                     }
                     """;
 
-            when(restTemplate.getForObject(anyString(), eq(String.class)))
+            when(restTemplate.getForObject(any(URI.class), eq(String.class)))
                     .thenReturn(promResponse);
 
             List<TimeSeries> result = service.queryInstant("test_query");
@@ -304,7 +311,7 @@ class PrometheusQueryServiceTest {
                     }
                     """;
 
-            when(restTemplate.getForObject(anyString(), eq(String.class)))
+            when(restTemplate.getForObject(any(URI.class), eq(String.class)))
                     .thenReturn(promResponse);
 
             List<TimeSeries> result = service.queryInstant("test_query");

@@ -4,10 +4,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import java.net.URI;
 import java.time.Instant;
 import java.util.*;
 
@@ -27,10 +29,15 @@ public class PrometheusQueryService {
 
     private final RestTemplate prometheusRestTemplate;
     private final ObjectMapper objectMapper;
+    private final String prometheusUrl;
 
-    public PrometheusQueryService(RestTemplate prometheusRestTemplate, ObjectMapper objectMapper) {
+    public PrometheusQueryService(
+            RestTemplate prometheusRestTemplate,
+            ObjectMapper objectMapper,
+            @Value("${emf.prometheus.url:http://prometheus.prometheus.svc.cluster.local:9090}") String prometheusUrl) {
         this.prometheusRestTemplate = prometheusRestTemplate;
         this.objectMapper = objectMapper;
+        this.prometheusUrl = prometheusUrl;
     }
 
     /**
@@ -45,13 +52,16 @@ public class PrometheusQueryService {
     public List<TimeSeries> queryRange(String promql, Instant start, Instant end, String step) {
         log.debug("Prometheus range query: promql={}, start={}, end={}, step={}", promql, start, end, step);
 
-        String uri = UriComponentsBuilder.fromPath("/api/v1/query_range")
+        // Build full URI to avoid RestTemplate treating PromQL curly braces as template variables
+        URI uri = UriComponentsBuilder.fromHttpUrl(prometheusUrl)
+                .path("/api/v1/query_range")
                 .queryParam("query", promql)
                 .queryParam("start", start.getEpochSecond())
                 .queryParam("end", end.getEpochSecond())
                 .queryParam("step", step)
                 .build()
-                .toUriString();
+                .encode()
+                .toUri();
 
         try {
             String responseBody = prometheusRestTemplate.getForObject(uri, String.class);
@@ -71,10 +81,13 @@ public class PrometheusQueryService {
     public List<TimeSeries> queryInstant(String promql) {
         log.debug("Prometheus instant query: promql={}", promql);
 
-        String uri = UriComponentsBuilder.fromPath("/api/v1/query")
+        // Build full URI to avoid RestTemplate treating PromQL curly braces as template variables
+        URI uri = UriComponentsBuilder.fromHttpUrl(prometheusUrl)
+                .path("/api/v1/query")
                 .queryParam("query", promql)
                 .build()
-                .toUriString();
+                .encode()
+                .toUri();
 
         try {
             String responseBody = prometheusRestTemplate.getForObject(uri, String.class);

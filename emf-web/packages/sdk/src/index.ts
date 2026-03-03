@@ -123,6 +123,11 @@ export type {
   ObjectPermissionRequest,
   FieldPermissionRequest,
   SystemPermissionRequest,
+  MetricsQueryParams,
+  MetricsQueryResult,
+  MetricsTimeSeries,
+  MetricsDataPoint,
+  MetricsSummary,
 } from './admin/types';
 
 // Authentication

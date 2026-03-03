@@ -150,6 +150,10 @@ export type { SetupAuditTrailPageProps } from './SetupAuditTrailPage'
 export { GovernorLimitsPage } from './GovernorLimitsPage'
 export type { GovernorLimitsPageProps } from './GovernorLimitsPage'
 
+// MetricsPage - Tenant metrics dashboard
+export { MetricsPage } from './MetricsPage'
+export type { MetricsPageProps } from './MetricsPage'
+
 // PageLayoutsPage - Page layout management page
 export { PageLayoutsPage } from './PageLayoutsPage'
 export type { PageLayoutsPageProps } from './PageLayoutsPage'

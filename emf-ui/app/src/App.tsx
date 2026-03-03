@@ -77,6 +77,7 @@ import {
   UserDetailPage,
   SetupAuditTrailPage,
   GovernorLimitsPage,
+  MetricsPage,
   TenantsPage,
   TenantDashboardPage,
   PicklistsPage,
@@ -861,6 +862,18 @@ function TenantRoutes(): React.ReactElement {
           <AdminPageRoute>
             <RequirePermission permission="VIEW_SETUP">
               <GovernorLimitsPage />
+            </RequirePermission>
+          </AdminPageRoute>
+        }
+      />
+
+      {/* Metrics route */}
+      <Route
+        path="metrics"
+        element={
+          <AdminPageRoute>
+            <RequirePermission permission="VIEW_SETUP">
+              <MetricsPage />
             </RequirePermission>
           </AdminPageRoute>
         }

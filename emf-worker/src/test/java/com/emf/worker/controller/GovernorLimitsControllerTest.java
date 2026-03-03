@@ -1,11 +1,15 @@
 package com.emf.worker.controller;
 
+import com.emf.runtime.event.PlatformEvent;
+import com.emf.runtime.event.RecordChangedPayload;
+import com.emf.runtime.events.RecordEventPublisher;
 import com.emf.worker.repository.GovernorLimitsRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.http.ResponseEntity;
@@ -31,6 +35,7 @@ class GovernorLimitsControllerTest {
     private ObjectMapper objectMapper;
     private StringRedisTemplate redisTemplate;
     private ValueOperations<String, String> valueOps;
+    private RecordEventPublisher recordEventPublisher;
     private GovernorLimitsController controller;
 
     @SuppressWarnings("unchecked")
@@ -40,10 +45,11 @@ class GovernorLimitsControllerTest {
         objectMapper = new ObjectMapper();
         redisTemplate = mock(StringRedisTemplate.class);
         valueOps = mock(ValueOperations.class);
+        recordEventPublisher = mock(RecordEventPublisher.class);
         when(redisTemplate.opsForValue()).thenReturn(valueOps);
         // Default: Redis returns null (0 API calls)
         when(valueOps.get(anyString())).thenReturn(null);
-        controller = new GovernorLimitsController(repository, objectMapper, redisTemplate);
+        controller = new GovernorLimitsController(repository, objectMapper, redisTemplate, recordEventPublisher);
     }
 
     /** Extracts the attributes map from a JSON:API single-resource response body. */
@@ -206,6 +212,33 @@ class GovernorLimitsControllerTest {
         }
 
         @Test
+        @DisplayName("Should parse limits from PGobject-like type (JSONB column)")
+        void handlesLimitsAsPGobject() {
+            // PostgreSQL JDBC driver returns JSONB columns as PGobject,
+            // which is not a String or Map but has a valid toString()
+            Object pgObjectLike = new Object() {
+                @Override
+                public String toString() {
+                    return "{\"apiCallsPerDay\":10000000,\"storageGb\":50,\"maxUsers\":500}";
+                }
+            };
+
+            when(repository.findTenantLimits("tenant-1")).thenReturn(Optional.of(pgObjectLike));
+            when(repository.countActiveUsers("tenant-1")).thenReturn(10);
+            when(repository.countActiveCollections("tenant-1")).thenReturn(5);
+
+            ResponseEntity<Map<String, Object>> response = controller.getStatus("tenant-1");
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> limits = (Map<String, Object>) getAttributes(response.getBody()).get("limits");
+            assertThat(limits.get("apiCallsPerDay")).isEqualTo(10_000_000);
+            assertThat(limits.get("storageGb")).isEqualTo(50);
+            assertThat(limits.get("maxUsers")).isEqualTo(500);
+            // Defaults filled for missing keys
+            assertThat(limits.get("maxCollections")).isEqualTo(200);
+        }
+
+        @Test
         @DisplayName("Should return zero apiCallsUsed when Redis key is absent")
         void returnsZeroApiCallsUsedWhenRedisEmpty() {
             when(repository.findTenantLimits("tenant-1")).thenReturn(Optional.of("{}"));
@@ -281,6 +314,50 @@ class GovernorLimitsControllerTest {
             assertThat(attrs).isNotNull();
             assertThat(attrs.get("usersUsed")).isEqualTo(50);
             assertThat(attrs.get("collectionsUsed")).isEqualTo(30);
+        }
+
+        @Test
+        @DisplayName("Should publish Kafka event when limits are updated")
+        @SuppressWarnings("unchecked")
+        void publishesKafkaEventOnUpdate() {
+            Map<String, Object> newLimits = new LinkedHashMap<>();
+            newLimits.put("apiCallsPerDay", 200_000);
+
+            when(repository.findTenantLimits("tenant-1")).thenReturn(Optional.of("{\"apiCallsPerDay\":200000}"));
+            when(repository.countActiveUsers("tenant-1")).thenReturn(0);
+            when(repository.countActiveCollections("tenant-1")).thenReturn(0);
+
+            controller.updateLimits("tenant-1", newLimits);
+
+            ArgumentCaptor<PlatformEvent<RecordChangedPayload>> captor =
+                    ArgumentCaptor.forClass(PlatformEvent.class);
+            verify(recordEventPublisher).publish(captor.capture());
+
+            PlatformEvent<RecordChangedPayload> event = captor.getValue();
+            assertThat(event.getTenantId()).isEqualTo("tenant-1");
+            assertThat(event.getEventType()).isEqualTo("record.updated");
+            assertThat(event.getPayload().getCollectionName()).isEqualTo("tenants");
+            assertThat(event.getPayload().getRecordId()).isEqualTo("tenant-1");
+            assertThat(event.getPayload().getChangedFields()).containsExactly("limits");
+        }
+
+        @Test
+        @DisplayName("Should not fail update if Kafka event publishing fails")
+        void doesNotFailIfKafkaPublishFails() {
+            Map<String, Object> newLimits = new LinkedHashMap<>();
+            newLimits.put("apiCallsPerDay", 200_000);
+
+            doThrow(new RuntimeException("Kafka is down"))
+                    .when(recordEventPublisher).publish(any());
+
+            when(repository.findTenantLimits("tenant-1")).thenReturn(Optional.of("{\"apiCallsPerDay\":200000}"));
+            when(repository.countActiveUsers("tenant-1")).thenReturn(0);
+            when(repository.countActiveCollections("tenant-1")).thenReturn(0);
+
+            ResponseEntity<Map<String, Object>> response = controller.updateLimits("tenant-1", newLimits);
+
+            assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+            verify(repository).updateTenantLimits(eq("tenant-1"), anyString());
         }
     }
 }

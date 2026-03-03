@@ -1,6 +1,7 @@
 package com.emf.gateway.listener;
 
 import com.emf.gateway.authz.PermissionResolutionService;
+import com.emf.gateway.cache.GatewayCacheManager;
 import com.emf.gateway.route.RouteRegistry;
 import com.emf.runtime.event.RecordChangedPayload;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -21,6 +22,7 @@ import java.util.Set;
  * {@code DynamicCollectionRouter}, this listener:
  * <ol>
  *   <li>Refreshes gateway routes when {@code collections} records change</li>
+ *   <li>Refreshes governor limit cache when {@code tenants} records change</li>
  *   <li>Evicts permission cache when permission-related collections change</li>
  * </ol>
  *
@@ -52,15 +54,18 @@ public class SystemCollectionRouteListener {
     private final ApplicationEventPublisher applicationEventPublisher;
     private final ObjectMapper objectMapper;
     private final PermissionResolutionService permissionResolutionService;
+    private final GatewayCacheManager cacheManager;
 
     public SystemCollectionRouteListener(RouteRegistry routeRegistry,
                                           ApplicationEventPublisher applicationEventPublisher,
                                           ObjectMapper objectMapper,
-                                          @Nullable PermissionResolutionService permissionResolutionService) {
+                                          @Nullable PermissionResolutionService permissionResolutionService,
+                                          GatewayCacheManager cacheManager) {
         this.routeRegistry = routeRegistry;
         this.applicationEventPublisher = applicationEventPublisher;
         this.objectMapper = objectMapper;
         this.permissionResolutionService = permissionResolutionService;
+        this.cacheManager = cacheManager;
     }
 
     /**
@@ -91,6 +96,13 @@ public class SystemCollectionRouteListener {
                 log.info("Collection definition changed (recordId={}, changeType={}), refreshing routes",
                         payload.getRecordId(), payload.getChangeType());
                 applicationEventPublisher.publishEvent(new RefreshRoutesEvent(this));
+            }
+
+            // Refresh governor limit cache when tenant records change
+            if ("tenants".equals(collectionName)) {
+                log.info("Tenant record changed (recordId={}, changeType={}), refreshing governor limits",
+                        payload.getRecordId(), payload.getChangeType());
+                cacheManager.refreshGovernorLimitsFromWorker();
             }
 
             // Evict permission cache when permission-related collections change

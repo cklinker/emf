@@ -370,12 +370,89 @@ class GatewayCacheManagerTest {
         }
     }
 
-    // ── Helper ────────────────────────────────────────────────────────
+    // ── Governor Limit Refresh From Worker Tests ────────────────────
+
+    @Nested
+    class GovernorLimitRefreshFromWorkerTests {
+
+        @Test
+        void refreshGovernorLimitsFromWorkerUpdatesCache() {
+            // Given
+            Map<String, Integer> limitsMap = Map.of(
+                    "tenant-1", 10_000_000,
+                    "tenant-2", 50_000
+            );
+            stubGovernorLimitsRefreshResponse(Mono.just(limitsMap));
+
+            // When
+            cacheManager.refreshGovernorLimitsFromWorker();
+
+            // Then
+            assertEquals(Optional.of(10_000_000), cacheManager.getGovernorLimit("tenant-1"));
+            assertEquals(Optional.of(50_000), cacheManager.getGovernorLimit("tenant-2"));
+            assertThat(cacheManager.governorLimitCacheSize()).isEqualTo(2);
+        }
+
+        @Test
+        void refreshGovernorLimitsFromWorkerReplacesExistingCache() {
+            // Given - pre-populate
+            cacheManager.updateGovernorLimit("old-tenant", 100_000);
+            assertThat(cacheManager.getGovernorLimit("old-tenant")).contains(100_000);
+
+            Map<String, Integer> limitsMap = Map.of("new-tenant", 200_000);
+            stubGovernorLimitsRefreshResponse(Mono.just(limitsMap));
+
+            // When
+            cacheManager.refreshGovernorLimitsFromWorker();
+
+            // Then
+            assertTrue(cacheManager.getGovernorLimit("old-tenant").isEmpty());
+            assertEquals(Optional.of(200_000), cacheManager.getGovernorLimit("new-tenant"));
+        }
+
+        @Test
+        void refreshGovernorLimitsFromWorkerHandlesErrorGracefully() {
+            // Given - pre-populate cache
+            cacheManager.updateGovernorLimit("tenant-1", 100_000);
+
+            stubGovernorLimitsRefreshResponse(Mono.error(new RuntimeException("Connection refused")));
+
+            // When - should not throw
+            cacheManager.refreshGovernorLimitsFromWorker();
+
+            // Then - existing cache is preserved
+            assertEquals(Optional.of(100_000), cacheManager.getGovernorLimit("tenant-1"));
+        }
+
+        @Test
+        void refreshGovernorLimitsFromWorkerKeepsCacheOnEmptyResponse() {
+            // Given - pre-populate cache
+            cacheManager.updateGovernorLimit("tenant-1", 100_000);
+
+            stubGovernorLimitsRefreshResponse(Mono.just(Map.of()));
+
+            // When
+            cacheManager.refreshGovernorLimitsFromWorker();
+
+            // Then - existing cache is preserved
+            assertEquals(Optional.of(100_000), cacheManager.getGovernorLimit("tenant-1"));
+        }
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────
 
     @SuppressWarnings("unchecked")
     private void stubRefreshResponse(Mono<Map<String, String>> response) {
         when(webClient.get()).thenReturn(requestHeadersUriSpec);
         when(requestHeadersUriSpec.uri("/internal/tenants/slug-map")).thenReturn(requestHeadersSpec);
+        when(requestHeadersSpec.retrieve()).thenReturn(responseSpec);
+        when(responseSpec.bodyToMono(any(ParameterizedTypeReference.class))).thenReturn(response);
+    }
+
+    @SuppressWarnings("unchecked")
+    private void stubGovernorLimitsRefreshResponse(Mono<Map<String, Integer>> response) {
+        when(webClient.get()).thenReturn(requestHeadersUriSpec);
+        when(requestHeadersUriSpec.uri("/internal/governor-limits")).thenReturn(requestHeadersSpec);
         when(requestHeadersSpec.retrieve()).thenReturn(responseSpec);
         when(responseSpec.bodyToMono(any(ParameterizedTypeReference.class))).thenReturn(response);
     }

@@ -23,25 +23,17 @@ const mockStatus = {
 }
 
 /**
- * Wrap the governor limits status object in a JSON:API list response.
- * The SDK's `governorLimits.getStatus()` calls `unwrapJsonApiList(response.data)`
- * and returns `items[0]`, so we need a JSON:API envelope.
+ * Wrap the governor limits status object in a JSON:API single-resource response.
+ * The SDK's `governorLimits.getStatus()` calls `unwrapJsonApiResource(response.data)`
+ * so we need a single-resource JSON:API envelope (not a list).
  */
 function toJsonApiGovernorLimitsResponse(status: typeof mockStatus) {
   return {
     data: {
-      data: [
-        {
-          type: 'governor-limits',
-          id: 'current',
-          attributes: { ...status },
-        },
-      ],
-      metadata: {
-        totalCount: 1,
-        currentPage: 0,
-        pageSize: 500,
-        totalPages: 1,
+      data: {
+        type: 'governor-limits',
+        id: 'current',
+        attributes: { ...status },
       },
     },
   }

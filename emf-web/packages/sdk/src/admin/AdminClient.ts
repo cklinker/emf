@@ -1201,8 +1201,7 @@ export class AdminClient {
   readonly governorLimits = {
     getStatus: async (): Promise<GovernorLimitsStatus> => {
       const response = await this.axios.get('/api/governor-limits');
-      const items = unwrapJsonApiList<GovernorLimitsStatus>(response.data);
-      return items[0] ?? ({} as GovernorLimitsStatus);
+      return unwrapJsonApiResource<GovernorLimitsStatus>(response.data);
     },
   };
 

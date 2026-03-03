@@ -1,6 +1,7 @@
 package com.emf.gateway.filter;
 
 import com.emf.gateway.cache.GatewayCacheManager;
+import com.emf.gateway.metrics.GatewayMetrics;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -54,6 +55,9 @@ class TenantSlugExtractionFilterTest {
 
     @Mock
     private WebFilterChain chain;
+
+    @Mock
+    private GatewayMetrics metrics;
 
     private GatewayCacheManager cacheManager;
 
@@ -426,7 +430,7 @@ class TenantSlugExtractionFilterTest {
     // --- Helpers ---
 
     private TenantSlugExtractionFilter createFilter(boolean enabled, boolean requirePrefix) {
-        return new TenantSlugExtractionFilter(cacheManager, enabled, requirePrefix, PLATFORM_PATHS);
+        return new TenantSlugExtractionFilter(cacheManager, metrics, enabled, requirePrefix, PLATFORM_PATHS);
     }
 
     @SuppressWarnings("unchecked")

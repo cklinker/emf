@@ -1,5 +1,7 @@
 package com.emf.gateway.auth;
 
+import com.emf.gateway.filter.TenantResolutionFilter;
+import com.emf.gateway.metrics.GatewayMetrics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
@@ -38,6 +40,7 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
     private final ReactiveJwtDecoder jwtDecoder;
     private final PrincipalExtractor principalExtractor;
     private final PublicPathMatcher publicPathMatcher;
+    private final GatewayMetrics metrics;
 
     /**
      * Creates a new JwtAuthenticationFilter.
@@ -45,12 +48,14 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
      * @param jwtDecoder the JWT decoder for validating tokens
      * @param principalExtractor the extractor for creating GatewayPrincipal from JWT
      * @param publicPathMatcher the matcher for public (unauthenticated) paths
+     * @param metrics the gateway metrics service
      */
     public JwtAuthenticationFilter(ReactiveJwtDecoder jwtDecoder, PrincipalExtractor principalExtractor,
-                                   PublicPathMatcher publicPathMatcher) {
+                                   PublicPathMatcher publicPathMatcher, GatewayMetrics metrics) {
         this.jwtDecoder = jwtDecoder;
         this.principalExtractor = principalExtractor;
         this.publicPathMatcher = publicPathMatcher;
+        this.metrics = metrics;
     }
     
     @Override
@@ -74,11 +79,13 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
         
         if (authHeader == null || authHeader.isEmpty()) {
             log.warn("Missing Authorization header for path: {}", path);
+            metrics.recordAuthFailure(TenantResolutionFilter.getTenantSlug(exchange), "missing_token");
             return unauthorized(exchange, "Missing Authorization header");
         }
-        
+
         if (!authHeader.startsWith(BEARER_PREFIX)) {
             log.warn("Invalid Authorization header format for path: {}", path);
+            metrics.recordAuthFailure(TenantResolutionFilter.getTenantSlug(exchange), "invalid_format");
             return unauthorized(exchange, "Invalid Authorization header format. Expected 'Bearer <token>'");
         }
         
@@ -101,15 +108,18 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
                     return chain.filter(mutatedExchange);
                 } catch (IllegalArgumentException e) {
                     log.error("Failed to extract principal from JWT for path: {}", path, e);
+                    metrics.recordAuthFailure(TenantResolutionFilter.getTenantSlug(exchange), "invalid_claims");
                     return unauthorized(exchange, "Invalid JWT claims: " + e.getMessage());
                 }
             })
             .onErrorResume(JwtException.class, e -> {
                 log.warn("JWT validation failed for path: {}: {}", path, e.getMessage());
+                metrics.recordAuthFailure(TenantResolutionFilter.getTenantSlug(exchange), "invalid_token");
                 return unauthorized(exchange, "Invalid or expired JWT token");
             })
             .onErrorResume(e -> {
                 log.error("Unexpected error during JWT validation for path: {}", path, e);
+                metrics.recordAuthFailure(TenantResolutionFilter.getTenantSlug(exchange), "invalid_token");
                 return unauthorized(exchange, "Authentication failed");
             });
     }

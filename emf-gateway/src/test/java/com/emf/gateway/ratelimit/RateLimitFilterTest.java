@@ -2,6 +2,7 @@ package com.emf.gateway.ratelimit;
 
 import com.emf.gateway.auth.GatewayPrincipal;
 import com.emf.gateway.cache.GatewayCacheManager;
+import com.emf.gateway.metrics.GatewayMetrics;
 import com.emf.gateway.route.RateLimitConfig;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -44,6 +45,9 @@ class RateLimitFilterTest {
     @Mock
     private WebClient webClient;
 
+    @Mock
+    private GatewayMetrics metrics;
+
     private GatewayCacheManager cacheManager;
     private RateLimitFilter filter;
 
@@ -55,7 +59,7 @@ class RateLimitFilterTest {
         when(webClientBuilder.build()).thenReturn(webClient);
 
         cacheManager = new GatewayCacheManager(webClientBuilder, "http://localhost:8080");
-        filter = new RateLimitFilter(rateLimiter, cacheManager);
+        filter = new RateLimitFilter(rateLimiter, cacheManager, metrics);
         lenient().when(chain.filter(any())).thenReturn(Mono.empty());
         lenient().when(rateLimiter.incrementDailyCounter(anyString())).thenReturn(Mono.empty());
     }

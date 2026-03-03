@@ -1,5 +1,7 @@
 package com.emf.gateway.error;
 
+import com.emf.gateway.filter.TenantResolutionFilter;
+import com.emf.gateway.metrics.GatewayMetrics;
 import com.emf.jsonapi.JsonApiError;
 import com.emf.jsonapi.JsonApiParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -49,9 +51,11 @@ public class GlobalErrorHandler implements ErrorWebExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(GlobalErrorHandler.class);
 
     private final ObjectMapper objectMapper;
+    private final GatewayMetrics metrics;
 
-    public GlobalErrorHandler(ObjectMapper objectMapper) {
+    public GlobalErrorHandler(ObjectMapper objectMapper, GatewayMetrics metrics) {
         this.objectMapper = objectMapper;
+        this.metrics = metrics;
         // Register JavaTimeModule to handle Java 8 date/time types
         this.objectMapper.registerModule(new JavaTimeModule());
     }
@@ -161,6 +165,10 @@ public class GlobalErrorHandler implements ErrorWebExceptionHandler {
             );
             log.error("Internal error for path: {}, correlationId: {}", path, correlationId, ex);
         }
+
+        // Record error metric
+        String tenantSlug = TenantResolutionFilter.getTenantSlug(exchange);
+        metrics.recordError(tenantSlug, String.valueOf(status.value()), error.getCode());
 
         // Set meta with timestamp, path, and correlationId
         Map<String, Object> meta = new LinkedHashMap<>();

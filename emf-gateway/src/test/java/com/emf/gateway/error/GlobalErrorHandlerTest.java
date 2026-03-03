@@ -1,5 +1,6 @@
 package com.emf.gateway.error;
 
+import com.emf.gateway.metrics.GatewayMetrics;
 import com.emf.jsonapi.JsonApiParser;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,11 +27,13 @@ class GlobalErrorHandlerTest {
 
     private GlobalErrorHandler errorHandler;
     private ObjectMapper objectMapper;
+    private GatewayMetrics metrics;
 
     @BeforeEach
     void setUp() {
         objectMapper = new ObjectMapper();
-        errorHandler = new GlobalErrorHandler(objectMapper);
+        metrics = org.mockito.Mockito.mock(GatewayMetrics.class);
+        errorHandler = new GlobalErrorHandler(objectMapper, metrics);
     }
 
     @Test

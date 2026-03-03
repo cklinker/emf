@@ -4,6 +4,7 @@ import com.emf.gateway.auth.GatewayPrincipal;
 import com.emf.gateway.auth.JwtAuthenticationFilter;
 import com.emf.gateway.cache.GatewayCacheManager;
 import com.emf.gateway.filter.TenantResolutionFilter;
+import com.emf.gateway.metrics.GatewayMetrics;
 import com.emf.gateway.route.RateLimitConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,17 +43,21 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
 
     private final RedisRateLimiter rateLimiter;
     private final GatewayCacheManager cacheManager;
+    private final GatewayMetrics metrics;
 
     /**
      * Creates a new RateLimitFilter.
      *
      * @param rateLimiter  the Redis-based rate limiter
      * @param cacheManager the gateway cache manager
+     * @param metrics      the gateway metrics service
      */
     public RateLimitFilter(RedisRateLimiter rateLimiter,
-                          GatewayCacheManager cacheManager) {
+                          GatewayCacheManager cacheManager,
+                          GatewayMetrics metrics) {
         this.rateLimiter = rateLimiter;
         this.cacheManager = cacheManager;
+        this.metrics = metrics;
     }
 
     @Override
@@ -85,12 +90,17 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
         // Check rate limit keyed by tenant (all users in a tenant share the limit)
         return rateLimiter.checkRateLimit(rateLimitKey, "tenant", config)
             .flatMap(result -> {
+                String tenantSlug = TenantResolutionFilter.getTenantSlug(exchange);
                 if (result.isAllowed()) {
                     // Request allowed - add rate limit headers and continue
                     log.debug("Rate limit check passed for tenant: {}, remaining: {}",
                         tenantId, result.getRemainingRequests());
 
                     addRateLimitHeaders(exchange, config, result);
+
+                    // Record rate limit remaining ratio metric
+                    metrics.recordRateLimitRemaining(tenantSlug,
+                            result.getRemainingRequests(), config.getRequestsPerWindow());
 
                     // Increment daily API call counter (fire-and-forget for the Governor Limits page)
                     rateLimiter.incrementDailyCounter(tenantId).subscribe();
@@ -100,6 +110,8 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
                     // Rate limit exceeded - return 429
                     log.warn("Rate limit exceeded for tenant: {}, principal: {}, retry after: {}",
                         tenantId, principal.getUsername(), result.getRetryAfter());
+
+                    metrics.recordRateLimitExceeded(tenantSlug);
 
                     return tooManyRequests(exchange, config, result);
                 }

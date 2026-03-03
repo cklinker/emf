@@ -1,6 +1,7 @@
 package com.emf.gateway.listener;
 
 import com.emf.gateway.authz.PermissionResolutionService;
+import com.emf.gateway.cache.GatewayCacheManager;
 import com.emf.gateway.route.RouteRegistry;
 import com.emf.runtime.event.ChangeType;
 import com.emf.runtime.event.EventFactory;
@@ -42,6 +43,9 @@ class SystemCollectionRouteListenerTest {
     @Mock
     private PermissionResolutionService permissionResolutionService;
 
+    @Mock
+    private GatewayCacheManager cacheManager;
+
     private ObjectMapper objectMapper;
     private SystemCollectionRouteListener listener;
 
@@ -51,7 +55,7 @@ class SystemCollectionRouteListenerTest {
         objectMapper.registerModule(new JavaTimeModule());
         listener = new SystemCollectionRouteListener(
                 routeRegistry, applicationEventPublisher, objectMapper,
-                permissionResolutionService
+                permissionResolutionService, cacheManager
         );
     }
 
@@ -201,12 +205,47 @@ class SystemCollectionRouteListenerTest {
         @DisplayName("Should work when permissionResolutionService is null")
         void shouldWorkWhenPermissionServiceIsNull() throws Exception {
             SystemCollectionRouteListener listenerNoPerms = new SystemCollectionRouteListener(
-                    routeRegistry, applicationEventPublisher, objectMapper, null
+                    routeRegistry, applicationEventPublisher, objectMapper, null, cacheManager
             );
 
             String message = createEventMessage("profiles", "profile-1", ChangeType.UPDATED);
 
             assertDoesNotThrow(() -> listenerNoPerms.onRecordChanged(message));
+        }
+    }
+
+    @Nested
+    @DisplayName("Governor Limit Cache Refresh Tests")
+    class GovernorLimitCacheTests {
+
+        @Test
+        @DisplayName("Should refresh governor limits when tenants collection changes")
+        void shouldRefreshGovernorLimitsOnTenantChange() throws Exception {
+            String message = createEventMessage("tenants", "tenant-1", ChangeType.UPDATED);
+
+            listener.onRecordChanged(message);
+
+            verify(cacheManager).refreshGovernorLimitsFromWorker();
+        }
+
+        @Test
+        @DisplayName("Should NOT refresh governor limits for non-tenant collections")
+        void shouldNotRefreshGovernorLimitsForNonTenantCollections() throws Exception {
+            String message = createEventMessage("products", "prod-1", ChangeType.UPDATED);
+
+            listener.onRecordChanged(message);
+
+            verify(cacheManager, never()).refreshGovernorLimitsFromWorker();
+        }
+
+        @Test
+        @DisplayName("Should NOT refresh governor limits for collections change")
+        void shouldNotRefreshGovernorLimitsForCollectionsChange() throws Exception {
+            String message = createEventMessage("collections", "col-1", ChangeType.UPDATED);
+
+            listener.onRecordChanged(message);
+
+            verify(cacheManager, never()).refreshGovernorLimitsFromWorker();
         }
     }
 

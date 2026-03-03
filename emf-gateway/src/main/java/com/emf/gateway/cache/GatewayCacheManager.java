@@ -211,4 +211,33 @@ public class GatewayCacheManager {
     public long governorLimitCacheSize() {
         return governorLimitCache.estimatedSize();
     }
+
+    /**
+     * Refreshes the governor limit cache from the worker service.
+     *
+     * <p>Called when a tenant record change event is received (e.g., governor
+     * limits updated via the admin UI). Fetches the lightweight governor-limits
+     * map from the worker's {@code /internal/governor-limits} endpoint and
+     * updates the cache.
+     */
+    public void refreshGovernorLimitsFromWorker() {
+        try {
+            Map<String, Integer> limitsMap = webClient.get()
+                    .uri("/internal/governor-limits")
+                    .retrieve()
+                    .bodyToMono(new ParameterizedTypeReference<Map<String, Integer>>() {})
+                    .block();
+
+            if (limitsMap != null && !limitsMap.isEmpty()) {
+                governorLimitCache.invalidateAll();
+                governorLimitCache.putAll(limitsMap);
+                log.info("Refreshed governor limit cache from worker: {} entries", limitsMap.size());
+            } else {
+                log.warn("Governor limits map returned empty; keeping existing cache ({} entries)",
+                        governorLimitCache.estimatedSize());
+            }
+        } catch (Exception e) {
+            log.warn("Failed to refresh governor limit cache from worker: {}", e.getMessage());
+        }
+    }
 }

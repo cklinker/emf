@@ -1,6 +1,10 @@
 package com.emf.worker.controller;
 
 import com.emf.jsonapi.JsonApiResponseBuilder;
+import com.emf.runtime.event.EventFactory;
+import com.emf.runtime.event.PlatformEvent;
+import com.emf.runtime.event.RecordChangedPayload;
+import com.emf.runtime.events.RecordEventPublisher;
 import com.emf.worker.repository.GovernorLimitsRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -12,6 +16,8 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.*;
+
+import static java.util.Collections.emptyList;
 
 /**
  * REST controller for the Governor Limits page.
@@ -44,12 +50,15 @@ public class GovernorLimitsController {
     private final GovernorLimitsRepository repository;
     private final ObjectMapper objectMapper;
     private final StringRedisTemplate redisTemplate;
+    private final RecordEventPublisher recordEventPublisher;
 
     public GovernorLimitsController(GovernorLimitsRepository repository, ObjectMapper objectMapper,
-                                     StringRedisTemplate redisTemplate) {
+                                     StringRedisTemplate redisTemplate,
+                                     RecordEventPublisher recordEventPublisher) {
         this.repository = repository;
         this.objectMapper = objectMapper;
         this.redisTemplate = redisTemplate;
+        this.recordEventPublisher = recordEventPublisher;
     }
 
     /**
@@ -110,12 +119,41 @@ public class GovernorLimitsController {
 
             log.info("Updated governor-limits for tenant {}", tenantId);
 
+            // Publish a record change event so the gateway refreshes its cache
+            publishTenantChangedEvent(tenantId, body);
+
             // Return the updated status (re-read to confirm)
             return getStatus(tenantId);
         } catch (Exception e) {
             log.error("Failed to update governor-limits for tenant {}: {}", tenantId, e.getMessage());
             return ResponseEntity.internalServerError().body(
                     JsonApiResponseBuilder.error("500", "Failed to update governor limits", e.getMessage()));
+        }
+    }
+
+    // =========================================================================
+    // Event publishing
+    // =========================================================================
+
+    /**
+     * Publishes a record change event for the tenant so the gateway
+     * can refresh its governor limit cache.
+     */
+    private void publishTenantChangedEvent(String tenantId, Map<String, Object> newLimits) {
+        try {
+            Map<String, Object> data = new LinkedHashMap<>();
+            data.put("limits", newLimits);
+
+            RecordChangedPayload payload = RecordChangedPayload.updated(
+                    "tenants", tenantId, data, null, List.of("limits"));
+
+            PlatformEvent<RecordChangedPayload> event = EventFactory.createRecordEvent(
+                    "record.updated", tenantId, null, payload);
+
+            recordEventPublisher.publish(event);
+        } catch (Exception e) {
+            log.warn("Failed to publish tenant change event for governor limits update (tenant {}): {}",
+                    tenantId, e.getMessage());
         }
     }
 
@@ -143,6 +181,19 @@ public class GovernorLimitsController {
             }
         } else if (limitsObj instanceof Map) {
             parsed = (Map<String, Object>) limitsObj;
+        } else {
+            // Handle PGobject and other types by converting to string first
+            String limitsStr = limitsObj.toString();
+            if (limitsStr != null && !limitsStr.isBlank()) {
+                try {
+                    parsed = objectMapper.readValue(limitsStr,
+                            objectMapper.getTypeFactory().constructMapType(
+                                    HashMap.class, String.class, Object.class));
+                } catch (Exception e) {
+                    log.warn("Failed to parse limits from {} for tenant {}: {}",
+                            limitsObj.getClass().getSimpleName(), tenantId, e.getMessage());
+                }
+            }
         }
 
         if (parsed == null || parsed.isEmpty()) {

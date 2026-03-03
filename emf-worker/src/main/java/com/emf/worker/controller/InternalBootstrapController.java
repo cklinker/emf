@@ -100,6 +100,33 @@ public class InternalBootstrapController {
     }
 
     /**
+     * Returns a lightweight governor limits map for periodic cache refresh.
+     *
+     * <p>Returns a simple map of tenantId to apiCallsPerDay. Used by the
+     * gateway's {@code GatewayCacheManager} to periodically refresh the
+     * governor limit cache without fetching the full bootstrap payload.
+     *
+     * @return map of tenantId to apiCallsPerDay
+     */
+    @GetMapping("/governor-limits")
+    public ResponseEntity<Map<String, Integer>> getGovernorLimitsMap() {
+        log.debug("REST request to get governor limits map");
+
+        Map<String, Map<String, Object>> fullLimits = loadGovernorLimits();
+
+        Map<String, Integer> limitsMap = new LinkedHashMap<>();
+        for (Map.Entry<String, Map<String, Object>> entry : fullLimits.entrySet()) {
+            Object apiCalls = entry.getValue().get("apiCallsPerDay");
+            if (apiCalls instanceof Number num) {
+                limitsMap.put(entry.getKey(), num.intValue());
+            }
+        }
+
+        log.info("Returning governor limits map with {} entries", limitsMap.size());
+        return ResponseEntity.ok(limitsMap);
+    }
+
+    /**
      * Looks up an OIDC provider by its issuer URI.
      *
      * <p>Returns the provider's JWKS URI and audience for JWT validation.
@@ -374,6 +401,23 @@ public class InternalBootstrapController {
                 Object apiCalls = limits.get("apiCallsPerDay");
                 if (apiCalls instanceof Number num) {
                     apiCallsPerDay = num.intValue();
+                }
+            } else if (limitsObj != null) {
+                // Handle PGobject and other types by converting to string first
+                String limitsStr = limitsObj.toString();
+                if (!limitsStr.isBlank()) {
+                    try {
+                        Map<String, Object> limits = objectMapper.readValue(limitsStr,
+                                objectMapper.getTypeFactory().constructMapType(
+                                        HashMap.class, String.class, Object.class));
+                        Object apiCalls = limits.get("apiCallsPerDay");
+                        if (apiCalls instanceof Number num) {
+                            apiCallsPerDay = num.intValue();
+                        }
+                    } catch (Exception e) {
+                        log.warn("Failed to parse limits from {} for tenant {}: {}",
+                                limitsObj.getClass().getSimpleName(), tenantId, e.getMessage());
+                    }
                 }
             }
 

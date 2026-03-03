@@ -1,5 +1,6 @@
 package com.emf.gateway.auth;
 
+import com.emf.gateway.metrics.GatewayMetrics;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -43,13 +44,16 @@ class JwtAuthenticationFilterTest {
     private PublicPathMatcher publicPathMatcher;
 
     @Mock
+    private GatewayMetrics metrics;
+
+    @Mock
     private GatewayFilterChain filterChain;
 
     private JwtAuthenticationFilter filter;
 
     @BeforeEach
     void setUp() {
-        filter = new JwtAuthenticationFilter(jwtDecoder, principalExtractor, publicPathMatcher);
+        filter = new JwtAuthenticationFilter(jwtDecoder, principalExtractor, publicPathMatcher, metrics);
 
         // Mock filter chain to return completed Mono (lenient to avoid unnecessary stubbing errors)
         lenient().when(filterChain.filter(any(ServerWebExchange.class))).thenReturn(Mono.empty());

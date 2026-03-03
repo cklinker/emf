@@ -1,6 +1,7 @@
 package com.emf.gateway.filter;
 
 import com.emf.gateway.cache.GatewayCacheManager;
+import com.emf.gateway.metrics.GatewayMetrics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -45,16 +46,19 @@ public class TenantSlugExtractionFilter implements WebFilter, Ordered {
     private static final Pattern SLUG_PATTERN = Pattern.compile("^[a-z][a-z0-9-]{1,61}[a-z0-9]$");
 
     private final GatewayCacheManager cacheManager;
+    private final GatewayMetrics metrics;
     private final boolean enabled;
     private final boolean requirePrefix;
     private final List<String> platformPaths;
 
     public TenantSlugExtractionFilter(
             GatewayCacheManager cacheManager,
+            GatewayMetrics metrics,
             @Value("${emf.gateway.tenant-slug.enabled:true}") boolean enabled,
             @Value("${emf.gateway.tenant-slug.require-prefix:false}") boolean requirePrefix,
             @Value("${emf.gateway.tenant-slug.platform-paths:/actuator,/platform}") List<String> platformPaths) {
         this.cacheManager = cacheManager;
+        this.metrics = metrics;
         this.enabled = enabled;
         this.requirePrefix = requirePrefix;
         this.platformPaths = platformPaths;
@@ -108,6 +112,7 @@ public class TenantSlugExtractionFilter implements WebFilter, Ordered {
         // Resolve slug to tenant ID
         Optional<String> tenantId = cacheManager.resolveTenantSlug(firstSegment);
         if (tenantId.isEmpty()) {
+            metrics.recordTenantResolution("slug", "not_found");
             if (requirePrefix) {
                 return notFound(exchange, "Tenant not found: " + firstSegment);
             }
@@ -116,6 +121,7 @@ public class TenantSlugExtractionFilter implements WebFilter, Ordered {
             // TenantResolutionFilter or worker will resolve tenant from headers.
             log.warn("Slug '{}' matches pattern but is not in cache; stripping path but no tenant context set", firstSegment);
         } else {
+            metrics.recordTenantResolution("slug", "success");
             // Set tenant context on exchange attributes
             exchange.getAttributes().put(TenantResolutionFilter.TENANT_ID_ATTR, tenantId.get());
             log.debug("Resolved tenant slug '{}' (id={}), rewriting path '{}' → '{}'",

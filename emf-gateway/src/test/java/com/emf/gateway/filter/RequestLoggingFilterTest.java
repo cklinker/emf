@@ -1,5 +1,6 @@
 package com.emf.gateway.filter;
 
+import com.emf.gateway.metrics.GatewayMetrics;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -33,12 +34,15 @@ class RequestLoggingFilterTest {
     
     @Mock
     private GatewayFilterChain filterChain;
-    
+
+    @Mock
+    private GatewayMetrics metrics;
+
     private RequestLoggingFilter loggingFilter;
     
     @BeforeEach
     void setUp() {
-        loggingFilter = new RequestLoggingFilter();
+        loggingFilter = new RequestLoggingFilter(metrics);
     }
     
     @Test

@@ -1,5 +1,6 @@
 package com.emf.gateway.authz;
 
+import com.emf.gateway.metrics.GatewayMetrics;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
@@ -37,6 +38,9 @@ class PermissionResolutionServiceTest {
     @Mock
     private ReactiveValueOperations<String, String> valueOps;
 
+    @Mock
+    private GatewayMetrics metrics;
+
     private ObjectMapper objectMapper;
     private MockWebServer mockWebServer;
     private PermissionResolutionService service;
@@ -60,7 +64,8 @@ class PermissionResolutionServiceTest {
                 WebClient.builder(),
                 objectMapper,
                 workerUrl,
-                5
+                5,
+                metrics
         );
     }
 

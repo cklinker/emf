@@ -2,6 +2,7 @@ package com.emf.gateway.authz;
 
 import com.emf.gateway.auth.GatewayPrincipal;
 import com.emf.gateway.auth.PublicPathMatcher;
+import com.emf.gateway.metrics.GatewayMetrics;
 import com.emf.gateway.route.RouteDefinition;
 import com.emf.gateway.route.RouteRegistry;
 import org.junit.jupiter.api.BeforeEach;
@@ -47,6 +48,9 @@ class RouteAuthorizationFilterTest {
     private PublicPathMatcher publicPathMatcher;
 
     @Mock
+    private GatewayMetrics metrics;
+
+    @Mock
     private GatewayFilterChain filterChain;
 
     @BeforeEach
@@ -57,7 +61,7 @@ class RouteAuthorizationFilterTest {
 
     @Test
     void shouldHaveOrderZero() {
-        RouteAuthorizationFilter filter = new RouteAuthorizationFilter(routeRegistry, false, publicPathMatcher);
+        RouteAuthorizationFilter filter = new RouteAuthorizationFilter(routeRegistry, false, publicPathMatcher, metrics);
         assertThat(filter.getOrder()).isEqualTo(0);
     }
 
@@ -73,7 +77,7 @@ class RouteAuthorizationFilterTest {
 
         @BeforeEach
         void setUp() {
-            filter = new RouteAuthorizationFilter(routeRegistry, false, publicPathMatcher);
+            filter = new RouteAuthorizationFilter(routeRegistry, false, publicPathMatcher, metrics);
         }
 
         @Test
@@ -165,7 +169,7 @@ class RouteAuthorizationFilterTest {
 
         @BeforeEach
         void setUp() {
-            filter = new RouteAuthorizationFilter(routeRegistry, true, publicPathMatcher);
+            filter = new RouteAuthorizationFilter(routeRegistry, true, publicPathMatcher, metrics);
         }
 
         @Test

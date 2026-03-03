@@ -1,5 +1,6 @@
 package com.emf.gateway.authz;
 
+import com.emf.gateway.metrics.GatewayMetrics;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -13,6 +14,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -37,17 +39,20 @@ public class PermissionResolutionService {
     private final WebClient webClient;
     private final ObjectMapper objectMapper;
     private final Duration cacheTtl;
+    private final GatewayMetrics metrics;
 
     public PermissionResolutionService(
             ReactiveRedisTemplate<String, String> redisTemplate,
             WebClient.Builder webClientBuilder,
             ObjectMapper objectMapper,
             @Value("${emf.gateway.worker-service-url:http://emf-worker:80}") String workerServiceUrl,
-            @Value("${emf.gateway.security.permissions-cache-ttl-minutes:5}") int cacheTtlMinutes) {
+            @Value("${emf.gateway.security.permissions-cache-ttl-minutes:5}") int cacheTtlMinutes,
+            GatewayMetrics metrics) {
         this.redisTemplate = redisTemplate;
         this.webClient = webClientBuilder.baseUrl(workerServiceUrl).build();
         this.objectMapper = objectMapper;
         this.cacheTtl = Duration.ofMinutes(cacheTtlMinutes);
+        this.metrics = metrics;
     }
 
     /**
@@ -60,11 +65,16 @@ public class PermissionResolutionService {
      */
     public Mono<ResolvedPermissions> resolvePermissions(String tenantId, String email) {
         String cacheKey = CACHE_KEY_PREFIX + tenantId + ":" + email;
+        Instant start = Instant.now();
 
         return redisTemplate.opsForValue().get(cacheKey)
-                .flatMap(this::deserialize)
+                .flatMap(json -> {
+                    metrics.recordPermissionResolve(tenantId, "cache", Duration.between(start, Instant.now()));
+                    return deserialize(json);
+                })
                 .switchIfEmpty(
                         fetchFromWorker(tenantId, email)
+                                .doOnNext(p -> metrics.recordPermissionResolve(tenantId, "worker", Duration.between(start, Instant.now())))
                                 .flatMap(perms -> cacheAndReturn(cacheKey, perms))
                 )
                 .onErrorResume(e -> {

@@ -3,6 +3,9 @@ package com.emf.gateway.authz;
 import com.emf.gateway.auth.GatewayPrincipal;
 import com.emf.gateway.auth.JwtAuthenticationFilter;
 import com.emf.gateway.auth.PublicPathMatcher;
+import com.emf.gateway.filter.RequestLoggingFilter;
+import com.emf.gateway.filter.TenantResolutionFilter;
+import com.emf.gateway.metrics.GatewayMetrics;
 import com.emf.gateway.route.RouteDefinition;
 import com.emf.gateway.route.RouteRegistry;
 import org.slf4j.Logger;
@@ -48,14 +51,17 @@ public class RouteAuthorizationFilter implements GlobalFilter, Ordered {
     private final RouteRegistry routeRegistry;
     private final boolean permissionsEnabled;
     private final PublicPathMatcher publicPathMatcher;
+    private final GatewayMetrics metrics;
 
     public RouteAuthorizationFilter(
             RouteRegistry routeRegistry,
             @Value("${emf.gateway.security.permissions-enabled:false}") boolean permissionsEnabled,
-            PublicPathMatcher publicPathMatcher) {
+            PublicPathMatcher publicPathMatcher,
+            GatewayMetrics metrics) {
         this.routeRegistry = routeRegistry;
         this.permissionsEnabled = permissionsEnabled;
         this.publicPathMatcher = publicPathMatcher;
+        this.metrics = metrics;
     }
 
     @Override
@@ -71,6 +77,9 @@ public class RouteAuthorizationFilter implements GlobalFilter, Ordered {
 
         if (principal == null) {
             log.warn("No principal found in exchange for path: {}", path);
+            String tenantSlug = TenantResolutionFilter.getTenantSlug(exchange);
+            String method = exchange.getRequest().getMethod() != null ? exchange.getRequest().getMethod().name() : "unknown";
+            metrics.recordAuthzDenied(tenantSlug, "unknown", method);
             return forbidden(exchange, "Authentication required");
         }
 
@@ -78,6 +87,8 @@ public class RouteAuthorizationFilter implements GlobalFilter, Ordered {
 
         // If permissions enforcement is disabled, allow all authenticated users
         if (!permissionsEnabled) {
+            // Still set route attribute for metrics if we can find the route
+            setRouteAttribute(exchange, path);
             return chain.filter(exchange);
         }
 
@@ -95,17 +106,22 @@ public class RouteAuthorizationFilter implements GlobalFilter, Ordered {
         ResolvedPermissions permissions = PermissionResolutionFilter.getPermissions(exchange);
         if (permissions == null) {
             // No permissions resolved (error or no tenant context) — fail-open
+            setRouteAttribute(exchange, path);
             return chain.filter(exchange);
         }
 
         // All-permissive bypasses all checks (platform admin, disabled, error fallback)
         if (permissions.isAllPermissive()) {
+            setRouteAttribute(exchange, path);
             return chain.filter(exchange);
         }
 
         // Check API_ACCESS system permission
         if (!permissions.hasSystemPermission("API_ACCESS")) {
             log.warn("User denied API access (no API_ACCESS permission) for path: {}", path);
+            String tenantSlug = TenantResolutionFilter.getTenantSlug(exchange);
+            String method = exchange.getRequest().getMethod() != null ? exchange.getRequest().getMethod().name() : "unknown";
+            metrics.recordAuthzDenied(tenantSlug, "unknown", method);
             return forbidden(exchange, "API access not permitted");
         }
 
@@ -121,6 +137,9 @@ public class RouteAuthorizationFilter implements GlobalFilter, Ordered {
         ObjectPermissions objPerms = permissions.getObjectPermissions(collectionId);
         HttpMethod method = exchange.getRequest().getMethod();
 
+        // Set route attribute for RequestLoggingFilter metrics
+        exchange.getAttributes().put(RequestLoggingFilter.ROUTE_ATTR, collectionName);
+
         boolean allowed = isAllowed(method, objPerms);
 
         // System permission overrides
@@ -135,11 +154,26 @@ public class RouteAuthorizationFilter implements GlobalFilter, Ordered {
         if (!allowed) {
             log.warn("User denied {} on collection '{}' (id={}): insufficient object permissions",
                     method, collectionName, collectionId);
+            String tenantSlug = TenantResolutionFilter.getTenantSlug(exchange);
+            String methodStr = method != null ? method.name() : "unknown";
+            metrics.recordAuthzDenied(tenantSlug, collectionName, methodStr);
             return forbidden(exchange,
                     "Insufficient permissions for " + method + " on " + collectionName);
         }
 
         return chain.filter(exchange);
+    }
+
+    /**
+     * Sets the route attribute on the exchange for downstream metric recording.
+     * Looks up the route by path and stores the collection name.
+     */
+    private void setRouteAttribute(ServerWebExchange exchange, String path) {
+        if (path != null && path.startsWith("/api/")) {
+            routeRegistry.findByPath(path)
+                    .ifPresent(route -> exchange.getAttributes()
+                            .put(RequestLoggingFilter.ROUTE_ATTR, route.getCollectionName()));
+        }
     }
 
     private boolean isAllowed(HttpMethod method, ObjectPermissions perms) {

@@ -18,7 +18,7 @@ import java.util.*;
  *
  * <p>Provides endpoints for range queries (chart data) and instant queries
  * (summary cards). All queries are scoped to the tenant from the
- * {@code X-Tenant-ID} header.
+ * {@code X-Tenant-Slug} header.
  *
  * <p>Returns JSON:API format consistent with other collection endpoints.
  *
@@ -39,7 +39,7 @@ public class MetricsController {
     /**
      * Range query endpoint for chart data.
      *
-     * @param tenantId the tenant ID from the gateway's X-Tenant-ID header
+     * @param tenantSlug the tenant slug from the gateway's X-Tenant-Slug header
      * @param metric   the metric type (e.g., "requests", "latency_p50", "errors")
      * @param start    start time as ISO-8601 instant
      * @param end      end time as ISO-8601 instant
@@ -49,7 +49,7 @@ public class MetricsController {
      */
     @GetMapping("/query")
     public ResponseEntity<Map<String, Object>> query(
-            @RequestHeader("X-Tenant-ID") String tenantId,
+            @RequestHeader("X-Tenant-Slug") String tenantSlug,
             @RequestParam String metric,
             @RequestParam String start,
             @RequestParam String end,
@@ -57,7 +57,7 @@ public class MetricsController {
             @RequestParam(required = false) String route) {
 
         log.debug("Metrics query: tenant={}, metric={}, start={}, end={}, step={}, route={}",
-                tenantId, metric, start, end, step, route);
+                tenantSlug, metric, start, end, step, route);
 
         Instant startInstant;
         Instant endInstant;
@@ -74,7 +74,7 @@ public class MetricsController {
             step = calculateStep(startInstant, endInstant);
         }
 
-        String promql = buildPromQL(metric, tenantId, route);
+        String promql = buildPromQL(metric, tenantSlug, route);
         if (promql == null) {
             return ResponseEntity.badRequest().body(
                     JsonApiResponseBuilder.error("400", "Bad Request",
@@ -113,33 +113,33 @@ public class MetricsController {
     /**
      * Summary endpoint for dashboard cards (instant query).
      *
-     * @param tenantId the tenant ID from the gateway's X-Tenant-ID header
+     * @param tenantSlug the tenant slug from the gateway's X-Tenant-Slug header
      * @return JSON:API single resource with summary metrics
      */
     @GetMapping("/summary")
     public ResponseEntity<Map<String, Object>> summary(
-            @RequestHeader("X-Tenant-ID") String tenantId) {
+            @RequestHeader("X-Tenant-Slug") String tenantSlug) {
 
-        log.debug("Metrics summary for tenant={}", tenantId);
+        log.debug("Metrics summary for tenant={}", tenantSlug);
 
         // Total requests today (sum of request count over last 24h)
         double totalRequests = queryScalar(
-                String.format("sum(increase(emf_gateway_requests_seconds_count{tenant=\"%s\"}[24h]))", tenantId));
+                String.format("sum(increase(emf_gateway_requests_seconds_count{tenant=\"%s\"}[24h]))", tenantSlug));
 
         // Error rate (errors / total requests * 100)
         double totalErrors = queryScalar(
-                String.format("sum(increase(emf_gateway_errors_total{tenant=\"%s\"}[24h]))", tenantId));
+                String.format("sum(increase(emf_gateway_errors_total{tenant=\"%s\"}[24h]))", tenantSlug));
         double errorRate = totalRequests > 0 ? (totalErrors / totalRequests) * 100 : 0;
 
         // Average latency (ms)
         double avgLatencySeconds = queryScalar(
                 String.format("sum(rate(emf_gateway_requests_seconds_sum{tenant=\"%s\"}[5m])) / " +
-                        "sum(rate(emf_gateway_requests_seconds_count{tenant=\"%s\"}[5m]))", tenantId, tenantId));
+                        "sum(rate(emf_gateway_requests_seconds_count{tenant=\"%s\"}[5m]))", tenantSlug, tenantSlug));
         double avgLatencyMs = avgLatencySeconds * 1000;
 
         // Active requests
         double activeRequests = queryScalar(
-                String.format("sum(emf_gateway_requests_active{tenant=\"%s\"})", tenantId));
+                String.format("sum(emf_gateway_requests_active{tenant=\"%s\"})", tenantSlug));
 
         Map<String, Object> attributes = new LinkedHashMap<>();
         attributes.put("totalRequests", Math.round(totalRequests));
@@ -158,48 +158,48 @@ public class MetricsController {
      * Builds a PromQL expression for the given metric type and tenant.
      *
      * @param metric   the metric name
-     * @param tenantId the tenant ID
+     * @param tenantSlug the tenant slug
      * @param route    optional route filter
      * @return PromQL string, or null if the metric type is unknown
      */
-    String buildPromQL(String metric, String tenantId, String route) {
+    String buildPromQL(String metric, String tenantSlug, String route) {
         String routeFilter = (route != null && !route.isBlank())
                 ? String.format(",route=\"%s\"", route) : "";
 
         return switch (metric) {
             case "requests" ->
                     String.format("sum(rate(emf_gateway_requests_seconds_count{tenant=\"%s\"%s}[5m])) by (status)",
-                            tenantId, routeFilter);
+                            tenantSlug, routeFilter);
             case "requests_by_route" ->
                     String.format("sum(rate(emf_gateway_requests_seconds_count{tenant=\"%s\"}[5m])) by (route)",
-                            tenantId);
+                            tenantSlug);
             case "errors" ->
                     String.format("sum(rate(emf_gateway_errors_total{tenant=\"%s\"%s}[5m])) by (error_code)",
-                            tenantId, routeFilter);
+                            tenantSlug, routeFilter);
             case "latency_p50" ->
                     String.format("histogram_quantile(0.50, sum(rate(emf_gateway_requests_seconds_bucket{tenant=\"%s\"%s}[5m])) by (le))",
-                            tenantId, routeFilter);
+                            tenantSlug, routeFilter);
             case "latency_p95" ->
                     String.format("histogram_quantile(0.95, sum(rate(emf_gateway_requests_seconds_bucket{tenant=\"%s\"%s}[5m])) by (le))",
-                            tenantId, routeFilter);
+                            tenantSlug, routeFilter);
             case "latency_p99" ->
                     String.format("histogram_quantile(0.99, sum(rate(emf_gateway_requests_seconds_bucket{tenant=\"%s\"%s}[5m])) by (le))",
-                            tenantId, routeFilter);
+                            tenantSlug, routeFilter);
             case "latency_avg" ->
                     String.format("sum(rate(emf_gateway_requests_seconds_sum{tenant=\"%s\"%s}[5m])) / " +
                                     "sum(rate(emf_gateway_requests_seconds_count{tenant=\"%s\"%s}[5m]))",
-                            tenantId, routeFilter, tenantId, routeFilter);
+                            tenantSlug, routeFilter, tenantSlug, routeFilter);
             case "auth_failures" ->
                     String.format("sum(rate(emf_gateway_auth_failures_total{tenant=\"%s\"}[5m])) by (reason)",
-                            tenantId);
+                            tenantSlug);
             case "rate_limit" ->
                     String.format("sum(rate(emf_gateway_ratelimit_exceeded_total{tenant=\"%s\"}[5m]))",
-                            tenantId);
+                            tenantSlug);
             case "active_requests" ->
-                    String.format("emf_gateway_requests_active{tenant=\"%s\"}", tenantId);
+                    String.format("emf_gateway_requests_active{tenant=\"%s\"}", tenantSlug);
             case "authz_denied" ->
                     String.format("sum(rate(emf_gateway_authz_denied_total{tenant=\"%s\"}[5m])) by (route)",
-                            tenantId);
+                            tenantSlug);
             default -> null;
         };
     }

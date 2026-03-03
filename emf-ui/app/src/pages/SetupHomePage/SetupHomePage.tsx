@@ -270,6 +270,12 @@ const CATEGORIES: SetupCategory[] = [
         permission: 'VIEW_SETUP',
       },
       {
+        name: 'Metrics',
+        path: '/metrics',
+        description: 'View tenant request metrics and performance',
+        permission: 'VIEW_SETUP',
+      },
+      {
         name: 'Tenants',
         path: '/tenants',
         description: 'Platform-level tenant management',

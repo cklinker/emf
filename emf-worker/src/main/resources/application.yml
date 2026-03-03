@@ -33,6 +33,8 @@ spring:
 emf:
   worker:
     id: ${WORKER_ID:}
+  prometheus:
+    url: ${PROMETHEUS_URL:http://prometheus.prometheus.svc.cluster.local:9090}
   storage:
     mode: PHYSICAL_TABLES
     s3:

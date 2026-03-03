@@ -103,6 +103,12 @@ management:
       enabled: true
     kafka:
       enabled: true
+  metrics:
+    distribution:
+      percentiles-histogram:
+        emf.gateway.requests: true
+      percentiles:
+        emf.gateway.requests: 0.5,0.95,0.99
 
 # Logging configuration
 logging:

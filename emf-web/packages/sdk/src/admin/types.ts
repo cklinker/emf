@@ -1656,3 +1656,40 @@ export interface CompositeSubResponse {
 export interface CompositeResponse {
   compositeResponse: CompositeSubResponse[];
 }
+
+// ---------------------------------------------------------------------------
+// Metrics
+// ---------------------------------------------------------------------------
+
+export interface MetricsQueryParams {
+  metric: string;
+  start: string;
+  end: string;
+  step?: string;
+  route?: string;
+}
+
+export interface MetricsDataPoint {
+  timestamp: number;
+  value: number;
+}
+
+export interface MetricsTimeSeries {
+  labels: Record<string, string>;
+  dataPoints: MetricsDataPoint[];
+}
+
+export interface MetricsQueryResult {
+  metric: string;
+  start: string;
+  end: string;
+  step: string;
+  series: MetricsTimeSeries[];
+}
+
+export interface MetricsSummary {
+  totalRequests: number;
+  errorRate: number;
+  avgLatencyMs: number;
+  activeRequests: number;
+}

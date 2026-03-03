@@ -100,6 +100,9 @@ import type {
   CreateBulkJobRequest,
   CompositeRequest,
   CompositeResponse,
+  MetricsQueryParams,
+  MetricsQueryResult,
+  MetricsSummary,
 } from './types';
 import {
   toJsonApiBody,
@@ -1898,6 +1901,28 @@ export class AdminClient {
   readonly composite = {
     execute: (_tenantId: string, _request: CompositeRequest): Promise<CompositeResponse> => {
       throw new Error('Composite API is temporarily unavailable');
+    },
+  };
+
+  // ---------------------------------------------------------------------------
+  // Metrics
+  // ---------------------------------------------------------------------------
+
+  readonly metrics = {
+    query: async (params: MetricsQueryParams): Promise<MetricsQueryResult> => {
+      const qs = new URLSearchParams();
+      qs.set('metric', params.metric);
+      qs.set('start', params.start);
+      qs.set('end', params.end);
+      if (params.step) qs.set('step', params.step);
+      if (params.route) qs.set('route', params.route);
+      const response = await this.axios.get(`/api/metrics/query?${qs.toString()}`);
+      return unwrapJsonApiResource<MetricsQueryResult>(response.data);
+    },
+
+    summary: async (): Promise<MetricsSummary> => {
+      const response = await this.axios.get('/api/metrics/summary');
+      return unwrapJsonApiResource<MetricsSummary>(response.data);
     },
   };
 }

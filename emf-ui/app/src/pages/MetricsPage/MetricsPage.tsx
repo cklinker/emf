@@ -146,6 +146,35 @@ function mergeSeriesData(
   return Array.from(pointMap.values()).sort((a, b) => a.timestamp - b.timestamp)
 }
 
+/** Generate zero-filled data points spanning the time range when no real data exists */
+function generateZeroFilledData(
+  startIso: string,
+  endIso: string,
+  metricNames: string[]
+): { timestamp: number; [key: string]: number }[] {
+  const startSec = Math.floor(new Date(startIso).getTime() / 1000)
+  const endSec = Math.floor(new Date(endIso).getTime() / 1000)
+  const durationSec = endSec - startSec
+
+  // Mirror the backend step calculation
+  let stepSec: number
+  if (durationSec <= 3600) stepSec = 60
+  else if (durationSec <= 21600) stepSec = 300
+  else if (durationSec <= 86400) stepSec = 900
+  else if (durationSec <= 604800) stepSec = 3600
+  else stepSec = 14400
+
+  const points: { timestamp: number; [key: string]: number }[] = []
+  for (let ts = startSec; ts <= endSec; ts += stepSec) {
+    const point: Record<string, number> = { timestamp: ts }
+    for (const name of metricNames) {
+      point[name] = 0
+    }
+    points.push(point)
+  }
+  return points
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -371,11 +400,18 @@ function MetricsChartWithQuery({
     refetchInterval: 60000,
   })
 
+  const chartData = useMemo(() => {
+    if (!data || data.length === 0) {
+      return generateZeroFilledData(start, end, config.metrics)
+    }
+    return data
+  }, [data, start, end, config.metrics])
+
   return (
     <ChartPanel
       testId={`metrics-chart-${config.id}`}
       title={t(config.titleKey)}
-      data={data ?? []}
+      data={chartData}
       isLoading={isLoading}
       type={config.type}
       unit={config.unit}
@@ -417,10 +453,6 @@ function ChartPanel({
       {isLoading ? (
         <div className="flex h-[250px] items-center justify-center">
           <LoadingSpinner />
-        </div>
-      ) : data.length === 0 ? (
-        <div className="flex h-[250px] items-center justify-center text-sm text-muted-foreground">
-          No data available
         </div>
       ) : (
         <ResponsiveContainer width="100%" height={250}>

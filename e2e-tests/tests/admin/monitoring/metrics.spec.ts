@@ -56,7 +56,7 @@ test.describe("Metrics Page", () => {
     await page.waitForLoadState("networkidle");
 
     // Click the Metrics item in the platform section
-    await page.getByText("Metrics").click();
+    await page.getByText("Metrics", { exact: true }).click();
     await page.waitForURL(`**/${tenantSlug}/metrics`);
 
     const heading = page.getByRole("heading", { name: /metrics/i });

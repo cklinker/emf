@@ -166,6 +166,7 @@ public class RouteConfigService {
         String[][] staticRoutes = {
                 {"governor-limits", "/api/governor-limits/**", "governor-limits"},
                 {"modules", "/api/modules/**", "modules"},
+                {"metrics", "/api/metrics/**", "metrics"},
         };
 
         for (String[] routeDef : staticRoutes) {

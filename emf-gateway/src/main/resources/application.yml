@@ -41,7 +41,6 @@ spring:
   cloud:
     gateway:
       default-filters:
-        - name: RequestTime
         - name: RequestSize
           args:
             maxSize: 10MB          # Default 10 MB request body limit

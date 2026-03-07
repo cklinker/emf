@@ -494,28 +494,28 @@ export function FieldEditor({
         }
       }
 
-      // Build fieldTypeConfig JSON for type-specific settings
-      let fieldTypeConfig: string | undefined = undefined
+      // Build fieldTypeConfig object for type-specific settings
+      let fieldTypeConfig: Record<string, unknown> | undefined = undefined
       if (data.type === 'auto_number') {
         const config: Record<string, unknown> = {}
         if (data.autoNumberPrefix) config.prefix = data.autoNumberPrefix
         if (data.autoNumberPadding !== undefined) config.padding = data.autoNumberPadding
-        if (Object.keys(config).length > 0) fieldTypeConfig = JSON.stringify(config)
+        if (Object.keys(config).length > 0) fieldTypeConfig = config
       } else if (data.type === 'currency') {
         const config: Record<string, unknown> = {}
         if (data.currencyCode) config.currencyCode = data.currencyCode
         if (data.currencyPrecision !== undefined) config.precision = data.currencyPrecision
-        if (Object.keys(config).length > 0) fieldTypeConfig = JSON.stringify(config)
+        if (Object.keys(config).length > 0) fieldTypeConfig = config
       } else if (data.type === 'picklist' || data.type === 'multi_picklist') {
         if (data.globalPicklistId) {
-          fieldTypeConfig = JSON.stringify({ globalPicklistId: data.globalPicklistId })
+          fieldTypeConfig = { globalPicklistId: data.globalPicklistId }
         }
       }
 
       const needsReferenceTarget = data.type === 'master_detail'
 
-      // Map validation rules to constraints JSON for backend
-      let constraints: string | undefined = undefined
+      // Map validation rules to constraints object for backend
+      let constraints: Record<string, unknown> | undefined = undefined
       if (validationRules.length > 0) {
         const constraintObj: Record<string, unknown> = {}
         for (const rule of validationRules) {
@@ -526,7 +526,7 @@ export function FieldEditor({
           else if (rule.type === 'email') constraintObj.email = true
           else if (rule.type === 'url') constraintObj.url = true
         }
-        if (Object.keys(constraintObj).length > 0) constraints = JSON.stringify(constraintObj)
+        if (Object.keys(constraintObj).length > 0) constraints = constraintObj
       }
 
       const fieldData: FieldDefinition = {

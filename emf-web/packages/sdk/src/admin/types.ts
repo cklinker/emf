@@ -638,7 +638,7 @@ export interface RoleHierarchyNode {
  */
 export interface SetupAuditTrailEntry {
   id: string;
-  userId: string;
+  userId: string | null;
   action: 'CREATED' | 'UPDATED' | 'DELETED' | 'ACTIVATED' | 'DEACTIVATED';
   section: string;
   entityType: string;

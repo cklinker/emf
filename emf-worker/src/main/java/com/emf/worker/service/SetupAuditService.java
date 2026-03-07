@@ -48,15 +48,12 @@ public class SetupAuditService {
             String id = UUID.randomUUID().toString();
             Timestamp now = Timestamp.from(Instant.now());
 
-            // Use a safe userId fallback — the table requires non-null user_id
-            String safeUserId = userId != null ? userId : "system";
-
             jdbcTemplate.update(
                     "INSERT INTO setup_audit_trail " +
                             "(id, tenant_id, user_id, action, section, entity_type, entity_id, entity_name, " +
                             "old_value, new_value, timestamp, created_at, updated_at) " +
                             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?, ?, ?)",
-                    id, tenantId, safeUserId, action, section, entityType, entityId, entityName,
+                    id, tenantId, userId, action, section, entityType, entityId, entityName,
                     oldValue, newValue, now, now, now);
 
             log.debug("Setup audit logged: {} {} {} {} in tenant {}", action, entityType, entityId, entityName, tenantId);

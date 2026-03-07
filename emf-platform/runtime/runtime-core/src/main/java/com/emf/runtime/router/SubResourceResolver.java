@@ -87,6 +87,7 @@ public final class SubResourceResolver {
             CollectionDefinition childDef) {
 
         List<SubResourceRelation> results = new ArrayList<>();
+        java.util.Set<String> matchedFieldNames = new java.util.HashSet<>();
 
         for (FieldDefinition field : childDef.fields()) {
             if (field.referenceConfig() != null
@@ -96,6 +97,19 @@ public final class SubResourceResolver {
                         parentDef,
                         childDef
                 ));
+                matchedFieldNames.add(field.name());
+            }
+        }
+
+        // System audit fields (created_by, updated_by) implicitly reference the
+        // "users" collection but are not present in the field definitions. Add them
+        // so that ?include=users resolves the user display names for audit fields.
+        if ("users".equals(parentDef.name())) {
+            if (!matchedFieldNames.contains("createdBy")) {
+                results.add(new SubResourceRelation("createdBy", parentDef, childDef));
+            }
+            if (!matchedFieldNames.contains("updatedBy")) {
+                results.add(new SubResourceRelation("updatedBy", parentDef, childDef));
             }
         }
 

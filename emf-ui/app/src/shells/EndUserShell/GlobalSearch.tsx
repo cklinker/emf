@@ -182,7 +182,7 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps): React.R
   const basePath = `/${tenantSlug}/app`
 
   return (
-    <CommandDialog open={open} onOpenChange={handleOpenChange}>
+    <CommandDialog open={open} onOpenChange={handleOpenChange} shouldFilter={false}>
       <CommandInput
         placeholder="Search records, collections, pages..."
         value={query}

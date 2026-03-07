@@ -93,6 +93,7 @@ export interface FieldDefinition {
   order: number
   description?: string
   trackHistory?: boolean
+  searchable?: boolean
   constraints?: string
 }
 
@@ -256,6 +257,7 @@ export const fieldEditorSchema = z
     globalPicklistId: z.string().optional().or(z.literal('')),
     description: z.string().max(500, 'validation.descriptionTooLong').optional().or(z.literal('')),
     trackHistory: z.boolean(),
+    searchable: z.boolean(),
     validationRules: z.array(validationRuleSchema).optional(),
   })
   .refine(
@@ -375,6 +377,7 @@ export function FieldEditor({
       globalPicklistId: (parsedConfig.globalPicklistId as string) ?? '',
       description: field?.description ?? '',
       trackHistory: field?.trackHistory ?? false,
+      searchable: field?.searchable ?? false,
       validationRules:
         field?.validation?.map((v) => ({
           type: v.type,
@@ -428,6 +431,7 @@ export function FieldEditor({
         globalPicklistId: (parsedConfig.globalPicklistId as string) ?? '',
         description: field.description ?? '',
         trackHistory: field.trackHistory ?? false,
+        searchable: field.searchable ?? false,
         validationRules:
           field.validation?.map((v) => ({
             type: v.type,
@@ -540,6 +544,7 @@ export function FieldEditor({
         order: field?.order ?? 0,
         description: data.description || undefined,
         trackHistory: data.trackHistory,
+        searchable: data.searchable,
         constraints,
       }
 
@@ -938,6 +943,20 @@ export function FieldEditor({
           />
           <label htmlFor="field-track-history" className="text-sm text-foreground cursor-pointer">
             {t('fieldEditor.trackHistory')}
+          </label>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <input
+            id="field-searchable"
+            type="checkbox"
+            className="w-[1.125rem] h-[1.125rem] accent-primary cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={isSubmitting}
+            data-testid="field-searchable-checkbox"
+            {...register('searchable')}
+          />
+          <label htmlFor="field-searchable" className="text-sm text-foreground cursor-pointer">
+            {t('fieldEditor.searchable')}
           </label>
         </div>
       </div>

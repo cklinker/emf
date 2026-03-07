@@ -266,6 +266,7 @@ public final class SystemCollectionDefinitions {
                 .withColumnName("reference_collection_id"))
             .addField(FieldDefinition.bool("trackHistory").withColumnName("track_history")
                 .withDefault(false))
+            .addField(FieldDefinition.bool("searchable").withDefault(false))
             .build();
     }
 

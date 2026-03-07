@@ -30,7 +30,6 @@ import {
 } from '@/components/ui/breadcrumb'
 import { useApi } from '@/context/ApiContext'
 import { useConfig } from '@/context/ConfigContext'
-import { unwrapCollection } from '@/utils/jsonapi'
 
 interface SearchResult {
   id: string
@@ -67,32 +66,6 @@ function getCollectionNames(
 }
 
 /**
- * Extract a display value from a flat record object.
- */
-function extractDisplayValue(record: Record<string, unknown>): string {
-  const displayFields = ['name', 'title', 'label', 'subject', 'displayName', 'display_name']
-  for (const field of displayFields) {
-    if (record[field] && typeof record[field] === 'string') {
-      return record[field] as string
-    }
-  }
-  return String(record.id || 'Unnamed')
-}
-
-/**
- * Extract a subtitle from a record (secondary fields like email, description).
- */
-function extractSubtitle(record: Record<string, unknown>): string | undefined {
-  const subtitleFields = ['email', 'description', 'status', 'type', 'category']
-  for (const field of subtitleFields) {
-    if (record[field] && typeof record[field] === 'string') {
-      return record[field] as string
-    }
-  }
-  return undefined
-}
-
-/**
  * Simple debounce hook.
  */
 function useDebounced(value: string, delay: number): string {
@@ -118,10 +91,17 @@ export function GlobalSearchPage(): React.ReactElement {
   const initialQuery = searchParams.get('q') || ''
   const [query, setQuery] = useState(initialQuery)
   const debouncedQuery = useDebounced(query, 300)
-  const hasQuery = debouncedQuery.trim().length >= 2
+  const hasQuery = debouncedQuery.trim().length >= 3
   const basePath = `/${tenantSlug}/app`
 
   const collections = useMemo(() => getCollectionNames(config), [config])
+  const collectionLabelMap = useMemo(() => {
+    const map: Record<string, string> = {}
+    for (const col of collections) {
+      map[col.name] = col.label
+    }
+    return map
+  }, [collections])
 
   // Update URL params when debounced query changes
   const updateSearchParams = useCallback(
@@ -140,45 +120,38 @@ export function GlobalSearchPage(): React.ReactElement {
     updateSearchParams(debouncedQuery)
   }, [debouncedQuery, updateSearchParams])
 
-  // Search across all collections in parallel
+  // Search using centralized full-text search endpoint
   const {
     data: searchResults = [],
     isLoading,
     isFetching,
   } = useQuery({
-    queryKey: ['page-search', debouncedQuery, collections.map((c) => c.name).join(',')],
+    queryKey: ['page-search', debouncedQuery],
     queryFn: async () => {
-      if (!hasQuery || collections.length === 0) return []
+      if (!hasQuery) return []
 
-      const results: SearchResult[] = []
-      const searchPromises = collections.map(async (col) => {
-        try {
-          const response = await apiClient.get(`/api/${col.name}`, {
-            params: {
-              'page[size]': '10',
-              'filter[_search]': debouncedQuery,
-            },
+      try {
+        const response = await apiClient.get('/api/_search', {
+          params: {
+            q: debouncedQuery,
+            limit: '50',
+          },
+        })
+        const data = (response as { data?: Array<Record<string, unknown>> })?.data
+        if (!Array.isArray(data)) return []
+
+        return data.map(
+          (item): SearchResult => ({
+            id: String(item.id),
+            collectionName: String(item.collectionName),
+            collectionLabel:
+              collectionLabelMap[String(item.collectionName)] || String(item.collectionName),
+            displayValue: String(item.displayValue || item.id),
           })
-          const unwrapped = unwrapCollection(response)
-          if (unwrapped?.data) {
-            for (const record of unwrapped.data) {
-              const typedRecord = record as Record<string, unknown>
-              results.push({
-                id: String(typedRecord.id),
-                collectionName: col.name,
-                collectionLabel: col.label,
-                displayValue: extractDisplayValue(typedRecord),
-                subtitle: extractSubtitle(typedRecord),
-              })
-            }
-          }
-        } catch {
-          // Skip collections that fail
-        }
-      })
-
-      await Promise.all(searchPromises)
-      return results
+        )
+      } catch {
+        return []
+      }
     },
     enabled: hasQuery,
     staleTime: 10 * 1000,
@@ -254,7 +227,7 @@ export function GlobalSearchPage(): React.ReactElement {
             <div className="flex flex-col items-center justify-center text-center">
               <Search className="mb-4 h-12 w-12 text-muted-foreground/30" />
               <p className="text-sm text-muted-foreground">
-                Enter at least 2 characters to search across all collections.
+                Enter at least 3 characters to search across all collections.
               </p>
             </div>
           </CardContent>

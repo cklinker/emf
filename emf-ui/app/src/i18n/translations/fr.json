@@ -1095,6 +1095,7 @@
     "globalPicklistHint": "Sélectionnez la liste de choix globale qui fournit les valeurs pour ce champ.",
     "descriptionPlaceholder": "Entrez une description pour ce champ...",
     "trackHistory": "Suivi de l'historique",
+    "searchable": "Recherchable",
     "validation": {
       "nameRequired": "Le nom du champ est obligatoire",
       "nameTooLong": "Le nom du champ ne doit pas dépasser 50 caractères",

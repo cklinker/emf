@@ -782,6 +782,7 @@
     "globalPicklistHint": "اختر قائمة الاختيار العامة التي توفر القيم لهذا الحقل.",
     "descriptionPlaceholder": "أدخل وصفاً لهذا الحقل...",
     "trackHistory": "تتبع السجل",
+    "searchable": "قابل للبحث",
     "validation": {
       "nameRequired": "اسم الحقل مطلوب",
       "nameTooLong": "يجب أن يكون اسم الحقل 50 حرفاً أو أقل",

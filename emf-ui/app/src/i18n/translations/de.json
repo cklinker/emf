@@ -1095,6 +1095,7 @@
     "globalPicklistHint": "Wählen Sie die globale Auswahlliste, die Werte für dieses Feld bereitstellt.",
     "descriptionPlaceholder": "Geben Sie eine Beschreibung für dieses Feld ein...",
     "trackHistory": "Verlauf verfolgen",
+    "searchable": "Durchsuchbar",
     "validation": {
       "nameRequired": "Feldname ist erforderlich",
       "nameTooLong": "Feldname darf maximal 50 Zeichen lang sein",

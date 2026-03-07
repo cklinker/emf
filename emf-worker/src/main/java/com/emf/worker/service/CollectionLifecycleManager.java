@@ -66,9 +66,26 @@ public class CollectionLifecycleManager {
     private static final String SELECT_FIELDS_BY_COLLECTION = """
             SELECT name, type, required, unique_constraint, indexed, default_value,
                    constraints, field_type_config, reference_target, relationship_type,
-                   relationship_name, cascade_delete, field_order, column_name, immutable
+                   relationship_name, cascade_delete, field_order, column_name, immutable,
+                   searchable
             FROM field WHERE collection_id = ? AND active = true
             ORDER BY field_order
+            """;
+
+    private static final String SELECT_SEARCHABLE_FIELDS = """
+            SELECT f.name FROM field f
+            JOIN collection c ON c.id = f.collection_id
+            WHERE c.name = ? AND f.active = true AND f.searchable = true
+            """;
+
+    private static final String SELECT_DISPLAY_FIELD_NAME = """
+            SELECT f.name FROM field f
+            JOIN collection c ON c.display_field_id = f.id
+            WHERE c.name = ? AND c.active = true AND f.active = true
+            """;
+
+    private static final String SELECT_COLLECTION_ID_BY_NAME = """
+            SELECT id FROM collection WHERE name = ? AND active = true LIMIT 1
             """;
 
     private static final String SELECT_VALIDATION_RULES = """
@@ -614,5 +631,75 @@ public class CollectionLifecycleManager {
             return str;
         }
         return defaultValue;
+    }
+
+    // =========================================================================
+    // Search Index Support
+    // =========================================================================
+
+    /**
+     * Returns the set of field names marked as searchable for a given collection.
+     *
+     * @param collectionName the collection name
+     * @return set of searchable field names (never null)
+     */
+    public Set<String> getSearchableFieldNames(String collectionName) {
+        try {
+            List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                    SELECT_SEARCHABLE_FIELDS, collectionName);
+            Set<String> names = new HashSet<>();
+            for (Map<String, Object> row : rows) {
+                String name = (String) row.get("name");
+                if (name != null) {
+                    names.add(name);
+                }
+            }
+            return names;
+        } catch (Exception e) {
+            log.warn("Failed to load searchable fields for collection '{}': {}",
+                    collectionName, e.getMessage());
+            return Set.of();
+        }
+    }
+
+    /**
+     * Returns the display field name for a given collection,
+     * or {@code null} if no display field is configured.
+     *
+     * @param collectionName the collection name
+     * @return the display field name, or null
+     */
+    public String getDisplayFieldName(String collectionName) {
+        try {
+            List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                    SELECT_DISPLAY_FIELD_NAME, collectionName);
+            if (!rows.isEmpty()) {
+                return (String) rows.get(0).get("name");
+            }
+        } catch (Exception e) {
+            log.warn("Failed to resolve display field for collection '{}': {}",
+                    collectionName, e.getMessage());
+        }
+        return null;
+    }
+
+    /**
+     * Returns the collection ID for a given collection name,
+     * or {@code null} if not found.
+     *
+     * @param collectionName the collection name
+     * @return the collection ID, or null
+     */
+    public String getCollectionIdByName(String collectionName) {
+        try {
+            List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                    SELECT_COLLECTION_ID_BY_NAME, collectionName);
+            if (!rows.isEmpty()) {
+                return (String) rows.get(0).get("id");
+            }
+        } catch (Exception e) {
+            log.warn("Failed to resolve collection ID for '{}': {}", collectionName, e.getMessage());
+        }
+        return null;
     }
 }

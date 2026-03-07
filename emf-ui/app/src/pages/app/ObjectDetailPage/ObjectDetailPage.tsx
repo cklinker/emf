@@ -100,7 +100,7 @@ const SYSTEM_FIELDS = new Set([
 const SYSTEM_FIELD_DEFINITIONS: FieldDefinition[] = [
   {
     id: '__sys_createdBy',
-    name: 'created_by',
+    name: 'createdBy',
     displayName: 'Created By',
     type: 'lookup',
     required: false,
@@ -108,14 +108,14 @@ const SYSTEM_FIELD_DEFINITIONS: FieldDefinition[] = [
   },
   {
     id: '__sys_createdAt',
-    name: 'created_at',
+    name: 'createdAt',
     displayName: 'Created',
     type: 'datetime',
     required: false,
   },
   {
     id: '__sys_updatedBy',
-    name: 'updated_by',
+    name: 'updatedBy',
     displayName: 'Updated By',
     type: 'lookup',
     required: false,
@@ -123,7 +123,7 @@ const SYSTEM_FIELD_DEFINITIONS: FieldDefinition[] = [
   },
   {
     id: '__sys_updatedAt',
-    name: 'updated_at',
+    name: 'updatedAt',
     displayName: 'Updated',
     type: 'datetime',
     required: false,

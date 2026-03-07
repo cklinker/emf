@@ -1,0 +1,270 @@
+import React, { useState, useCallback } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { useI18n } from '../../context/I18nContext'
+import { useApi } from '../../context/ApiContext'
+import { LoadingSpinner, ErrorMessage } from '../../components'
+import { cn } from '@/lib/utils'
+import { useNavigate } from 'react-router-dom'
+
+export interface LogViewerPageProps {
+  className?: string
+}
+
+const LOG_LEVELS = ['', 'ERROR', 'WARN', 'INFO', 'DEBUG']
+const SERVICES = ['', 'emf-gateway', 'emf-worker']
+
+export function LogViewerPage({ className }: LogViewerPageProps) {
+  const { t } = useI18n()
+  const { emfClient } = useApi()
+  const navigate = useNavigate()
+
+  const [query, setQuery] = useState('')
+  const [level, setLevel] = useState('')
+  const [service, setService] = useState('')
+  const [page, setPage] = useState(0)
+  const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set())
+  const pageSize = 50
+
+  const now = new Date()
+  const start = new Date(now.getTime() - 24 * 3600 * 1000).toISOString()
+  const end = now.toISOString()
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['log-viewer', query, level, service, page],
+    queryFn: () =>
+      emfClient.admin.observability.searchLogs({
+        query: query || undefined,
+        level: level || undefined,
+        service: service || undefined,
+        start,
+        end,
+        page,
+        size: pageSize,
+      }),
+    refetchInterval: 30000,
+  })
+
+  const toggleRow = useCallback((idx: number) => {
+    setExpandedRows((prev) => {
+      const next = new Set(prev)
+      if (next.has(idx)) next.delete(idx)
+      else next.add(idx)
+      return next
+    })
+  }, [])
+
+  if (isLoading) return <LoadingSpinner />
+  if (error) return <ErrorMessage error={t('logViewer.loadError')} />
+
+  const hits = data?.hits ?? []
+  const totalHits = data?.totalHits ?? 0
+  const totalPages = Math.max(1, Math.ceil(totalHits / pageSize))
+
+  const getLevelColor = (lvl: string) => {
+    switch (lvl?.toUpperCase()) {
+      case 'ERROR':
+        return 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300'
+      case 'WARN':
+        return 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+      case 'INFO':
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300'
+      case 'DEBUG':
+        return 'bg-muted text-muted-foreground'
+      default:
+        return 'bg-muted text-muted-foreground'
+    }
+  }
+
+  return (
+    <div className={cn('mx-auto max-w-[1400px] p-6', className)} data-testid="log-viewer-page">
+      <div className="mb-6">
+        <h1 className="m-0 text-2xl font-semibold text-foreground">{t('logViewer.title')}</h1>
+      </div>
+
+      {/* Filters */}
+      <div className="mb-6 flex flex-wrap gap-4">
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium text-muted-foreground">
+            {t('logViewer.search')}
+          </label>
+          <input
+            data-testid="log-viewer-search"
+            type="text"
+            placeholder={t('logViewer.searchPlaceholder')}
+            className="min-w-[250px] rounded-md border border-border bg-background p-2 text-sm text-foreground placeholder:text-muted-foreground"
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value)
+              setPage(0)
+            }}
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium text-muted-foreground">
+            {t('logViewer.level')}
+          </label>
+          <select
+            data-testid="log-viewer-level-filter"
+            className="min-w-[120px] rounded-md border border-border bg-background p-2 text-sm text-foreground"
+            value={level}
+            onChange={(e) => {
+              setLevel(e.target.value)
+              setPage(0)
+            }}
+          >
+            <option value="">{t('common.all')}</option>
+            {LOG_LEVELS.filter(Boolean).map((l) => (
+              <option key={l} value={l}>
+                {l}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium text-muted-foreground">
+            {t('logViewer.service')}
+          </label>
+          <select
+            data-testid="log-viewer-service-filter"
+            className="min-w-[150px] rounded-md border border-border bg-background p-2 text-sm text-foreground"
+            value={service}
+            onChange={(e) => {
+              setService(e.target.value)
+              setPage(0)
+            }}
+          >
+            <option value="">{t('common.all')}</option>
+            {SERVICES.filter(Boolean).map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Results */}
+      {hits.length === 0 ? (
+        <div className="p-12 text-center text-muted-foreground">
+          <p>{t('logViewer.noEntries')}</p>
+        </div>
+      ) : (
+        <>
+          <div
+            className="overflow-x-auto rounded-lg border border-border bg-card"
+            data-testid="log-viewer-table"
+          >
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="bg-muted">
+                  <th className="border-b border-border p-3 text-left font-semibold text-muted-foreground">
+                    {t('logViewer.timestamp')}
+                  </th>
+                  <th className="border-b border-border p-3 text-left font-semibold text-muted-foreground">
+                    {t('logViewer.level')}
+                  </th>
+                  <th className="border-b border-border p-3 text-left font-semibold text-muted-foreground">
+                    {t('logViewer.service')}
+                  </th>
+                  <th className="border-b border-border p-3 text-left font-semibold text-muted-foreground">
+                    {t('logViewer.message')}
+                  </th>
+                  <th className="border-b border-border p-3 text-left font-semibold text-muted-foreground">
+                    {t('requestLog.traceId')}
+                  </th>
+                  <th className="border-b border-border p-3 text-left font-semibold text-muted-foreground"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {hits.map((log, idx) => (
+                  <React.Fragment key={idx}>
+                    <tr
+                      data-testid={`log-viewer-row-${idx}`}
+                      className={cn(
+                        'cursor-pointer hover:bg-accent',
+                        expandedRows.has(idx) && 'bg-muted'
+                      )}
+                      onClick={() => toggleRow(idx)}
+                    >
+                      <td className="border-b border-border p-3 text-xs text-muted-foreground whitespace-nowrap">
+                        {new Date(log['@timestamp']).toLocaleString()}
+                      </td>
+                      <td className="border-b border-border p-3">
+                        <span
+                          data-testid="log-level-badge"
+                          className={cn(
+                            'inline-block rounded-full px-2 py-0.5 text-xs font-medium',
+                            getLevelColor(log.level)
+                          )}
+                        >
+                          {log.level}
+                        </span>
+                      </td>
+                      <td className="border-b border-border p-3 text-xs">{log.service || ''}</td>
+                      <td className="border-b border-border p-3 max-w-[400px] truncate font-mono text-xs">
+                        {log.message}
+                      </td>
+                      <td className="border-b border-border p-3">
+                        {log.traceId && (
+                          <button
+                            data-testid="log-viewer-trace-link"
+                            className="font-mono text-xs text-primary hover:underline"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              navigate(`../request-log/${log.traceId}`)
+                            }}
+                          >
+                            {log.traceId.substring(0, 16)}...
+                          </button>
+                        )}
+                      </td>
+                      <td className="border-b border-border p-3">
+                        <span className="text-xs text-muted-foreground">
+                          {expandedRows.has(idx) ? '\u25BC' : '\u25B6'}
+                        </span>
+                      </td>
+                    </tr>
+                    {expandedRows.has(idx) && (
+                      <tr className="bg-muted">
+                        <td colSpan={6} className="!p-0">
+                          <div className="p-4" data-testid="log-viewer-expanded">
+                            <pre className="m-0 max-h-[300px] overflow-auto whitespace-pre-wrap break-all rounded border border-border bg-card p-3 text-xs">
+                              {JSON.stringify(log, null, 2)}
+                            </pre>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          <div className="mt-4 flex items-center justify-center gap-4 text-sm">
+            <button
+              className="cursor-pointer rounded-md border border-border bg-card px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={page === 0}
+              onClick={() => setPage((p) => p - 1)}
+            >
+              {t('common.previous')}
+            </button>
+            <span className="text-muted-foreground">
+              {t('common.pageOf', { current: String(page + 1), total: String(totalPages) })}
+            </span>
+            <button
+              className="cursor-pointer rounded-md border border-border bg-card px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={page >= totalPages - 1}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              {t('common.next')}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+export default LogViewerPage

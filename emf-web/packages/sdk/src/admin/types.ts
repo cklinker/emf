@@ -1692,4 +1692,124 @@ export interface MetricsSummary {
   errorRate: number;
   avgLatencyMs: number;
   activeRequests: number;
+  authFailures?: number;
+  rateLimited?: number;
+}
+
+// ─── Observability types ───────────────────────────────────────────
+
+export interface RequestLogEntry {
+  traceID: string;
+  spanID: string;
+  operationName: string;
+  startTime: number;
+  duration: number;
+  tags: Record<string, string>;
+  process?: {
+    serviceName: string;
+  };
+}
+
+export interface RequestLogSearchParams {
+  method?: string;
+  status?: string;
+  path?: string;
+  traceId?: string;
+  userId?: string;
+  start?: string;
+  end?: string;
+  page?: number;
+  size?: number;
+}
+
+export interface RequestLogSearchResult {
+  hits: RequestLogEntry[];
+  totalHits: number;
+  page: number;
+  size: number;
+}
+
+export interface RequestLogDetail {
+  spans: RequestLogEntry[];
+  traceId: string;
+}
+
+export interface LogEntry {
+  '@timestamp': string;
+  level: string;
+  message: string;
+  logger_name?: string;
+  thread_name?: string;
+  service?: string;
+  traceId?: string;
+  spanId?: string;
+  tenantId?: string;
+  tenantSlug?: string;
+  userId?: string;
+  userEmail?: string;
+  correlationId?: string;
+  stack_trace?: string;
+}
+
+export interface LogSearchParams {
+  query?: string;
+  level?: string;
+  service?: string;
+  traceId?: string;
+  start?: string;
+  end?: string;
+  page?: number;
+  size?: number;
+}
+
+export interface LogSearchResult {
+  hits: LogEntry[];
+  totalHits: number;
+  page: number;
+  size: number;
+}
+
+export interface AuditSearchParams {
+  auditType?: string;
+  action?: string;
+  userId?: string;
+  start?: string;
+  end?: string;
+  page?: number;
+  size?: number;
+}
+
+export interface AuditSearchResult {
+  hits: Record<string, unknown>[];
+  totalHits: number;
+  page: number;
+  size: number;
+}
+
+export interface EndpointPerformance {
+  endpoint: string;
+  requestCount: number;
+  p50: number;
+  p95: number;
+  p99: number;
+  avgDuration: number;
+}
+
+export interface ErrorGroup {
+  path: string;
+  count: number;
+  statusCodes: Record<string, number>;
+}
+
+export interface LatencyPercentiles {
+  p50: number;
+  p95: number;
+  p99: number;
+  avg: number;
+}
+
+export interface ObservabilitySetting {
+  id: string;
+  settingKey: string;
+  settingValue: string;
 }

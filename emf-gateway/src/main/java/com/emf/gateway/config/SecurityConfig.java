@@ -57,7 +57,8 @@ public class SecurityConfig {
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of(
                 "Authorization", "Content-Type", "Accept", "X-Correlation-ID",
-                "X-Tenant-ID", "X-Tenant-Slug", "X-Requested-With"));
+                "X-Tenant-ID", "X-Tenant-Slug", "X-Requested-With",
+                "traceparent", "tracestate", "baggage"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
         configuration.setExposedHeaders(Arrays.asList(

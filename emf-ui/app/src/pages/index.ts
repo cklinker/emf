@@ -236,6 +236,34 @@ export { LoginHistoryPage } from './LoginHistoryPage'
 // SecurityAuditPage - Security audit log page
 export { SecurityAuditPage } from './SecurityAuditPage'
 
+// RequestLogPage - Request log explorer
+export { RequestLogPage } from './RequestLogPage'
+export type { RequestLogPageProps } from './RequestLogPage'
+
+// RequestLogDetailPage - Request log detail view
+export { RequestLogDetailPage } from './RequestLogDetailPage'
+export type { RequestLogDetailPageProps } from './RequestLogDetailPage'
+
+// LogViewerPage - Log viewer
+export { LogViewerPage } from './LogViewerPage'
+export type { LogViewerPageProps } from './LogViewerPage'
+
+// ErrorDashboardPage - Error aggregation dashboard
+export { ErrorDashboardPage } from './ErrorDashboardPage'
+export type { ErrorDashboardPageProps } from './ErrorDashboardPage'
+
+// UserActivityPage - User activity timeline
+export { UserActivityPage } from './UserActivityPage'
+export type { UserActivityPageProps } from './UserActivityPage'
+
+// EndpointPerformancePage - Endpoint performance leaderboard
+export { EndpointPerformancePage } from './EndpointPerformancePage'
+export type { EndpointPerformancePageProps } from './EndpointPerformancePage'
+
+// ObservabilitySettingsPage - Observability retention settings
+export { ObservabilitySettingsPage } from './ObservabilitySettingsPage'
+export type { ObservabilitySettingsPageProps } from './ObservabilitySettingsPage'
+
 // NotFoundPage - 404 error page
 export { NotFoundPage } from './NotFoundPage'
 export type { NotFoundPageProps } from './NotFoundPage'

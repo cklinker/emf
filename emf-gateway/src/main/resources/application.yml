@@ -45,6 +45,13 @@ spring:
         - name: RequestSize
           args:
             maxSize: 10MB          # Default 10 MB request body limit
+      routes:
+        - id: otel-traces
+          uri: ${OTEL_COLLECTOR_URL:http://jaeger.observability.svc.cluster.local:4318}
+          predicates:
+            - Path=/otel/v1/traces
+          filters:
+            - StripPrefix=1
       httpclient:
         connect-timeout: 5000
         response-timeout: 120s
@@ -85,14 +92,14 @@ emf:
       permissions-cache-ttl-minutes: ${PERMISSIONS_CACHE_TTL:5}   # Redis cache TTL for resolved permissions
       # Paths accessible without authentication (GET/HEAD only).
       # Matched as prefixes against the slug-stripped path.
-      public-paths: /api/ui-pages,/api/ui-menus,/api/oidc-providers,/api/tenants
+      public-paths: /api/ui-pages,/api/ui-menus,/api/oidc-providers,/api/tenants,/otel
 
 # Actuator configuration for health and metrics
 management:
   endpoints:
     web:
       exposure:
-        include: health,metrics,info,prometheus
+        include: health,metrics,info
   endpoint:
     health:
       show-details: always
@@ -103,18 +110,15 @@ management:
       enabled: true
     kafka:
       enabled: true
+  tracing:
+    enabled: true
+    sampling:
+      probability: ${OTEL_TRACES_SAMPLER_ARG:1.0}
+    propagation:
+      type: w3c
   metrics:
     distribution:
       percentiles-histogram:
         emf.gateway.requests: true
       percentiles:
         emf.gateway.requests: 0.5,0.95,0.99
-
-# Logging configuration
-logging:
-  level:
-    root: INFO
-    com.emf.gateway: DEBUG
-    org.springframework.cloud.gateway: DEBUG
-  pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"

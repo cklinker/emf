@@ -246,6 +246,53 @@ services:
       - emf-network
 
   # ===========================================
+  # OpenSearch (observability data store)
+  # ===========================================
+  opensearch:
+    image: opensearchproject/opensearch:2.17.1
+    container_name: emf-opensearch
+    environment:
+      discovery.type: single-node
+      plugins.security.disabled: "true"
+      DISABLE_INSTALL_DEMO_CONFIG: "true"
+      OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - opensearch_data:/usr/share/opensearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - emf-network
+    profiles:
+      - observability
+
+  # ===========================================
+  # Jaeger V2 (OTLP receiver + trace UI)
+  # ===========================================
+  jaeger:
+    image: jaegertracing/jaeger:2
+    container_name: emf-jaeger
+    command: ["--config", "/etc/jaeger/config.yaml"]
+    volumes:
+      - ./docker/jaeger/config.yaml:/etc/jaeger/config.yaml:ro
+    ports:
+      - "16686:16686"
+      - "4317:4317"
+      - "4318:4318"
+    depends_on:
+      opensearch:
+        condition: service_healthy
+    networks:
+      - emf-network
+    profiles:
+      - observability
+
+  # ===========================================
   # Sample Service for Integration Testing
   # ===========================================
   sample-service:
@@ -285,6 +332,7 @@ volumes:
   kafka_data:
   keycloak_data:
   pgadmin_data:
+  opensearch_data:
 
 networks:
   emf-network:

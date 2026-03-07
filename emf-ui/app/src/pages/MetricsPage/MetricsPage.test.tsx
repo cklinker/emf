@@ -228,7 +228,9 @@ describe('MetricsPage', () => {
       expect(screen.getByText('Rate Limit Events')).toBeInTheDocument()
       // "Active Requests" appears in both summary card and chart, so query within chart grid
       const chartGrid = screen.getByTestId('metrics-chart-grid')
-      expect(chartGrid.querySelector('[data-testid="metrics-chart-active-requests"]')).toBeInTheDocument()
+      expect(
+        chartGrid.querySelector('[data-testid="metrics-chart-active-requests"]')
+      ).toBeInTheDocument()
     })
   })
 

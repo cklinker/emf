@@ -105,6 +105,13 @@ import {
   PermissionSetDetailPage,
   LoginHistoryPage,
   SecurityAuditPage,
+  RequestLogPage,
+  RequestLogDetailPage,
+  LogViewerPage,
+  ErrorDashboardPage,
+  UserActivityPage,
+  EndpointPerformancePage,
+  ObservabilitySettingsPage,
 } from './pages'
 import { NoTenantPage } from './pages/NoTenantPage/NoTenantPage'
 
@@ -874,6 +881,88 @@ function TenantRoutes(): React.ReactElement {
           <AdminPageRoute>
             <RequirePermission permission="VIEW_SETUP">
               <MetricsPage />
+            </RequirePermission>
+          </AdminPageRoute>
+        }
+      />
+
+      {/* Request Log routes */}
+      <Route
+        path="request-log"
+        element={
+          <AdminPageRoute>
+            <RequirePermission permission="VIEW_SETUP">
+              <RequestLogPage />
+            </RequirePermission>
+          </AdminPageRoute>
+        }
+      />
+      <Route
+        path="request-log/:traceId"
+        element={
+          <AdminPageRoute>
+            <RequirePermission permission="VIEW_SETUP">
+              <RequestLogDetailPage />
+            </RequirePermission>
+          </AdminPageRoute>
+        }
+      />
+
+      {/* Log Viewer route */}
+      <Route
+        path="logs"
+        element={
+          <AdminPageRoute>
+            <RequirePermission permission="VIEW_SETUP">
+              <LogViewerPage />
+            </RequirePermission>
+          </AdminPageRoute>
+        }
+      />
+
+      {/* Error Dashboard route */}
+      <Route
+        path="errors"
+        element={
+          <AdminPageRoute>
+            <RequirePermission permission="VIEW_SETUP">
+              <ErrorDashboardPage />
+            </RequirePermission>
+          </AdminPageRoute>
+        }
+      />
+
+      {/* User Activity route */}
+      <Route
+        path="user-activity"
+        element={
+          <AdminPageRoute>
+            <RequirePermission permission="VIEW_SETUP">
+              <UserActivityPage />
+            </RequirePermission>
+          </AdminPageRoute>
+        }
+      />
+
+      {/* Endpoint Performance route */}
+      <Route
+        path="endpoint-performance"
+        element={
+          <AdminPageRoute>
+            <RequirePermission permission="VIEW_SETUP">
+              <EndpointPerformancePage />
+            </RequirePermission>
+          </AdminPageRoute>
+        }
+      />
+
+      {/* Observability Settings route */}
+      <Route
+        path="observability-settings"
+        element={
+          <AdminPageRoute>
+            <RequirePermission permission="CUSTOMIZE_APPLICATION">
+              <ObservabilitySettingsPage />
             </RequirePermission>
           </AdminPageRoute>
         }

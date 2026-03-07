@@ -307,6 +307,19 @@ vi.mock('./pages', () => ({
   TenantDashboardPage: () => <div data-testid="tenant-dashboard-page">Tenant Dashboard Page</div>,
   LoginPage: () => <div data-testid="login-page">Login Page</div>,
   UnauthorizedPage: () => <div data-testid="unauthorized-page">Unauthorized Page</div>,
+  RequestLogPage: () => <div data-testid="request-log-page">Request Log Page</div>,
+  RequestLogDetailPage: () => (
+    <div data-testid="request-log-detail-page">Request Log Detail Page</div>
+  ),
+  LogViewerPage: () => <div data-testid="log-viewer-page">Log Viewer Page</div>,
+  ErrorDashboardPage: () => <div data-testid="error-dashboard-page">Error Dashboard Page</div>,
+  UserActivityPage: () => <div data-testid="user-activity-page">User Activity Page</div>,
+  EndpointPerformancePage: () => (
+    <div data-testid="endpoint-performance-page">Endpoint Performance Page</div>
+  ),
+  ObservabilitySettingsPage: () => (
+    <div data-testid="observability-settings-page">Observability Settings Page</div>
+  ),
   NotFoundPage: () => <div data-testid="not-found-page">Not Found Page</div>,
 }))
 

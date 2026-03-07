@@ -72,6 +72,7 @@ export function useRecordMutation(options: UseRecordMutationOptions): UseRecordM
 
   const invalidateRecords = () => {
     queryClient.invalidateQueries({ queryKey: ['collection-records', collectionName] })
+    queryClient.invalidateQueries({ queryKey: ['record', collectionName] })
   }
 
   const createMutation = useMutation({

@@ -131,12 +131,9 @@ export function GlobalSearchPage(): React.ReactElement {
       if (!hasQuery) return []
 
       try {
-        const response = await apiClient.get('/api/_search', {
-          params: {
-            q: debouncedQuery,
-            limit: '50',
-          },
-        })
+        const response = await apiClient.get(
+          `/api/_search?q=${encodeURIComponent(debouncedQuery)}&limit=50`
+        )
         const data = (response as { data?: Array<Record<string, unknown>> })?.data
         if (!Array.isArray(data)) return []
 

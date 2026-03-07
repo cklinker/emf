@@ -17,7 +17,7 @@
  */
 
 import React, { useState, useCallback, useMemo } from 'react'
-import { useNavigate, useParams, Link } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Save, X, Loader2, AlertCircle } from 'lucide-react'
 import {
@@ -288,7 +288,8 @@ function FormField({
 function computeInitialFormData(
   isNew: boolean,
   record: Record<string, unknown> | undefined,
-  fields: FieldDefinition[]
+  fields: FieldDefinition[],
+  queryDefaults?: Record<string, string>
 ): Record<string, unknown> {
   if (!isNew && record) {
     const data: Record<string, unknown> = { ...record }
@@ -311,6 +312,15 @@ function computeInitialFormData(
   for (const field of fields) {
     if (field.type === 'boolean') {
       defaults[field.name] = false
+    }
+  }
+  // Apply query parameter defaults (e.g. ?order_ref=<id> from related list)
+  if (queryDefaults) {
+    const fieldNames = new Set(fields.map((f) => f.name))
+    for (const [key, value] of Object.entries(queryDefaults)) {
+      if (fieldNames.has(key)) {
+        defaults[key] = value
+      }
     }
   }
   return defaults
@@ -519,6 +529,7 @@ export function ObjectFormPage(): React.ReactElement {
   const basePath = `/${tenantSlug}/app`
   const isNew = !recordId
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { apiClient } = useApi()
 
   // Fetch collection schema
@@ -660,14 +671,24 @@ export function ObjectFormPage(): React.ReactElement {
     schema?.displayName ||
     (collectionName ? collectionName.charAt(0).toUpperCase() + collectionName.slice(1) : 'Object')
 
+  // Extract query parameter defaults for new records (e.g. ?order_ref=<id>)
+  const queryDefaults = useMemo(() => {
+    if (!isNew) return undefined
+    const params: Record<string, string> = {}
+    searchParams.forEach((value, key) => {
+      params[key] = value
+    })
+    return Object.keys(params).length > 0 ? params : undefined
+  }, [isNew, searchParams])
+
   // Compute initial data and a key that changes when the data source changes.
   // The key forces ObjectFormBody to remount, running useState with fresh initialData.
   const initialData = useMemo(
-    () => computeInitialFormData(isNew, record, enrichedFields),
-    [isNew, record, enrichedFields]
+    () => computeInitialFormData(isNew, record, enrichedFields, queryDefaults),
+    [isNew, record, enrichedFields, queryDefaults]
   )
   const formKey = isNew
-    ? `new:${enrichedFields.length}`
+    ? `new:${enrichedFields.length}:${searchParams.toString()}`
     : `edit:${recordId}:${record?.id ?? 'loading'}`
 
   // Handle cancel (needed for error state)

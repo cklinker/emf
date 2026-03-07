@@ -29,7 +29,6 @@ import { Badge } from '@/components/ui/badge'
 import { useApi } from '@/context/ApiContext'
 import { useConfig } from '@/context/ConfigContext'
 import { useAppContext } from '@/context/AppContext'
-import { unwrapCollection } from '@/utils/jsonapi'
 
 interface SearchResult {
   id: string
@@ -81,20 +80,6 @@ function formatRelativeTime(timestamp: number): string {
 }
 
 /**
- * Extract a display value from a flat record object.
- * Looks for common display fields, then falls back to id.
- */
-function extractDisplayValue(record: Record<string, unknown>): string {
-  const displayFields = ['name', 'title', 'label', 'subject', 'displayName', 'display_name']
-  for (const field of displayFields) {
-    if (record[field] && typeof record[field] === 'string') {
-      return record[field] as string
-    }
-  }
-  return String(record.id || 'Unnamed')
-}
-
-/**
  * Simple debounce hook.
  */
 function useDebounced(value: string, delay: number): string {
@@ -124,43 +109,44 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps): React.R
   const [query, setQuery] = useState('')
 
   const collections = useMemo(() => getCollectionNames(config), [config])
+  const collectionLabelMap = useMemo(() => {
+    const map: Record<string, string> = {}
+    for (const col of collections) {
+      map[col.name] = col.label
+    }
+    return map
+  }, [collections])
   const debouncedQuery = useDebounced(query, 300)
-  const hasQuery = debouncedQuery.trim().length >= 2
+  const hasQuery = debouncedQuery.trim().length >= 3
 
-  // Search across all collections in parallel
+  // Search using centralized full-text search endpoint
   const { data: searchResults = [], isLoading } = useQuery({
-    queryKey: ['global-search', debouncedQuery, collections.map((c) => c.name).join(',')],
+    queryKey: ['global-search', debouncedQuery],
     queryFn: async () => {
-      if (!hasQuery || collections.length === 0) return []
+      if (!hasQuery) return []
 
-      const results: SearchResult[] = []
-      const searchPromises = collections.map(async (col) => {
-        try {
-          const response = await apiClient.get(`/api/${col.name}`, {
-            params: {
-              'page[size]': '5',
-              'filter[_search]': debouncedQuery,
-            },
+      try {
+        const response = await apiClient.get('/api/_search', {
+          params: {
+            q: debouncedQuery,
+            limit: '20',
+          },
+        })
+        const data = (response as { data?: Array<Record<string, unknown>> })?.data
+        if (!Array.isArray(data)) return []
+
+        return data.map(
+          (item): SearchResult => ({
+            id: String(item.id),
+            collectionName: String(item.collectionName),
+            collectionLabel:
+              collectionLabelMap[String(item.collectionName)] || String(item.collectionName),
+            displayValue: String(item.displayValue || item.id),
           })
-          const unwrapped = unwrapCollection(response)
-          if (unwrapped?.data) {
-            for (const record of unwrapped.data) {
-              const displayValue = extractDisplayValue(record as Record<string, unknown>)
-              results.push({
-                id: String(record.id),
-                collectionName: col.name,
-                collectionLabel: col.label,
-                displayValue,
-              })
-            }
-          }
-        } catch {
-          // Skip collections that fail to search
-        }
-      })
-
-      await Promise.all(searchPromises)
-      return results
+        )
+      } catch {
+        return []
+      }
     },
     enabled: open && hasQuery,
     staleTime: 10 * 1000,
@@ -212,7 +198,7 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps): React.R
             <p className="text-sm text-muted-foreground">
               {hasQuery && !isLoading
                 ? 'No results found. Try a different query.'
-                : 'Type at least 2 characters to search.'}
+                : 'Type at least 3 characters to search.'}
             </p>
           </div>
         </CommandEmpty>

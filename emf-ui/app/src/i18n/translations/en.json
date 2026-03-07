@@ -1095,6 +1095,7 @@
     "globalPicklistHint": "Select the global picklist that provides values for this field.",
     "descriptionPlaceholder": "Enter a description for this field...",
     "trackHistory": "Track History",
+    "searchable": "Searchable",
     "validation": {
       "nameRequired": "Field name is required",
       "nameTooLong": "Field name must be 50 characters or less",

@@ -1095,6 +1095,7 @@
     "globalPicklistHint": "Selecione a lista de opcoes global que fornece valores para este campo.",
     "descriptionPlaceholder": "Insira uma descricao para este campo...",
     "trackHistory": "Rastrear Historico",
+    "searchable": "Pesquisavel",
     "validation": {
       "nameRequired": "O nome do campo e obrigatorio",
       "nameTooLong": "O nome do campo deve ter no maximo 50 caracteres",

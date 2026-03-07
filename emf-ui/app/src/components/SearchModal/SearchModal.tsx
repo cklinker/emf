@@ -180,9 +180,9 @@ export function SearchModal({ open, onClose }: SearchModalProps): JSX.Element | 
     }
   }, [open])
 
-  // Debounced record search
+  // Debounced record search using centralized search endpoint
   useEffect(() => {
-    if (!query.trim()) {
+    if (!query.trim() || query.trim().length < 3) {
       setRecordResults([])
       setSearching(false)
       return
@@ -193,36 +193,32 @@ export function SearchModal({ open, onClose }: SearchModalProps): JSX.Element | 
 
     debounceRef.current = setTimeout(async () => {
       try {
-        // Search across collections using cached summaries
-        const colList = collectionSummaries.slice(0, 5)
-
-        const results: SearchResult[] = []
-        await Promise.all(
-          colList.map(async (col) => {
-            try {
-              const params = new URLSearchParams({ q: query, limit: '3' })
-              const records = await apiClient.get<Array<Record<string, unknown>>>(
-                `/api/${col.name}?${params.toString()}`
-              )
-              const recordList = Array.isArray(records) ? records : []
-              recordList.forEach((rec) => {
-                const id = String(rec.id ?? '')
-                const displayVal = String(
-                  rec.name ?? rec.title ?? rec.displayName ?? rec.display_name ?? id
-                )
-                results.push({
-                  id: `rec-${col.name}-${id}`,
-                  type: 'record',
-                  title: displayVal,
-                  subtitle: col.displayName || col.name,
-                  path: `/resources/${col.name}/${id}`,
-                })
-              })
-            } catch {
-              // Collection search failed, skip
-            }
-          })
+        const response = await apiClient.get<{ data?: Array<Record<string, unknown>> }>(
+          `/api/_search?q=${encodeURIComponent(query)}&limit=15`
         )
+        const data = response?.data
+        if (!Array.isArray(data)) {
+          setRecordResults([])
+          return
+        }
+
+        // Build a label map from collection summaries
+        const labelMap: Record<string, string> = {}
+        for (const col of collectionSummaries) {
+          labelMap[col.name] = col.displayName || col.name
+        }
+
+        const results: SearchResult[] = data.map((item) => {
+          const collectionName = String(item.collectionName)
+          const id = String(item.id ?? '')
+          return {
+            id: `rec-${collectionName}-${id}`,
+            type: 'record' as const,
+            title: String(item.displayValue || id),
+            subtitle: labelMap[collectionName] || collectionName,
+            path: `/resources/${collectionName}/${id}`,
+          }
+        })
         setRecordResults(results)
       } catch {
         setRecordResults([])

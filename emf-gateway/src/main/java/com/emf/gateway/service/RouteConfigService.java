@@ -167,6 +167,7 @@ public class RouteConfigService {
                 {"governor-limits", "/api/governor-limits/**", "governor-limits"},
                 {"modules", "/api/modules/**", "modules"},
                 {"metrics", "/api/metrics/**", "metrics"},
+                {"search", "/api/_search/**", "_search"},
         };
 
         for (String[] routeDef : staticRoutes) {

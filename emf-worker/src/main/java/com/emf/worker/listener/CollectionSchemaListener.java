@@ -3,6 +3,7 @@ package com.emf.worker.listener;
 import com.emf.runtime.event.ChangeType;
 import com.emf.runtime.event.CollectionChangedPayload;
 import com.emf.worker.service.CollectionLifecycleManager;
+import com.emf.worker.service.SearchIndexService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,11 +27,14 @@ public class CollectionSchemaListener {
     private static final Logger log = LoggerFactory.getLogger(CollectionSchemaListener.class);
 
     private final CollectionLifecycleManager lifecycleManager;
+    private final SearchIndexService searchIndexService;
     private final ObjectMapper objectMapper;
 
     public CollectionSchemaListener(CollectionLifecycleManager lifecycleManager,
+                                     SearchIndexService searchIndexService,
                                      ObjectMapper objectMapper) {
         this.lifecycleManager = lifecycleManager;
+        this.searchIndexService = searchIndexService;
         this.objectMapper = objectMapper;
     }
 
@@ -55,6 +59,9 @@ public class CollectionSchemaListener {
         log.debug("Received collection changed event: {}", message);
 
         try {
+            // Extract tenantId from the outer PlatformEvent envelope
+            String tenantId = extractTenantId(message);
+
             CollectionChangedPayload payload = parsePayload(message);
 
             if (payload == null) {
@@ -95,8 +102,25 @@ public class CollectionSchemaListener {
                     collectionName, collectionId, changeType);
             lifecycleManager.refreshCollection(collectionId);
 
+            // Rebuild search index for the collection (searchable fields may have changed)
+            if (tenantId != null && collectionName != null) {
+                searchIndexService.rebuildCollectionIndexAsync(tenantId, collectionName);
+            }
+
         } catch (Exception e) {
             log.error("Error processing collection changed event: {}", e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Extracts the tenant ID from the PlatformEvent envelope.
+     */
+    private String extractTenantId(String message) {
+        try {
+            var tree = objectMapper.readTree(message);
+            return tree.path("tenantId").asText(null);
+        } catch (Exception e) {
+            return null;
         }
     }
 

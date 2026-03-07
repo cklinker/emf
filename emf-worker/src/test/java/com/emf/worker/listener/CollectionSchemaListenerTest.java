@@ -3,6 +3,7 @@ package com.emf.worker.listener;
 import com.emf.runtime.event.ChangeType;
 import com.emf.runtime.event.CollectionChangedPayload;
 import com.emf.worker.service.CollectionLifecycleManager;
+import com.emf.worker.service.SearchIndexService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -17,14 +18,16 @@ import static org.mockito.Mockito.*;
 class CollectionSchemaListenerTest {
 
     private CollectionLifecycleManager lifecycleManager;
+    private SearchIndexService searchIndexService;
     private ObjectMapper objectMapper;
     private CollectionSchemaListener listener;
 
     @BeforeEach
     void setUp() {
         lifecycleManager = mock(CollectionLifecycleManager.class);
+        searchIndexService = mock(SearchIndexService.class);
         objectMapper = new ObjectMapper();
-        listener = new CollectionSchemaListener(lifecycleManager, objectMapper);
+        listener = new CollectionSchemaListener(lifecycleManager, searchIndexService, objectMapper);
     }
 
     @Nested

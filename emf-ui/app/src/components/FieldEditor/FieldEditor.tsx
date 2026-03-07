@@ -608,7 +608,8 @@ export function FieldEditor({
           type="text"
           className={cn(inputClasses, errors.name && errorInputClasses)}
           placeholder={t('fieldEditor.namePlaceholder')}
-          disabled={isEditMode || isSubmitting}
+          readOnly={isEditMode}
+          disabled={isSubmitting}
           aria-required="true"
           aria-invalid={!!errors.name}
           aria-describedby={errors.name ? 'field-name-error' : 'field-name-hint'}
@@ -683,9 +684,15 @@ export function FieldEditor({
         </label>
         <select
           id="field-type"
-          className={cn(selectClasses, errors.type && errorInputClasses)}
-          disabled={isEditMode || isSubmitting}
+          className={cn(
+            selectClasses,
+            errors.type && errorInputClasses,
+            isEditMode && 'pointer-events-none opacity-60'
+          )}
+          disabled={isSubmitting}
+          tabIndex={isEditMode ? -1 : undefined}
           aria-required="true"
+          aria-disabled={isEditMode || undefined}
           aria-invalid={!!errors.type}
           aria-describedby={errors.type ? 'field-type-error' : undefined}
           data-testid="field-type-select"

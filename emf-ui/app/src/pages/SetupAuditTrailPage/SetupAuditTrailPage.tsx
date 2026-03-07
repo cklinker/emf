@@ -11,7 +11,7 @@ export interface SetupAuditTrailPageProps {
 
 interface AuditEntry {
   id: string
-  userId: string
+  userId: string | null
   action: string
   section: string
   entityType: string
@@ -181,7 +181,7 @@ export function SetupAuditTrailPage({ className }: SetupAuditTrailPageProps): Re
                       <td className="border-b border-border p-3">
                         {entry.entityName || entry.entityId || '-'}
                       </td>
-                      <td className="border-b border-border p-3">{entry.userId}</td>
+                      <td className="border-b border-border p-3">{entry.userId || '-'}</td>
                       <td className="border-b border-border p-3">
                         <span className="text-xs text-muted-foreground">
                           {expandedRows.has(entry.id) ? '\u25BC' : '\u25B6'}

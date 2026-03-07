@@ -47,7 +47,7 @@ class AuditBeforeSaveHookTest {
         hook.afterCreate("collections", data, "tenant-1");
 
         verify(auditService).log(
-                eq("tenant-1"), eq("user-1"), eq("CREATE"), eq("Schema"),
+                eq("tenant-1"), eq("user-1"), eq("CREATED"), eq("Schema"),
                 eq("collection"), eq("coll-123"), eq("accounts"),
                 isNull(), contains("accounts"));
     }
@@ -60,7 +60,7 @@ class AuditBeforeSaveHookTest {
         hook.afterUpdate("fields", "field-456", data, Map.of(), "tenant-1");
 
         verify(auditService).log(
-                eq("tenant-1"), eq("user-1"), eq("UPDATE"), eq("Schema"),
+                eq("tenant-1"), eq("user-1"), eq("UPDATED"), eq("Schema"),
                 eq("field"), eq("field-456"), isNull(),
                 isNull(), contains("Updated Label"));
     }
@@ -71,7 +71,7 @@ class AuditBeforeSaveHookTest {
         hook.afterDelete("profiles", "prof-789", "tenant-1");
 
         verify(auditService).log(
-                eq("tenant-1"), isNull(), eq("DELETE"), eq("Profiles"),
+                eq("tenant-1"), isNull(), eq("DELETED"), eq("Profiles"),
                 eq("profile"), eq("prof-789"), isNull(),
                 isNull(), isNull());
     }
@@ -108,7 +108,7 @@ class AuditBeforeSaveHookTest {
         hook.afterCreate("profile-system-permissions",
                 Map.of("name", "VIEW_ALL", "id", "psp-1", "createdBy", "u1"), "t1");
 
-        verify(auditService).log(eq("t1"), eq("u1"), eq("CREATE"), eq("Profiles"),
+        verify(auditService).log(eq("t1"), eq("u1"), eq("CREATED"), eq("Profiles"),
                 eq("system-permissions"), eq("psp-1"), eq("VIEW_ALL"),
                 isNull(), any());
     }
@@ -119,7 +119,7 @@ class AuditBeforeSaveHookTest {
         hook.afterCreate("permission-sets",
                 Map.of("name", "Sales Admin", "id", "ps-1", "createdBy", "u1"), "t1");
 
-        verify(auditService).log(eq("t1"), eq("u1"), eq("CREATE"), eq("Permission Sets"),
+        verify(auditService).log(eq("t1"), eq("u1"), eq("CREATED"), eq("Permission Sets"),
                 eq("permission-set"), eq("ps-1"), eq("Sales Admin"),
                 isNull(), any());
     }
@@ -130,7 +130,7 @@ class AuditBeforeSaveHookTest {
         hook.afterUpdate("users", "u2",
                 Map.of("email", "new@example.com", "updatedBy", "u1"), Map.of(), "t1");
 
-        verify(auditService).log(eq("t1"), eq("u1"), eq("UPDATE"), eq("Users"),
+        verify(auditService).log(eq("t1"), eq("u1"), eq("UPDATED"), eq("Users"),
                 eq("user"), eq("u2"), isNull(),
                 isNull(), any());
     }
@@ -141,7 +141,7 @@ class AuditBeforeSaveHookTest {
         hook.afterCreate("flows",
                 Map.of("name", "My Flow", "id", "flow-1", "createdBy", "u1"), "t1");
 
-        verify(auditService).log(eq("t1"), eq("u1"), eq("CREATE"), eq("Flows"),
+        verify(auditService).log(eq("t1"), eq("u1"), eq("CREATED"), eq("Flows"),
                 eq("flow"), eq("flow-1"), eq("My Flow"),
                 isNull(), any());
     }
@@ -151,7 +151,7 @@ class AuditBeforeSaveHookTest {
     void shouldMapOidcProviders() {
         hook.afterDelete("oidc-providers", "oidc-1", "t1");
 
-        verify(auditService).log(eq("t1"), isNull(), eq("DELETE"), eq("OIDC"),
+        verify(auditService).log(eq("t1"), isNull(), eq("DELETED"), eq("OIDC"),
                 eq("oidc-provider"), eq("oidc-1"), isNull(),
                 isNull(), isNull());
     }
@@ -218,7 +218,7 @@ class AuditBeforeSaveHookTest {
 
         hook.afterCreate("collections", data, "t1");
 
-        verify(auditService).log(eq("t1"), eq("user-uuid-123"), eq("CREATE"),
+        verify(auditService).log(eq("t1"), eq("user-uuid-123"), eq("CREATED"),
                 any(), any(), any(), any(), any(), any());
     }
 
@@ -229,7 +229,7 @@ class AuditBeforeSaveHookTest {
 
         hook.afterUpdate("collections", "c1", data, Map.of(), "t1");
 
-        verify(auditService).log(eq("t1"), eq("user-uuid-456"), eq("UPDATE"),
+        verify(auditService).log(eq("t1"), eq("user-uuid-456"), eq("UPDATED"),
                 any(), any(), any(), any(), any(), any());
     }
 }

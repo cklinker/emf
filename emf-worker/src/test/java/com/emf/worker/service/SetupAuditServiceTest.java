@@ -23,7 +23,7 @@ class SetupAuditServiceTest {
 
     @Test
     void shouldInsertAuditEntryWithAllFields() {
-        service.log("tenant-1", "user-1", "CREATE", "Schema", "collection",
+        service.log("tenant-1", "user-1", "CREATED", "Schema", "collection",
                 "coll-123", "accounts", null, "{\"name\":\"accounts\"}");
 
         verify(jdbcTemplate).update(
@@ -31,7 +31,7 @@ class SetupAuditServiceTest {
                 any(String.class),  // id
                 eq("tenant-1"),     // tenant_id
                 eq("user-1"),       // user_id
-                eq("CREATE"),       // action
+                eq("CREATED"),      // action
                 eq("Schema"),       // section
                 eq("collection"),   // entity_type
                 eq("coll-123"),     // entity_id
@@ -44,13 +44,13 @@ class SetupAuditServiceTest {
 
     @Test
     void shouldHandleNullOldAndNewValues() {
-        service.log("tenant-1", "user-1", "DELETE", "Schema", "collection",
+        service.log("tenant-1", "user-1", "DELETED", "Schema", "collection",
                 "coll-123", "accounts", null, null);
 
         verify(jdbcTemplate).update(
                 contains("INSERT INTO setup_audit_trail"),
                 any(String.class), eq("tenant-1"), eq("user-1"),
-                eq("DELETE"), eq("Schema"), eq("collection"),
+                eq("DELETED"), eq("Schema"), eq("collection"),
                 eq("coll-123"), eq("accounts"),
                 isNull(), isNull(),
                 any(), any(), any()
@@ -58,13 +58,13 @@ class SetupAuditServiceTest {
     }
 
     @Test
-    void shouldUseSystemAsFallbackForNullUserId() {
-        service.log("tenant-1", null, "CREATE", "Schema", "collection",
+    void shouldPassNullUserIdWhenNotProvided() {
+        service.log("tenant-1", null, "CREATED", "Schema", "collection",
                 "coll-123", "accounts", null, null);
 
         verify(jdbcTemplate).update(
                 contains("INSERT INTO setup_audit_trail"),
-                any(String.class), eq("tenant-1"), eq("system"),
+                any(String.class), eq("tenant-1"), isNull(),
                 any(), any(), any(), any(), any(),
                 any(), any(), any(), any(), any()
         );
@@ -78,7 +78,7 @@ class SetupAuditServiceTest {
                         any(), any(), any(), any(), any(), any());
 
         // Should NOT throw
-        service.log("tenant-1", "user-1", "CREATE", "Schema", "collection",
+        service.log("tenant-1", "user-1", "CREATED", "Schema", "collection",
                 "coll-123", "accounts", null, null);
 
         verify(jdbcTemplate).update(anyString(),

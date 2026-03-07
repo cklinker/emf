@@ -111,7 +111,7 @@ public class AuditBeforeSaveHook implements BeforeSaveHook {
         String recordId = extractRecordId(record);
         String userId = extractUserId(record);
 
-        auditService.log(tenantId, userId, "CREATE", section, entityType,
+        auditService.log(tenantId, userId, "CREATED", section, entityType,
                 recordId, entityName, null, toJson(record));
     }
 
@@ -126,7 +126,7 @@ public class AuditBeforeSaveHook implements BeforeSaveHook {
         String entityType = resolveEntityType(collectionName);
         String userId = extractUserId(record);
 
-        auditService.log(tenantId, userId, "UPDATE", section, entityType,
+        auditService.log(tenantId, userId, "UPDATED", section, entityType,
                 id, null, null, toJson(record));
     }
 
@@ -139,7 +139,7 @@ public class AuditBeforeSaveHook implements BeforeSaveHook {
 
         String entityType = resolveEntityType(collectionName);
 
-        auditService.log(tenantId, null, "DELETE", section, entityType,
+        auditService.log(tenantId, null, "DELETED", section, entityType,
                 id, null, null, null);
     }
 

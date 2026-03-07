@@ -179,16 +179,28 @@ describe('FieldEditor Component', () => {
       expect(submitButton).toHaveTextContent('Save')
     })
 
-    it('should disable name field in edit mode', () => {
+    it('should make name field read-only in edit mode', () => {
       renderWithProviders(<FieldEditor {...defaultProps} field={mockField} />)
 
-      expect(screen.getByTestId('field-name-input')).toBeDisabled()
+      expect(screen.getByTestId('field-name-input')).toHaveAttribute('readonly')
     })
 
-    it('should disable type field in edit mode', () => {
+    it('should make type field non-interactive in edit mode', () => {
       renderWithProviders(<FieldEditor {...defaultProps} field={mockField} />)
 
-      expect(screen.getByTestId('field-type-select')).toBeDisabled()
+      const select = screen.getByTestId('field-type-select')
+      expect(select).toHaveAttribute('aria-disabled', 'true')
+      expect(select).toHaveAttribute('tabindex', '-1')
+    })
+
+    it('should pre-populate field type in edit mode', () => {
+      const emailField: FieldDefinition = {
+        ...mockField,
+        type: 'email',
+      }
+      renderWithProviders(<FieldEditor {...defaultProps} field={emailField} />)
+
+      expect(screen.getByTestId('field-type-select')).toHaveValue('email')
     })
 
     it('should not render name hint in edit mode', () => {

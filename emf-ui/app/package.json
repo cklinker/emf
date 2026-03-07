@@ -38,7 +38,17 @@
     "recharts": "^3.7.0",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.1",
-    "zod": "^4.3.6"
+    "zod": "^4.3.6",
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/sdk-trace-web": "^1.25.0",
+    "@opentelemetry/sdk-trace-base": "^1.25.0",
+    "@opentelemetry/context-zone": "^1.25.0",
+    "@opentelemetry/instrumentation-fetch": "^0.52.0",
+    "@opentelemetry/instrumentation-xml-http-request": "^0.52.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.52.0",
+    "@opentelemetry/resources": "^1.25.0",
+    "@opentelemetry/semantic-conventions": "^1.25.0",
+    "@opentelemetry/propagator-b3": "^1.25.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

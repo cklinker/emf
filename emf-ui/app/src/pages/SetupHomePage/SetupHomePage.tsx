@@ -276,6 +276,42 @@ const CATEGORIES: SetupCategory[] = [
         permission: 'VIEW_SETUP',
       },
       {
+        name: 'Request Log',
+        path: '/request-log',
+        description: 'Explore API request logs with trace details',
+        permission: 'VIEW_SETUP',
+      },
+      {
+        name: 'Log Viewer',
+        path: '/logs',
+        description: 'Search and filter application logs',
+        permission: 'VIEW_SETUP',
+      },
+      {
+        name: 'Error Dashboard',
+        path: '/errors',
+        description: 'View error aggregation and trends',
+        permission: 'VIEW_SETUP',
+      },
+      {
+        name: 'Endpoint Performance',
+        path: '/endpoint-performance',
+        description: 'Endpoint latency and performance leaderboard',
+        permission: 'VIEW_SETUP',
+      },
+      {
+        name: 'User Activity',
+        path: '/user-activity',
+        description: 'View unified user activity timeline',
+        permission: 'VIEW_SETUP',
+      },
+      {
+        name: 'Observability Settings',
+        path: '/observability-settings',
+        description: 'Configure data retention and storage',
+        permission: 'CUSTOMIZE_APPLICATION',
+      },
+      {
         name: 'Tenants',
         path: '/tenants',
         description: 'Platform-level tenant management',

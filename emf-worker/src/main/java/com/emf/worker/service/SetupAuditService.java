@@ -10,7 +10,8 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Service for recording configuration changes to the {@code setup_audit_trail} table.
+ * Service for recording configuration changes.
+ * Writes to both PostgreSQL (for backward compatibility) and OpenSearch (for observability).
  *
  * <p>All logging is non-fatal — exceptions are caught and logged as warnings
  * to ensure audit failures never disrupt normal operations.
@@ -23,9 +24,11 @@ public class SetupAuditService {
     private static final Logger log = LoggerFactory.getLogger(SetupAuditService.class);
 
     private final JdbcTemplate jdbcTemplate;
+    private final OpenSearchAuditService openSearchAuditService;
 
-    public SetupAuditService(JdbcTemplate jdbcTemplate) {
+    public SetupAuditService(JdbcTemplate jdbcTemplate, OpenSearchAuditService openSearchAuditService) {
         this.jdbcTemplate = jdbcTemplate;
+        this.openSearchAuditService = openSearchAuditService;
     }
 
     /**
@@ -61,5 +64,9 @@ public class SetupAuditService {
             log.warn("Failed to write setup audit entry: {} {} {}: {}",
                     action, entityType, entityId, e.getMessage());
         }
+
+        // Also write to OpenSearch for observability
+        openSearchAuditService.logSetupAudit(tenantId, userId, action, section,
+                entityType, entityId, entityName, oldValue, newValue);
     }
 }

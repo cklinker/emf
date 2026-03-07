@@ -1,5 +1,6 @@
 package com.emf.worker.filter;
 
+import com.emf.worker.service.OpenSearchAuditService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,14 +23,16 @@ import static org.mockito.Mockito.*;
 class LoginTrackingFilterTest {
 
     private JdbcTemplate jdbcTemplate;
+    private OpenSearchAuditService openSearchAuditService;
     private Map<String, Long> throttleCache;
     private LoginTrackingFilter filter;
 
     @BeforeEach
     void setUp() {
         jdbcTemplate = mock(JdbcTemplate.class);
+        openSearchAuditService = mock(OpenSearchAuditService.class);
         throttleCache = new ConcurrentHashMap<>();
-        filter = new LoginTrackingFilter(jdbcTemplate, throttleCache);
+        filter = new LoginTrackingFilter(jdbcTemplate, openSearchAuditService, throttleCache);
     }
 
     @Test

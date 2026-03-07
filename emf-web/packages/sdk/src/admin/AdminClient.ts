@@ -103,6 +103,16 @@ import type {
   MetricsQueryParams,
   MetricsQueryResult,
   MetricsSummary,
+  EndpointPerformance,
+  ErrorGroup,
+  LatencyPercentiles,
+  RequestLogSearchParams,
+  RequestLogSearchResult,
+  RequestLogDetail,
+  LogSearchParams,
+  LogSearchResult,
+  AuditSearchParams,
+  AuditSearchResult,
 } from './types';
 import {
   toJsonApiBody,
@@ -1923,6 +1933,79 @@ export class AdminClient {
     summary: async (): Promise<MetricsSummary> => {
       const response = await this.axios.get('/api/metrics/summary');
       return unwrapJsonApiResource<MetricsSummary>(response.data);
+    },
+
+    endpoints: async (limit = 20): Promise<{ endpoints: EndpointPerformance[] }> => {
+      const response = await this.axios.get(`/api/metrics/endpoints?limit=${limit}`);
+      return unwrapJsonApiResource<{ endpoints: EndpointPerformance[] }>(response.data);
+    },
+
+    errors: async (limit = 20): Promise<{ errors: ErrorGroup[] }> => {
+      const response = await this.axios.get(`/api/metrics/errors?limit=${limit}`);
+      return unwrapJsonApiResource<{ errors: ErrorGroup[] }>(response.data);
+    },
+
+    latency: async (start?: string, end?: string): Promise<LatencyPercentiles> => {
+      const qs = new URLSearchParams();
+      if (start) qs.set('start', start);
+      if (end) qs.set('end', end);
+      const response = await this.axios.get(`/api/metrics/latency?${qs.toString()}`);
+      return unwrapJsonApiResource<LatencyPercentiles>(response.data);
+    },
+  };
+
+  // ---------------------------------------------------------------------------
+  // Observability
+  // ---------------------------------------------------------------------------
+
+  readonly observability = {
+    searchRequestLogs: async (params: RequestLogSearchParams): Promise<RequestLogSearchResult> => {
+      const qs = new URLSearchParams();
+      if (params.method) qs.set('method', params.method);
+      if (params.status) qs.set('status', params.status);
+      if (params.path) qs.set('path', params.path);
+      if (params.traceId) qs.set('traceId', params.traceId);
+      if (params.userId) qs.set('userId', params.userId);
+      if (params.start) qs.set('start', params.start);
+      if (params.end) qs.set('end', params.end);
+      if (params.page !== undefined) qs.set('page', String(params.page));
+      if (params.size !== undefined) qs.set('size', String(params.size));
+      const response = await this.axios.get(
+        `/api/admin/observability/request-logs?${qs.toString()}`
+      );
+      return unwrapJsonApiResource<RequestLogSearchResult>(response.data);
+    },
+
+    getRequestLog: async (traceId: string): Promise<RequestLogDetail> => {
+      const response = await this.axios.get(`/api/admin/observability/request-logs/${traceId}`);
+      return unwrapJsonApiResource<RequestLogDetail>(response.data);
+    },
+
+    searchLogs: async (params: LogSearchParams): Promise<LogSearchResult> => {
+      const qs = new URLSearchParams();
+      if (params.query) qs.set('query', params.query);
+      if (params.level) qs.set('level', params.level);
+      if (params.service) qs.set('service', params.service);
+      if (params.traceId) qs.set('traceId', params.traceId);
+      if (params.start) qs.set('start', params.start);
+      if (params.end) qs.set('end', params.end);
+      if (params.page !== undefined) qs.set('page', String(params.page));
+      if (params.size !== undefined) qs.set('size', String(params.size));
+      const response = await this.axios.get(`/api/admin/observability/logs?${qs.toString()}`);
+      return unwrapJsonApiResource<LogSearchResult>(response.data);
+    },
+
+    searchAudit: async (params: AuditSearchParams): Promise<AuditSearchResult> => {
+      const qs = new URLSearchParams();
+      if (params.auditType) qs.set('auditType', params.auditType);
+      if (params.action) qs.set('action', params.action);
+      if (params.userId) qs.set('userId', params.userId);
+      if (params.start) qs.set('start', params.start);
+      if (params.end) qs.set('end', params.end);
+      if (params.page !== undefined) qs.set('page', String(params.page));
+      if (params.size !== undefined) qs.set('size', String(params.size));
+      const response = await this.axios.get(`/api/admin/observability/audit?${qs.toString()}`);
+      return unwrapJsonApiResource<AuditSearchResult>(response.data);
     },
   };
 }

@@ -972,6 +972,86 @@
     "chartRateLimit": "Eventos de limite de taxa",
     "chartActiveRequests": "Solicitações ativas"
   },
+  "requestLog": {
+    "title": "Request Log",
+    "loadError": "Failed to load request logs.",
+    "method": "Method",
+    "status": "Status",
+    "path": "Path",
+    "pathPlaceholder": "Filter by path...",
+    "time": "Time",
+    "duration": "Duration",
+    "traceId": "Trace ID",
+    "noEntries": "No request log entries found.",
+    "detail": {
+      "loadError": "Failed to load request log detail.",
+      "backToList": "Back to Request Log",
+      "requestTab": "Request",
+      "responseTab": "Response",
+      "traceTab": "Trace",
+      "logsTab": "Logs",
+      "auditTab": "Audit Events",
+      "requestHeaders": "Request Headers",
+      "requestBody": "Request Body",
+      "responseBody": "Response Body",
+      "childSpans": "Child Spans",
+      "noChildSpans": "No child spans.",
+      "correlatedLogs": "Correlated Logs",
+      "noLogs": "No correlated log entries.",
+      "auditEvents": "Audit Events",
+      "noAuditEvents": "No audit events for this request.",
+      "noHeaders": "No request headers captured.",
+      "viewInJaeger": "View full trace in Jaeger"
+    }
+  },
+  "logViewer": {
+    "title": "Log Viewer",
+    "loadError": "Failed to load logs.",
+    "search": "Search",
+    "searchPlaceholder": "Search log messages...",
+    "level": "Level",
+    "service": "Service",
+    "timestamp": "Timestamp",
+    "message": "Message",
+    "noEntries": "No log entries found."
+  },
+  "errorDashboard": {
+    "title": "Error Dashboard",
+    "loadError": "Failed to load error data.",
+    "errorRate": "Error Rate",
+    "totalErrors": "Total Errors",
+    "uniqueEndpoints": "Unique Endpoints",
+    "endpoint": "Endpoint",
+    "count": "Count",
+    "statusCodes": "Status Codes",
+    "noErrors": "No errors found."
+  },
+  "userActivity": {
+    "title": "User Activity",
+    "selectUser": "User",
+    "chooseUser": "Select a user...",
+    "selectPrompt": "Select a user to view their activity.",
+    "noActivity": "No activity found for this user."
+  },
+  "endpointPerformance": {
+    "title": "Endpoint Performance",
+    "loadError": "Failed to load endpoint performance data.",
+    "endpoint": "Endpoint",
+    "requests": "Requests",
+    "avg": "Avg",
+    "noData": "No endpoint performance data available."
+  },
+  "observabilitySettings": {
+    "title": "Observability Settings",
+    "description": "Configure data retention periods for observability data stored in OpenSearch.",
+    "loadError": "Failed to load observability settings.",
+    "retention": "Data Retention",
+    "traceRetention": "Trace Retention",
+    "logRetention": "Log Retention",
+    "auditRetention": "Audit Retention",
+    "days": "days",
+    "saved": "Settings saved successfully."
+  },
   "workers": {
     "title": "Workers",
     "count": "{{count}} workers",

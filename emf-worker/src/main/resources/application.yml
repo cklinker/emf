@@ -33,8 +33,16 @@ spring:
 emf:
   worker:
     id: ${WORKER_ID:}
-  prometheus:
-    url: ${PROMETHEUS_URL:http://prometheus.prometheus.svc.cluster.local:9090}
+  opensearch:
+    url: ${OPENSEARCH_URL:http://localhost:9200}
+    index-prefix: ${OPENSEARCH_INDEX_PREFIX:emf}
+  observability:
+    request-logging:
+      enabled: ${REQUEST_LOGGING_ENABLED:true}
+      max-body-size: 16384
+      sensitive-headers: Authorization,Cookie,Set-Cookie,X-Api-Key
+      sensitive-body-fields: password,secret,token,apiKey,creditCard,ssn
+      exclude-paths: /actuator,/health
   storage:
     mode: PHYSICAL_TABLES
     s3:
@@ -54,14 +62,12 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,prometheus
+        include: health,info,metrics
   endpoint:
     health:
       show-details: always
       probes:
         enabled: true
-    prometheus:
-      enabled: true
     metrics:
       enabled: true
   health:
@@ -69,6 +75,12 @@ management:
       enabled: true
     livenessState:
       enabled: true
+  tracing:
+    enabled: true
+    sampling:
+      probability: ${OTEL_TRACES_SAMPLER_ARG:1.0}
+    propagation:
+      type: w3c
   metrics:
     distribution:
       percentiles-histogram:
@@ -77,8 +89,3 @@ management:
         emf_worker_request_duration_seconds: 0.5,0.95,0.99
     tags:
       application: ${spring.application.name}
-
-logging:
-  level:
-    com.emf: ${LOGGING_LEVEL_COM_EMF:INFO}
-    root: ${LOGGING_LEVEL_ROOT:INFO}

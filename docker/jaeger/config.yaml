@@ -1,0 +1,50 @@
+extensions:
+  jaeger_storage:
+    backends:
+      opensearch_main:
+        opensearch:
+          server_urls: http://opensearch:9200
+          index_prefix: jaeger
+          create_index_templates: true
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    send_batch_size: 1024
+    timeout: 5s
+
+exporters:
+  jaeger_storage_exporter:
+    trace_storage: opensearch_main
+  opensearch/logs:
+    http:
+      endpoint: http://opensearch:9200
+    logs_index: emf-logs
+  opensearch/metrics:
+    http:
+      endpoint: http://opensearch:9200
+    dataset: metrics
+    namespace: emf
+
+service:
+  extensions: [jaeger_storage]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [jaeger_storage_exporter]
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [opensearch/logs]
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [opensearch/metrics]

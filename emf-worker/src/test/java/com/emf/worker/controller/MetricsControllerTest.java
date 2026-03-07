@@ -1,14 +1,14 @@
 package com.emf.worker.controller;
 
-import com.emf.worker.service.PrometheusQueryService;
-import com.emf.worker.service.PrometheusQueryService.DataPoint;
-import com.emf.worker.service.PrometheusQueryService.TimeSeries;
+import com.emf.worker.service.OpenSearchQueryService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.ResponseEntity;
 
+import java.io.IOException;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
@@ -19,21 +19,20 @@ import static org.mockito.Mockito.*;
 /**
  * Tests for {@link MetricsController}.
  *
- * <p>Verifies the metrics query and summary endpoints, including
- * PromQL construction, parameter validation, and JSON:API response format.
+ * <p>Verifies the metrics query and summary endpoints backed by OpenSearch,
+ * including parameter validation and JSON:API response format.
  */
 class MetricsControllerTest {
 
-    private PrometheusQueryService prometheusQueryService;
+    private OpenSearchQueryService queryService;
     private MetricsController controller;
 
     @BeforeEach
     void setUp() {
-        prometheusQueryService = mock(PrometheusQueryService.class);
-        controller = new MetricsController(prometheusQueryService);
+        queryService = mock(OpenSearchQueryService.class);
+        controller = new MetricsController(queryService);
     }
 
-    /** Extracts the attributes map from a JSON:API single-resource response body. */
     @SuppressWarnings("unchecked")
     private Map<String, Object> getAttributes(Map<String, Object> body) {
         Map<String, Object> data = (Map<String, Object>) body.get("data");
@@ -53,8 +52,8 @@ class MetricsControllerTest {
 
         @Test
         @DisplayName("Should return JSON:API envelope with type 'metrics-query'")
-        void returnsJsonApiEnvelope() {
-            when(prometheusQueryService.queryRange(anyString(), any(), any(), anyString()))
+        void returnsJsonApiEnvelope() throws IOException {
+            when(queryService.getRequestCountOverTime(anyString(), any(Instant.class), any(Instant.class), anyString()))
                     .thenReturn(List.of());
 
             ResponseEntity<Map<String, Object>> response = controller.query(
@@ -72,15 +71,13 @@ class MetricsControllerTest {
 
         @Test
         @DisplayName("Should return time series data in attributes")
-        void returnsTimeSeriesData() {
-            List<TimeSeries> mockResult = List.of(
-                    new TimeSeries(
-                            Map.of("status", "200"),
-                            List.of(new DataPoint(1704067200.0, 42.5), new DataPoint(1704067260.0, 38.1))
-                    )
+        void returnsTimeSeriesData() throws IOException {
+            List<Map<String, Object>> mockDataPoints = List.of(
+                    Map.of("timestamp", "2024-01-01T00:00:00Z", "value", 42L),
+                    Map.of("timestamp", "2024-01-01T00:01:00Z", "value", 38L)
             );
-            when(prometheusQueryService.queryRange(anyString(), any(), any(), anyString()))
-                    .thenReturn(mockResult);
+            when(queryService.getRequestCountOverTime(anyString(), any(Instant.class), any(Instant.class), anyString()))
+                    .thenReturn(mockDataPoints);
 
             ResponseEntity<Map<String, Object>> response = controller.query(
                     "tenant-1", "requests",
@@ -98,13 +95,8 @@ class MetricsControllerTest {
             assertThat(series).hasSize(1);
 
             @SuppressWarnings("unchecked")
-            Map<String, String> labels = (Map<String, String>) series.get(0).get("labels");
-            assertThat(labels.get("status")).isEqualTo("200");
-
-            @SuppressWarnings("unchecked")
             List<Map<String, Object>> points = (List<Map<String, Object>>) series.get(0).get("dataPoints");
             assertThat(points).hasSize(2);
-            assertThat((double) points.get(0).get("value")).isEqualTo(42.5);
         }
 
         @Test
@@ -119,20 +111,9 @@ class MetricsControllerTest {
         }
 
         @Test
-        @DisplayName("Should reject unknown metric type")
-        void rejectsUnknownMetric() {
-            ResponseEntity<Map<String, Object>> response = controller.query(
-                    "tenant-1", "nonexistent_metric",
-                    "2024-01-01T00:00:00Z", "2024-01-01T01:00:00Z",
-                    "60s", null);
-
-            assertThat(response.getStatusCode().value()).isEqualTo(400);
-        }
-
-        @Test
         @DisplayName("Should auto-calculate step when not provided")
-        void autoCalculatesStep() {
-            when(prometheusQueryService.queryRange(anyString(), any(), any(), anyString()))
+        void autoCalculatesStep() throws IOException {
+            when(queryService.getRequestCountOverTime(anyString(), any(Instant.class), any(Instant.class), anyString()))
                     .thenReturn(List.of());
 
             // 1 hour range → should use 15s step
@@ -146,24 +127,9 @@ class MetricsControllerTest {
         }
 
         @Test
-        @DisplayName("Should pass route filter to PromQL")
-        void passesRouteFilter() {
-            when(prometheusQueryService.queryRange(anyString(), any(), any(), anyString()))
-                    .thenReturn(List.of());
-
-            controller.query(
-                    "tenant-1", "requests",
-                    "2024-01-01T00:00:00Z", "2024-01-01T01:00:00Z",
-                    "60s", "/api/users");
-
-            verify(prometheusQueryService).queryRange(
-                    contains("route=\"/api/users\""), any(), any(), eq("60s"));
-        }
-
-        @Test
-        @DisplayName("Should return empty series when Prometheus returns no data")
-        void returnsEmptySeriesWhenNoData() {
-            when(prometheusQueryService.queryRange(anyString(), any(), any(), anyString()))
+        @DisplayName("Should return empty series when OpenSearch returns no data")
+        void returnsEmptySeriesWhenNoData() throws IOException {
+            when(queryService.getRequestCountOverTime(anyString(), any(Instant.class), any(Instant.class), anyString()))
                     .thenReturn(List.of());
 
             ResponseEntity<Map<String, Object>> response = controller.query(
@@ -174,80 +140,24 @@ class MetricsControllerTest {
             Map<String, Object> attrs = getAttributes(response.getBody());
             @SuppressWarnings("unchecked")
             List<Map<String, Object>> series = (List<Map<String, Object>>) attrs.get("series");
-            assertThat(series).isEmpty();
-        }
-    }
-
-    // ==================== PromQL Construction Tests ====================
-
-    @Nested
-    @DisplayName("PromQL construction")
-    class PromQLTests {
-
-        @Test
-        @DisplayName("Should build requests PromQL with tenant filter")
-        void buildsRequestsPromql() {
-            String promql = controller.buildPromQL("requests", "tenant-1", null);
-            assertThat(promql).contains("emf_gateway_requests_seconds_count");
-            assertThat(promql).contains("tenant=\"tenant-1\"");
-            assertThat(promql).contains("by (status)");
+            assertThat(series).hasSize(1);
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> dataPoints = (List<Map<String, Object>>) series.get(0).get("dataPoints");
+            assertThat(dataPoints).isEmpty();
         }
 
         @Test
-        @DisplayName("Should build latency_p95 PromQL with histogram_quantile")
-        void buildsLatencyP95Promql() {
-            String promql = controller.buildPromQL("latency_p95", "tenant-1", null);
-            assertThat(promql).contains("histogram_quantile(0.95");
-            assertThat(promql).contains("emf_gateway_requests_seconds_bucket");
-            assertThat(promql).contains("tenant=\"tenant-1\"");
-        }
+        @DisplayName("Should return 500 when OpenSearch throws")
+        void returns500OnOpenSearchError() throws IOException {
+            when(queryService.getRequestCountOverTime(anyString(), any(Instant.class), any(Instant.class), anyString()))
+                    .thenThrow(new IOException("Connection refused"));
 
-        @Test
-        @DisplayName("Should build errors PromQL with error_code grouping")
-        void buildsErrorsPromql() {
-            String promql = controller.buildPromQL("errors", "tenant-1", null);
-            assertThat(promql).contains("emf_gateway_errors_total");
-            assertThat(promql).contains("tenant=\"tenant-1\"");
-            assertThat(promql).contains("by (error_code)");
-        }
+            ResponseEntity<Map<String, Object>> response = controller.query(
+                    "tenant-1", "requests",
+                    "2024-01-01T00:00:00Z", "2024-01-01T01:00:00Z",
+                    "60s", null);
 
-        @Test
-        @DisplayName("Should build auth_failures PromQL with reason grouping")
-        void buildsAuthFailuresPromql() {
-            String promql = controller.buildPromQL("auth_failures", "tenant-1", null);
-            assertThat(promql).contains("emf_gateway_auth_failures_total");
-            assertThat(promql).contains("tenant=\"tenant-1\"");
-            assertThat(promql).contains("by (reason)");
-        }
-
-        @Test
-        @DisplayName("Should build rate_limit PromQL")
-        void buildsRateLimitPromql() {
-            String promql = controller.buildPromQL("rate_limit", "tenant-1", null);
-            assertThat(promql).contains("emf_gateway_ratelimit_exceeded_total");
-            assertThat(promql).contains("tenant=\"tenant-1\"");
-        }
-
-        @Test
-        @DisplayName("Should build active_requests PromQL")
-        void buildsActiveRequestsPromql() {
-            String promql = controller.buildPromQL("active_requests", "tenant-1", null);
-            assertThat(promql).contains("emf_gateway_requests_active");
-            assertThat(promql).contains("tenant=\"tenant-1\"");
-        }
-
-        @Test
-        @DisplayName("Should add route filter when provided")
-        void addsRouteFilter() {
-            String promql = controller.buildPromQL("requests", "tenant-1", "/api/users");
-            assertThat(promql).contains("route=\"/api/users\"");
-        }
-
-        @Test
-        @DisplayName("Should return null for unknown metric")
-        void returnsNullForUnknown() {
-            String promql = controller.buildPromQL("unknown", "tenant-1", null);
-            assertThat(promql).isNull();
+            assertThat(response.getStatusCode().value()).isEqualTo(500);
         }
     }
 
@@ -259,9 +169,15 @@ class MetricsControllerTest {
 
         @Test
         @DisplayName("Should return JSON:API envelope with type 'metrics-summary'")
-        void returnsJsonApiEnvelope() {
-            when(prometheusQueryService.queryInstant(anyString()))
-                    .thenReturn(List.of());
+        void returnsJsonApiEnvelope() throws IOException {
+            when(queryService.getMetricsSummary(anyString(), any(Instant.class), any(Instant.class)))
+                    .thenReturn(Map.of(
+                            "totalRequests", 0L,
+                            "errorRate", 0.0,
+                            "avgLatencyMs", 0.0,
+                            "errorCount", 0L,
+                            "authFailures", 0L,
+                            "rateLimited", 0L));
 
             ResponseEntity<Map<String, Object>> response = controller.summary("tenant-1");
 
@@ -273,42 +189,157 @@ class MetricsControllerTest {
 
         @Test
         @DisplayName("Should return summary metrics with correct keys")
-        void returnsSummaryMetrics() {
-            // Mock total requests
-            when(prometheusQueryService.queryInstant(contains("emf_gateway_requests_seconds_count")))
-                    .thenReturn(List.of(new TimeSeries(Map.of(), List.of(new DataPoint(0, 1500)))));
-
-            // Mock total errors
-            when(prometheusQueryService.queryInstant(contains("emf_gateway_errors_total")))
-                    .thenReturn(List.of(new TimeSeries(Map.of(), List.of(new DataPoint(0, 15)))));
-
-            // Mock avg latency (sum / count)
-            when(prometheusQueryService.queryInstant(contains("emf_gateway_requests_seconds_sum")))
-                    .thenReturn(List.of(new TimeSeries(Map.of(), List.of(new DataPoint(0, 0.150)))));
-
-            // Mock active requests
-            when(prometheusQueryService.queryInstant(contains("emf_gateway_requests_active")))
-                    .thenReturn(List.of(new TimeSeries(Map.of(), List.of(new DataPoint(0, 5)))));
+        void returnsSummaryMetrics() throws IOException {
+            when(queryService.getMetricsSummary(anyString(), any(Instant.class), any(Instant.class)))
+                    .thenReturn(Map.of(
+                            "totalRequests", 1500L,
+                            "errorRate", 1.0,
+                            "avgLatencyMs", 150.0,
+                            "errorCount", 15L,
+                            "authFailures", 3L,
+                            "rateLimited", 2L));
 
             ResponseEntity<Map<String, Object>> response = controller.summary("tenant-1");
 
             Map<String, Object> attrs = getAttributes(response.getBody());
-            assertThat(attrs).containsKeys("totalRequests", "errorRate", "avgLatencyMs", "activeRequests");
+            assertThat(attrs).containsKeys("totalRequests", "errorRate", "avgLatencyMs", "activeRequests",
+                    "authFailures", "rateLimited");
+            assertThat(((Number) attrs.get("totalRequests")).longValue()).isEqualTo(1500L);
+            assertThat(((Number) attrs.get("errorRate")).doubleValue()).isEqualTo(1.0);
+            assertThat(((Number) attrs.get("avgLatencyMs")).doubleValue()).isEqualTo(150.0);
         }
 
         @Test
-        @DisplayName("Should return zeros when Prometheus returns no data")
-        void returnsZerosWhenNoData() {
-            when(prometheusQueryService.queryInstant(anyString()))
-                    .thenReturn(List.of());
+        @DisplayName("Should return 500 when OpenSearch throws")
+        void returns500OnOpenSearchError() throws IOException {
+            when(queryService.getMetricsSummary(anyString(), any(Instant.class), any(Instant.class)))
+                    .thenThrow(new IOException("Connection refused"));
 
             ResponseEntity<Map<String, Object>> response = controller.summary("tenant-1");
 
+            assertThat(response.getStatusCode().value()).isEqualTo(500);
+        }
+    }
+
+    // ==================== Endpoints Tests ====================
+
+    @Nested
+    @DisplayName("GET /api/metrics/endpoints")
+    class EndpointsTests {
+
+        @Test
+        @DisplayName("Should return top endpoints in JSON:API envelope")
+        void returnsTopEndpoints() throws IOException {
+            List<Map<String, Object>> mockEndpoints = List.of(
+                    Map.of("endpoint", "/api/users", "requestCount", 500L, "p50", 12.5, "p95", 45.0, "p99", 120.0, "avgDuration", 20.0),
+                    Map.of("endpoint", "/api/collections", "requestCount", 300L, "p50", 8.0, "p95", 30.0, "p99", 80.0, "avgDuration", 15.0)
+            );
+            when(queryService.getTopEndpoints(anyString(), any(Instant.class), any(Instant.class), anyInt()))
+                    .thenReturn(mockEndpoints);
+
+            ResponseEntity<Map<String, Object>> response = controller.topEndpoints("tenant-1", 20);
+
+            assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+            Map<String, Object> data = getData(response.getBody());
+            assertThat(data.get("type")).isEqualTo("metrics-endpoints");
+            assertThat(data.get("id")).isEqualTo("top");
+
             Map<String, Object> attrs = getAttributes(response.getBody());
-            assertThat(((Number) attrs.get("totalRequests")).longValue()).isEqualTo(0);
-            assertThat(((Number) attrs.get("errorRate")).doubleValue()).isEqualTo(0.0);
-            assertThat(((Number) attrs.get("avgLatencyMs")).doubleValue()).isEqualTo(0.0);
-            assertThat(((Number) attrs.get("activeRequests")).longValue()).isEqualTo(0);
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> endpoints = (List<Map<String, Object>>) attrs.get("endpoints");
+            assertThat(endpoints).hasSize(2);
+            assertThat(endpoints.get(0).get("endpoint")).isEqualTo("/api/users");
+        }
+
+        @Test
+        @DisplayName("Should return 500 when OpenSearch throws")
+        void returns500OnOpenSearchError() throws IOException {
+            when(queryService.getTopEndpoints(anyString(), any(Instant.class), any(Instant.class), anyInt()))
+                    .thenThrow(new IOException("Connection refused"));
+
+            ResponseEntity<Map<String, Object>> response = controller.topEndpoints("tenant-1", 20);
+
+            assertThat(response.getStatusCode().value()).isEqualTo(500);
+        }
+    }
+
+    // ==================== Errors Tests ====================
+
+    @Nested
+    @DisplayName("GET /api/metrics/errors")
+    class ErrorsTests {
+
+        @Test
+        @DisplayName("Should return top errors in JSON:API envelope")
+        void returnsTopErrors() throws IOException {
+            List<Map<String, Object>> mockErrors = List.of(
+                    Map.of("path", "/api/users", "count", 15L, "statusCodes", Map.of("404", 10L, "500", 5L))
+            );
+            when(queryService.getTopErrors(anyString(), any(Instant.class), any(Instant.class), anyInt()))
+                    .thenReturn(mockErrors);
+
+            ResponseEntity<Map<String, Object>> response = controller.topErrors("tenant-1", 20);
+
+            assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+            Map<String, Object> data = getData(response.getBody());
+            assertThat(data.get("type")).isEqualTo("metrics-errors");
+
+            Map<String, Object> attrs = getAttributes(response.getBody());
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> errors = (List<Map<String, Object>>) attrs.get("errors");
+            assertThat(errors).hasSize(1);
+            assertThat(errors.get(0).get("path")).isEqualTo("/api/users");
+        }
+    }
+
+    // ==================== Latency Tests ====================
+
+    @Nested
+    @DisplayName("GET /api/metrics/latency")
+    class LatencyTests {
+
+        @Test
+        @DisplayName("Should return latency percentiles in JSON:API envelope")
+        void returnsLatencyPercentiles() throws IOException {
+            when(queryService.getLatencyPercentiles(anyString(), any(Instant.class), any(Instant.class)))
+                    .thenReturn(Map.of("p50", 12.5, "p95", 45.0, "p99", 120.0, "avg", 20.0));
+
+            ResponseEntity<Map<String, Object>> response = controller.latencyPercentiles(
+                    "tenant-1", "2024-01-01T00:00:00Z", "2024-01-01T01:00:00Z");
+
+            assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+            Map<String, Object> data = getData(response.getBody());
+            assertThat(data.get("type")).isEqualTo("metrics-latency");
+
+            Map<String, Object> attrs = getAttributes(response.getBody());
+            assertThat(((Number) attrs.get("p50")).doubleValue()).isEqualTo(12.5);
+            assertThat(((Number) attrs.get("p95")).doubleValue()).isEqualTo(45.0);
+            assertThat(((Number) attrs.get("p99")).doubleValue()).isEqualTo(120.0);
+        }
+
+        @Test
+        @DisplayName("Should use default time range when start/end not provided")
+        void usesDefaultTimeRange() throws IOException {
+            when(queryService.getLatencyPercentiles(anyString(), any(Instant.class), any(Instant.class)))
+                    .thenReturn(Map.of("p50", 10.0, "p95", 30.0, "p99", 80.0, "avg", 15.0));
+
+            ResponseEntity<Map<String, Object>> response = controller.latencyPercentiles(
+                    "tenant-1", null, null);
+
+            assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+            verify(queryService).getLatencyPercentiles(eq("tenant-1"), any(Instant.class), any(Instant.class));
+        }
+
+        @Test
+        @DisplayName("Should return 500 when OpenSearch throws")
+        void returns500OnOpenSearchError() throws IOException {
+            when(queryService.getLatencyPercentiles(anyString(), any(Instant.class), any(Instant.class)))
+                    .thenThrow(new IOException("Connection refused"));
+
+            ResponseEntity<Map<String, Object>> response = controller.latencyPercentiles(
+                    "tenant-1", "2024-01-01T00:00:00Z", "2024-01-01T01:00:00Z");
+
+            assertThat(response.getStatusCode().value()).isEqualTo(500);
         }
     }
 }

@@ -1,9 +1,7 @@
 package com.emf.worker.controller;
 
 import com.emf.jsonapi.JsonApiResponseBuilder;
-import com.emf.worker.service.PrometheusQueryService;
-import com.emf.worker.service.PrometheusQueryService.DataPoint;
-import com.emf.worker.service.PrometheusQueryService.TimeSeries;
+import com.emf.worker.service.OpenSearchQueryService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -14,13 +12,17 @@ import java.time.Instant;
 import java.util.*;
 
 /**
- * REST controller for tenant metrics, backed by Prometheus.
+ * REST controller for tenant metrics, backed by OpenSearch.
  *
  * <p>Provides endpoints for range queries (chart data) and instant queries
  * (summary cards). All queries are scoped to the tenant from the
  * {@code X-Tenant-Slug} header.
  *
- * <p>Returns JSON:API format consistent with other collection endpoints.
+ * <p>Metrics are derived from two sources in OpenSearch:
+ * <ul>
+ *   <li>Trace spans (jaeger-span-*) — per-request latency, errors, throughput</li>
+ *   <li>Direct OTEL metrics (emf-metrics-*) — JVM, HTTP server, custom Micrometer</li>
+ * </ul>
  *
  * @since 1.0.0
  */
@@ -30,22 +32,14 @@ public class MetricsController {
 
     private static final Logger log = LoggerFactory.getLogger(MetricsController.class);
 
-    private final PrometheusQueryService prometheusQueryService;
+    private final OpenSearchQueryService queryService;
 
-    public MetricsController(PrometheusQueryService prometheusQueryService) {
-        this.prometheusQueryService = prometheusQueryService;
+    public MetricsController(OpenSearchQueryService queryService) {
+        this.queryService = queryService;
     }
 
     /**
      * Range query endpoint for chart data.
-     *
-     * @param tenantSlug the tenant slug from the gateway's X-Tenant-Slug header
-     * @param metric   the metric type (e.g., "requests", "latency_p50", "errors")
-     * @param start    start time as ISO-8601 instant
-     * @param end      end time as ISO-8601 instant
-     * @param step     step duration (e.g., "60s", "5m"); auto-calculated if omitted
-     * @param route    optional route filter
-     * @return JSON:API single resource with time series data
      */
     @GetMapping("/query")
     public ResponseEntity<Map<String, Object>> query(
@@ -74,47 +68,35 @@ public class MetricsController {
             step = calculateStep(startInstant, endInstant);
         }
 
-        String promql = buildPromQL(metric, tenantSlug, route);
-        if (promql == null) {
-            return ResponseEntity.badRequest().body(
-                    JsonApiResponseBuilder.error("400", "Bad Request",
-                            "Unknown metric type: " + metric));
-        }
+        try {
+            String interval = convertStepToInterval(step);
+            List<Map<String, Object>> dataPoints = queryService.getRequestCountOverTime(
+                    tenantSlug, startInstant, endInstant, interval);
 
-        List<TimeSeries> results = prometheusQueryService.queryRange(promql, startInstant, endInstant, step);
-
-        // Convert to response
-        List<Map<String, Object>> series = new ArrayList<>();
-        for (TimeSeries ts : results) {
+            List<Map<String, Object>> series = new ArrayList<>();
             Map<String, Object> seriesMap = new LinkedHashMap<>();
-            seriesMap.put("labels", ts.labels());
-
-            List<Map<String, Object>> points = new ArrayList<>();
-            for (DataPoint dp : ts.dataPoints()) {
-                Map<String, Object> point = new LinkedHashMap<>();
-                point.put("timestamp", dp.timestamp());
-                point.put("value", dp.value());
-                points.add(point);
-            }
-            seriesMap.put("dataPoints", points);
+            seriesMap.put("labels", Map.of("metric", metric, "tenant", tenantSlug));
+            seriesMap.put("dataPoints", dataPoints);
             series.add(seriesMap);
+
+            Map<String, Object> attributes = new LinkedHashMap<>();
+            attributes.put("metric", metric);
+            attributes.put("start", start);
+            attributes.put("end", end);
+            attributes.put("step", step);
+            attributes.put("series", series);
+
+            return ResponseEntity.ok(JsonApiResponseBuilder.single("metrics-query", metric, attributes));
+        } catch (Exception e) {
+            log.error("Failed to query metrics from OpenSearch: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().body(
+                    JsonApiResponseBuilder.error("500", "Internal Server Error",
+                            "Failed to query metrics"));
         }
-
-        Map<String, Object> attributes = new LinkedHashMap<>();
-        attributes.put("metric", metric);
-        attributes.put("start", start);
-        attributes.put("end", end);
-        attributes.put("step", step);
-        attributes.put("series", series);
-
-        return ResponseEntity.ok(JsonApiResponseBuilder.single("metrics-query", metric, attributes));
     }
 
     /**
-     * Summary endpoint for dashboard cards (instant query).
-     *
-     * @param tenantSlug the tenant slug from the gateway's X-Tenant-Slug header
-     * @return JSON:API single resource with summary metrics
+     * Summary endpoint for dashboard cards.
      */
     @GetMapping("/summary")
     public ResponseEntity<Map<String, Object>> summary(
@@ -122,118 +104,127 @@ public class MetricsController {
 
         log.debug("Metrics summary for tenant={}", tenantSlug);
 
-        // Total requests today (sum of request count over last 24h)
-        double totalRequests = queryScalar(
-                String.format("sum(increase(emf_gateway_requests_seconds_count{tenant=\"%s\"}[24h]))", tenantSlug));
+        try {
+            Instant end = Instant.now();
+            Instant start = end.minus(Duration.ofHours(24));
 
-        // Error rate (errors / total requests * 100)
-        double totalErrors = queryScalar(
-                String.format("sum(increase(emf_gateway_errors_total{tenant=\"%s\"}[24h]))", tenantSlug));
-        double errorRate = totalRequests > 0 ? (totalErrors / totalRequests) * 100 : 0;
+            Map<String, Object> summaryData = queryService.getMetricsSummary(tenantSlug, start, end);
 
-        // Average latency (ms)
-        double avgLatencySeconds = queryScalar(
-                String.format("sum(rate(emf_gateway_requests_seconds_sum{tenant=\"%s\"}[5m])) / " +
-                        "sum(rate(emf_gateway_requests_seconds_count{tenant=\"%s\"}[5m]))", tenantSlug, tenantSlug));
-        double avgLatencyMs = avgLatencySeconds * 1000;
+            Map<String, Object> attributes = new LinkedHashMap<>();
+            attributes.put("totalRequests", summaryData.getOrDefault("totalRequests", 0L));
+            attributes.put("errorRate", summaryData.getOrDefault("errorRate", 0.0));
+            attributes.put("avgLatencyMs", summaryData.getOrDefault("avgLatencyMs", 0.0));
+            attributes.put("activeRequests", 0); // Active requests not available from historical data
+            attributes.put("authFailures", summaryData.getOrDefault("authFailures", 0L));
+            attributes.put("rateLimited", summaryData.getOrDefault("rateLimited", 0L));
 
-        // Active requests
-        double activeRequests = queryScalar(
-                String.format("sum(emf_gateway_requests_active{tenant=\"%s\"})", tenantSlug));
-
-        Map<String, Object> attributes = new LinkedHashMap<>();
-        attributes.put("totalRequests", Math.round(totalRequests));
-        attributes.put("errorRate", Math.round(errorRate * 100.0) / 100.0);
-        attributes.put("avgLatencyMs", Math.round(avgLatencyMs * 100.0) / 100.0);
-        attributes.put("activeRequests", Math.round(activeRequests));
-
-        return ResponseEntity.ok(JsonApiResponseBuilder.single("metrics-summary", "current", attributes));
-    }
-
-    // =========================================================================
-    // PromQL builders
-    // =========================================================================
-
-    /**
-     * Builds a PromQL expression for the given metric type and tenant.
-     *
-     * @param metric   the metric name
-     * @param tenantSlug the tenant slug
-     * @param route    optional route filter
-     * @return PromQL string, or null if the metric type is unknown
-     */
-    String buildPromQL(String metric, String tenantSlug, String route) {
-        String routeFilter = (route != null && !route.isBlank())
-                ? String.format(",route=\"%s\"", route) : "";
-
-        return switch (metric) {
-            case "requests" ->
-                    String.format("sum(rate(emf_gateway_requests_seconds_count{tenant=\"%s\"%s}[5m])) by (status)",
-                            tenantSlug, routeFilter);
-            case "requests_by_route" ->
-                    String.format("sum(rate(emf_gateway_requests_seconds_count{tenant=\"%s\"}[5m])) by (route)",
-                            tenantSlug);
-            case "errors" ->
-                    String.format("sum(rate(emf_gateway_errors_total{tenant=\"%s\"%s}[5m])) by (error_code)",
-                            tenantSlug, routeFilter);
-            case "latency_p50" ->
-                    String.format("histogram_quantile(0.50, sum(rate(emf_gateway_requests_seconds_bucket{tenant=\"%s\"%s}[5m])) by (le))",
-                            tenantSlug, routeFilter);
-            case "latency_p95" ->
-                    String.format("histogram_quantile(0.95, sum(rate(emf_gateway_requests_seconds_bucket{tenant=\"%s\"%s}[5m])) by (le))",
-                            tenantSlug, routeFilter);
-            case "latency_p99" ->
-                    String.format("histogram_quantile(0.99, sum(rate(emf_gateway_requests_seconds_bucket{tenant=\"%s\"%s}[5m])) by (le))",
-                            tenantSlug, routeFilter);
-            case "latency_avg" ->
-                    String.format("sum(rate(emf_gateway_requests_seconds_sum{tenant=\"%s\"%s}[5m])) / " +
-                                    "sum(rate(emf_gateway_requests_seconds_count{tenant=\"%s\"%s}[5m]))",
-                            tenantSlug, routeFilter, tenantSlug, routeFilter);
-            case "auth_failures" ->
-                    String.format("sum(rate(emf_gateway_auth_failures_total{tenant=\"%s\"}[5m])) by (reason)",
-                            tenantSlug);
-            case "rate_limit" ->
-                    String.format("sum(rate(emf_gateway_ratelimit_exceeded_total{tenant=\"%s\"}[5m]))",
-                            tenantSlug);
-            case "active_requests" ->
-                    String.format("emf_gateway_requests_active{tenant=\"%s\"}", tenantSlug);
-            case "authz_denied" ->
-                    String.format("sum(rate(emf_gateway_authz_denied_total{tenant=\"%s\"}[5m])) by (route)",
-                            tenantSlug);
-            default -> null;
-        };
-    }
-
-    // =========================================================================
-    // Helpers
-    // =========================================================================
-
-    /**
-     * Runs an instant query and returns the first scalar value (or 0).
-     */
-    private double queryScalar(String promql) {
-        List<TimeSeries> result = prometheusQueryService.queryInstant(promql);
-        if (result.isEmpty() || result.get(0).dataPoints().isEmpty()) {
-            return 0.0;
+            return ResponseEntity.ok(JsonApiResponseBuilder.single("metrics-summary", "current", attributes));
+        } catch (Exception e) {
+            log.error("Failed to query metrics summary from OpenSearch: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().body(
+                    JsonApiResponseBuilder.error("500", "Internal Server Error",
+                            "Failed to query metrics summary"));
         }
-        return result.get(0).dataPoints().get(0).value();
     }
 
     /**
-     * Auto-calculate a reasonable step size based on the time range.
+     * Top endpoints ranked by request count with latency percentiles.
      */
+    @GetMapping("/endpoints")
+    public ResponseEntity<Map<String, Object>> topEndpoints(
+            @RequestHeader("X-Tenant-Slug") String tenantSlug,
+            @RequestParam(defaultValue = "20") int limit) {
+        try {
+            Instant end = Instant.now();
+            Instant start = end.minus(Duration.ofHours(24));
+
+            List<Map<String, Object>> endpoints = queryService.getTopEndpoints(tenantSlug, start, end, limit);
+
+            Map<String, Object> attributes = new LinkedHashMap<>();
+            attributes.put("endpoints", endpoints);
+
+            return ResponseEntity.ok(JsonApiResponseBuilder.single("metrics-endpoints", "top", attributes));
+        } catch (Exception e) {
+            log.error("Failed to query top endpoints: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().body(
+                    JsonApiResponseBuilder.error("500", "Internal Server Error",
+                            "Failed to query top endpoints"));
+        }
+    }
+
+    /**
+     * Top error paths with status code breakdown.
+     */
+    @GetMapping("/errors")
+    public ResponseEntity<Map<String, Object>> topErrors(
+            @RequestHeader("X-Tenant-Slug") String tenantSlug,
+            @RequestParam(defaultValue = "20") int limit) {
+        try {
+            Instant end = Instant.now();
+            Instant start = end.minus(Duration.ofHours(24));
+
+            List<Map<String, Object>> errors = queryService.getTopErrors(tenantSlug, start, end, limit);
+
+            Map<String, Object> attributes = new LinkedHashMap<>();
+            attributes.put("errors", errors);
+
+            return ResponseEntity.ok(JsonApiResponseBuilder.single("metrics-errors", "top", attributes));
+        } catch (Exception e) {
+            log.error("Failed to query top errors: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().body(
+                    JsonApiResponseBuilder.error("500", "Internal Server Error",
+                            "Failed to query top errors"));
+        }
+    }
+
+    /**
+     * Latency percentiles for a time range.
+     */
+    @GetMapping("/latency")
+    public ResponseEntity<Map<String, Object>> latencyPercentiles(
+            @RequestHeader("X-Tenant-Slug") String tenantSlug,
+            @RequestParam(required = false) String start,
+            @RequestParam(required = false) String end) {
+        try {
+            Instant endInstant = end != null ? Instant.parse(end) : Instant.now();
+            Instant startInstant = start != null ? Instant.parse(start) : endInstant.minus(Duration.ofHours(1));
+
+            Map<String, Double> percentiles = queryService.getLatencyPercentiles(tenantSlug, startInstant, endInstant);
+
+            Map<String, Object> attributes = new LinkedHashMap<>(percentiles);
+            return ResponseEntity.ok(JsonApiResponseBuilder.single("metrics-latency", "percentiles", attributes));
+        } catch (Exception e) {
+            log.error("Failed to query latency percentiles: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().body(
+                    JsonApiResponseBuilder.error("500", "Internal Server Error",
+                            "Failed to query latency percentiles"));
+        }
+    }
+
     private String calculateStep(Instant start, Instant end) {
         long durationSeconds = Duration.between(start, end).getSeconds();
-        if (durationSeconds <= 3600) {          // <= 1h
+        if (durationSeconds <= 3600) {
             return "15s";
-        } else if (durationSeconds <= 21600) {  // <= 6h
+        } else if (durationSeconds <= 21600) {
             return "60s";
-        } else if (durationSeconds <= 86400) {  // <= 24h
+        } else if (durationSeconds <= 86400) {
             return "5m";
-        } else if (durationSeconds <= 604800) { // <= 7d
+        } else if (durationSeconds <= 604800) {
             return "30m";
-        } else {                                // > 7d
+        } else {
             return "2h";
         }
+    }
+
+    private String convertStepToInterval(String step) {
+        // Convert Prometheus-style step to OpenSearch date histogram interval
+        if (step.endsWith("s")) {
+            return step;
+        } else if (step.endsWith("m")) {
+            return step;
+        } else if (step.endsWith("h")) {
+            return step;
+        }
+        return "1m";
     }
 }

@@ -111,10 +111,19 @@ public class SearchIndexListener {
         return switch (collectionName) {
             case "fields", "collections", "collection_versions", "field_versions",
                  "tenants", "users", "roles", "profiles", "permission_sets",
-                 "groups", "group_memberships", "layouts", "picklists",
-                 "validation_rules", "flows", "flow_executions",
-                 "setup_audit_trail", "field_history",
-                 "dashboards", "reports", "ui_menus" -> true;
+                 "groups", "group_memberships", "layouts", "layout_sections",
+                 "layout_fields", "layout-sections", "layout-fields", "picklists",
+                 "picklist_values", "picklist-values",
+                 "validation_rules", "validation-rules",
+                 "flows", "flow_executions", "flow-executions",
+                 "setup_audit_trail", "setup-audit-trail", "field_history", "field-history",
+                 "dashboards", "reports", "ui_menus", "ui-menus",
+                 "ui_menu_items", "ui-menu-items",
+                 "profile_object_permissions", "profile-object-permissions",
+                 "profile_field_permissions", "profile-field-permissions",
+                 "migration_runs", "migration-runs",
+                 "record_types", "record-types",
+                 "record_type_picklist_values", "record-type-picklist-values" -> true;
             default -> false;
         };
     }

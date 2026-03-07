@@ -46,7 +46,7 @@ public class SearchController {
     @GetMapping
     public ResponseEntity<Map<String, Object>> search(
             @RequestHeader("X-Tenant-ID") String tenantId,
-            @RequestParam String q,
+            @RequestParam(required = false) String q,
             @RequestParam(defaultValue = "20") int limit) {
 
         if (tenantId == null || tenantId.isBlank()) {

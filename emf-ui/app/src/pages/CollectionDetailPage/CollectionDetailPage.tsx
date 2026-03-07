@@ -614,6 +614,7 @@ export function CollectionDetailPage({
             validation: fieldData.validation,
             description: fieldData.description,
             trackHistory: fieldData.trackHistory,
+            searchable: fieldData.searchable,
             constraints: fieldData.constraints,
           },
         })
@@ -632,6 +633,7 @@ export function CollectionDetailPage({
           validation: fieldData.validation,
           description: fieldData.description,
           trackHistory: fieldData.trackHistory,
+          searchable: fieldData.searchable,
           constraints: fieldData.constraints,
         })
       }

@@ -90,8 +90,11 @@ public class LoginTrackingFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
         try {
             trackLoginIfNeeded(request);
-        } catch (Exception e) {
-            log.warn("Login tracking failed (non-fatal): {}", e.getMessage());
+        } catch (Throwable t) {
+            // Catch Throwable (not just Exception) to handle NoClassDefFoundError,
+            // ExceptionInInitializerError, and other Errors that would otherwise
+            // crash normal requests due to OpenSearch/audit failures.
+            log.warn("Login tracking failed (non-fatal): {}", t.getMessage());
         }
         filterChain.doFilter(request, response);
     }

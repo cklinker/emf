@@ -215,12 +215,18 @@ export function RequestLogPage({ className }: RequestLogPageProps) {
               </thead>
               <tbody>
                 {hits.map((hit, idx) => {
-                  const tags = hit.tags || {}
-                  const statusCode = tags['http.status_code'] || ''
-                  const httpMethod = tags['http.method'] || ''
-                  const httpRoute = tags['http.route'] || hit.operationName || ''
+                  const tags = hit.tagMap || {}
+                  const statusCode = String(tags['http.response.status_code'] ?? '')
+                  const httpMethod = String(tags['http.request.method'] ?? '')
+                  const httpRoute = String(
+                    tags['http.route'] || tags['http.url.path'] || hit.operationName || ''
+                  )
                   const durationMs = hit.duration ? (hit.duration / 1000).toFixed(0) : '?'
-                  const time = hit.startTime ? new Date(hit.startTime / 1000).toLocaleString() : ''
+                  const time = hit.startTimeMillis
+                    ? new Date(hit.startTimeMillis).toLocaleString()
+                    : hit.startTime
+                      ? new Date(hit.startTime / 1000).toLocaleString()
+                      : ''
 
                   return (
                     <tr

@@ -51,16 +51,22 @@ export function RequestLogDetailPage({ className }: RequestLogDetailPageProps) {
     spans.find((s) => !spans.some((p) => s.tags?.['parent.spanId'] === p.spanID)) || spans[0]
   const childSpans = spans.filter((s) => s !== rootSpan)
 
-  const tags = rootSpan?.tags || {}
-  const httpMethod = tags['http.method'] || ''
-  const httpRoute = tags['http.route'] || rootSpan?.operationName || ''
-  const statusCode = tags['http.status_code'] || ''
+  const tags = rootSpan?.tagMap || {}
+  const httpMethod = String(tags['http.request.method'] ?? '')
+  const httpRoute = String(
+    tags['http.route'] || tags['http.url.path'] || rootSpan?.operationName || ''
+  )
+  const statusCode = String(tags['http.response.status_code'] ?? '')
   const durationMs = rootSpan?.duration ? (rootSpan.duration / 1000).toFixed(0) : '?'
-  const startTime = rootSpan?.startTime ? new Date(rootSpan.startTime / 1000).toLocaleString() : ''
-  const serviceName = rootSpan?.process?.serviceName || ''
-  const requestBody = tags['http.request.body'] || ''
-  const responseBody = tags['http.response.body'] || ''
-  const userId = tags['emf.user.email'] || tags['emf.user.id'] || ''
+  const startTime = rootSpan?.startTimeMillis
+    ? new Date(rootSpan.startTimeMillis).toLocaleString()
+    : rootSpan?.startTime
+      ? new Date(rootSpan.startTime / 1000).toLocaleString()
+      : ''
+  const serviceName = String(tags['process.serviceName'] || rootSpan?.process?.serviceName || '')
+  const requestBody = String(tags['http.request.body'] ?? '')
+  const responseBody = String(tags['http.response.body'] ?? '')
+  const userId = String(tags['emf.user.email'] || tags['emf.user.id'] || '')
 
   const getStatusColor = (code: string) => {
     if (code?.startsWith('2'))

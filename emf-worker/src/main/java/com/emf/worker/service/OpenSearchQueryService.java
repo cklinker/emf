@@ -1,5 +1,6 @@
 package com.emf.worker.service;
 
+import org.apache.lucene.search.join.ScoreMode;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.client.RequestOptions;
@@ -28,6 +29,17 @@ import java.util.*;
 /**
  * Service for querying OpenSearch indices for observability data.
  * Used by admin UI endpoints for request logs, logs, metrics, and audit data.
+ *
+ * <p>Jaeger V2 stores span tags in a nested array format:
+ * {@code tags: [{key: "http.request.method", type: "string", value: "GET"}, ...]}
+ * All tag queries must use OpenSearch nested queries against this structure.
+ *
+ * <p>OTEL semantic conventions (v1.21+) use:
+ * <ul>
+ *   <li>{@code http.request.method} (was http.method)</li>
+ *   <li>{@code http.response.status_code} (was http.status_code)</li>
+ *   <li>{@code http.route} (unchanged)</li>
+ * </ul>
  */
 @Service
 public class OpenSearchQueryService {
@@ -80,28 +92,62 @@ public class OpenSearchQueryService {
 
     /**
      * Search for trace spans by time range and optional filters.
+     *
+     * <p>Filters use Jaeger V2's nested tag structure. The hits are post-processed
+     * to flatten the {@code tags} array into a {@code tagMap} for easier frontend consumption.
      */
     public SearchResult searchTraceSpans(String tenantSlug, Instant start, Instant end,
                                          Map<String, String> filters,
                                          int page, int size) throws IOException {
         SearchSourceBuilder sourceBuilder = new SearchSourceBuilder();
         BoolQueryBuilder query = QueryBuilders.boolQuery()
-                .filter(QueryBuilders.rangeQuery("startTime").gte(start.toEpochMilli()).lte(end.toEpochMilli()));
+                .filter(QueryBuilders.rangeQuery("startTimeMillis").gte(start.toEpochMilli()).lte(end.toEpochMilli()));
 
-        if (tenantSlug != null) {
-            query.filter(QueryBuilders.termQuery("tag.emf.tenant.slug", tenantSlug));
+        // Filter by tenant slug using nested tag query
+        if (tenantSlug != null && !tenantSlug.isEmpty()) {
+            query.filter(nestedTagQuery("emf.tenant.slug", tenantSlug));
         }
 
-        filters.forEach((key, value) -> {
-            if (value != null && !value.isEmpty()) {
-                query.filter(QueryBuilders.termQuery(key, value));
+        // Apply user-provided filters (also nested tag queries)
+        for (Map.Entry<String, String> entry : filters.entrySet()) {
+            String key = entry.getKey();
+            String value = entry.getValue();
+            if (value == null || value.isEmpty()) continue;
+
+            switch (key) {
+                case "method":
+                    query.filter(nestedTagQuery("http.request.method", value));
+                    break;
+                case "status":
+                    // Status can be exact (e.g., "404") or group (e.g., "4xx")
+                    if (value.endsWith("xx")) {
+                        String prefix = value.substring(0, 1);
+                        query.filter(nestedTagPrefixQuery("http.response.status_code", prefix));
+                    } else {
+                        query.filter(nestedTagQuery("http.response.status_code", value));
+                    }
+                    break;
+                case "path":
+                    query.filter(nestedTagWildcardQuery("http.route", "*" + value + "*"));
+                    break;
+                case "traceId":
+                    query.filter(QueryBuilders.termQuery("traceID", value));
+                    break;
+                case "userId":
+                    query.filter(nestedTagQuery("emf.user.id", value));
+                    break;
+                default:
+                    log.warn("Unknown filter key: {}", key);
             }
-        });
+        }
+
+        // Only include server spans (not internal/client spans) for the request log
+        query.filter(QueryBuilders.termQuery("tag.span@kind", "server"));
 
         sourceBuilder.query(query);
         sourceBuilder.from(page * size);
         sourceBuilder.size(size);
-        sourceBuilder.sort("startTime", SortOrder.DESC);
+        sourceBuilder.sort("startTimeMillis", SortOrder.DESC);
 
         SearchRequest request = new SearchRequest("jaeger-span-*");
         request.source(sourceBuilder);
@@ -110,10 +156,95 @@ public class OpenSearchQueryService {
 
         List<Map<String, Object>> hits = new ArrayList<>();
         for (SearchHit hit : response.getHits().getHits()) {
-            hits.add(hit.getSourceAsMap());
+            Map<String, Object> source = hit.getSourceAsMap();
+            // Flatten the nested tags array into a tagMap for easy frontend access
+            source.put("tagMap", flattenTags(source));
+            hits.add(source);
         }
 
         return new SearchResult(hits, response.getHits().getTotalHits().value);
+    }
+
+    /**
+     * Creates a nested query matching a specific tag key-value pair.
+     * Jaeger stores tags as: {@code tags: [{key: "...", value: "..."}]}
+     */
+    private org.opensearch.index.query.NestedQueryBuilder nestedTagQuery(String tagKey, String tagValue) {
+        return QueryBuilders.nestedQuery("tags",
+                QueryBuilders.boolQuery()
+                        .must(QueryBuilders.termQuery("tags.key", tagKey))
+                        .must(QueryBuilders.termQuery("tags.value", tagValue)),
+                ScoreMode.None);
+    }
+
+    /**
+     * Creates a nested query matching a tag value by prefix (e.g., status codes starting with "4").
+     */
+    private org.opensearch.index.query.NestedQueryBuilder nestedTagPrefixQuery(String tagKey, String valuePrefix) {
+        return QueryBuilders.nestedQuery("tags",
+                QueryBuilders.boolQuery()
+                        .must(QueryBuilders.termQuery("tags.key", tagKey))
+                        .must(QueryBuilders.prefixQuery("tags.value", valuePrefix)),
+                ScoreMode.None);
+    }
+
+    /**
+     * Creates a nested query matching a tag value by wildcard pattern.
+     */
+    private org.opensearch.index.query.NestedQueryBuilder nestedTagWildcardQuery(String tagKey, String pattern) {
+        return QueryBuilders.nestedQuery("tags",
+                QueryBuilders.boolQuery()
+                        .must(QueryBuilders.termQuery("tags.key", tagKey))
+                        .must(QueryBuilders.wildcardQuery("tags.value", pattern)),
+                ScoreMode.None);
+    }
+
+    /**
+     * Flattens the nested tags array into a simple key-value map.
+     * Converts: {@code [{key: "http.method", type: "string", value: "GET"}, ...]}
+     * Into: {@code {"http.method": "GET", ...}}
+     */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> flattenTags(Map<String, Object> source) {
+        Map<String, Object> tagMap = new LinkedHashMap<>();
+        Object tagsObj = source.get("tags");
+        if (tagsObj instanceof List<?> tagsList) {
+            for (Object tagObj : tagsList) {
+                if (tagObj instanceof Map<?, ?> tag) {
+                    String key = String.valueOf(tag.get("key"));
+                    Object value = tag.get("value");
+                    String type = String.valueOf(tag.get("type"));
+                    // Convert numeric types
+                    if ("int64".equals(type) && value instanceof Number) {
+                        tagMap.put(key, ((Number) value).longValue());
+                    } else if ("float64".equals(type) && value instanceof Number) {
+                        tagMap.put(key, ((Number) value).doubleValue());
+                    } else if ("bool".equals(type)) {
+                        tagMap.put(key, Boolean.parseBoolean(String.valueOf(value)));
+                    } else {
+                        tagMap.put(key, value);
+                    }
+                }
+            }
+        }
+        // Also include process tags if present
+        Object processObj = source.get("process");
+        if (processObj instanceof Map<?, ?> process) {
+            Object processTagsObj = process.get("tags");
+            if (processTagsObj instanceof List<?> processTags) {
+                for (Object tagObj : processTags) {
+                    if (tagObj instanceof Map<?, ?> tag) {
+                        String key = "process." + tag.get("key");
+                        tagMap.put(key, tag.get("value"));
+                    }
+                }
+            }
+            Object serviceName = process.get("serviceName");
+            if (serviceName != null) {
+                tagMap.put("process.serviceName", serviceName);
+            }
+        }
+        return tagMap;
     }
 
     /**
@@ -124,10 +255,11 @@ public class OpenSearchQueryService {
                                                               String interval) throws IOException {
         SearchSourceBuilder sourceBuilder = new SearchSourceBuilder();
         BoolQueryBuilder query = QueryBuilders.boolQuery()
-                .filter(QueryBuilders.rangeQuery("startTime").gte(start.toEpochMilli()).lte(end.toEpochMilli()));
+                .filter(QueryBuilders.rangeQuery("startTimeMillis").gte(start.toEpochMilli()).lte(end.toEpochMilli()))
+                .filter(QueryBuilders.termQuery("tag.span@kind", "server"));
 
-        if (tenantSlug != null) {
-            query.filter(QueryBuilders.termQuery("tag.emf.tenant.slug", tenantSlug));
+        if (tenantSlug != null && !tenantSlug.isEmpty()) {
+            query.filter(nestedTagQuery("emf.tenant.slug", tenantSlug));
         }
 
         sourceBuilder.query(query);
@@ -135,7 +267,7 @@ public class OpenSearchQueryService {
 
         DateHistogramAggregationBuilder dateHistogram = AggregationBuilders
                 .dateHistogram("requests_over_time")
-                .field("startTime")
+                .field("startTimeMillis")
                 .fixedInterval(new DateHistogramInterval(interval));
 
         sourceBuilder.aggregation(dateHistogram);
@@ -163,10 +295,11 @@ public class OpenSearchQueryService {
                                                      Instant start, Instant end) throws IOException {
         SearchSourceBuilder sourceBuilder = new SearchSourceBuilder();
         BoolQueryBuilder query = QueryBuilders.boolQuery()
-                .filter(QueryBuilders.rangeQuery("startTime").gte(start.toEpochMilli()).lte(end.toEpochMilli()));
+                .filter(QueryBuilders.rangeQuery("startTimeMillis").gte(start.toEpochMilli()).lte(end.toEpochMilli()))
+                .filter(QueryBuilders.termQuery("tag.span@kind", "server"));
 
-        if (tenantSlug != null) {
-            query.filter(QueryBuilders.termQuery("tag.emf.tenant.slug", tenantSlug));
+        if (tenantSlug != null && !tenantSlug.isEmpty()) {
+            query.filter(nestedTagQuery("emf.tenant.slug", tenantSlug));
         }
 
         sourceBuilder.query(query);
@@ -195,26 +328,29 @@ public class OpenSearchQueryService {
 
     /**
      * Get top endpoints by request count.
+     * Note: aggregation on nested tag fields requires special handling. We use
+     * operationName (which contains the route template) as it's a top-level keyword field.
      */
     public List<Map<String, Object>> getTopEndpoints(String tenantSlug,
                                                       Instant start, Instant end,
                                                       int limit) throws IOException {
         SearchSourceBuilder sourceBuilder = new SearchSourceBuilder();
         BoolQueryBuilder query = QueryBuilders.boolQuery()
-                .filter(QueryBuilders.rangeQuery("startTime").gte(start.toEpochMilli()).lte(end.toEpochMilli()));
+                .filter(QueryBuilders.rangeQuery("startTimeMillis").gte(start.toEpochMilli()).lte(end.toEpochMilli()))
+                .filter(QueryBuilders.termQuery("tag.span@kind", "server"));
 
-        if (tenantSlug != null) {
-            query.filter(QueryBuilders.termQuery("tag.emf.tenant.slug", tenantSlug));
+        if (tenantSlug != null && !tenantSlug.isEmpty()) {
+            query.filter(nestedTagQuery("emf.tenant.slug", tenantSlug));
         }
 
         sourceBuilder.query(query);
         sourceBuilder.size(0);
         sourceBuilder.aggregation(AggregationBuilders.terms("top_endpoints")
-                .field("tag.http.route")
+                .field("operationName")
                 .size(limit)
                 .subAggregation(AggregationBuilders.percentiles("latency").field("duration").percentiles(50, 95, 99))
                 .subAggregation(AggregationBuilders.avg("avg_duration").field("duration"))
-                .subAggregation(AggregationBuilders.count("request_count").field("startTime")));
+                .subAggregation(AggregationBuilders.count("request_count").field("startTimeMillis")));
 
         SearchRequest request = new SearchRequest("jaeger-span-*");
         request.source(sourceBuilder);
@@ -242,26 +378,33 @@ public class OpenSearchQueryService {
     }
 
     /**
-     * Get error count by status code and path.
+     * Get error count by operation name and status code.
+     * Errors are identified by spans with http.response.status_code >= 400.
+     * Uses a nested query to filter for error status codes.
      */
     public List<Map<String, Object>> getTopErrors(String tenantSlug,
                                                    Instant start, Instant end,
                                                    int limit) throws IOException {
         SearchSourceBuilder sourceBuilder = new SearchSourceBuilder();
         BoolQueryBuilder query = QueryBuilders.boolQuery()
-                .filter(QueryBuilders.rangeQuery("startTime").gte(start.toEpochMilli()).lte(end.toEpochMilli()))
-                .filter(QueryBuilders.rangeQuery("tag.http.status_code").gte(400));
+                .filter(QueryBuilders.rangeQuery("startTimeMillis").gte(start.toEpochMilli()).lte(end.toEpochMilli()))
+                .filter(QueryBuilders.termQuery("tag.span@kind", "server"))
+                // Filter for error/client-error status codes via nested tag
+                .filter(QueryBuilders.nestedQuery("tags",
+                        QueryBuilders.boolQuery()
+                                .must(QueryBuilders.termQuery("tags.key", "http.response.status_code"))
+                                .must(QueryBuilders.rangeQuery("tags.value").gte("400")),
+                        ScoreMode.None));
 
-        if (tenantSlug != null) {
-            query.filter(QueryBuilders.termQuery("tag.emf.tenant.slug", tenantSlug));
+        if (tenantSlug != null && !tenantSlug.isEmpty()) {
+            query.filter(nestedTagQuery("emf.tenant.slug", tenantSlug));
         }
 
         sourceBuilder.query(query);
         sourceBuilder.size(0);
-        sourceBuilder.aggregation(AggregationBuilders.terms("error_paths")
-                .field("tag.http.route")
-                .size(limit)
-                .subAggregation(AggregationBuilders.terms("status_codes").field("tag.http.status_code")));
+        sourceBuilder.aggregation(AggregationBuilders.terms("error_operations")
+                .field("operationName")
+                .size(limit));
 
         SearchRequest request = new SearchRequest("jaeger-span-*");
         request.source(sourceBuilder);
@@ -269,18 +412,11 @@ public class OpenSearchQueryService {
         SearchResponse response = client.search(request, RequestOptions.DEFAULT);
 
         List<Map<String, Object>> result = new ArrayList<>();
-        Terms terms = response.getAggregations().get("error_paths");
+        Terms terms = response.getAggregations().get("error_operations");
         for (Terms.Bucket bucket : terms.getBuckets()) {
             Map<String, Object> error = new HashMap<>();
             error.put("path", bucket.getKeyAsString());
             error.put("count", bucket.getDocCount());
-
-            Terms statusCodes = bucket.getAggregations().get("status_codes");
-            Map<String, Long> codes = new HashMap<>();
-            for (Terms.Bucket codeBucket : statusCodes.getBuckets()) {
-                codes.put(codeBucket.getKeyAsString(), codeBucket.getDocCount());
-            }
-            error.put("statusCodes", codes);
             result.add(error);
         }
         return result;
@@ -293,22 +429,17 @@ public class OpenSearchQueryService {
                                                   Instant start, Instant end) throws IOException {
         SearchSourceBuilder sourceBuilder = new SearchSourceBuilder();
         BoolQueryBuilder query = QueryBuilders.boolQuery()
-                .filter(QueryBuilders.rangeQuery("startTime").gte(start.toEpochMilli()).lte(end.toEpochMilli()));
+                .filter(QueryBuilders.rangeQuery("startTimeMillis").gte(start.toEpochMilli()).lte(end.toEpochMilli()))
+                .filter(QueryBuilders.termQuery("tag.span@kind", "server"));
 
-        if (tenantSlug != null) {
-            query.filter(QueryBuilders.termQuery("tag.emf.tenant.slug", tenantSlug));
+        if (tenantSlug != null && !tenantSlug.isEmpty()) {
+            query.filter(nestedTagQuery("emf.tenant.slug", tenantSlug));
         }
 
         sourceBuilder.query(query);
         sourceBuilder.size(0);
-        sourceBuilder.aggregation(AggregationBuilders.count("total_requests").field("startTime"));
+        sourceBuilder.aggregation(AggregationBuilders.count("total_requests").field("startTimeMillis"));
         sourceBuilder.aggregation(AggregationBuilders.avg("avg_duration").field("duration"));
-        sourceBuilder.aggregation(AggregationBuilders.filter("errors",
-                QueryBuilders.rangeQuery("tag.http.status_code").gte(400)));
-        sourceBuilder.aggregation(AggregationBuilders.filter("auth_failures",
-                QueryBuilders.termsQuery("tag.http.status_code", (Object) 401, (Object) 403)));
-        sourceBuilder.aggregation(AggregationBuilders.filter("rate_limited",
-                QueryBuilders.termQuery("tag.http.status_code", 429)));
 
         SearchRequest request = new SearchRequest("jaeger-span-*");
         request.source(sourceBuilder);
@@ -322,22 +453,75 @@ public class OpenSearchQueryService {
         Avg avgDuration = response.getAggregations().get("avg_duration");
         summary.put("avgLatencyMs", Double.isNaN(avgDuration.getValue()) ? 0 : avgDuration.getValue() / 1000.0);
 
-        org.opensearch.search.aggregations.bucket.filter.Filter errors =
-                response.getAggregations().get("errors");
-        long errorCount = errors.getDocCount();
+        // For error counts, we need a separate query with nested tag filter
+        // since we can't easily combine nested aggregations
+        long errorCount = countSpansWithStatusGte(tenantSlug, start, end, "400");
         summary.put("errorCount", errorCount);
         summary.put("errorRate", totalRequests.getValue() > 0
                 ? (double) errorCount / totalRequests.getValue() * 100.0 : 0.0);
 
-        org.opensearch.search.aggregations.bucket.filter.Filter authFailures =
-                response.getAggregations().get("auth_failures");
-        summary.put("authFailures", authFailures.getDocCount());
+        long authFailures = countSpansWithStatus(tenantSlug, start, end, "401") +
+                countSpansWithStatus(tenantSlug, start, end, "403");
+        summary.put("authFailures", authFailures);
 
-        org.opensearch.search.aggregations.bucket.filter.Filter rateLimited =
-                response.getAggregations().get("rate_limited");
-        summary.put("rateLimited", rateLimited.getDocCount());
+        long rateLimited = countSpansWithStatus(tenantSlug, start, end, "429");
+        summary.put("rateLimited", rateLimited);
 
         return summary;
+    }
+
+    /**
+     * Count server spans with a specific HTTP status code.
+     */
+    private long countSpansWithStatus(String tenantSlug, Instant start, Instant end,
+                                       String statusCode) throws IOException {
+        SearchSourceBuilder sourceBuilder = new SearchSourceBuilder();
+        BoolQueryBuilder query = QueryBuilders.boolQuery()
+                .filter(QueryBuilders.rangeQuery("startTimeMillis").gte(start.toEpochMilli()).lte(end.toEpochMilli()))
+                .filter(QueryBuilders.termQuery("tag.span@kind", "server"))
+                .filter(nestedTagQuery("http.response.status_code", statusCode));
+
+        if (tenantSlug != null && !tenantSlug.isEmpty()) {
+            query.filter(nestedTagQuery("emf.tenant.slug", tenantSlug));
+        }
+
+        sourceBuilder.query(query);
+        sourceBuilder.size(0);
+
+        SearchRequest request = new SearchRequest("jaeger-span-*");
+        request.source(sourceBuilder);
+
+        SearchResponse response = client.search(request, RequestOptions.DEFAULT);
+        return response.getHits().getTotalHits().value;
+    }
+
+    /**
+     * Count server spans with HTTP status code >= given value.
+     */
+    private long countSpansWithStatusGte(String tenantSlug, Instant start, Instant end,
+                                          String minStatusCode) throws IOException {
+        SearchSourceBuilder sourceBuilder = new SearchSourceBuilder();
+        BoolQueryBuilder query = QueryBuilders.boolQuery()
+                .filter(QueryBuilders.rangeQuery("startTimeMillis").gte(start.toEpochMilli()).lte(end.toEpochMilli()))
+                .filter(QueryBuilders.termQuery("tag.span@kind", "server"))
+                .filter(QueryBuilders.nestedQuery("tags",
+                        QueryBuilders.boolQuery()
+                                .must(QueryBuilders.termQuery("tags.key", "http.response.status_code"))
+                                .must(QueryBuilders.rangeQuery("tags.value").gte(minStatusCode)),
+                        ScoreMode.None));
+
+        if (tenantSlug != null && !tenantSlug.isEmpty()) {
+            query.filter(nestedTagQuery("emf.tenant.slug", tenantSlug));
+        }
+
+        sourceBuilder.query(query);
+        sourceBuilder.size(0);
+
+        SearchRequest request = new SearchRequest("jaeger-span-*");
+        request.source(sourceBuilder);
+
+        SearchResponse response = client.search(request, RequestOptions.DEFAULT);
+        return response.getHits().getTotalHits().value;
     }
 
     public record SearchResult(List<Map<String, Object>> hits, long totalHits) {}

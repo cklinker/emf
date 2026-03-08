@@ -993,6 +993,7 @@
       "logsTab": "Logs",
       "auditTab": "Audit Events",
       "requestHeaders": "Request Headers",
+      "responseHeaders": "Antwort-Header",
       "requestBody": "Request Body",
       "responseBody": "Response Body",
       "childSpans": "Child Spans",

@@ -1,5 +1,6 @@
 package com.emf.worker.filter;
 
+import com.emf.worker.service.RequestDataCaptureService;
 import io.opentelemetry.api.trace.Span;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -15,13 +16,15 @@ import org.springframework.web.util.ContentCachingResponseWrapper;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
- * Captures request/response bodies and adds them as OTEL span attributes.
- * Only processes JSON content types and truncates bodies exceeding max size.
- * Sensitive fields (passwords, tokens, etc.) are redacted.
+ * Captures request/response bodies and headers, writing them both as OTEL span
+ * attributes and directly to OpenSearch. The direct OpenSearch write is the primary
+ * mechanism because the OTEL Java agent silently drops span attributes set via
+ * Span.current().setAttribute() when trace context is propagated from upstream services.
  */
 @Component
 @Order(Ordered.LOWEST_PRECEDENCE - 1)
@@ -36,11 +39,17 @@ public class SpanBodyEnrichmentFilter extends OncePerRequestFilter {
             Pattern.CASE_INSENSITIVE
     );
 
+    private final RequestDataCaptureService captureService;
+
     @Value("${emf.observability.request-logging.max-body-size:16384}")
     private int maxBodySize;
 
     @Value("${emf.observability.request-logging.enabled:true}")
     private boolean enabled;
+
+    public SpanBodyEnrichmentFilter(RequestDataCaptureService captureService) {
+        this.captureService = captureService;
+    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
@@ -56,43 +65,69 @@ public class SpanBodyEnrichmentFilter extends OncePerRequestFilter {
         try {
             filterChain.doFilter(wrappedRequest, wrappedResponse);
         } finally {
-            enrichSpan(wrappedRequest, wrappedResponse);
+            captureData(wrappedRequest, wrappedResponse);
             wrappedResponse.copyBodyToResponse();
         }
     }
 
-    private void enrichSpan(ContentCachingRequestWrapper request, ContentCachingResponseWrapper response) {
-        Span span = Span.current();
-        if (!span.getSpanContext().isValid()) {
-            return;
-        }
+    private void captureData(ContentCachingRequestWrapper request, ContentCachingResponseWrapper response) {
+        // Extract bodies
+        String requestBody = extractBody(request.getContentAsByteArray(), request.getContentType());
+        String responseBody = extractBody(response.getContentAsByteArray(), response.getContentType());
 
-        // Capture request body
-        String contentType = request.getContentType();
-        if (contentType != null && contentType.contains("application/json")) {
-            byte[] requestBody = request.getContentAsByteArray();
-            if (requestBody.length > 0) {
-                String body = new String(requestBody, StandardCharsets.UTF_8);
-                span.setAttribute("http.request.body", sanitize(truncate(body)));
-            }
-        }
-
-        // Capture response body
-        String responseContentType = response.getContentType();
-        if (responseContentType != null && responseContentType.contains("application/json")) {
-            byte[] responseBody = response.getContentAsByteArray();
-            if (responseBody.length > 0) {
-                String body = new String(responseBody, StandardCharsets.UTF_8);
-                span.setAttribute("http.response.body", sanitize(truncate(body)));
-            }
-        }
-
-        // Add tenant/user context from headers
+        // Extract context from headers
         String tenantId = request.getHeader("X-Tenant-ID");
         String userId = request.getHeader("X-User-Id");
         String userEmail = request.getHeader("X-Forwarded-User");
         String correlationId = request.getHeader("X-Correlation-ID");
 
+        // Try to set OTEL span attributes (works when no trace propagation)
+        enrichSpan(requestBody, responseBody, tenantId, userId, userEmail, correlationId);
+
+        // Write directly to OpenSearch (always works, bypasses OTEL agent limitations)
+        Span span = Span.current();
+        if (span.getSpanContext().isValid()) {
+            String traceId = span.getSpanContext().getTraceId();
+            String spanId = span.getSpanContext().getSpanId();
+
+            Map<String, String> requestHeaders = RequestDataCaptureService.extractRequestHeaders(request);
+            Map<String, String> responseHeaders = RequestDataCaptureService.extractResponseHeaders(response);
+
+            captureService.captureRequestData(
+                    traceId, spanId,
+                    requestHeaders, responseHeaders,
+                    requestBody, responseBody,
+                    request.getMethod(), request.getRequestURI(), response.getStatus(),
+                    tenantId, userId, userEmail, correlationId
+            );
+        }
+    }
+
+    private String extractBody(byte[] content, String contentType) {
+        if (content == null || content.length == 0) {
+            return null;
+        }
+        // Capture JSON-like content types
+        if (contentType != null && (contentType.contains("json") || contentType.contains("text"))) {
+            String body = new String(content, StandardCharsets.UTF_8);
+            return sanitize(truncate(body));
+        }
+        return null;
+    }
+
+    private void enrichSpan(String requestBody, String responseBody,
+                            String tenantId, String userId, String userEmail, String correlationId) {
+        Span span = Span.current();
+        if (!span.getSpanContext().isValid()) {
+            return;
+        }
+
+        if (requestBody != null) {
+            span.setAttribute("http.request.body", requestBody);
+        }
+        if (responseBody != null) {
+            span.setAttribute("http.response.body", responseBody);
+        }
         if (tenantId != null) span.setAttribute("emf.tenant.id", tenantId);
         if (userId != null) span.setAttribute("emf.user.id", userId);
         if (userEmail != null) span.setAttribute("emf.user.email", userEmail);

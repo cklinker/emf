@@ -63,7 +63,7 @@ RUN groupadd -r emf && useradd -r -g emf emf
 COPY --from=builder /build/target/emf-gateway.jar app.jar
 
 RUN curl -fL -o opentelemetry-javaagent.jar \
-    https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v2.11.0/opentelemetry-javaagent.jar && \
+    https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v2.25.0/opentelemetry-javaagent.jar && \
     test -s opentelemetry-javaagent.jar
 
 RUN chown -R emf:emf /app

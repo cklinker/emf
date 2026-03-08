@@ -16,7 +16,17 @@
         </encoder>
     </appender>
 
+    <!-- OpenSearch log appender: batches and ships logs for the admin Log Viewer -->
+    <appender name="OPENSEARCH" class="com.emf.worker.logging.OpenSearchLogAppender">
+        <opensearchUrl>${OPENSEARCH_URL:-http://localhost:9200}</opensearchUrl>
+        <indexPrefix>emf-logs</indexPrefix>
+        <serviceName>emf-worker</serviceName>
+        <batchSize>50</batchSize>
+        <flushIntervalMs>5000</flushIntervalMs>
+    </appender>
+
     <root level="INFO">
         <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="OPENSEARCH"/>
     </root>
 </configuration>

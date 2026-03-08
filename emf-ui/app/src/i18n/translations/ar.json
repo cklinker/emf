@@ -704,6 +704,7 @@
       "logsTab": "Logs",
       "auditTab": "Audit Events",
       "requestHeaders": "Request Headers",
+      "responseHeaders": "رؤوس الاستجابة",
       "requestBody": "Request Body",
       "responseBody": "Response Body",
       "childSpans": "Child Spans",

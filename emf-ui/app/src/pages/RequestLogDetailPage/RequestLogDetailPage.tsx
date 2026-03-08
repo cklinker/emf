@@ -231,6 +231,33 @@ export function RequestLogDetailPage({ className }: RequestLogDetailPageProps) {
         {activeTab === 'response' && (
           <div data-testid="request-detail-response-body">
             <h3 className="mb-3 text-sm font-semibold text-muted-foreground uppercase">
+              {t('requestLog.detail.responseHeaders')}
+            </h3>
+            <div className="mb-4" data-testid="request-detail-response-headers">
+              <table className="w-full text-sm">
+                <tbody>
+                  {Object.entries(tags)
+                    .filter(([k]) => k.startsWith('http.response.header.'))
+                    .map(([k, v]) => (
+                      <tr key={k} className="border-b border-border">
+                        <td className="p-2 font-mono text-xs text-muted-foreground">
+                          {k.replace('http.response.header.', '')}
+                        </td>
+                        <td className="p-2 font-mono text-xs">{String(v)}</td>
+                      </tr>
+                    ))}
+                  {Object.entries(tags).filter(([k]) => k.startsWith('http.response.header.'))
+                    .length === 0 && (
+                    <tr>
+                      <td className="p-2 text-sm text-muted-foreground" colSpan={2}>
+                        {t('requestLog.detail.noHeaders')}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <h3 className="mb-3 text-sm font-semibold text-muted-foreground uppercase">
               {t('requestLog.detail.responseBody')}
             </h3>
             <pre className="max-h-[400px] overflow-auto rounded border border-border bg-muted p-3 font-mono text-xs">

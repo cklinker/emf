@@ -1,4 +1,32 @@
+service:
+  extensions: [jaeger_storage, jaeger_query]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [jaeger_storage_exporter]
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [opensearch/logs]
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [opensearch/metrics]
+  telemetry:
+    resource:
+      service.name: jaeger
+    logs:
+      level: info
+
 extensions:
+  jaeger_query:
+    storage:
+      traces: opensearch_main
+      metrics: opensearch_main
+    ui:
+      config_file: /etc/jaeger/ui-config.json
+
   jaeger_storage:
     backends:
       opensearch_main:
@@ -6,6 +34,11 @@ extensions:
           server_urls: http://opensearch:9200
           index_prefix: jaeger
           create_index_templates: true
+    metric_backends:
+      opensearch_main:
+        opensearch:
+          server_urls: http://opensearch:9200
+          index_prefix: jaeger
 
 receivers:
   otlp:
@@ -32,19 +65,3 @@ exporters:
       endpoint: http://opensearch:9200
     dataset: metrics
     namespace: emf
-
-service:
-  extensions: [jaeger_storage]
-  pipelines:
-    traces:
-      receivers: [otlp]
-      processors: [batch]
-      exporters: [jaeger_storage_exporter]
-    logs:
-      receivers: [otlp]
-      processors: [batch]
-      exporters: [opensearch/logs]
-    metrics:
-      receivers: [otlp]
-      processors: [batch]
-      exporters: [opensearch/metrics]

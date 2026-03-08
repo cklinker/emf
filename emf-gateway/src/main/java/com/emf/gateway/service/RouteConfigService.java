@@ -168,6 +168,7 @@ public class RouteConfigService {
                 {"modules", "/api/modules/**", "modules"},
                 {"metrics", "/api/metrics/**", "metrics"},
                 {"search", "/api/_search/**", "_search"},
+                {"admin", "/api/admin/**", "admin"},
         };
 
         for (String[] routeDef : staticRoutes) {

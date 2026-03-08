@@ -7,8 +7,6 @@ import { XMLHttpRequestInstrumentation } from '@opentelemetry/instrumentation-xm
 import { Resource } from '@opentelemetry/resources'
 import { ATTR_SERVICE_NAME } from '@opentelemetry/semantic-conventions'
 import { W3CTraceContextPropagator } from '@opentelemetry/core'
-import { CompositePropagator } from '@opentelemetry/core'
-import { B3Propagator } from '@opentelemetry/propagator-b3'
 import { registerInstrumentations } from '@opentelemetry/instrumentation'
 
 /**
@@ -37,11 +35,13 @@ export function initTelemetry(): void {
     spanProcessors: [new BatchSpanProcessor(exporter)],
   })
 
+  // Use W3C TraceContext only (traceparent/tracestate headers).
+  // B3 propagation was removed because the b3 header isn't needed for
+  // browser→gateway communication and causes CORS preflight failures.
+  // Backend services use b3multi between themselves via the OTEL Java agent.
   provider.register({
     contextManager: new ZoneContextManager(),
-    propagator: new CompositePropagator({
-      propagators: [new W3CTraceContextPropagator(), new B3Propagator()],
-    }),
+    propagator: new W3CTraceContextPropagator(),
   })
 
   // Propagate trace context headers to both the UI origin and the gateway origin

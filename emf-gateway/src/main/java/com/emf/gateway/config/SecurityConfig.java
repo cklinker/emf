@@ -58,7 +58,8 @@ public class SecurityConfig {
         configuration.setAllowedHeaders(List.of(
                 "Authorization", "Content-Type", "Accept", "X-Correlation-ID",
                 "X-Tenant-ID", "X-Tenant-Slug", "X-Requested-With",
-                "traceparent", "tracestate", "baggage"));
+                "traceparent", "tracestate", "baggage",
+                "b3", "X-B3-TraceId", "X-B3-SpanId", "X-B3-ParentSpanId", "X-B3-Sampled"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
         configuration.setExposedHeaders(Arrays.asList(

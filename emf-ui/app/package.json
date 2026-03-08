@@ -47,8 +47,7 @@
     "@opentelemetry/instrumentation-xml-http-request": "^0.52.0",
     "@opentelemetry/exporter-trace-otlp-http": "^0.52.0",
     "@opentelemetry/resources": "^1.25.0",
-    "@opentelemetry/semantic-conventions": "^1.25.0",
-    "@opentelemetry/propagator-b3": "^1.25.0"
+    "@opentelemetry/semantic-conventions": "^1.25.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

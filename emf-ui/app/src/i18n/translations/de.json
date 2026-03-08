@@ -1054,6 +1054,24 @@
     "days": "days",
     "saved": "Settings saved successfully."
   },
+  "monitoring": {
+    "title": "Monitoring",
+    "description": "Metriken, Anforderungsprotokolle, Fehler und Systemleistung anzeigen",
+    "tabs": {
+      "overview": "Übersicht",
+      "requests": "Anfragen",
+      "logs": "Protokolle",
+      "errors": "Fehler",
+      "performance": "Leistung",
+      "activity": "Aktivität",
+      "settings": "Einstellungen"
+    },
+    "overview": {
+      "topErrors": "Häufigste Fehler",
+      "slowestEndpoints": "Langsamste Endpunkte",
+      "viewAll": "Alle anzeigen"
+    }
+  },
   "workers": {
     "title": "Worker",
     "count": "{{count}} Worker",

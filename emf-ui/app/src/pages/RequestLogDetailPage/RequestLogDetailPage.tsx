@@ -112,10 +112,7 @@ export function RequestLogDetailPage({ className }: RequestLogDetailPageProps) {
   ]
 
   return (
-    <div
-      className={cn('mx-auto max-w-[1400px] p-6', className)}
-      data-testid="request-log-detail-page"
-    >
+    <div className={cn('mx-auto max-w-[1400px]', className)} data-testid="request-log-detail-page">
       {/* Back link */}
       <button className="mb-4 text-sm text-primary hover:underline" onClick={() => navigate(-1)}>
         &larr; {t('requestLog.detail.backToList')}

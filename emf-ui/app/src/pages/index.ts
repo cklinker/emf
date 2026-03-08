@@ -264,6 +264,9 @@ export type { EndpointPerformancePageProps } from './EndpointPerformancePage'
 export { ObservabilitySettingsPage } from './ObservabilitySettingsPage'
 export type { ObservabilitySettingsPageProps } from './ObservabilitySettingsPage'
 
+// MonitoringPage - Monitoring hub layout and overview
+export { MonitoringLayout, MonitoringOverviewPage } from './MonitoringPage'
+
 // NotFoundPage - 404 error page
 export { NotFoundPage } from './NotFoundPage'
 export type { NotFoundPageProps } from './NotFoundPage'

@@ -90,9 +90,9 @@ export function UserActivityPage({ className }: UserActivityPageProps) {
   activities.sort((a, b) => b.timestamp - a.timestamp)
 
   return (
-    <div className={cn('mx-auto max-w-[1400px] p-6', className)} data-testid="user-activity-page">
-      <div className="mb-6">
-        <h1 className="m-0 text-2xl font-semibold text-foreground">{t('userActivity.title')}</h1>
+    <div className={cn('mx-auto max-w-[1400px]', className)} data-testid="user-activity-page">
+      <div className="mb-4">
+        <h2 className="m-0 text-lg font-semibold text-foreground">{t('userActivity.title')}</h2>
       </div>
 
       {/* User selector */}
@@ -142,7 +142,7 @@ export function UserActivityPage({ className }: UserActivityPageProps) {
               className="flex w-full cursor-pointer items-center gap-4 rounded-lg border border-border bg-card p-4 text-left hover:bg-accent"
               onClick={() => {
                 if (entry.traceId) {
-                  navigate(`../request-log/${entry.traceId}`)
+                  navigate(`../requests/${entry.traceId}`)
                 }
               }}
             >

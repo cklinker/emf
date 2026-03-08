@@ -19,6 +19,7 @@ import {
   Navigate,
   useNavigate,
   useLocation,
+  useParams,
   Link,
 } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -77,7 +78,6 @@ import {
   UserDetailPage,
   SetupAuditTrailPage,
   GovernorLimitsPage,
-  MetricsPage,
   TenantsPage,
   TenantDashboardPage,
   PicklistsPage,
@@ -112,6 +112,8 @@ import {
   UserActivityPage,
   EndpointPerformancePage,
   ObservabilitySettingsPage,
+  MonitoringLayout,
+  MonitoringOverviewPage,
 } from './pages'
 import { NoTenantPage } from './pages/NoTenantPage/NoTenantPage'
 
@@ -367,6 +369,15 @@ function AdminLayout({ children }: { children: React.ReactNode }): React.ReactEl
       <KeyboardShortcutsHelp isOpen={helpOpen} onClose={() => setHelpOpen(false)} />
     </div>
   )
+}
+
+/**
+ * Redirect helper for legacy request-log/:traceId routes.
+ * Reads the traceId param and redirects to monitoring/requests/:traceId.
+ */
+function NavigateWithTraceId(): React.ReactElement {
+  const { traceId } = useParams()
+  return <Navigate to={`monitoring/requests/${traceId}`} replace />
 }
 
 /**
@@ -874,98 +885,49 @@ function TenantRoutes(): React.ReactElement {
         }
       />
 
-      {/* Metrics route */}
+      {/* Monitoring hub — consolidated observability section */}
       <Route
-        path="metrics"
+        path="monitoring"
         element={
           <AdminPageRoute>
             <RequirePermission permission="VIEW_SETUP">
-              <MetricsPage />
+              <MonitoringLayout />
             </RequirePermission>
           </AdminPageRoute>
         }
-      />
-
-      {/* Request Log routes */}
-      <Route
-        path="request-log"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="VIEW_SETUP">
-              <RequestLogPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
-      <Route
-        path="request-log/:traceId"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="VIEW_SETUP">
-              <RequestLogDetailPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
-
-      {/* Log Viewer route */}
-      <Route
-        path="logs"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="VIEW_SETUP">
-              <LogViewerPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
-
-      {/* Error Dashboard route */}
-      <Route
-        path="errors"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="VIEW_SETUP">
-              <ErrorDashboardPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
-
-      {/* User Activity route */}
-      <Route
-        path="user-activity"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="VIEW_SETUP">
-              <UserActivityPage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
-
-      {/* Endpoint Performance route */}
-      <Route
-        path="endpoint-performance"
-        element={
-          <AdminPageRoute>
-            <RequirePermission permission="VIEW_SETUP">
-              <EndpointPerformancePage />
-            </RequirePermission>
-          </AdminPageRoute>
-        }
-      />
-
-      {/* Observability Settings route */}
-      <Route
-        path="observability-settings"
-        element={
-          <AdminPageRoute>
+      >
+        <Route index element={<Navigate to="overview" replace />} />
+        <Route path="overview" element={<MonitoringOverviewPage />} />
+        <Route path="requests" element={<RequestLogPage />} />
+        <Route path="requests/:traceId" element={<RequestLogDetailPage />} />
+        <Route path="logs" element={<LogViewerPage />} />
+        <Route path="errors" element={<ErrorDashboardPage />} />
+        <Route path="performance" element={<EndpointPerformancePage />} />
+        <Route path="activity" element={<UserActivityPage />} />
+        <Route
+          path="settings"
+          element={
             <RequirePermission permission="CUSTOMIZE_APPLICATION">
               <ObservabilitySettingsPage />
             </RequirePermission>
-          </AdminPageRoute>
-        }
+          }
+        />
+      </Route>
+
+      {/* Legacy observability route redirects */}
+      <Route path="metrics" element={<Navigate to="monitoring/overview" replace />} />
+      <Route path="request-log" element={<Navigate to="monitoring/requests" replace />} />
+      <Route path="request-log/:traceId" element={<NavigateWithTraceId />} />
+      <Route path="logs" element={<Navigate to="monitoring/logs" replace />} />
+      <Route path="errors" element={<Navigate to="monitoring/errors" replace />} />
+      <Route
+        path="endpoint-performance"
+        element={<Navigate to="monitoring/performance" replace />}
+      />
+      <Route path="user-activity" element={<Navigate to="monitoring/activity" replace />} />
+      <Route
+        path="observability-settings"
+        element={<Navigate to="monitoring/settings" replace />}
       />
 
       {/* Tenant Management routes (platform admin) */}

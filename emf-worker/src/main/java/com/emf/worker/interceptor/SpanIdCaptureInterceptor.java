@@ -29,7 +29,23 @@ public class SpanIdCaptureInterceptor implements HandlerInterceptor {
         if (span.getSpanContext().isValid()) {
             request.setAttribute(SERVER_SPAN_ID_ATTR, span.getSpanContext().getSpanId());
             request.setAttribute(SERVER_TRACE_ID_ATTR, span.getSpanContext().getTraceId());
+
+            // Set user/tenant attributes on the correct server span.
+            // MdcEnrichmentFilter populates these headers via MDC but sets span
+            // attributes on the propagated parent (wrong span) because it runs
+            // outside the DispatcherServlet scope.
+            setIfPresent(span, "emf.user.id", request.getHeader("X-User-Id"));
+            setIfPresent(span, "emf.user.email", request.getHeader("X-Forwarded-User"));
+            setIfPresent(span, "emf.tenant.id", request.getHeader("X-Tenant-ID"));
+            setIfPresent(span, "emf.tenant.slug", request.getHeader("X-Tenant-Slug"));
+            setIfPresent(span, "emf.correlation.id", request.getHeader("X-Correlation-ID"));
         }
         return true;
+    }
+
+    private void setIfPresent(Span span, String key, String value) {
+        if (value != null && !value.isEmpty()) {
+            span.setAttribute(key, value);
+        }
     }
 }

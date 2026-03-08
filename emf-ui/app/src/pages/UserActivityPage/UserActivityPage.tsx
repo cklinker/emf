@@ -64,12 +64,16 @@ export function UserActivityPage({ className }: UserActivityPageProps) {
 
   if (requestData?.hits) {
     for (const hit of requestData.hits) {
-      const tags = hit.tags || {}
+      const tags = hit.tagMap || {}
       activities.push({
         type: 'request',
-        timestamp: hit.startTime ? hit.startTime / 1000 : 0,
-        description: `${tags['http.method'] || ''} ${tags['http.route'] || hit.operationName || ''}`,
-        status: tags['http.status_code'] || '',
+        timestamp: hit.startTimeMillis
+          ? hit.startTimeMillis
+          : hit.startTime
+            ? hit.startTime / 1000
+            : 0,
+        description: `${tags['http.request.method'] || ''} ${tags['http.route'] || tags['http.url.path'] || hit.operationName || ''}`,
+        status: String(tags['http.response.status_code'] || ''),
         traceId: hit.traceID,
       })
     }
@@ -113,7 +117,7 @@ export function UserActivityPage({ className }: UserActivityPageProps) {
             <option value="">{t('userActivity.chooseUser')}</option>
             {(usersData?.content || []).map(
               (user: { id: string; email?: string; displayName?: string }) => (
-                <option key={user.id} value={user.id}>
+                <option key={user.id} value={user.email || user.id}>
                   {user.email || user.displayName || user.id}
                 </option>
               )

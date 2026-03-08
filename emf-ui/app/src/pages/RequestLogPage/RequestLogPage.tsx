@@ -233,7 +233,7 @@ export function RequestLogPage({ className }: RequestLogPageProps) {
                       key={hit.traceID + '-' + idx}
                       data-testid={`request-log-row-${idx}`}
                       className="cursor-pointer hover:bg-accent"
-                      onClick={() => navigate(`request-log/${hit.traceID}`)}
+                      onClick={() => navigate(`${hit.traceID}`)}
                     >
                       <td className="border-b border-border p-3 text-muted-foreground">{time}</td>
                       <td className="border-b border-border p-3">

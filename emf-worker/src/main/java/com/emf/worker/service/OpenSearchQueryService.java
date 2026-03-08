@@ -128,7 +128,13 @@ public class OpenSearchQueryService {
                     }
                     break;
                 case "path":
-                    query.filter(nestedTagWildcardQuery("http.route", "*" + value + "*"));
+                    // Search both http.url.path (actual request path) and http.route (template).
+                    // The performance page navigates with concrete paths like /api/products/123
+                    // while http.route contains Spring MVC templates like /api/{collectionName}/{id}.
+                    query.filter(QueryBuilders.boolQuery()
+                            .should(nestedTagWildcardQuery("http.url.path", "*" + value + "*"))
+                            .should(nestedTagWildcardQuery("http.route", "*" + value + "*"))
+                            .minimumShouldMatch(1));
                     break;
                 case "traceId":
                     query.filter(QueryBuilders.termQuery("traceID", value));

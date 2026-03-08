@@ -47,8 +47,13 @@ export function RequestLogDetailPage({ className }: RequestLogDetailPageProps) {
   if (error || !data) return <ErrorMessage error={t('requestLog.detail.loadError')} />
 
   const spans = data.spans || []
+  // Find the root span: the span whose parent is not in the result set.
+  // Jaeger stores parent references in the 'references' array, not in the flat tagMap.
   const rootSpan =
-    spans.find((s) => !spans.some((p) => s.tags?.['parent.spanId'] === p.spanID)) || spans[0]
+    spans.find((s) => {
+      const parentSpanId = s.references?.[0]?.spanID
+      return !parentSpanId || !spans.some((p) => p.spanID === parentSpanId)
+    }) || spans[0]
   const childSpans = spans.filter((s) => s !== rootSpan)
 
   const tags = rootSpan?.tagMap || {}

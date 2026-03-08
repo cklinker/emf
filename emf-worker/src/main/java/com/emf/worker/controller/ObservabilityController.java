@@ -94,7 +94,12 @@ public class ObservabilityController {
             SearchResult requestData = queryService.search("emf-request-data-*",
                     dataFilters, 0, 100, "@timestamp", org.opensearch.search.sort.SortOrder.DESC);
 
-            // Merge captured data into spans by matching spanId
+            // Merge captured data into spans by matching spanId.
+            // The OTEL agent creates the server span inside DispatcherServlet, so by the
+            // time SpanBodyEnrichmentFilter's finally block runs, Span.current() has reverted
+            // to the propagated parent context (from the traceparent header). This means the
+            // captured spanId is the PARENT span, not the worker's server span. We handle
+            // this by also matching on the span's parent reference.
             if (requestData.totalHits() > 0) {
                 Map<String, Map<String, Object>> dataBySpanId = new HashMap<>();
                 for (Map<String, Object> dataHit : requestData.hits()) {
@@ -106,36 +111,25 @@ public class ObservabilityController {
                 for (Map<String, Object> span : result.hits()) {
                     String spanId = (String) span.get("spanID");
                     Map<String, Object> captured = dataBySpanId.get(spanId);
+
+                    // Fallback: match by parent spanId — the captured spanId is often the
+                    // propagated parent (gateway client span) rather than the worker's own span
+                    if (captured == null) {
+                        @SuppressWarnings("unchecked")
+                        List<Map<String, Object>> refs = (List<Map<String, Object>>) span.get("references");
+                        if (refs != null) {
+                            for (Map<String, Object> ref : refs) {
+                                String parentSpanId = (String) ref.get("spanID");
+                                if (parentSpanId != null) {
+                                    captured = dataBySpanId.get(parentSpanId);
+                                    if (captured != null) break;
+                                }
+                            }
+                        }
+                    }
+
                     if (captured != null) {
-                        // Merge captured data into the span's tagMap
-                        @SuppressWarnings("unchecked")
-                        Map<String, Object> tagMap = (Map<String, Object>) span.get("tagMap");
-                        if (tagMap == null) {
-                            tagMap = new LinkedHashMap<>();
-                            span.put("tagMap", tagMap);
-                        }
-                        if (captured.get("requestBody") != null) {
-                            tagMap.put("http.request.body", captured.get("requestBody"));
-                        }
-                        if (captured.get("responseBody") != null) {
-                            tagMap.put("http.response.body", captured.get("responseBody"));
-                        }
-                        // Add request headers as individual tags
-                        @SuppressWarnings("unchecked")
-                        Map<String, String> reqHeaders = (Map<String, String>) captured.get("requestHeaders");
-                        if (reqHeaders != null) {
-                            for (Map.Entry<String, String> entry : reqHeaders.entrySet()) {
-                                tagMap.put("http.request.header." + entry.getKey().toLowerCase(), entry.getValue());
-                            }
-                        }
-                        // Add response headers
-                        @SuppressWarnings("unchecked")
-                        Map<String, String> respHeaders = (Map<String, String>) captured.get("responseHeaders");
-                        if (respHeaders != null) {
-                            for (Map.Entry<String, String> entry : respHeaders.entrySet()) {
-                                tagMap.put("http.response.header." + entry.getKey().toLowerCase(), entry.getValue());
-                            }
-                        }
+                        mergeCapturedData(span, captured);
                     }
                 }
             }
@@ -230,6 +224,38 @@ public class ObservabilityController {
             return ResponseEntity.internalServerError().body(
                     JsonApiResponseBuilder.error("500", "Internal Server Error",
                             "Failed to search audit events"));
+        }
+    }
+
+    /**
+     * Merges captured request/response data (bodies, headers) into a span's tagMap.
+     */
+    @SuppressWarnings("unchecked")
+    private void mergeCapturedData(Map<String, Object> span, Map<String, Object> captured) {
+        Map<String, Object> tagMap = (Map<String, Object>) span.get("tagMap");
+        if (tagMap == null) {
+            tagMap = new LinkedHashMap<>();
+            span.put("tagMap", tagMap);
+        }
+        if (captured.get("requestBody") != null) {
+            tagMap.put("http.request.body", captured.get("requestBody"));
+        }
+        if (captured.get("responseBody") != null) {
+            tagMap.put("http.response.body", captured.get("responseBody"));
+        }
+        // Add request headers as individual tags
+        Map<String, String> reqHeaders = (Map<String, String>) captured.get("requestHeaders");
+        if (reqHeaders != null) {
+            for (Map.Entry<String, String> entry : reqHeaders.entrySet()) {
+                tagMap.put("http.request.header." + entry.getKey().toLowerCase(), entry.getValue());
+            }
+        }
+        // Add response headers
+        Map<String, String> respHeaders = (Map<String, String>) captured.get("responseHeaders");
+        if (respHeaders != null) {
+            for (Map.Entry<String, String> entry : respHeaders.entrySet()) {
+                tagMap.put("http.response.header." + entry.getKey().toLowerCase(), entry.getValue());
+            }
         }
     }
 }

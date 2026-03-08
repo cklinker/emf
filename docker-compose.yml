@@ -280,6 +280,7 @@ services:
     command: ["--config", "/etc/jaeger/config.yaml"]
     volumes:
       - ./docker/jaeger/config.yaml:/etc/jaeger/config.yaml:ro
+      - ./docker/jaeger/ui-config.json:/etc/jaeger/ui-config.json:ro
     ports:
       - "16686:16686"
       - "4317:4317"

@@ -10,22 +10,31 @@ export interface UserActivityPageProps {
   className?: string
 }
 
+const TIME_RANGES = [
+  { label: '1h', seconds: 3600 },
+  { label: '6h', seconds: 21600 },
+  { label: '24h', seconds: 86400 },
+  { label: '7d', seconds: 604800 },
+  { label: '30d', seconds: 2592000 },
+]
+
 export function UserActivityPage({ className }: UserActivityPageProps) {
   const { t } = useI18n()
   const { emfClient } = useApi()
   const navigate = useNavigate()
 
+  const [timeRange, setTimeRange] = useState(604800)
   const [userId, setUserId] = useState('')
   const [page, setPage] = useState(0)
   const pageSize = 50
 
   const now = new Date()
-  const start = new Date(now.getTime() - 7 * 24 * 3600 * 1000).toISOString()
+  const start = new Date(now.getTime() - timeRange * 1000).toISOString()
   const end = now.toISOString()
 
   // Fetch request logs for user
   const { data: requestData, isLoading: requestLoading } = useQuery({
-    queryKey: ['user-activity-requests', userId, page],
+    queryKey: ['user-activity-requests', userId, timeRange, page],
     queryFn: () =>
       emfClient.admin.observability.searchRequestLogs({
         userId: userId || undefined,
@@ -39,7 +48,7 @@ export function UserActivityPage({ className }: UserActivityPageProps) {
 
   // Fetch audit events for user
   const { data: auditData, isLoading: auditLoading } = useQuery({
-    queryKey: ['user-activity-audit', userId],
+    queryKey: ['user-activity-audit', userId, timeRange],
     queryFn: () =>
       emfClient.admin.observability.searchAudit({
         userId: userId || undefined,
@@ -97,6 +106,30 @@ export function UserActivityPage({ className }: UserActivityPageProps) {
     <div className={cn('mx-auto max-w-[1400px]', className)} data-testid="user-activity-page">
       <div className="mb-4">
         <h2 className="m-0 text-lg font-semibold text-foreground">{t('userActivity.title')}</h2>
+      </div>
+
+      {/* Time range selector */}
+      <div
+        className="mb-4 flex gap-1 rounded-lg border border-border bg-card p-1"
+        data-testid="user-activity-date-range"
+      >
+        {TIME_RANGES.map(({ label, seconds }) => (
+          <button
+            key={label}
+            onClick={() => {
+              setTimeRange(seconds)
+              setPage(0)
+            }}
+            className={cn(
+              'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+              timeRange === seconds
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:bg-muted'
+            )}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       {/* User selector */}

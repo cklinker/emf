@@ -1,10 +1,10 @@
-import React, { useState } from 'react'
+import React, { useState, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
 import { LoadingSpinner, ErrorMessage } from '../../components'
 import { cn } from '@/lib/utils'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 
 export interface RequestLogPageProps {
   className?: string
@@ -21,17 +21,57 @@ const TIME_RANGES = [
 const HTTP_METHODS = ['', 'GET', 'POST', 'PUT', 'PATCH', 'DELETE']
 const STATUS_GROUPS = ['', '2xx', '3xx', '4xx', '5xx']
 
+/**
+ * Parse the `path` query param which may be:
+ * - "GET /api/collections" (method + path from EndpointPerformancePage)
+ * - "/api/collections" (path only from ErrorDashboardPage)
+ */
+function parsePathParam(raw: string): { method: string; path: string } {
+  const match = raw.match(/^(GET|POST|PUT|PATCH|DELETE)\s+(.+)$/)
+  if (match) {
+    return { method: match[1], path: match[2] }
+  }
+  return { method: '', path: raw }
+}
+
 export function RequestLogPage({ className }: RequestLogPageProps) {
   const { t } = useI18n()
   const { emfClient } = useApi()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
 
-  const [timeRange, setTimeRange] = useState(3600)
-  const [method, setMethod] = useState('')
-  const [status, setStatus] = useState('')
-  const [pathSearch, setPathSearch] = useState('')
+  // Initialize state from URL query params
+  const initialPath = searchParams.get('path') || ''
+  const parsed = parsePathParam(initialPath)
+  const initialTimeRange = Number(searchParams.get('timeRange')) || 3600
+
+  const [timeRange, setTimeRange] = useState(initialTimeRange)
+  const [method, setMethod] = useState(searchParams.get('method') || parsed.method)
+  const [status, setStatus] = useState(searchParams.get('status') || '')
+  const [pathSearch, setPathSearch] = useState(parsed.path)
   const [page, setPage] = useState(0)
   const pageSize = 50
+
+  // Sync filter changes back to URL
+  const updateSearchParams = useCallback(
+    (updates: Record<string, string>) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          Object.entries(updates).forEach(([k, v]) => {
+            if (v) {
+              next.set(k, v)
+            } else {
+              next.delete(k)
+            }
+          })
+          return next
+        },
+        { replace: true }
+      )
+    },
+    [setSearchParams]
+  )
 
   const now = new Date()
   const start = new Date(now.getTime() - timeRange * 1000).toISOString()
@@ -104,6 +144,7 @@ export function RequestLogPage({ className }: RequestLogPageProps) {
             onClick={() => {
               setTimeRange(seconds)
               setPage(0)
+              updateSearchParams({ timeRange: String(seconds) })
             }}
             className={cn(
               'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
@@ -130,6 +171,7 @@ export function RequestLogPage({ className }: RequestLogPageProps) {
             onChange={(e) => {
               setMethod(e.target.value)
               setPage(0)
+              updateSearchParams({ method: e.target.value })
             }}
           >
             <option value="">{t('common.all')}</option>
@@ -151,6 +193,7 @@ export function RequestLogPage({ className }: RequestLogPageProps) {
             onChange={(e) => {
               setStatus(e.target.value)
               setPage(0)
+              updateSearchParams({ status: e.target.value })
             }}
           >
             <option value="">{t('common.all')}</option>
@@ -174,6 +217,7 @@ export function RequestLogPage({ className }: RequestLogPageProps) {
             onChange={(e) => {
               setPathSearch(e.target.value)
               setPage(0)
+              updateSearchParams({ path: e.target.value })
             }}
           />
         </div>

@@ -1,0 +1,32 @@
+<configuration>
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <includeMdcKeyName>traceId</includeMdcKeyName>
+            <includeMdcKeyName>spanId</includeMdcKeyName>
+            <includeMdcKeyName>tenantId</includeMdcKeyName>
+            <includeMdcKeyName>tenantSlug</includeMdcKeyName>
+            <includeMdcKeyName>userId</includeMdcKeyName>
+            <includeMdcKeyName>userEmail</includeMdcKeyName>
+            <includeMdcKeyName>correlationId</includeMdcKeyName>
+            <customFields>{"service":"kelta-worker"}</customFields>
+            <fieldNames>
+                <timestamp>@timestamp</timestamp>
+                <version>[ignore]</version>
+            </fieldNames>
+        </encoder>
+    </appender>
+
+    <!-- OpenSearch log appender: batches and ships logs for the admin Log Viewer -->
+    <appender name="OPENSEARCH" class="io.kelta.worker.logging.OpenSearchLogAppender">
+        <opensearchUrl>${OPENSEARCH_URL:-http://localhost:9200}</opensearchUrl>
+        <indexPrefix>kelta-logs</indexPrefix>
+        <serviceName>kelta-worker</serviceName>
+        <batchSize>50</batchSize>
+        <flushIntervalMs>5000</flushIntervalMs>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="OPENSEARCH"/>
+    </root>
+</configuration>

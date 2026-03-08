@@ -49,17 +49,17 @@ jobs:
           restore-keys: |
             maven-${{ runner.os }}-
 
-      - name: Clean stale EMF artifacts
-        run: rm -rf ~/.m2/repository/com/emf
+      - name: Clean stale Kelta artifacts
+        run: rm -rf ~/.m2/repository/io/kelta
 
       - name: Build runtime modules
-        run: mvn clean install -DskipTests -f emf-platform/pom.xml -pl runtime/runtime-core,runtime/runtime-events,runtime/runtime-jsonapi,runtime/runtime-module-core,runtime/runtime-module-integration,runtime/runtime-module-schema -am -B
+        run: mvn clean install -DskipTests -f kelta-platform/pom.xml -pl runtime/runtime-core,runtime/runtime-events,runtime/runtime-jsonapi,runtime/runtime-module-core,runtime/runtime-module-integration,runtime/runtime-module-schema -am -B
 
       - name: Test Gateway
-        run: mvn verify -f emf-gateway/pom.xml -B
+        run: mvn verify -f kelta-gateway/pom.xml -B
 
       - name: Test Worker
-        run: mvn verify -f emf-worker/pom.xml -B
+        run: mvn verify -f kelta-worker/pom.xml -B
 
       - name: Upload test results
         if: always()
@@ -67,8 +67,8 @@ jobs:
         with:
           name: java-test-results
           path: |
-            emf-gateway/target/surefire-reports/
-            emf-worker/target/surefire-reports/
+            kelta-gateway/target/surefire-reports/
+            kelta-worker/target/surefire-reports/
           retention-days: 7
 
       - name: Upload coverage reports
@@ -77,8 +77,8 @@ jobs:
         with:
           name: java-coverage
           path: |
-            emf-gateway/target/site/jacoco/
-            emf-worker/target/site/jacoco/
+            kelta-gateway/target/site/jacoco/
+            kelta-worker/target/site/jacoco/
           if-no-files-found: ignore
           retention-days: 7
 
@@ -90,7 +90,7 @@ jobs:
     runs-on: k8s-runner
     defaults:
       run:
-        working-directory: emf-web
+        working-directory: kelta-web
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -104,7 +104,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.npm
-          key: npm-${{ runner.os }}-${{ hashFiles('emf-web/package-lock.json') }}
+          key: npm-${{ runner.os }}-${{ hashFiles('kelta-web/package-lock.json') }}
           restore-keys: |
             npm-${{ runner.os }}-
 
@@ -129,7 +129,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: frontend-coverage
-          path: emf-web/coverage/
+          path: kelta-web/coverage/
           if-no-files-found: ignore
           retention-days: 7
 

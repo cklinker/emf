@@ -6,13 +6,13 @@
 #   - Node.js 18 (~30 MB via actions/setup-node)
 #
 # Build:
-#   docker build -t ghcr.io/cklinker/emf-runner:latest .github/runner/
+#   docker build -t ghcr.io/cklinker/kelta-runner:latest .github/runner/
 #
 # Use in your runner controller (e.g. actions-runner-controller):
 #   spec:
 #     containers:
 #       - name: runner
-#         image: ghcr.io/cklinker/emf-runner:latest
+#         image: ghcr.io/cklinker/kelta-runner:latest
 #
 # If using this image, you can remove the "Set up JDK", "Install Maven",
 # and "Set up Node.js" steps from your workflows — they'll be no-ops or

@@ -4,11 +4,11 @@ on:
   push:
     branches: [main]
     paths:
-      - 'emf-gateway/**'
-      - 'emf-platform/runtime/**'
-      - 'emf-worker/**'
-      - 'emf-web/**'
-      - 'emf-ui/**'
+      - 'kelta-gateway/**'
+      - 'kelta-platform/runtime/**'
+      - 'kelta-worker/**'
+      - 'kelta-web/**'
+      - 'kelta-ui/**'
       - 'e2e-tests/**'
       - '.github/workflows/build-and-publish-containers.yml'
   workflow_dispatch:
@@ -68,17 +68,17 @@ jobs:
           restore-keys: |
             maven-${{ runner.os }}-
 
-      - name: Clean stale EMF artifacts
-        run: rm -rf ~/.m2/repository/com/emf
+      - name: Clean stale Kelta artifacts
+        run: rm -rf ~/.m2/repository/io/kelta
 
       - name: Build runtime modules
-        run: mvn clean install -DskipTests -f emf-platform/pom.xml -pl runtime/runtime-core,runtime/runtime-events,runtime/runtime-jsonapi,runtime/runtime-module-core,runtime/runtime-module-integration,runtime/runtime-module-schema -am -B
+        run: mvn clean install -DskipTests -f kelta-platform/pom.xml -pl runtime/runtime-core,runtime/runtime-events,runtime/runtime-jsonapi,runtime/runtime-module-core,runtime/runtime-module-integration,runtime/runtime-module-schema -am -B
 
       - name: Test Gateway
-        run: mvn verify -f emf-gateway/pom.xml -B
+        run: mvn verify -f kelta-gateway/pom.xml -B
 
       - name: Test Worker
-        run: mvn verify -f emf-worker/pom.xml -B
+        run: mvn verify -f kelta-worker/pom.xml -B
 
   # ===========================================================================
   # Test Frontend
@@ -88,7 +88,7 @@ jobs:
     runs-on: k8s-runner
     defaults:
       run:
-        working-directory: emf-web
+        working-directory: kelta-web
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -102,7 +102,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.npm
-          key: npm-${{ runner.os }}-${{ hashFiles('emf-web/package-lock.json') }}
+          key: npm-${{ runner.os }}-${{ hashFiles('kelta-web/package-lock.json') }}
           restore-keys: |
             npm-${{ runner.os }}-
 
@@ -125,14 +125,14 @@ jobs:
       matrix:
         include:
           - service: gateway
-            dockerfile: emf-gateway/Dockerfile
-            image: emf-gateway
+            dockerfile: kelta-gateway/Dockerfile
+            image: kelta-gateway
           - service: worker
-            dockerfile: emf-worker/Dockerfile
-            image: emf-worker
+            dockerfile: kelta-worker/Dockerfile
+            image: kelta-worker
           - service: ui
-            dockerfile: emf-ui/Dockerfile
-            image: emf-ui
+            dockerfile: kelta-ui/Dockerfile
+            image: kelta-ui
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -190,18 +190,18 @@ jobs:
           IMAGE_TAG="main-${{ steps.sha.outputs.short }}"
 
           # Update gateway deployment
-          if [ -f emf/gateway-deployment.yaml ]; then
-            sed -i "s|image: cklinker/emf-gateway:.*|image: cklinker/emf-gateway:${IMAGE_TAG}|g" emf/gateway-deployment.yaml
+          if [ -f kelta/gateway-deployment.yaml ]; then
+            sed -i "s|image: cklinker/kelta-gateway:.*|image: cklinker/kelta-gateway:${IMAGE_TAG}|g" kelta/gateway-deployment.yaml
           fi
 
           # Update admin UI deployment
-          if [ -f emf/ui-deployment.yaml ]; then
-            sed -i "s|image: cklinker/emf-ui:.*|image: cklinker/emf-ui:${IMAGE_TAG}|g" emf/ui-deployment.yaml
+          if [ -f kelta/ui-deployment.yaml ]; then
+            sed -i "s|image: cklinker/kelta-ui:.*|image: cklinker/kelta-ui:${IMAGE_TAG}|g" kelta/ui-deployment.yaml
           fi
 
           # Update worker deployment
-          if [ -f emf/worker-deployment.yaml ]; then
-            sed -i "s|image: cklinker/emf-worker:.*|image: cklinker/emf-worker:${IMAGE_TAG}|g" emf/worker-deployment.yaml
+          if [ -f kelta/worker-deployment.yaml ]; then
+            sed -i "s|image: cklinker/kelta-worker:.*|image: cklinker/kelta-worker:${IMAGE_TAG}|g" kelta/worker-deployment.yaml
           fi
 
       - name: Commit and push
@@ -213,7 +213,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "No changes to commit"
           else
-            git commit -m "chore: update EMF images to main-${{ steps.sha.outputs.short }}"
+            git commit -m "chore: update Kelta images to main-${{ steps.sha.outputs.short }}"
             git push
           fi
 
@@ -229,14 +229,14 @@ jobs:
       - name: Wait for rollout
         run: |
           echo "Waiting for deployments to roll out..."
-          kubectl -n emf rollout status deployment/emf-gateway --timeout=300s || true
-          kubectl -n emf rollout status deployment/emf-ui --timeout=300s || true
-          kubectl -n emf rollout status deployment/emf-worker --timeout=300s || true
+          kubectl -n kelta rollout status deployment/kelta-gateway --timeout=300s || true
+          kubectl -n kelta rollout status deployment/kelta-ui --timeout=300s || true
+          kubectl -n kelta rollout status deployment/kelta-worker --timeout=300s || true
 
       - name: Verify gateway health
         run: |
           for i in $(seq 1 30); do
-            STATUS=$(kubectl -n emf exec deploy/emf-gateway -- curl -sf http://localhost:8080/actuator/health/liveness 2>/dev/null | grep -o '"status":"UP"' || true)
+            STATUS=$(kubectl -n kelta exec deploy/kelta-gateway -- curl -sf http://localhost:8080/actuator/health/liveness 2>/dev/null | grep -o '"status":"UP"' || true)
             if [ -n "$STATUS" ]; then
               echo "Gateway is healthy"
               exit 0
@@ -250,7 +250,7 @@ jobs:
       - name: Verify worker health
         run: |
           for i in $(seq 1 30); do
-            STATUS=$(kubectl -n emf exec deploy/emf-worker -- curl -sf http://localhost:8080/actuator/health/liveness 2>/dev/null | grep -o '"status":"UP"' || true)
+            STATUS=$(kubectl -n kelta exec deploy/kelta-worker -- curl -sf http://localhost:8080/actuator/health/liveness 2>/dev/null | grep -o '"status":"UP"' || true)
             if [ -n "$STATUS" ]; then
               echo "Worker is healthy"
               exit 0
@@ -300,8 +300,8 @@ jobs:
       - name: Run E2E tests
         working-directory: e2e-tests
         env:
-          E2E_BASE_URL: https://emf-ui.rzware.com
-          E2E_API_BASE_URL: https://emf.rzware.com
+          E2E_BASE_URL: https://kelta.io
+          E2E_API_BASE_URL: https://kelta.io
           E2E_TENANT_SLUG: default
           E2E_AUTHENTIK_URL: ${{ secrets.E2E_AUTHENTIK_URL }}
           E2E_CLIENT_ID: ${{ secrets.E2E_CLIENT_ID }}

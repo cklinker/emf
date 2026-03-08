@@ -8,7 +8,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.resolve(__dirname, ".env.local") });
 dotenv.config({ path: path.resolve(__dirname, ".env") });
 
-const BASE_URL = process.env.E2E_BASE_URL || "https://emf-ui.rzware.com";
+const BASE_URL = process.env.E2E_BASE_URL || "https://kelta.io";
 const CI = !!process.env.CI;
 
 export default defineConfig({

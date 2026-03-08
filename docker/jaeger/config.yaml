@@ -59,9 +59,9 @@ exporters:
   opensearch/logs:
     http:
       endpoint: http://opensearch:9200
-    logs_index: emf-logs
+    logs_index: kelta-logs
   opensearch/metrics:
     http:
       endpoint: http://opensearch:9200
     dataset: metrics
-    namespace: emf
+    namespace: kelta

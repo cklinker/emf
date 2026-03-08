@@ -214,9 +214,9 @@ A purpose-built observability stack with 7 fully implemented monitoring pages in
 - User activity page with per-user request and audit event analysis
 
 **Prometheus Metrics:**
-- `emf_worker_request_total{collection, method, status}`
-- `emf_worker_request_duration_seconds{collection, method}`
-- `emf_worker_error_total{collection, error_type}`
+- `kelta_worker_request_total{collection, method, status}`
+- `kelta_worker_request_duration_seconds{collection, method}`
+- `kelta_worker_error_total{collection, error_type}`
 - Active collection gauge for HPA autoscaling
 
 **Retention:**
@@ -248,11 +248,11 @@ Connect Kelta to your existing systems with HTTP callouts, webhooks, and event s
 Extend the platform with custom action handlers, before-save hooks, and frontend components.
 
 **Working:**
-- **Module SPI**: `EmfModule` interface with `getActionHandlers()`, `getBeforeSaveHooks()`, `onStartup(ModuleContext)` lifecycle
+- **Module SPI**: `KeltaModule` interface with `getActionHandlers()`, `getBeforeSaveHooks()`, `onStartup(ModuleContext)` lifecycle
 - **3 built-in compile-time modules**: Core Actions (8 handlers), Integration (7 handlers), Schema Lifecycle (hooks)
 - **Module lifecycle management**: Install, enable, disable, uninstall per tenant with status tracking and Kafka event propagation across pods
 - **ModuleContext**: Provides QueryEngine, CollectionRegistry, FormulaEvaluator, and extensible service map to modules
-- **Frontend Plugin SDK** (`@emf/plugin-sdk`): `BasePlugin` abstract class with `init`/`mount`/`unmount` lifecycle, `ComponentRegistry` for custom field renderers and page components
+- **Frontend Plugin SDK** (`@kelta/plugin-sdk`): `BasePlugin` abstract class with `init`/`mount`/`unmount` lifecycle, `ComponentRegistry` for custom field renderers and page components
 
 > **TODO**
 > - Runtime JAR loading: Module lifecycle works but action handler execution returns placeholder responses — real ClassLoader-based JAR loading deferred until S3 storage and sandboxed ClassLoaders are implemented
@@ -362,7 +362,7 @@ A visual drag-and-drop page editor for building custom pages.
 
 Everything developers need to build on top of Kelta.
 
-- **TypeScript SDK** (`@emf/sdk`): `EMFClient` with auto-discovery, token management (refresh + validation), and configurable retry with exponential backoff
+- **TypeScript SDK** (`@kelta/sdk`): `KeltaClient` with auto-discovery, token management (refresh + validation), and configurable retry with exponential backoff
 - **Fluent Query Builder**: `QueryBuilder<T>` for filtering, pagination, sorting, field selection, and includes
 - **Admin Client**: Typed access to collections, fields, roles, policies, and webhooks
 - **Error taxonomy**: `ValidationError`, `AuthenticationError`, `AuthorizationError`, `NotFoundError`, `ServerError`, `NetworkError`

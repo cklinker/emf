@@ -2,7 +2,7 @@
 
 ## Container Build and Publish
 
-The `build-and-publish-containers.yml` workflow builds and publishes Docker images for the EMF Gateway and Control Plane services to DockerHub.
+The `build-and-publish-containers.yml` workflow builds and publishes Docker images for the Kelta Gateway and Control Plane services to DockerHub.
 
 ### Setup Instructions
 
@@ -37,10 +37,10 @@ Images are tagged with:
 ### Published Images
 
 After successful builds, images are available at:
-- `cklinker/emf-gateway:latest`
-- `cklinker/emf-gateway:main-<sha>`
-- `cklinker/emf-control-plane:latest`
-- `cklinker/emf-control-plane:main-<sha>`
+- `cklinker/kelta-gateway:latest`
+- `cklinker/kelta-gateway:main-<sha>`
+- `cklinker/kelta-control-plane:latest`
+- `cklinker/kelta-control-plane:main-<sha>`
 
 ### Manual Workflow Execution
 

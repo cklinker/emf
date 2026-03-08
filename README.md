@@ -1,12 +1,12 @@
-# EMF Platform
+# Kelta Platform
 
-EMF (Enterprise Metadata Framework) is a platform for building dynamic, runtime-configurable enterprise applications. It provides a metadata-driven architecture where collections (tables), fields, validation rules, relationships, and workflows are all defined and managed at runtime — no redeployment required.
+Kelta is a platform for building dynamic, runtime-configurable enterprise applications. It provides a metadata-driven architecture where collections (tables), fields, validation rules, relationships, and workflows are all defined and managed at runtime — no redeployment required.
 
 ## Architecture
 
 ```
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│   emf-ui    │────▶│ emf-gateway  │────▶│  emf-worker  │
+│   kelta-ui    │────▶│ kelta-gateway  │────▶│  kelta-worker  │
 │  (React)    │     │ (API Gateway)│     │  (Services)  │
 └─────────────┘     └──────┬───────┘     └──────┬───────┘
                            │                     │
@@ -25,16 +25,16 @@ EMF (Enterprise Metadata Framework) is a platform for building dynamic, runtime-
 
 | Module | Description |
 |--------|-------------|
-| `emf-platform/runtime/runtime-core` | Core runtime library — collection management, query engine, validation, dual storage modes |
-| `emf-platform/runtime/runtime-events` | Shared Kafka event classes for lifecycle events |
-| `emf-platform/runtime/runtime-jsonapi` | Shared JSON:API model classes |
-| `emf-platform/runtime/runtime-module-core` | Workflow action handlers (field updates, record CRUD, tasks, decisions) |
-| `emf-platform/runtime/runtime-module-integration` | Integration action handlers (HTTP callouts, email, scripts, delays) |
-| `emf-platform/runtime/runtime-module-schema` | Schema lifecycle hooks for system collections |
-| `emf-gateway` | Spring Cloud Gateway — authentication, authorization, JSON:API processing |
-| `emf-worker` | Worker service — owns database migrations, executes business logic |
-| `emf-web` | TypeScript SDK, React component library, and plugin SDK |
-| `emf-ui/app` | Admin/builder UI application |
+| `kelta-platform/runtime/runtime-core` | Core runtime library — collection management, query engine, validation, dual storage modes |
+| `kelta-platform/runtime/runtime-events` | Shared Kafka event classes for lifecycle events |
+| `kelta-platform/runtime/runtime-jsonapi` | Shared JSON:API model classes |
+| `kelta-platform/runtime/runtime-module-core` | Workflow action handlers (field updates, record CRUD, tasks, decisions) |
+| `kelta-platform/runtime/runtime-module-integration` | Integration action handlers (HTTP callouts, email, scripts, delays) |
+| `kelta-platform/runtime/runtime-module-schema` | Schema lifecycle hooks for system collections |
+| `kelta-gateway` | Spring Cloud Gateway — authentication, authorization, JSON:API processing |
+| `kelta-worker` | Worker service — owns database migrations, executes business logic |
+| `kelta-web` | TypeScript SDK, React component library, and plugin SDK |
+| `kelta-ui/app` | Admin/builder UI application |
 
 ## Tech Stack
 
@@ -73,7 +73,7 @@ docker-compose --profile tools up -d
 The runtime modules must be built first as they are dependencies for the gateway and worker.
 
 ```bash
-mvn clean install -DskipTests -f emf-platform/pom.xml \
+mvn clean install -DskipTests -f kelta-platform/pom.xml \
   -pl runtime/runtime-core,runtime/runtime-events,runtime/runtime-jsonapi,runtime/runtime-module-core,runtime/runtime-module-integration,runtime/runtime-module-schema \
   -am -B
 ```
@@ -82,17 +82,17 @@ mvn clean install -DskipTests -f emf-platform/pom.xml \
 
 ```bash
 # Gateway (port 8080)
-mvn spring-boot:run -f emf-gateway/pom.xml
+mvn spring-boot:run -f kelta-gateway/pom.xml
 
 # Worker (port 8083)
-mvn spring-boot:run -f emf-worker/pom.xml
+mvn spring-boot:run -f kelta-worker/pom.xml
 ```
 
 ### 4. Run Frontend
 
 ```bash
-cd emf-web && npm install
-cd emf-ui/app && npm install && npm run dev
+cd kelta-web && npm install
+cd kelta-ui/app && npm install && npm run dev
 ```
 
 ## Running Tests
@@ -101,21 +101,21 @@ cd emf-ui/app && npm install && npm run dev
 
 ```bash
 # Build runtime (required before testing)
-mvn clean install -DskipTests -f emf-platform/pom.xml \
+mvn clean install -DskipTests -f kelta-platform/pom.xml \
   -pl runtime/runtime-core,runtime/runtime-events,runtime/runtime-jsonapi,runtime/runtime-module-core,runtime/runtime-module-integration,runtime/runtime-module-schema \
   -am -B
 
 # Test gateway
-mvn verify -f emf-gateway/pom.xml -B
+mvn verify -f kelta-gateway/pom.xml -B
 
 # Test worker
-mvn verify -f emf-worker/pom.xml -B
+mvn verify -f kelta-worker/pom.xml -B
 ```
 
 ### Frontend
 
 ```bash
-cd emf-web
+cd kelta-web
 npm run lint
 npm run typecheck
 npm run format:check
@@ -142,7 +142,7 @@ See [`.env.example`](.env.example) for the full list. Key variables:
 | `DB_HOST` | `localhost` | PostgreSQL host |
 | `DB_PORT` | `5432` | PostgreSQL port |
 | `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9094` | Kafka broker address |
-| `OIDC_ISSUER_URI` | `http://localhost:8180/realms/emf` | Keycloak OIDC issuer |
+| `OIDC_ISSUER_URI` | `http://localhost:8180/realms/kelta` | Keycloak OIDC issuer |
 | `SECURITY_ENABLED` | `true` | Enable/disable authentication |
 | `KAFKA_EVENTS_ENABLED` | `true` | Enable/disable Kafka event publishing |
 
@@ -151,7 +151,7 @@ See [`.env.example`](.env.example) for the full list. Key variables:
 Pull requests run the full quality gate via GitHub Actions:
 
 1. **Build & Test Java** — builds runtime modules, runs gateway and worker tests
-2. **Test Frontend** — lint, typecheck, format check, and test coverage for emf-web
+2. **Test Frontend** — lint, typecheck, format check, and test coverage for kelta-web
 3. **Quality Gate** — all jobs must pass before merge
 
 On merge to `main`, container images are built, pushed, and deployed to Kubernetes via ArgoCD.

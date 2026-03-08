@@ -21,7 +21,7 @@ export async function getAuthentikTokens(): Promise<string> {
   const params = new URLSearchParams({
     grant_type: 'password',
     client_id: process.env.E2E_CLIENT_ID || '',
-    username: process.env.E2E_TEST_USERNAME || 'e2e-admin@emf.local',
+    username: process.env.E2E_TEST_USERNAME || 'e2e-admin@kelta.local',
     password: process.env.E2E_TEST_PASSWORD || '',
     scope: 'openid profile email',
   });

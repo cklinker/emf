@@ -64,6 +64,10 @@ public class OpenSearchQueryService {
             if (value != null && !value.isEmpty()) {
                 if (key.equals("query")) {
                     query.must(QueryBuilders.queryStringQuery(value));
+                } else if (key.equals("@timestamp_gte")) {
+                    query.filter(QueryBuilders.rangeQuery("@timestamp").gte(value));
+                } else if (key.equals("@timestamp_lte")) {
+                    query.filter(QueryBuilders.rangeQuery("@timestamp").lte(value));
                 } else {
                     query.filter(QueryBuilders.termQuery(key, value));
                 }

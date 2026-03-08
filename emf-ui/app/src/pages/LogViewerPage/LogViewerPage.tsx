@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
@@ -10,6 +10,14 @@ export interface LogViewerPageProps {
   className?: string
 }
 
+const TIME_RANGES = [
+  { label: '1h', seconds: 3600 },
+  { label: '6h', seconds: 21600 },
+  { label: '24h', seconds: 86400 },
+  { label: '7d', seconds: 604800 },
+  { label: '30d', seconds: 2592000 },
+]
+
 const LOG_LEVELS = ['', 'ERROR', 'WARN', 'INFO', 'DEBUG']
 const SERVICES = ['', 'emf-gateway', 'emf-worker']
 
@@ -18,22 +26,34 @@ export function LogViewerPage({ className }: LogViewerPageProps) {
   const { emfClient } = useApi()
   const navigate = useNavigate()
 
-  const [query, setQuery] = useState('')
+  const [timeRange, setTimeRange] = useState(3600)
+  const [queryInput, setQueryInput] = useState('')
+  const [debouncedQuery, setDebouncedQuery] = useState('')
   const [level, setLevel] = useState('')
   const [service, setService] = useState('')
   const [page, setPage] = useState(0)
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set())
   const pageSize = 50
 
+  // Debounce the search query to avoid firing on every keystroke
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>()
+  useEffect(() => {
+    debounceRef.current = setTimeout(() => {
+      setDebouncedQuery(queryInput)
+      setPage(0)
+    }, 400)
+    return () => clearTimeout(debounceRef.current)
+  }, [queryInput])
+
   const now = new Date()
-  const start = new Date(now.getTime() - 24 * 3600 * 1000).toISOString()
+  const start = new Date(now.getTime() - timeRange * 1000).toISOString()
   const end = now.toISOString()
 
-  const { data, isLoading, error } = useQuery({
-    queryKey: ['log-viewer', query, level, service, page],
+  const { data, isLoading, isFetching, error } = useQuery({
+    queryKey: ['log-viewer', debouncedQuery, level, service, timeRange, page],
     queryFn: () =>
       emfClient.admin.observability.searchLogs({
-        query: query || undefined,
+        query: debouncedQuery || undefined,
         level: level || undefined,
         service: service || undefined,
         start,
@@ -53,7 +73,6 @@ export function LogViewerPage({ className }: LogViewerPageProps) {
     })
   }, [])
 
-  if (isLoading) return <LoadingSpinner />
   if (error) return <ErrorMessage error={t('logViewer.loadError')} />
 
   const hits = data?.hits ?? []
@@ -81,6 +100,30 @@ export function LogViewerPage({ className }: LogViewerPageProps) {
         <h2 className="m-0 text-lg font-semibold text-foreground">{t('logViewer.title')}</h2>
       </div>
 
+      {/* Time range selector */}
+      <div
+        className="mb-4 flex gap-1 rounded-lg border border-border bg-card p-1"
+        data-testid="log-viewer-date-range"
+      >
+        {TIME_RANGES.map(({ label, seconds }) => (
+          <button
+            key={label}
+            onClick={() => {
+              setTimeRange(seconds)
+              setPage(0)
+            }}
+            className={cn(
+              'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+              timeRange === seconds
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:bg-muted'
+            )}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       {/* Filters */}
       <div className="mb-6 flex flex-wrap gap-4">
         <div className="flex flex-col gap-1">
@@ -92,11 +135,8 @@ export function LogViewerPage({ className }: LogViewerPageProps) {
             type="text"
             placeholder={t('logViewer.searchPlaceholder')}
             className="min-w-[250px] rounded-md border border-border bg-background p-2 text-sm text-foreground placeholder:text-muted-foreground"
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value)
-              setPage(0)
-            }}
+            value={queryInput}
+            onChange={(e) => setQueryInput(e.target.value)}
           />
         </div>
         <div className="flex flex-col gap-1">
@@ -144,14 +184,19 @@ export function LogViewerPage({ className }: LogViewerPageProps) {
       </div>
 
       {/* Results */}
-      {hits.length === 0 ? (
+      {isLoading && !data ? (
+        <LoadingSpinner />
+      ) : hits.length === 0 ? (
         <div className="p-12 text-center text-muted-foreground">
           <p>{t('logViewer.noEntries')}</p>
         </div>
       ) : (
         <>
           <div
-            className="overflow-x-auto rounded-lg border border-border bg-card"
+            className={cn(
+              'overflow-x-auto rounded-lg border border-border bg-card',
+              isFetching && 'opacity-60'
+            )}
             data-testid="log-viewer-table"
           >
             <table className="w-full border-collapse text-sm">

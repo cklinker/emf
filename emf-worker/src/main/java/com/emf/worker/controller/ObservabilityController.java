@@ -30,6 +30,9 @@ public class ObservabilityController {
 
     /**
      * Search request logs (trace spans).
+     *
+     * <p>Filters are passed as simple query params and translated internally
+     * to the correct nested tag queries against the Jaeger span index.
      */
     @GetMapping("/request-logs")
     public ResponseEntity<Map<String, Object>> searchRequestLogs(
@@ -48,11 +51,11 @@ public class ObservabilityController {
             Instant startInstant = start != null ? Instant.parse(start) : endInstant.minusSeconds(3600);
 
             Map<String, String> filters = new HashMap<>();
-            if (method != null) filters.put("tag.http.method", method);
-            if (status != null) filters.put("tag.http.status_code", status);
-            if (path != null) filters.put("tag.http.route", path);
-            if (traceId != null) filters.put("traceID", traceId);
-            if (userId != null) filters.put("tag.emf.user.id", userId);
+            if (method != null) filters.put("method", method);
+            if (status != null) filters.put("status", status);
+            if (path != null) filters.put("path", path);
+            if (traceId != null) filters.put("traceId", traceId);
+            if (userId != null) filters.put("userId", userId);
 
             SearchResult result = queryService.searchTraceSpans(tenantSlug, startInstant, endInstant,
                     filters, page, size);
@@ -79,7 +82,7 @@ public class ObservabilityController {
     public ResponseEntity<Map<String, Object>> getRequestLog(
             @PathVariable String traceId) {
         try {
-            Map<String, String> filters = Map.of("traceID", traceId);
+            Map<String, String> filters = Map.of("traceId", traceId);
             SearchResult result = queryService.searchTraceSpans(null,
                     Instant.now().minusSeconds(86400 * 30), Instant.now(),
                     filters, 0, 100);

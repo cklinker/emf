@@ -60,6 +60,7 @@
     "deselectAll": "Deseleccionar todo",
     "noResults": "No se encontraron resultados",
     "noData": "No hay datos disponibles",
+    "all": "Todos",
     "required": "Obligatorio",
     "optional": "Opcional",
     "none": "Ninguno",

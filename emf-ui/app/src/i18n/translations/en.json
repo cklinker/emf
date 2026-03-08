@@ -60,6 +60,7 @@
     "deselectAll": "Deselect All",
     "noResults": "No results found",
     "noData": "No data available",
+    "all": "All",
     "required": "Required",
     "optional": "Optional",
     "none": "None",

@@ -151,6 +151,10 @@ jobs:
         id: sha
         run: echo "short=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
 
+      - name: Determine legacy image name
+        id: legacy
+        run: echo "image=emf-${{ matrix.service }}" >> $GITHUB_OUTPUT
+
       - name: Build and push ${{ matrix.service }}
         uses: docker/build-push-action@v5
         with:
@@ -160,6 +164,8 @@ jobs:
           tags: |
             ${{ env.DOCKERHUB_USERNAME }}/${{ matrix.image }}:latest
             ${{ env.DOCKERHUB_USERNAME }}/${{ matrix.image }}:main-${{ steps.sha.outputs.short }}
+            ${{ env.DOCKERHUB_USERNAME }}/${{ steps.legacy.outputs.image }}:latest
+            ${{ env.DOCKERHUB_USERNAME }}/${{ steps.legacy.outputs.image }}:main-${{ steps.sha.outputs.short }}
           cache-from: type=gha,scope=${{ matrix.service }}
           cache-to: type=gha,mode=max,scope=${{ matrix.service }}
           platforms: linux/amd64
@@ -189,20 +195,34 @@ jobs:
         run: |
           IMAGE_TAG="main-${{ steps.sha.outputs.short }}"
 
-          # Update gateway deployment
-          if [ -f kelta/gateway-deployment.yaml ]; then
-            sed -i "s|image: cklinker/kelta-gateway:.*|image: cklinker/kelta-gateway:${IMAGE_TAG}|g" kelta/gateway-deployment.yaml
-          fi
+          # Support both kelta/ (new) and emf/ (legacy) manifest paths
+          for DIR in kelta emf; do
+            if [ -d "$DIR" ]; then
+              echo "Found $DIR/ directory, updating image tags..."
 
-          # Update admin UI deployment
-          if [ -f kelta/ui-deployment.yaml ]; then
-            sed -i "s|image: cklinker/kelta-ui:.*|image: cklinker/kelta-ui:${IMAGE_TAG}|g" kelta/ui-deployment.yaml
-          fi
+              # Determine image name prefix based on directory
+              if [ "$DIR" = "kelta" ]; then
+                PREFIX="kelta"
+              else
+                PREFIX="emf"
+              fi
 
-          # Update worker deployment
-          if [ -f kelta/worker-deployment.yaml ]; then
-            sed -i "s|image: cklinker/kelta-worker:.*|image: cklinker/kelta-worker:${IMAGE_TAG}|g" kelta/worker-deployment.yaml
-          fi
+              # Update gateway deployment
+              if [ -f "$DIR/gateway-deployment.yaml" ]; then
+                sed -i "s|image: cklinker/${PREFIX}-gateway:.*|image: cklinker/${PREFIX}-gateway:${IMAGE_TAG}|g" "$DIR/gateway-deployment.yaml"
+              fi
+
+              # Update admin UI deployment
+              if [ -f "$DIR/ui-deployment.yaml" ]; then
+                sed -i "s|image: cklinker/${PREFIX}-ui:.*|image: cklinker/${PREFIX}-ui:${IMAGE_TAG}|g" "$DIR/ui-deployment.yaml"
+              fi
+
+              # Update worker deployment
+              if [ -f "$DIR/worker-deployment.yaml" ]; then
+                sed -i "s|image: cklinker/${PREFIX}-worker:.*|image: cklinker/${PREFIX}-worker:${IMAGE_TAG}|g" "$DIR/worker-deployment.yaml"
+              fi
+            fi
+          done
 
       - name: Commit and push
         working-directory: homelab-argo
@@ -226,17 +246,37 @@ jobs:
     runs-on: k8s-runner
     timeout-minutes: 10
     steps:
+      - name: Detect namespace and deployment names
+        id: k8s
+        run: |
+          # Check if kelta namespace has deployments, otherwise fall back to emf
+          if kubectl -n kelta get deploy kelta-gateway &>/dev/null; then
+            echo "ns=kelta" >> $GITHUB_OUTPUT
+            echo "gateway=kelta-gateway" >> $GITHUB_OUTPUT
+            echo "worker=kelta-worker" >> $GITHUB_OUTPUT
+            echo "ui=kelta-ui" >> $GITHUB_OUTPUT
+          else
+            echo "ns=emf" >> $GITHUB_OUTPUT
+            echo "gateway=emf-gateway" >> $GITHUB_OUTPUT
+            echo "worker=emf-worker" >> $GITHUB_OUTPUT
+            echo "ui=emf-ui" >> $GITHUB_OUTPUT
+          fi
+          echo "Using namespace: $(grep ns= $GITHUB_OUTPUT | cut -d= -f2)"
+
       - name: Wait for rollout
         run: |
-          echo "Waiting for deployments to roll out..."
-          kubectl -n kelta rollout status deployment/kelta-gateway --timeout=300s || true
-          kubectl -n kelta rollout status deployment/kelta-ui --timeout=300s || true
-          kubectl -n kelta rollout status deployment/kelta-worker --timeout=300s || true
+          NS=${{ steps.k8s.outputs.ns }}
+          echo "Waiting for deployments to roll out in namespace ${NS}..."
+          kubectl -n ${NS} rollout status deployment/${{ steps.k8s.outputs.gateway }} --timeout=300s || true
+          kubectl -n ${NS} rollout status deployment/${{ steps.k8s.outputs.ui }} --timeout=300s || true
+          kubectl -n ${NS} rollout status deployment/${{ steps.k8s.outputs.worker }} --timeout=300s || true
 
       - name: Verify gateway health
         run: |
+          NS=${{ steps.k8s.outputs.ns }}
+          DEPLOY=${{ steps.k8s.outputs.gateway }}
           for i in $(seq 1 30); do
-            STATUS=$(kubectl -n kelta exec deploy/kelta-gateway -- curl -sf http://localhost:8080/actuator/health/liveness 2>/dev/null | grep -o '"status":"UP"' || true)
+            STATUS=$(kubectl -n ${NS} exec deploy/${DEPLOY} -- curl -sf http://localhost:8080/actuator/health/liveness 2>/dev/null | grep -o '"status":"UP"' || true)
             if [ -n "$STATUS" ]; then
               echo "Gateway is healthy"
               exit 0
@@ -249,8 +289,10 @@ jobs:
 
       - name: Verify worker health
         run: |
+          NS=${{ steps.k8s.outputs.ns }}
+          DEPLOY=${{ steps.k8s.outputs.worker }}
           for i in $(seq 1 30); do
-            STATUS=$(kubectl -n kelta exec deploy/kelta-worker -- curl -sf http://localhost:8080/actuator/health/liveness 2>/dev/null | grep -o '"status":"UP"' || true)
+            STATUS=$(kubectl -n ${NS} exec deploy/${DEPLOY} -- curl -sf http://localhost:8080/actuator/health/liveness 2>/dev/null | grep -o '"status":"UP"' || true)
             if [ -n "$STATUS" ]; then
               echo "Worker is healthy"
               exit 0
@@ -300,8 +342,8 @@ jobs:
       - name: Run E2E tests
         working-directory: e2e-tests
         env:
-          E2E_BASE_URL: https://kelta.io
-          E2E_API_BASE_URL: https://kelta.io
+          E2E_BASE_URL: https://emf.rzware.com
+          E2E_API_BASE_URL: https://emf.rzware.com
           E2E_TENANT_SLUG: default
           E2E_AUTHENTIK_URL: ${{ secrets.E2E_AUTHENTIK_URL }}
           E2E_CLIENT_ID: ${{ secrets.E2E_CLIENT_ID }}

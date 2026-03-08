@@ -18,9 +18,11 @@ import { registerInstrumentations } from '@opentelemetry/instrumentation'
  * Auto-instruments fetch and XMLHttpRequest to propagate trace context headers.
  */
 export function initTelemetry(): void {
-  const otlpEndpoint =
-    (import.meta as Record<string, Record<string, string>>).env?.VITE_OTEL_ENDPOINT ||
-    `${window.location.origin}/otel/v1/traces`
+  const env = (import.meta as Record<string, Record<string, string>>).env
+  // Use the gateway origin (VITE_API_BASE_URL) for OTEL traces, not window.location.origin.
+  // The UI is served from emf-ui.rzware.com but the OTEL route is on the gateway (emf.rzware.com).
+  const gatewayOrigin = env?.VITE_API_BASE_URL || window.location.origin
+  const otlpEndpoint = env?.VITE_OTEL_ENDPOINT || `${gatewayOrigin}/otel/v1/traces`
 
   const resource = new Resource({
     [ATTR_SERVICE_NAME]: 'emf-ui',
@@ -42,19 +44,21 @@ export function initTelemetry(): void {
     }),
   })
 
-  const apiOrigin = window.location.origin
+  // Propagate trace context headers to both the UI origin and the gateway origin
+  const corsUrls: RegExp[] = [
+    new RegExp(window.location.origin.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
+  ]
+  if (gatewayOrigin && gatewayOrigin !== window.location.origin) {
+    corsUrls.push(new RegExp(gatewayOrigin.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+  }
 
   registerInstrumentations({
     instrumentations: [
       new FetchInstrumentation({
-        propagateTraceHeaderCorsUrls: [
-          new RegExp(apiOrigin.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
-        ],
+        propagateTraceHeaderCorsUrls: corsUrls,
       }),
       new XMLHttpRequestInstrumentation({
-        propagateTraceHeaderCorsUrls: [
-          new RegExp(apiOrigin.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
-        ],
+        propagateTraceHeaderCorsUrls: corsUrls,
       }),
     ],
   })

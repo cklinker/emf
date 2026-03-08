@@ -91,7 +91,10 @@ emf:
       permissions-cache-ttl-minutes: ${PERMISSIONS_CACHE_TTL:5}   # Redis cache TTL for resolved permissions
       # Paths accessible without authentication (GET/HEAD only).
       # Matched as prefixes against the slug-stripped path.
-      public-paths: /api/ui-pages,/api/ui-menus,/api/oidc-providers,/api/tenants,/otel
+      public-paths: /api/ui-pages,/api/ui-menus,/api/oidc-providers,/api/tenants
+      # Paths accessible without authentication for ALL HTTP methods.
+      # Used for endpoints receiving data from unauthenticated sources (e.g., browser OTEL SDK).
+      unauthenticated-paths: /otel
 
 # Actuator configuration for health and metrics
 management:

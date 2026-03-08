@@ -49,14 +49,27 @@ public class ObservabilityContextFilter implements GlobalFilter, Ordered {
         if (userId != null) MDC.put("userId", userId);
         if (userEmail != null) MDC.put("userEmail", userEmail);
 
+        // Capture the actual request path for Jaeger visibility.
+        // The OTEL agent names gateway spans generically (e.g., "GET") because
+        // Spring Cloud Gateway doesn't expose route templates to the agent.
+        // Adding the concrete path as an attribute makes traces far easier to read.
+        String requestPath = request.getURI().getPath();
+        String requestMethod = request.getMethod() != null ? request.getMethod().name() : "UNKNOWN";
+        String queryString = request.getURI().getRawQuery();
+
         // Enrich current OTEL span with custom attributes
         Span span = Span.current();
         if (span.getSpanContext().isValid()) {
+            span.setAttribute("http.url.path", requestPath);
+            if (queryString != null) span.setAttribute("http.url.query", queryString);
             if (tenantId != null) span.setAttribute("emf.tenant.id", tenantId);
             if (tenantSlug != null) span.setAttribute("emf.tenant.slug", tenantSlug);
             if (userId != null) span.setAttribute("emf.user.id", userId);
             if (userEmail != null) span.setAttribute("emf.user.email", userEmail);
             span.setAttribute("emf.correlation.id", correlationId);
+
+            // Update span name to include the path for Jaeger readability
+            span.updateName(requestMethod + " " + requestPath);
         }
 
         // Set OTEL Baggage for downstream propagation

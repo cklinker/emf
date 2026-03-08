@@ -37,9 +37,20 @@ public class MdcEnrichmentFilter extends OncePerRequestFilter {
             if (userEmail != null) MDC.put("userEmail", userEmail);
             if (correlationId != null) MDC.put("correlationId", correlationId);
 
+            // Capture the actual request path for Jaeger visibility.
+            // The OTEL agent uses Spring MVC route templates for span names
+            // (e.g., "GET /api/{collectionName}"), which is good for grouping
+            // but makes individual traces hard to identify. Adding the concrete
+            // path as an attribute makes it easy to find specific requests.
+            String requestPath = request.getRequestURI();
+            String requestMethod = request.getMethod();
+            String queryString = request.getQueryString();
+
             // Enrich current OTEL span with custom attributes
             Span span = Span.current();
             if (span.getSpanContext().isValid()) {
+                span.setAttribute("http.url.path", requestPath);
+                if (queryString != null) span.setAttribute("http.url.query", queryString);
                 if (tenantId != null) span.setAttribute("emf.tenant.id", tenantId);
                 if (tenantSlug != null) span.setAttribute("emf.tenant.slug", tenantSlug);
                 if (userId != null) span.setAttribute("emf.user.id", userId);

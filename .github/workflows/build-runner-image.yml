@@ -33,7 +33,7 @@ jobs:
           file: github-runner/Dockerfile
           push: true
           tags: |
-            cklinker/github-runner-emf:latest
+            cklinker/github-runner-kelta:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64

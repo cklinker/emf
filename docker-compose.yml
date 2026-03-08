@@ -1,4 +1,4 @@
-# EMF Local Development Environment
+# Kelta Local Development Environment
 # Provides: PostgreSQL, Redis, Kafka, and Keycloak (OIDC)
 
 services:
@@ -7,31 +7,31 @@ services:
   # ===========================================
   postgres:
     image: postgres:15-alpine
-    container_name: emf-postgres
+    container_name: kelta-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: emf
-      POSTGRES_PASSWORD: emf
-      POSTGRES_DB: emf_control_plane
+      POSTGRES_USER: kelta
+      POSTGRES_PASSWORD: kelta
+      POSTGRES_DB: kelta_control_plane
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U emf -d emf_control_plane"]
+      test: ["CMD-SHELL", "pg_isready -U kelta -d kelta_control_plane"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
-      - emf-network
+      - kelta-network
 
   # ===========================================
   # Redis Cache
   # ===========================================
   redis:
     image: redis:7-alpine
-    container_name: emf-redis
+    container_name: kelta-redis
     restart: unless-stopped
     command: redis-server --appendonly yes
     ports:
@@ -44,14 +44,14 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - emf-network
+      - kelta-network
 
   # ===========================================
   # Kafka (KRaft mode - no Zookeeper needed)
   # ===========================================
   kafka:
     image: apache/kafka:3.7.0
-    container_name: emf-kafka
+    container_name: kelta-kafka
     restart: unless-stopped
     environment:
       KAFKA_NODE_ID: 1
@@ -80,17 +80,17 @@ services:
       retries: 5
       start_period: 30s
     networks:
-      - emf-network
+      - kelta-network
 
   # ===========================================
   # Kafka UI (optional - for debugging)
   # ===========================================
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
-    container_name: emf-kafka-ui
+    container_name: kelta-kafka-ui
     restart: unless-stopped
     environment:
-      KAFKA_CLUSTERS_0_NAME: emf-local
+      KAFKA_CLUSTERS_0_NAME: kelta-local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
     ports:
       - "8090:8080"
@@ -98,7 +98,7 @@ services:
       kafka:
         condition: service_healthy
     networks:
-      - emf-network
+      - kelta-network
     profiles:
       - tools
 
@@ -107,7 +107,7 @@ services:
   # ===========================================
   keycloak:
     image: quay.io/keycloak/keycloak:23.0
-    container_name: emf-keycloak
+    container_name: kelta-keycloak
     restart: unless-stopped
     command: start-dev --import-realm
     environment:
@@ -118,7 +118,7 @@ services:
     ports:
       - "8180:8180"
     volumes:
-      - ./docker/keycloak/emf-realm.json:/opt/keycloak/data/import/emf-realm.json:ro
+      - ./docker/keycloak/kelta-realm.json:/opt/keycloak/data/import/kelta-realm.json:ro
       - keycloak_data:/opt/keycloak/data
     healthcheck:
       test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8180;echo -e 'GET /health/ready HTTP/1.1\r\nhost: localhost\r\nConnection: close\r\n\r\n' >&3;if [ $? -eq 0 ]; then echo 'Healthcheck Successful';exit 0;else echo 'Healthcheck Failed';exit 1;fi;"]
@@ -127,14 +127,14 @@ services:
       retries: 5
       start_period: 60s
     networks:
-      - emf-network
+      - kelta-network
 
   # ===========================================
   # Redis Commander (optional - for debugging)
   # ===========================================
   redis-commander:
     image: rediscommander/redis-commander:latest
-    container_name: emf-redis-commander
+    container_name: kelta-redis-commander
     restart: unless-stopped
     environment:
       REDIS_HOSTS: local:redis:6379
@@ -144,7 +144,7 @@ services:
       redis:
         condition: service_healthy
     networks:
-      - emf-network
+      - kelta-network
     profiles:
       - tools
 
@@ -153,10 +153,10 @@ services:
   # ===========================================
   pgadmin:
     image: dpage/pgadmin4:latest
-    container_name: emf-pgadmin
+    container_name: kelta-pgadmin
     restart: unless-stopped
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@emf.local
+      PGADMIN_DEFAULT_EMAIL: admin@kelta.local
       PGADMIN_DEFAULT_PASSWORD: admin
       PGADMIN_CONFIG_SERVER_MODE: "False"
     ports:
@@ -167,29 +167,29 @@ services:
       postgres:
         condition: service_healthy
     networks:
-      - emf-network
+      - kelta-network
     profiles:
       - tools
 
   # ===========================================
-  # EMF API Gateway Service
+  # Kelta API Gateway Service
   # ===========================================
-  emf-gateway:
+  kelta-gateway:
     build:
       context: .
-      dockerfile: emf-gateway/Dockerfile
-    container_name: emf-gateway
+      dockerfile: kelta-gateway/Dockerfile
+    container_name: kelta-gateway
     restart: unless-stopped
     environment:
       SPRING_PROFILES_ACTIVE: integration-test
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
-      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://keycloak:8180/realms/emf
-      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8180/realms/emf/protocol/openid-connect/certs
-      EMF_GATEWAY_SERVICE_ACCOUNT_CLIENT_ID: emf-gateway-service
-      EMF_GATEWAY_SERVICE_ACCOUNT_CLIENT_SECRET: emf-gateway-service-secret
-      LOGGING_LEVEL_COM_EMF: INFO
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://keycloak:8180/realms/kelta
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8180/realms/kelta/protocol/openid-connect/certs
+      KELTA_GATEWAY_SERVICE_ACCOUNT_CLIENT_ID: kelta-gateway-service
+      KELTA_GATEWAY_SERVICE_ACCOUNT_CLIENT_SECRET: kelta-gateway-service-secret
+      LOGGING_LEVEL_IO_KELTA: INFO
     ports:
       - "8080:8080"
     depends_on:
@@ -206,27 +206,27 @@ services:
       retries: 10
       start_period: 60s
     networks:
-      - emf-network
+      - kelta-network
 
   # ===========================================
-  # EMF Worker Service
+  # Kelta Worker Service
   # ===========================================
-  emf-worker:
+  kelta-worker:
     build:
       context: .
-      dockerfile: emf-worker/Dockerfile
-    container_name: emf-worker
+      dockerfile: kelta-worker/Dockerfile
+    container_name: kelta-worker
     restart: unless-stopped
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/emf_control_plane
-      SPRING_DATASOURCE_USERNAME: emf
-      SPRING_DATASOURCE_PASSWORD: emf
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/kelta_control_plane
+      SPRING_DATASOURCE_USERNAME: kelta
+      SPRING_DATASOURCE_PASSWORD: kelta
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       WORKER_POOL: default
       WORKER_CAPACITY: 50
-      LOGGING_LEVEL_COM_EMF: INFO
+      LOGGING_LEVEL_IO_KELTA: INFO
     ports:
       - "8083:8080"
     depends_on:
@@ -243,14 +243,14 @@ services:
       retries: 10
       start_period: 60s
     networks:
-      - emf-network
+      - kelta-network
 
   # ===========================================
   # OpenSearch (observability data store)
   # ===========================================
   opensearch:
     image: opensearchproject/opensearch:2.17.1
-    container_name: emf-opensearch
+    container_name: kelta-opensearch
     environment:
       discovery.type: single-node
       plugins.security.disabled: "true"
@@ -267,7 +267,7 @@ services:
       retries: 10
       start_period: 30s
     networks:
-      - emf-network
+      - kelta-network
     profiles:
       - observability
 
@@ -276,7 +276,7 @@ services:
   # ===========================================
   jaeger:
     image: jaegertracing/jaeger:2
-    container_name: emf-jaeger
+    container_name: kelta-jaeger
     command: ["--config", "/etc/jaeger/config.yaml"]
     volumes:
       - ./docker/jaeger/config.yaml:/etc/jaeger/config.yaml:ro
@@ -289,7 +289,7 @@ services:
       opensearch:
         condition: service_healthy
     networks:
-      - emf-network
+      - kelta-network
     profiles:
       - observability
 
@@ -300,17 +300,17 @@ services:
     build:
       context: .
       dockerfile: sample-service/Dockerfile
-    container_name: emf-sample-service
+    container_name: kelta-sample-service
     restart: unless-stopped
     environment:
       SPRING_PROFILES_ACTIVE: integration-test
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/emf_control_plane
-      SPRING_DATASOURCE_USERNAME: emf
-      SPRING_DATASOURCE_PASSWORD: emf
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/kelta_control_plane
+      SPRING_DATASOURCE_USERNAME: kelta
+      SPRING_DATASOURCE_PASSWORD: kelta
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
-      EMF_STORAGE_MODE: PHYSICAL_TABLES
-      LOGGING_LEVEL_COM_EMF: INFO
+      KELTA_STORAGE_MODE: PHYSICAL_TABLES
+      LOGGING_LEVEL_IO_KELTA: INFO
     ports:
       - "8082:8080"
     depends_on:
@@ -325,7 +325,7 @@ services:
       retries: 10
       start_period: 60s
     networks:
-      - emf-network
+      - kelta-network
 
 volumes:
   postgres_data:
@@ -336,5 +336,5 @@ volumes:
   opensearch_data:
 
 networks:
-  emf-network:
+  kelta-network:
     driver: bridge

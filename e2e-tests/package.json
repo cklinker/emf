@@ -1,5 +1,5 @@
 {
-  "name": "emf-e2e-tests",
+  "name": "kelta-e2e-tests",
   "private": true,
   "version": "0.0.1",
   "description": "End-to-end tests for the EMF platform",

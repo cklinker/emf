@@ -1,20 +1,20 @@
-# EMF Project — Claude Code Instructions
+# Kelta Project — Claude Code Instructions
 
 ## Overview
 
-This is the EMF Enterprise Platform monorepo. When working on tasks, follow this workflow exactly.
+This is the Kelta Enterprise Platform monorepo. When working on tasks, follow this workflow exactly.
 
 **All changes require a PR.** Never commit directly to `main`. Always create a feature branch, open a PR, and auto-merge. This applies to EPIC tasks, bug fixes, hotfixes, and any other code changes.
 
 ## Project Structure
 
 ```
-emf-platform/runtime/runtime-core   # Core runtime library (Java, JAR)
-emf-platform/runtime/runtime-events # Shared Kafka event classes (Java, JAR)
-emf-gateway                         # Spring Cloud Gateway service (Java)
-emf-worker                          # Worker service (Java, owns DB migrations)
-emf-web                             # Frontend SDK, components, plugin-sdk (TypeScript/React)
-emf-ui/app                          # Admin/builder UI (TypeScript/React/Vite)
+kelta-platform/runtime/runtime-core   # Core runtime library (Java, JAR)
+kelta-platform/runtime/runtime-events # Shared Kafka event classes (Java, JAR)
+kelta-gateway                         # Spring Cloud Gateway service (Java)
+kelta-worker                          # Worker service (Java, owns DB migrations)
+kelta-web                             # Frontend SDK, components, plugin-sdk (TypeScript/React)
+kelta-ui/app                          # Admin/builder UI (TypeScript/React/Vite)
 ```
 
 - **Java 21**, Spring Boot 3.2.2, Maven
@@ -68,29 +68,29 @@ Run the full build pipeline locally. **All steps must pass with zero errors.**
 
 ```bash
 # 1. Build runtime modules (dependency for gateway and worker)
-mvn clean install -DskipTests -f emf-platform/pom.xml -pl runtime/runtime-core,runtime/runtime-events,runtime/runtime-jsonapi,runtime/runtime-module-core,runtime/runtime-module-integration,runtime/runtime-module-schema -am -B
+mvn clean install -DskipTests -f kelta-platform/pom.xml -pl runtime/runtime-core,runtime/runtime-events,runtime/runtime-jsonapi,runtime/runtime-module-core,runtime/runtime-module-integration,runtime/runtime-module-schema -am -B
 
 # 2. Run gateway tests
-mvn verify -f emf-gateway/pom.xml -B
+mvn verify -f kelta-gateway/pom.xml -B
 
 # 3. Run worker tests
-mvn verify -f emf-worker/pom.xml -B
+mvn verify -f kelta-worker/pom.xml -B
 ```
 
 #### Frontend (always — CI runs these on every PR)
 
 ```bash
-# emf-web (always run — CI checks this on every PR regardless of changes)
-cd emf-web && npm install
+# kelta-web (always run — CI checks this on every PR regardless of changes)
+cd kelta-web && npm install
 npm run lint
 npm run typecheck
 npm run format:check
 npm run test:coverage
 ```
 
-If changes were made to emf-ui:
+If changes were made to kelta-ui:
 ```bash
-cd emf-ui/app && npm install
+cd kelta-ui/app && npm install
 npm run lint
 npm run format:check
 npm run test:run
@@ -100,10 +100,10 @@ npm run test:run
 
 - [ ] `mvn verify` passes for gateway (zero test failures, zero lint errors)
 - [ ] `mvn verify` passes for worker (zero test failures, zero lint errors)
-- [ ] `npm run lint` passes in emf-web
-- [ ] `npm run typecheck` passes in emf-web
-- [ ] `npm run format:check` passes in emf-web
-- [ ] `npm run test:coverage` passes in emf-web
+- [ ] `npm run lint` passes in kelta-web
+- [ ] `npm run typecheck` passes in kelta-web
+- [ ] `npm run format:check` passes in kelta-web
+- [ ] `npm run test:coverage` passes in kelta-web
 - [ ] No compiler warnings introduced
 - [ ] Flyway migration numbering is correct and sequential
 - [ ] New tests cover the feature adequately
@@ -164,7 +164,7 @@ gh pr merge --auto --squash
 
 | Fact | Value |
 |------|-------|
-| Flyway migration ranges | V1-V65 in emf-worker/src/main/resources/db/migration/ |
+| Flyway migration ranges | V1-V65 in kelta-worker/src/main/resources/db/migration/ |
 | FieldType enum (runtime-core) | STRING, INTEGER, LONG, DOUBLE, BOOLEAN, DATE, DATETIME, JSON |
 | FieldService VALID_FIELD_TYPES | "string", "number", "boolean", "date", "datetime", "reference", "array", "object" |
 | Worker "number" field type maps to | runtime DOUBLE (not INTEGER) |
@@ -196,27 +196,27 @@ The platform is deployed via ArgoCD to a local Kubernetes cluster. Use `kubectl`
 
 | Resource | Value |
 |----------|-------|
-| Namespace | `emf` |
-| Gateway | `deployment/emf-gateway` |
-| Worker | `deployment/emf-worker` |
+| Namespace | `kelta` |
+| Gateway | `deployment/kelta-gateway` |
+| Worker | `deployment/kelta-worker` |
 
 ### Useful Commands
 
 ```bash
 # View gateway logs
-kubectl logs -n emf deployment/emf-gateway --tail=200
+kubectl logs -n kelta deployment/kelta-gateway --tail=200
 
 # View worker logs
-kubectl logs -n emf deployment/emf-worker --tail=200
+kubectl logs -n kelta deployment/kelta-worker --tail=200
 
 # Search for errors in last hour
-kubectl logs -n emf deployment/emf-worker --since=1h | grep -i "ERROR\|exception"
+kubectl logs -n kelta deployment/kelta-worker --since=1h | grep -i "ERROR\|exception"
 
 # Check pod status
-kubectl get pods -n emf
+kubectl get pods -n kelta
 
 # Describe a pod for events/restarts
-kubectl describe pod -n emf <pod-name>
+kubectl describe pod -n kelta <pod-name>
 ```
 
 ## Branch and PR Policy

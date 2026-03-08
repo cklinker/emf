@@ -1,6 +1,6 @@
 # EPIC: Workflow Engine — Visual State Machine with Runtime Modules
 
-> A phased plan to evolve EMF's automation system into a visual, state-machine-driven workflow engine with durable execution, runtime-loadable modules, and rich observability.
+> A phased plan to evolve Kelta's automation system into a visual, state-machine-driven workflow engine with durable execution, runtime-loadable modules, and rich observability.
 
 ---
 
@@ -22,7 +22,7 @@
 - **No backend execution engine exists**
 
 **Module System**:
-- `EmfModule` interface with `getId()`, `getName()`, `getVersion()`, `getActionHandlers()`, `getBeforeSaveHooks()`, `onStartup(ModuleContext)`
+- `KeltaModule` interface with `getId()`, `getName()`, `getVersion()`, `getActionHandlers()`, `getBeforeSaveHooks()`, `onStartup(ModuleContext)`
 - `ModuleRegistry` discovers beans via Spring classpath scanning
 - `ModuleContext` provides runtime services (QueryEngine, CollectionRegistry, FormulaEvaluator, ActionHandlerRegistry, extensions map)
 - 3 compile-time modules: SchemaLifecycleModule, CoreActionsModule, IntegrationModule
@@ -69,7 +69,7 @@ The existing Workflow Rules system will be **fully migrated to Flows** and then 
 1. **Durable Execution** — Every state transition persists to PostgreSQL. Executions survive pod restarts and can resume from any checkpoint.
 2. **State Data Flow** — Each step receives input state, produces output state. JSONPath expressions map data between steps (InputPath, OutputPath, ResultPath).
 3. **Unified Handler SPI** — The existing `ActionHandler` interface remains unchanged. All 15+ existing handlers become available as Task state resources.
-4. **Tenant-Scoped Runtime Modules** — JARs downloaded by URL, stored in S3, loaded via sandboxed ClassLoader, scoped to a tenant. Module lifecycle events (install, enable, disable, uninstall) propagate to all pods via Kafka (`emf.config.module.changed`) — no process restarts required. Modules expose new `ActionHandler` implementations.
+4. **Tenant-Scoped Runtime Modules** — JARs downloaded by URL, stored in S3, loaded via sandboxed ClassLoader, scoped to a tenant. Module lifecycle events (install, enable, disable, uninstall) propagate to all pods via Kafka (`kelta.config.module.changed`) — no process restarts required. Modules expose new `ActionHandler` implementations.
 5. **Visual-First Design** — Every flow is visually composable. The JSON definition is the source of truth; the visual builder is a bidirectional editor of that JSON.
 
 ---
@@ -78,7 +78,7 @@ The existing Workflow Rules system will be **fully migrated to Flows** and then 
 
 ### State Types
 
-Inspired by AWS Step Functions, with additions for EMF's data platform context.
+Inspired by AWS Step Functions, with additions for Kelta's data platform context.
 
 | State Type | Purpose | Key Properties |
 |------------|---------|---------------|
@@ -169,7 +169,7 @@ Invoked when a record in a specific collection is created, updated, or deleted.
 | `synchronous` | boolean | No | Default `false`. If `true`, the flow executes synchronously during the save operation (before commit) and can return field updates. Used to replace `BEFORE_CREATE`/`BEFORE_UPDATE` workflow triggers. |
 
 **How it works:**
-1. `FlowEventListener` consumes `emf.record.changed` Kafka topic
+1. `FlowEventListener` consumes `kelta.record.changed` Kafka topic
 2. For each event, queries all ACTIVE flows for the tenant where `flow_type = 'RECORD_TRIGGERED'` and `trigger_config.collection` matches the event's collection
 3. Checks if the event's `changeType` is in `trigger_config.events`
 4. If `triggerFields` is specified and event is UPDATE, checks intersection with `changedFields`
@@ -186,7 +186,7 @@ Invoked when a message arrives on a specific Kafka topic matching filter criteri
 ```json
 {
   "topic": "external.payments.completed",
-  "consumerGroup": "emf-flow-payments",
+  "consumerGroup": "kelta-flow-payments",
   "keyFilter": "tenant-123:*",
   "messageFilter": {
     "path": "$.payload.type",
@@ -200,7 +200,7 @@ Invoked when a message arrives on a specific Kafka topic matching filter criteri
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `topic` | string | Yes | Kafka topic to subscribe to |
-| `consumerGroup` | string | No | Custom consumer group. Default: `emf-flow-{flowId}` |
+| `consumerGroup` | string | No | Custom consumer group. Default: `kelta-flow-{flowId}` |
 | `keyFilter` | string | No | Glob pattern matched against the Kafka message key. If the key doesn't match, the message is skipped. |
 | `messageFilter` | object | No | JSONPath-based filter on the message body. Only messages where the path matches the operator/value trigger the flow. |
 | `messageFilter.path` | string | Yes (if messageFilter) | JSONPath into the message body |
@@ -344,7 +344,7 @@ This flattens the source data into a clean top-level structure, making downstrea
 
 ### 1.1 Flow Definition Model (runtime-core)
 
-New package: `com.emf.runtime.flow`
+New package: `io.kelta.runtime.flow`
 
 **Classes to create:**
 - `FlowDefinition` — Parsed representation of the definition JSON (record with `startAt`, `comment`, `Map<String, StateDefinition> states`)
@@ -366,7 +366,7 @@ New package: `com.emf.runtime.flow`
   - `executeSynchronous(tenantId, flowId, definition, initialInput, userId)` → blocks until completion, returns final state data. Used for `synchronous: true` record-triggered flows (replaces BEFORE_CREATE/BEFORE_UPDATE triggers) where the caller needs the result before commit.
   - `resumeExecution(executionId)` → loads persisted state, resumes from `current_node_id` (async)
   - `cancelExecution(executionId)` → marks execution as CANCELLED
-  - Thread pool: configurable `emf.flow.executor.pool-size` (default: 10), bounded queue with rejection policy that logs and marks execution as FAILED
+  - Thread pool: configurable `kelta.flow.executor.pool-size` (default: 10), bounded queue with rejection policy that logs and marks execution as FAILED
   - **Flow-level execution timeout:** Each flow has optional `maxExecutionDurationSeconds` (default: 3600s). FlowEngine monitors execution age and cancels with status FAILED + error code `FlowTimeout` if exceeded. Prevents infinite loops.
   - **Graceful shutdown:** On SIGTERM, FlowEngine stops accepting new executions, waits for in-flight executions to reach a persist point (next state transition), persists them as WAITING with `resume_reason = 'POD_SHUTDOWN'`. `ScheduledFlowExecutor` picks them up on another pod.
   - Internal state dispatch loop: reads current state type → delegates to typed handler → persists transition → moves to next state
@@ -382,7 +382,7 @@ New package: `com.emf.runtime.flow`
 
 **Key file to reuse:** `ActionHandlerRegistry.java` — Task states look up handlers by key
 
-### 1.3 Flow Store (runtime-core + emf-worker)
+### 1.3 Flow Store (runtime-core + kelta-worker)
 
 **Interface:** `FlowStore` (in runtime-core)
 - `createExecution(tenantId, flowId, userId, initialState)` → String executionId
@@ -392,7 +392,7 @@ New package: `com.emf.runtime.flow`
 - `findWaitingExecutions()` → for scheduled resume
 - `cancelExecution(executionId)`
 
-**Implementation:** `JdbcFlowStore` (in emf-worker) — JDBC implementation against flow tables
+**Implementation:** `JdbcFlowStore` (in kelta-worker) — JDBC implementation against flow tables
 
 ### 1.4 Database Schema Changes
 
@@ -474,7 +474,7 @@ CREATE INDEX idx_flow_pending_resume_event ON flow_pending_resume(resume_event) 
 
 **Modify:** Gateway route configuration → Add routes for `/api/flows/{flowId}/execute`, `/api/flows/executions/**`, `/api/webhooks/**` proxying to the worker service (following existing gateway → worker routing pattern)
 
-**New classes in emf-worker:**
+**New classes in kelta-worker:**
 - `FlowExecutionController` — REST endpoints:
   - `POST /api/flows/{flowId}/execute` — Start execution with optional `{ "input": {...} }` body for AUTOLAUNCHED flows
   - `POST /api/flows/executions/{executionId}/cancel` — Cancel execution
@@ -482,8 +482,8 @@ CREATE INDEX idx_flow_pending_resume_event ON flow_pending_resume(resume_event) 
   - `GET /api/flows/{flowId}/flow-executions` — List executions (existing)
   - `GET /api/flows/executions/{executionId}` — Get execution detail with state data
   - `GET /api/flows/executions/{executionId}/steps` — Get step-level log
-  - `POST /api/webhooks/{path}` — Webhook endpoint that looks up flow by `webhookPath` in trigger_config. Supports HMAC signature verification via `X-EMF-Signature` header when `authentication = 'WEBHOOK_SECRET'` (secret stored per-flow, compared using constant-time comparison).
-- `FlowEventListener` — Kafka listener for `emf.record.changed`:
+  - `POST /api/webhooks/{path}` — Webhook endpoint that looks up flow by `webhookPath` in trigger_config. Supports HMAC signature verification via `X-Kelta-Signature` header when `authentication = 'WEBHOOK_SECRET'` (secret stored per-flow, compared using constant-time comparison).
+- `FlowEventListener` — Kafka listener for `kelta.record.changed`:
   - Maintains an in-memory cache of active flow trigger configs per tenant (`ConcurrentHashMap<String, List<FlowTriggerConfig>>`), loaded from DB on startup and invalidated when flows are created/updated/deleted (via the existing system collection save hooks)
   - For each event, checks cached trigger configs — no DB query per event
   - Uses `FlowTriggerEvaluator.matchesRecordTrigger()` to filter
@@ -491,7 +491,7 @@ CREATE INDEX idx_flow_pending_resume_event ON flow_pending_resume(resume_event) 
   - Calls `FlowEngine.startExecution()` for each matching flow
 - `KafkaFlowTriggerManager` — Manages dynamic Kafka consumers for `KAFKA_TRIGGERED` flows:
   - **On pod startup:** queries DB for all ACTIVE flows with `flow_type = 'KAFKA_TRIGGERED'`, creates a consumer for each
-  - **Consumer group strategy:** each flow uses consumer group `emf-flow-{flowId}`. All pods join the same group, so Kafka distributes partitions — each message is processed by exactly one pod. No cross-pod activation events needed.
+  - **Consumer group strategy:** each flow uses consumer group `kelta-flow-{flowId}`. All pods join the same group, so Kafka distributes partitions — each message is processed by exactly one pod. No cross-pod activation events needed.
   - On flow activation (via API on this pod), creates a consumer for the configured topic
   - On message receipt, uses `FlowTriggerEvaluator.matchesKafkaTrigger()` to filter
   - Uses `InitialStateBuilder.buildFromKafkaMessage()` for initial state
@@ -584,13 +584,13 @@ Handlers that return `null` get a generic form (raw JSON config editor). Handler
 
 ### 1.9 Enterprise Guardrails
 
-**RBAC:** Flow operations require permissions integrated with the existing EMF permission framework:
+**RBAC:** Flow operations require permissions integrated with the existing Kelta permission framework:
 - `MANAGE_FLOWS` — create, edit, activate, deactivate, delete flows
 - `EXECUTE_FLOWS` — manually trigger flow executions
 - `VIEW_FLOW_EXECUTIONS` — view execution history and step logs
 - Permissions checked in `FlowExecutionController` and flow CRUD endpoints
 
-**Per-Tenant Rate Limiting:** Configurable max concurrent executions per tenant (`emf.flow.max-concurrent-per-tenant`, default: 50). `FlowEngine` tracks active execution count per tenant in an `AtomicInteger` map. Exceeding the limit → execution rejected with HTTP 429 / error code `TenantRateLimitExceeded`. Queue overflow → execution marked FAILED.
+**Per-Tenant Rate Limiting:** Configurable max concurrent executions per tenant (`kelta.flow.max-concurrent-per-tenant`, default: 50). `FlowEngine` tracks active execution count per tenant in an `AtomicInteger` map. Exceeding the limit → execution rejected with HTTP 429 / error code `TenantRateLimitExceeded`. Queue overflow → execution marked FAILED.
 
 **Idempotency:** `FlowEventListener` deduplicates trigger events using a `(eventId, flowId)` composite key. Uses Redis SET with TTL (default: 5 minutes) for deduplication window. If Redis unavailable, falls back to a DB `flow_execution_dedup` table with periodic TTL cleanup. Prevents duplicate executions from Kafka at-least-once delivery.
 
@@ -923,7 +923,7 @@ After all tenants are migrated and verified:
 - `WorkflowRuleData.java`, `WorkflowActionData.java`
 - `JdbcWorkflowStore.java`
 
-**Remove from emf-worker:**
+**Remove from kelta-worker:**
 - `WorkflowEventListener.java` (replaced by `FlowEventListener`)
 - `ScheduledWorkflowExecutor.java` (replaced by `ScheduledFlowExecutor`)
 - Workflow-related beans from `WorkflowConfig.java`
@@ -963,7 +963,7 @@ The `BEFORE_CREATE`/`BEFORE_UPDATE` workflow triggers that call FIELD_UPDATE wil
 
 ### 4.1 Module Manifest
 
-Each module JAR must contain a `META-INF/emf-module.json` manifest. The manifest declares the module's handlers and importantly their **UI descriptors** — the same `ActionHandlerDescriptor` contract used by built-in handlers (Section 1.7). This is what enables runtime modules to render rich configuration forms, provide output schema autocomplete, and integrate identically to native capabilities.
+Each module JAR must contain a `META-INF/kelta-module.json` manifest. The manifest declares the module's handlers and importantly their **UI descriptors** — the same `ActionHandlerDescriptor` contract used by built-in handlers (Section 1.7). This is what enables runtime modules to render rich configuration forms, provide output schema autocomplete, and integrate identically to native capabilities.
 
 ```json
 {
@@ -971,8 +971,8 @@ Each module JAR must contain a `META-INF/emf-module.json` manifest. The manifest
   "name": "Stripe Integration",
   "version": "1.2.0",
   "description": "Stripe payment processing actions",
-  "author": "EMF Marketplace",
-  "moduleClass": "com.stripe.emf.StripeModule",
+  "author": "Kelta Marketplace",
+  "moduleClass": "com.stripe.kelta.StripeModule",
   "minPlatformVersion": "1.0.0",
   "permissions": ["HTTP_OUTBOUND", "READ_RECORDS", "WRITE_RECORDS"],
   "actionHandlers": [
@@ -1034,7 +1034,7 @@ When a tenant installs a module, the platform:
 
 **S3 key structure:**
 ```
-s3://{emf-modules-bucket}/modules/{tenant_id}/{module_id}/{version}/{module_id}-{version}.jar
+s3://{kelta-modules-bucket}/modules/{tenant_id}/{module_id}/{version}/{module_id}-{version}.jar
 ```
 
 **New class:** `ModuleStorageService`
@@ -1042,8 +1042,8 @@ s3://{emf-modules-bucket}/modules/{tenant_id}/{module_id}/{version}/{module_id}-
 - `downloadModule(tenantId, moduleId, version)` → InputStream (for ClassLoader loading)
 - `deleteModule(tenantId, moduleId, version)` → removes from S3
 - Uses AWS SDK v2 (`software.amazon.awssdk:s3`)
-- Configurable bucket name via `emf.modules.s3.bucket`
-- Configurable prefix via `emf.modules.s3.prefix` (default: `modules/`)
+- Configurable bucket name via `kelta.modules.s3.bucket`
+- Configurable prefix via `kelta.modules.s3.prefix` (default: `modules/`)
 - Supports S3-compatible stores (MinIO for local dev) via endpoint override
 
 **Worker startup:** On pod startup, the `RuntimeModuleManager` reads all ACTIVE modules from the database, downloads their JARs from S3, and loads them into sandboxed ClassLoaders. This ensures modules are available after pod restarts without re-downloading from external URLs.
@@ -1094,10 +1094,10 @@ CREATE INDEX idx_tenant_module_action_key ON tenant_module_action(tenant_module_
 Restrictions:
 - **No filesystem access** — Cannot call `java.io.File`, `java.nio.file.*` (except through provided APIs)
 - **No network access** — Cannot open sockets directly; must use the provided `RestTemplate` from `ModuleContext`
-- **No reflection on platform classes** — Cannot reflectively access EMF internals beyond the provided API
+- **No reflection on platform classes** — Cannot reflectively access Kelta internals beyond the provided API
 - **No System.exit, Runtime.exec** — Blocked system calls
 - **No thread creation** — Cannot spawn threads; Parallel/Map execution is handled by the engine
-- **Class allow-list** — Can load: `java.*`, `javax.*`, `com.fasterxml.jackson.*`, `org.slf4j.*`, and the module's own packages. Cannot load EMF internal packages except `com.emf.runtime.workflow.ActionHandler`, `com.emf.runtime.workflow.ActionContext`, `com.emf.runtime.workflow.ActionResult`, `com.emf.runtime.workflow.module.EmfModule`, `com.emf.runtime.workflow.module.ModuleContext`
+- **Class allow-list** — Can load: `java.*`, `javax.*`, `com.fasterxml.jackson.*`, `org.slf4j.*`, and the module's own packages. Cannot load Kelta internal packages except `io.kelta.runtime.workflow.ActionHandler`, `io.kelta.runtime.workflow.ActionContext`, `io.kelta.runtime.workflow.ActionResult`, `io.kelta.runtime.workflow.module.KeltaModule`, `io.kelta.runtime.workflow.module.ModuleContext`
 
 Implementation approach:
 - Override `loadClass()` to check allow-list before delegating to parent
@@ -1110,7 +1110,7 @@ Implementation approach:
 Install → Download JAR from source URL → Verify SHA-256 checksum → Upload to S3 →
 Parse manifest from JAR → Update DB status → Publish Kafka event →
 All pods: receive event → Download JAR from S3 → Load via sandboxed ClassLoader →
-Validate EmfModule interface → Register handlers → Set status ACTIVE
+Validate KeltaModule interface → Register handlers → Set status ACTIVE
 ```
 
 **On pod startup:**
@@ -1139,17 +1139,17 @@ Extend `ActionHandlerRegistry` to support tenant-scoped handlers:
 
 Module lifecycle events propagate to **all running worker pods** without process restarts, following the existing `CollectionConfigEventPublisher` → `CollectionSchemaListener` Kafka pattern.
 
-**Kafka topic:** `emf.config.module.changed`
+**Kafka topic:** `kelta.config.module.changed`
 
 **New event payload (runtime-events):** `ModuleChangedPayload` — fields: `id`, `tenantId`, `moduleId`, `name`, `version`, `s3Key`, `moduleClass`, `manifest` (JSON), `changeType` (INSTALLED/ENABLED/DISABLED/UNINSTALLED). Uses `ConfigEvent<ModuleChangedPayload>` envelope via `EventFactory.createEvent()`. Kafka key: `tenantId:moduleId`.
 
 **New classes:**
-- `ModuleConfigEventPublisher` (emf-worker) — Publishes to `emf.config.module.changed` after DB updates. Uses `KafkaTemplate<String, String>` + `ObjectMapper` (same pattern as `CollectionConfigEventPublisher`).
-- `ModuleEventListener` (emf-worker) — `@KafkaListener` on `emf.config.module.changed`. On INSTALLED/ENABLED: calls `runtimeModuleManager.loadModule()`. On DISABLED/UNINSTALLED: calls `runtimeModuleManager.unloadModule()`. S3 cleanup only by originating pod.
-- `ModuleConfigEventListener` (emf-gateway) — `@KafkaListener` that invalidates `resourceDescriptorCache` so `GET /api/flows/resources` returns updated list.
+- `ModuleConfigEventPublisher` (kelta-worker) — Publishes to `kelta.config.module.changed` after DB updates. Uses `KafkaTemplate<String, String>` + `ObjectMapper` (same pattern as `CollectionConfigEventPublisher`).
+- `ModuleEventListener` (kelta-worker) — `@KafkaListener` on `kelta.config.module.changed`. On INSTALLED/ENABLED: calls `runtimeModuleManager.loadModule()`. On DISABLED/UNINSTALLED: calls `runtimeModuleManager.unloadModule()`. S3 cleanup only by originating pod.
+- `ModuleConfigEventListener` (kelta-gateway) — `@KafkaListener` that invalidates `resourceDescriptorCache` so `GET /api/flows/resources` returns updated list.
 
 **Design constraints:**
-1. **Fan-out consumer groups:** Each pod uses unique group ID (`${emf.worker.id}-modules`) so every pod receives every event
+1. **Fan-out consumer groups:** Each pod uses unique group ID (`${kelta.worker.id}-modules`) so every pod receives every event
 2. **Idempotent operations:** `loadModule`/`unloadModule` are no-ops if already in target state
 3. **Thread safety:** `ConcurrentHashMap<String, Map<String, LoadedModule>>` (tenantId → moduleId → LoadedModule)
 4. **DB as source of truth:** On pod startup, loads from DB. Kafka only for real-time propagation.
@@ -1206,7 +1206,7 @@ Each module is a card (not a table row) showing: name, description, version, sta
 │                                    │
 │ JAR URL *                          │
 │ [https://modules.example.com/    ] │
-│ [stripe-emf-1.2.0.jar           ] │
+│ [stripe-kelta-1.2.0.jar           ] │
 │                                    │
 │ SHA-256 Checksum *                 │
 │ [a1b2c3d4e5f6...                ] │
@@ -1243,7 +1243,7 @@ When a runtime module is active, its action handlers appear in the Task resource
 - Audit logging for all module lifecycle events (install, enable, disable, uninstall)
 - Module execution timeout (configurable per handler)
 - Resource limits: memory allocation tracking per ClassLoader
-- Ability to disable runtime module loading entirely via config (`emf.modules.runtime.enabled=false`)
+- Ability to disable runtime module loading entirely via config (`kelta.modules.runtime.enabled=false`)
 - Module version immutability — once a version is uploaded to S3, it cannot be overwritten (install new version instead)
 
 ### 4.9 Deliverables
@@ -1260,9 +1260,9 @@ When a runtime module is active, its action handlers appear in the Task resource
 - [ ] S3 bucket configuration (bucket name, prefix, endpoint override for MinIO)
 - [ ] Pod startup module loading from S3 (database as source of truth)
 - [ ] `ModuleChangedPayload` event class (runtime-events)
-- [ ] `ModuleConfigEventPublisher` — publishes to `emf.config.module.changed` topic
-- [ ] `ModuleEventListener` (emf-worker) — Kafka listener that loads/unloads modules on each pod
-- [ ] `ModuleConfigEventListener` (emf-gateway) — Kafka listener that invalidates resource descriptor cache
+- [ ] `ModuleConfigEventPublisher` — publishes to `kelta.config.module.changed` topic
+- [ ] `ModuleEventListener` (kelta-worker) — Kafka listener that loads/unloads modules on each pod
+- [ ] `ModuleConfigEventListener` (kelta-gateway) — Kafka listener that invalidates resource descriptor cache
 - [ ] Fan-out consumer group pattern (each pod receives all module events)
 - [ ] Idempotent load/unload with ConcurrentHashMap-based module tracking
 - [ ] Audit logging for module events
@@ -1327,7 +1327,7 @@ Shows a filterable list of all executions for the current flow:
 
 Read-only debug mode: same canvas layout as designer, with execution data overlaid. Three-panel layout:
 
-**Left — State Summary:** Execution status, duration, step count, trigger info, trace ID (copyable, with optional link to external tracing UI like Jaeger/Grafana Tempo if `emf.tracing.ui-url` is configured), initial/final state (collapsible JSON viewers).
+**Left — State Summary:** Execution status, duration, step count, trigger info, trace ID (copyable, with optional link to external tracing UI like Jaeger/Grafana Tempo if `kelta.tracing.ui-url` is configured), initial/final state (collapsible JSON viewers).
 
 **Center — Canvas with debug decorations:**
 - Traversed edges: Green (success) or Red (failed). Untaken: gray dashed.
@@ -1342,7 +1342,7 @@ Horizontal bar at bottom: each step as colored segment proportional to duration 
 
 ### 5.5 Live Execution Tracking
 
-For running executions: auto-refresh as steps complete. Worker publishes `FlowStepCompletedEvent` to Kafka topic `emf.flow.step.completed` on each transition. Gateway subscribes and pushes to UI via SSE at `GET /api/flows/executions/{executionId}/events`. Canvas animates: current node pulsates, completed nodes transition to green check.
+For running executions: auto-refresh as steps complete. Worker publishes `FlowStepCompletedEvent` to Kafka topic `kelta.flow.step.completed` on each transition. Gateway subscribes and pushes to UI via SSE at `GET /api/flows/executions/{executionId}/events`. Canvas animates: current node pulsates, completed nodes transition to green check.
 
 ### 5.6 Failed Execution Management & Retry
 
@@ -1369,7 +1369,7 @@ Migration `V74__flow_execution_viewer_support.sql`: Add `parent_execution_id`, `
 - [ ] Audit Log tab in flow designer (chronological change history per flow)
 - [ ] Execution timeline component with click-to-select and scrubber
 - [ ] Live execution tracking via SSE
-- [ ] `emf.flow.step.completed` Kafka topic and gateway SSE endpoint
+- [ ] `kelta.flow.step.completed` Kafka topic and gateway SSE endpoint
 - [ ] Manual retry API endpoints (retry from beginning, retry from failed step)
 - [ ] Retry UI in execution viewer and executions tab
 - [ ] Failed execution dashboard (cross-flow view with bulk retry)
@@ -1387,18 +1387,18 @@ Migration `V74__flow_execution_viewer_support.sql`: Add `parent_execution_id`, `
 New metrics registered in `FlowMetricsConfig`:
 
 **Counters:**
-- `emf_flow_execution_total{tenant, flow_id, flow_name, status}` — Total executions by outcome
-- `emf_flow_step_total{tenant, flow_id, state_type, resource, status}` — Total step executions
-- `emf_flow_error_total{tenant, flow_id, error_code}` — Errors by type
+- `kelta_flow_execution_total{tenant, flow_id, flow_name, status}` — Total executions by outcome
+- `kelta_flow_step_total{tenant, flow_id, state_type, resource, status}` — Total step executions
+- `kelta_flow_error_total{tenant, flow_id, error_code}` — Errors by type
 
 **Histograms:**
-- `emf_flow_execution_duration_seconds{tenant, flow_id, flow_name}` — Execution duration distribution (p50, p95, p99)
-- `emf_flow_step_duration_seconds{tenant, flow_id, state_type, resource}` — Step duration distribution
+- `kelta_flow_execution_duration_seconds{tenant, flow_id, flow_name}` — Execution duration distribution (p50, p95, p99)
+- `kelta_flow_step_duration_seconds{tenant, flow_id, state_type, resource}` — Step duration distribution
 
 **Gauges:**
-- `emf_flow_execution_active{tenant}` — Currently running executions per tenant
-- `emf_flow_execution_waiting{tenant}` — Executions in Wait state
-- `emf_flow_modules_active{tenant}` — Active runtime modules per tenant
+- `kelta_flow_execution_active{tenant}` — Currently running executions per tenant
+- `kelta_flow_execution_waiting{tenant}` — Executions in Wait state
+- `kelta_flow_modules_active{tenant}` — Active runtime modules per tenant
 
 **Summary metrics for dashboards:**
 - Flow success rate (7d rolling window)
@@ -1487,7 +1487,7 @@ ALTER TABLE flow ADD COLUMN published_version INTEGER;
 
 ### 6.6 Data Retention & Sensitivity
 
-**Execution data retention:** Configurable per-tenant TTL for `flow_execution`, `flow_step_log`, and `flow_audit_log` records. Default: 90 days. Background cleanup job (`FlowDataRetentionJob`) runs daily, deletes expired records in batches. Option to archive to S3 before deletion (configurable `emf.flow.retention.archive-to-s3`).
+**Execution data retention:** Configurable per-tenant TTL for `flow_execution`, `flow_step_log`, and `flow_audit_log` records. Default: 90 days. Background cleanup job (`FlowDataRetentionJob`) runs daily, deletes expired records in batches. Option to archive to S3 before deletion (configurable `kelta.flow.retention.archive-to-s3`).
 
 **Data masking in execution logs:** Optional per-flow config `sensitiveFields[]` — listed JSONPath expressions are redacted in `flow_step_log` `input_snapshot` and `output_snapshot` (replaced with `"***REDACTED***"`). Applied at write time so sensitive data is never persisted. Configurable in flow settings UI.
 
@@ -1538,7 +1538,7 @@ New page: **Flow Settings** — registered in the **Automation** category of Set
 **Permissions tab:**
 - Shows which roles have MANAGE_FLOWS, EXECUTE_FLOWS, VIEW_FLOW_EXECUTIONS permissions
 - Quick-assign dropdown to add permissions to existing roles
-- Integrates with existing EMF role/permission management system
+- Integrates with existing Kelta role/permission management system
 
 **Dependencies tab:**
 - **Collection → Flow impact analysis:** Shows which flows are triggered by or reference each collection. When editing a collection's schema (adding/removing/renaming fields), a warning banner shows affected flows. Example: "3 flows reference field 'status' on collection 'orders': Order Processing, Status Notification, Daily Report."

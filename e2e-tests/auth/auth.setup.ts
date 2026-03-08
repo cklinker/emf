@@ -45,7 +45,7 @@ setup("authenticate via Authentik", async ({ page }) => {
 
   // Now we're on Authentik's login form — fill in credentials
   await loginViaAuthentik(page, {
-    username: process.env.E2E_TEST_USERNAME || "e2e-admin@emf.local",
+    username: process.env.E2E_TEST_USERNAME || "e2e-admin@kelta.local",
     password: process.env.E2E_TEST_PASSWORD || "",
   });
 
@@ -73,7 +73,7 @@ setup("authenticate via Authentik", async ({ page }) => {
     const result: Record<string, string> = {};
     for (let i = 0; i < sessionStorage.length; i++) {
       const key = sessionStorage.key(i);
-      if (key && key.startsWith("emf_auth")) {
+      if (key && key.startsWith("kelta_auth")) {
         result[key] = sessionStorage.getItem(key) || "";
       }
     }

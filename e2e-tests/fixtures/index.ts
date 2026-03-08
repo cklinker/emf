@@ -20,7 +20,7 @@ interface EMFFixtures {
 export const test = base.extend<EMFFixtures>({
   tenantSlug: [process.env.E2E_TENANT_SLUG || "default", { option: true }],
   apiBaseUrl: [
-    process.env.E2E_API_BASE_URL || "https://emf.rzware.com",
+    process.env.E2E_API_BASE_URL || "https://kelta.io",
     { option: true },
   ],
 

@@ -1054,6 +1054,24 @@
     "days": "days",
     "saved": "Settings saved successfully."
   },
+  "monitoring": {
+    "title": "Surveillance",
+    "description": "Voir les métriques, journaux de requêtes, erreurs et performances du système",
+    "tabs": {
+      "overview": "Aperçu",
+      "requests": "Requêtes",
+      "logs": "Journaux",
+      "errors": "Erreurs",
+      "performance": "Performance",
+      "activity": "Activité",
+      "settings": "Paramètres"
+    },
+    "overview": {
+      "topErrors": "Principales erreurs",
+      "slowestEndpoints": "Endpoints les plus lents",
+      "viewAll": "Voir tout"
+    }
+  },
   "workers": {
     "title": "Workers",
     "count": "{{count}} workers",

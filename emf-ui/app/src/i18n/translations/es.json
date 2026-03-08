@@ -1054,6 +1054,24 @@
     "days": "days",
     "saved": "Settings saved successfully."
   },
+  "monitoring": {
+    "title": "Monitoreo",
+    "description": "Ver métricas, registros de solicitudes, errores y rendimiento del sistema",
+    "tabs": {
+      "overview": "Resumen",
+      "requests": "Solicitudes",
+      "logs": "Registros",
+      "errors": "Errores",
+      "performance": "Rendimiento",
+      "activity": "Actividad",
+      "settings": "Configuración"
+    },
+    "overview": {
+      "topErrors": "Principales errores",
+      "slowestEndpoints": "Endpoints más lentos",
+      "viewAll": "Ver todo"
+    }
+  },
   "workers": {
     "title": "Workers",
     "count": "{{count}} workers",

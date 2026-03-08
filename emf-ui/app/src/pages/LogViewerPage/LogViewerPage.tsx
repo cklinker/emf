@@ -76,9 +76,9 @@ export function LogViewerPage({ className }: LogViewerPageProps) {
   }
 
   return (
-    <div className={cn('mx-auto max-w-[1400px] p-6', className)} data-testid="log-viewer-page">
-      <div className="mb-6">
-        <h1 className="m-0 text-2xl font-semibold text-foreground">{t('logViewer.title')}</h1>
+    <div className={cn('mx-auto max-w-[1400px]', className)} data-testid="log-viewer-page">
+      <div className="mb-4">
+        <h2 className="m-0 text-lg font-semibold text-foreground">{t('logViewer.title')}</h2>
       </div>
 
       {/* Filters */}
@@ -211,7 +211,7 @@ export function LogViewerPage({ className }: LogViewerPageProps) {
                             className="font-mono text-xs text-primary hover:underline"
                             onClick={(e) => {
                               e.stopPropagation()
-                              navigate(`../request-log/${log.traceId}`)
+                              navigate(`../requests/${log.traceId}`)
                             }}
                           >
                             {log.traceId.substring(0, 16)}...

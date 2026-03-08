@@ -424,6 +424,7 @@ export function Sidebar({ menus, collapsed, onToggle, onItemClick }: SidebarProp
       `${base}/workers`,
       `${base}/audit-trail`,
       `${base}/governor-limits`,
+      `${base}/monitoring`,
     ]
     return setupPaths.some((p) => location.pathname.startsWith(p))
   }, [location.pathname])

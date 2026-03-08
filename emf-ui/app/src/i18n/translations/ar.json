@@ -765,6 +765,24 @@
     "days": "days",
     "saved": "Settings saved successfully."
   },
+  "monitoring": {
+    "title": "Monitoring",
+    "description": "View metrics, request logs, errors, and system performance",
+    "tabs": {
+      "overview": "Overview",
+      "requests": "Requests",
+      "logs": "Logs",
+      "errors": "Errors",
+      "performance": "Performance",
+      "activity": "Activity",
+      "settings": "Settings"
+    },
+    "overview": {
+      "topErrors": "Top Errors",
+      "slowestEndpoints": "Slowest Endpoints",
+      "viewAll": "View all"
+    }
+  },
   "errors": {
     "generic": "حدث خطأ. يرجى المحاولة مرة أخرى.",
     "network": "خطأ في الشبكة. يرجى التحقق من اتصالك.",

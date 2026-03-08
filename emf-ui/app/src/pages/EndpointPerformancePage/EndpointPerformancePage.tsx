@@ -59,13 +59,13 @@ export function EndpointPerformancePage({ className }: EndpointPerformancePagePr
 
   return (
     <div
-      className={cn('mx-auto max-w-[1400px] p-6', className)}
+      className={cn('mx-auto max-w-[1400px]', className)}
       data-testid="endpoint-performance-page"
     >
-      <div className="mb-6">
-        <h1 className="m-0 text-2xl font-semibold text-foreground">
+      <div className="mb-4">
+        <h2 className="m-0 text-lg font-semibold text-foreground">
           {t('endpointPerformance.title')}
-        </h1>
+        </h2>
       </div>
 
       {endpoints.length === 0 ? (
@@ -132,10 +132,10 @@ export function EndpointPerformancePage({ className }: EndpointPerformancePagePr
                     const parts = ep.endpoint.match(/^(GET|POST|PUT|PATCH|DELETE)\s+(.+)$/)
                     if (parts) {
                       navigate(
-                        `../request-log?method=${encodeURIComponent(parts[1])}&path=${encodeURIComponent(parts[2])}`
+                        `../requests?method=${encodeURIComponent(parts[1])}&path=${encodeURIComponent(parts[2])}`
                       )
                     } else {
-                      navigate(`../request-log?path=${encodeURIComponent(ep.endpoint)}`)
+                      navigate(`../requests?path=${encodeURIComponent(ep.endpoint)}`)
                     }
                   }}
                 >

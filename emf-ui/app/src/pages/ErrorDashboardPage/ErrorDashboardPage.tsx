@@ -33,9 +33,9 @@ export function ErrorDashboardPage({ className }: ErrorDashboardPageProps) {
   const errors = data?.errors ?? []
 
   return (
-    <div className={cn('mx-auto max-w-[1400px] p-6', className)} data-testid="error-dashboard-page">
-      <div className="mb-6">
-        <h1 className="m-0 text-2xl font-semibold text-foreground">{t('errorDashboard.title')}</h1>
+    <div className={cn('mx-auto max-w-[1400px]', className)} data-testid="error-dashboard-page">
+      <div className="mb-4">
+        <h2 className="m-0 text-lg font-semibold text-foreground">{t('errorDashboard.title')}</h2>
       </div>
 
       {/* Summary cards */}
@@ -99,7 +99,7 @@ export function ErrorDashboardPage({ className }: ErrorDashboardPageProps) {
                   data-testid={`error-dashboard-row-${idx}`}
                   className="cursor-pointer hover:bg-accent"
                   onClick={() =>
-                    navigate(`../request-log?path=${encodeURIComponent(err.path)}&status=4xx`)
+                    navigate(`../requests?path=${encodeURIComponent(err.path)}&status=4xx`)
                   }
                 >
                   <td className="border-b border-border p-3 font-mono text-xs">{err.path}</td>

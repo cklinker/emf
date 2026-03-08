@@ -128,9 +128,9 @@ export function RequestLogPage({ className }: RequestLogPageProps) {
   }
 
   return (
-    <div className={cn('mx-auto max-w-[1400px] p-6', className)} data-testid="request-log-page">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="m-0 text-2xl font-semibold text-foreground">{t('requestLog.title')}</h1>
+    <div className={cn('mx-auto max-w-[1400px]', className)} data-testid="request-log-page">
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="m-0 text-lg font-semibold text-foreground">{t('requestLog.title')}</h2>
       </div>
 
       {/* Time range selector */}

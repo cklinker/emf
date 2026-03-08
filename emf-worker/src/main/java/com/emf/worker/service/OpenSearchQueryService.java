@@ -69,7 +69,12 @@ public class OpenSearchQueryService {
                 } else if (key.equals("@timestamp_lte")) {
                     query.filter(QueryBuilders.rangeQuery("@timestamp").lte(value));
                 } else {
-                    query.filter(QueryBuilders.termQuery(key, value));
+                    // Use .keyword sub-field for text fields that have keyword mappings.
+                    // Fields like "level" and "service" are mapped as text (analyzed/lowercased)
+                    // so termQuery("level", "ERROR") won't match. The .keyword sub-field
+                    // preserves the original case and supports exact matching.
+                    String fieldName = isTextFieldWithKeyword(key) ? key + ".keyword" : key;
+                    query.filter(QueryBuilders.termQuery(fieldName, value));
                 }
             }
         });
@@ -532,6 +537,16 @@ public class OpenSearchQueryService {
 
         SearchResponse response = client.search(request, RequestOptions.DEFAULT);
         return response.getHits().getTotalHits().value;
+    }
+
+    /**
+     * Returns true for log fields mapped as {@code text} with a {@code .keyword} sub-field.
+     * {@code termQuery} on a text field fails because the analyzer lowercases the indexed
+     * tokens, so "ERROR" won't match the indexed "error". Using the {@code .keyword}
+     * sub-field preserves the original case and supports exact matching.
+     */
+    private static boolean isTextFieldWithKeyword(String fieldName) {
+        return Set.of("level", "service", "logger", "thread").contains(fieldName);
     }
 
     public record SearchResult(List<Map<String, Object>> hits, long totalHits) {}

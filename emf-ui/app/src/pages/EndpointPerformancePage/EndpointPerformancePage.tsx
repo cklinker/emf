@@ -127,7 +127,17 @@ export function EndpointPerformancePage({ className }: EndpointPerformancePagePr
                   key={idx}
                   data-testid={`endpoint-performance-row-${idx}`}
                   className="cursor-pointer hover:bg-accent"
-                  onClick={() => navigate(`../request-log?path=${encodeURIComponent(ep.endpoint)}`)}
+                  onClick={() => {
+                    // ep.endpoint is "GET /api/collections" format — split into method + path
+                    const parts = ep.endpoint.match(/^(GET|POST|PUT|PATCH|DELETE)\s+(.+)$/)
+                    if (parts) {
+                      navigate(
+                        `../request-log?method=${encodeURIComponent(parts[1])}&path=${encodeURIComponent(parts[2])}`
+                      )
+                    } else {
+                      navigate(`../request-log?path=${encodeURIComponent(ep.endpoint)}`)
+                    }
+                  }}
                 >
                   <td className="border-b border-border p-3 font-mono text-xs">{ep.endpoint}</td>
                   <td className="border-b border-border p-3 text-right">

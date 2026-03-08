@@ -67,7 +67,7 @@ emf:
     tenant-slug:
       enabled: ${TENANT_SLUG_ENABLED:true}
       require-prefix: ${TENANT_SLUG_REQUIRE_PREFIX:false}
-      platform-paths: /actuator,/platform,/internal
+      platform-paths: /actuator,/platform,/internal,/otel
       cache-refresh-ms: 60000
 
     # Worker service URL (used for routing AND internal API calls)

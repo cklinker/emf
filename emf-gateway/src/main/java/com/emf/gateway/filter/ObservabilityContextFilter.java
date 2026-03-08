@@ -1,5 +1,7 @@
 package com.emf.gateway.filter;
 
+import com.emf.gateway.auth.GatewayPrincipal;
+import com.emf.gateway.auth.JwtAuthenticationFilter;
 import io.opentelemetry.api.baggage.Baggage;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.context.Context;
@@ -36,11 +38,16 @@ public class ObservabilityContextFilter implements GlobalFilter, Ordered {
             correlationId = UUID.randomUUID().toString();
         }
 
-        // Extract tenant and user context from exchange attributes (set by earlier filters)
-        String tenantId = request.getHeaders().getFirst("X-Tenant-ID");
+        // Extract tenant context from exchange attributes (set by TenantResolutionFilter)
+        String tenantId = TenantResolutionFilter.getTenantId(exchange);
         String tenantSlug = TenantResolutionFilter.getTenantSlug(exchange);
-        String userId = request.getHeaders().getFirst("X-User-Id");
-        String userEmail = request.getHeaders().getFirst("X-Forwarded-User");
+
+        // Read user context from the authenticated principal (set by JwtAuthenticationFilter).
+        // Cannot read from X-User-Id headers here because HeaderTransformationFilter
+        // (order 50) hasn't run yet to set them.
+        GatewayPrincipal principal = JwtAuthenticationFilter.getPrincipal(exchange);
+        String userEmail = principal != null ? principal.getUsername() : null;
+        String userId = principal != null ? resolveUserId(principal) : null;
 
         // Set MDC values for structured logging
         MDC.put("correlationId", correlationId);
@@ -94,6 +101,22 @@ public class ObservabilityContextFilter implements GlobalFilter, Ordered {
                     MDC.remove("userId");
                     MDC.remove("userEmail");
                 });
+    }
+
+    /**
+     * Resolves the user ID from the JWT principal.
+     * Uses the same logic as HeaderTransformationFilter for consistency.
+     */
+    private String resolveUserId(GatewayPrincipal principal) {
+        Object sub = principal.getClaims().get("sub");
+        if (sub instanceof String s && !s.isEmpty()) {
+            return s;
+        }
+        Object userId = principal.getClaims().get("user_id");
+        if (userId instanceof String s && !s.isEmpty()) {
+            return s;
+        }
+        return principal.getUsername();
     }
 
     @Override

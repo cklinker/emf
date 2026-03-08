@@ -1,5 +1,6 @@
 package com.emf.worker.filter;
 
+import com.emf.worker.interceptor.SpanIdCaptureInterceptor;
 import com.emf.worker.service.RequestDataCaptureService;
 import io.opentelemetry.api.trace.Span;
 import jakarta.servlet.FilterChain;
@@ -84,11 +85,24 @@ public class SpanBodyEnrichmentFilter extends OncePerRequestFilter {
         // Try to set OTEL span attributes (works when no trace propagation)
         enrichSpan(requestBody, responseBody, tenantId, userId, userEmail, correlationId);
 
-        // Write directly to OpenSearch (always works, bypasses OTEL agent limitations)
-        Span span = Span.current();
-        if (span.getSpanContext().isValid()) {
-            String traceId = span.getSpanContext().getTraceId();
-            String spanId = span.getSpanContext().getSpanId();
+        // Write directly to OpenSearch (always works, bypasses OTEL agent limitations).
+        // Prefer the span ID captured by SpanIdCaptureInterceptor (which runs inside the
+        // DispatcherServlet scope where the OTEL server span is active). By the time this
+        // filter's finally block runs, the OTEL agent has closed the server span scope and
+        // Span.current() returns the propagated parent context instead.
+        String traceId = (String) request.getAttribute(SpanIdCaptureInterceptor.SERVER_TRACE_ID_ATTR);
+        String spanId = (String) request.getAttribute(SpanIdCaptureInterceptor.SERVER_SPAN_ID_ATTR);
+
+        // Fallback to Span.current() for requests that don't go through the DispatcherServlet
+        if (traceId == null || spanId == null) {
+            Span span = Span.current();
+            if (span.getSpanContext().isValid()) {
+                traceId = span.getSpanContext().getTraceId();
+                spanId = span.getSpanContext().getSpanId();
+            }
+        }
+
+        if (traceId != null && spanId != null) {
 
             Map<String, String> requestHeaders = RequestDataCaptureService.extractRequestHeaders(request);
             Map<String, String> responseHeaders = RequestDataCaptureService.extractResponseHeaders(response);

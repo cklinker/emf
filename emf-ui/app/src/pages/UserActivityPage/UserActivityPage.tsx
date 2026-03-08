@@ -54,7 +54,7 @@ export function UserActivityPage({ className }: UserActivityPageProps) {
   // Fetch users list
   const { data: usersData } = useQuery({
     queryKey: ['users-list'],
-    queryFn: () => emfClient.admin.users.list({ page: 0, size: 100 }),
+    queryFn: () => emfClient.admin.users.list(undefined, undefined, 0, 100),
   })
 
   const isLoading = requestLoading || auditLoading

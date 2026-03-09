@@ -41,14 +41,13 @@ test.describe("Metrics Page", () => {
     expect(chartCount).toBe(6);
   });
 
-  test("charts have proper titles", async ({ page }) => {
-    await expect(page.getByText("Request Rate")).toBeVisible();
-    await expect(page.getByText("Latency")).toBeVisible();
-    await expect(
-      page.locator('[data-testid="overview-chart-errors"]').getByText("Errors"),
-    ).toBeVisible();
-    await expect(page.getByText("Auth Failures")).toBeVisible();
-    await expect(page.getByText("Rate Limit Events")).toBeVisible();
+  test("charts have proper titles", async () => {
+    const grid = metricsPage.chartGrid;
+    await expect(grid.getByText("Request Rate")).toBeVisible();
+    await expect(grid.getByText("Latency", { exact: true })).toBeVisible();
+    await expect(grid.getByText("Errors", { exact: true })).toBeVisible();
+    await expect(grid.getByText("Auth Failures")).toBeVisible();
+    await expect(grid.getByText("Rate Limit Events")).toBeVisible();
   });
 
   test("navigates from setup page", async ({ page, tenantSlug }) => {

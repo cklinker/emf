@@ -30,7 +30,7 @@ export class RequestLogPage extends BasePage {
   }
 
   async goto(): Promise<void> {
-    await this.page.goto(this.tenantUrl("/request-log"));
+    await this.page.goto(this.tenantUrl("/monitoring/requests"));
     await this.waitForLoadingComplete();
   }
 

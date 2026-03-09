@@ -4,7 +4,7 @@ import { RequestLogDetailPage } from "../../../pages/request-log-detail.page";
 test.describe("Request Log Detail", () => {
   test("shows detail page with tabs", async ({ page, tenantSlug }) => {
     // Navigate to request log first
-    await page.goto(`/${tenantSlug}/request-log`);
+    await page.goto(`/${tenantSlug}/monitoring/requests`);
     await page.waitForLoadState("networkidle");
 
     // If there are rows, click the first one
@@ -12,7 +12,7 @@ test.describe("Request Log Detail", () => {
     const rowCount = await rows.count();
     if (rowCount > 0) {
       await rows.first().click();
-      await page.waitForURL(`**/${tenantSlug}/request-log/*`);
+      await page.waitForURL(`**/${tenantSlug}/monitoring/requests/*`);
 
       const detailPage = new RequestLogDetailPage(page, tenantSlug);
       await expect(detailPage.summaryCard).toBeVisible();
@@ -24,14 +24,14 @@ test.describe("Request Log Detail", () => {
   });
 
   test("shows Jaeger trace link", async ({ page, tenantSlug }) => {
-    await page.goto(`/${tenantSlug}/request-log`);
+    await page.goto(`/${tenantSlug}/monitoring/requests`);
     await page.waitForLoadState("networkidle");
 
     const rows = page.locator('[data-testid^="request-log-row-"]');
     const rowCount = await rows.count();
     if (rowCount > 0) {
       await rows.first().click();
-      await page.waitForURL(`**/${tenantSlug}/request-log/*`);
+      await page.waitForURL(`**/${tenantSlug}/monitoring/requests/*`);
 
       const detailPage = new RequestLogDetailPage(page, tenantSlug);
       await expect(detailPage.jaegerLink).toBeVisible();

@@ -22,7 +22,7 @@ export class LogViewerPage extends BasePage {
   }
 
   async goto(): Promise<void> {
-    await this.page.goto(this.tenantUrl("/logs"));
+    await this.page.goto(this.tenantUrl("/monitoring/logs"));
     await this.waitForLoadingComplete();
   }
 

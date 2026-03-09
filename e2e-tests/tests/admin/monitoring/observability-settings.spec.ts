@@ -10,7 +10,9 @@ test.describe("Observability Settings", () => {
   });
 
   test("displays observability settings page with title", async ({ page }) => {
-    const heading = page.getByRole("heading", { name: /observability settings/i });
+    const heading = page.getByRole("heading", {
+      name: /observability settings/i,
+    });
     await expect(heading).toBeVisible();
   });
 
@@ -24,12 +26,14 @@ test.describe("Observability Settings", () => {
     await expect(settingsPage.saveButton).toBeVisible();
   });
 
-  test("navigates from setup page", async ({ page, tenantSlug }) => {
-    await page.goto(`/${tenantSlug}/setup`);
+  test("navigates via monitoring hub tabs", async ({ page, tenantSlug }) => {
+    await page.goto(`/${tenantSlug}/monitoring`);
     await page.waitForLoadState("networkidle");
-    await page.getByText("Observability Settings", { exact: true }).click();
-    await page.waitForURL(`**/${tenantSlug}/observability-settings`);
-    const heading = page.getByRole("heading", { name: /observability settings/i });
+    await page.getByTestId("monitoring-tab-settings").click();
+    await page.waitForURL(`**/${tenantSlug}/monitoring/settings`);
+    const heading = page.getByRole("heading", {
+      name: /observability settings/i,
+    });
     await expect(heading).toBeVisible();
   });
 });

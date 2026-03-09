@@ -10,7 +10,9 @@ test.describe("Endpoint Performance", () => {
   });
 
   test("displays endpoint performance page with title", async ({ page }) => {
-    const heading = page.getByRole("heading", { name: /endpoint performance/i });
+    const heading = page.getByRole("heading", {
+      name: /endpoint performance/i,
+    });
     await expect(heading).toBeVisible();
   });
 
@@ -30,12 +32,14 @@ test.describe("Endpoint Performance", () => {
     }
   });
 
-  test("navigates from setup page", async ({ page, tenantSlug }) => {
-    await page.goto(`/${tenantSlug}/setup`);
+  test("navigates via monitoring hub tabs", async ({ page, tenantSlug }) => {
+    await page.goto(`/${tenantSlug}/monitoring`);
     await page.waitForLoadState("networkidle");
-    await page.getByText("Endpoint Performance", { exact: true }).click();
-    await page.waitForURL(`**/${tenantSlug}/endpoint-performance`);
-    const heading = page.getByRole("heading", { name: /endpoint performance/i });
+    await page.getByTestId("monitoring-tab-performance").click();
+    await page.waitForURL(`**/${tenantSlug}/monitoring/performance`);
+    const heading = page.getByRole("heading", {
+      name: /endpoint performance/i,
+    });
     await expect(heading).toBeVisible();
   });
 });

@@ -14,7 +14,7 @@ export class UserActivityPage extends BasePage {
   }
 
   async goto(): Promise<void> {
-    await this.page.goto(this.tenantUrl("/user-activity"));
+    await this.page.goto(this.tenantUrl("/monitoring/activity"));
     await this.waitForLoadingComplete();
   }
 

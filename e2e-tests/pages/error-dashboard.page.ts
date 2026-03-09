@@ -12,7 +12,7 @@ export class ErrorDashboardPage extends BasePage {
   }
 
   async goto(): Promise<void> {
-    await this.page.goto(this.tenantUrl("/errors"));
+    await this.page.goto(this.tenantUrl("/monitoring/errors"));
     await this.waitForLoadingComplete();
   }
 

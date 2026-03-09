@@ -16,26 +16,26 @@ export class MetricsPage extends BasePage {
 
   constructor(page: Page, tenantSlug?: string) {
     super(page, tenantSlug);
-    this.container = this.testId("metrics-page");
-    this.summaryCards = this.testId("metrics-summary-cards");
-    this.timeRangeToolbar = this.testId("metrics-time-range");
-    this.routeFilter = this.testId("metrics-route-filter");
-    this.chartGrid = this.testId("metrics-chart-grid");
-    this.requestRateChart = this.testId("metrics-chart-request-rate");
-    this.latencyChart = this.testId("metrics-chart-latency");
-    this.errorsChart = this.testId("metrics-chart-errors");
-    this.authFailuresChart = this.testId("metrics-chart-auth-failures");
-    this.rateLimitChart = this.testId("metrics-chart-rate-limit");
-    this.activeRequestsChart = this.testId("metrics-chart-active-requests");
+    this.container = this.testId("monitoring-overview-page");
+    this.summaryCards = this.testId("monitoring-summary-cards");
+    this.timeRangeToolbar = this.testId("overview-time-range");
+    this.routeFilter = this.testId("overview-route-filter");
+    this.chartGrid = this.testId("overview-chart-grid");
+    this.requestRateChart = this.testId("overview-chart-request-rate");
+    this.latencyChart = this.testId("overview-chart-latency");
+    this.errorsChart = this.testId("overview-chart-errors");
+    this.authFailuresChart = this.testId("overview-chart-auth-failures");
+    this.rateLimitChart = this.testId("overview-chart-rate-limit");
+    this.activeRequestsChart = this.testId("overview-chart-active-requests");
   }
 
   async goto(): Promise<void> {
-    await this.page.goto(this.tenantUrl("/metrics"));
+    await this.page.goto(this.tenantUrl("/monitoring/overview"));
     await this.waitForLoadingComplete();
   }
 
   async selectTimeRange(range: string): Promise<void> {
-    await this.testId(`metrics-time-range-${range}`).click();
+    await this.testId(`overview-time-range-${range}`).click();
   }
 
   async selectRoute(route: string): Promise<void> {
@@ -44,14 +44,12 @@ export class MetricsPage extends BasePage {
 
   async getSummaryCardCount(): Promise<number> {
     return this.summaryCards
-      .locator('[data-testid^="metrics-summary-card-"]')
+      .locator('[data-testid^="monitoring-summary-"]')
       .count();
   }
 
   async getChartCount(): Promise<number> {
-    return this.chartGrid
-      .locator('[data-testid^="metrics-chart-"]')
-      .count();
+    return this.chartGrid.locator('[data-testid^="overview-chart-"]').count();
   }
 
   async getActiveTimeRange(): Promise<string> {

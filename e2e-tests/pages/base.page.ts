@@ -52,12 +52,17 @@ export abstract class BasePage {
   async confirmDialog(
     buttonText: RegExp | string = /delete|confirm|yes/i,
   ): Promise<void> {
-    const dialog = this.page.getByRole("dialog");
+    // Match both role="dialog" (Dialog) and role="alertdialog" (AlertDialog)
+    const dialog = this.page
+      .getByRole("alertdialog")
+      .or(this.page.getByRole("dialog"));
     await dialog.getByRole("button", { name: buttonText }).click();
   }
 
   async cancelDialog(): Promise<void> {
-    const dialog = this.page.getByRole("dialog");
+    const dialog = this.page
+      .getByRole("alertdialog")
+      .or(this.page.getByRole("dialog"));
     await dialog.getByRole("button", { name: /cancel|no/i }).click();
   }
 }

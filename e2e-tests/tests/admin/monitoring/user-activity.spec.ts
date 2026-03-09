@@ -19,7 +19,9 @@ test.describe("User Activity", () => {
   });
 
   test("shows prompt to select user", async ({ page }) => {
-    await expect(page.getByText(/select a user/i)).toBeVisible();
+    await expect(
+      page.getByText(/select a user to view their activity/i),
+    ).toBeVisible();
   });
 
   test("navigates via monitoring hub tabs", async ({ page, tenantSlug }) => {

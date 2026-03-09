@@ -152,7 +152,9 @@ export function GovernorLimitsPage({ className }: GovernorLimitsPageProps): Reac
 
       <div className="mb-8 grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-6">
         {metrics.map((metric) => {
-          const percentage = metric.limit > 0 ? (metric.used / metric.limit) * 100 : 0
+          const used = metric.used ?? 0
+          const limit = metric.limit ?? 0
+          const percentage = limit > 0 ? (used / limit) * 100 : 0
           const isWarning = percentage >= 80
           const isCritical = percentage >= 95
 
@@ -176,10 +178,10 @@ export function GovernorLimitsPage({ className }: GovernorLimitsPageProps): Reac
               <div className="flex flex-col gap-2">
                 <div className="flex items-baseline gap-1">
                   <span className="text-2xl font-bold text-foreground">
-                    {metric.used.toLocaleString()}
+                    {used.toLocaleString()}
                   </span>
                   <span className="text-muted-foreground">/</span>
-                  <span className="text-muted-foreground">{metric.limit.toLocaleString()}</span>
+                  <span className="text-muted-foreground">{limit.toLocaleString()}</span>
                 </div>
                 <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                   <div
@@ -236,7 +238,7 @@ export function GovernorLimitsPage({ className }: GovernorLimitsPageProps): Reac
                       />
                     ) : (
                       <>
-                        {status.limits[row.key].toLocaleString()}
+                        {(status.limits?.[row.key] ?? 0).toLocaleString()}
                         {row.suffix ?? ''}
                       </>
                     )}

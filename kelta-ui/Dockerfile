@@ -37,7 +37,7 @@ COPY kelta-ui/app/src ./src
 COPY kelta-ui/app/public ./public
 
 # Set API base URL for production (frontend calls gateway directly, no nginx proxy)
-ARG VITE_API_BASE_URL=https://kelta.io
+ARG VITE_API_BASE_URL=https://emf.rzware.com
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
 # Build the Vite app (skip tsc — CI validates types separately)

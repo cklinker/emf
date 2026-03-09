@@ -342,7 +342,7 @@ jobs:
       - name: Run E2E tests
         working-directory: e2e-tests
         env:
-          E2E_BASE_URL: https://emf.rzware.com
+          E2E_BASE_URL: https://emf-ui.rzware.com
           E2E_API_BASE_URL: https://emf.rzware.com
           E2E_TENANT_SLUG: default
           E2E_AUTHENTIK_URL: ${{ secrets.E2E_AUTHENTIK_URL }}

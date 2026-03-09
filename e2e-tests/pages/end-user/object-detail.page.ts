@@ -32,6 +32,8 @@ export class ObjectDetailPage extends BasePage {
   }
 
   async clickDelete(): Promise<void> {
+    // Delete is inside the "More actions" dropdown — open it first
+    await this.page.getByRole("button", { name: /more actions/i }).click();
     await this.deleteButton.click();
   }
 

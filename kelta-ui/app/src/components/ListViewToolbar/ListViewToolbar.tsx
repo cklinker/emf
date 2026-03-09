@@ -108,7 +108,12 @@ export function ListViewToolbar({
 
           {/* New record button (hidden if user lacks create permission) */}
           {canCreate && (
-            <Button size="sm" onClick={onNew} aria-label={`New ${collectionLabel}`}>
+            <Button
+              size="sm"
+              onClick={onNew}
+              aria-label={`New ${collectionLabel}`}
+              data-testid="new-record-button"
+            >
               <Plus className="mr-1.5 h-3.5 w-3.5" />
               New
             </Button>

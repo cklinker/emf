@@ -113,6 +113,8 @@ import type {
   LogSearchResult,
   AuditSearchParams,
   AuditSearchResult,
+  ObservabilitySettingsResponse,
+  UpdateObservabilitySettingsRequest,
 } from './types';
 import {
   toJsonApiBody,
@@ -2006,6 +2008,18 @@ export class AdminClient {
       if (params.size !== undefined) qs.set('size', String(params.size));
       const response = await this.axios.get(`/api/admin/observability/audit?${qs.toString()}`);
       return unwrapJsonApiResource<AuditSearchResult>(response.data);
+    },
+
+    getSettings: async (): Promise<ObservabilitySettingsResponse> => {
+      const response = await this.axios.get('/api/admin/observability-settings');
+      return unwrapJsonApiResource<ObservabilitySettingsResponse>(response.data);
+    },
+
+    updateSettings: async (
+      request: UpdateObservabilitySettingsRequest
+    ): Promise<ObservabilitySettingsResponse> => {
+      const response = await this.axios.put('/api/admin/observability-settings', request);
+      return unwrapJsonApiResource<ObservabilitySettingsResponse>(response.data);
     },
   };
 }

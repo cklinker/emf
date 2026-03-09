@@ -22,13 +22,8 @@ export class ObservabilitySettingsPage extends BasePage {
   async goto(): Promise<void> {
     await this.page.goto(this.tenantUrl("/monitoring/settings"));
     await this.waitForLoadingComplete();
-    // Wait for either the settings form or error message to render
-    await this.page
-      .locator(
-        '[data-testid="observability-settings-page"], [data-testid="error-message"]',
-      )
-      .first()
-      .waitFor({ state: "visible", timeout: 30_000 });
+    // Wait for the settings page content to render after API data loads
+    await this.container.waitFor({ state: "visible", timeout: 30_000 });
   }
 
   async setTraceRetention(days: number): Promise<void> {

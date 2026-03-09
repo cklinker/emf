@@ -4,19 +4,14 @@ import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
 import { LoadingSpinner, ErrorMessage } from '../../components'
 import { cn } from '@/lib/utils'
+import type { ObservabilitySetting } from '@kelta/sdk'
 
 export interface ObservabilitySettingsPageProps {
   className?: string
 }
 
-interface RetentionSettings {
-  trace_retention_days: string
-  log_retention_days: string
-  audit_retention_days: string
-}
-
 function findSetting(
-  settings: { settingKey: string; settingValue: string }[] | undefined,
+  settings: ObservabilitySetting[] | undefined,
   key: string,
   fallback: string
 ): string {
@@ -33,10 +28,7 @@ export function ObservabilitySettingsPage({ className }: ObservabilitySettingsPa
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['observability-settings'],
-    queryFn: async () => {
-      const response = await keltaClient.http.get('/api/admin/observability-settings')
-      return response.data as { settings: { settingKey: string; settingValue: string }[] }
-    },
+    queryFn: () => keltaClient.admin.observability.getSettings(),
   })
 
   const traceRetention =
@@ -47,14 +39,17 @@ export function ObservabilitySettingsPage({ className }: ObservabilitySettingsPa
     overrides.audit_retention_days ?? findSetting(data?.settings, 'audit_retention_days', '90')
 
   const saveMutation = useMutation({
-    mutationFn: async (settings: RetentionSettings) => {
-      await keltaClient.http.put('/api/admin/observability-settings', {
+    mutationFn: (settings: {
+      trace_retention_days: string
+      log_retention_days: string
+      audit_retention_days: string
+    }) =>
+      keltaClient.admin.observability.updateSettings({
         settings: Object.entries(settings).map(([key, value]) => ({
           settingKey: key,
           settingValue: value,
         })),
-      })
-    },
+      }),
     onSuccess: () => {
       setOverrides({})
       queryClient.invalidateQueries({ queryKey: ['observability-settings'] })

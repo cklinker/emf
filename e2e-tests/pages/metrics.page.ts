@@ -32,6 +32,8 @@ export class MetricsPage extends BasePage {
   async goto(): Promise<void> {
     await this.page.goto(this.tenantUrl("/monitoring/overview"));
     await this.waitForLoadingComplete();
+    // Wait for the overview page content to render after summary data loads
+    await this.container.waitFor({ state: "visible", timeout: 30_000 });
   }
 
   async selectTimeRange(range: string): Promise<void> {

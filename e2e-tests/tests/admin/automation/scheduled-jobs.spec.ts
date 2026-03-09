@@ -53,7 +53,12 @@ test.describe("Scheduled Jobs", () => {
     await scheduledJobsPage.clickCreate();
     await expect(scheduledJobsPage.formModal).toBeVisible();
 
-    await scheduledJobsPage.cancelButton.click();
+    // The name input is auto-focused. A direct Playwright click on the cancel
+    // button triggers blur → validation error → layout shift, which can cause
+    // the mouseup to miss the button. Use a programmatic click to bypass this.
+    await scheduledJobsPage.cancelButton.evaluate((node) =>
+      (node as HTMLButtonElement).click(),
+    );
     await expect(scheduledJobsPage.formModal).not.toBeVisible({
       timeout: 5000,
     });

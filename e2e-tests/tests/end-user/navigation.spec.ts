@@ -20,13 +20,11 @@ test.describe("End-User Navigation", () => {
     await expect(userMenuOrAvatar).toBeVisible();
   });
 
-  // Skip: requires dataFactory API token (Authentik password grant not available)
-  test.skip("navigates between collections", async ({ page, dataFactory }) => {
+  test("navigates between collections", async ({ page, dataFactory }) => {
     await dataFactory.createCollection({ displayName: "Nav Test A" });
   });
 
-  // Skip: requires dataFactory API token (Authentik password grant not available)
-  test.skip("shows collection tabs in nav", async ({ page, dataFactory }) => {
+  test("shows collection tabs in nav", async ({ page, dataFactory }) => {
     await dataFactory.createCollection();
   });
 });

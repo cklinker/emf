@@ -102,8 +102,7 @@ test.describe("Collection Wizard", () => {
     ).toBeVisible();
   });
 
-  // Skip: requires dataFactory API token (Authentik password grant not available)
-  test.skip("completes wizard and creates collection", async ({
+  test("completes wizard and creates collection", async ({
     page,
     dataFactory,
   }) => {

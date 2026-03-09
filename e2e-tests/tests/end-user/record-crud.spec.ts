@@ -32,8 +32,7 @@ async function setupCollection(dataFactory: {
   return collectionName;
 }
 
-// Skip: requires dataFactory API token (Authentik password grant not available)
-test.describe.skip("Record CRUD", () => {
+test.describe("Record CRUD", () => {
   test("creates a new record via form", async ({ page, dataFactory }) => {
     const collectionName = await setupCollection(dataFactory);
 

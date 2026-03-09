@@ -1,8 +1,9 @@
 /**
  * Utility for getting API tokens for test fixtures.
  *
- * Uses Authentik's token endpoint to get tokens for API-level operations
- * (creating test data, cleaning up, etc.) independent of the browser session.
+ * Uses Authentik's token endpoint with client_credentials grant to get tokens
+ * for API-level operations (creating test data, cleaning up, etc.) independent
+ * of the browser session.
  */
 
 let cachedToken: string | null = null;
@@ -15,31 +16,41 @@ export async function getAuthentikTokens(): Promise<string> {
   }
 
   const authentikUrl =
-    process.env.E2E_AUTHENTIK_URL || 'https://authentik.rzware.com';
+    process.env.E2E_AUTHENTIK_URL || "https://authentik.rzware.com";
   const tokenUrl = `${authentikUrl}/application/o/token/`;
 
+  const clientId = process.env.E2E_SERVICE_CLIENT_ID || "";
+  const clientSecret = process.env.E2E_SERVICE_CLIENT_SECRET || "";
+
+  if (!clientId || !clientSecret) {
+    console.warn(
+      "E2E_SERVICE_CLIENT_ID and E2E_SERVICE_CLIENT_SECRET are not set. " +
+        "DataFactory API calls will fail. " +
+        "Configure an Authentik service account with client_credentials grant.",
+    );
+    return "";
+  }
+
   const params = new URLSearchParams({
-    grant_type: 'password',
-    client_id: process.env.E2E_CLIENT_ID || '',
-    username: process.env.E2E_TEST_USERNAME || 'e2e-admin@kelta.local',
-    password: process.env.E2E_TEST_PASSWORD || '',
-    scope: 'openid profile email',
+    grant_type: "client_credentials",
+    client_id: clientId,
+    client_secret: clientSecret,
+    scope: "openid profile email",
   });
 
   const response = await fetch(tokenUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: params.toString(),
   });
 
   if (!response.ok) {
-    // If password grant is not available, return empty token
-    // Tests using dataFactory will need the password grant to work.
+    const errorBody = await response.text().catch(() => "");
     console.warn(
       `Authentik token endpoint returned ${response.status}. ` +
-        'DataFactory API calls may fail. Ensure password grant is enabled in Authentik.',
+        `DataFactory API calls will fail. Body: ${errorBody}`,
     );
-    return '';
+    return "";
   }
 
   const data = (await response.json()) as {

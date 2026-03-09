@@ -11,11 +11,7 @@ test.describe("Collections CRUD", () => {
     await expect(collectionsPage.container).toBeVisible();
   });
 
-  // Skip: requires dataFactory API token (Authentik password grant not available)
-  test.skip("shows collections table with data", async ({
-    page,
-    dataFactory,
-  }) => {
+  test("shows collections table with data", async ({ page, dataFactory }) => {
     // Ensure at least one collection exists
     await dataFactory.createCollection();
 
@@ -28,8 +24,7 @@ test.describe("Collections CRUD", () => {
     await expect(tableOrEmpty).toBeVisible();
   });
 
-  // Skip: requires dataFactory API token (Authentik password grant not available)
-  test.skip("filters collections by name", async ({ page, dataFactory }) => {
+  test("filters collections by name", async ({ page, dataFactory }) => {
     const collection = await dataFactory.createCollection({
       displayName: "FilterTestCollection",
     });
@@ -51,8 +46,7 @@ test.describe("Collections CRUD", () => {
     }
   });
 
-  // Skip: requires dataFactory API token (Authentik password grant not available)
-  test.skip("filters collections by status", async ({ page, dataFactory }) => {
+  test("filters collections by status", async ({ page, dataFactory }) => {
     await dataFactory.createCollection({ active: true });
 
     const collectionsPage = new CollectionsListPage(page, tenantSlug);
@@ -67,8 +61,7 @@ test.describe("Collections CRUD", () => {
     expect(rowCount).toBeGreaterThan(0);
   });
 
-  // Skip: requires dataFactory API token (Authentik password grant not available)
-  test.skip("sorts collections by name", async ({ page, dataFactory }) => {
+  test("sorts collections by name", async ({ page, dataFactory }) => {
     await dataFactory.createCollection({ displayName: "Alpha Collection" });
     await dataFactory.createCollection({ displayName: "Beta Collection" });
 
@@ -95,8 +88,7 @@ test.describe("Collections CRUD", () => {
     }
   });
 
-  // Skip: requires dataFactory API token (Authentik password grant not available)
-  test.skip("navigates to collection detail on row click", async ({
+  test("navigates to collection detail on row click", async ({
     page,
     dataFactory,
   }) => {
@@ -110,8 +102,7 @@ test.describe("Collections CRUD", () => {
     await expect(page).toHaveURL(new RegExp(`/${tenantSlug}/collections/.+`));
   });
 
-  // Skip: requires dataFactory API token (Authentik password grant not available)
-  test.skip("deletes a collection with confirmation dialog", async ({
+  test("deletes a collection with confirmation dialog", async ({
     page,
     dataFactory,
   }) => {

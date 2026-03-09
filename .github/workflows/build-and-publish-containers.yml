@@ -350,6 +350,8 @@ jobs:
           E2E_OIDC_PROVIDER_ID: ${{ secrets.E2E_OIDC_PROVIDER_ID }}
           E2E_TEST_USERNAME: ${{ secrets.E2E_TEST_USERNAME }}
           E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
+          E2E_SERVICE_CLIENT_ID: ${{ secrets.E2E_SERVICE_CLIENT_ID }}
+          E2E_SERVICE_CLIENT_SECRET: ${{ secrets.E2E_SERVICE_CLIENT_SECRET }}
         run: npx playwright test
 
       - name: Upload test report

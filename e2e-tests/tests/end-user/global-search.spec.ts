@@ -19,8 +19,7 @@ test.describe("Global Search", () => {
     await expect(searchPage.searchInput).toHaveValue("test query");
   });
 
-  // Skip: requires dataFactory API token (Authentik password grant not available)
-  test.skip("shows search results", async ({ page, dataFactory }) => {
+  test("shows search results", async ({ page, dataFactory }) => {
     const collection = await dataFactory.createCollection();
     const collectionName = collection.attributes.name as string;
 
@@ -46,8 +45,7 @@ test.describe("Global Search", () => {
     expect(resultCount).toBeGreaterThanOrEqual(0);
   });
 
-  // Skip: requires dataFactory API token (Authentik password grant not available)
-  test.skip("navigates to result on click", async ({ page, dataFactory }) => {
+  test("navigates to result on click", async ({ page, dataFactory }) => {
     const collection = await dataFactory.createCollection();
     const collectionName = collection.attributes.name as string;
 

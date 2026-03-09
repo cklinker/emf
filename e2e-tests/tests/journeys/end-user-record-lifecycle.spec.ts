@@ -5,8 +5,7 @@ import { ObjectFormPage } from "../../pages/end-user/object-form.page";
 
 const tenantSlug = process.env.E2E_TENANT_SLUG || "default";
 
-// Skip: requires dataFactory API token (Authentik password grant not available)
-test.describe.skip("End-User Record Lifecycle Journey", () => {
+test.describe("End-User Record Lifecycle Journey", () => {
   test("full record lifecycle: create, view, edit, delete", async ({
     page,
     dataFactory,

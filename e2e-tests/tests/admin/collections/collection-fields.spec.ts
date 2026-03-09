@@ -4,8 +4,7 @@ import { CollectionDetailPage } from "../../../pages/collection-detail.page";
 
 const tenantSlug = process.env.E2E_TENANT_SLUG || "default";
 
-// Skip: requires dataFactory API token (Authentik password grant not available)
-test.describe.skip("Collection Fields", () => {
+test.describe("Collection Fields", () => {
   test("displays fields on collection detail page", async ({
     page,
     dataFactory,

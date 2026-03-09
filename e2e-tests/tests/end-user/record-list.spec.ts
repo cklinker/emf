@@ -3,8 +3,7 @@ import { ObjectListPage } from "../../pages/end-user/object-list.page";
 
 const tenantSlug = process.env.E2E_TENANT_SLUG || "default";
 
-// Skip: requires dataFactory API token (Authentik password grant not available)
-test.describe.skip("Record List", () => {
+test.describe("Record List", () => {
   test("displays record list for a collection", async ({
     page,
     dataFactory,

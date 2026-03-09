@@ -172,7 +172,9 @@ export class AdminClient {
 
   readonly collections = {
     list: async (): Promise<CollectionDefinition[]> => {
-      const response = await this.axios.get('/api/collections');
+      const response = await this.axios.get('/api/collections', {
+        params: { 'page[size]': 1000 },
+      });
       return unwrapJsonApiList<CollectionDefinition>(response.data);
     },
 

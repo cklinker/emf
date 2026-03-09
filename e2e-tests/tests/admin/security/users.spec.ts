@@ -43,10 +43,19 @@ test.describe("Users", () => {
     const hasRows = await firstRow
       .isVisible({ timeout: 10_000 })
       .catch(() => false);
-    if (hasRows) {
-      await usersPage.clickRow(0);
-      await page.waitForURL(/\/users\/.+/);
-    }
+    if (!hasRows) return;
+
+    // Click the user name button (first cell, first button) directly
+    const nameButton = firstRow.locator("td").first().locator("button");
+    const hasNameButton = await nameButton
+      .isVisible({ timeout: 3_000 })
+      .catch(() => false);
+    if (!hasNameButton) return;
+
+    await nameButton.click();
+
+    // Wait for SPA navigation (React Router uses pushState, not full page load)
+    await expect(page).toHaveURL(/\/users\/[^/]+/, { timeout: 10_000 });
   });
 
   test("shows create user button", async ({ page }) => {

@@ -35,8 +35,16 @@ test.describe("Collections CRUD", () => {
     const collectionsPage = new CollectionsListPage(page, tenantSlug);
     await collectionsPage.goto();
 
-    // Wait for the created collection to appear in the table
+    // Wait for rows, then sort by created DESC so the newly-created collection
+    // appears on page 1 (client-side filter only searches current page)
     await collectionsPage.waitForRows();
+    await collectionsPage.sortByColumn("created"); // toggles to asc
+    await collectionsPage.sortByColumn("created"); // toggles to desc — newest first
+
+    // Wait for re-sorted rows to load
+    await expect(
+      page.locator('[data-testid^="collection-row-"]').first(),
+    ).toBeVisible({ timeout: 10_000 });
 
     // Filter by the collection's name
     await collectionsPage.filterByName(collectionName);
@@ -44,7 +52,7 @@ test.describe("Collections CRUD", () => {
     // Wait for filtered rows to appear
     await expect(
       page.locator('[data-testid^="collection-row-"]').first(),
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 10_000 });
 
     const names = await collectionsPage.getCollectionNames();
     expect(names.length).toBeGreaterThan(0);
@@ -131,15 +139,31 @@ test.describe("Collections CRUD", () => {
     page,
     dataFactory,
   }) => {
-    await dataFactory.createCollection({
+    const collection = await dataFactory.createCollection({
       displayName: "ToDeleteCollection",
     });
+    const collectionName = collection.attributes.name as string;
 
     const collectionsPage = new CollectionsListPage(page, tenantSlug);
     await collectionsPage.goto();
 
-    // Wait for rows before counting
+    // Sort by created DESC so our new collection is on page 1
     await collectionsPage.waitForRows();
+    await collectionsPage.sortByColumn("created");
+    await collectionsPage.sortByColumn("created");
+
+    // Wait for re-sorted rows to load
+    await expect(
+      page.locator('[data-testid^="collection-row-"]').first(),
+    ).toBeVisible({ timeout: 10_000 });
+
+    // Filter to isolate our test collection
+    await collectionsPage.filterByName(collectionName);
+
+    // Wait for the filtered row to appear
+    await expect(
+      page.locator('[data-testid^="collection-row-"]').first(),
+    ).toBeVisible({ timeout: 10_000 });
 
     const initialCount = await collectionsPage.getRowCount();
     expect(initialCount).toBeGreaterThan(0);
@@ -150,10 +174,18 @@ test.describe("Collections CRUD", () => {
     // Confirm the deletion in the dialog (waits for dialog to appear)
     await collectionsPage.confirmDelete();
 
-    // Reload the page to see the updated list
+    // Reload the page and re-apply the same filter
     await collectionsPage.goto();
+    await collectionsPage.sortByColumn("created");
+    await collectionsPage.sortByColumn("created");
+    await collectionsPage.filterByName(collectionName);
 
-    const finalCount = await collectionsPage.getRowCount();
+    // After deletion, the specific collection should be gone
+    // Either no rows exist or the count decreased
+    const rowLocator = page.locator('[data-testid^="collection-row-"]');
+    // Wait a moment for the page to settle, then check
+    await page.waitForTimeout(1_000);
+    const finalCount = await rowLocator.count();
     expect(finalCount).toBeLessThan(initialCount);
   });
 });

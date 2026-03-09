@@ -121,8 +121,14 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
                 continue; // Skip FORMULA, ROLLUP_SUMMARY
             }
 
-            String sqlType = mapFieldTypeToSql(field.type());
             String columnName = getColumnName(definition, field);
+
+            // Skip system columns already defined above (id, created_at, etc.)
+            if (SYSTEM_COLUMNS.contains(columnName)) {
+                continue;
+            }
+
+            String sqlType = mapFieldTypeToSql(field.type());
             sql.append(", ");
             sql.append(sanitizeIdentifier(columnName)).append(" ").append(sqlType);
 

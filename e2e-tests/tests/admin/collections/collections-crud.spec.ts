@@ -35,16 +35,8 @@ test.describe("Collections CRUD", () => {
     const collectionsPage = new CollectionsListPage(page, tenantSlug);
     await collectionsPage.goto();
 
-    // Wait for rows, then sort by created DESC so the newly-created collection
-    // appears on page 1 (client-side filter only searches current page)
+    // Wait for rows to load
     await collectionsPage.waitForRows();
-    await collectionsPage.sortByColumn("created"); // toggles to asc
-    await collectionsPage.sortByColumn("created"); // toggles to desc — newest first
-
-    // Wait for re-sorted rows to load
-    await expect(
-      page.locator('[data-testid^="collection-row-"]').first(),
-    ).toBeVisible({ timeout: 10_000 });
 
     // Filter by the collection's name
     await collectionsPage.filterByName(collectionName);
@@ -147,15 +139,8 @@ test.describe("Collections CRUD", () => {
     const collectionsPage = new CollectionsListPage(page, tenantSlug);
     await collectionsPage.goto();
 
-    // Sort by created DESC so our new collection is on page 1
+    // Wait for rows to load
     await collectionsPage.waitForRows();
-    await collectionsPage.sortByColumn("created");
-    await collectionsPage.sortByColumn("created");
-
-    // Wait for re-sorted rows to load
-    await expect(
-      page.locator('[data-testid^="collection-row-"]').first(),
-    ).toBeVisible({ timeout: 10_000 });
 
     // Filter to isolate our test collection
     await collectionsPage.filterByName(collectionName);
@@ -176,8 +161,6 @@ test.describe("Collections CRUD", () => {
 
     // Reload the page and re-apply the same filter
     await collectionsPage.goto();
-    await collectionsPage.sortByColumn("created");
-    await collectionsPage.sortByColumn("created");
     await collectionsPage.filterByName(collectionName);
 
     // After deletion, the specific collection should be gone

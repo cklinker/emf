@@ -159,16 +159,9 @@ test.describe("Collections CRUD", () => {
     // Confirm the deletion in the dialog (waits for dialog to appear)
     await collectionsPage.confirmDelete();
 
-    // Reload the page and re-apply the same filter
-    await collectionsPage.goto();
-    await collectionsPage.filterByName(collectionName);
-
-    // After deletion, the specific collection should be gone
-    // Either no rows exist or the count decreased
+    // Wait for the delete to process — the filtered row should disappear
+    // as React Query refetches after the mutation completes
     const rowLocator = page.locator('[data-testid^="collection-row-"]');
-    // Wait a moment for the page to settle, then check
-    await page.waitForTimeout(1_000);
-    const finalCount = await rowLocator.count();
-    expect(finalCount).toBeLessThan(initialCount);
+    await expect(rowLocator).toHaveCount(0, { timeout: 10_000 });
   });
 });

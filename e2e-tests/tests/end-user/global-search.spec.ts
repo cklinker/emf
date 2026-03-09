@@ -29,6 +29,7 @@ test.describe("Global Search", () => {
       type: "string",
     });
 
+    await dataFactory.waitForStorageReady(collectionName);
     await dataFactory.createRecord(collectionName, {
       title: `SearchTarget_${Date.now()}`,
     });
@@ -56,6 +57,7 @@ test.describe("Global Search", () => {
       type: "string",
     });
 
+    await dataFactory.waitForStorageReady(collectionName);
     await dataFactory.createRecord(collectionName, {
       title: `NavTarget_${Date.now()}`,
     });

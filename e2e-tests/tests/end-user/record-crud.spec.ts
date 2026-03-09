@@ -18,6 +18,7 @@ async function setupCollection(dataFactory: {
       required?: boolean;
     },
   ) => Promise<unknown>;
+  waitForStorageReady: (collectionName: string) => Promise<void>;
 }) {
   const collection = await dataFactory.createCollection();
   const collectionName = collection.attributes.name as string;
@@ -28,6 +29,9 @@ async function setupCollection(dataFactory: {
     type: "string",
     required: true,
   });
+
+  // Wait for the backend to finish provisioning storage for this collection
+  await dataFactory.waitForStorageReady(collectionName);
 
   return collectionName;
 }
@@ -69,7 +73,10 @@ test.describe("Record CRUD", () => {
 
     await expect(detailPage.fieldValues).toBeVisible();
     await expect(detailPage.editButton).toBeVisible();
-    await expect(detailPage.deleteButton).toBeVisible();
+    // Delete is inside the "More actions" dropdown — verify the trigger is visible
+    await expect(
+      page.getByRole("button", { name: /more actions/i }),
+    ).toBeVisible();
   });
 
   test("edits an existing record", async ({ page, dataFactory }) => {

@@ -21,6 +21,9 @@ test.describe("End-User Record Lifecycle Journey", () => {
       required: true,
     });
 
+    // Wait for the backend to finish provisioning storage
+    await dataFactory.waitForStorageReady(collectionName);
+
     const recordTitle = `Lifecycle Record ${Date.now()}`;
     const updatedTitle = `Updated Lifecycle ${Date.now()}`;
 
@@ -42,9 +45,10 @@ test.describe("End-User Record Lifecycle Journey", () => {
 
     // Step 3: View the created record
     // Extract the record ID from the URL if we landed on a detail page
+    // Exclude "new" and "edit" which are route segments, not record IDs
     const currentUrl = page.url();
     const recordIdMatch = currentUrl.match(
-      new RegExp(`/app/o/${collectionName}/([^/]+)$`),
+      new RegExp(`/app/o/${collectionName}/(?!new$|edit$)([0-9a-f-]{36})$`),
     );
 
     if (recordIdMatch) {

@@ -27,6 +27,7 @@ test.describe("Record List", () => {
       type: "string",
     });
 
+    await dataFactory.waitForStorageReady(collectionName);
     await dataFactory.createRecord(collectionName, { title: "Record A" });
     await dataFactory.createRecord(collectionName, { title: "Record B" });
 
@@ -50,6 +51,7 @@ test.describe("Record List", () => {
       type: "string",
     });
 
+    await dataFactory.waitForStorageReady(collectionName);
     await dataFactory.createRecord(collectionName, {
       title: "Searchable Item",
     });
@@ -76,6 +78,7 @@ test.describe("Record List", () => {
       type: "string",
     });
 
+    await dataFactory.waitForStorageReady(collectionName);
     await dataFactory.createRecord(collectionName, { title: "Alpha" });
     await dataFactory.createRecord(collectionName, { title: "Beta" });
 

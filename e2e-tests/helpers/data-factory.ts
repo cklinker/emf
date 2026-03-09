@@ -24,6 +24,10 @@ interface JsonApiResponse {
 const MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY_MS = 2_000;
 
+/** How long to wait for storage to become ready after collection/field creation */
+const STORAGE_READY_TIMEOUT_MS = 30_000;
+const STORAGE_READY_POLL_MS = 2_000;
+
 export class DataFactory {
   private createdEntities: Array<{ type: string; id: string }> = [];
 
@@ -75,6 +79,50 @@ export class DataFactory {
 
     throw new Error(
       `API ${method} ${path} failed: max retries (${MAX_RETRIES}) exceeded`,
+    );
+  }
+
+  /**
+   * Poll the collection's record endpoint until storage is provisioned.
+   *
+   * After creating a collection and adding fields, the backend
+   * asynchronously provisions the storage table. Attempting to
+   * create records before it is ready returns a 500 storageError.
+   * This method polls GET /api/{collectionName} until it stops
+   * returning 500, ensuring the storage layer is ready.
+   */
+  async waitForStorageReady(
+    collectionName: string,
+    timeoutMs = STORAGE_READY_TIMEOUT_MS,
+  ): Promise<void> {
+    const url = `${this.api.baseUrl}/${this.api.tenantSlug}/api/${collectionName}`;
+    const deadline = Date.now() + timeoutMs;
+
+    while (Date.now() < deadline) {
+      try {
+        const response = await fetch(url, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/vnd.api+json",
+            Authorization: `Bearer ${this.api.token}`,
+          },
+        });
+
+        // Any non-500 response means storage is ready (200 OK, or 404 empty list)
+        if (response.status < 500) {
+          return;
+        }
+      } catch {
+        // Network error — keep retrying
+      }
+
+      await new Promise((resolve) =>
+        setTimeout(resolve, STORAGE_READY_POLL_MS),
+      );
+    }
+
+    throw new Error(
+      `Storage for collection '${collectionName}' not ready after ${timeoutMs}ms`,
     );
   }
 

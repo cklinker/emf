@@ -120,13 +120,14 @@ export function GovernorLimitsPage({ className }: GovernorLimitsPageProps): Reac
   ]
 
   return (
-    <div className={cn('mx-auto max-w-[1200px] p-6', className)}>
+    <div className={cn('mx-auto max-w-[1200px] p-6', className)} data-testid="governor-limits-page">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="m-0 text-2xl font-semibold text-foreground">{t('governorLimits.title')}</h1>
         {isPlatformAdmin && !isEditing && (
           <button
             onClick={handleEdit}
             className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            data-testid="governor-limits-edit-button"
           >
             {t('governorLimits.editLimits')}
           </button>
@@ -136,6 +137,7 @@ export function GovernorLimitsPage({ className }: GovernorLimitsPageProps): Reac
             <button
               onClick={handleCancel}
               className="rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
+              data-testid="governor-limits-cancel-button"
             >
               {t('common.cancel')}
             </button>
@@ -143,6 +145,7 @@ export function GovernorLimitsPage({ className }: GovernorLimitsPageProps): Reac
               onClick={handleSave}
               disabled={saveMutation.isPending}
               className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              data-testid="governor-limits-save-button"
             >
               {saveMutation.isPending ? t('common.saving') : t('common.save')}
             </button>
@@ -150,8 +153,11 @@ export function GovernorLimitsPage({ className }: GovernorLimitsPageProps): Reac
         )}
       </div>
 
-      <div className="mb-8 grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-6">
-        {metrics.map((metric) => {
+      <div
+        className="mb-8 grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-6"
+        data-testid="governor-limits-metric-cards"
+      >
+        {metrics.map((metric, metricIndex) => {
           const used = metric.used ?? 0
           const limit = metric.limit ?? 0
           const percentage = limit > 0 ? (used / limit) * 100 : 0
@@ -159,7 +165,11 @@ export function GovernorLimitsPage({ className }: GovernorLimitsPageProps): Reac
           const isCritical = percentage >= 95
 
           return (
-            <div key={metric.label} className="rounded-lg border border-border bg-card p-6">
+            <div
+              key={metric.label}
+              className="rounded-lg border border-border bg-card p-6"
+              data-testid={`metric-card-${metricIndex}`}
+            >
               <div className="mb-4 flex items-center justify-between">
                 <h3 className="m-0 text-base font-semibold text-foreground">{metric.label}</h3>
                 {isWarning && (
@@ -206,7 +216,7 @@ export function GovernorLimitsPage({ className }: GovernorLimitsPageProps): Reac
           {t('governorLimits.allLimits')}
         </h2>
         <div className="overflow-x-auto rounded-lg border border-border bg-card">
-          <table className="w-full border-collapse text-sm">
+          <table className="w-full border-collapse text-sm" data-testid="governor-limits-table">
             <thead>
               <tr className="bg-muted">
                 <th className="border-b border-border p-3 text-left font-semibold text-muted-foreground">
@@ -219,7 +229,7 @@ export function GovernorLimitsPage({ className }: GovernorLimitsPageProps): Reac
             </thead>
             <tbody>
               {limitRows.map((row, index) => (
-                <tr key={row.key}>
+                <tr key={row.key} data-testid={`limit-row-${row.key}`}>
                   <td
                     className={cn('p-3', index < limitRows.length - 1 && 'border-b border-border')}
                   >
@@ -235,6 +245,7 @@ export function GovernorLimitsPage({ className }: GovernorLimitsPageProps): Reac
                         value={editLimits[row.key]}
                         onChange={(e) => updateField(row.key, e.target.value)}
                         className="w-32 rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground"
+                        data-testid={`limit-input-${row.key}`}
                       />
                     ) : (
                       <>

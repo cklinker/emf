@@ -46,7 +46,7 @@ export function DataTablePagination({
   const endRecord = Math.min(page * pageSize, total)
 
   return (
-    <div className="flex items-center justify-between px-2 py-4">
+    <div className="flex items-center justify-between px-2 py-4" data-testid="pagination">
       {/* Left: Selection count or rows per page */}
       <div className="flex items-center gap-4 text-sm text-muted-foreground">
         {selectedCount > 0 ? (

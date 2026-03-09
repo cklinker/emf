@@ -46,7 +46,11 @@ export class DataFactory {
         body: body ? JSON.stringify(body) : undefined,
       });
 
-      if (response.status === 429 && attempt < MAX_RETRIES) {
+      // Retry on rate limiting (429) and transient server errors (500-503)
+      const isRetryable =
+        response.status === 429 ||
+        (response.status >= 500 && response.status <= 503);
+      if (isRetryable && attempt < MAX_RETRIES) {
         const retryAfter = response.headers.get("Retry-After");
         const delayMs = retryAfter
           ? parseInt(retryAfter, 10) * 1_000
@@ -70,7 +74,7 @@ export class DataFactory {
     }
 
     throw new Error(
-      `API ${method} ${path} failed: max retries (${MAX_RETRIES}) exceeded due to rate limiting`,
+      `API ${method} ${path} failed: max retries (${MAX_RETRIES}) exceeded`,
     );
   }
 

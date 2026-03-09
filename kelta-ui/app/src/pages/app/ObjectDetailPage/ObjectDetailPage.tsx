@@ -540,7 +540,7 @@ export function ObjectDetailPage(): React.ReactElement {
             executionContext={quickActionContext}
           />
           {permissions.canEdit && (
-            <Button size="sm" variant="outline" onClick={handleEdit}>
+            <Button size="sm" variant="outline" onClick={handleEdit} data-testid="edit-button">
               <Pencil className="mr-1.5 h-3.5 w-3.5" />
               Edit
             </Button>
@@ -563,6 +563,7 @@ export function ObjectDetailPage(): React.ReactElement {
                 <DropdownMenuItem
                   className="text-destructive focus:text-destructive"
                   onClick={handleDelete}
+                  data-testid="delete-button"
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
                   Delete
@@ -575,7 +576,7 @@ export function ObjectDetailPage(): React.ReactElement {
 
       {/* Field Sections — use page layout sections when available, otherwise fall back to generic highlights + details */}
       {hasLayoutSections ? (
-        <>
+        <div data-testid="field-values">
           <LayoutFieldSections
             sections={layout!.sections}
             schemaFields={fields}
@@ -583,9 +584,9 @@ export function ObjectDetailPage(): React.ReactElement {
             tenantSlug={tenantSlug}
             lookupDisplayMap={lookupDisplayMap}
           />
-        </>
+        </div>
       ) : (
-        <>
+        <div data-testid="field-values">
           {/* Highlights Panel (fallback) */}
           {highlightFields.length > 0 && record && (
             <Card>
@@ -639,7 +640,7 @@ export function ObjectDetailPage(): React.ReactElement {
               lookupDisplayMap={lookupDisplayMap}
             />
           )}
-        </>
+        </div>
       )}
 
       {/* Related Lists — use layout when available, otherwise auto-discover reverse relationships */}

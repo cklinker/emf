@@ -473,6 +473,7 @@ export function ObjectDataTable({
         role="grid"
         tabIndex={0}
         aria-label={`${collectionName} records`}
+        data-testid="data-table"
       >
         <Table>{tableHeader}</Table>
         <div
@@ -497,6 +498,7 @@ export function ObjectDataTable({
       role="grid"
       tabIndex={0}
       aria-label={`${collectionName} records`}
+      data-testid="data-table"
     >
       <Table>
         {tableHeader}

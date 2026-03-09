@@ -184,6 +184,7 @@ function FormField({
         {labelEl}
         <select
           id={fieldId}
+          data-testid={fieldId}
           value={value != null ? String(value) : ''}
           onChange={(e) => onChange(field.name, e.target.value)}
           disabled={isReadOnly}
@@ -227,6 +228,7 @@ function FormField({
         {labelEl}
         <Textarea
           id={fieldId}
+          data-testid={fieldId}
           value={value != null ? String(value) : ''}
           onChange={(e) => onChange(field.name, e.target.value)}
           disabled={isReadOnly}
@@ -245,6 +247,7 @@ function FormField({
         {labelEl}
         <Input
           id={fieldId}
+          data-testid={fieldId}
           type="password"
           value={value != null ? String(value) : ''}
           onChange={(e) => onChange(field.name, e.target.value)}
@@ -262,6 +265,7 @@ function FormField({
       {labelEl}
       <Input
         id={fieldId}
+        data-testid={fieldId}
         type={inputType}
         value={value != null ? String(value) : ''}
         onChange={(e) => {
@@ -448,11 +452,17 @@ function ObjectFormBody({
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold tracking-tight text-foreground">{pageTitle}</h1>
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" onClick={handleCancel} disabled={isSaving}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleCancel}
+            disabled={isSaving}
+            data-testid="cancel-button"
+          >
             <X className="mr-1.5 h-3.5 w-3.5" />
             Cancel
           </Button>
-          <Button size="sm" onClick={handleSave} disabled={isSaving}>
+          <Button size="sm" onClick={handleSave} disabled={isSaving} data-testid="save-button">
             {isSaving ? (
               <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
             ) : (
@@ -467,24 +477,26 @@ function ObjectFormBody({
 
       {/* Form Fields — use page layout sections when available, otherwise flat grid */}
       {layout && layout.sections.length > 0 ? (
-        <LayoutFormSections
-          sections={layout.sections}
-          schemaFields={displayFields}
-          renderField={(field) => {
-            const fieldIsEditable = !isFieldEditable || isFieldEditable(field.name)
-            return (
-              <FormField
-                key={field.name}
-                field={field as FieldDefinition}
-                value={formData[field.name]}
-                onChange={fieldIsEditable ? handleFieldChange : () => {}}
-                readOnly={!fieldIsEditable}
-              />
-            )
-          }}
-        />
+        <div data-testid="form-fields">
+          <LayoutFormSections
+            sections={layout.sections}
+            schemaFields={displayFields}
+            renderField={(field) => {
+              const fieldIsEditable = !isFieldEditable || isFieldEditable(field.name)
+              return (
+                <FormField
+                  key={field.name}
+                  field={field as FieldDefinition}
+                  value={formData[field.name]}
+                  onChange={fieldIsEditable ? handleFieldChange : () => {}}
+                  readOnly={!fieldIsEditable}
+                />
+              )
+            }}
+          />
+        </div>
       ) : (
-        <Card>
+        <Card data-testid="form-fields">
           <CardHeader className="py-3">
             <CardTitle className="text-sm font-medium">{collectionLabel} Information</CardTitle>
           </CardHeader>

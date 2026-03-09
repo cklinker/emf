@@ -38,8 +38,12 @@ test.describe("Users", () => {
   });
 
   test("navigates to user detail on click", async ({ page }) => {
-    const rowCount = await usersPage.getRowCount();
-    if (rowCount > 0) {
+    // Wait for table rows to appear before trying to click
+    const firstRow = usersPage.userTable.locator("tbody tr").first();
+    const hasRows = await firstRow
+      .isVisible({ timeout: 10_000 })
+      .catch(() => false);
+    if (hasRows) {
       await usersPage.clickRow(0);
       await page.waitForURL(/\/users\/.+/);
     }

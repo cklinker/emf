@@ -31,19 +31,19 @@ test.describe("Request Log", () => {
     await expect(tableOrEmpty).toBeVisible();
   });
 
-  test("can filter by method", async () => {
+  test("can filter by method", async ({ page }) => {
     await requestLogPage.filterByMethod("GET");
-    await requestLogPage.page.waitForTimeout(500);
+    await page.waitForTimeout(500);
   });
 
-  test("can filter by status", async () => {
+  test("can filter by status", async ({ page }) => {
     await requestLogPage.filterByStatus("2xx");
-    await requestLogPage.page.waitForTimeout(500);
+    await page.waitForTimeout(500);
   });
 
-  test("can search by path", async () => {
+  test("can search by path", async ({ page }) => {
     await requestLogPage.searchByPath("/api/collections");
-    await requestLogPage.page.waitForTimeout(500);
+    await page.waitForTimeout(500);
   });
 
   test("navigates via monitoring hub tabs", async ({ page, tenantSlug }) => {

@@ -14,7 +14,6 @@ test.describe("Admin Collection Setup Journey", () => {
       displayName: `Journey Test ${Date.now()}`,
     });
     const collectionName = collection.attributes.name as string;
-    const displayName = collection.attributes.displayName as string;
 
     // Step 2: Add fields to the collection
     await dataFactory.addField(collection.id, {
@@ -36,15 +35,20 @@ test.describe("Admin Collection Setup Journey", () => {
 
     await expect(collectionsPage.container).toBeVisible();
 
-    // Filter to find the newly created collection
-    await collectionsPage.filterByName(displayName);
-    await page.waitForTimeout(500);
+    // Wait for rows to load, then filter by the collection's API name
+    await collectionsPage.waitForRows();
+    await collectionsPage.filterByName(collectionName);
+
+    // Wait for filtered rows to appear
+    await expect(
+      page.locator('[data-testid^="collection-row-"]').first(),
+    ).toBeVisible();
 
     const names = await collectionsPage.getCollectionNames();
     expect(names.length).toBeGreaterThan(0);
 
     const found = names.some((name) =>
-      name.toLowerCase().includes(displayName.toLowerCase()),
+      name.toLowerCase().includes(collectionName.toLowerCase()),
     );
     expect(found).toBe(true);
 

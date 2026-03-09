@@ -38,12 +38,12 @@ test.describe("Collection Wizard", () => {
       name: "step_test_collection",
     });
 
-    // Advance to step 2
+    // Advance to step 2 (Fields)
     await wizardPage.nextStep();
     const secondStep = await wizardPage.getCurrentStep();
     expect(secondStep).toBe(2);
 
-    // Advance to step 3 (review)
+    // Advance to step 3 (Authorization)
     await wizardPage.nextStep();
     const thirdStep = await wizardPage.getCurrentStep();
     expect(thirdStep).toBe(3);
@@ -122,7 +122,10 @@ test.describe("Collection Wizard", () => {
     // Step 2: Fields (skip adding fields, just proceed)
     await wizardPage.nextStep();
 
-    // Step 3: Review - verify summary is shown
+    // Step 3: Authorization (skip, just proceed)
+    await wizardPage.nextStep();
+
+    // Step 4: Review - verify summary is shown
     await expect(wizardPage.reviewDisplayName).toBeVisible();
     await expect(wizardPage.reviewName).toBeVisible();
 

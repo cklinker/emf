@@ -38,8 +38,9 @@ test.describe("Global Search", () => {
 
     await searchPage.search("SearchTarget");
 
-    // Wait for search results to load
-    await page.waitForTimeout(1000);
+    // Search indexing may be delayed; wait briefly then check results
+    // Accept 0 results since indexing is eventually consistent
+    await page.waitForTimeout(2000);
 
     const resultCount = await searchPage.getResultCount();
     expect(resultCount).toBeGreaterThanOrEqual(0);
@@ -63,7 +64,9 @@ test.describe("Global Search", () => {
     await searchPage.goto();
 
     await searchPage.search("NavTarget");
-    await page.waitForTimeout(1000);
+
+    // Search indexing may be delayed; wait then check results
+    await page.waitForTimeout(2000);
 
     const resultCount = await searchPage.getResultCount();
     if (resultCount > 0) {
@@ -71,8 +74,9 @@ test.describe("Global Search", () => {
       await searchPage.clickResult(0);
 
       // Should navigate away from search page
-      await page.waitForTimeout(500);
-      expect(page.url()).not.toBe(initialUrl);
+      await page.waitForURL((url) => url.href !== initialUrl, {
+        timeout: 10_000,
+      });
     }
   });
 });

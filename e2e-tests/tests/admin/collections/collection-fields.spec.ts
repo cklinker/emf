@@ -19,10 +19,8 @@ test.describe("Collection Fields", () => {
     const detailPage = new CollectionDetailPage(page, tenantSlug);
     await detailPage.goto(collection.id);
 
-    const tableOrEmpty = detailPage.fieldsTable.or(
-      page.getByTestId("empty-state"),
-    );
-    await expect(tableOrEmpty).toBeVisible();
+    // Wait for field rows to appear
+    await detailPage.waitForFieldRows();
 
     const fieldCount = await detailPage.getFieldCount();
     expect(fieldCount).toBeGreaterThan(0);
@@ -49,10 +47,8 @@ test.describe("Collection Fields", () => {
     const detailPage = new CollectionDetailPage(page, tenantSlug);
     await detailPage.goto(collection.id);
 
-    const tableOrEmpty = detailPage.fieldsTable.or(
-      page.getByTestId("empty-state"),
-    );
-    await expect(tableOrEmpty).toBeVisible();
+    // Wait for field rows to appear
+    await detailPage.waitForFieldRows();
 
     const fieldNames = await detailPage.getFieldNames();
     expect(fieldNames).toContain("string_field");
@@ -64,10 +60,13 @@ test.describe("Collection Fields", () => {
     page,
     dataFactory,
   }) => {
-    const collection = await dataFactory.createCollection();
+    await dataFactory.createCollection();
 
     const listPage = new CollectionsListPage(page, tenantSlug);
     await listPage.goto();
+
+    // Wait for rows before clicking
+    await listPage.waitForRows();
 
     await listPage.clickRow(0);
 

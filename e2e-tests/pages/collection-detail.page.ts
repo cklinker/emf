@@ -34,6 +34,16 @@ export class CollectionDetailPage extends BasePage {
   async goto(id: string): Promise<void> {
     await this.page.goto(this.tenantUrl(`/collections/${id}`));
     await this.waitForPageLoad();
+    await this.waitForDetailLoaded();
+  }
+
+  async waitForDetailLoaded(): Promise<void> {
+    await this.container.waitFor({ state: "visible", timeout: 15_000 });
+  }
+
+  async waitForFieldRows(): Promise<void> {
+    const row = this.page.locator('[data-testid^="field-row-"]').first();
+    await row.waitFor({ state: "visible", timeout: 15_000 });
   }
 
   async getFieldCount(): Promise<number> {
@@ -46,7 +56,8 @@ export class CollectionDetailPage extends BasePage {
     const count = await rows.count();
     const names: string[] = [];
     for (let i = 0; i < count; i++) {
-      const text = await rows.nth(i).locator("td").first().textContent();
+      // First td is the drag handle; second td contains the field name
+      const text = await rows.nth(i).locator("td").nth(1).textContent();
       if (text) names.push(text.trim());
     }
     return names;

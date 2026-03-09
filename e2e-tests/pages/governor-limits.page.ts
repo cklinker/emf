@@ -3,6 +3,7 @@ import { BasePage } from "./base.page";
 
 export class GovernorLimitsPage extends BasePage {
   readonly governorLimitsPage: Locator;
+  readonly heading: Locator;
   readonly editButton: Locator;
   readonly saveButton: Locator;
   readonly cancelButton: Locator;
@@ -12,6 +13,7 @@ export class GovernorLimitsPage extends BasePage {
   constructor(page: Page, tenantSlug?: string) {
     super(page, tenantSlug);
     this.governorLimitsPage = this.testId("governor-limits-page");
+    this.heading = page.getByRole("heading", { name: /governor limits/i });
     this.editButton = this.testId("governor-limits-edit-button");
     this.saveButton = this.testId("governor-limits-save-button");
     this.cancelButton = this.testId("governor-limits-cancel-button");
@@ -38,5 +40,21 @@ export class GovernorLimitsPage extends BasePage {
 
   async getMetricCardCount(): Promise<number> {
     return this.metricCards.locator('[data-testid^="metric-card-"]').count();
+  }
+
+  metricCard(index: number): Locator {
+    return this.testId(`metric-card-${index}`);
+  }
+
+  limitRow(key: string): Locator {
+    return this.testId(`limit-row-${key}`);
+  }
+
+  limitInput(key: string): Locator {
+    return this.testId(`limit-input-${key}`);
+  }
+
+  async getLimitRowCount(): Promise<number> {
+    return this.limitsTable.locator("tbody tr").count();
   }
 }

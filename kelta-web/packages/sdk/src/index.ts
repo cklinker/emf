@@ -128,6 +128,9 @@ export type {
   MetricsTimeSeries,
   MetricsDataPoint,
   MetricsSummary,
+  ObservabilitySetting,
+  ObservabilitySettingsResponse,
+  UpdateObservabilitySettingsRequest,
 } from './admin/types';
 
 // Authentication

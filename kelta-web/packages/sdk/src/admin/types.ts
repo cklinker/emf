@@ -1813,3 +1813,11 @@ export interface ObservabilitySetting {
   settingKey: string;
   settingValue: string;
 }
+
+export interface ObservabilitySettingsResponse {
+  settings: ObservabilitySetting[];
+}
+
+export interface UpdateObservabilitySettingsRequest {
+  settings: { settingKey: string; settingValue: string }[];
+}

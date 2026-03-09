@@ -37,11 +37,11 @@ test.describe("Log Viewer", () => {
     await logViewerPage.page.waitForTimeout(500);
   });
 
-  test("navigates from setup page", async ({ page, tenantSlug }) => {
-    await page.goto(`/${tenantSlug}/setup`);
+  test("navigates via monitoring hub tabs", async ({ page, tenantSlug }) => {
+    await page.goto(`/${tenantSlug}/monitoring`);
     await page.waitForLoadState("networkidle");
-    await page.getByText("Log Viewer", { exact: true }).click();
-    await page.waitForURL(`**/${tenantSlug}/logs`);
+    await page.getByTestId("monitoring-tab-logs").click();
+    await page.waitForURL(`**/${tenantSlug}/monitoring/logs`);
     const heading = page.getByRole("heading", { name: /log viewer/i });
     await expect(heading).toBeVisible();
   });

@@ -22,11 +22,11 @@ test.describe("User Activity", () => {
     await expect(page.getByText(/select a user/i)).toBeVisible();
   });
 
-  test("navigates from setup page", async ({ page, tenantSlug }) => {
-    await page.goto(`/${tenantSlug}/setup`);
+  test("navigates via monitoring hub tabs", async ({ page, tenantSlug }) => {
+    await page.goto(`/${tenantSlug}/monitoring`);
     await page.waitForLoadState("networkidle");
-    await page.getByText("User Activity", { exact: true }).click();
-    await page.waitForURL(`**/${tenantSlug}/user-activity`);
+    await page.getByTestId("monitoring-tab-activity").click();
+    await page.waitForURL(`**/${tenantSlug}/monitoring/activity`);
     const heading = page.getByRole("heading", { name: /user activity/i });
     await expect(heading).toBeVisible();
   });

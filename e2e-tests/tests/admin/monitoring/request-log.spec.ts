@@ -46,11 +46,11 @@ test.describe("Request Log", () => {
     await requestLogPage.page.waitForTimeout(500);
   });
 
-  test("navigates from setup page", async ({ page, tenantSlug }) => {
-    await page.goto(`/${tenantSlug}/setup`);
+  test("navigates via monitoring hub tabs", async ({ page, tenantSlug }) => {
+    await page.goto(`/${tenantSlug}/monitoring`);
     await page.waitForLoadState("networkidle");
-    await page.getByText("Request Log", { exact: true }).click();
-    await page.waitForURL(`**/${tenantSlug}/request-log`);
+    await page.getByTestId("monitoring-tab-requests").click();
+    await page.waitForURL(`**/${tenantSlug}/monitoring/requests`);
     const heading = page.getByRole("heading", { name: /request log/i });
     await expect(heading).toBeVisible();
   });

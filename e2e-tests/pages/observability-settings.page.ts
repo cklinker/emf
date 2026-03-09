@@ -18,7 +18,7 @@ export class ObservabilitySettingsPage extends BasePage {
   }
 
   async goto(): Promise<void> {
-    await this.page.goto(this.tenantUrl("/observability-settings"));
+    await this.page.goto(this.tenantUrl("/monitoring/settings"));
     await this.waitForLoadingComplete();
   }
 

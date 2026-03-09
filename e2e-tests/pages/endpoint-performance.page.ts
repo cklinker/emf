@@ -12,7 +12,7 @@ export class EndpointPerformancePage extends BasePage {
   }
 
   async goto(): Promise<void> {
-    await this.page.goto(this.tenantUrl("/endpoint-performance"));
+    await this.page.goto(this.tenantUrl("/monitoring/performance"));
     await this.waitForLoadingComplete();
   }
 

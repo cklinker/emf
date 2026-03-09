@@ -10,7 +10,7 @@ test.describe("Metrics Page", () => {
   });
 
   test("displays metrics page with title", async ({ page }) => {
-    const heading = page.getByRole("heading", { name: /metrics/i });
+    const heading = page.getByRole("heading", { name: /monitoring/i });
     await expect(heading).toBeVisible();
   });
 
@@ -28,7 +28,7 @@ test.describe("Metrics Page", () => {
 
   test("can change time range", async ({ page }) => {
     await metricsPage.selectTimeRange("7d");
-    const button = page.getByTestId("metrics-time-range-7d");
+    const button = page.getByTestId("overview-time-range-7d");
     await expect(button).toHaveClass(/bg-primary/);
   });
 
@@ -45,7 +45,7 @@ test.describe("Metrics Page", () => {
     await expect(page.getByText("Request Rate")).toBeVisible();
     await expect(page.getByText("Latency")).toBeVisible();
     await expect(
-      page.locator('[data-testid="metrics-chart-errors"]').getByText("Errors"),
+      page.locator('[data-testid="overview-chart-errors"]').getByText("Errors"),
     ).toBeVisible();
     await expect(page.getByText("Auth Failures")).toBeVisible();
     await expect(page.getByText("Rate Limit Events")).toBeVisible();
@@ -55,11 +55,11 @@ test.describe("Metrics Page", () => {
     await page.goto(`/${tenantSlug}/setup`);
     await page.waitForLoadState("networkidle");
 
-    // Click the Metrics item in the platform section
-    await page.getByText("Metrics", { exact: true }).click();
-    await page.waitForURL(`**/${tenantSlug}/metrics`);
+    // Click the Monitoring item in the platform section
+    await page.getByText("Monitoring", { exact: true }).click();
+    await page.waitForURL(`**/${tenantSlug}/monitoring/overview`);
 
-    const heading = page.getByRole("heading", { name: /metrics/i });
+    const heading = page.getByRole("heading", { name: /monitoring/i });
     await expect(heading).toBeVisible();
   });
 });

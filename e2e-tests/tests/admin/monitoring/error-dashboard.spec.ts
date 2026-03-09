@@ -26,11 +26,11 @@ test.describe("Error Dashboard", () => {
     await expect(tableOrEmpty).toBeVisible();
   });
 
-  test("navigates from setup page", async ({ page, tenantSlug }) => {
-    await page.goto(`/${tenantSlug}/setup`);
+  test("navigates via monitoring hub tabs", async ({ page, tenantSlug }) => {
+    await page.goto(`/${tenantSlug}/monitoring`);
     await page.waitForLoadState("networkidle");
-    await page.getByText("Error Dashboard", { exact: true }).click();
-    await page.waitForURL(`**/${tenantSlug}/errors`);
+    await page.getByTestId("monitoring-tab-errors").click();
+    await page.waitForURL(`**/${tenantSlug}/monitoring/errors`);
     const heading = page.getByRole("heading", { name: /error dashboard/i });
     await expect(heading).toBeVisible();
   });

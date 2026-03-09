@@ -27,14 +27,14 @@ test.describe("Log Viewer", () => {
     await expect(tableOrEmpty).toBeVisible();
   });
 
-  test("can filter by log level", async () => {
+  test("can filter by log level", async ({ page }) => {
     await logViewerPage.filterByLevel("ERROR");
-    await logViewerPage.page.waitForTimeout(500);
+    await page.waitForTimeout(500);
   });
 
-  test("can search logs", async () => {
+  test("can search logs", async ({ page }) => {
     await logViewerPage.search("exception");
-    await logViewerPage.page.waitForTimeout(500);
+    await page.waitForTimeout(500);
   });
 
   test("navigates via monitoring hub tabs", async ({ page, tenantSlug }) => {

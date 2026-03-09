@@ -32,6 +32,17 @@ export class CollectionsListPage extends BasePage {
   async goto(): Promise<void> {
     await this.page.goto(this.tenantUrl("/collections"));
     await this.waitForPageLoad();
+    await this.waitForTableLoaded();
+  }
+
+  async waitForTableLoaded(): Promise<void> {
+    const tableOrEmpty = this.collectionsTable.or(this.emptyState);
+    await tableOrEmpty.waitFor({ state: "visible", timeout: 15_000 });
+  }
+
+  async waitForRows(minCount = 1): Promise<void> {
+    const row = this.page.locator('[data-testid^="collection-row-"]').first();
+    await row.waitFor({ state: "visible", timeout: 15_000 });
   }
 
   async clickCreateCollection(): Promise<void> {
@@ -68,7 +79,9 @@ export class CollectionsListPage extends BasePage {
   }
 
   async confirmDelete(): Promise<void> {
-    await this.testId("confirm-dialog-confirm").click();
+    const confirmButton = this.testId("confirm-dialog-confirm");
+    await confirmButton.waitFor({ state: "visible", timeout: 5_000 });
+    await confirmButton.click();
   }
 
   async sortByColumn(column: "name" | "created" | "updated"): Promise<void> {
@@ -80,7 +93,18 @@ export class CollectionsListPage extends BasePage {
     const count = await rows.count();
     const names: string[] = [];
     for (let i = 0; i < count; i++) {
-      const text = await rows.nth(i).locator("td").first().textContent();
+      const text = await rows.nth(i).locator("td").nth(0).textContent();
+      if (text) names.push(text.trim());
+    }
+    return names;
+  }
+
+  async getCollectionDisplayNames(): Promise<string[]> {
+    const rows = this.page.locator('[data-testid^="collection-row-"]');
+    const count = await rows.count();
+    const names: string[] = [];
+    for (let i = 0; i < count; i++) {
+      const text = await rows.nth(i).locator("td").nth(1).textContent();
       if (text) names.push(text.trim());
     }
     return names;

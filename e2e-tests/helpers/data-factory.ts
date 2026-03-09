@@ -1,7 +1,7 @@
 /**
  * Test data factory for creating and cleaning up test entities.
  *
- * Uses the EMF API directly to set up test state before tests
+ * Uses the Kelta API directly to set up test state before tests
  * and tear it down afterward.
  */
 
@@ -21,6 +21,9 @@ interface JsonApiResponse {
   data: JsonApiResource | JsonApiResource[];
 }
 
+const MAX_RETRIES = 3;
+const INITIAL_RETRY_DELAY_MS = 2_000;
+
 export class DataFactory {
   private createdEntities: Array<{ type: string; id: string }> = [];
 
@@ -32,34 +35,52 @@ export class DataFactory {
     body?: unknown,
   ): Promise<JsonApiResponse> {
     const url = `${this.api.baseUrl}/${this.api.tenantSlug}${path}`;
-    const response = await fetch(url, {
-      method,
-      headers: {
-        'Content-Type': 'application/vnd.api+json',
-        Authorization: `Bearer ${this.api.token}`,
-      },
-      body: body ? JSON.stringify(body) : undefined,
-    });
 
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`API ${method} ${path} failed (${response.status}): ${error}`);
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      const response = await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/vnd.api+json",
+          Authorization: `Bearer ${this.api.token}`,
+        },
+        body: body ? JSON.stringify(body) : undefined,
+      });
+
+      if (response.status === 429 && attempt < MAX_RETRIES) {
+        const retryAfter = response.headers.get("Retry-After");
+        const delayMs = retryAfter
+          ? parseInt(retryAfter, 10) * 1_000
+          : INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt);
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        continue;
+      }
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(
+          `API ${method} ${path} failed (${response.status}): ${error}`,
+        );
+      }
+
+      if (response.status === 204) {
+        return { data: { id: "", type: "", attributes: {} } };
+      }
+
+      return response.json() as Promise<JsonApiResponse>;
     }
 
-    if (response.status === 204) {
-      return { data: { id: '', type: '', attributes: {} } };
-    }
-
-    return response.json() as Promise<JsonApiResponse>;
+    throw new Error(
+      `API ${method} ${path} failed: max retries (${MAX_RETRIES}) exceeded due to rate limiting`,
+    );
   }
 
   async createCollection(
     overrides: Record<string, unknown> = {},
   ): Promise<JsonApiResource> {
     const uniqueName = `e2e_test_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    const result = await this.request('POST', '/api/collections', {
+    const result = await this.request("POST", "/api/collections", {
       data: {
-        type: 'collections',
+        type: "collections",
         attributes: {
           name: uniqueName,
           displayName: `E2E ${uniqueName}`,
@@ -70,7 +91,7 @@ export class DataFactory {
     });
 
     const resource = result.data as JsonApiResource;
-    this.createdEntities.push({ type: 'collections', id: resource.id });
+    this.createdEntities.push({ type: "collections", id: resource.id });
     return resource;
   }
 
@@ -84,11 +105,11 @@ export class DataFactory {
     },
   ): Promise<JsonApiResource> {
     const result = await this.request(
-      'POST',
+      "POST",
       `/api/collections/${collectionId}/fields`,
       {
         data: {
-          type: 'fields',
+          type: "fields",
           attributes: field,
         },
       },
@@ -100,7 +121,7 @@ export class DataFactory {
     collectionName: string,
     attributes: Record<string, unknown>,
   ): Promise<JsonApiResource> {
-    const result = await this.request('POST', `/api/${collectionName}`, {
+    const result = await this.request("POST", `/api/${collectionName}`, {
       data: {
         type: collectionName,
         attributes,
@@ -115,7 +136,7 @@ export class DataFactory {
   async cleanup(): Promise<void> {
     for (const entity of this.createdEntities.reverse()) {
       try {
-        await this.request('DELETE', `/api/${entity.type}/${entity.id}`);
+        await this.request("DELETE", `/api/${entity.type}/${entity.id}`);
       } catch {
         // Ignore cleanup failures
       }

@@ -20,11 +20,13 @@ test.describe("End-User Navigation", () => {
     await expect(userMenuOrAvatar).toBeVisible();
   });
 
-  test("navigates between collections", async ({ page, dataFactory }) => {
+  // Skip: test body is incomplete — no assertions after creating collection
+  test.skip("navigates between collections", async ({ page, dataFactory }) => {
     await dataFactory.createCollection({ displayName: "Nav Test A" });
   });
 
-  test("shows collection tabs in nav", async ({ page, dataFactory }) => {
+  // Skip: test body is incomplete — no assertions after creating collection
+  test.skip("shows collection tabs in nav", async ({ page, dataFactory }) => {
     await dataFactory.createCollection();
   });
 });

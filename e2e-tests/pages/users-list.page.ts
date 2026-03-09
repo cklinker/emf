@@ -37,7 +37,17 @@ export class UsersListPage extends BasePage {
 
   async clickRow(index: number): Promise<void> {
     const row = this.userTable.locator("tbody tr").nth(index);
-    await row.locator("button").first().click();
+    await row.waitFor({ state: "visible", timeout: 10_000 });
+    // Try clicking a view/detail button first; fall back to clicking the row itself
+    const button = row.locator("button").first();
+    const hasButton = await button
+      .isVisible({ timeout: 2_000 })
+      .catch(() => false);
+    if (hasButton) {
+      await button.click();
+    } else {
+      await row.click();
+    }
   }
 
   async filterByStatus(status: string): Promise<void> {

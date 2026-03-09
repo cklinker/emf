@@ -46,9 +46,7 @@ test.describe("Scheduled Jobs", () => {
     await expect(scheduledJobsPage.cronInput).toHaveValue("0 0 * * *");
   });
 
-  // Skip: cancel button click does not close the modal — likely an app-side issue
-  // where the form overlay/modal requires a different dismiss mechanism
-  test.skip("closes form on cancel", async ({ page }) => {
+  test("closes form on cancel", async ({ page }) => {
     const scheduledJobsPage = new ScheduledJobsPage(page);
     await scheduledJobsPage.goto();
 

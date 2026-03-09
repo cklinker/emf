@@ -54,11 +54,21 @@ test.describe("Collection Wizard", () => {
     expect(backToSecond).toBe(2);
   });
 
-  // Skip: wizard starts on Basics step, not template selection
-  test.skip("can select a template", async ({ page }) => {
+  test("can select a template on fields step", async ({ page }) => {
     const wizardPage = new CollectionWizardPage(page, tenantSlug);
     await wizardPage.goto();
-    await wizardPage.selectTemplate("blank");
+
+    // Fill basic info first (required to advance)
+    await wizardPage.fillBasicInfo({
+      displayName: "Template Test Collection",
+      name: "template_test_collection",
+    });
+
+    // Advance to Step 2 (Fields) where template selection lives
+    await wizardPage.nextStep();
+
+    // Select the "custom" template (blank — no pre-defined fields)
+    await wizardPage.selectTemplate("custom");
     await expect(wizardPage.container).toBeVisible();
   });
 

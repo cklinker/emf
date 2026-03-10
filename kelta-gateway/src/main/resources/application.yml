@@ -87,7 +87,7 @@ kelta:
     # Security settings
     security:
       jwt-clock-skew-seconds: 30   # Tolerance for clock drift between gateway and IdP
-      permissions-enabled: ${PERMISSIONS_ENABLED:false}   # Enable object-level permission enforcement
+      permissions-enabled: ${PERMISSIONS_ENABLED:true}   # Object-level permission enforcement (default: enabled)
       permissions-cache-ttl-minutes: ${PERMISSIONS_CACHE_TTL:5}   # Redis cache TTL for resolved permissions
       # Paths accessible without authentication (GET/HEAD only).
       # Matched as prefixes against the slug-stripped path.

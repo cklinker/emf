@@ -321,7 +321,7 @@ class InternalBootstrapControllerTest {
                     ));
             when(repository.findProfileObjectPermissions("profile-1"))
                     .thenReturn(List.of(
-                            objectPermRow("coll-1", true, true, false, false, false, false)
+                            objectPermRow("coll-1", true, true, false, false)
                     ));
             when(repository.findProfileFieldPermissions("profile-1"))
                     .thenReturn(List.of(fieldPermRow("coll-1", "field-1", "VISIBLE")));
@@ -364,7 +364,7 @@ class InternalBootstrapControllerTest {
             when(repository.findProfileSystemPermissions("profile-1"))
                     .thenReturn(List.of(systemPermRow("API_ACCESS", true)));
             when(repository.findProfileObjectPermissions("profile-1"))
-                    .thenReturn(List.of(objectPermRow("coll-1", false, true, false, false, false, false)));
+                    .thenReturn(List.of(objectPermRow("coll-1", false, true, false, false)));
             when(repository.findProfileFieldPermissions("profile-1"))
                     .thenReturn(List.of(fieldPermRow("coll-1", "field-1", "READ_ONLY")));
             when(repository.findUserPermissionSetIds("user-1"))
@@ -373,7 +373,7 @@ class InternalBootstrapControllerTest {
             when(repository.findPermsetSystemPermissions("ps-1"))
                     .thenReturn(List.of(systemPermRow("VIEW_ALL_DATA", true)));
             when(repository.findPermsetObjectPermissions("ps-1"))
-                    .thenReturn(List.of(objectPermRow("coll-1", true, false, false, false, false, false)));
+                    .thenReturn(List.of(objectPermRow("coll-1", true, false, false, false)));
             when(repository.findPermsetFieldPermissions("ps-1"))
                     .thenReturn(List.of(fieldPermRow("coll-1", "field-1", "VISIBLE")));
 
@@ -416,7 +416,7 @@ class InternalBootstrapControllerTest {
             when(repository.findPermsetSystemPermissions("ps-group-1"))
                     .thenReturn(List.of(systemPermRow("API_ACCESS", true)));
             when(repository.findPermsetObjectPermissions("ps-group-1"))
-                    .thenReturn(List.of(objectPermRow("coll-1", true, true, true, true, false, false)));
+                    .thenReturn(List.of(objectPermRow("coll-1", true, true, true, true)));
             when(repository.findPermsetFieldPermissions("ps-group-1"))
                     .thenReturn(List.of());
 
@@ -473,15 +473,13 @@ class InternalBootstrapControllerTest {
 
     private Map<String, Object> objectPermRow(String collectionId,
                                                 boolean canCreate, boolean canRead, boolean canEdit,
-                                                boolean canDelete, boolean canViewAll, boolean canModifyAll) {
+                                                boolean canDelete) {
         Map<String, Object> row = new HashMap<>();
         row.put("collection_id", collectionId);
         row.put("can_create", canCreate);
         row.put("can_read", canRead);
         row.put("can_edit", canEdit);
         row.put("can_delete", canDelete);
-        row.put("can_view_all", canViewAll);
-        row.put("can_modify_all", canModifyAll);
         return row;
     }
 

@@ -15,6 +15,9 @@ import org.springframework.web.cors.reactive.CorsConfigurationSource;
 import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
@@ -33,13 +36,15 @@ import java.util.List;
 @EnableWebFluxSecurity
 public class SecurityConfig {
 
+    private static final Logger log = LoggerFactory.getLogger(SecurityConfig.class);
+
     @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}")
     private String issuerUri;
 
     @Value("${kelta.gateway.worker-service-url:http://kelta-worker:80}")
     private String workerServiceUrl;
 
-    @Value("${CORS_ALLOWED_ORIGIN_PATTERN:*}")
+    @Value("${CORS_ALLOWED_ORIGIN_PATTERN:}")
     private String corsAllowedOriginPattern;
 
     @Value("${kelta.gateway.security.jwt-clock-skew-seconds:30}")
@@ -52,6 +57,16 @@ public class SecurityConfig {
      */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
+        if (corsAllowedOriginPattern == null || corsAllowedOriginPattern.isBlank()) {
+            throw new IllegalStateException(
+                    "CORS_ALLOWED_ORIGIN_PATTERN must be configured. " +
+                    "Set it to your UI domain (e.g., 'https://app.example.com'). " +
+                    "Wildcard '*' is not permitted with allowCredentials=true.");
+        }
+        if ("*".equals(corsAllowedOriginPattern)) {
+            log.warn("CORS_ALLOWED_ORIGIN_PATTERN is set to '*' which allows any origin " +
+                    "to make credentialed requests. This is insecure for production.");
+        }
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOriginPatterns(List.of(corsAllowedOriginPattern));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));

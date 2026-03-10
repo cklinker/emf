@@ -66,4 +66,25 @@ public record ResolvedPermissions(
         return userId == null && systemPermissions.isEmpty()
                 && objectPermissions.isEmpty() && fieldPermissions.isEmpty();
     }
+
+    /**
+     * Returns a deny-all permissions result. Used when permission resolution
+     * fails (fail-closed). All permission checks against this object will
+     * return false/denied.
+     */
+    public static ResolvedPermissions denied() {
+        return new ResolvedPermissions(
+                "__denied__",
+                Collections.emptyMap(),
+                Collections.emptyMap(),
+                Collections.emptyMap()
+        );
+    }
+
+    /**
+     * Returns true if this represents a denied result from a resolution failure.
+     */
+    public boolean isDenied() {
+        return "__denied__".equals(userId);
+    }
 }

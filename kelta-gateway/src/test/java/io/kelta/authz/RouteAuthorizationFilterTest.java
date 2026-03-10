@@ -1,5 +1,6 @@
 package io.kelta.gateway.authz;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.kelta.gateway.auth.GatewayPrincipal;
 import io.kelta.gateway.auth.PublicPathMatcher;
 import io.kelta.gateway.metrics.GatewayMetrics;
@@ -61,7 +62,7 @@ class RouteAuthorizationFilterTest {
 
     @Test
     void shouldHaveOrderZero() {
-        RouteAuthorizationFilter filter = new RouteAuthorizationFilter(routeRegistry, false, publicPathMatcher, metrics);
+        RouteAuthorizationFilter filter = new RouteAuthorizationFilter(routeRegistry, false, publicPathMatcher, metrics, new ObjectMapper());
         assertThat(filter.getOrder()).isEqualTo(0);
     }
 
@@ -77,7 +78,7 @@ class RouteAuthorizationFilterTest {
 
         @BeforeEach
         void setUp() {
-            filter = new RouteAuthorizationFilter(routeRegistry, false, publicPathMatcher, metrics);
+            filter = new RouteAuthorizationFilter(routeRegistry, false, publicPathMatcher, metrics, new ObjectMapper());
         }
 
         @Test
@@ -169,7 +170,7 @@ class RouteAuthorizationFilterTest {
 
         @BeforeEach
         void setUp() {
-            filter = new RouteAuthorizationFilter(routeRegistry, true, publicPathMatcher, metrics);
+            filter = new RouteAuthorizationFilter(routeRegistry, true, publicPathMatcher, metrics, new ObjectMapper());
         }
 
         @Test
@@ -219,8 +220,8 @@ class RouteAuthorizationFilterTest {
         }
 
         @Test
-        @DisplayName("Should fail-open when no permissions attribute")
-        void shouldFailOpenWhenNoPermissions() {
+        @DisplayName("Should fail-closed when no permissions attribute")
+        void shouldFailClosedWhenNoPermissions() {
             MockServerHttpRequest request = MockServerHttpRequest.get("/api/users").build();
             MockServerWebExchange exchange = MockServerWebExchange.from(request);
             exchange.getAttributes().put(PRINCIPAL_ATTR,
@@ -230,7 +231,8 @@ class RouteAuthorizationFilterTest {
                     .expectComplete()
                     .verify();
 
-            verify(filterChain).filter(exchange);
+            assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+            verify(filterChain, never()).filter(exchange);
         }
 
         @Test
@@ -289,7 +291,7 @@ class RouteAuthorizationFilterTest {
             ResolvedPermissions perms = new ResolvedPermissions(
                     "user-1",
                     Map.of("API_ACCESS", true),
-                    Map.of("coll-1", new ObjectPermissions(false, true, false, false, false, false)),
+                    Map.of("coll-1", new ObjectPermissions(false, true, false, false)),
                     Collections.emptyMap()
             );
 
@@ -316,7 +318,7 @@ class RouteAuthorizationFilterTest {
             ResolvedPermissions perms = new ResolvedPermissions(
                     "user-1",
                     Map.of("API_ACCESS", true),
-                    Map.of("coll-1", new ObjectPermissions(true, false, true, true, false, false)),
+                    Map.of("coll-1", new ObjectPermissions(true, false, true, true)),
                     Collections.emptyMap()
             );
 
@@ -343,7 +345,7 @@ class RouteAuthorizationFilterTest {
             ResolvedPermissions perms = new ResolvedPermissions(
                     "user-1",
                     Map.of("API_ACCESS", true),
-                    Map.of("coll-1", new ObjectPermissions(true, true, false, false, false, false)),
+                    Map.of("coll-1", new ObjectPermissions(true, true, false, false)),
                     Collections.emptyMap()
             );
 
@@ -370,7 +372,7 @@ class RouteAuthorizationFilterTest {
             ResolvedPermissions perms = new ResolvedPermissions(
                     "user-1",
                     Map.of("API_ACCESS", true),
-                    Map.of("coll-1", new ObjectPermissions(false, true, true, true, false, false)),
+                    Map.of("coll-1", new ObjectPermissions(false, true, true, true)),
                     Collections.emptyMap()
             );
 
@@ -397,7 +399,7 @@ class RouteAuthorizationFilterTest {
             ResolvedPermissions perms = new ResolvedPermissions(
                     "user-1",
                     Map.of("API_ACCESS", true),
-                    Map.of("coll-1", new ObjectPermissions(false, true, true, false, false, false)),
+                    Map.of("coll-1", new ObjectPermissions(false, true, true, false)),
                     Collections.emptyMap()
             );
 
@@ -424,7 +426,7 @@ class RouteAuthorizationFilterTest {
             ResolvedPermissions perms = new ResolvedPermissions(
                     "user-1",
                     Map.of("API_ACCESS", true),
-                    Map.of("coll-1", new ObjectPermissions(false, true, true, false, false, false)),
+                    Map.of("coll-1", new ObjectPermissions(false, true, true, false)),
                     Collections.emptyMap()
             );
 
@@ -451,7 +453,7 @@ class RouteAuthorizationFilterTest {
             ResolvedPermissions perms = new ResolvedPermissions(
                     "user-1",
                     Map.of("API_ACCESS", true),
-                    Map.of("coll-1", new ObjectPermissions(false, true, false, true, false, false)),
+                    Map.of("coll-1", new ObjectPermissions(false, true, false, true)),
                     Collections.emptyMap()
             );
 
@@ -478,7 +480,7 @@ class RouteAuthorizationFilterTest {
             ResolvedPermissions perms = new ResolvedPermissions(
                     "user-1",
                     Map.of("API_ACCESS", true),
-                    Map.of("coll-1", new ObjectPermissions(true, true, true, false, false, false)),
+                    Map.of("coll-1", new ObjectPermissions(true, true, true, false)),
                     Collections.emptyMap()
             );
 
@@ -505,7 +507,7 @@ class RouteAuthorizationFilterTest {
             ResolvedPermissions perms = new ResolvedPermissions(
                     "user-1",
                     Map.of("API_ACCESS", true, "VIEW_ALL_DATA", true),
-                    Map.of("coll-1", new ObjectPermissions(false, false, false, false, false, false)),
+                    Map.of("coll-1", new ObjectPermissions(false, false, false, false)),
                     Collections.emptyMap()
             );
 
@@ -532,7 +534,7 @@ class RouteAuthorizationFilterTest {
             ResolvedPermissions perms = new ResolvedPermissions(
                     "user-1",
                     Map.of("API_ACCESS", true, "MODIFY_ALL_DATA", true),
-                    Map.of("coll-1", new ObjectPermissions(false, false, false, false, false, false)),
+                    Map.of("coll-1", new ObjectPermissions(false, false, false, false)),
                     Collections.emptyMap()
             );
 

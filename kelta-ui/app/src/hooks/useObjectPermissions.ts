@@ -19,8 +19,6 @@ export interface ObjectPermissions {
   canRead: boolean
   canEdit: boolean
   canDelete: boolean
-  canViewAll: boolean
-  canModifyAll: boolean
 }
 
 export interface UseObjectPermissionsReturn {
@@ -35,8 +33,6 @@ const PERMISSIVE_DEFAULTS: ObjectPermissions = {
   canRead: true,
   canEdit: true,
   canDelete: true,
-  canViewAll: true,
-  canModifyAll: true,
 }
 
 /**

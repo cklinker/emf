@@ -428,8 +428,6 @@ export interface ObjectPermission {
   canRead: boolean;
   canEdit: boolean;
   canDelete: boolean;
-  canViewAll: boolean;
-  canModifyAll: boolean;
 }
 
 /**
@@ -474,8 +472,6 @@ export interface ObjectPermissionRequest {
   canRead: boolean;
   canEdit: boolean;
   canDelete: boolean;
-  canViewAll: boolean;
-  canModifyAll: boolean;
 }
 
 /**

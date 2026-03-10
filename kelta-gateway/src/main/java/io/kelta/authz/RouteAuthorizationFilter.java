@@ -21,13 +21,19 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
+import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
 /**
  * Global filter that enforces route-level authorization.
  *
- * <p>When {@code kelta.gateway.security.permissions-enabled} is false (default),
+ * <p>When {@code kelta.gateway.security.permissions-enabled} is false,
  * this filter only checks that the user is authenticated (valid JWT required).
+ * Defaults to enabled (true).
  *
  * <p>When permissions are enabled, this filter additionally checks object-level
  * permissions for API paths:
@@ -52,16 +58,19 @@ public class RouteAuthorizationFilter implements GlobalFilter, Ordered {
     private final boolean permissionsEnabled;
     private final PublicPathMatcher publicPathMatcher;
     private final GatewayMetrics metrics;
+    private final ObjectMapper objectMapper;
 
     public RouteAuthorizationFilter(
             RouteRegistry routeRegistry,
-            @Value("${kelta.gateway.security.permissions-enabled:false}") boolean permissionsEnabled,
+            @Value("${kelta.gateway.security.permissions-enabled:true}") boolean permissionsEnabled,
             PublicPathMatcher publicPathMatcher,
-            GatewayMetrics metrics) {
+            GatewayMetrics metrics,
+            ObjectMapper objectMapper) {
         this.routeRegistry = routeRegistry;
         this.permissionsEnabled = permissionsEnabled;
         this.publicPathMatcher = publicPathMatcher;
         this.metrics = metrics;
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -105,12 +114,24 @@ public class RouteAuthorizationFilter implements GlobalFilter, Ordered {
                                                String path) {
         ResolvedPermissions permissions = PermissionResolutionFilter.getPermissions(exchange);
         if (permissions == null) {
-            // No permissions resolved (error or no tenant context) — fail-open
-            setRouteAttribute(exchange, path);
-            return chain.filter(exchange);
+            // No permissions resolved and no tenant context — deny access
+            log.warn("No permissions resolved for path: {}", path);
+            String tenantSlug = TenantResolutionFilter.getTenantSlug(exchange);
+            String methodStr = exchange.getRequest().getMethod() != null ? exchange.getRequest().getMethod().name() : "unknown";
+            metrics.recordAuthzDenied(tenantSlug, "unknown", methodStr);
+            return forbidden(exchange, "Permission resolution unavailable");
         }
 
-        // All-permissive bypasses all checks (platform admin, disabled, error fallback)
+        // Deny if permission resolution failed (fail-closed)
+        if (permissions.isDenied()) {
+            log.warn("Permission resolution failed (fail-closed) for path: {}", path);
+            String tenantSlug = TenantResolutionFilter.getTenantSlug(exchange);
+            String methodStr = exchange.getRequest().getMethod() != null ? exchange.getRequest().getMethod().name() : "unknown";
+            metrics.recordAuthzDenied(tenantSlug, "unknown", methodStr);
+            return forbidden(exchange, "Permission resolution unavailable");
+        }
+
+        // All-permissive bypasses all checks (platform admin, disabled)
         if (permissions.isAllPermissive()) {
             setRouteAttribute(exchange, path);
             return chain.filter(exchange);
@@ -201,14 +222,28 @@ public class RouteAuthorizationFilter implements GlobalFilter, Ordered {
         exchange.getResponse().setStatusCode(HttpStatus.FORBIDDEN);
         exchange.getResponse().getHeaders().add(HttpHeaders.CONTENT_TYPE, "application/json");
 
-        String errorJson = String.format(
-            "{\"errors\":[{\"status\":\"403\",\"code\":\"FORBIDDEN\",\"detail\":\"%s\",\"meta\":{\"path\":\"%s\"}}]}",
-            message,
-            exchange.getRequest().getPath().value()
-        );
+        // Use Jackson to safely serialize — prevents JSON injection via untrusted
+        // values in message or request path.
+        ObjectNode error = objectMapper.createObjectNode();
+        error.put("status", "403");
+        error.put("code", "FORBIDDEN");
+        error.put("detail", message);
+        ObjectNode meta = error.putObject("meta");
+        meta.put("path", exchange.getRequest().getPath().value());
+
+        ObjectNode root = objectMapper.createObjectNode();
+        ArrayNode errors = root.putArray("errors");
+        errors.add(error);
+
+        byte[] errorBytes;
+        try {
+            errorBytes = objectMapper.writeValueAsBytes(root);
+        } catch (Exception e) {
+            errorBytes = "{\"errors\":[{\"status\":\"403\",\"code\":\"FORBIDDEN\"}]}".getBytes(StandardCharsets.UTF_8);
+        }
 
         return exchange.getResponse().writeWith(
-            Mono.just(exchange.getResponse().bufferFactory().wrap(errorJson.getBytes()))
+            Mono.just(exchange.getResponse().bufferFactory().wrap(errorBytes))
         );
     }
 

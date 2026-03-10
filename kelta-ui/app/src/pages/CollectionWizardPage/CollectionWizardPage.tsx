@@ -63,8 +63,6 @@ interface ProfilePermission {
   canRead: boolean
   canEdit: boolean
   canDelete: boolean
-  canViewAll: boolean
-  canModifyAll: boolean
 }
 
 /**
@@ -253,8 +251,6 @@ export function CollectionWizardPage({
           canRead: false,
           canEdit: false,
           canDelete: false,
-          canViewAll: false,
-          canModifyAll: false,
         }))
       )
     }
@@ -353,8 +349,6 @@ export function CollectionWizardPage({
         canRead: false,
         canEdit: false,
         canDelete: false,
-        canViewAll: false,
-        canModifyAll: false,
       }))
     )
     setCurrentStep(4)
@@ -431,8 +425,7 @@ export function CollectionWizardPage({
 
       // Step 3: Create profile object permissions for profiles with any permission set
       const configuredPermissions = profilePermissions.filter(
-        (p) =>
-          p.canCreate || p.canRead || p.canEdit || p.canDelete || p.canViewAll || p.canModifyAll
+        (p) => p.canCreate || p.canRead || p.canEdit || p.canDelete
       )
 
       for (const perm of configuredPermissions) {
@@ -441,8 +434,6 @@ export function CollectionWizardPage({
           canRead: perm.canRead,
           canEdit: perm.canEdit,
           canDelete: perm.canDelete,
-          canViewAll: perm.canViewAll,
-          canModifyAll: perm.canModifyAll,
         })
       }
 
@@ -458,11 +449,7 @@ export function CollectionWizardPage({
 
   // Check if any profile permissions are configured
   const hasAuthConfigured = useMemo(
-    () =>
-      profilePermissions.some(
-        (p) =>
-          p.canCreate || p.canRead || p.canEdit || p.canDelete || p.canViewAll || p.canModifyAll
-      ),
+    () => profilePermissions.some((p) => p.canCreate || p.canRead || p.canEdit || p.canDelete),
     [profilePermissions]
   )
 
@@ -835,8 +822,6 @@ export function CollectionWizardPage({
         { key: 'canRead', label: 'Read' },
         { key: 'canEdit', label: 'Edit' },
         { key: 'canDelete', label: 'Delete' },
-        { key: 'canViewAll', label: 'View All' },
-        { key: 'canModifyAll', label: 'Modify All' },
       ] as const,
     []
   )
@@ -1111,51 +1096,30 @@ export function CollectionWizardPage({
                         <th className="px-3 py-2 text-xs font-semibold text-center uppercase tracking-wider text-muted-foreground bg-muted border-b border-border dark:text-gray-400 dark:bg-gray-700 dark:border-gray-600">
                           Delete
                         </th>
-                        <th className="px-3 py-2 text-xs font-semibold text-center uppercase tracking-wider text-muted-foreground bg-muted border-b border-border dark:text-gray-400 dark:bg-gray-700 dark:border-gray-600">
-                          View All
-                        </th>
-                        <th className="px-3 py-2 text-xs font-semibold text-center uppercase tracking-wider text-muted-foreground bg-muted border-b border-border dark:text-gray-400 dark:bg-gray-700 dark:border-gray-600">
-                          Modify All
-                        </th>
                       </tr>
                     </thead>
                     <tbody>
                       {profilePermissions
-                        .filter(
-                          (p) =>
-                            p.canCreate ||
-                            p.canRead ||
-                            p.canEdit ||
-                            p.canDelete ||
-                            p.canViewAll ||
-                            p.canModifyAll
-                        )
+                        .filter((p) => p.canCreate || p.canRead || p.canEdit || p.canDelete)
                         .map((perm) => (
                           <tr key={perm.profileId} className="last:[&>td]:border-b-0">
                             <td className="px-3 py-2 text-sm font-medium text-foreground border-b border-border dark:text-gray-100 dark:border-gray-600">
                               {perm.profileName}
                             </td>
-                            {(
-                              [
-                                'canCreate',
-                                'canRead',
-                                'canEdit',
-                                'canDelete',
-                                'canViewAll',
-                                'canModifyAll',
-                              ] as const
-                            ).map((key) => (
-                              <td
-                                key={key}
-                                className="px-3 py-2 text-sm text-center border-b border-border dark:border-gray-600"
-                              >
-                                {perm[key] ? (
-                                  <Check size={16} className="inline-block text-green-600" />
-                                ) : (
-                                  <span className="text-muted-foreground">{'\u2014'}</span>
-                                )}
-                              </td>
-                            ))}
+                            {(['canCreate', 'canRead', 'canEdit', 'canDelete'] as const).map(
+                              (key) => (
+                                <td
+                                  key={key}
+                                  className="px-3 py-2 text-sm text-center border-b border-border dark:border-gray-600"
+                                >
+                                  {perm[key] ? (
+                                    <Check size={16} className="inline-block text-green-600" />
+                                  ) : (
+                                    <span className="text-muted-foreground">{'\u2014'}</span>
+                                  )}
+                                </td>
+                              )
+                            )}
                           </tr>
                         ))}
                     </tbody>

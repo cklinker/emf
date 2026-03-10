@@ -47,8 +47,6 @@ interface ProfileObjectPermission {
   canRead: boolean
   canEdit: boolean
   canDelete: boolean
-  canViewAll: boolean
-  canModifyAll: boolean
 }
 
 export interface ProfileDetailPageProps {
@@ -128,8 +126,6 @@ export function ProfileDetailPage({
       canRead: op.canRead,
       canEdit: op.canEdit,
       canDelete: op.canDelete,
-      canViewAll: op.canViewAll,
-      canModifyAll: op.canModifyAll,
     }))
   }, [objectPermissions, collectionSummaryMap])
 

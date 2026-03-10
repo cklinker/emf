@@ -912,10 +912,6 @@ public final class SystemCollectionDefinitions {
                 .withDefault(false).withNullable(false))
             .addField(FieldDefinition.bool("canDelete").withColumnName("can_delete")
                 .withDefault(false).withNullable(false))
-            .addField(FieldDefinition.bool("canViewAll").withColumnName("can_view_all")
-                .withDefault(false).withNullable(false))
-            .addField(FieldDefinition.bool("canModifyAll").withColumnName("can_modify_all")
-                .withDefault(false).withNullable(false))
             .build();
     }
 
@@ -962,10 +958,6 @@ public final class SystemCollectionDefinitions {
             .addField(FieldDefinition.bool("canEdit").withColumnName("can_edit")
                 .withDefault(false).withNullable(false))
             .addField(FieldDefinition.bool("canDelete").withColumnName("can_delete")
-                .withDefault(false).withNullable(false))
-            .addField(FieldDefinition.bool("canViewAll").withColumnName("can_view_all")
-                .withDefault(false).withNullable(false))
-            .addField(FieldDefinition.bool("canModifyAll").withColumnName("can_modify_all")
                 .withDefault(false).withNullable(false))
             .build();
     }

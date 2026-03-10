@@ -20,8 +20,8 @@ import reactor.core.publisher.Mono;
  * <p>Order: -5 (runs after JwtAuthenticationFilter at -100 and TenantResolutionFilter
  * at -200, but before RouteAuthorizationFilter at 0).
  *
- * <p>When {@code kelta.gateway.security.permissions-enabled} is false (default),
- * this filter is a no-op.
+ * <p>When {@code kelta.gateway.security.permissions-enabled} is false,
+ * this filter is a no-op. Defaults to enabled (true).
  *
  * <p>Platform admins (users with PLATFORM_ADMIN role) bypass permission resolution
  * and receive all-permissive permissions.
@@ -39,7 +39,7 @@ public class PermissionResolutionFilter implements GlobalFilter, Ordered {
 
     public PermissionResolutionFilter(
             PermissionResolutionService permissionService,
-            @Value("${kelta.gateway.security.permissions-enabled:false}") boolean permissionsEnabled) {
+            @Value("${kelta.gateway.security.permissions-enabled:true}") boolean permissionsEnabled) {
         this.permissionService = permissionService;
         this.permissionsEnabled = permissionsEnabled;
     }

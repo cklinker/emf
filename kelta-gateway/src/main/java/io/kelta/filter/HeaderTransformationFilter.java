@@ -96,13 +96,10 @@ public class HeaderTransformationFilter implements GlobalFilter, Ordered {
                     if (tenantSlug != null) {
                         headers.set(X_TENANT_SLUG_HEADER, tenantSlug);
                     }
-                    // Default to "default" tenant for authenticated requests with no tenant context.
-                    // The UI doesn't send X-Tenant-ID/X-Tenant-Slug headers, so we inject
-                    // the default slug so the worker can resolve the proper tenant ID.
                     if (tenantId == null && tenantSlug == null) {
-                        headers.set(X_TENANT_SLUG_HEADER, "default");
-                        log.debug("No tenant context for authenticated user {}, defaulting to 'default' tenant",
-                                principal.getUsername());
+                        log.warn("No tenant context for authenticated user {} on path {}. " +
+                                "Request will proceed without tenant isolation.",
+                                principal.getUsername(), exchange.getRequest().getPath().value());
                     }
 
                     log.debug("Added forwarding headers for user: {}, roles: {}, tenantId: {}",

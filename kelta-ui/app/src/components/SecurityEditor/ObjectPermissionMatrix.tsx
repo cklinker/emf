@@ -2,7 +2,7 @@
  * ObjectPermissionMatrix Component
  *
  * A reusable CRUD permission matrix for managing object-level access.
- * Displays a table with columns for Create, Read, Edit, Delete, View All, and Modify All
+ * Displays a table with columns for Create, Read, Edit, and Delete
  * with checkboxes in each cell.
  *
  * Features:
@@ -26,18 +26,10 @@ export interface ObjectPermission {
   canRead: boolean
   canEdit: boolean
   canDelete: boolean
-  canViewAll: boolean
-  canModifyAll: boolean
 }
 
 /** Permission field keys */
-type PermissionField =
-  | 'canCreate'
-  | 'canRead'
-  | 'canEdit'
-  | 'canDelete'
-  | 'canViewAll'
-  | 'canModifyAll'
+type PermissionField = 'canCreate' | 'canRead' | 'canEdit' | 'canDelete'
 
 /** Column definition */
 interface ColumnDef {
@@ -51,8 +43,6 @@ const COLUMNS: ColumnDef[] = [
   { field: 'canRead', label: 'Read', shortLabel: 'Read' },
   { field: 'canEdit', label: 'Edit', shortLabel: 'Edit' },
   { field: 'canDelete', label: 'Delete', shortLabel: 'Delete' },
-  { field: 'canViewAll', label: 'View All', shortLabel: 'View All' },
-  { field: 'canModifyAll', label: 'Modify All', shortLabel: 'Mod All' },
 ]
 
 export interface ObjectPermissionMatrixProps {
@@ -88,8 +78,6 @@ export function ObjectPermissionMatrix({
       canRead: 'none',
       canEdit: 'none',
       canDelete: 'none',
-      canViewAll: 'none',
-      canModifyAll: 'none',
     }
 
     if (filteredPermissions.length === 0) return states
@@ -204,7 +192,7 @@ export function ObjectPermissionMatrix({
             {filteredPermissions.length === 0 ? (
               <tr>
                 <td
-                  colSpan={7}
+                  colSpan={5}
                   className="px-4 py-8 text-center text-sm text-muted-foreground"
                   data-testid={`${testId}-empty`}
                 >

@@ -84,7 +84,7 @@ class PermissionResolutionServiceTest {
                   "systemPermissions": {"API_ACCESS": true},
                   "objectPermissions": {
                     "coll-1": {"canCreate": true, "canRead": true, "canEdit": false,
-                               "canDelete": false, "canViewAll": false, "canModifyAll": false}
+                               "canDelete": false}
                   },
                   "fieldPermissions": {}
                 }
@@ -124,7 +124,7 @@ class PermissionResolutionServiceTest {
                   "systemPermissions": {"API_ACCESS": true, "MANAGE_USERS": false},
                   "objectPermissions": {
                     "coll-1": {"canCreate": true, "canRead": true, "canEdit": true,
-                               "canDelete": false, "canViewAll": false, "canModifyAll": false}
+                               "canDelete": false}
                   },
                   "fieldPermissions": {
                     "coll-1": {"field-1": "VISIBLE", "field-2": "READ_ONLY"}
@@ -160,8 +160,8 @@ class PermissionResolutionServiceTest {
     }
 
     @Test
-    @DisplayName("Should return allPermissive on worker error")
-    void shouldReturnAllPermissiveOnWorkerError() {
+    @DisplayName("Should return denied on worker error (fail-closed)")
+    void shouldReturnDeniedOnWorkerError() {
         // Given: no cached data
         when(valueOps.get("permissions:tenant-1:user@test.com"))
                 .thenReturn(Mono.empty());
@@ -172,15 +172,16 @@ class PermissionResolutionServiceTest {
         // When
         StepVerifier.create(service.resolvePermissions("tenant-1", "user@test.com"))
                 .assertNext(perms -> {
-                    assertThat(perms.isAllPermissive()).isTrue();
+                    assertThat(perms.isDenied()).isTrue();
+                    assertThat(perms.isAllPermissive()).isFalse();
                 })
                 .expectComplete()
                 .verify();
     }
 
     @Test
-    @DisplayName("Should return allPermissive on Redis error")
-    void shouldReturnAllPermissiveOnRedisError() {
+    @DisplayName("Should return denied on Redis error (fail-closed)")
+    void shouldReturnDeniedOnRedisError() {
         // Given: Redis throws
         when(valueOps.get("permissions:tenant-1:user@test.com"))
                 .thenReturn(Mono.error(new RuntimeException("Redis connection refused")));
@@ -188,7 +189,8 @@ class PermissionResolutionServiceTest {
         // When
         StepVerifier.create(service.resolvePermissions("tenant-1", "user@test.com"))
                 .assertNext(perms -> {
-                    assertThat(perms.isAllPermissive()).isTrue();
+                    assertThat(perms.isDenied()).isTrue();
+                    assertThat(perms.isAllPermissive()).isFalse();
                 })
                 .expectComplete()
                 .verify();

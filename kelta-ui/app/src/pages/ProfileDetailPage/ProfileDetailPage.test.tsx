@@ -57,8 +57,6 @@ function makeProfileResponse(
     canRead: boolean
     canEdit: boolean
     canDelete: boolean
-    canViewAll: boolean
-    canModifyAll: boolean
   }> = mockObjPerms
 ) {
   return {
@@ -93,8 +91,6 @@ function makeProfileResponse(
           canRead: op.canRead,
           canEdit: op.canEdit,
           canDelete: op.canDelete,
-          canViewAll: op.canViewAll,
-          canModifyAll: op.canModifyAll,
         },
         relationships: {
           profileId: { data: { type: 'profiles', id: op.profileId } },
@@ -134,8 +130,6 @@ const mockObjPerms = [
     canRead: true,
     canEdit: true,
     canDelete: false,
-    canViewAll: false,
-    canModifyAll: false,
   },
 ]
 

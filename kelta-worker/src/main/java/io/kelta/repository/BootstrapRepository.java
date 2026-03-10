@@ -50,8 +50,7 @@ public class BootstrapRepository {
             """;
 
     private static final String SELECT_PROFILE_OBJECT_PERMISSIONS = """
-            SELECT collection_id, can_create, can_read, can_edit,
-                   can_delete, can_view_all, can_modify_all
+            SELECT collection_id, can_create, can_read, can_edit, can_delete
             FROM profile_object_permission WHERE profile_id = ?
             """;
 
@@ -75,8 +74,7 @@ public class BootstrapRepository {
             """;
 
     private static final String SELECT_PERMSET_OBJECT_PERMISSIONS = """
-            SELECT collection_id, can_create, can_read, can_edit,
-                   can_delete, can_view_all, can_modify_all
+            SELECT collection_id, can_create, can_read, can_edit, can_delete
             FROM permset_object_permission WHERE permission_set_id = ?
             """;
 

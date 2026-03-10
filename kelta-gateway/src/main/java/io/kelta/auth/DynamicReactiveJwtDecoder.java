@@ -25,11 +25,16 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Dynamic JWT decoder that resolves the OIDC provider from the token's issuer claim.
- * Supports multi-provider JWT validation by:
- * 1. Parsing the JWT to extract the issuer (without signature validation)
- * 2. Looking up the OIDC provider configuration from the worker service (cached in Redis)
- * 3. Creating/caching a NimbusReactiveJwtDecoder per JWKS URI
- * 4. Validating the token with the correct decoder
+ * Only accepts issuers registered in the worker's OIDC provider database.
+ *
+ * <p>Validation flow:
+ * <ol>
+ *   <li>Parse the JWT to extract the issuer (without signature validation)</li>
+ *   <li>Look up the OIDC provider configuration from the worker service (cached in Redis)</li>
+ *   <li>Reject the token if the issuer is not registered</li>
+ *   <li>Create/cache a NimbusReactiveJwtDecoder per JWKS URI</li>
+ *   <li>Validate the token with the correct decoder</li>
+ * </ol>
  */
 public class DynamicReactiveJwtDecoder implements ReactiveJwtDecoder {
 
@@ -101,23 +106,7 @@ public class DynamicReactiveJwtDecoder implements ReactiveJwtDecoder {
         }
 
         return resolveProviderInfo(issuer)
-                .flatMap(info -> decodeWithProviderInfo(token, info))
-                .onErrorResume(e -> {
-                    // Primary JWKS URI failed (stale DB, unreachable endpoint, etc.)
-                    // Fall back to standard OIDC discovery from the issuer URL
-                    log.warn("JWT decode failed for issuer {}, trying OIDC discovery: {}",
-                            issuer, e.getMessage());
-                    return discoverJwksUri(issuer)
-                            .flatMap(jwksUri -> {
-                                // Update Redis cache with the discovered URI
-                                Mono<Boolean> cacheUpdate = redisTemplate != null
-                                        ? redisTemplate.opsForValue()
-                                                .set(REDIS_PREFIX + issuer, jwksUri, PROVIDER_CACHE_TTL)
-                                        : Mono.just(true);
-                                return cacheUpdate.then(decodeWithProviderInfo(token,
-                                        new ProviderInfo(jwksUri, audienceCache.get(issuer))));
-                            });
-                });
+                .flatMap(info -> decodeWithProviderInfo(token, info));
     }
 
     private Mono<Jwt> decodeWithProviderInfo(String token, ProviderInfo info) {
@@ -235,30 +224,10 @@ public class DynamicReactiveJwtDecoder implements ReactiveJwtDecoder {
                     }
                     log.debug("Worker returned JWKS URI: {} for issuer: {}", jwksUri, issuer);
                     return new ProviderInfo(jwksUri, audience);
-                })
-                .onErrorResume(e -> {
-                    log.warn("Failed to lookup OIDC provider for issuer {}, using OIDC discovery: {}",
-                            issuer, e.getMessage());
-                    return discoverJwksUri(issuer)
-                            .map(jwksUri -> new ProviderInfo(jwksUri, audienceCache.get(issuer)));
                 });
-    }
-
-    /**
-     * Discovers the JWKS URI from the issuer's standard OIDC discovery endpoint.
-     * This is a fallback when the worker lookup fails or returns stale data.
-     */
-    private Mono<String> discoverJwksUri(String issuer) {
-        String discoveryUrl = issuer.replaceAll("/$", "") + "/.well-known/openid-configuration";
-        return WebClient.create().get()
-                .uri(discoveryUrl)
-                .retrieve()
-                .bodyToMono(JsonNode.class)
-                .map(json -> json.get("jwks_uri").asText())
-                .onErrorResume(e -> {
-                    log.error("OIDC discovery failed for issuer {}: {}", issuer, e.getMessage());
-                    return Mono.just(fallbackIssuerUri + "/protocol/openid-connect/certs");
-                });
+        // No fallback — if the issuer is not registered in the worker's OIDC provider
+        // database, the token is rejected. This prevents attackers from using
+        // arbitrary issuers with self-hosted JWKS endpoints.
     }
 
     /**

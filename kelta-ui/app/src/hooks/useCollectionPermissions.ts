@@ -46,8 +46,6 @@ const PERMISSIVE_DEFAULTS: ObjectPermissions = {
   canRead: true,
   canEdit: true,
   canDelete: true,
-  canViewAll: true,
-  canModifyAll: true,
 }
 
 /**

@@ -78,9 +78,9 @@ public class PermissionResolutionService {
                                 .flatMap(perms -> cacheAndReturn(cacheKey, perms))
                 )
                 .onErrorResume(e -> {
-                    log.warn("Error resolving permissions for {}/{}, allowing request: {}",
+                    log.error("Error resolving permissions for {}/{}, denying request: {}",
                             tenantId, email, e.getMessage());
-                    return Mono.just(ResolvedPermissions.allPermissive());
+                    return Mono.just(ResolvedPermissions.denied());
                 });
     }
 
@@ -125,9 +125,9 @@ public class PermissionResolutionService {
                 .doOnNext(p -> log.debug("Fetched permissions from worker for {}/{}: {} sys, {} obj perms",
                         tenantId, email, p.systemPermissions().size(), p.objectPermissions().size()))
                 .onErrorResume(e -> {
-                    log.warn("Failed to fetch permissions from worker for {}/{}: {}",
+                    log.error("Failed to fetch permissions from worker for {}/{}: {}",
                             tenantId, email, e.getMessage());
-                    return Mono.just(ResolvedPermissions.allPermissive());
+                    return Mono.just(ResolvedPermissions.denied());
                 });
     }
 
@@ -153,9 +153,7 @@ public class PermissionResolutionService {
                         toBool(op.get("canCreate")),
                         toBool(op.get("canRead")),
                         toBool(op.get("canEdit")),
-                        toBool(op.get("canDelete")),
-                        toBool(op.get("canViewAll")),
-                        toBool(op.get("canModifyAll"))
+                        toBool(op.get("canDelete"))
                 ));
             }
 
@@ -166,7 +164,7 @@ public class PermissionResolutionService {
             return Mono.just(new ResolvedPermissions(userId, systemPerms, objectPerms, fieldPerms));
         } catch (Exception e) {
             log.error("Failed to parse worker permission response: {}", e.getMessage());
-            return Mono.just(ResolvedPermissions.allPermissive());
+            return Mono.just(ResolvedPermissions.denied());
         }
     }
 
@@ -198,8 +196,6 @@ public class PermissionResolutionService {
             opMap.put("canRead", op.canRead());
             opMap.put("canEdit", op.canEdit());
             opMap.put("canDelete", op.canDelete());
-            opMap.put("canViewAll", op.canViewAll());
-            opMap.put("canModifyAll", op.canModifyAll());
             objectPerms.put(entry.getKey(), opMap);
         }
         map.put("objectPermissions", objectPerms);

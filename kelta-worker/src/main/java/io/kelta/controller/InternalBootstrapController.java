@@ -288,8 +288,6 @@ public class InternalBootstrapController {
             perms.put("canRead", toBoolean(row.get("can_read")));
             perms.put("canEdit", toBoolean(row.get("can_edit")));
             perms.put("canDelete", toBoolean(row.get("can_delete")));
-            perms.put("canViewAll", toBoolean(row.get("can_view_all")));
-            perms.put("canModifyAll", toBoolean(row.get("can_modify_all")));
 
             // Merge: most-permissive-wins (OR)
             objectPerms.merge(collectionId, perms, this::mergeObjectPermissionMaps);

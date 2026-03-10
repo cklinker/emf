@@ -134,7 +134,7 @@ class PermissionResolutionFilterTest {
         ResolvedPermissions perms = new ResolvedPermissions(
                 "user-123",
                 Map.of("API_ACCESS", true),
-                Map.of("coll-1", new ObjectPermissions(true, true, false, false, false, false)),
+                Map.of("coll-1", new ObjectPermissions(true, true, false, false)),
                 Collections.emptyMap()
         );
 

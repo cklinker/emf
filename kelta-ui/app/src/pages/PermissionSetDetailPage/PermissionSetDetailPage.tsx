@@ -37,8 +37,6 @@ interface PermsetObjectPermission {
   canRead: boolean
   canEdit: boolean
   canDelete: boolean
-  canViewAll: boolean
-  canModifyAll: boolean
 }
 
 interface PermissionSetDetail {
@@ -161,8 +159,6 @@ export function PermissionSetDetailPage({
       canRead: op.canRead,
       canEdit: op.canEdit,
       canDelete: op.canDelete,
-      canViewAll: op.canViewAll,
-      canModifyAll: op.canModifyAll,
     }))
   }, [objectPermissions, collectionSummaryMap])
 

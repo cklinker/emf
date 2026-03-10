@@ -29,8 +29,6 @@ interface EffectiveObjectPermission {
   canRead: boolean
   canEdit: boolean
   canDelete: boolean
-  canViewAll: boolean
-  canModifyAll: boolean
 }
 
 /** API response shape */
@@ -217,18 +215,16 @@ export function EffectivePermissionsPanel({
                       >
                         Collection
                       </th>
-                      {['Create', 'Read', 'Edit', 'Delete', 'View All', 'Modify All'].map(
-                        (header) => (
-                          <th
-                            key={header}
-                            role="columnheader"
-                            scope="col"
-                            className="px-3 py-2 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-                          >
-                            {header}
-                          </th>
-                        )
-                      )}
+                      {['Create', 'Read', 'Edit', 'Delete'].map((header) => (
+                        <th
+                          key={header}
+                          role="columnheader"
+                          scope="col"
+                          className="px-3 py-2 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                        >
+                          {header}
+                        </th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
@@ -243,14 +239,7 @@ export function EffectivePermissionsPanel({
                           {perm.collectionName}
                         </td>
                         {(
-                          [
-                            perm.canCreate,
-                            perm.canRead,
-                            perm.canEdit,
-                            perm.canDelete,
-                            perm.canViewAll,
-                            perm.canModifyAll,
-                          ] as boolean[]
+                          [perm.canCreate, perm.canRead, perm.canEdit, perm.canDelete] as boolean[]
                         ).map((granted, colIndex) => (
                           <td key={colIndex} role="gridcell" className="px-3 py-2 text-center">
                             {granted ? (

@@ -1,5 +1,6 @@
 package io.kelta.gateway.integration;
 
+import io.kelta.gateway.auth.DynamicReactiveJwtDecoder;
 import io.kelta.gateway.route.RateLimitConfig;
 import io.kelta.gateway.route.RouteDefinition;
 import io.kelta.gateway.route.RouteRegistry;
@@ -12,12 +13,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import reactor.core.publisher.Mono;
@@ -57,8 +58,8 @@ class EndToEndRequestFlowIntegrationTest {
     @Autowired
     private RouteRegistry routeRegistry;
 
-    @Autowired
-    private ReactiveJwtDecoder jwtDecoder;
+    @MockBean
+    private DynamicReactiveJwtDecoder jwtDecoder;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -83,7 +84,7 @@ class EndToEndRequestFlowIntegrationTest {
                 .expiresAt(Instant.now().plusSeconds(3600))
                 .build();
 
-        when(jwtDecoder.decode(anyString())).thenReturn(Mono.just(mockJwt));
+        when(jwtDecoder.decode(anyString(), anyString())).thenReturn(Mono.just(mockJwt));
     }
 
     @AfterEach
@@ -124,10 +125,11 @@ class EndToEndRequestFlowIntegrationTest {
                 .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .setBody(jsonApiResponse));
 
-        // Act - send request through gateway
+        // Act - send request through gateway (X-Tenant-ID required for JWT validation)
         webTestClient.get()
                 .uri("/api/test/1")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer mock-token")
+                .header("X-Tenant-ID", "test-tenant-id")
                 .exchange()
                 .expectStatus().isOk()
                 .expectHeader().contentType(MediaType.APPLICATION_JSON)
@@ -171,6 +173,7 @@ class EndToEndRequestFlowIntegrationTest {
         webTestClient.get()
                 .uri("/api/ratelimited/1")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer mock-token")
+                .header("X-Tenant-ID", "test-tenant-id")
                 .exchange()
                 .expectStatus().isOk()
                 .expectHeader().exists("X-RateLimit-Limit")
@@ -179,6 +182,7 @@ class EndToEndRequestFlowIntegrationTest {
         webTestClient.get()
                 .uri("/api/ratelimited/1")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer mock-token")
+                .header("X-Tenant-ID", "test-tenant-id")
                 .exchange()
                 .expectStatus().isOk();
 
@@ -187,6 +191,7 @@ class EndToEndRequestFlowIntegrationTest {
         webTestClient.get()
                 .uri("/api/ratelimited/1")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer mock-token")
+                .header("X-Tenant-ID", "test-tenant-id")
                 .exchange()
                 .expectStatus().value(status ->
                     assertThat(status).isIn(HttpStatus.OK.value(), HttpStatus.TOO_MANY_REQUESTS.value()));
@@ -220,6 +225,7 @@ class EndToEndRequestFlowIntegrationTest {
         webTestClient.get()
                 .uri("/api/nonexistent/1")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer mock-token")
+                .header("X-Tenant-ID", "test-tenant-id")
                 .exchange()
                 .expectStatus().isNotFound();
     }
@@ -246,6 +252,7 @@ class EndToEndRequestFlowIntegrationTest {
         webTestClient.get()
                 .uri("/api/test/1")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer mock-token")
+                .header("X-Tenant-ID", "test-tenant-id")
                 .exchange()
                 .expectStatus().isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR)
                 .expectBody()

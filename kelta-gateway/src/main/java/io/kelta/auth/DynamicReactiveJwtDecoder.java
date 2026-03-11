@@ -94,6 +94,20 @@ public class DynamicReactiveJwtDecoder implements ReactiveJwtDecoder {
 
     @Override
     public Mono<Jwt> decode(String token) throws JwtException {
+        return decode(token, null);
+    }
+
+    /**
+     * Decodes a JWT token with tenant-scoped OIDC provider validation.
+     * When tenantId is provided, the OIDC provider lookup is scoped to that tenant,
+     * preventing cross-tenant JWT acceptance.
+     *
+     * @param token the JWT token string
+     * @param tenantId the tenant ID for scoped provider lookup (null for unscoped — not recommended)
+     * @return a Mono emitting the decoded JWT
+     * @throws JwtException if the token is invalid or the issuer is not registered for the tenant
+     */
+    public Mono<Jwt> decode(String token, String tenantId) throws JwtException {
         String issuer;
         try {
             issuer = extractIssuer(token);
@@ -105,7 +119,7 @@ public class DynamicReactiveJwtDecoder implements ReactiveJwtDecoder {
             return Mono.error(new JwtException("JWT missing issuer (iss) claim"));
         }
 
-        return resolveProviderInfo(issuer)
+        return resolveProviderInfo(issuer, tenantId)
                 .flatMap(info -> decodeWithProviderInfo(token, info));
     }
 
@@ -187,30 +201,46 @@ public class DynamicReactiveJwtDecoder implements ReactiveJwtDecoder {
     }
 
     /**
-     * Resolves the provider info (JWKS URI + audience) for an issuer.
+     * Resolves the provider info (JWKS URI + audience) for an issuer, scoped to a tenant.
      * Checks Redis cache first for JWKS URI, then calls the worker's internal API.
-     * Falls back to the configured default OIDC issuer if no provider is found.
+     *
+     * @param issuer the OIDC issuer URI from the JWT
+     * @param tenantId the tenant ID for scoped lookup (null for unscoped — not recommended)
      */
-    private Mono<ProviderInfo> resolveProviderInfo(String issuer) {
+    private Mono<ProviderInfo> resolveProviderInfo(String issuer, String tenantId) {
+        // Cache key includes tenant ID to prevent cross-tenant cache poisoning
+        String cacheKey = tenantId != null ? tenantId + ":" + issuer : issuer;
+
         if (redisTemplate == null) {
-            return lookupFromWorker(issuer);
+            return lookupFromWorker(issuer, tenantId);
         }
 
-        String redisKey = REDIS_PREFIX + issuer;
+        String redisKey = REDIS_PREFIX + cacheKey;
         return redisTemplate.opsForValue().get(redisKey)
-                .map(jwksUri -> new ProviderInfo(jwksUri, audienceCache.get(issuer)))
+                .map(jwksUri -> new ProviderInfo(jwksUri, audienceCache.get(cacheKey)))
                 .switchIfEmpty(
-                        lookupFromWorker(issuer)
+                        lookupFromWorker(issuer, tenantId)
                                 .flatMap(info ->
                                         redisTemplate.opsForValue()
                                                 .set(redisKey, info.jwksUri(), PROVIDER_CACHE_TTL)
                                                 .thenReturn(info)));
     }
 
-    private Mono<ProviderInfo> lookupFromWorker(String issuer) {
-        log.debug("Looking up OIDC provider from worker for issuer: {}", issuer);
-        return workerClient.get()
-                .uri("/internal/oidc/by-issuer?issuer={issuer}", issuer)
+    private Mono<ProviderInfo> lookupFromWorker(String issuer, String tenantId) {
+        log.debug("Looking up OIDC provider from worker for issuer={} tenant={}", issuer, tenantId);
+
+        String uri = tenantId != null
+                ? "/internal/oidc/by-issuer?issuer={issuer}&tenantId={tenantId}"
+                : "/internal/oidc/by-issuer?issuer={issuer}";
+
+        // Cache key includes tenant ID to prevent cross-tenant cache poisoning
+        String cacheKey = tenantId != null ? tenantId + ":" + issuer : issuer;
+
+        WebClient.RequestHeadersSpec<?> request = tenantId != null
+                ? workerClient.get().uri(uri, issuer, tenantId)
+                : workerClient.get().uri(uri, issuer);
+
+        return request
                 .retrieve()
                 .bodyToMono(JsonNode.class)
                 .map(json -> {
@@ -219,15 +249,15 @@ public class DynamicReactiveJwtDecoder implements ReactiveJwtDecoder {
                     JsonNode audienceNode = json.get("audience");
                     if (audienceNode != null && !audienceNode.isNull() && !audienceNode.asText().isBlank()) {
                         audience = audienceNode.asText();
-                        audienceCache.put(issuer, audience);
+                        audienceCache.put(cacheKey, audience);
                         log.debug("Worker returned audience: {} for issuer: {}", audience, issuer);
                     }
-                    log.debug("Worker returned JWKS URI: {} for issuer: {}", jwksUri, issuer);
+                    log.debug("Worker returned JWKS URI: {} for issuer={} tenant={}", jwksUri, issuer, tenantId);
                     return new ProviderInfo(jwksUri, audience);
                 });
         // No fallback — if the issuer is not registered in the worker's OIDC provider
-        // database, the token is rejected. This prevents attackers from using
-        // arbitrary issuers with self-hosted JWKS endpoints.
+        // database for this tenant, the token is rejected. This prevents cross-tenant
+        // JWT acceptance and attackers from using arbitrary issuers.
     }
 
     /**

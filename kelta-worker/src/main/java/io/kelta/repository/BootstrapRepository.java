@@ -38,6 +38,13 @@ public class BootstrapRepository {
             LIMIT 1
             """;
 
+    private static final String SELECT_OIDC_PROVIDER_BY_ISSUER_AND_TENANT = """
+            SELECT id, name, issuer, jwks_uri, audience, active,
+                   client_id, roles_claim, roles_mapping
+            FROM oidc_provider WHERE issuer = ? AND tenant_id = ? AND active = true
+            LIMIT 1
+            """;
+
     private static final String SELECT_USER_BY_EMAIL = """
             SELECT id, profile_id FROM platform_user
             WHERE email = ? AND tenant_id = ? AND status = 'ACTIVE'
@@ -104,6 +111,12 @@ public class BootstrapRepository {
     public Optional<Map<String, Object>> findOidcProviderByIssuer(String issuer) {
         List<Map<String, Object>> rows = jdbcTemplate.queryForList(
                 SELECT_OIDC_PROVIDER_BY_ISSUER, issuer);
+        return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));
+    }
+
+    public Optional<Map<String, Object>> findOidcProviderByIssuerAndTenant(String issuer, String tenantId) {
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                SELECT_OIDC_PROVIDER_BY_ISSUER_AND_TENANT, issuer, tenantId);
         return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));
     }
 

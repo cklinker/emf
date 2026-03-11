@@ -11,8 +11,8 @@ import org.springframework.http.ResponseEntity;
 import java.util.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.*;
 
 /**
  * Tests for {@link InternalBootstrapController}.
@@ -209,11 +209,12 @@ class InternalBootstrapControllerTest {
             providerRow.put("roles_claim", "roles");
             providerRow.put("roles_mapping", null);
 
-            when(repository.findOidcProviderByIssuer("https://auth.example.com/realms/emf"))
+            when(repository.findOidcProviderByIssuerAndTenant(
+                    "https://auth.example.com/realms/emf", "tenant-1"))
                     .thenReturn(Optional.of(providerRow));
 
             ResponseEntity<Map<String, Object>> response =
-                    controller.getOidcProviderByIssuer("https://auth.example.com/realms/emf");
+                    controller.getOidcProviderByIssuer("https://auth.example.com/realms/emf", "tenant-1");
 
             assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
             Map<String, Object> body = response.getBody();
@@ -232,7 +233,7 @@ class InternalBootstrapControllerTest {
                     .thenReturn(Optional.empty());
 
             ResponseEntity<Map<String, Object>> response =
-                    controller.getOidcProviderByIssuer("https://unknown.example.com");
+                    controller.getOidcProviderByIssuer("https://unknown.example.com", null);
 
             assertThat(response.getStatusCode().value()).isEqualTo(404);
         }
@@ -254,11 +255,75 @@ class InternalBootstrapControllerTest {
                     .thenReturn(Optional.of(providerRow));
 
             ResponseEntity<Map<String, Object>> response =
-                    controller.getOidcProviderByIssuer("https://sso.example.com");
+                    controller.getOidcProviderByIssuer("https://sso.example.com", null);
 
             assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
             assertThat(response.getBody().get("jwksUri")).isEqualTo("https://sso.example.com/jwks");
             assertThat(response.getBody().get("audience")).isNull();
+        }
+
+        @Test
+        @DisplayName("Should use tenant-scoped lookup when tenantId provided")
+        void usesTenantScopedLookup() {
+            Map<String, Object> providerRow = new HashMap<>();
+            providerRow.put("id", "oidc-1");
+            providerRow.put("name", "Keycloak");
+            providerRow.put("issuer", "https://auth.example.com/realms/emf");
+            providerRow.put("jwks_uri", "https://auth.example.com/realms/emf/protocol/openid-connect/certs");
+            providerRow.put("audience", "kelta-api");
+            providerRow.put("client_id", "kelta-client");
+            providerRow.put("roles_claim", "roles");
+            providerRow.put("roles_mapping", null);
+
+            when(repository.findOidcProviderByIssuerAndTenant(
+                    "https://auth.example.com/realms/emf", "tenant-1"))
+                    .thenReturn(Optional.of(providerRow));
+
+            ResponseEntity<Map<String, Object>> response =
+                    controller.getOidcProviderByIssuer("https://auth.example.com/realms/emf", "tenant-1");
+
+            assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+            assertThat(response.getBody().get("id")).isEqualTo("oidc-1");
+            verify(repository).findOidcProviderByIssuerAndTenant(
+                    "https://auth.example.com/realms/emf", "tenant-1");
+            verify(repository, never()).findOidcProviderByIssuer(anyString());
+        }
+
+        @Test
+        @DisplayName("Should reject issuer not belonging to the specified tenant")
+        void rejectsIssuerFromDifferentTenant() {
+            when(repository.findOidcProviderByIssuerAndTenant(
+                    "https://auth.example.com/realms/emf", "tenant-2"))
+                    .thenReturn(Optional.empty());
+
+            ResponseEntity<Map<String, Object>> response =
+                    controller.getOidcProviderByIssuer("https://auth.example.com/realms/emf", "tenant-2");
+
+            assertThat(response.getStatusCode().value()).isEqualTo(404);
+        }
+
+        @Test
+        @DisplayName("Should fall back to global lookup when tenantId is not provided")
+        void fallsBackToGlobalLookupWithoutTenantId() {
+            Map<String, Object> providerRow = new HashMap<>();
+            providerRow.put("id", "oidc-1");
+            providerRow.put("name", "Keycloak");
+            providerRow.put("issuer", "https://auth.example.com/realms/emf");
+            providerRow.put("jwks_uri", "https://auth.example.com/realms/emf/protocol/openid-connect/certs");
+            providerRow.put("audience", null);
+            providerRow.put("client_id", null);
+            providerRow.put("roles_claim", null);
+            providerRow.put("roles_mapping", null);
+
+            when(repository.findOidcProviderByIssuer("https://auth.example.com/realms/emf"))
+                    .thenReturn(Optional.of(providerRow));
+
+            ResponseEntity<Map<String, Object>> response =
+                    controller.getOidcProviderByIssuer("https://auth.example.com/realms/emf", null);
+
+            assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+            verify(repository).findOidcProviderByIssuer("https://auth.example.com/realms/emf");
+            verify(repository, never()).findOidcProviderByIssuerAndTenant(anyString(), anyString());
         }
     }
 

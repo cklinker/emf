@@ -11,9 +11,9 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
 import org.springframework.mock.web.server.MockServerWebExchange;
+import io.kelta.gateway.filter.TenantResolutionFilter;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtException;
-import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
@@ -35,7 +35,7 @@ import static org.mockito.Mockito.*;
 class JwtAuthenticationFilterTest {
     
     @Mock
-    private ReactiveJwtDecoder jwtDecoder;
+    private DynamicReactiveJwtDecoder jwtDecoder;
 
     @Mock
     private PrincipalExtractor principalExtractor;
@@ -169,6 +169,29 @@ class JwtAuthenticationFilterTest {
     }
     
     @Test
+    void shouldReturn401WhenTenantContextIsMissing() {
+        // Given — Bearer token present but no tenant context set
+        String token = "valid.jwt.token";
+        MockServerHttpRequest request = MockServerHttpRequest
+            .get("/api/users")
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+            .build();
+        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+        // No tenant context set on exchange
+
+        // When
+        Mono<Void> result = filter.filter(exchange, filterChain);
+
+        // Then
+        StepVerifier.create(result)
+            .verifyComplete();
+
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        verify(filterChain, never()).filter(any());
+        verify(jwtDecoder, never()).decode(anyString(), anyString());
+    }
+
+    @Test
     void shouldReturn401WhenJwtIsInvalid() {
         // Given
         String token = "invalid.jwt.token";
@@ -177,20 +200,21 @@ class JwtAuthenticationFilterTest {
             .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
             .build();
         MockServerWebExchange exchange = MockServerWebExchange.from(request);
-        
-        when(jwtDecoder.decode(token)).thenReturn(Mono.error(new JwtException("Invalid token")));
-        
+        exchange.getAttributes().put(TenantResolutionFilter.TENANT_ID_ATTR, "tenant-1");
+
+        when(jwtDecoder.decode(token, "tenant-1")).thenReturn(Mono.error(new JwtException("Invalid token")));
+
         // When
         Mono<Void> result = filter.filter(exchange, filterChain);
-        
+
         // Then
         StepVerifier.create(result)
             .verifyComplete();
-        
+
         assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         verify(filterChain, never()).filter(any());
     }
-    
+
     @Test
     void shouldReturn401WhenJwtIsExpired() {
         // Given
@@ -200,20 +224,21 @@ class JwtAuthenticationFilterTest {
             .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
             .build();
         MockServerWebExchange exchange = MockServerWebExchange.from(request);
-        
-        when(jwtDecoder.decode(token)).thenReturn(Mono.error(new JwtException("Token expired")));
-        
+        exchange.getAttributes().put(TenantResolutionFilter.TENANT_ID_ATTR, "tenant-1");
+
+        when(jwtDecoder.decode(token, "tenant-1")).thenReturn(Mono.error(new JwtException("Token expired")));
+
         // When
         Mono<Void> result = filter.filter(exchange, filterChain);
-        
+
         // Then
         StepVerifier.create(result)
             .verifyComplete();
-        
+
         assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         verify(filterChain, never()).filter(any());
     }
-    
+
     @Test
     void shouldReturn401WhenPrincipalExtractionFails() {
         // Given
@@ -223,23 +248,24 @@ class JwtAuthenticationFilterTest {
             .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
             .build();
         MockServerWebExchange exchange = MockServerWebExchange.from(request);
-        
+        exchange.getAttributes().put(TenantResolutionFilter.TENANT_ID_ATTR, "tenant-1");
+
         Jwt jwt = createMockJwt("user123", List.of("USER"));
-        when(jwtDecoder.decode(token)).thenReturn(Mono.just(jwt));
+        when(jwtDecoder.decode(token, "tenant-1")).thenReturn(Mono.just(jwt));
         when(principalExtractor.extractPrincipal(jwt))
             .thenThrow(new IllegalArgumentException("Missing required claim"));
-        
+
         // When
         Mono<Void> result = filter.filter(exchange, filterChain);
-        
+
         // Then
         StepVerifier.create(result)
             .verifyComplete();
-        
+
         assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         verify(filterChain, never()).filter(any());
     }
-    
+
     @Test
     void shouldAuthenticateValidJwtAndStorePrincipal() {
         // Given
@@ -249,29 +275,30 @@ class JwtAuthenticationFilterTest {
             .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
             .build();
         MockServerWebExchange exchange = MockServerWebExchange.from(request);
-        
+        exchange.getAttributes().put(TenantResolutionFilter.TENANT_ID_ATTR, "tenant-1");
+
         Jwt jwt = createMockJwt("user123", List.of("USER", "ADMIN"));
         GatewayPrincipal principal = new GatewayPrincipal(
             "user123",
             List.of("USER", "ADMIN"),
             Map.of("sub", "user123", "roles", List.of("USER", "ADMIN"))
         );
-        
-        when(jwtDecoder.decode(token)).thenReturn(Mono.just(jwt));
+
+        when(jwtDecoder.decode(token, "tenant-1")).thenReturn(Mono.just(jwt));
         when(principalExtractor.extractPrincipal(jwt)).thenReturn(principal);
-        
+
         // When
         Mono<Void> result = filter.filter(exchange, filterChain);
-        
+
         // Then
         StepVerifier.create(result)
             .verifyComplete();
-        
+
         verify(filterChain).filter(any(ServerWebExchange.class));
-        verify(jwtDecoder).decode(token);
+        verify(jwtDecoder).decode(token, "tenant-1");
         verify(principalExtractor).extractPrincipal(jwt);
     }
-    
+
     @Test
     void shouldStorePrincipalInExchangeAttributes() {
         // Given
@@ -281,17 +308,18 @@ class JwtAuthenticationFilterTest {
             .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
             .build();
         MockServerWebExchange exchange = MockServerWebExchange.from(request);
-        
+        exchange.getAttributes().put(TenantResolutionFilter.TENANT_ID_ATTR, "tenant-1");
+
         Jwt jwt = createMockJwt("user123", List.of("USER"));
         GatewayPrincipal principal = new GatewayPrincipal(
             "user123",
             List.of("USER"),
             Map.of("sub", "user123")
         );
-        
-        when(jwtDecoder.decode(token)).thenReturn(Mono.just(jwt));
+
+        when(jwtDecoder.decode(token, "tenant-1")).thenReturn(Mono.just(jwt));
         when(principalExtractor.extractPrincipal(jwt)).thenReturn(principal);
-        
+
         // Capture the exchange passed to filter chain
         when(filterChain.filter(any(ServerWebExchange.class))).thenAnswer(invocation -> {
             ServerWebExchange capturedExchange = invocation.getArgument(0);
@@ -301,15 +329,15 @@ class JwtAuthenticationFilterTest {
             assertThat(storedPrincipal.getRoles()).containsExactly("USER");
             return Mono.empty();
         });
-        
+
         // When
         Mono<Void> result = filter.filter(exchange, filterChain);
-        
+
         // Then
         StepVerifier.create(result)
             .verifyComplete();
     }
-    
+
     @Test
     void shouldHandleUnexpectedExceptionsDuringValidation() {
         // Given
@@ -319,16 +347,17 @@ class JwtAuthenticationFilterTest {
             .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
             .build();
         MockServerWebExchange exchange = MockServerWebExchange.from(request);
-        
-        when(jwtDecoder.decode(token)).thenReturn(Mono.error(new RuntimeException("Unexpected error")));
-        
+        exchange.getAttributes().put(TenantResolutionFilter.TENANT_ID_ATTR, "tenant-1");
+
+        when(jwtDecoder.decode(token, "tenant-1")).thenReturn(Mono.error(new RuntimeException("Unexpected error")));
+
         // When
         Mono<Void> result = filter.filter(exchange, filterChain);
-        
+
         // Then
         StepVerifier.create(result)
             .verifyComplete();
-        
+
         assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         verify(filterChain, never()).filter(any());
     }

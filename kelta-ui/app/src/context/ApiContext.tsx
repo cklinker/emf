@@ -61,10 +61,10 @@ export function ApiProvider({ children, baseUrl = '' }: ApiProviderProps): React
       retry: { maxAttempts: 0 },
     })
 
-    // Add a 401 response interceptor to trigger re-authentication
+    // Add a 401 response interceptor: attempt token refresh + retry before redirecting
     client.getAxiosInstance().interceptors.response.use(
       (response) => response,
-      (error) => {
+      async (error) => {
         if (
           error &&
           typeof error === 'object' &&
@@ -72,10 +72,24 @@ export function ApiProvider({ children, baseUrl = '' }: ApiProviderProps): React
           error.response &&
           typeof error.response === 'object' &&
           'status' in error.response &&
-          error.response.status === 401
+          error.response.status === 401 &&
+          error.config &&
+          !(error.config as Record<string, unknown>).__retried
         ) {
-          console.warn('[API] Received 401 Unauthorized, triggering re-authentication')
-          login()
+          // Try refreshing the token and retrying the request once
+          try {
+            const newToken = await getAccessToken()
+            const retryConfig = {
+              ...error.config,
+              __retried: true,
+              headers: { ...error.config.headers, Authorization: `Bearer ${newToken}` },
+            }
+            return await client.getAxiosInstance().request(retryConfig)
+          } catch {
+            // Refresh failed — redirect to login
+            console.warn('[API] Token refresh failed on 401, triggering re-authentication')
+            login()
+          }
         }
         return Promise.reject(error)
       }

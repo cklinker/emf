@@ -59,7 +59,7 @@ test.describe("Users", () => {
   });
 
   test("shows create user button", async ({ page }) => {
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
     const found = await waitForAnyVisible([
       usersPage.createButton,
       usersPage.container,

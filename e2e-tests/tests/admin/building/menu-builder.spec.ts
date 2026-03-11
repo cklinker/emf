@@ -3,7 +3,7 @@ import { test, expect } from "../../../fixtures";
 test.describe("Menu Builder", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/default/menus");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
   });
 
   test("displays menu builder page", async ({ page }) => {

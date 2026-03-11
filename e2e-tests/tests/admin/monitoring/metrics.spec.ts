@@ -52,7 +52,7 @@ test.describe("Metrics Page", () => {
 
   test("navigates from setup page", async ({ page, tenantSlug }) => {
     await page.goto(`/${tenantSlug}/setup`);
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
 
     // Click the Monitoring item in the platform section
     await page.getByText("Monitoring", { exact: true }).click();

@@ -9,6 +9,8 @@ export interface ApiClient {
   baseUrl: string;
   token: string;
   tenantSlug: string;
+  /** Optional callback to refresh the token when a 401 is received. */
+  refreshToken?: () => Promise<string>;
 }
 
 interface JsonApiResource {
@@ -30,8 +32,11 @@ const STORAGE_READY_POLL_MS = 2_000;
 
 export class DataFactory {
   private createdEntities: Array<{ type: string; id: string }> = [];
+  private currentToken: string;
 
-  constructor(private readonly api: ApiClient) {}
+  constructor(private readonly api: ApiClient) {
+    this.currentToken = api.token;
+  }
 
   private async request(
     method: string,
@@ -45,10 +50,20 @@ export class DataFactory {
         method,
         headers: {
           "Content-Type": "application/vnd.api+json",
-          Authorization: `Bearer ${this.api.token}`,
+          Authorization: `Bearer ${this.currentToken}`,
         },
         body: body ? JSON.stringify(body) : undefined,
       });
+
+      // Retry on auth failure with token refresh
+      if (
+        response.status === 401 &&
+        this.api.refreshToken &&
+        attempt < MAX_RETRIES
+      ) {
+        this.currentToken = await this.api.refreshToken();
+        continue;
+      }
 
       // Retry on rate limiting (429) and transient server errors (500-503)
       const isRetryable =
@@ -104,7 +119,7 @@ export class DataFactory {
           method: "GET",
           headers: {
             "Content-Type": "application/vnd.api+json",
-            Authorization: `Bearer ${this.api.token}`,
+            Authorization: `Bearer ${this.currentToken}`,
           },
         });
 

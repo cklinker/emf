@@ -9,6 +9,12 @@
 let cachedToken: string | null = null;
 let tokenExpiry = 0;
 
+/** Clear the cached token so the next call to getAuthentikTokens() fetches a fresh one. */
+export function clearTokenCache(): void {
+  cachedToken = null;
+  tokenExpiry = 0;
+}
+
 export async function getAuthentikTokens(): Promise<string> {
   // Return cached token if still valid (with 60s buffer)
   if (cachedToken && Date.now() < tokenExpiry - 60_000) {

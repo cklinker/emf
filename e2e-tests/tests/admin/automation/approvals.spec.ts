@@ -12,16 +12,13 @@ test.describe("Approval Processes", () => {
   test("shows approvals table or empty state", async ({ page }) => {
     const approvalsPage = new ApprovalsPage(page);
     await approvalsPage.goto();
-
-    const tableOrEmpty = approvalsPage.table.or(
-      page.getByTestId("empty-state"),
-    );
-    await expect(tableOrEmpty).toBeVisible();
+    await approvalsPage.waitForTableLoaded();
   });
 
   test("opens create approval process form", async ({ page }) => {
     const approvalsPage = new ApprovalsPage(page);
     await approvalsPage.goto();
+    await approvalsPage.waitForTableLoaded();
 
     await approvalsPage.clickCreate();
 
@@ -32,6 +29,7 @@ test.describe("Approval Processes", () => {
   test("closes form on cancel", async ({ page }) => {
     const approvalsPage = new ApprovalsPage(page);
     await approvalsPage.goto();
+    await approvalsPage.waitForTableLoaded();
 
     await approvalsPage.clickCreate();
     await expect(approvalsPage.formModal).toBeVisible();

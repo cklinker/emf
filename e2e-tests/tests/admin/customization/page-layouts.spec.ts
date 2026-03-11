@@ -22,7 +22,7 @@ test.describe("Page Layouts", () => {
   });
 
   test("has create layout button", async ({ page }) => {
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
     await expect(pageLayoutsPage.createButton).toBeVisible();
   });
 });

@@ -34,7 +34,7 @@ test.describe("Endpoint Performance", () => {
 
   test("navigates via monitoring hub tabs", async ({ page, tenantSlug }) => {
     await page.goto(`/${tenantSlug}/monitoring`);
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
     await page.getByTestId("monitoring-tab-performance").click();
     await page.waitForURL(`**/${tenantSlug}/monitoring/performance`);
     const heading = page.getByRole("heading", {

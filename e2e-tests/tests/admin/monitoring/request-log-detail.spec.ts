@@ -5,7 +5,7 @@ test.describe("Request Log Detail", () => {
   test("shows detail page with tabs", async ({ page, tenantSlug }) => {
     // Navigate to request log first
     await page.goto(`/${tenantSlug}/monitoring/requests`);
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
 
     // If there are rows, click the first one
     const rows = page.locator('[data-testid^="request-log-row-"]');
@@ -25,7 +25,7 @@ test.describe("Request Log Detail", () => {
 
   test("shows Jaeger trace link", async ({ page, tenantSlug }) => {
     await page.goto(`/${tenantSlug}/monitoring/requests`);
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
 
     const rows = page.locator('[data-testid^="request-log-row-"]');
     const rowCount = await rows.count();

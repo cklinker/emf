@@ -32,17 +32,16 @@ export class CollectionsListPage extends BasePage {
   async goto(): Promise<void> {
     await this.page.goto(this.tenantUrl("/collections"));
     await this.waitForPageLoad();
-    await this.waitForTableLoaded();
   }
 
   async waitForTableLoaded(): Promise<void> {
     const tableOrEmpty = this.collectionsTable.or(this.emptyState);
-    await tableOrEmpty.waitFor({ state: "visible", timeout: 15_000 });
+    await this.waitForContentReady(tableOrEmpty);
   }
 
   async waitForRows(minCount = 1): Promise<void> {
     const row = this.page.locator('[data-testid^="collection-row-"]').first();
-    await row.waitFor({ state: "visible", timeout: 15_000 });
+    await this.waitForContentReady(row);
   }
 
   async clickCreateCollection(): Promise<void> {

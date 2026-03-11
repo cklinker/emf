@@ -57,7 +57,7 @@ export class CollectionWizardPage extends BasePage {
 
   async goto(): Promise<void> {
     await this.page.goto(this.tenantUrl("/collections/new"));
-    await this.waitForPageLoad();
+    await this.waitForLoadingComplete();
   }
 
   async selectTemplate(template: string): Promise<void> {

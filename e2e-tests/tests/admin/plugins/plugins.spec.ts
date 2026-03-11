@@ -23,7 +23,7 @@ test.describe("Plugins", () => {
   test("shows plugin cards or empty state", async ({ page }) => {
     const pluginsPage = new PluginsPage(page);
     await pluginsPage.goto();
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
 
     // Plugins page shows either plugin cards (data-testid="plugin-card-{id}") or
     // an empty-state div (data-testid="empty-state") with "No plugins found"

@@ -4,7 +4,7 @@ import { waitForAnyVisible } from "../../../helpers/wait-helpers";
 test.describe("Modules", () => {
   test("displays modules page", async ({ page }) => {
     await page.goto("/default/modules");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
 
     await expect(page).toHaveURL(/\/modules/);
     const found = await waitForAnyVisible([
@@ -16,7 +16,7 @@ test.describe("Modules", () => {
 
   test("shows installed modules or description text", async ({ page }) => {
     await page.goto("/default/modules");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
 
     const found = await waitForAnyVisible([
       page.getByTestId("modules-page"),
@@ -27,7 +27,7 @@ test.describe("Modules", () => {
 
   test("has install module button", async ({ page }) => {
     await page.goto("/default/modules");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
 
     const found = await waitForAnyVisible([
       page.getByRole("button", { name: /install module/i }),

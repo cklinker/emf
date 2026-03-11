@@ -14,7 +14,7 @@ test.describe("Logout", () => {
     // redirect to Authentik's end-session endpoint, then back to the app.
     // The multi-step OIDC logout redirect is unreliable in e2e tests.
     await page.goto(`/${tenantSlug}/collections`);
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
 
     const logoutButton = page.getByTestId("logout-button");
     await logoutButton.click();
@@ -26,7 +26,7 @@ test.describe("Logout", () => {
     // Skipped: OIDC logout flows through Authentik's end-session endpoint.
     // The redirect chain (app -> Authentik -> app/login) is unreliable in e2e.
     await page.goto(`/${tenantSlug}/collections`);
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
 
     const logoutButton = page.getByTestId("logout-button");
     await logoutButton.click();
@@ -39,7 +39,7 @@ test.describe("Logout", () => {
     // verifying session invalidation. The Authentik round-trip makes this
     // flaky without a dedicated test harness.
     await page.goto(`/${tenantSlug}/collections`);
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
 
     const logoutButton = page.getByTestId("logout-button");
     await logoutButton.click();

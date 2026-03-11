@@ -11,7 +11,7 @@ setup("authenticate via Authentik", async ({ page }) => {
 
   // Navigate to the app login page — the SPA will load, check auth, then either
   // show provider buttons or auto-redirect to Authentik (single provider).
-  await page.goto(`/${TENANT_SLUG}/login`, { waitUntil: "networkidle" });
+  await page.goto(`/${TENANT_SLUG}/login`, { waitUntil: "load" });
 
   // The SPA may auto-redirect to Authentik if there's only one OIDC provider.
   // Wait until we're either on Authentik or see provider buttons on the login page.

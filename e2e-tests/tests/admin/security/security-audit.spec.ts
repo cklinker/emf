@@ -4,7 +4,7 @@ import { waitForAnyVisible } from "../../../helpers/wait-helpers";
 test.describe("Security Audit", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/default/security-audit");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
   });
 
   test("displays security audit page", async ({ page }) => {

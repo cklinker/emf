@@ -13,15 +13,13 @@ test.describe("Tenants", () => {
   test("shows tenants table or empty state", async ({ page }) => {
     const tenantsPage = new TenantsPage(page);
     await tenantsPage.goto();
-
-    const tableOrEmpty = tenantsPage.table.or(page.getByTestId("empty-state"));
-    await expect(tableOrEmpty).toBeVisible();
+    await tenantsPage.waitForTableLoaded();
   });
 
   test("has create tenant button", async ({ page }) => {
     const tenantsPage = new TenantsPage(page);
     await tenantsPage.goto();
-    await page.waitForLoadState("networkidle");
+    await tenantsPage.waitForTableLoaded();
 
     await expect(tenantsPage.createButton).toBeVisible();
   });

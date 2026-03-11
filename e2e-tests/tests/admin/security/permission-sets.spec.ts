@@ -4,7 +4,7 @@ import { waitForAnyVisible } from "../../../helpers/wait-helpers";
 test.describe("Permission Sets", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/default/permission-sets");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
   });
 
   test("displays permission sets list page", async ({ page }) => {

@@ -4,7 +4,7 @@ import { waitForAnyVisible } from "../../../helpers/wait-helpers";
 test.describe("Login History", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/default/login-history");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
   });
 
   test("displays login history page", async ({ page }) => {
@@ -51,7 +51,7 @@ test.describe("Login History", () => {
     const isNextEnabled = await nextButton.isEnabled();
     if (isNextEnabled) {
       await nextButton.click();
-      await page.waitForLoadState("networkidle");
+      await page.waitForLoadState("load");
     }
   });
 });

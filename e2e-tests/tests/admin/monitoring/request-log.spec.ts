@@ -48,7 +48,7 @@ test.describe("Request Log", () => {
 
   test("navigates via monitoring hub tabs", async ({ page, tenantSlug }) => {
     await page.goto(`/${tenantSlug}/monitoring`);
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
     await page.getByTestId("monitoring-tab-requests").click();
     await page.waitForURL(`**/${tenantSlug}/monitoring/requests`);
     const heading = page.getByRole("heading", { name: /request log/i });

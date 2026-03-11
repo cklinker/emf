@@ -8,16 +8,8 @@ test.describe("Collection Wizard", () => {
   test("opens collection creation wizard", async ({ page }) => {
     const collectionsPage = new CollectionsListPage(page, tenantSlug);
     await collectionsPage.goto();
+    await collectionsPage.waitForTableLoaded();
 
-    // Create button may not be available in error state
-    try {
-      await collectionsPage.createCollectionButton.waitFor({
-        state: "visible",
-        timeout: 5000,
-      });
-    } catch {
-      return;
-    }
     await collectionsPage.clickCreateCollection();
 
     const wizardPage = new CollectionWizardPage(page, tenantSlug);

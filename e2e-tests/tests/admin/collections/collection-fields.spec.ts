@@ -64,6 +64,7 @@ test.describe("Collection Fields", () => {
 
     const listPage = new CollectionsListPage(page, tenantSlug);
     await listPage.goto();
+    await listPage.waitForTableLoaded();
 
     // Wait for rows before clicking
     await listPage.waitForRows();

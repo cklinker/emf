@@ -28,7 +28,7 @@ test.describe("Error Dashboard", () => {
 
   test("navigates via monitoring hub tabs", async ({ page, tenantSlug }) => {
     await page.goto(`/${tenantSlug}/monitoring`);
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
     await page.getByTestId("monitoring-tab-errors").click();
     await page.waitForURL(`**/${tenantSlug}/monitoring/errors`);
     const heading = page.getByRole("heading", { name: /error dashboard/i });

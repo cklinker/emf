@@ -12,7 +12,7 @@ test.describe("End-User Home", () => {
   test("shows quick create section", async ({ page }) => {
     const homePage = new AppHomePage(page);
     await homePage.goto();
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
 
     // CardTitle renders as h3 "Quick Actions" — no data-testid on the page
     const section = homePage.quickActions;
@@ -34,7 +34,7 @@ test.describe("End-User Home", () => {
   test("shows recent records section", async ({ page }) => {
     const homePage = new AppHomePage(page);
     await homePage.goto();
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
 
     // CardTitle renders as h3 "Recent Items"
     const section = homePage.recentItems;
@@ -56,7 +56,7 @@ test.describe("End-User Home", () => {
   test("shows favorites section", async ({ page }) => {
     const homePage = new AppHomePage(page);
     await homePage.goto();
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
 
     // CardTitle renders as h3 "Favorites"
     const section = homePage.favorites;

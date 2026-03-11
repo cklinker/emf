@@ -15,7 +15,7 @@ test.describe("Permission Enforcement Journey", () => {
     await listPage.goto();
 
     // Wait for the page to settle after navigation
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
     await page.waitForTimeout(2000);
 
     // The application should handle this gracefully:

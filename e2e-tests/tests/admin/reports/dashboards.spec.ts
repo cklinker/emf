@@ -3,7 +3,7 @@ import { test, expect } from "../../../fixtures";
 test.describe("Dashboards", () => {
   test("displays dashboards page", async ({ page }) => {
     await page.goto("/default/dashboards");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
 
     await expect(page).toHaveURL(/\/dashboards/);
     const heading = page.getByRole("heading", { name: /dashboards/i });
@@ -12,7 +12,7 @@ test.describe("Dashboards", () => {
 
   test("has create dashboard button", async ({ page }) => {
     await page.goto("/default/dashboards");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
 
     const createButton = page.getByRole("button", {
       name: /create dashboard/i,
@@ -22,7 +22,7 @@ test.describe("Dashboards", () => {
 
   test("shows dashboards list or empty state", async ({ page }) => {
     await page.goto("/default/dashboards");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
 
     const emptyState = page.getByText(/no.*dashboard|no.*data/i);
     const table = page.locator("table, [role='grid']");

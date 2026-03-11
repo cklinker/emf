@@ -9,19 +9,18 @@ test.describe("List Views", () => {
     await listViewsPage.goto();
   });
 
-  test("displays list views page", async ({ page }) => {
-    const tableOrEmpty = listViewsPage.table.or(
-      page.getByTestId("empty-state"),
-    );
-    await expect(tableOrEmpty).toBeVisible();
+  test("displays list views page", async () => {
+    await listViewsPage.waitForTableLoaded();
   });
 
   test("shows list views in table", async () => {
+    await listViewsPage.waitForTableLoaded();
     const rowCount = await listViewsPage.getRowCount();
     expect(rowCount).toBeGreaterThanOrEqual(0);
   });
 
   test("opens create list view form", async () => {
+    await listViewsPage.waitForTableLoaded();
     await listViewsPage.clickCreate();
     await expect(listViewsPage.formModal).toBeVisible();
   });

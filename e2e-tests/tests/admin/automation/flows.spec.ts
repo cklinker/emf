@@ -13,15 +13,13 @@ test.describe("Flows", () => {
   test("shows flows table or empty state", async ({ page }) => {
     const flowsPage = new FlowsListPage(page);
     await flowsPage.goto();
-
-    const tableOrEmpty = flowsPage.table.or(page.getByTestId("empty-state"));
-    await expect(tableOrEmpty).toBeVisible();
+    await flowsPage.waitForTableLoaded();
   });
 
   test("has create flow button", async ({ page }) => {
     const flowsPage = new FlowsListPage(page);
     await flowsPage.goto();
-    await page.waitForLoadState("networkidle");
+    await flowsPage.waitForTableLoaded();
 
     await expect(flowsPage.createButton).toBeVisible();
   });
@@ -29,6 +27,7 @@ test.describe("Flows", () => {
   test("opens flow designer from list", async ({ page }) => {
     const flowsPage = new FlowsListPage(page);
     await flowsPage.goto();
+    await flowsPage.waitForTableLoaded();
 
     const rowCount = await flowsPage.getRowCount();
     if (rowCount > 0) {

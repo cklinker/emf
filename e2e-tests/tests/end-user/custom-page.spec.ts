@@ -8,7 +8,7 @@ test.describe("Custom Page", () => {
 
   test("shows page content or loading/not-found state", async ({ page }) => {
     await page.goto("/default/app/p/home");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
 
     // Custom pages may show content, a loading state, or a "not found" message
     // depending on whether the page slug exists and has a registered component

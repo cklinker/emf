@@ -310,7 +310,7 @@ jobs:
     name: E2E Tests
     needs: smoke-test
     runs-on: k8s-runner
-    timeout-minutes: 60
+    timeout-minutes: 15
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -334,12 +334,13 @@ jobs:
 
       - name: Install Playwright browsers
         working-directory: e2e-tests
-        run: npx playwright install --with-deps chromium firefox
+        run: npx playwright install --with-deps chromium
 
       - name: Wait for services to stabilize
         run: sleep 30
 
       - name: Run E2E tests
+        timeout-minutes: 12
         working-directory: e2e-tests
         env:
           E2E_BASE_URL: https://emf-ui.rzware.com

@@ -39,7 +39,7 @@ test.describe("Log Viewer", () => {
 
   test("navigates via monitoring hub tabs", async ({ page, tenantSlug }) => {
     await page.goto(`/${tenantSlug}/monitoring`);
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
     await page.getByTestId("monitoring-tab-logs").click();
     await page.waitForURL(`**/${tenantSlug}/monitoring/logs`);
     const heading = page.getByRole("heading", { name: /log viewer/i });

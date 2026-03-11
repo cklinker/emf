@@ -18,7 +18,7 @@ export abstract class BasePage {
   }
 
   async waitForPageLoad(): Promise<void> {
-    await this.page.waitForLoadState("networkidle");
+    await this.page.waitForLoadState("load");
   }
 
   async waitForLoadingComplete(): Promise<void> {
@@ -35,17 +35,41 @@ export abstract class BasePage {
     return this.page.getByTestId("error-message");
   }
 
+  /** Locator for the loading spinner */
+  get loadingIndicator(): Locator {
+    return this.page.locator(
+      '[data-testid*="loading"], [aria-busy="true"]',
+    );
+  }
+
   /**
    * Wait for expected content OR an error state to become visible.
    * If the page renders an error instead of the expected content,
    * throws immediately with a descriptive message instead of timing out.
+   * Also detects stuck loading states (spinner visible but no content/error).
    */
   async waitForContentReady(
     contentLocator: Locator,
     timeout = 15_000,
   ): Promise<void> {
     const contentOrError = contentLocator.or(this.pageError);
-    await contentOrError.waitFor({ state: "visible", timeout });
+
+    try {
+      await contentOrError.waitFor({ state: "visible", timeout });
+    } catch {
+      // Neither content nor error appeared — check if stuck in loading state
+      const isLoading = await this.loadingIndicator
+        .isVisible()
+        .catch(() => false);
+      if (isLoading) {
+        throw new Error(
+          "Page appears stuck in a loading state — neither content nor error rendered within timeout",
+        );
+      }
+      throw new Error(
+        `Timed out waiting for content or error to appear (${timeout}ms)`,
+      );
+    }
 
     if (await this.pageError.isVisible()) {
       const errorText = await this.pageError.textContent();

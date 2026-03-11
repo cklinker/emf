@@ -26,7 +26,7 @@ test.describe("User Activity", () => {
 
   test("navigates via monitoring hub tabs", async ({ page, tenantSlug }) => {
     await page.goto(`/${tenantSlug}/monitoring`);
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
     await page.getByTestId("monitoring-tab-activity").click();
     await page.waitForURL(`**/${tenantSlug}/monitoring/activity`);
     const heading = page.getByRole("heading", { name: /user activity/i });

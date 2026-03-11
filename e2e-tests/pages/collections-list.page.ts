@@ -41,7 +41,7 @@ export class CollectionsListPage extends BasePage {
 
   async waitForRows(minCount = 1): Promise<void> {
     const row = this.page.locator('[data-testid^="collection-row-"]').first();
-    await row.waitFor({ state: "visible", timeout: 15_000 });
+    await this.waitForContentReady(row);
   }
 
   async clickCreateCollection(): Promise<void> {

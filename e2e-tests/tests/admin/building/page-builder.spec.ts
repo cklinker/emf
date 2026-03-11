@@ -3,7 +3,7 @@ import { test, expect } from "../../../fixtures";
 test.describe("Page Builder", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/default/pages");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
   });
 
   test("displays page builder page", async ({ page }) => {

@@ -28,7 +28,7 @@ test.describe("End-User Navigation", () => {
 
     // Navigate to the collection's object list page
     await page.goto(`/default/app/o/${collectionName}`);
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
 
     // Verify we're on the collection page
     await expect(page).toHaveURL(new RegExp(`/app/o/${collectionName}`));

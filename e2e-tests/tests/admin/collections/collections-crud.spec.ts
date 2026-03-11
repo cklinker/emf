@@ -7,6 +7,7 @@ test.describe("Collections CRUD", () => {
   test("displays collections list page", async ({ page }) => {
     const collectionsPage = new CollectionsListPage(page, tenantSlug);
     await collectionsPage.goto();
+    await collectionsPage.waitForTableLoaded();
 
     await expect(collectionsPage.container).toBeVisible();
   });
@@ -17,6 +18,7 @@ test.describe("Collections CRUD", () => {
 
     const collectionsPage = new CollectionsListPage(page, tenantSlug);
     await collectionsPage.goto();
+    await collectionsPage.waitForTableLoaded();
 
     // Wait for rows to actually appear (not just table or empty state)
     await collectionsPage.waitForRows();
@@ -34,6 +36,7 @@ test.describe("Collections CRUD", () => {
 
     const collectionsPage = new CollectionsListPage(page, tenantSlug);
     await collectionsPage.goto();
+    await collectionsPage.waitForTableLoaded();
 
     // Wait for rows to load
     await collectionsPage.waitForRows();
@@ -58,6 +61,7 @@ test.describe("Collections CRUD", () => {
 
     const collectionsPage = new CollectionsListPage(page, tenantSlug);
     await collectionsPage.goto();
+    await collectionsPage.waitForTableLoaded();
 
     // Wait for rows to appear before filtering
     await collectionsPage.waitForRows();
@@ -79,6 +83,7 @@ test.describe("Collections CRUD", () => {
 
     const collectionsPage = new CollectionsListPage(page, tenantSlug);
     await collectionsPage.goto();
+    await collectionsPage.waitForTableLoaded();
 
     // Wait for rows to appear (ensures table header exists)
     await collectionsPage.waitForRows();
@@ -118,6 +123,7 @@ test.describe("Collections CRUD", () => {
 
     const collectionsPage = new CollectionsListPage(page, tenantSlug);
     await collectionsPage.goto();
+    await collectionsPage.waitForTableLoaded();
 
     // Wait for rows before clicking
     await collectionsPage.waitForRows();
@@ -138,6 +144,7 @@ test.describe("Collections CRUD", () => {
 
     const collectionsPage = new CollectionsListPage(page, tenantSlug);
     await collectionsPage.goto();
+    await collectionsPage.waitForTableLoaded();
 
     // Wait for rows to load
     await collectionsPage.waitForRows();

@@ -4,7 +4,7 @@ import { waitForAnyVisible } from "../../../helpers/wait-helpers";
 test.describe("Reports", () => {
   test("displays reports page", async ({ page }) => {
     await page.goto("/default/reports");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
 
     await expect(page).toHaveURL(/\/reports/);
     const found = await waitForAnyVisible([
@@ -17,7 +17,7 @@ test.describe("Reports", () => {
 
   test("has create report button", async ({ page }) => {
     await page.goto("/default/reports");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
 
     const found = await waitForAnyVisible([
       page.getByRole("button", { name: /create report/i }),
@@ -29,7 +29,7 @@ test.describe("Reports", () => {
 
   test("shows reports list or empty state", async ({ page }) => {
     await page.goto("/default/reports");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
 
     const found = await waitForAnyVisible([
       page.locator("table, [role='grid']"),

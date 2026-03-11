@@ -6,7 +6,7 @@ test.describe("Connected Apps", () => {
   test("displays connected apps page", async ({ page }) => {
     const connectedAppsPage = new ConnectedAppsPage(page);
     await connectedAppsPage.goto();
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
 
     await expect(page).toHaveURL(/\/connected-apps/);
     await expect(connectedAppsPage.connectedAppsPage).toBeVisible();
@@ -15,7 +15,7 @@ test.describe("Connected Apps", () => {
   test("shows apps table or empty state", async ({ page }) => {
     const connectedAppsPage = new ConnectedAppsPage(page);
     await connectedAppsPage.goto();
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
 
     const found = await waitForAnyVisible([
       connectedAppsPage.table,
@@ -29,7 +29,7 @@ test.describe("Connected Apps", () => {
   test("opens create connected app form", async ({ page }) => {
     const connectedAppsPage = new ConnectedAppsPage(page);
     await connectedAppsPage.goto();
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
 
     // The create button may not be visible (rate limiting, permissions, or error state)
     try {

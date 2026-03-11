@@ -28,7 +28,7 @@ test.describe("Observability Settings", () => {
 
   test("navigates via monitoring hub tabs", async ({ page, tenantSlug }) => {
     await page.goto(`/${tenantSlug}/monitoring`);
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
     await page.getByTestId("monitoring-tab-settings").click();
     await page.waitForURL(`**/${tenantSlug}/monitoring/settings`);
     const heading = page.getByRole("heading", {

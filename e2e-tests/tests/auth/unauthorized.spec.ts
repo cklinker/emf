@@ -14,7 +14,7 @@ test.describe("Unauthorized Page", () => {
     // The /unauthorized page may not be implemented yet or may redirect
     // elsewhere depending on auth state.
     await page.goto(`/${tenantSlug}/unauthorized`);
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
 
     const unauthorizedContainer = page.getByTestId("unauthorized-page");
     await expect(unauthorizedContainer).toBeVisible();
@@ -24,7 +24,7 @@ test.describe("Unauthorized Page", () => {
     // Depends on the unauthorized page having a "home" button with a
     // specific role/label. Skipped until the page structure is confirmed.
     await page.goto(`/${tenantSlug}/unauthorized`);
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
 
     const goHomeButton = page.getByRole("button", { name: /home/i });
     await expect(goHomeButton).toBeVisible();
@@ -38,10 +38,10 @@ test.describe("Unauthorized Page", () => {
     // Depends on the unauthorized page having a "back" button with a
     // specific role/label. Skipped until the page structure is confirmed.
     await page.goto(`/${tenantSlug}/collections`);
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
 
     await page.goto(`/${tenantSlug}/unauthorized`);
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
 
     const goBackButton = page.getByRole("button", { name: /back/i });
     await expect(goBackButton).toBeVisible();

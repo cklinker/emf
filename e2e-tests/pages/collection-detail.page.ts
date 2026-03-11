@@ -38,12 +38,12 @@ export class CollectionDetailPage extends BasePage {
   }
 
   async waitForDetailLoaded(): Promise<void> {
-    await this.container.waitFor({ state: "visible", timeout: 15_000 });
+    await this.waitForContentReady(this.container);
   }
 
   async waitForFieldRows(): Promise<void> {
     const row = this.page.locator('[data-testid^="field-row-"]').first();
-    await row.waitFor({ state: "visible", timeout: 15_000 });
+    await this.waitForContentReady(row);
   }
 
   async getFieldCount(): Promise<number> {

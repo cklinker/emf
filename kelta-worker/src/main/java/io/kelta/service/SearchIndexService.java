@@ -82,6 +82,10 @@ public class SearchIndexService {
             ORDER BY name
             """;
 
+    private static final String SELECT_TENANT_SLUG = """
+            SELECT slug FROM tenant WHERE id = ?
+            """;
+
     private static final String SEARCH_QUERY = """
             SELECT collection_name, collection_id, record_id, display_value,
                    ts_rank(search_vector, to_tsquery('simple', ?)) AS rank
@@ -263,6 +267,7 @@ public class SearchIndexService {
         log.info("Rebuilding search index for collection '{}' (tenant={})", collectionName, tenantId);
         try {
             TenantContext.set(tenantId);
+            ensureTenantSlug(tenantId);
 
             String collectionId = lifecycleManager.getCollectionIdByName(collectionName);
             if (collectionId == null) {
@@ -361,18 +366,24 @@ public class SearchIndexService {
      * Runs asynchronously. Returns immediately.
      *
      * @param tenantId       the tenant ID
+     * @param tenantSlug     the tenant slug (required for schema-qualified queries)
      * @param collectionName optional collection name to rebuild; if null, rebuilds all
      */
     @Async
-    public void rebuildAllCollectionsAsync(String tenantId, String collectionName) {
-        if (collectionName != null && !collectionName.isBlank()) {
-            rebuildCollectionIndexAsync(tenantId, collectionName);
-            return;
-        }
-
-        log.info("Rebuilding search index for ALL collections (tenant={})", tenantId);
+    public void rebuildAllCollectionsAsync(String tenantId, String tenantSlug, String collectionName) {
         TenantContext.set(tenantId);
+        if (tenantSlug != null && !tenantSlug.isBlank()) {
+            TenantContext.setSlug(tenantSlug);
+        } else {
+            ensureTenantSlug(tenantId);
+        }
         try {
+            if (collectionName != null && !collectionName.isBlank()) {
+                rebuildCollectionIndexSync(tenantId, collectionName);
+                return;
+            }
+
+            log.info("Rebuilding search index for ALL collections (tenant={})", tenantId);
             // Clean up any stale system collection records that were indexed before the filter was fixed
             int purged = jdbcTemplate.update(DELETE_SYSTEM_COLLECTION_INDEX, tenantId);
             if (purged > 0) {
@@ -486,6 +497,27 @@ public class SearchIndexService {
                 builder.append(' ');
             }
             builder.append(str);
+        }
+    }
+
+    /**
+     * Ensures the tenant slug is set in TenantContext by looking it up from the
+     * tenant ID if not already present. Required for schema-qualified queries
+     * via StorageAdapter.
+     */
+    private void ensureTenantSlug(String tenantId) {
+        if (TenantContext.getSlug() != null && !TenantContext.getSlug().isBlank()) {
+            return;
+        }
+        try {
+            String slug = jdbcTemplate.queryForObject(SELECT_TENANT_SLUG, String.class, tenantId);
+            if (slug != null) {
+                TenantContext.setSlug(slug);
+            } else {
+                log.warn("Could not resolve slug for tenant {}", tenantId);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to resolve slug for tenant {}: {}", tenantId, e.getMessage());
         }
     }
 }

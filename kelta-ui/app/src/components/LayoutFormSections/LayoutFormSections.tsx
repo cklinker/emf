@@ -40,15 +40,38 @@ export interface LayoutFormSectionsProps {
 
 /**
  * Resolves layout placements to schema fields, applying layout overrides.
+ *
+ * Fields are interleaved by column so that CSS grid auto-placement (left-to-right,
+ * top-to-bottom) puts each field in the correct designer-assigned column.
  */
 function resolvePlacements(
   placements: LayoutFieldPlacementDto[],
   fieldsByName: Map<string, LayoutFormFieldDefinition>,
-  fieldsById: Map<string, LayoutFormFieldDefinition>
+  fieldsById: Map<string, LayoutFormFieldDefinition>,
+  columns: number
 ): LayoutFormFieldDefinition[] {
-  const sorted = [...placements].sort((a, b) => a.sortOrder - b.sortOrder)
+  // Group placements by column, sorted within each column by sortOrder
+  const columnGroups: LayoutFieldPlacementDto[][] = Array.from({ length: columns }, () => [])
+  for (const p of placements) {
+    const col = Math.min(p.columnNumber, columns - 1)
+    columnGroups[col].push(p)
+  }
+  for (const group of columnGroups) {
+    group.sort((a, b) => a.sortOrder - b.sortOrder)
+  }
 
-  return sorted
+  // Interleave row-by-row across columns for CSS grid auto-placement
+  const interleaved: LayoutFieldPlacementDto[] = []
+  const maxRows = Math.max(...columnGroups.map((g) => g.length), 0)
+  for (let row = 0; row < maxRows; row++) {
+    for (let col = 0; col < columns; col++) {
+      if (row < columnGroups[col].length) {
+        interleaved.push(columnGroups[col][row])
+      }
+    }
+  }
+
+  return interleaved
     .map((placement) => {
       const schemaField = fieldsById.get(placement.fieldId) || fieldsByName.get(placement.fieldName)
       if (!schemaField) return null
@@ -141,7 +164,12 @@ export function LayoutFormSections({
       startIndex: number
     }[] = []
     sorted.reduce((acc, section) => {
-      const fields = resolvePlacements(section.fields, fieldsByName, fieldsById)
+      const fields = resolvePlacements(
+        section.fields,
+        fieldsByName,
+        fieldsById,
+        section.columns || 1
+      )
       result.push({ section, fields, startIndex: acc })
       return acc + fields.length
     }, 0)

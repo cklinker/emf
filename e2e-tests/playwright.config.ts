@@ -15,8 +15,10 @@ export default defineConfig({
   testDir: "./tests",
   fullyParallel: false,
   forbidOnly: CI,
-  retries: CI ? 2 : 0,
+  retries: CI ? 1 : 0,
   workers: CI ? 1 : 2,
+  timeout: 45_000,
+  globalTimeout: CI ? 10 * 60 * 1000 : undefined,
   reporter: CI
     ? [
         ["html", { open: "never", outputFolder: "playwright-report" }],

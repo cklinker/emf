@@ -1,7 +1,9 @@
 package io.kelta.worker.listener;
 
+import io.kelta.runtime.model.CollectionDefinition;
 import io.kelta.runtime.event.ChangeType;
 import io.kelta.runtime.event.RecordChangedPayload;
+import io.kelta.runtime.registry.CollectionRegistry;
 import io.kelta.worker.service.CollectionLifecycleManager;
 import io.kelta.worker.service.SearchIndexService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -19,6 +21,7 @@ class SearchIndexListenerTest {
 
     private SearchIndexService searchIndexService;
     private CollectionLifecycleManager lifecycleManager;
+    private CollectionRegistry collectionRegistry;
     private ObjectMapper objectMapper;
     private SearchIndexListener listener;
 
@@ -26,9 +29,21 @@ class SearchIndexListenerTest {
     void setUp() {
         searchIndexService = mock(SearchIndexService.class);
         lifecycleManager = mock(CollectionLifecycleManager.class);
+        collectionRegistry = mock(CollectionRegistry.class);
         objectMapper = new ObjectMapper();
         objectMapper.findAndRegisterModules();
-        listener = new SearchIndexListener(searchIndexService, lifecycleManager, objectMapper);
+        listener = new SearchIndexListener(searchIndexService, lifecycleManager,
+                collectionRegistry, objectMapper);
+
+        // User collections return a non-system definition
+        CollectionDefinition userCollection = mock(CollectionDefinition.class);
+        when(userCollection.systemCollection()).thenReturn(false);
+        when(collectionRegistry.get("products")).thenReturn(userCollection);
+
+        // System collections return a system definition
+        CollectionDefinition systemCollection = mock(CollectionDefinition.class);
+        when(systemCollection.systemCollection()).thenReturn(true);
+        when(collectionRegistry.get("fields")).thenReturn(systemCollection);
     }
 
     @Nested

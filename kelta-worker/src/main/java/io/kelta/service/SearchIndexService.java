@@ -50,15 +50,30 @@ public class SearchIndexService {
             """;
 
     private static final String COUNT_SEARCH_INDEX = """
-            SELECT COUNT(*) FROM search_index WHERE tenant_id = ?
+            SELECT COUNT(*) FROM search_index si
+            WHERE si.tenant_id = ?
+              AND EXISTS (SELECT 1 FROM collection c
+                          WHERE c.name = si.collection_name
+                            AND c.active = true AND c.system_collection = false)
             """;
 
     private static final String STATS_BY_COLLECTION = """
-            SELECT collection_name, collection_id, COUNT(*) AS indexed_count
-            FROM search_index
-            WHERE tenant_id = ?
-            GROUP BY collection_name, collection_id
-            ORDER BY collection_name
+            SELECT si.collection_name, si.collection_id, COUNT(*) AS indexed_count
+            FROM search_index si
+            WHERE si.tenant_id = ?
+              AND EXISTS (SELECT 1 FROM collection c
+                          WHERE c.name = si.collection_name
+                            AND c.active = true AND c.system_collection = false)
+            GROUP BY si.collection_name, si.collection_id
+            ORDER BY si.collection_name
+            """;
+
+    private static final String DELETE_SYSTEM_COLLECTION_INDEX = """
+            DELETE FROM search_index si
+            WHERE si.tenant_id = ?
+              AND EXISTS (SELECT 1 FROM collection c
+                          WHERE c.name = si.collection_name
+                            AND c.system_collection = true)
             """;
 
     private static final String SELECT_USER_COLLECTIONS = """
@@ -358,6 +373,12 @@ public class SearchIndexService {
         log.info("Rebuilding search index for ALL collections (tenant={})", tenantId);
         TenantContext.set(tenantId);
         try {
+            // Clean up any stale system collection records that were indexed before the filter was fixed
+            int purged = jdbcTemplate.update(DELETE_SYSTEM_COLLECTION_INDEX, tenantId);
+            if (purged > 0) {
+                log.info("Purged {} stale system collection records from search index", purged);
+            }
+
             List<Map<String, Object>> collections = jdbcTemplate.queryForList(SELECT_USER_COLLECTIONS, tenantId);
             log.info("Found {} user collections to reindex for tenant {}", collections.size(), tenantId);
 

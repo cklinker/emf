@@ -58,6 +58,7 @@ public class SearchReindexController {
     @PostMapping
     public ResponseEntity<Map<String, Object>> triggerReindex(
             @RequestHeader(value = "X-Tenant-ID", required = false) String tenantId,
+            @RequestHeader(value = "X-Tenant-Slug", required = false) String tenantSlug,
             @RequestBody(required = false) Map<String, Object> body) {
         try {
             if (tenantId == null || tenantId.isBlank()) {
@@ -70,10 +71,10 @@ public class SearchReindexController {
                 collectionName = String.valueOf(body.get("collectionName"));
             }
 
-            log.info("Search reindex triggered for tenant={}, collection={}",
-                    tenantId, collectionName != null ? collectionName : "ALL");
+            log.info("Search reindex triggered for tenant={}, slug={}, collection={}",
+                    tenantId, tenantSlug, collectionName != null ? collectionName : "ALL");
 
-            searchIndexService.rebuildAllCollectionsAsync(tenantId, collectionName);
+            searchIndexService.rebuildAllCollectionsAsync(tenantId, tenantSlug, collectionName);
 
             Map<String, Object> attributes = new LinkedHashMap<>();
             attributes.put("status", "STARTED");

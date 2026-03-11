@@ -15,6 +15,7 @@ import { useCollectionSummaries } from '../../hooks/useCollectionSummaries'
 import { useAuth } from '../../context/AuthContext'
 import { useRecentRecords } from '../../hooks/useRecentRecords'
 import { formatRelativeTime } from '../../utils/formatRelativeTime'
+import { getTenantSlug } from '../../context/TenantContext'
 import { cn } from '@/lib/utils'
 import {
   Dialog,
@@ -166,6 +167,8 @@ export function SearchModal({ open, onClose }: SearchModalProps): JSX.Element | 
   const [searching, setSearching] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout>>()
 
+  const tenantSlug = getTenantSlug()
+  const basePath = `/${tenantSlug}/app`
   const userId = user?.id ?? 'anonymous'
   const { recentRecords } = useRecentRecords(userId)
   const { summaries: collectionSummaries } = useCollectionSummaries()
@@ -216,7 +219,7 @@ export function SearchModal({ open, onClose }: SearchModalProps): JSX.Element | 
             type: 'record' as const,
             title: String(item.displayValue || id),
             subtitle: labelMap[collectionName] || collectionName,
-            path: `/resources/${collectionName}/${id}`,
+            path: `${basePath}/o/${collectionName}/${id}`,
           }
         })
         setRecordResults(results)
@@ -230,7 +233,7 @@ export function SearchModal({ open, onClose }: SearchModalProps): JSX.Element | 
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
     }
-  }, [query, apiClient, collectionSummaries])
+  }, [query, apiClient, collectionSummaries, basePath])
 
   // Build results list
   const results = useMemo((): SearchResult[] => {
@@ -243,7 +246,7 @@ export function SearchModal({ open, onClose }: SearchModalProps): JSX.Element | 
         type: 'recent' as const,
         title: r.displayValue,
         subtitle: `${r.collectionDisplayName || r.collectionName} · ${formatRelativeTime(r.viewedAt)}`,
-        path: `/resources/${r.collectionName}/${r.id}`,
+        path: `${basePath}/o/${r.collectionName}/${r.id}`,
       }))
     }
 
@@ -266,11 +269,11 @@ export function SearchModal({ open, onClose }: SearchModalProps): JSX.Element | 
         type: 'recent' as const,
         title: r.displayValue,
         subtitle: r.collectionDisplayName || r.collectionName,
-        path: `/resources/${r.collectionName}/${r.id}`,
+        path: `${basePath}/o/${r.collectionName}/${r.id}`,
       }))
 
     return [...recordResults, ...pageResults, ...recentResults]
-  }, [query, recordResults, recentRecords])
+  }, [query, recordResults, recentRecords, basePath])
 
   // Reset active index when results change
   useEffect(() => {

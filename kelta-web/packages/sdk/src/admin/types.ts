@@ -1817,3 +1817,22 @@ export interface ObservabilitySettingsResponse {
 export interface UpdateObservabilitySettingsRequest {
   settings: { settingKey: string; settingValue: string }[];
 }
+
+// --- Search Reindex ---
+
+export interface SearchIndexCollectionStats {
+  collectionId: string;
+  collectionName: string;
+  indexedRecords: number;
+}
+
+export interface SearchIndexStats {
+  totalIndexed: number;
+  collections: SearchIndexCollectionStats[];
+}
+
+export interface SearchReindexResult {
+  status: string;
+  collection: string;
+  message: string;
+}

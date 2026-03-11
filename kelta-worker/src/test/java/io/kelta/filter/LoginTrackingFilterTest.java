@@ -129,14 +129,21 @@ class LoginTrackingFilterTest {
                 .thenReturn(null)
                 .thenReturn("provisioned-uuid");
 
+        // Profile lookup returns the Standard User profile ID
+        when(jdbcTemplate.queryForObject(
+                contains("SELECT id FROM profile"),
+                eq(String.class), eq("tenant-123")))
+                .thenReturn("standard-user-profile-id");
+
         filter.doFilterInternal(request, response, chain);
 
         verify(chain).doFilter(request, response);
 
-        // Should have attempted to provision the user
+        // Should have attempted to provision the user with a default profile
         verify(jdbcTemplate).update(
                 contains("INSERT INTO platform_user"),
-                any(String.class), eq("tenant-123"), eq("new-user@example.com"), eq("new-user"));
+                any(String.class), eq("tenant-123"), eq("new-user@example.com"),
+                eq("new-user"), eq("standard-user-profile-id"));
 
         // Should have proceeded with login tracking after provisioning
         verify(jdbcTemplate).update(
@@ -163,7 +170,7 @@ class LoginTrackingFilterTest {
         when(jdbcTemplate.queryForObject(anyString(), eq(String.class), any(), any()))
                 .thenReturn(null);
         // Provisioning INSERT throws
-        when(jdbcTemplate.update(contains("INSERT INTO platform_user"), any(), any(), any(), any()))
+        when(jdbcTemplate.update(contains("INSERT INTO platform_user"), any(), any(), any(), any(), any()))
                 .thenThrow(new RuntimeException("FK constraint violation"));
 
         filter.doFilterInternal(request, response, chain);

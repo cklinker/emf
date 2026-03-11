@@ -112,6 +112,7 @@ import {
   UserActivityPage,
   EndpointPerformancePage,
   ObservabilitySettingsPage,
+  SearchSettingsPage,
   MonitoringLayout,
   MonitoringOverviewPage,
 } from './pages'
@@ -995,6 +996,18 @@ function TenantRoutes(): React.ReactElement {
           <AdminPageRoute>
             <RequirePermission permission="MANAGE_DATA">
               <BulkJobsPage />
+            </RequirePermission>
+          </AdminPageRoute>
+        }
+      />
+
+      {/* Search Settings route */}
+      <Route
+        path="search-settings"
+        element={
+          <AdminPageRoute>
+            <RequirePermission permission="CUSTOMIZE_APPLICATION">
+              <SearchSettingsPage />
             </RequirePermission>
           </AdminPageRoute>
         }

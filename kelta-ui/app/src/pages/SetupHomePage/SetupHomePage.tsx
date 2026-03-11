@@ -282,6 +282,12 @@ const CATEGORIES: SetupCategory[] = [
         permission: 'PLATFORM_ADMIN',
       },
       {
+        name: 'Search Index',
+        path: '/search-settings',
+        description: 'Manage search index and rebuild data',
+        permission: 'CUSTOMIZE_APPLICATION',
+      },
+      {
         name: 'Bulk Jobs',
         path: '/bulk-jobs',
         description: 'Monitor bulk data operations',

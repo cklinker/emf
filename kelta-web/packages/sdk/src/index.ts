@@ -131,6 +131,9 @@ export type {
   ObservabilitySetting,
   ObservabilitySettingsResponse,
   UpdateObservabilitySettingsRequest,
+  SearchIndexStats,
+  SearchIndexCollectionStats,
+  SearchReindexResult,
 } from './admin/types';
 
 // Authentication

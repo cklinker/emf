@@ -1054,6 +1054,24 @@
     "days": "days",
     "saved": "Settings saved successfully."
   },
+  "searchSettings": {
+    "title": "Search Index",
+    "description": "View search index statistics and rebuild the index for collections that are missing data.",
+    "loadError": "Failed to load search index statistics.",
+    "totalIndexed": "Total Indexed Records",
+    "collectionsCount": "Collections",
+    "collectionsTitle": "Collections",
+    "collectionName": "Collection",
+    "indexedRecords": "Indexed Records",
+    "reindexAll": "Rebuild All",
+    "reindex": "Rebuild",
+    "reindexing": "Rebuilding...",
+    "reindexStarted": "Search index rebuild started.",
+    "reindexingAll": "Rebuilding search index for all collections...",
+    "reindexingCollection": "Rebuilding search index for {{name}}...",
+    "reindexError": "Failed to start search index rebuild.",
+    "noCollections": "No collections found."
+  },
   "monitoring": {
     "title": "Monitoring",
     "description": "View metrics, request logs, errors, and system performance",

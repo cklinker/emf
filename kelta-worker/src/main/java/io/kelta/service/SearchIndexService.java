@@ -49,6 +49,24 @@ public class SearchIndexService {
             WHERE tenant_id = ? AND collection_name = ?
             """;
 
+    private static final String COUNT_SEARCH_INDEX = """
+            SELECT COUNT(*) FROM search_index WHERE tenant_id = ?
+            """;
+
+    private static final String STATS_BY_COLLECTION = """
+            SELECT collection_name, collection_id, COUNT(*) AS indexed_count
+            FROM search_index
+            WHERE tenant_id = ?
+            GROUP BY collection_name, collection_id
+            ORDER BY collection_name
+            """;
+
+    private static final String SELECT_USER_COLLECTIONS = """
+            SELECT id, name FROM collection
+            WHERE tenant_id = ? AND active = true AND system_collection = false
+            ORDER BY name
+            """;
+
     private static final String SEARCH_QUERY = """
             SELECT collection_name, collection_id, record_id, display_value,
                    ts_rank(search_vector, to_tsquery('simple', ?)) AS rank
@@ -283,6 +301,135 @@ public class SearchIndexService {
         } finally {
             TenantContext.clear();
         }
+    }
+
+    /**
+     * Returns search index statistics for a tenant, including per-collection counts.
+     *
+     * @param tenantId the tenant ID
+     * @return map containing totalIndexed and collections list
+     */
+    public Map<String, Object> getSearchIndexStats(String tenantId) {
+        TenantContext.set(tenantId);
+        try {
+            Long totalIndexed = jdbcTemplate.queryForObject(COUNT_SEARCH_INDEX, Long.class, tenantId);
+            List<Map<String, Object>> collectionStats = jdbcTemplate.queryForList(STATS_BY_COLLECTION, tenantId);
+            List<Map<String, Object>> allCollections = jdbcTemplate.queryForList(SELECT_USER_COLLECTIONS, tenantId);
+
+            List<Map<String, Object>> collections = new ArrayList<>();
+            Map<String, Map<String, Object>> statsMap = new HashMap<>();
+            for (Map<String, Object> row : collectionStats) {
+                statsMap.put((String) row.get("collection_name"), row);
+            }
+
+            for (Map<String, Object> col : allCollections) {
+                Map<String, Object> entry = new LinkedHashMap<>();
+                String name = (String) col.get("name");
+                entry.put("collectionId", col.get("id"));
+                entry.put("collectionName", name);
+                Map<String, Object> stat = statsMap.get(name);
+                entry.put("indexedRecords", stat != null ? ((Number) stat.get("indexed_count")).longValue() : 0L);
+                collections.add(entry);
+            }
+
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("totalIndexed", totalIndexed != null ? totalIndexed : 0L);
+            result.put("collections", collections);
+            return result;
+        } finally {
+            TenantContext.clear();
+        }
+    }
+
+    /**
+     * Rebuilds the search index for all non-system collections in a tenant.
+     * Runs asynchronously. Returns immediately.
+     *
+     * @param tenantId       the tenant ID
+     * @param collectionName optional collection name to rebuild; if null, rebuilds all
+     */
+    @Async
+    public void rebuildAllCollectionsAsync(String tenantId, String collectionName) {
+        if (collectionName != null && !collectionName.isBlank()) {
+            rebuildCollectionIndexAsync(tenantId, collectionName);
+            return;
+        }
+
+        log.info("Rebuilding search index for ALL collections (tenant={})", tenantId);
+        TenantContext.set(tenantId);
+        try {
+            List<Map<String, Object>> collections = jdbcTemplate.queryForList(SELECT_USER_COLLECTIONS, tenantId);
+            log.info("Found {} user collections to reindex for tenant {}", collections.size(), tenantId);
+
+            for (Map<String, Object> col : collections) {
+                String name = (String) col.get("name");
+                try {
+                    rebuildCollectionIndexSync(tenantId, name);
+                } catch (Exception e) {
+                    log.error("Failed to reindex collection '{}': {}", name, e.getMessage(), e);
+                }
+            }
+
+            log.info("Search index rebuild complete for ALL collections (tenant={})", tenantId);
+        } catch (Exception e) {
+            log.error("Failed to rebuild search index for all collections: {}", e.getMessage(), e);
+        } finally {
+            TenantContext.clear();
+        }
+    }
+
+    /**
+     * Synchronous version of collection reindex (for use within rebuildAllCollectionsAsync).
+     */
+    private void rebuildCollectionIndexSync(String tenantId, String collectionName) {
+        log.info("Rebuilding search index for collection '{}' (tenant={})", collectionName, tenantId);
+
+        String collectionId = lifecycleManager.getCollectionIdByName(collectionName);
+        if (collectionId == null) {
+            log.warn("Cannot rebuild index: collection '{}' not found", collectionName);
+            return;
+        }
+
+        CollectionDefinition definition = collectionRegistry.get(collectionName);
+        if (definition == null) {
+            log.warn("Cannot rebuild index: collection '{}' not registered", collectionName);
+            return;
+        }
+
+        // Delete existing index entries for this collection
+        jdbcTemplate.update(DELETE_COLLECTION_INDEX, tenantId, collectionName);
+
+        // Re-index all records in batches
+        int page = 1;
+        int pageSize = 500;
+        int totalIndexed = 0;
+
+        while (true) {
+            QueryRequest request = new QueryRequest(
+                    new io.kelta.runtime.query.Pagination(page, pageSize),
+                    List.of(), List.of(), List.of());
+
+            QueryResult result = storageAdapter.query(definition, request);
+            List<Map<String, Object>> records = result.data();
+
+            if (records == null || records.isEmpty()) {
+                break;
+            }
+
+            for (Map<String, Object> record : records) {
+                String recordId = String.valueOf(record.get("id"));
+                indexRecord(tenantId, collectionId, collectionName, recordId, record);
+                totalIndexed++;
+            }
+
+            if (records.size() < pageSize) {
+                break;
+            }
+            page++;
+        }
+
+        log.info("Search index rebuild complete for collection '{}': {} records indexed",
+                collectionName, totalIndexed);
     }
 
     // =========================================================================

@@ -115,6 +115,8 @@ import type {
   AuditSearchResult,
   ObservabilitySettingsResponse,
   UpdateObservabilitySettingsRequest,
+  SearchIndexStats,
+  SearchReindexResult,
 } from './types';
 import {
   toJsonApiBody,
@@ -2022,6 +2024,23 @@ export class AdminClient {
     ): Promise<ObservabilitySettingsResponse> => {
       const response = await this.axios.put('/api/admin/observability-settings', request);
       return unwrapJsonApiResource<ObservabilitySettingsResponse>(response.data);
+    },
+  };
+
+  // ---------------------------------------------------------------------------
+  // Search Reindex
+  // ---------------------------------------------------------------------------
+
+  readonly searchReindex = {
+    getStats: async (): Promise<SearchIndexStats> => {
+      const response = await this.axios.get('/api/admin/search-reindex');
+      return unwrapJsonApiResource<SearchIndexStats>(response.data);
+    },
+
+    reindex: async (collectionName?: string): Promise<SearchReindexResult> => {
+      const body = collectionName ? { collectionName } : {};
+      const response = await this.axios.post('/api/admin/search-reindex', body);
+      return unwrapJsonApiResource<SearchReindexResult>(response.data);
     },
   };
 }

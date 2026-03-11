@@ -267,6 +267,10 @@ export type { ObservabilitySettingsPageProps } from './ObservabilitySettingsPage
 // MonitoringPage - Monitoring hub layout and overview
 export { MonitoringLayout, MonitoringOverviewPage } from './MonitoringPage'
 
+// SearchSettingsPage - Search index management and reindexing
+export { SearchSettingsPage } from './SearchSettingsPage'
+export type { SearchSettingsPageProps } from './SearchSettingsPage'
+
 // NotFoundPage - 404 error page
 export { NotFoundPage } from './NotFoundPage'
 export type { NotFoundPageProps } from './NotFoundPage'

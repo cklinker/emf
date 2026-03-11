@@ -180,22 +180,40 @@ public class LoginTrackingFilter extends OncePerRequestFilter {
     String provisionUser(String email, String tenantId, String username) {
         String id = UUID.randomUUID().toString();
         try {
+            String defaultProfileId = lookupDefaultProfileId(tenantId);
             jdbcTemplate.update(
-                    "INSERT INTO platform_user (id, tenant_id, email, username, status, created_at, updated_at) " +
-                            "VALUES (?, ?, ?, ?, 'ACTIVE', NOW(), NOW()) " +
+                    "INSERT INTO platform_user (id, tenant_id, email, username, profile_id, status, created_at, updated_at) " +
+                            "VALUES (?, ?, ?, ?, ?, 'ACTIVE', NOW(), NOW()) " +
                             "ON CONFLICT (tenant_id, email) DO NOTHING",
-                    id, tenantId, email, username);
+                    id, tenantId, email, username, defaultProfileId);
 
             // Re-query to get the actual ID (handles race condition where another thread inserted first)
             String resolvedId = lookupUserId(email, tenantId);
             if (resolvedId != null) {
-                log.info("Auto-provisioned platform_user for '{}' in tenant '{}'", email, tenantId);
+                log.info("Auto-provisioned platform_user for '{}' in tenant '{}' with profile '{}'",
+                        email, tenantId, defaultProfileId != null ? "Standard User" : "none");
                 return resolvedId;
             }
         } catch (Exception e) {
             log.warn("Failed to auto-provision user '{}' in tenant '{}': {}", email, tenantId, e.getMessage());
         }
         return null;
+    }
+
+    /**
+     * Looks up the "Standard User" profile for the given tenant.
+     * Falls back to {@code null} if the profile does not exist
+     * (e.g. the tenant was created before profile seeding).
+     */
+    private String lookupDefaultProfileId(String tenantId) {
+        try {
+            return jdbcTemplate.queryForObject(
+                    "SELECT id FROM profile WHERE tenant_id = ? AND name = 'Standard User' LIMIT 1",
+                    String.class, tenantId);
+        } catch (Exception e) {
+            log.debug("No 'Standard User' profile found for tenant '{}': {}", tenantId, e.getMessage());
+            return null;
+        }
     }
 
     private void updateUserLoginInfo(String userId, Timestamp ts) {

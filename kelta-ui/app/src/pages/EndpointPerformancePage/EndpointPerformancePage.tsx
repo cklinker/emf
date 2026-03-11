@@ -51,7 +51,8 @@ export function EndpointPerformancePage({ className }: EndpointPerformancePagePr
   const sortIndicator = (key: SortKey) =>
     sortKey === key ? (sortDir === 'asc' ? ' \u25B2' : ' \u25BC') : ''
 
-  const formatDuration = (ms: number) => {
+  const formatDuration = (micros: number) => {
+    const ms = micros / 1000
     if (ms < 1) return `${(ms * 1000).toFixed(0)}\u00B5s`
     if (ms < 1000) return `${ms.toFixed(1)}ms`
     return `${(ms / 1000).toFixed(2)}s`

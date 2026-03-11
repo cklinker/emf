@@ -15,7 +15,15 @@
  * - 2.8: Trigger token refresh on 401 responses
  */
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from 'react'
 import type {
   User,
   AuthContextValue,
@@ -228,6 +236,7 @@ export function AuthProvider({
   const [discoveryDocs, setDiscoveryDocs] = useState<Map<string, OIDCDiscoveryDocument>>(new Map())
 
   const isAuthenticated = user !== null
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   /**
    * Fetch OIDC discovery document for a provider
@@ -296,6 +305,7 @@ export function AuthProvider({
 
       const params = new URLSearchParams({
         grant_type: 'refresh_token',
+        client_id: provider.clientId,
         refresh_token: storedTokens.refreshToken,
       })
 
@@ -332,6 +342,40 @@ export function AuthProvider({
       return null
     }
   }, [providers, fetchDiscoveryDocument])
+
+  /**
+   * Schedule a proactive token refresh before the token expires.
+   * Refreshes 60 seconds before expiry (or immediately if already within the window).
+   */
+  const scheduleTokenRefresh = useCallback(() => {
+    // Clear any existing timer
+    if (refreshTimerRef.current) {
+      clearTimeout(refreshTimerRef.current)
+      refreshTimerRef.current = null
+    }
+
+    const storedTokens = getStoredTokens()
+    if (!storedTokens?.refreshToken || !storedTokens.expiresAt) {
+      return
+    }
+
+    // Schedule refresh 60 seconds before expiry (twice the buffer to be safe)
+    const refreshAt = storedTokens.expiresAt - 2 * TOKEN_REFRESH_BUFFER_MS
+    const delay = Math.max(refreshAt - Date.now(), 0)
+
+    refreshTimerRef.current = setTimeout(async () => {
+      refreshTimerRef.current = null
+      try {
+        const refreshed = await refreshAccessToken()
+        if (refreshed) {
+          // Schedule the next refresh after this one succeeds
+          scheduleTokenRefresh()
+        }
+      } catch (err) {
+        console.warn('[Auth] Proactive token refresh failed:', err)
+      }
+    }, delay)
+  }, [refreshAccessToken])
 
   /**
    * Get the current access token, refreshing if necessary
@@ -734,6 +778,22 @@ export function AuthProvider({
     initAuth()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // Run only once on mount
+
+  /**
+   * Proactive token refresh: schedule a timer whenever the user is authenticated.
+   * This ensures tokens are refreshed before they expire, even if no API calls are being made.
+   */
+  useEffect(() => {
+    if (isAuthenticated) {
+      scheduleTokenRefresh()
+    }
+    return () => {
+      if (refreshTimerRef.current) {
+        clearTimeout(refreshTimerRef.current)
+        refreshTimerRef.current = null
+      }
+    }
+  }, [isAuthenticated, scheduleTokenRefresh])
 
   // Memoize context value to prevent unnecessary re-renders
   const contextValue = useMemo<AuthContextValue>(

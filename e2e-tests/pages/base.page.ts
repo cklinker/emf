@@ -30,6 +30,31 @@ export abstract class BasePage {
     }
   }
 
+  /** Locator for the ErrorMessage component rendered when API calls fail */
+  get pageError(): Locator {
+    return this.page.getByTestId("error-message");
+  }
+
+  /**
+   * Wait for expected content OR an error state to become visible.
+   * If the page renders an error instead of the expected content,
+   * throws immediately with a descriptive message instead of timing out.
+   */
+  async waitForContentReady(
+    contentLocator: Locator,
+    timeout = 15_000,
+  ): Promise<void> {
+    const contentOrError = contentLocator.or(this.pageError);
+    await contentOrError.waitFor({ state: "visible", timeout });
+
+    if (await this.pageError.isVisible()) {
+      const errorText = await this.pageError.textContent();
+      throw new Error(
+        `Page displayed an error instead of expected content: ${errorText?.trim()}`,
+      );
+    }
+  }
+
   async getToastMessage(): Promise<string | null> {
     const toast = this.page.locator("[data-sonner-toast]").first();
     if (await toast.isVisible({ timeout: 5000 }).catch(() => false)) {

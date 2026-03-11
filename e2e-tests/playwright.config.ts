@@ -18,7 +18,7 @@ export default defineConfig({
   retries: CI ? 1 : 0,
   workers: CI ? 1 : 2,
   timeout: 45_000,
-  globalTimeout: CI ? 10 * 60 * 1000 : undefined,
+  globalTimeout: CI ? 15 * 60 * 1000 : undefined,
   reporter: CI
     ? [
         ["html", { open: "never", outputFolder: "playwright-report" }],

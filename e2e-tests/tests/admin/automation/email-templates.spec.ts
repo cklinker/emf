@@ -12,16 +12,13 @@ test.describe("Email Templates", () => {
   test("shows templates table or empty state", async ({ page }) => {
     const templatesPage = new EmailTemplatesPage(page);
     await templatesPage.goto();
-
-    const tableOrEmpty = templatesPage.table.or(
-      page.getByTestId("empty-state"),
-    );
-    await expect(tableOrEmpty).toBeVisible();
+    await templatesPage.waitForTableLoaded();
   });
 
   test("opens create template form", async ({ page }) => {
     const templatesPage = new EmailTemplatesPage(page);
     await templatesPage.goto();
+    await templatesPage.waitForTableLoaded();
 
     await templatesPage.clickCreate();
 
@@ -33,6 +30,7 @@ test.describe("Email Templates", () => {
   test("can fill out template form", async ({ page }) => {
     const templatesPage = new EmailTemplatesPage(page);
     await templatesPage.goto();
+    await templatesPage.waitForTableLoaded();
 
     await templatesPage.clickCreate();
     await templatesPage.fillForm({

@@ -12,16 +12,13 @@ test.describe("Scheduled Jobs", () => {
   test("shows scheduled jobs table or empty state", async ({ page }) => {
     const scheduledJobsPage = new ScheduledJobsPage(page);
     await scheduledJobsPage.goto();
-
-    const tableOrEmpty = scheduledJobsPage.table.or(
-      page.getByTestId("empty-state"),
-    );
-    await expect(tableOrEmpty).toBeVisible();
+    await scheduledJobsPage.waitForTableLoaded();
   });
 
   test("opens create scheduled job form", async ({ page }) => {
     const scheduledJobsPage = new ScheduledJobsPage(page);
     await scheduledJobsPage.goto();
+    await scheduledJobsPage.waitForTableLoaded();
 
     await scheduledJobsPage.clickCreate();
 
@@ -32,6 +29,7 @@ test.describe("Scheduled Jobs", () => {
   test("can fill out job form fields", async ({ page }) => {
     const scheduledJobsPage = new ScheduledJobsPage(page);
     await scheduledJobsPage.goto();
+    await scheduledJobsPage.waitForTableLoaded();
 
     await scheduledJobsPage.clickCreate();
 
@@ -49,6 +47,7 @@ test.describe("Scheduled Jobs", () => {
   test("closes form on cancel", async ({ page }) => {
     const scheduledJobsPage = new ScheduledJobsPage(page);
     await scheduledJobsPage.goto();
+    await scheduledJobsPage.waitForTableLoaded();
 
     await scheduledJobsPage.clickCreate();
     await expect(scheduledJobsPage.formModal).toBeVisible();

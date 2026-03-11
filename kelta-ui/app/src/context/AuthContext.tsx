@@ -139,9 +139,20 @@ function extractUserFromToken(
   const provider = oidcProviders?.find((p) => p.rolesClaim)
   const rolesClaim = provider?.rolesClaim || 'groups'
 
-  // Extract raw groups from the configured claim
-  const rawGroups =
+  // Extract raw groups from the configured claim.
+  // Check both ID token and access token since Keycloak typically puts
+  // roles only in the access token, not the ID token.
+  let rawGroups =
     (claims.roles as string[] | undefined) || (claims[rolesClaim] as string[] | undefined)
+
+  if (!rawGroups && accessToken && accessToken !== token) {
+    const accessClaims = parseJwt(accessToken)
+    if (accessClaims) {
+      rawGroups =
+        (accessClaims.roles as string[] | undefined) ||
+        (accessClaims[rolesClaim] as string[] | undefined)
+    }
+  }
 
   // Apply role mapping if providers are available
   const roles = applyRoleMapping(rawGroups, oidcProviders)

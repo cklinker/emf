@@ -9,20 +9,18 @@ test.describe("Page Layouts", () => {
     await pageLayoutsPage.goto();
   });
 
-  test("displays page layouts list", async ({ page }) => {
-    const tableOrEmpty = pageLayoutsPage.table.or(
-      page.getByTestId("empty-state"),
-    );
-    await expect(tableOrEmpty).toBeVisible();
+  test("displays page layouts list", async () => {
+    await pageLayoutsPage.waitForTableLoaded();
   });
 
   test("shows layouts in table", async () => {
+    await pageLayoutsPage.waitForTableLoaded();
     const rowCount = await pageLayoutsPage.getRowCount();
     expect(rowCount).toBeGreaterThanOrEqual(0);
   });
 
-  test("has create layout button", async ({ page }) => {
-    await page.waitForLoadState("load");
+  test("has create layout button", async () => {
+    await pageLayoutsPage.waitForTableLoaded();
     await expect(pageLayoutsPage.createButton).toBeVisible();
   });
 });

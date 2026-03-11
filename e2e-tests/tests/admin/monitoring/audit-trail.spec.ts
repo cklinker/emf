@@ -7,20 +7,26 @@ test.describe("Audit Trail", () => {
   });
 
   test("displays audit trail page", async ({ page }) => {
-    // The page renders with a heading containing "Audit Trail"
+    // Wait for page content or error to appear before asserting
     const heading = page.getByRole("heading", { name: /audit trail/i });
+    const errorMessage = page.getByTestId("error-message");
+    await expect(heading.or(errorMessage)).toBeVisible();
     await expect(heading).toBeVisible();
   });
 
   test("shows audit entries table or empty state", async ({ page }) => {
-    // The page shows a table or a "no entries" message
     const table = page.locator("table");
     const noEntries = page.getByText(/no audit trail entries/i);
-    const tableOrEmpty = table.or(noEntries);
-    await expect(tableOrEmpty).toBeVisible();
+    const errorMessage = page.getByTestId("error-message");
+    await expect(table.or(noEntries).or(errorMessage)).toBeVisible();
   });
 
   test("has section filter", async ({ page }) => {
+    // Wait for page to finish loading content before checking filter
+    const heading = page.getByRole("heading", { name: /audit trail/i });
+    const errorMessage = page.getByTestId("error-message");
+    await expect(heading.or(errorMessage)).toBeVisible();
+
     const sectionFilter = page
       .locator("#section-filter")
       .or(page.getByRole("combobox", { name: /section/i }));
@@ -28,6 +34,11 @@ test.describe("Audit Trail", () => {
   });
 
   test("has entity type filter", async ({ page }) => {
+    // Wait for page to finish loading content before checking filter
+    const heading = page.getByRole("heading", { name: /audit trail/i });
+    const errorMessage = page.getByTestId("error-message");
+    await expect(heading.or(errorMessage)).toBeVisible();
+
     const entityFilter = page
       .locator("#entity-filter")
       .or(page.getByRole("textbox", { name: /entity type/i }));

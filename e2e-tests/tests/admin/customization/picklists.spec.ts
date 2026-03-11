@@ -9,25 +9,25 @@ test.describe("Picklists", () => {
     await picklistsPage.goto();
   });
 
-  test("displays picklists page", async ({ page }) => {
-    const tableOrEmpty = picklistsPage.table.or(
-      page.getByTestId("empty-state"),
-    );
-    await expect(tableOrEmpty).toBeVisible();
+  test("displays picklists page", async () => {
+    await picklistsPage.waitForTableLoaded();
   });
 
   test("shows picklists in table", async () => {
+    await picklistsPage.waitForTableLoaded();
     const rowCount = await picklistsPage.getRowCount();
     expect(rowCount).toBeGreaterThanOrEqual(0);
   });
 
   test("opens create picklist form", async () => {
+    await picklistsPage.waitForTableLoaded();
     await picklistsPage.clickCreate();
     await expect(picklistsPage.formModal).toBeVisible();
     await expect(picklistsPage.nameInput).toBeVisible();
   });
 
   test("can fill out picklist form", async () => {
+    await picklistsPage.waitForTableLoaded();
     await picklistsPage.clickCreate();
     await expect(picklistsPage.formModal).toBeVisible();
 
@@ -42,6 +42,7 @@ test.describe("Picklists", () => {
   });
 
   test("closes form on cancel", async () => {
+    await picklistsPage.waitForTableLoaded();
     await picklistsPage.clickCreate();
     await expect(picklistsPage.formModal).toBeVisible();
 

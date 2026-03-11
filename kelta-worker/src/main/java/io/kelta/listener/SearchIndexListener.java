@@ -1,8 +1,10 @@
 package io.kelta.worker.listener;
 
+import io.kelta.runtime.model.CollectionDefinition;
 import io.kelta.runtime.context.TenantContext;
 import io.kelta.runtime.event.ChangeType;
 import io.kelta.runtime.event.RecordChangedPayload;
+import io.kelta.runtime.registry.CollectionRegistry;
 import io.kelta.worker.service.CollectionLifecycleManager;
 import io.kelta.worker.service.SearchIndexService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -32,13 +34,16 @@ public class SearchIndexListener {
 
     private final SearchIndexService searchIndexService;
     private final CollectionLifecycleManager lifecycleManager;
+    private final CollectionRegistry collectionRegistry;
     private final ObjectMapper objectMapper;
 
     public SearchIndexListener(SearchIndexService searchIndexService,
                                 CollectionLifecycleManager lifecycleManager,
+                                CollectionRegistry collectionRegistry,
                                 ObjectMapper objectMapper) {
         this.searchIndexService = searchIndexService;
         this.lifecycleManager = lifecycleManager;
+        this.collectionRegistry = collectionRegistry;
         this.objectMapper = objectMapper;
     }
 
@@ -106,25 +111,16 @@ public class SearchIndexListener {
 
     /**
      * Returns true if the collection is a system collection that should not be indexed.
+     * Uses the {@code systemCollection} flag from the {@link CollectionRegistry} instead
+     * of a hardcoded list, so newly added system collections are automatically excluded.
      */
     private boolean isSystemCollection(String collectionName) {
-        return switch (collectionName) {
-            case "fields", "collections", "collection_versions", "field_versions",
-                 "tenants", "users", "roles", "profiles", "permission_sets",
-                 "groups", "group_memberships", "layouts", "layout_sections",
-                 "layout_fields", "layout-sections", "layout-fields", "picklists",
-                 "picklist_values", "picklist-values",
-                 "validation_rules", "validation-rules",
-                 "flows", "flow_executions", "flow-executions",
-                 "setup_audit_trail", "setup-audit-trail", "field_history", "field-history",
-                 "dashboards", "reports", "ui_menus", "ui-menus",
-                 "ui_menu_items", "ui-menu-items",
-                 "profile_object_permissions", "profile-object-permissions",
-                 "profile_field_permissions", "profile-field-permissions",
-                 "migration_runs", "migration-runs",
-                 "record_types", "record-types",
-                 "record_type_picklist_values", "record-type-picklist-values" -> true;
-            default -> false;
-        };
+        CollectionDefinition definition = collectionRegistry.get(collectionName);
+        if (definition == null) {
+            // Unknown collections are likely system collections not yet registered;
+            // err on the side of not indexing them
+            return true;
+        }
+        return definition.systemCollection();
     }
 }

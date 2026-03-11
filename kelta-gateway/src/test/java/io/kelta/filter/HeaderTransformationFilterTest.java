@@ -277,7 +277,7 @@ class HeaderTransformationFilterTest {
         GatewayPrincipal principal = new GatewayPrincipal(
                 "real.user",
                 Arrays.asList("USER"),
-                Map.of("sub", "real-user-id")
+                Map.of("sub", "real-user-id", "email", "real.user@example.com")
         );
         exchange.getAttributes().put("gateway.principal", principal);
 
@@ -296,8 +296,88 @@ class HeaderTransformationFilterTest {
         assertThat(capturedExchange[0]).isNotNull();
         HttpHeaders headers = capturedExchange[0].getRequest().getHeaders();
         assertThat(headers.getFirst("X-Forwarded-User")).isEqualTo("real.user");
-        assertThat(headers.getFirst("X-User-Id")).isEqualTo("real-user-id");
+        assertThat(headers.getFirst("X-User-Id")).isEqualTo("real.user@example.com");
         assertThat(headers.getFirst("X-Forwarded-Roles")).isEqualTo("USER");
+    }
+
+    @Test
+    void shouldUseEmailClaimForUserIdHeader() {
+        // Given: JWT with both sub (UUID) and email claims
+        MockServerHttpRequest request = MockServerHttpRequest.get("/api/data").build();
+        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        GatewayPrincipal principal = new GatewayPrincipal(
+                "craig@example.com",
+                List.of("USER"),
+                Map.of("sub", "277d1874-8e12-4101-b22e-37f6c31f8d69",
+                       "email", "craig@example.com",
+                       "preferred_username", "craig@example.com")
+        );
+        exchange.getAttributes().put("gateway.principal", principal);
+
+        final ServerWebExchange[] capturedExchange = new ServerWebExchange[1];
+        when(chain.filter(any(ServerWebExchange.class))).thenAnswer(invocation -> {
+            capturedExchange[0] = invocation.getArgument(0);
+            return Mono.empty();
+        });
+
+        StepVerifier.create(filter.filter(exchange, chain)).verifyComplete();
+
+        // Then: X-User-Id should be the email, NOT the sub UUID
+        HttpHeaders headers = capturedExchange[0].getRequest().getHeaders();
+        assertThat(headers.getFirst("X-User-Id")).isEqualTo("craig@example.com");
+    }
+
+    @Test
+    void shouldFallBackToPreferredUsernameWhenNoEmailClaim() {
+        // Given: JWT with sub and preferred_username but no email claim
+        MockServerHttpRequest request = MockServerHttpRequest.get("/api/data").build();
+        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        GatewayPrincipal principal = new GatewayPrincipal(
+                "craig",
+                List.of("USER"),
+                Map.of("sub", "277d1874-8e12-4101-b22e-37f6c31f8d69",
+                       "preferred_username", "craig@example.com")
+        );
+        exchange.getAttributes().put("gateway.principal", principal);
+
+        final ServerWebExchange[] capturedExchange = new ServerWebExchange[1];
+        when(chain.filter(any(ServerWebExchange.class))).thenAnswer(invocation -> {
+            capturedExchange[0] = invocation.getArgument(0);
+            return Mono.empty();
+        });
+
+        StepVerifier.create(filter.filter(exchange, chain)).verifyComplete();
+
+        HttpHeaders headers = capturedExchange[0].getRequest().getHeaders();
+        assertThat(headers.getFirst("X-User-Id")).isEqualTo("craig@example.com");
+    }
+
+    @Test
+    void shouldFallBackToUsernameWhenNoEmailOrPreferredUsername() {
+        // Given: JWT with only sub claim (no email, no preferred_username)
+        MockServerHttpRequest request = MockServerHttpRequest.get("/api/data").build();
+        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        GatewayPrincipal principal = new GatewayPrincipal(
+                "craig@example.com",
+                List.of("USER"),
+                Map.of("sub", "277d1874-8e12-4101-b22e-37f6c31f8d69")
+        );
+        exchange.getAttributes().put("gateway.principal", principal);
+
+        final ServerWebExchange[] capturedExchange = new ServerWebExchange[1];
+        when(chain.filter(any(ServerWebExchange.class))).thenAnswer(invocation -> {
+            capturedExchange[0] = invocation.getArgument(0);
+            return Mono.empty();
+        });
+
+        StepVerifier.create(filter.filter(exchange, chain)).verifyComplete();
+
+        // Then: Falls back to principal.getUsername() (which PrincipalExtractor sets to email)
+        HttpHeaders headers = capturedExchange[0].getRequest().getHeaders();
+        assertThat(headers.getFirst("X-User-Id")).isEqualTo("craig@example.com");
     }
 
     @Test

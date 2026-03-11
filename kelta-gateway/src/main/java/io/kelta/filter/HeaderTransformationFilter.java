@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
  * This filter:
  * - Preserves the Authorization header so downstream services can validate JWT tokens
  * - Adds X-Forwarded-User header with the authenticated principal's username
- * - Adds X-User-Id header with the user's unique identifier (from JWT 'sub' claim)
+ * - Adds X-User-Id header with the user's email (resolved from JWT claims)
  * - Adds X-Forwarded-Roles header with comma-separated list of principal's roles
  * - Preserves all other request headers
  *
@@ -78,7 +78,7 @@ public class HeaderTransformationFilter implements GlobalFilter, Ordered {
                     // Add X-Forwarded-User header
                     headers.set(X_FORWARDED_USER_HEADER, principal.getUsername());
 
-                    // Add X-User-Id header (resolved from JWT sub claim)
+                    // Add X-User-Id header (email for platform_user resolution)
                     String userId = resolveUserId(principal);
                     headers.set(X_USER_ID_HEADER, userId);
 
@@ -116,22 +116,29 @@ public class HeaderTransformationFilter implements GlobalFilter, Ordered {
     }
     
     /**
-     * Resolves the user's unique identifier from JWT claims.
-     * Tries 'sub' claim first (standard OIDC), then 'user_id' claim,
-     * then falls back to the username.
+     * Resolves the user's identifier from JWT claims for the X-User-Id header.
+     *
+     * <p>The worker's {@code JdbcUserIdResolver} translates this value to a
+     * {@code platform_user.id} UUID.  It performs a lookup by email, so this
+     * method prefers the email-style claims ({@code email}, {@code preferred_username})
+     * over the OIDC {@code sub} claim (which is typically an IdP-internal UUID
+     * that does not match any {@code platform_user.id}).
      *
      * @param principal the authenticated gateway principal
-     * @return the resolved user ID
+     * @return the resolved user identifier (ideally an email address)
      */
     private String resolveUserId(GatewayPrincipal principal) {
-        Object sub = principal.getClaims().get("sub");
-        if (sub instanceof String s && !s.isEmpty()) {
+        // Prefer email claim — matches platform_user lookup in JdbcUserIdResolver
+        Object email = principal.getClaims().get("email");
+        if (email instanceof String s && !s.isEmpty()) {
             return s;
         }
-        Object userId = principal.getClaims().get("user_id");
-        if (userId instanceof String s && !s.isEmpty()) {
+        // Fall back to preferred_username (often the email in OIDC providers)
+        Object preferredUsername = principal.getClaims().get("preferred_username");
+        if (preferredUsername instanceof String s && !s.isEmpty()) {
             return s;
         }
+        // Last resort: use the principal username (extracted by PrincipalExtractor)
         return principal.getUsername();
     }
 

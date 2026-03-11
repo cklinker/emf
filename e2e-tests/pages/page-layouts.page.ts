@@ -28,6 +28,11 @@ export class PageLayoutsPage extends BasePage {
     await this.waitForLoadingComplete();
   }
 
+  async waitForTableLoaded(): Promise<void> {
+    const tableOrEmpty = this.table.or(this.page.getByTestId("empty-state"));
+    await this.waitForContentReady(tableOrEmpty);
+  }
+
   async clickCreate(): Promise<void> {
     await this.createButton.click();
   }

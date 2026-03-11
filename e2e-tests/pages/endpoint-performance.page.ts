@@ -16,6 +16,13 @@ export class EndpointPerformancePage extends BasePage {
     await this.waitForLoadingComplete();
   }
 
+  async waitForContentLoaded(): Promise<void> {
+    const tableOrEmpty = this.leaderboard.or(
+      this.page.getByText(/no endpoint performance data/i),
+    );
+    await this.waitForContentReady(tableOrEmpty);
+  }
+
   async getRowCount(): Promise<number> {
     return this.rows.count();
   }

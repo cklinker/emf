@@ -10,17 +10,15 @@ test.describe("Endpoint Performance", () => {
   });
 
   test("displays endpoint performance page with title", async ({ page }) => {
+    await perfPage.waitForContentLoaded();
     const heading = page.getByRole("heading", {
       name: /endpoint performance/i,
     });
     await expect(heading).toBeVisible();
   });
 
-  test("shows performance table or empty state", async ({ page }) => {
-    const table = perfPage.leaderboard;
-    const noData = page.getByText(/no endpoint performance data/i);
-    const tableOrEmpty = table.or(noData);
-    await expect(tableOrEmpty).toBeVisible();
+  test("shows performance table or empty state", async () => {
+    await perfPage.waitForContentLoaded();
   });
 
   test("shows latency percentile columns", async ({ page }) => {

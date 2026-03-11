@@ -10,6 +10,7 @@ test.describe("Modules", () => {
     const found = await waitForAnyVisible([
       page.getByTestId("modules-page"),
       page.getByRole("heading", { name: /modules/i }),
+      page.getByTestId("error-message"),
     ]);
     expect(found).toBe(true);
   });

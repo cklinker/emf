@@ -31,15 +31,38 @@ export interface LayoutFieldSectionsProps {
 /**
  * Maps layout field placements to FieldDefinition objects that DetailSection expects.
  * Applies label overrides from the layout and preserves schema metadata (type, reference info).
+ *
+ * Fields are interleaved by column so that CSS grid auto-placement (left-to-right,
+ * top-to-bottom) puts each field in the correct designer-assigned column.
  */
 function mapPlacementsToFields(
   placements: LayoutFieldPlacementDto[],
   schemaFieldsByName: Map<string, FieldDefinition>,
-  schemaFieldsById: Map<string, FieldDefinition>
+  schemaFieldsById: Map<string, FieldDefinition>,
+  columns: number
 ): FieldDefinition[] {
-  const sorted = [...placements].sort((a, b) => a.sortOrder - b.sortOrder)
+  // Group placements by column, sorted within each column by sortOrder
+  const columnGroups: LayoutFieldPlacementDto[][] = Array.from({ length: columns }, () => [])
+  for (const p of placements) {
+    const col = Math.min(p.columnNumber, columns - 1)
+    columnGroups[col].push(p)
+  }
+  for (const group of columnGroups) {
+    group.sort((a, b) => a.sortOrder - b.sortOrder)
+  }
 
-  return sorted
+  // Interleave row-by-row across columns for CSS grid auto-placement
+  const interleaved: LayoutFieldPlacementDto[] = []
+  const maxRows = Math.max(...columnGroups.map((g) => g.length), 0)
+  for (let row = 0; row < maxRows; row++) {
+    for (let col = 0; col < columns; col++) {
+      if (row < columnGroups[col].length) {
+        interleaved.push(columnGroups[col][row])
+      }
+    }
+  }
+
+  return interleaved
     .map((placement) => {
       // Try to find the schema field by ID first, then by name
       const schemaField =
@@ -82,7 +105,12 @@ export function LayoutFieldSections({
   return (
     <>
       {sortedSections.map((section) => {
-        const fields = mapPlacementsToFields(section.fields, schemaFieldsByName, schemaFieldsById)
+        const fields = mapPlacementsToFields(
+          section.fields,
+          schemaFieldsByName,
+          schemaFieldsById,
+          section.columns || 2
+        )
 
         if (fields.length === 0) return null
 

@@ -10,9 +10,7 @@ import org.springframework.core.Ordered;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtException;
-import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
@@ -37,7 +35,7 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
     private static final String BEARER_PREFIX = "Bearer ";
     private static final String PRINCIPAL_ATTRIBUTE = "gateway.principal";
 
-    private final ReactiveJwtDecoder jwtDecoder;
+    private final DynamicReactiveJwtDecoder jwtDecoder;
     private final PrincipalExtractor principalExtractor;
     private final PublicPathMatcher publicPathMatcher;
     private final GatewayMetrics metrics;
@@ -45,12 +43,12 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
     /**
      * Creates a new JwtAuthenticationFilter.
      *
-     * @param jwtDecoder the JWT decoder for validating tokens
+     * @param jwtDecoder the JWT decoder for validating tokens (tenant-aware)
      * @param principalExtractor the extractor for creating GatewayPrincipal from JWT
      * @param publicPathMatcher the matcher for public (unauthenticated) paths
      * @param metrics the gateway metrics service
      */
-    public JwtAuthenticationFilter(ReactiveJwtDecoder jwtDecoder, PrincipalExtractor principalExtractor,
+    public JwtAuthenticationFilter(DynamicReactiveJwtDecoder jwtDecoder, PrincipalExtractor principalExtractor,
                                    PublicPathMatcher publicPathMatcher, GatewayMetrics metrics) {
         this.jwtDecoder = jwtDecoder;
         this.principalExtractor = principalExtractor;
@@ -91,9 +89,18 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
         
         // Extract token from header
         String token = authHeader.substring(BEARER_PREFIX.length());
-        
-        // Validate JWT and extract principal
-        return jwtDecoder.decode(token)
+
+        // Get tenant context (set by TenantSlugExtractionFilter / TenantResolutionFilter)
+        // to scope JWT issuer validation to the correct tenant
+        String tenantId = TenantResolutionFilter.getTenantId(exchange);
+        if (tenantId == null || tenantId.isBlank()) {
+            log.warn("No tenant context available for JWT validation on path: {}", path);
+            metrics.recordAuthFailure(TenantResolutionFilter.getTenantSlug(exchange), "missing_tenant_context");
+            return unauthorized(exchange, "Tenant context required for authentication");
+        }
+
+        // Validate JWT with tenant-scoped issuer verification
+        return jwtDecoder.decode(token, tenantId)
             .flatMap(jwt -> {
                 try {
                     GatewayPrincipal principal = principalExtractor.extractPrincipal(jwt);

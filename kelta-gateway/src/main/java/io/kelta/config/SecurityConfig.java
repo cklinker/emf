@@ -9,6 +9,7 @@ import org.springframework.lang.Nullable;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
+// Note: Bean returns DynamicReactiveJwtDecoder (which implements ReactiveJwtDecoder)
 import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.reactive.CorsConfigurationSource;
@@ -111,7 +112,7 @@ public class SecurityConfig {
      * ({@code /internal/oidc/by-issuer}).
      */
     @Bean
-    public ReactiveJwtDecoder jwtDecoder(@Nullable ReactiveStringRedisTemplate redisTemplate) {
+    public DynamicReactiveJwtDecoder jwtDecoder(@Nullable ReactiveStringRedisTemplate redisTemplate) {
         WebClient workerClient = WebClient.builder()
                 .baseUrl(workerServiceUrl)
                 .build();

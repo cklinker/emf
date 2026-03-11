@@ -140,13 +140,22 @@ public class InternalBootstrapController {
      */
     @GetMapping("/oidc/by-issuer")
     public ResponseEntity<Map<String, Object>> getOidcProviderByIssuer(
-            @RequestParam String issuer) {
-        log.debug("Internal lookup: OIDC provider by issuer: {}", issuer);
+            @RequestParam String issuer,
+            @RequestParam(required = false) String tenantId) {
 
-        Optional<Map<String, Object>> providerOpt = repository.findOidcProviderByIssuer(issuer);
+        Optional<Map<String, Object>> providerOpt;
+
+        if (tenantId != null && !tenantId.isBlank()) {
+            log.debug("Internal lookup: OIDC provider by issuer={} tenant={}", issuer, tenantId);
+            providerOpt = repository.findOidcProviderByIssuerAndTenant(issuer, tenantId);
+        } else {
+            log.warn("Internal lookup: OIDC provider by issuer={} WITHOUT tenant scope "
+                    + "(cross-tenant risk — gateway should always provide tenantId)", issuer);
+            providerOpt = repository.findOidcProviderByIssuer(issuer);
+        }
 
         if (providerOpt.isEmpty()) {
-            log.warn("No active OIDC provider found for issuer: {}", issuer);
+            log.warn("No active OIDC provider found for issuer={} tenant={}", issuer, tenantId);
             return ResponseEntity.notFound().build();
         }
 

@@ -6,28 +6,18 @@ test.describe("Custom Page", () => {
     await expect(page).toHaveURL(/\/app\/p\/home/);
   });
 
-  test("shows page content or loading/not-found state", async ({ page }) => {
+  test("shows page content or not-found state", async ({ page }) => {
     await page.goto("/default/app/p/home");
-    await page.waitForLoadState("load");
 
-    // Custom pages may show content, a loading state, or a "not found" message
-    // depending on whether the page slug exists and has a registered component
-    const hasContent = await page
-      .getByTestId("custom-page-content")
-      .isVisible({ timeout: 5000 })
-      .catch(() => false);
-    const hasNotFound = await page
-      .getByText(/not found/i)
-      .first()
-      .isVisible({ timeout: 3000 })
-      .catch(() => false);
-    const hasLoading = await page
-      .getByText(/loading/i)
-      .first()
-      .isVisible({ timeout: 2000 })
-      .catch(() => false);
-
-    // Any of these states is acceptable
-    expect(hasContent || hasNotFound || hasLoading).toBe(true);
+    // Custom pages show "Page Not Found" or "Component Not Available" when
+    // the slug doesn't exist or the component isn't registered. Either state
+    // (plus a loading spinner) is acceptable here.
+    await expect(
+      page
+        .getByText(/page not found/i)
+        .first()
+        .or(page.getByText(/component not available/i).first())
+        .or(page.locator(".animate-spin").first()),
+    ).toBeVisible({ timeout: 10_000 });
   });
 });

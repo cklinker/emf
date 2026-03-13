@@ -22,10 +22,11 @@ import java.util.stream.Collectors;
  * - Preserves the Authorization header so downstream services can validate JWT tokens
  * - Adds X-Forwarded-User header with the authenticated principal's username
  * - Adds X-User-Id header with the user's email (resolved from JWT claims)
- * - Adds X-Forwarded-Roles header with comma-separated list of principal's roles
+ * - Adds X-Forwarded-Groups header with comma-separated list of principal's groups
+ * - Adds X-Forwarded-Roles header (backward compatibility, same value as groups)
  * - Preserves all other request headers
  *
- * The backend services can use the X-Forwarded-User, X-User-Id, and X-Forwarded-Roles
+ * The backend services can use the X-Forwarded-User, X-User-Id, and X-Forwarded-Groups
  * headers for lightweight identity extraction, or validate the JWT themselves using the
  * preserved Authorization header.
  *
@@ -39,6 +40,7 @@ public class HeaderTransformationFilter implements GlobalFilter, Ordered {
     private static final String X_FORWARDED_USER_HEADER = "X-Forwarded-User";
     private static final String X_USER_ID_HEADER = "X-User-Id";
     private static final String X_FORWARDED_ROLES_HEADER = "X-Forwarded-Roles";
+    private static final String X_FORWARDED_GROUPS_HEADER = "X-Forwarded-Groups";
     private static final String X_TENANT_ID_HEADER = "X-Tenant-ID";
     private static final String X_TENANT_SLUG_HEADER = "X-Tenant-Slug";
     
@@ -73,6 +75,7 @@ public class HeaderTransformationFilter implements GlobalFilter, Ordered {
                     // These headers are gateway-verified and must not be set by clients.
                     headers.remove(X_FORWARDED_USER_HEADER);
                     headers.remove(X_USER_ID_HEADER);
+                    headers.remove(X_FORWARDED_GROUPS_HEADER);
                     headers.remove(X_FORWARDED_ROLES_HEADER);
 
                     // Add X-Forwarded-User header
@@ -82,10 +85,12 @@ public class HeaderTransformationFilter implements GlobalFilter, Ordered {
                     String userId = resolveUserId(principal);
                     headers.set(X_USER_ID_HEADER, userId);
 
-                    // Add X-Forwarded-Roles header with comma-separated roles
-                    String roles = principal.getRoles().stream()
+                    // Add X-Forwarded-Groups header with comma-separated groups
+                    String groups = principal.getGroups().stream()
                             .collect(Collectors.joining(","));
-                    headers.set(X_FORWARDED_ROLES_HEADER, roles);
+                    headers.set(X_FORWARDED_GROUPS_HEADER, groups);
+                    // Backward compatibility: also forward as X-Forwarded-Roles
+                    headers.set(X_FORWARDED_ROLES_HEADER, groups);
 
                     // Add tenant headers from exchange attributes (set by TenantResolutionFilter)
                     String tenantId = TenantResolutionFilter.getTenantId(exchange);
@@ -102,8 +107,8 @@ public class HeaderTransformationFilter implements GlobalFilter, Ordered {
                                 principal.getUsername(), exchange.getRequest().getPath().value());
                     }
 
-                    log.debug("Added forwarding headers for user: {}, roles: {}, tenantId: {}",
-                            principal.getUsername(), roles, tenantId);
+                    log.debug("Added forwarding headers for user: {}, groups: {}, tenantId: {}",
+                            principal.getUsername(), groups, tenantId);
                 })
                 .build();
         

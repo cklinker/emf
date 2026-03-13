@@ -14,7 +14,6 @@ export interface User {
   email: string
   name?: string
   picture?: string
-  roles?: string[]
   /** Raw claims from the ID token */
   claims?: Record<string, unknown>
 }

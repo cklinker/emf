@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Unit tests for PrincipalExtractor.
- * Tests extraction of username, roles, and claims from JWT tokens.
+ * Tests extraction of username, groups, and claims from JWT tokens.
  */
 class PrincipalExtractorTest {
     
@@ -36,7 +36,7 @@ class PrincipalExtractorTest {
         GatewayPrincipal principal = extractor.extractPrincipal(jwt);
         
         assertEquals("testuser", principal.getUsername());
-        assertEquals(List.of("ADMIN", "USER"), principal.getRoles());
+        assertEquals(List.of("ADMIN", "USER"), principal.getGroups());
         assertEquals(claims, principal.getClaims());
     }
     
@@ -52,12 +52,12 @@ class PrincipalExtractorTest {
         GatewayPrincipal principal = extractor.extractPrincipal(jwt);
         
         assertEquals("user-id-123", principal.getUsername());
-        assertEquals(List.of("USER"), principal.getRoles());
+        assertEquals(List.of("USER"), principal.getGroups());
         assertEquals(claims, principal.getClaims());
     }
     
     @Test
-    void testExtractPrincipalWithAuthoritiesClaim() {
+    void testExtractPrincipalWithAuthoritiesClaimAsGroups() {
         Map<String, Object> claims = Map.of(
             "preferred_username", "testuser",
             "sub", "user-id-123",
@@ -69,12 +69,12 @@ class PrincipalExtractorTest {
         GatewayPrincipal principal = extractor.extractPrincipal(jwt);
         
         assertEquals("testuser", principal.getUsername());
-        assertEquals(List.of("ADMIN", "USER"), principal.getRoles());
+        assertEquals(List.of("ADMIN", "USER"), principal.getGroups());
         assertEquals(claims, principal.getClaims());
     }
     
     @Test
-    void testExtractPrincipalWithRolesPreferredOverAuthorities() {
+    void testExtractPrincipalWithRolesClaimPreferredOverAuthorities() {
         Map<String, Object> claims = Map.of(
             "preferred_username", "testuser",
             "sub", "user-id-123",
@@ -87,12 +87,12 @@ class PrincipalExtractorTest {
         GatewayPrincipal principal = extractor.extractPrincipal(jwt);
         
         assertEquals("testuser", principal.getUsername());
-        assertEquals(List.of("ADMIN"), principal.getRoles());
+        assertEquals(List.of("ADMIN"), principal.getGroups());
         assertEquals(claims, principal.getClaims());
     }
     
     @Test
-    void testExtractPrincipalWithNoRoles() {
+    void testExtractPrincipalWithNoGroups() {
         Map<String, Object> claims = Map.of(
             "preferred_username", "testuser",
             "sub", "user-id-123",
@@ -103,12 +103,12 @@ class PrincipalExtractorTest {
         GatewayPrincipal principal = extractor.extractPrincipal(jwt);
         
         assertEquals("testuser", principal.getUsername());
-        assertTrue(principal.getRoles().isEmpty());
+        assertTrue(principal.getGroups().isEmpty());
         assertEquals(claims, principal.getClaims());
     }
     
     @Test
-    void testExtractPrincipalWithEmptyRolesList() {
+    void testExtractPrincipalWithEmptyGroupsList() {
         Map<String, Object> claims = Map.of(
             "preferred_username", "testuser",
             "sub", "user-id-123",
@@ -120,12 +120,12 @@ class PrincipalExtractorTest {
         GatewayPrincipal principal = extractor.extractPrincipal(jwt);
         
         assertEquals("testuser", principal.getUsername());
-        assertTrue(principal.getRoles().isEmpty());
+        assertTrue(principal.getGroups().isEmpty());
         assertEquals(claims, principal.getClaims());
     }
     
     @Test
-    void testExtractPrincipalWithRolesAsCommaSeparatedString() {
+    void testExtractPrincipalWithGroupsAsCommaSeparatedString() {
         Map<String, Object> claims = Map.of(
             "preferred_username", "testuser",
             "sub", "user-id-123",
@@ -137,12 +137,12 @@ class PrincipalExtractorTest {
         GatewayPrincipal principal = extractor.extractPrincipal(jwt);
         
         assertEquals("testuser", principal.getUsername());
-        assertEquals(List.of("ADMIN", "USER", "MODERATOR"), principal.getRoles());
+        assertEquals(List.of("ADMIN", "USER", "MODERATOR"), principal.getGroups());
         assertEquals(claims, principal.getClaims());
     }
     
     @Test
-    void testExtractPrincipalWithAuthoritiesAsCommaSeparatedString() {
+    void testExtractPrincipalWithAuthoritiesAsCommaSeparatedGroupsString() {
         Map<String, Object> claims = Map.of(
             "preferred_username", "testuser",
             "sub", "user-id-123",
@@ -154,12 +154,12 @@ class PrincipalExtractorTest {
         GatewayPrincipal principal = extractor.extractPrincipal(jwt);
         
         assertEquals("testuser", principal.getUsername());
-        assertEquals(List.of("ADMIN", "USER"), principal.getRoles());
+        assertEquals(List.of("ADMIN", "USER"), principal.getGroups());
         assertEquals(claims, principal.getClaims());
     }
     
     @Test
-    void testExtractPrincipalWithEmptyRolesString() {
+    void testExtractPrincipalWithEmptyGroupsString() {
         Map<String, Object> claims = Map.of(
             "preferred_username", "testuser",
             "sub", "user-id-123",
@@ -171,12 +171,12 @@ class PrincipalExtractorTest {
         GatewayPrincipal principal = extractor.extractPrincipal(jwt);
         
         assertEquals("testuser", principal.getUsername());
-        assertTrue(principal.getRoles().isEmpty());
+        assertTrue(principal.getGroups().isEmpty());
         assertEquals(claims, principal.getClaims());
     }
     
     @Test
-    void testExtractPrincipalWithSingleRole() {
+    void testExtractPrincipalWithSingleGroup() {
         Map<String, Object> claims = Map.of(
             "preferred_username", "testuser",
             "sub", "user-id-123",
@@ -188,7 +188,7 @@ class PrincipalExtractorTest {
         GatewayPrincipal principal = extractor.extractPrincipal(jwt);
         
         assertEquals("testuser", principal.getUsername());
-        assertEquals(List.of("USER"), principal.getRoles());
+        assertEquals(List.of("USER"), principal.getGroups());
         assertEquals(claims, principal.getClaims());
     }
     
@@ -244,7 +244,7 @@ class PrincipalExtractorTest {
     }
     
     @Test
-    void testExtractPrincipalWithInvalidRolesType() {
+    void testExtractPrincipalWithInvalidGroupsType() {
         Map<String, Object> claims = Map.of(
             "preferred_username", "testuser",
             "sub", "user-id-123",
@@ -256,12 +256,12 @@ class PrincipalExtractorTest {
         GatewayPrincipal principal = extractor.extractPrincipal(jwt);
         
         assertEquals("testuser", principal.getUsername());
-        assertTrue(principal.getRoles().isEmpty()); // Should handle gracefully
+        assertTrue(principal.getGroups().isEmpty()); // Should handle gracefully with invalid type
         assertEquals(claims, principal.getClaims());
     }
     
     @Test
-    void testExtractPrincipalWithMixedTypeRolesList() {
+    void testExtractPrincipalWithMixedTypeGroupsList() {
         Map<String, Object> claims = Map.of(
             "preferred_username", "testuser",
             "sub", "user-id-123",
@@ -274,7 +274,7 @@ class PrincipalExtractorTest {
         
         assertEquals("testuser", principal.getUsername());
         // Should only extract string values
-        assertEquals(List.of("ADMIN", "USER"), principal.getRoles());
+        assertEquals(List.of("ADMIN", "USER"), principal.getGroups());
         assertEquals(claims, principal.getClaims());
     }
     
@@ -296,7 +296,7 @@ class PrincipalExtractorTest {
         GatewayPrincipal principal = extractor.extractPrincipal(jwt);
         
         assertEquals("testuser", principal.getUsername());
-        assertEquals(List.of("ADMIN", "USER"), principal.getRoles());
+        assertEquals(List.of("ADMIN", "USER"), principal.getGroups());
         assertEquals(claims, principal.getClaims());
         assertEquals("test@example.com", principal.getClaims().get("email"));
         assertEquals("Test User", principal.getClaims().get("name"));

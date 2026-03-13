@@ -203,12 +203,12 @@ class RouteAuthorizationFilterTest {
         }
 
         @Test
-        @DisplayName("Should allow allPermissive permissions (platform admin)")
+        @DisplayName("Should allow allPermissive permissions (system administrator profile)")
         void shouldAllowAllPermissive() {
             MockServerHttpRequest request = MockServerHttpRequest.get("/api/users").build();
             MockServerWebExchange exchange = MockServerWebExchange.from(request);
             exchange.getAttributes().put(PRINCIPAL_ATTR,
-                    new GatewayPrincipal("admin@test.com", List.of("PLATFORM_ADMIN"), Map.of()));
+                    new GatewayPrincipal("admin@test.com", List.of("ADMIN"), Map.of()));
             exchange.getAttributes().put(PermissionResolutionFilter.PERMISSIONS_ATTRIBUTE,
                     ResolvedPermissions.allPermissive());
 

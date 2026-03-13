@@ -279,7 +279,7 @@ const CATEGORIES: SetupCategory[] = [
         name: 'Tenants',
         path: '/tenants',
         description: 'Platform-level tenant management',
-        permission: 'PLATFORM_ADMIN',
+        permission: 'MANAGE_TENANTS',
       },
       {
         name: 'Search Index',

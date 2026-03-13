@@ -14,6 +14,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import java.io.IOException;
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -63,6 +66,8 @@ public class LoginTrackingFilter extends OncePerRequestFilter {
 
     /** Maximum length for user agent strings stored in the database. */
     private static final int MAX_USER_AGENT_LENGTH = 500;
+
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final JdbcTemplate jdbcTemplate;
     private final OpenSearchAuditService openSearchAuditService;
@@ -125,7 +130,8 @@ public class LoginTrackingFilter extends OncePerRequestFilter {
         String userId = lookupUserId(email, tenantId);
         if (userId == null) {
             String username = request.getHeader("X-Forwarded-User");
-            userId = provisionUser(email, tenantId, username);
+            String groups = request.getHeader("X-Forwarded-Groups");
+            userId = provisionUser(email, tenantId, username, groups);
             if (userId == null) {
                 return;
             }
@@ -175,29 +181,93 @@ public class LoginTrackingFilter extends OncePerRequestFilter {
      * for the first time. Uses {@code INSERT ... ON CONFLICT DO NOTHING} for thread
      * safety when multiple concurrent requests arrive for the same new user.
      *
+     * <p>The profile is resolved from the user's OIDC groups using the
+     * {@code groups_profile_mapping} on the tenant's OIDC provider. Falls back
+     * to "Standard User" if no mapping matches.
+     *
      * @return the new user's UUID, or {@code null} if provisioning failed
      */
-    String provisionUser(String email, String tenantId, String username) {
+    String provisionUser(String email, String tenantId, String username, String groups) {
         String id = UUID.randomUUID().toString();
         try {
-            String defaultProfileId = lookupDefaultProfileId(tenantId);
+            String profileId = resolveProfileForGroups(tenantId, groups);
+            String profileName = profileId != null ? "mapped" : null;
+            if (profileId == null) {
+                profileId = lookupDefaultProfileId(tenantId);
+                profileName = profileId != null ? "Standard User" : "none";
+            }
             jdbcTemplate.update(
                     "INSERT INTO platform_user (id, tenant_id, email, username, profile_id, status, created_at, updated_at) " +
                             "VALUES (?, ?, ?, ?, ?, 'ACTIVE', NOW(), NOW()) " +
                             "ON CONFLICT (tenant_id, email) DO NOTHING",
-                    id, tenantId, email, username, defaultProfileId);
+                    id, tenantId, email, username, profileId);
 
             // Re-query to get the actual ID (handles race condition where another thread inserted first)
             String resolvedId = lookupUserId(email, tenantId);
             if (resolvedId != null) {
                 log.info("Auto-provisioned platform_user for '{}' in tenant '{}' with profile '{}'",
-                        email, tenantId, defaultProfileId != null ? "Standard User" : "none");
+                        email, tenantId, profileName);
                 return resolvedId;
             }
         } catch (Exception e) {
             log.warn("Failed to auto-provision user '{}' in tenant '{}': {}", email, tenantId, e.getMessage());
         }
         return null;
+    }
+
+    /**
+     * Resolves a profile ID from the user's OIDC groups using the tenant's
+     * {@code groups_profile_mapping} configuration.
+     *
+     * @param tenantId the tenant UUID
+     * @param groups   comma-separated OIDC group names from the gateway
+     * @return profile ID if a mapping matched, or {@code null} to fall back to default
+     */
+    String resolveProfileForGroups(String tenantId, String groups) {
+        if (groups == null || groups.isBlank()) {
+            return null;
+        }
+        try {
+            String mappingJson = jdbcTemplate.queryForObject(
+                    "SELECT groups_profile_mapping FROM oidc_provider " +
+                            "WHERE tenant_id = ? AND active = true AND groups_profile_mapping IS NOT NULL LIMIT 1",
+                    String.class, tenantId);
+            if (mappingJson == null) {
+                return null;
+            }
+
+            Map<String, String> mapping = OBJECT_MAPPER.readValue(
+                    mappingJson, new TypeReference<Map<String, String>>() {});
+
+            for (String group : groups.split(",")) {
+                String profileName = mapping.get(group.trim());
+                if (profileName != null) {
+                    String profileId = lookupProfileIdByName(tenantId, profileName);
+                    if (profileId != null) {
+                        log.debug("Mapped OIDC group '{}' to profile '{}' for tenant '{}'",
+                                group.trim(), profileName, tenantId);
+                        return profileId;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.debug("Could not resolve profile from groups for tenant '{}': {}", tenantId, e.getMessage());
+        }
+        return null;
+    }
+
+    /**
+     * Looks up a profile by name for the given tenant.
+     */
+    private String lookupProfileIdByName(String tenantId, String profileName) {
+        try {
+            return jdbcTemplate.queryForObject(
+                    "SELECT id FROM profile WHERE tenant_id = ? AND name = ? LIMIT 1",
+                    String.class, tenantId, profileName);
+        } catch (Exception e) {
+            log.debug("No profile '{}' found for tenant '{}': {}", profileName, tenantId, e.getMessage());
+            return null;
+        }
     }
 
     /**

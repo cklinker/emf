@@ -8,7 +8,6 @@
 // Route guard utilities
 export {
   checkPageAuthorization,
-  checkRoleAuthorization,
   checkPolicyAuthorization,
   checkAuthorization,
   getRedirectPath,

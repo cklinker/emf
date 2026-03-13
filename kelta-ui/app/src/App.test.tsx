@@ -55,7 +55,7 @@ const mockBootstrapConfig = {
 
 // Mock auth context values
 const mockAuthContext = {
-  user: null as { id: string; email: string; name: string; roles?: string[] } | null,
+  user: null as { id: string; email: string; name: string } | null,
   isAuthenticated: false,
   isLoading: false,
   error: null as Error | null,
@@ -499,7 +499,6 @@ describe('App', () => {
         id: 'user-1',
         email: 'test@example.com',
         name: 'Test User',
-        roles: ['admin'],
       }
     })
 

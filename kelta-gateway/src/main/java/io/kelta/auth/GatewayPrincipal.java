@@ -10,24 +10,24 @@ import java.util.Objects;
  * Contains user information extracted from JWT token claims.
  */
 public class GatewayPrincipal {
-    
+
     private final String username;
-    private final List<String> roles;
+    private final List<String> groups;
     private final Map<String, Object> claims;
-    
+
     /**
      * Creates a new GatewayPrincipal.
      *
      * @param username the username of the authenticated user
-     * @param roles the roles assigned to the user
+     * @param groups the OIDC groups extracted from the JWT token
      * @param claims all JWT claims for the user
      */
-    public GatewayPrincipal(String username, List<String> roles, Map<String, Object> claims) {
+    public GatewayPrincipal(String username, List<String> groups, Map<String, Object> claims) {
         this.username = Objects.requireNonNull(username, "username cannot be null");
-        this.roles = roles != null ? List.copyOf(roles) : Collections.emptyList();
+        this.groups = groups != null ? List.copyOf(groups) : Collections.emptyList();
         this.claims = claims != null ? Map.copyOf(claims) : Collections.emptyMap();
     }
-    
+
     /**
      * Gets the username of the authenticated user.
      *
@@ -36,16 +36,16 @@ public class GatewayPrincipal {
     public String getUsername() {
         return username;
     }
-    
+
     /**
-     * Gets the roles assigned to the user.
+     * Gets the OIDC groups extracted from the JWT token.
      *
-     * @return an immutable list of roles
+     * @return an immutable list of groups
      */
-    public List<String> getRoles() {
-        return roles;
+    public List<String> getGroups() {
+        return groups;
     }
-    
+
     /**
      * Gets all JWT claims for the user.
      *
@@ -54,37 +54,37 @@ public class GatewayPrincipal {
     public Map<String, Object> getClaims() {
         return claims;
     }
-    
+
     /**
-     * Checks if the user has a specific role.
+     * Checks if the user belongs to a specific OIDC group.
      *
-     * @param role the role to check
-     * @return true if the user has the role, false otherwise
+     * @param group the group to check
+     * @return true if the user belongs to the group, false otherwise
      */
-    public boolean hasRole(String role) {
-        return roles.contains(role);
+    public boolean hasGroup(String group) {
+        return groups.contains(group);
     }
-    
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         GatewayPrincipal that = (GatewayPrincipal) o;
         return Objects.equals(username, that.username) &&
-               Objects.equals(roles, that.roles) &&
+               Objects.equals(groups, that.groups) &&
                Objects.equals(claims, that.claims);
     }
-    
+
     @Override
     public int hashCode() {
-        return Objects.hash(username, roles, claims);
+        return Objects.hash(username, groups, claims);
     }
-    
+
     @Override
     public String toString() {
         return "GatewayPrincipal{" +
                "username='" + username + '\'' +
-               ", roles=" + roles +
+               ", groups=" + groups +
                ", claims=" + claims.keySet() +
                '}';
     }

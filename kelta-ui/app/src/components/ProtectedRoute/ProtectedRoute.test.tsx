@@ -13,7 +13,7 @@ import React from 'react'
 import { render, screen } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom'
-import { ProtectedRoute, hasRequiredRoles, hasRequiredPolicies } from './ProtectedRoute'
+import { ProtectedRoute, hasRequiredPolicies } from './ProtectedRoute'
 import type { AuthContextValue } from '../../types/auth'
 
 // Mock the AuthContext
@@ -181,110 +181,6 @@ describe('ProtectedRoute', () => {
     })
   })
 
-  describe('Role-Based Authorization', () => {
-    it('should render children when user has required role', () => {
-      mockAuthContext.isAuthenticated = true
-      mockAuthContext.user = {
-        id: 'user-1',
-        email: 'admin@example.com',
-        name: 'Admin User',
-        roles: ['admin', 'user'],
-      }
-
-      render(
-        <TestWrapper>
-          <ProtectedRoute requiredRoles={['admin']}>
-            <div>Admin Content</div>
-          </ProtectedRoute>
-        </TestWrapper>
-      )
-
-      expect(screen.getByText('Admin Content')).toBeInTheDocument()
-    })
-
-    it('should render children when user has any of the required roles', () => {
-      mockAuthContext.isAuthenticated = true
-      mockAuthContext.user = {
-        id: 'user-1',
-        email: 'editor@example.com',
-        name: 'Editor User',
-        roles: ['editor'],
-      }
-
-      render(
-        <TestWrapper>
-          <ProtectedRoute requiredRoles={['admin', 'editor']}>
-            <div>Editor Content</div>
-          </ProtectedRoute>
-        </TestWrapper>
-      )
-
-      expect(screen.getByText('Editor Content')).toBeInTheDocument()
-    })
-
-    it('should redirect to unauthorized when user lacks required role', () => {
-      mockAuthContext.isAuthenticated = true
-      mockAuthContext.user = {
-        id: 'user-1',
-        email: 'user@example.com',
-        name: 'Regular User',
-        roles: ['user'],
-      }
-
-      render(
-        <TestWrapper>
-          <ProtectedRoute requiredRoles={['admin']}>
-            <div>Admin Content</div>
-          </ProtectedRoute>
-        </TestWrapper>
-      )
-
-      expect(screen.getByTestId('pathname')).toHaveTextContent('/unauthorized')
-      expect(screen.queryByText('Admin Content')).not.toBeInTheDocument()
-    })
-
-    it('should redirect to unauthorized when user has no roles', () => {
-      mockAuthContext.isAuthenticated = true
-      mockAuthContext.user = {
-        id: 'user-1',
-        email: 'user@example.com',
-        name: 'User Without Roles',
-      }
-
-      render(
-        <TestWrapper>
-          <ProtectedRoute requiredRoles={['admin']}>
-            <div>Admin Content</div>
-          </ProtectedRoute>
-        </TestWrapper>
-      )
-
-      expect(screen.getByTestId('pathname')).toHaveTextContent('/unauthorized')
-    })
-
-    it('should include required roles in unauthorized state', () => {
-      mockAuthContext.isAuthenticated = true
-      mockAuthContext.user = {
-        id: 'user-1',
-        email: 'user@example.com',
-        name: 'Regular User',
-        roles: ['user'],
-      }
-
-      render(
-        <TestWrapper>
-          <ProtectedRoute requiredRoles={['admin', 'superadmin']}>
-            <div>Admin Content</div>
-          </ProtectedRoute>
-        </TestWrapper>
-      )
-
-      const stateElement = screen.getByTestId('state')
-      const state = JSON.parse(stateElement.textContent || '{}')
-      expect(state.requiredRoles).toEqual(['admin', 'superadmin'])
-    })
-  })
-
   describe('Policy-Based Authorization', () => {
     it('should render children when user has required policy', () => {
       mockAuthContext.isAuthenticated = true
@@ -393,77 +289,6 @@ describe('ProtectedRoute', () => {
     })
   })
 
-  describe('Combined Role and Policy Authorization', () => {
-    it('should render children when user has both required role and policy', () => {
-      mockAuthContext.isAuthenticated = true
-      mockAuthContext.user = {
-        id: 'user-1',
-        email: 'admin@example.com',
-        name: 'Admin User',
-        roles: ['admin'],
-        claims: {
-          policies: ['collections:read'],
-        },
-      }
-
-      render(
-        <TestWrapper>
-          <ProtectedRoute requiredRoles={['admin']} requiredPolicies={['collections:read']}>
-            <div>Admin Collections Content</div>
-          </ProtectedRoute>
-        </TestWrapper>
-      )
-
-      expect(screen.getByText('Admin Collections Content')).toBeInTheDocument()
-    })
-
-    it('should redirect when user has role but lacks policy', () => {
-      mockAuthContext.isAuthenticated = true
-      mockAuthContext.user = {
-        id: 'user-1',
-        email: 'admin@example.com',
-        name: 'Admin User',
-        roles: ['admin'],
-        claims: {
-          policies: ['other:read'],
-        },
-      }
-
-      render(
-        <TestWrapper>
-          <ProtectedRoute requiredRoles={['admin']} requiredPolicies={['collections:read']}>
-            <div>Admin Collections Content</div>
-          </ProtectedRoute>
-        </TestWrapper>
-      )
-
-      expect(screen.getByTestId('pathname')).toHaveTextContent('/unauthorized')
-    })
-
-    it('should redirect when user has policy but lacks role', () => {
-      mockAuthContext.isAuthenticated = true
-      mockAuthContext.user = {
-        id: 'user-1',
-        email: 'user@example.com',
-        name: 'Regular User',
-        roles: ['user'],
-        claims: {
-          policies: ['collections:read'],
-        },
-      }
-
-      render(
-        <TestWrapper>
-          <ProtectedRoute requiredRoles={['admin']} requiredPolicies={['collections:read']}>
-            <div>Admin Collections Content</div>
-          </ProtectedRoute>
-        </TestWrapper>
-      )
-
-      expect(screen.getByTestId('pathname')).toHaveTextContent('/unauthorized')
-    })
-  })
-
   describe('Custom Paths and Callbacks', () => {
     it('should redirect to custom unauthorized path when provided', () => {
       mockAuthContext.isAuthenticated = true
@@ -471,12 +296,14 @@ describe('ProtectedRoute', () => {
         id: 'user-1',
         email: 'user@example.com',
         name: 'Regular User',
-        roles: ['user'],
       }
 
       render(
         <TestWrapper>
-          <ProtectedRoute requiredRoles={['admin']} unauthorizedPath="/custom-unauthorized">
+          <ProtectedRoute
+            requiredPolicies={['admin:access']}
+            unauthorizedPath="/custom-unauthorized"
+          >
             <div>Admin Content</div>
           </ProtectedRoute>
         </TestWrapper>
@@ -492,12 +319,11 @@ describe('ProtectedRoute', () => {
         id: 'user-1',
         email: 'user@example.com',
         name: 'Regular User',
-        roles: ['user'],
       }
 
       render(
         <TestWrapper>
-          <ProtectedRoute requiredRoles={['admin']} onUnauthorized={onUnauthorized}>
+          <ProtectedRoute requiredPolicies={['admin:access']} onUnauthorized={onUnauthorized}>
             <div>Admin Content</div>
           </ProtectedRoute>
         </TestWrapper>
@@ -513,12 +339,12 @@ describe('ProtectedRoute', () => {
         id: 'user-1',
         email: 'admin@example.com',
         name: 'Admin User',
-        roles: ['admin'],
+        claims: { policies: ['admin:access'] },
       }
 
       render(
         <TestWrapper>
-          <ProtectedRoute requiredRoles={['admin']} onUnauthorized={onUnauthorized}>
+          <ProtectedRoute requiredPolicies={['admin:access']} onUnauthorized={onUnauthorized}>
             <div>Admin Content</div>
           </ProtectedRoute>
         </TestWrapper>
@@ -548,7 +374,7 @@ describe('ProtectedRoute', () => {
       expect(screen.getByText('Public Protected Content')).toBeInTheDocument()
     })
 
-    it('should render children with empty role and policy arrays', () => {
+    it('should render children with empty policy array', () => {
       mockAuthContext.isAuthenticated = true
       mockAuthContext.user = {
         id: 'user-1',
@@ -558,7 +384,7 @@ describe('ProtectedRoute', () => {
 
       render(
         <TestWrapper>
-          <ProtectedRoute requiredRoles={[]} requiredPolicies={[]}>
+          <ProtectedRoute requiredPolicies={[]}>
             <div>Public Protected Content</div>
           </ProtectedRoute>
         </TestWrapper>
@@ -566,30 +392,6 @@ describe('ProtectedRoute', () => {
 
       expect(screen.getByText('Public Protected Content')).toBeInTheDocument()
     })
-  })
-})
-
-describe('hasRequiredRoles', () => {
-  it('should return true when no roles are required', () => {
-    expect(hasRequiredRoles(['user'], [])).toBe(true)
-    expect(hasRequiredRoles(undefined, [])).toBe(true)
-  })
-
-  it('should return true when user has required role', () => {
-    expect(hasRequiredRoles(['admin', 'user'], ['admin'])).toBe(true)
-  })
-
-  it('should return true when user has any of the required roles', () => {
-    expect(hasRequiredRoles(['editor'], ['admin', 'editor'])).toBe(true)
-  })
-
-  it('should return false when user lacks required role', () => {
-    expect(hasRequiredRoles(['user'], ['admin'])).toBe(false)
-  })
-
-  it('should return false when user has no roles', () => {
-    expect(hasRequiredRoles(undefined, ['admin'])).toBe(false)
-    expect(hasRequiredRoles([], ['admin'])).toBe(false)
   })
 })
 

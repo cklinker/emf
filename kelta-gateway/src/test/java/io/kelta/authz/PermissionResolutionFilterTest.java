@@ -82,25 +82,31 @@ class PermissionResolutionFilterTest {
     }
 
     @Test
-    @DisplayName("Should set allPermissive for PLATFORM_ADMIN")
-    void shouldSetAllPermissiveForPlatformAdmin() {
+    @DisplayName("Should resolve permissions for all users including former PLATFORM_ADMIN")
+    void shouldResolvePermissionsForAllUsersIncludingFormerPlatformAdmin() {
         PermissionResolutionFilter filter = new PermissionResolutionFilter(permissionService, true);
 
         GatewayPrincipal admin = new GatewayPrincipal("admin@test.com",
                 List.of("PLATFORM_ADMIN"), Map.of());
 
+        ResolvedPermissions perms = ResolvedPermissions.allPermissive();
+
+        when(permissionService.resolvePermissions("tenant-1", "admin@test.com"))
+                .thenReturn(Mono.just(perms));
+
         ServerWebExchange exchange = MockServerWebExchange.from(
                 MockServerHttpRequest.get("/api/users").build());
         exchange.getAttributes().put(PRINCIPAL_ATTR, admin);
+        exchange.getAttributes().put(TenantResolutionFilter.TENANT_ID_ATTR, "tenant-1");
 
         StepVerifier.create(filter.filter(exchange, filterChain))
                 .expectComplete()
                 .verify();
 
-        verify(permissionService, never()).resolvePermissions(any(), any());
-        ResolvedPermissions perms = PermissionResolutionFilter.getPermissions(exchange);
-        assertThat(perms).isNotNull();
-        assertThat(perms.isAllPermissive()).isTrue();
+        verify(permissionService).resolvePermissions("tenant-1", "admin@test.com");
+        ResolvedPermissions resolved = PermissionResolutionFilter.getPermissions(exchange);
+        assertThat(resolved).isNotNull();
+        assertThat(resolved.isAllPermissive()).isTrue();
     }
 
     @Test

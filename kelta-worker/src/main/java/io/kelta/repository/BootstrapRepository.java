@@ -33,14 +33,16 @@ public class BootstrapRepository {
 
     private static final String SELECT_OIDC_PROVIDER_BY_ISSUER = """
             SELECT id, name, issuer, jwks_uri, audience, active,
-                   client_id, roles_claim, roles_mapping
+                   client_id, roles_claim, roles_mapping,
+                   groups_claim, groups_profile_mapping
             FROM oidc_provider WHERE issuer = ? AND active = true
             LIMIT 1
             """;
 
     private static final String SELECT_OIDC_PROVIDER_BY_ISSUER_AND_TENANT = """
             SELECT id, name, issuer, jwks_uri, audience, active,
-                   client_id, roles_claim, roles_mapping
+                   client_id, roles_claim, roles_mapping,
+                   groups_claim, groups_profile_mapping
             FROM oidc_provider WHERE issuer = ? AND tenant_id = ? AND active = true
             LIMIT 1
             """;

@@ -386,18 +386,15 @@ function NavigateWithTraceId(): React.ReactElement {
  */
 function AdminPageRoute({
   children,
-  requiredRoles,
   requiredPolicies,
 }: {
   children: React.ReactNode
-  requiredRoles?: string[]
   requiredPolicies?: string[]
 }): React.ReactElement {
   const { tenantBasePath } = useTenant()
 
   return (
     <ProtectedRoute
-      requiredRoles={requiredRoles}
       requiredPolicies={requiredPolicies}
       loginPath={`${tenantBasePath}/login`}
       unauthorizedPath={`${tenantBasePath}/unauthorized`}
@@ -935,8 +932,8 @@ function TenantRoutes(): React.ReactElement {
       <Route
         path="tenants"
         element={
-          <AdminPageRoute requiredRoles={['PLATFORM_ADMIN']}>
-            <RequirePermission permission="PLATFORM_ADMIN">
+          <AdminPageRoute>
+            <RequirePermission permission="MANAGE_TENANTS">
               <TenantsPage />
             </RequirePermission>
           </AdminPageRoute>

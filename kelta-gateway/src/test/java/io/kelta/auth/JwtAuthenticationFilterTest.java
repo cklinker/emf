@@ -326,7 +326,7 @@ class JwtAuthenticationFilterTest {
             GatewayPrincipal storedPrincipal = JwtAuthenticationFilter.getPrincipal(capturedExchange);
             assertThat(storedPrincipal).isNotNull();
             assertThat(storedPrincipal.getUsername()).isEqualTo("user123");
-            assertThat(storedPrincipal.getRoles()).containsExactly("USER");
+            assertThat(storedPrincipal.getGroups()).containsExactly("USER");
             return Mono.empty();
         });
 
@@ -386,7 +386,7 @@ class JwtAuthenticationFilterTest {
     /**
      * Helper method to create a mock JWT for testing.
      */
-    private Jwt createMockJwt(String subject, List<String> roles) {
+    private Jwt createMockJwt(String subject, List<String> groups) {
         return new Jwt(
             "token-value",
             Instant.now(),
@@ -394,7 +394,7 @@ class JwtAuthenticationFilterTest {
             Map.of("alg", "RS256"),
             Map.of(
                 "sub", subject,
-                "roles", roles,
+                "roles", groups,
                 "iss", "http://localhost:9000/realms/emf"
             )
         );

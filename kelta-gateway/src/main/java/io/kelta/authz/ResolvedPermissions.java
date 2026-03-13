@@ -42,12 +42,8 @@ public record ResolvedPermissions(
     }
 
     /**
-     * Returns all-permissive permissions. Used when:
-     * <ul>
-     *   <li>Permission enforcement is disabled</li>
-     *   <li>User is a platform admin</li>
-     *   <li>Permission resolution fails (fail-open)</li>
-     * </ul>
+     * Returns all-permissive permissions. Used when permission enforcement
+     * is disabled. Empty maps mean no restrictions are applied.
      */
     public static ResolvedPermissions allPermissive() {
         return new ResolvedPermissions(

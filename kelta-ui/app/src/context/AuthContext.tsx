@@ -95,82 +95,20 @@ function parseJwt(token: string): Record<string, unknown> | null {
 }
 
 /**
- * Apply role mapping from OIDC provider configuration.
- * Maps raw IdP groups (e.g., "authentik Admins", "kelta-admins") to
- * application roles (e.g., "PLATFORM_ADMIN", "ADMIN") using the
- * rolesMapping JSON from the provider config.
- */
-function applyRoleMapping(
-  rawGroups: string[] | undefined,
-  oidcProviders?: OIDCProviderSummary[]
-): string[] | undefined {
-  if (!rawGroups || rawGroups.length === 0) return rawGroups
-  if (!oidcProviders || oidcProviders.length === 0) return rawGroups
-
-  // Find the first provider with a rolesMapping configured
-  const provider = oidcProviders.find((p) => p.rolesMapping)
-  if (!provider?.rolesMapping) return rawGroups
-
-  try {
-    const mapping = JSON.parse(provider.rolesMapping) as Record<string, string>
-    const mappedRoles: string[] = []
-    for (const group of rawGroups) {
-      const role = mapping[group]
-      if (role) {
-        mappedRoles.push(role)
-      }
-    }
-    return mappedRoles.length > 0 ? mappedRoles : rawGroups
-  } catch {
-    console.warn('[Auth] Failed to parse rolesMapping:', provider.rolesMapping)
-    return rawGroups
-  }
-}
-
-/**
  * Extract user information from ID token or access token.
- * When OIDC providers are supplied, applies role mapping to convert
- * raw IdP groups to application roles.
  */
-function extractUserFromToken(
-  idToken?: string,
-  accessToken?: string,
-  oidcProviders?: OIDCProviderSummary[]
-): User | null {
+function extractUserFromToken(idToken?: string, accessToken?: string): User | null {
   const token = idToken || accessToken
   if (!token) return null
 
   const claims = parseJwt(token)
   if (!claims) return null
 
-  // Determine the roles claim name from the provider config (default: "groups")
-  const provider = oidcProviders?.find((p) => p.rolesClaim)
-  const rolesClaim = provider?.rolesClaim || 'groups'
-
-  // Extract raw groups from the configured claim.
-  // Check both ID token and access token since Keycloak typically puts
-  // roles only in the access token, not the ID token.
-  let rawGroups =
-    (claims.roles as string[] | undefined) || (claims[rolesClaim] as string[] | undefined)
-
-  if (!rawGroups && accessToken && accessToken !== token) {
-    const accessClaims = parseJwt(accessToken)
-    if (accessClaims) {
-      rawGroups =
-        (accessClaims.roles as string[] | undefined) ||
-        (accessClaims[rolesClaim] as string[] | undefined)
-    }
-  }
-
-  // Apply role mapping if providers are available
-  const roles = applyRoleMapping(rawGroups, oidcProviders)
-
   return {
     id: (claims.sub as string) || '',
     email: (claims.email as string) || '',
     name: (claims.name as string) || (claims.preferred_username as string),
     picture: claims.picture as string | undefined,
-    roles,
     claims,
   }
 }
@@ -331,7 +269,7 @@ export function AuthProvider({
       }
 
       storeTokens(newTokens)
-      const newUser = extractUserFromToken(newTokens.idToken, newTokens.accessToken, providers)
+      const newUser = extractUserFromToken(newTokens.idToken, newTokens.accessToken)
       if (newUser) {
         setUser(newUser)
       }
@@ -626,7 +564,7 @@ export function AuthProvider({
 
       storeTokens(tokens)
 
-      const newUser = extractUserFromToken(tokens.idToken, tokens.accessToken, availableProviders)
+      const newUser = extractUserFromToken(tokens.idToken, tokens.accessToken)
       if (newUser) {
         setUser(newUser)
       } else {
@@ -746,8 +684,7 @@ export function AuthProvider({
           if (!isTokenExpired(storedTokens.expiresAt)) {
             const existingUser = extractUserFromToken(
               storedTokens.idToken,
-              storedTokens.accessToken,
-              availableProviders
+              storedTokens.accessToken
             )
             if (existingUser) {
               setUser(existingUser)

@@ -188,7 +188,6 @@ function TestComponent({ onRender }: { onRender?: (auth: ReturnType<typeof useAu
         {auth.isAuthenticated ? 'authenticated' : 'not-authenticated'}
       </div>
       <div data-testid="user">{auth.user ? auth.user.email : 'no-user'}</div>
-      <div data-testid="roles">{auth.user?.roles?.join(',') || 'no-roles'}</div>
       <div data-testid="error">{auth.error ? auth.error.message : 'no-error'}</div>
       <button onClick={() => auth.login().catch(() => {})}>Login</button>
       <button onClick={() => auth.logout()}>Logout</button>
@@ -379,70 +378,6 @@ describe('AuthContext', () => {
 
       expect(screen.getByTestId('authenticated')).toHaveTextContent('authenticated')
       expect(screen.getByTestId('user')).toHaveTextContent('test@example.com')
-    })
-  })
-
-  describe('Role Extraction', () => {
-    it('should extract roles from access token when ID token lacks them', async () => {
-      // ID token without roles (typical Keycloak ID token)
-      const idPayload = {
-        sub: 'user-123',
-        email: 'test@example.com',
-        name: 'Test User',
-        exp: Math.floor(Date.now() / 1000) + 3600,
-      }
-      // Access token with roles (typical Keycloak access token)
-      const accessPayload = {
-        sub: 'user-123',
-        email: 'test@example.com',
-        name: 'Test User',
-        roles: ['ADMIN', 'PLATFORM_ADMIN'],
-        exp: Math.floor(Date.now() / 1000) + 3600,
-      }
-      const idToken = createMockJwt(idPayload)
-      const accessToken = createMockJwt(accessPayload)
-
-      const storedTokens = {
-        accessToken,
-        idToken,
-        expiresAt: Date.now() + 3600000,
-      }
-      mockSessionStorage['kelta_auth_tokens'] = JSON.stringify(storedTokens)
-
-      renderWithAuth()
-
-      await waitFor(() => {
-        expect(screen.getByTestId('loading')).toHaveTextContent('not-loading')
-      })
-
-      expect(screen.getByTestId('authenticated')).toHaveTextContent('authenticated')
-      expect(screen.getByTestId('roles')).toHaveTextContent('ADMIN,PLATFORM_ADMIN')
-    })
-
-    it('should use roles from ID token when present', async () => {
-      const payload = {
-        sub: 'user-123',
-        email: 'test@example.com',
-        name: 'Test User',
-        roles: ['VIEWER', 'DEVELOPER'],
-        exp: Math.floor(Date.now() / 1000) + 3600,
-      }
-      const mockToken = createMockJwt(payload)
-
-      const storedTokens = {
-        accessToken: mockToken,
-        idToken: mockToken,
-        expiresAt: Date.now() + 3600000,
-      }
-      mockSessionStorage['kelta_auth_tokens'] = JSON.stringify(storedTokens)
-
-      renderWithAuth()
-
-      await waitFor(() => {
-        expect(screen.getByTestId('loading')).toHaveTextContent('not-loading')
-      })
-
-      expect(screen.getByTestId('roles')).toHaveTextContent('VIEWER,DEVELOPER')
     })
   })
 

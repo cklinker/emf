@@ -127,14 +127,17 @@ public class LoginTrackingFilter extends OncePerRequestFilter {
         }
 
         // Resolve user UUID from email, auto-provisioning if needed
+        String groups = request.getHeader("X-Forwarded-Groups");
         String userId = lookupUserId(email, tenantId);
         if (userId == null) {
             String username = request.getHeader("X-Forwarded-User");
-            String groups = request.getHeader("X-Forwarded-Groups");
             userId = provisionUser(email, tenantId, username, groups);
             if (userId == null) {
                 return;
             }
+        } else {
+            // Existing user — sync profile from OIDC groups mapping
+            syncProfileFromGroups(userId, tenantId, groups);
         }
 
         String sourceIp = extractClientIp(request);
@@ -213,6 +216,32 @@ public class LoginTrackingFilter extends OncePerRequestFilter {
             log.warn("Failed to auto-provision user '{}' in tenant '{}': {}", email, tenantId, e.getMessage());
         }
         return null;
+    }
+
+    /**
+     * Syncs an existing user's profile based on their OIDC groups.
+     * If the groups_profile_mapping resolves to a different profile than
+     * currently assigned, updates the user's profile. This ensures profiles
+     * stay in sync when OIDC group membership changes.
+     */
+    void syncProfileFromGroups(String userId, String tenantId, String groups) {
+        String resolvedProfileId = resolveProfileForGroups(tenantId, groups);
+        if (resolvedProfileId == null) {
+            return;
+        }
+        try {
+            String currentProfileId = jdbcTemplate.queryForObject(
+                    "SELECT profile_id FROM platform_user WHERE id = ?",
+                    String.class, userId);
+            if (!resolvedProfileId.equals(currentProfileId)) {
+                jdbcTemplate.update(
+                        "UPDATE platform_user SET profile_id = ?, updated_at = NOW() WHERE id = ?",
+                        resolvedProfileId, userId);
+                log.info("Synced profile for user '{}' in tenant '{}' from OIDC groups", userId, tenantId);
+            }
+        } catch (Exception e) {
+            log.debug("Could not sync profile for user '{}': {}", userId, e.getMessage());
+        }
     }
 
     /**

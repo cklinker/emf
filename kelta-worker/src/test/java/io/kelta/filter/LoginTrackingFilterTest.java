@@ -301,6 +301,88 @@ class LoginTrackingFilterTest {
     }
 
     @Test
+    void shouldSyncProfileFromGroupsForExistingUser() throws ServletException, IOException {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/accounts");
+        request.addHeader("X-User-Id", "alice@example.com");
+        request.addHeader("X-Tenant-ID", "tenant-123");
+        request.addHeader("X-Forwarded-Groups", "admins");
+        request.setRemoteAddr("192.168.1.1");
+        request.addHeader("User-Agent", "Mozilla/5.0");
+
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+
+        // User already exists
+        when(jdbcTemplate.queryForObject(
+                eq("SELECT id FROM platform_user WHERE tenant_id = ? AND email = ? LIMIT 1"),
+                eq(String.class), eq("tenant-123"), eq("alice@example.com")))
+                .thenReturn("user-uuid-1");
+
+        // Groups mapping
+        when(jdbcTemplate.queryForObject(
+                contains("SELECT groups_profile_mapping FROM oidc_provider"),
+                eq(String.class), eq("tenant-123")))
+                .thenReturn("{\"admins\": \"System Administrator\"}");
+
+        // Profile lookup by name
+        when(jdbcTemplate.queryForObject(
+                contains("SELECT id FROM profile WHERE tenant_id = ? AND name = ?"),
+                eq(String.class), eq("tenant-123"), eq("System Administrator")))
+                .thenReturn("sysadmin-profile-id");
+
+        // Current profile is different
+        when(jdbcTemplate.queryForObject(
+                eq("SELECT profile_id FROM platform_user WHERE id = ?"),
+                eq(String.class), eq("user-uuid-1")))
+                .thenReturn("standard-user-profile-id");
+
+        filter.doFilterInternal(request, response, chain);
+
+        verify(chain).doFilter(request, response);
+
+        // Should update the user's profile
+        verify(jdbcTemplate).update(
+                eq("UPDATE platform_user SET profile_id = ?, updated_at = NOW() WHERE id = ?"),
+                eq("sysadmin-profile-id"), eq("user-uuid-1"));
+    }
+
+    @Test
+    void shouldNotSyncProfileWhenAlreadyCorrect() {
+        // User already has the correct profile
+        when(jdbcTemplate.queryForObject(
+                contains("SELECT groups_profile_mapping FROM oidc_provider"),
+                eq(String.class), eq("tenant-123")))
+                .thenReturn("{\"admins\": \"System Administrator\"}");
+
+        when(jdbcTemplate.queryForObject(
+                contains("SELECT id FROM profile WHERE tenant_id = ? AND name = ?"),
+                eq(String.class), eq("tenant-123"), eq("System Administrator")))
+                .thenReturn("sysadmin-profile-id");
+
+        when(jdbcTemplate.queryForObject(
+                eq("SELECT profile_id FROM platform_user WHERE id = ?"),
+                eq(String.class), eq("user-uuid-1")))
+                .thenReturn("sysadmin-profile-id");
+
+        filter.syncProfileFromGroups("user-uuid-1", "tenant-123", "admins");
+
+        // Should NOT update because profile is already correct
+        verify(jdbcTemplate, never()).update(
+                contains("UPDATE platform_user SET profile_id"),
+                any(), any());
+    }
+
+    @Test
+    void shouldNotSyncProfileWhenNoGroupsHeader() {
+        filter.syncProfileFromGroups("user-uuid-1", "tenant-123", null);
+
+        // Should not query anything
+        verify(jdbcTemplate, never()).queryForObject(
+                contains("groups_profile_mapping"),
+                eq(String.class), any());
+    }
+
+    @Test
     void shouldTrackDifferentUsersIndependently() throws ServletException, IOException {
         FilterChain chain = mock(FilterChain.class);
 

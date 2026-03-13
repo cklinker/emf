@@ -15,6 +15,11 @@ test.describe("Setup Home", () => {
     const setupPage = new SetupHomePage(page, tenantSlug);
     await setupPage.goto();
 
+    // Wait for at least one category card to appear before counting
+    await expect(
+      page.locator('[data-testid^="setup-category-"]').first(),
+    ).toBeVisible({ timeout: 10_000 });
+
     const categoryCount = await setupPage.getCategoryCount();
     expect(categoryCount).toBeGreaterThan(0);
   });

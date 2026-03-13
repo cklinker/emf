@@ -169,6 +169,8 @@ public class InternalBootstrapController {
         response.put("clientId", provider.get("client_id"));
         response.put("rolesClaim", provider.get("roles_claim"));
         response.put("rolesMapping", provider.get("roles_mapping"));
+        response.put("groupsClaim", provider.get("groups_claim"));
+        response.put("groupsProfileMapping", provider.get("groups_profile_mapping"));
 
         return ResponseEntity.ok(response);
     }

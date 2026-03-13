@@ -156,7 +156,6 @@ describe('UserMenu', () => {
     email: 'john.doe@example.com',
     name: 'John Doe',
     picture: undefined,
-    roles: ['admin'],
   }
 
   const defaultProps: UserMenuProps = {

@@ -10,7 +10,7 @@ import java.util.Map;
 
 /**
  * Extracts user information from JWT token claims to create a GatewayPrincipal.
- * Handles extraction of username, roles, and all claims from the JWT.
+ * Handles extraction of username, groups, and all claims from the JWT.
  */
 @Component
 public class PrincipalExtractor {
@@ -25,7 +25,7 @@ public class PrincipalExtractor {
      * Extracts a GatewayPrincipal from a JWT token.
      * 
      * Username is extracted from "preferred_username" claim, falling back to "sub" if not present.
-     * Roles are extracted from "roles" claim, falling back to "authorities" if not present.
+     * Groups are extracted from "roles" claim, falling back to "authorities" then "groups".
      *
      * @param jwt the JWT token to extract information from
      * @return a GatewayPrincipal containing the user information
@@ -37,10 +37,10 @@ public class PrincipalExtractor {
         }
         
         String username = extractUsername(jwt);
-        List<String> roles = extractRoles(jwt);
+        List<String> groups = extractGroups(jwt);
         Map<String, Object> claims = jwt.getClaims();
-        
-        return new GatewayPrincipal(username, roles, claims);
+
+        return new GatewayPrincipal(username, groups, claims);
     }
     
     /**
@@ -66,71 +66,71 @@ public class PrincipalExtractor {
     }
     
     /**
-     * Extracts roles from the JWT.
+     * Extracts groups from the JWT.
      * Tries "roles" claim first, then "authorities", then "groups" (Authentik).
-     * Returns an empty list if no role claims are present.
+     * Returns an empty list if no group claims are present.
      *
      * @param jwt the JWT token
-     * @return a list of roles, or an empty list if no roles are found
+     * @return a list of groups, or an empty list if no groups are found
      */
-    private List<String> extractRoles(Jwt jwt) {
+    private List<String> extractGroups(Jwt jwt) {
         // Try "roles" claim first
-        List<String> roles = extractRolesFromClaim(jwt, ROLES_CLAIM);
-        if (!roles.isEmpty()) {
-            return roles;
+        List<String> groups = extractGroupsFromClaim(jwt, ROLES_CLAIM);
+        if (!groups.isEmpty()) {
+            return groups;
         }
 
         // Fall back to "authorities" claim
-        roles = extractRolesFromClaim(jwt, AUTHORITIES_CLAIM);
-        if (!roles.isEmpty()) {
-            return roles;
+        groups = extractGroupsFromClaim(jwt, AUTHORITIES_CLAIM);
+        if (!groups.isEmpty()) {
+            return groups;
         }
 
         // Fall back to "groups" claim (used by Authentik and other providers)
-        return extractRolesFromClaim(jwt, GROUPS_CLAIM);
+        return extractGroupsFromClaim(jwt, GROUPS_CLAIM);
     }
-    
+
     /**
-     * Extracts roles from a specific claim in the JWT.
-     * Handles both List<String> and comma-separated string formats.
+     * Extracts groups from a specific claim in the JWT.
+     * Handles both List&lt;String&gt; and comma-separated string formats.
      *
      * @param jwt the JWT token
-     * @param claimName the name of the claim to extract roles from
-     * @return a list of roles, or an empty list if the claim is not present or invalid
+     * @param claimName the name of the claim to extract groups from
+     * @return a list of groups, or an empty list if the claim is not present or invalid
      */
     @SuppressWarnings("unchecked")
-    private List<String> extractRolesFromClaim(Jwt jwt, String claimName) {
+    private List<String> extractGroupsFromClaim(Jwt jwt, String claimName) {
         Object claimValue = jwt.getClaim(claimName);
-        
+
         if (claimValue == null) {
             return Collections.emptyList();
         }
-        
+
         // Handle List<String> format
         if (claimValue instanceof List) {
             try {
                 List<?> list = (List<?>) claimValue;
-                List<String> roles = new ArrayList<>();
+                List<String> groups = new ArrayList<>();
                 for (Object item : list) {
                     if (item instanceof String) {
-                        roles.add((String) item);
+                        groups.add((String) item);
                     }
                 }
-                return roles;
+                return groups;
             } catch (ClassCastException e) {
                 return Collections.emptyList();
             }
         }
-        
+
         // Handle comma-separated string format
         if (claimValue instanceof String) {
-            String rolesString = (String) claimValue;
-            if (rolesString.isEmpty()) {
+            String groupsString = (String) claimValue;
+            if (groupsString.isEmpty()) {
                 return Collections.emptyList();
             }
-            return List.of(rolesString.split(","));
+            return List.of(groupsString.split(","));
         }
-        
+
         return Collections.emptyList();
     }
 }

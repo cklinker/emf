@@ -22,8 +22,6 @@ export interface ProtectedRouteProps {
   children: React.ReactNode
   /** Optional policies required to access this route */
   requiredPolicies?: string[]
-  /** Optional roles required to access this route */
-  requiredRoles?: string[]
   /** Custom redirect path for unauthenticated users (defaults to /login) */
   loginPath?: string
   /** Custom redirect path for unauthorized users (defaults to /unauthorized) */
@@ -32,23 +30,6 @@ export interface ProtectedRouteProps {
   loadingComponent?: React.ReactNode
   /** Callback when authorization check fails */
   onUnauthorized?: () => void
-}
-
-/**
- * Check if user has any of the required roles
- */
-// eslint-disable-next-line react-refresh/only-export-components
-export function hasRequiredRoles(
-  userRoles: string[] | undefined,
-  requiredRoles: string[]
-): boolean {
-  if (!requiredRoles || requiredRoles.length === 0) {
-    return true
-  }
-  if (!userRoles || userRoles.length === 0) {
-    return false
-  }
-  return requiredRoles.some((role) => userRoles.includes(role))
 }
 
 /**
@@ -78,7 +59,6 @@ export function hasRequiredPolicies(
 export function ProtectedRoute({
   children,
   requiredPolicies = [],
-  requiredRoles = [],
   loginPath = '/login',
   unauthorizedPath = '/unauthorized',
   loadingComponent,
@@ -115,15 +95,12 @@ export function ProtectedRoute({
     )
   }
 
-  // Check role-based authorization
-  const hasRoles = hasRequiredRoles(user?.roles, requiredRoles)
-
   // Check policy-based authorization
   const userPolicies = (user?.claims?.policies as string[]) || []
   const hasPolicies = hasRequiredPolicies(userPolicies, requiredPolicies)
 
   // Redirect to unauthorized page if user lacks required permissions
-  if (!hasRoles || !hasPolicies) {
+  if (!hasPolicies) {
     if (onUnauthorized) {
       onUnauthorized()
     }
@@ -132,7 +109,6 @@ export function ProtectedRoute({
         to={unauthorizedPath}
         state={{
           from: location,
-          requiredRoles: requiredRoles.length > 0 ? requiredRoles : undefined,
           requiredPolicies: requiredPolicies.length > 0 ? requiredPolicies : undefined,
         }}
         replace

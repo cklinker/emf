@@ -142,6 +142,8 @@ class EndToEndRequestFlowIntegrationTest {
         RecordedRequest backendRequest = mockBackend.takeRequest();
         assertThat(backendRequest.getPath()).isEqualTo("/1");
         assertThat(backendRequest.getHeader("X-Forwarded-User")).isEqualTo("test-user");
+        assertThat(backendRequest.getHeader("X-Forwarded-Groups")).isEqualTo("USER");
+        // Backward compatibility: X-Forwarded-Roles should also be present
         assertThat(backendRequest.getHeader("X-Forwarded-Roles")).isEqualTo("USER");
         assertThat(backendRequest.getHeader(HttpHeaders.AUTHORIZATION)).isNull();
     }

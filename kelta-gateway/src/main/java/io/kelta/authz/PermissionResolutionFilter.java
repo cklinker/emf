@@ -23,8 +23,9 @@ import reactor.core.publisher.Mono;
  * <p>When {@code kelta.gateway.security.permissions-enabled} is false,
  * this filter is a no-op. Defaults to enabled (true).
  *
- * <p>Platform admins (users with PLATFORM_ADMIN role) bypass permission resolution
- * and receive all-permissive permissions.
+ * <p>All authenticated users have their permissions resolved through the worker's
+ * {@code /internal/permissions} endpoint (cached in Redis). The System Administrator
+ * profile grants all permissions, replacing the previous PLATFORM_ADMIN role bypass.
  */
 @Component
 public class PermissionResolutionFilter implements GlobalFilter, Ordered {
@@ -52,12 +53,6 @@ public class PermissionResolutionFilter implements GlobalFilter, Ordered {
 
         GatewayPrincipal principal = JwtAuthenticationFilter.getPrincipal(exchange);
         if (principal == null) {
-            return chain.filter(exchange);
-        }
-
-        // Platform admins bypass permission resolution
-        if (principal.hasRole("PLATFORM_ADMIN")) {
-            exchange.getAttributes().put(PERMISSIONS_ATTRIBUTE, ResolvedPermissions.allPermissive());
             return chain.filter(exchange);
         }
 

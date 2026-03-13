@@ -4,6 +4,16 @@ import { createTestWrapper, setupAuthMocks, mockAxios, resetMockAxios } from '..
 import { render, screen, waitFor } from '@testing-library/react'
 import { GovernorLimitsPage } from './GovernorLimitsPage'
 
+const mockHasPermission = vi.fn().mockReturnValue(false)
+vi.mock('../../hooks/useSystemPermissions', () => ({
+  useSystemPermissions: () => ({
+    permissions: {},
+    hasPermission: mockHasPermission,
+    isLoading: false,
+    error: null,
+  }),
+}))
+
 const mockStatus = {
   limits: {
     apiCallsPerDay: 100000,
@@ -133,7 +143,7 @@ describe('GovernorLimitsPage', () => {
   })
 
   describe('Edit functionality', () => {
-    it('does not show edit button for non-PLATFORM_ADMIN users', async () => {
+    it('does not show edit button for users without MANAGE_TENANTS permission', async () => {
       render(<GovernorLimitsPage />, { wrapper: createTestWrapper() })
 
       await waitFor(() => {

@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '../../context/I18nContext'
 import { useApi } from '../../context/ApiContext'
-import { useAuth } from '../../context/AuthContext'
+import { useSystemPermissions } from '../../hooks/useSystemPermissions'
 import { useToast } from '../../components/Toast'
 import { LoadingSpinner, ErrorMessage } from '../../components'
 import { cn } from '@/lib/utils'
@@ -24,11 +24,11 @@ export interface GovernorLimitsPageProps {
 export function GovernorLimitsPage({ className }: GovernorLimitsPageProps): React.ReactElement {
   const { t } = useI18n()
   const { apiClient, keltaClient } = useApi()
-  const { user } = useAuth()
+  const { hasPermission } = useSystemPermissions()
   const { showToast } = useToast()
   const queryClient = useQueryClient()
 
-  const isPlatformAdmin = user?.roles?.includes('PLATFORM_ADMIN') ?? false
+  const canManageTenants = hasPermission('MANAGE_TENANTS')
   const [isEditing, setIsEditing] = useState(false)
   const [editLimits, setEditLimits] = useState<GovernorLimits | null>(null)
 
@@ -123,7 +123,7 @@ export function GovernorLimitsPage({ className }: GovernorLimitsPageProps): Reac
     <div className={cn('mx-auto max-w-[1200px] p-6', className)} data-testid="governor-limits-page">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="m-0 text-2xl font-semibold text-foreground">{t('governorLimits.title')}</h1>
-        {isPlatformAdmin && !isEditing && (
+        {canManageTenants && !isEditing && (
           <button
             onClick={handleEdit}
             className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"

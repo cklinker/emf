@@ -11,7 +11,6 @@
 import { describe, it, expect } from 'vitest'
 import {
   checkPageAuthorization,
-  checkRoleAuthorization,
   checkPolicyAuthorization,
   checkAuthorization,
   getRedirectPath,
@@ -107,53 +106,6 @@ describe('checkPageAuthorization', () => {
   })
 })
 
-describe('checkRoleAuthorization', () => {
-  it('should return unauthorized for null user', () => {
-    const result = checkRoleAuthorization(null, ['admin'])
-
-    expect(result.authorized).toBe(false)
-    expect(result.reason).toBe('unauthenticated')
-  })
-
-  it('should return authorized when no roles are required', () => {
-    const user = createUser()
-    const result = checkRoleAuthorization(user, [])
-
-    expect(result.authorized).toBe(true)
-  })
-
-  it('should return authorized when user has required role', () => {
-    const user = createUser({ roles: ['admin', 'user'] })
-    const result = checkRoleAuthorization(user, ['admin'])
-
-    expect(result.authorized).toBe(true)
-  })
-
-  it('should return authorized when user has any of the required roles', () => {
-    const user = createUser({ roles: ['editor'] })
-    const result = checkRoleAuthorization(user, ['admin', 'editor'])
-
-    expect(result.authorized).toBe(true)
-  })
-
-  it('should return unauthorized when user lacks required role', () => {
-    const user = createUser({ roles: ['user'] })
-    const result = checkRoleAuthorization(user, ['admin'])
-
-    expect(result.authorized).toBe(false)
-    expect(result.reason).toBe('missing_role')
-    expect(result.missingRoles).toContain('admin')
-  })
-
-  it('should return unauthorized when user has no roles', () => {
-    const user = createUser()
-    const result = checkRoleAuthorization(user, ['admin'])
-
-    expect(result.authorized).toBe(false)
-    expect(result.reason).toBe('missing_role')
-  })
-})
-
 describe('checkPolicyAuthorization', () => {
   it('should return unauthorized for null user', () => {
     const result = checkPolicyAuthorization(null, ['read:collections'])
@@ -191,7 +143,7 @@ describe('checkPolicyAuthorization', () => {
 
 describe('checkAuthorization', () => {
   it('should return unauthorized for null user', () => {
-    const result = checkAuthorization(null, ['admin'], ['read:collections'])
+    const result = checkAuthorization(null, ['read:collections'])
 
     expect(result.authorized).toBe(false)
     expect(result.reason).toBe('unauthenticated')
@@ -199,53 +151,28 @@ describe('checkAuthorization', () => {
 
   it('should return authorized when no requirements', () => {
     const user = createUser()
-    const result = checkAuthorization(user, [], [])
+    const result = checkAuthorization(user, [])
 
     expect(result.authorized).toBe(true)
   })
 
-  it('should return authorized when user meets all requirements', () => {
+  it('should return authorized when user meets policy requirements', () => {
     const user = createUser({
-      roles: ['admin'],
       claims: { policies: ['read:collections'] },
     })
-    const result = checkAuthorization(user, ['admin'], ['read:collections'])
+    const result = checkAuthorization(user, ['read:collections'])
 
     expect(result.authorized).toBe(true)
-  })
-
-  it('should return unauthorized when user lacks role', () => {
-    const user = createUser({
-      roles: ['user'],
-      claims: { policies: ['read:collections'] },
-    })
-    const result = checkAuthorization(user, ['admin'], ['read:collections'])
-
-    expect(result.authorized).toBe(false)
-    expect(result.reason).toBe('missing_role')
   })
 
   it('should return unauthorized when user lacks policy', () => {
     const user = createUser({
-      roles: ['admin'],
       claims: { policies: ['read:other'] },
     })
-    const result = checkAuthorization(user, ['admin'], ['read:collections'])
+    const result = checkAuthorization(user, ['read:collections'])
 
     expect(result.authorized).toBe(false)
     expect(result.reason).toBe('missing_policy')
-  })
-
-  it('should check roles before policies', () => {
-    const user = createUser({
-      roles: ['user'],
-      claims: { policies: ['read:other'] },
-    })
-    const result = checkAuthorization(user, ['admin'], ['read:collections'])
-
-    // Should fail on role check first
-    expect(result.authorized).toBe(false)
-    expect(result.reason).toBe('missing_role')
   })
 })
 
@@ -263,15 +190,6 @@ describe('getRedirectPath', () => {
     })
 
     expect(result).toBe('/login')
-  })
-
-  it('should return unauthorized path when missing role', () => {
-    const result = getRedirectPath({
-      authorized: false,
-      reason: 'missing_role',
-    })
-
-    expect(result).toBe('/unauthorized')
   })
 
   it('should return unauthorized path when missing policy', () => {
@@ -294,7 +212,7 @@ describe('getRedirectPath', () => {
 
   it('should use custom unauthorized path', () => {
     const result = getRedirectPath(
-      { authorized: false, reason: 'missing_role' },
+      { authorized: false, reason: 'missing_policy' },
       '/login',
       '/custom-unauthorized'
     )

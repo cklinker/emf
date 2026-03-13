@@ -37,7 +37,6 @@ export function UnauthorizedPage({ title, message }: UnauthorizedPageProps): Rea
   // Get required permissions from location state
   const state = location.state as {
     from?: { pathname: string }
-    requiredRoles?: string[]
     requiredPolicies?: string[]
   } | null
 
@@ -82,35 +81,21 @@ export function UnauthorizedPage({ title, message }: UnauthorizedPageProps): Rea
         )}
 
         {/* Required permissions info */}
-        {(state?.requiredRoles || state?.requiredPolicies) && (
+        {state?.requiredPolicies && state.requiredPolicies.length > 0 && (
           <div className="mb-6 rounded-lg bg-muted p-4 text-left">
             <p className="mb-2 font-medium text-foreground">
               {t('unauthorized.requiredPermissions')}
             </p>
-            {state.requiredRoles && state.requiredRoles.length > 0 && (
-              <div className="mb-2 text-sm text-muted-foreground">
-                <strong>{t('unauthorized.requiredRoles')}:</strong>
-                <ul className="mt-1 pl-6">
-                  {state.requiredRoles.map((role) => (
-                    <li key={role} className="mb-1">
-                      {role}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {state.requiredPolicies && state.requiredPolicies.length > 0 && (
-              <div className="mb-2 text-sm text-muted-foreground">
-                <strong>{t('unauthorized.requiredPolicies')}:</strong>
-                <ul className="mt-1 pl-6">
-                  {state.requiredPolicies.map((policy) => (
-                    <li key={policy} className="mb-1">
-                      {policy}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+            <div className="mb-2 text-sm text-muted-foreground">
+              <strong>{t('unauthorized.requiredPolicies')}:</strong>
+              <ul className="mt-1 pl-6">
+                {state.requiredPolicies.map((policy) => (
+                  <li key={policy} className="mb-1">
+                    {policy}
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
         )}
 

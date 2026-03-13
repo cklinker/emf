@@ -19,9 +19,7 @@ export interface AuthorizationResult {
   /** Whether the user is authorized */
   authorized: boolean
   /** Reason for denial if not authorized */
-  reason?: 'unauthenticated' | 'missing_role' | 'missing_policy'
-  /** Missing roles if authorization failed due to roles */
-  missingRoles?: string[]
+  reason?: 'unauthenticated' | 'missing_policy'
   /** Missing policies if authorization failed due to policies */
   missingPolicies?: string[]
 }
@@ -61,47 +59,6 @@ export function checkPageAuthorization(
       authorized: false,
       reason: 'missing_policy',
       missingPolicies: pageConfig.policies.filter((policy) => !userPolicies.includes(policy)),
-    }
-  }
-
-  return { authorized: true }
-}
-
-/**
- * Check if a user has specific roles
- *
- * @param user - The current user
- * @param requiredRoles - Array of required roles (user needs at least one)
- * @returns Authorization result
- */
-export function checkRoleAuthorization(
-  user: User | null,
-  requiredRoles: string[]
-): AuthorizationResult {
-  // Check authentication first
-  if (!user) {
-    return {
-      authorized: false,
-      reason: 'unauthenticated',
-    }
-  }
-
-  // If no roles are required, allow access
-  if (!requiredRoles || requiredRoles.length === 0) {
-    return { authorized: true }
-  }
-
-  // Get user's roles
-  const userRoles = user.roles || []
-
-  // Check if user has any of the required roles
-  const hasRole = requiredRoles.some((role) => userRoles.includes(role))
-
-  if (!hasRole) {
-    return {
-      authorized: false,
-      reason: 'missing_role',
-      missingRoles: requiredRoles.filter((role) => !userRoles.includes(role)),
     }
   }
 
@@ -150,16 +107,14 @@ export function checkPolicyAuthorization(
 }
 
 /**
- * Combined authorization check for both roles and policies
+ * Authorization check for policies
  *
  * @param user - The current user
- * @param requiredRoles - Array of required roles (user needs at least one)
  * @param requiredPolicies - Array of required policies (user needs at least one)
  * @returns Authorization result
  */
 export function checkAuthorization(
   user: User | null,
-  requiredRoles: string[] = [],
   requiredPolicies: string[] = []
 ): AuthorizationResult {
   // Check authentication first
@@ -168,12 +123,6 @@ export function checkAuthorization(
       authorized: false,
       reason: 'unauthenticated',
     }
-  }
-
-  // Check roles
-  const roleResult = checkRoleAuthorization(user, requiredRoles)
-  if (!roleResult.authorized && roleResult.reason === 'missing_role') {
-    return roleResult
   }
 
   // Check policies

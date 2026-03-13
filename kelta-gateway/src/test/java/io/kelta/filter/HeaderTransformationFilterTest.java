@@ -27,7 +27,8 @@ import static org.mockito.Mockito.when;
  * Tests verify that:
  * - Authorization header is preserved for downstream JWT validation
  * - X-Forwarded-User header is added with principal username
- * - X-Forwarded-Roles header is added with comma-separated roles
+ * - X-Forwarded-Groups header is added with comma-separated groups
+ * - X-Forwarded-Roles header is added for backward compatibility (same value as groups)
  * - Other headers are preserved
  * - Filter handles unauthenticated requests gracefully
  */
@@ -118,36 +119,38 @@ class HeaderTransformationFilterTest {
     }
     
     @Test
-    void shouldAddForwardedRolesHeaderWithCommaSeparatedRoles() {
-        // Given: A request with authenticated principal having multiple roles
+    void shouldAddForwardedGroupsHeaderWithCommaSeparatedGroups() {
+        // Given: A request with authenticated principal having multiple groups
         MockServerHttpRequest request = MockServerHttpRequest
                 .get("/api/users")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer test-token")
                 .build();
-        
+
         MockServerWebExchange exchange = MockServerWebExchange.from(request);
-        
+
         GatewayPrincipal principal = new GatewayPrincipal(
                 "admin.user",
                 Arrays.asList("USER", "ADMIN", "MODERATOR"),
                 Collections.emptyMap()
         );
         exchange.getAttributes().put("gateway.principal", principal);
-        
+
         // Capture the mutated exchange
         final ServerWebExchange[] capturedExchange = new ServerWebExchange[1];
         when(chain.filter(any(ServerWebExchange.class))).thenAnswer(invocation -> {
             capturedExchange[0] = invocation.getArgument(0);
             return Mono.empty();
         });
-        
+
         // When: Filter is applied
         StepVerifier.create(filter.filter(exchange, chain))
                 .verifyComplete();
-        
-        // Then: X-Forwarded-Roles header should contain comma-separated roles
+
+        // Then: X-Forwarded-Groups header should contain comma-separated groups
         assertThat(capturedExchange[0]).isNotNull();
         HttpHeaders headers = capturedExchange[0].getRequest().getHeaders();
+        assertThat(headers.getFirst("X-Forwarded-Groups")).isEqualTo("USER,ADMIN,MODERATOR");
+        // Backward compatibility: X-Forwarded-Roles should also be set with the same value
         assertThat(headers.getFirst("X-Forwarded-Roles")).isEqualTo("USER,ADMIN,MODERATOR");
     }
     
@@ -192,36 +195,37 @@ class HeaderTransformationFilterTest {
     }
     
     @Test
-    void shouldHandleEmptyRolesList() {
-        // Given: A request with principal having no roles
+    void shouldHandleEmptyGroupsList() {
+        // Given: A request with principal having no groups
         MockServerHttpRequest request = MockServerHttpRequest
                 .get("/api/users")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer test-token")
                 .build();
-        
+
         MockServerWebExchange exchange = MockServerWebExchange.from(request);
-        
+
         GatewayPrincipal principal = new GatewayPrincipal(
                 "testuser",
                 Collections.emptyList(),
                 Collections.emptyMap()
         );
         exchange.getAttributes().put("gateway.principal", principal);
-        
+
         // Capture the mutated exchange
         final ServerWebExchange[] capturedExchange = new ServerWebExchange[1];
         when(chain.filter(any(ServerWebExchange.class))).thenAnswer(invocation -> {
             capturedExchange[0] = invocation.getArgument(0);
             return Mono.empty();
         });
-        
+
         // When: Filter is applied
         StepVerifier.create(filter.filter(exchange, chain))
                 .verifyComplete();
-        
-        // Then: X-Forwarded-Roles header should be empty string
+
+        // Then: Both group headers should be empty string
         assertThat(capturedExchange[0]).isNotNull();
         HttpHeaders headers = capturedExchange[0].getRequest().getHeaders();
+        assertThat(headers.getFirst("X-Forwarded-Groups")).isEqualTo("");
         assertThat(headers.getFirst("X-Forwarded-Roles")).isEqualTo("");
     }
     
@@ -251,6 +255,7 @@ class HeaderTransformationFilterTest {
         assertThat(capturedExchange[0]).isNotNull();
         HttpHeaders headers = capturedExchange[0].getRequest().getHeaders();
         assertThat(headers.containsKey("X-Forwarded-User")).isFalse();
+        assertThat(headers.containsKey("X-Forwarded-Groups")).isFalse();
         assertThat(headers.containsKey("X-Forwarded-Roles")).isFalse();
         assertThat(headers.getFirst("X-Custom-Header")).isEqualTo("custom-value");
     }
@@ -269,6 +274,7 @@ class HeaderTransformationFilterTest {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer test-token")
                 .header("X-Forwarded-User", "forged-admin")
                 .header("X-User-Id", "forged-user-id")
+                .header("X-Forwarded-Groups", "SUPER_ADMIN")
                 .header("X-Forwarded-Roles", "SUPER_ADMIN")
                 .build();
 
@@ -297,6 +303,7 @@ class HeaderTransformationFilterTest {
         HttpHeaders headers = capturedExchange[0].getRequest().getHeaders();
         assertThat(headers.getFirst("X-Forwarded-User")).isEqualTo("real.user");
         assertThat(headers.getFirst("X-User-Id")).isEqualTo("real.user@example.com");
+        assertThat(headers.getFirst("X-Forwarded-Groups")).isEqualTo("USER");
         assertThat(headers.getFirst("X-Forwarded-Roles")).isEqualTo("USER");
     }
 
@@ -381,35 +388,36 @@ class HeaderTransformationFilterTest {
     }
 
     @Test
-    void shouldHandleSingleRole() {
-        // Given: A request with principal having single role
+    void shouldHandleSingleGroup() {
+        // Given: A request with principal having single group
         MockServerHttpRequest request = MockServerHttpRequest
                 .get("/api/users")
                 .build();
-        
+
         MockServerWebExchange exchange = MockServerWebExchange.from(request);
-        
+
         GatewayPrincipal principal = new GatewayPrincipal(
                 "testuser",
                 Arrays.asList("ADMIN"),
                 Collections.emptyMap()
         );
         exchange.getAttributes().put("gateway.principal", principal);
-        
+
         // Capture the mutated exchange
         final ServerWebExchange[] capturedExchange = new ServerWebExchange[1];
         when(chain.filter(any(ServerWebExchange.class))).thenAnswer(invocation -> {
             capturedExchange[0] = invocation.getArgument(0);
             return Mono.empty();
         });
-        
+
         // When: Filter is applied
         StepVerifier.create(filter.filter(exchange, chain))
                 .verifyComplete();
-        
-        // Then: X-Forwarded-Roles header should contain single role without comma
+
+        // Then: Both group headers should contain single group without comma
         assertThat(capturedExchange[0]).isNotNull();
         HttpHeaders headers = capturedExchange[0].getRequest().getHeaders();
+        assertThat(headers.getFirst("X-Forwarded-Groups")).isEqualTo("ADMIN");
         assertThat(headers.getFirst("X-Forwarded-Roles")).isEqualTo("ADMIN");
     }
 }

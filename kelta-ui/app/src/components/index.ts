@@ -90,7 +90,7 @@ export type {
 } from './LiveRegion'
 
 // ProtectedRoute component for route guards
-export { ProtectedRoute, hasRequiredRoles, hasRequiredPolicies } from './ProtectedRoute'
+export { ProtectedRoute, hasRequiredPolicies } from './ProtectedRoute'
 export type { ProtectedRouteProps } from './ProtectedRoute'
 
 // PageTransition component for page animations

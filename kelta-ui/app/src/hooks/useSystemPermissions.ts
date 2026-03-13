@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../context'
-import { useTenant } from '../context/TenantContext'
+import { useApi } from '../context/ApiContext'
 
 /**
  * System-level permission flags for the current user.
@@ -20,21 +20,16 @@ export interface UseSystemPermissionsReturn {
  * Results are cached with a 5-minute stale time.
  */
 export function useSystemPermissions(): UseSystemPermissionsReturn {
-  const { user, getAccessToken } = useAuth()
-  const { tenantSlug } = useTenant()
+  const { user } = useAuth()
+  const { keltaClient } = useApi()
 
   const { data, isLoading, error } = useQuery<SystemPermissions>({
-    queryKey: ['my-permissions', 'system', tenantSlug],
+    queryKey: ['my-permissions', 'system'],
     queryFn: async () => {
-      const token = await getAccessToken()
-      const response = await fetch(`/${tenantSlug}/api/me/permissions`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (!response.ok) return {} as SystemPermissions
-      const json = await response.json()
-      return (json.systemPermissions ?? {}) as SystemPermissions
+      const response = await keltaClient.getAxiosInstance().get('/api/me/permissions')
+      return (response.data?.systemPermissions ?? {}) as SystemPermissions
     },
-    enabled: !!user && !!tenantSlug,
+    enabled: !!user,
     staleTime: 5 * 60 * 1000,
     retry: false,
   })

@@ -12,7 +12,7 @@ export class AppHomePage extends BasePage {
     this.quickActions = this.page.getByText("Quick Actions").first();
     this.recentItems = this.page.getByText("Recent Items").first();
     this.favorites = this.page
-      .locator("h3, [class*='CardTitle']")
+      .locator("[data-slot='card-title']")
       .filter({ hasText: "Favorites" })
       .first();
   }

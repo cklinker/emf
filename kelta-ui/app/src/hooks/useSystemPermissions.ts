@@ -31,7 +31,8 @@ export function useSystemPermissions(): UseSystemPermissionsReturn {
     },
     enabled: !!user,
     staleTime: 5 * 60 * 1000,
-    retry: false,
+    retry: 2,
+    retryDelay: 1000,
   })
 
   const permissions: SystemPermissions = data ?? {}

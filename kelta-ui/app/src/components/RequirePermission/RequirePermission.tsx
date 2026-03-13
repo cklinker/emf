@@ -9,22 +9,22 @@ interface RequirePermissionProps {
 
 /**
  * Component that conditionally renders children based on system permission.
- * Shows a loading spinner while permissions are being fetched.
- * Shows the fallback (or a default "Unauthorized" message) if permission is denied.
+ * Renders children while permissions are loading or on error to avoid blocking
+ * page access — the gateway enforces permissions at the API level.
+ * Only hides content when permissions are loaded and the required permission
+ * is explicitly not granted.
  */
 export function RequirePermission({
   permission,
   children,
   fallback,
 }: RequirePermissionProps): React.ReactElement | null {
-  const { hasPermission, isLoading } = useSystemPermissions()
+  const { hasPermission, isLoading, error } = useSystemPermissions()
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600" />
-      </div>
-    )
+  // Render children while loading or on error — the gateway enforces
+  // permissions at the API level, so blocking the UI is unnecessary.
+  if (isLoading || error) {
+    return <>{children}</>
   }
 
   if (!hasPermission(permission)) {

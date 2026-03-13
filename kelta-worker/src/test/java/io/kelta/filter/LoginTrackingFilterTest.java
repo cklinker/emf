@@ -410,4 +410,36 @@ class LoginTrackingFilterTest {
         // Two UPDATE queries (one per user)
         verify(jdbcTemplate, times(2)).update(contains("UPDATE platform_user"), any(), any(), any());
     }
+
+    @Test
+    void shouldPreferSystemAdministratorWhenMultipleGroupsMatch() {
+        // User is in both "developers" and "admins" groups, with "developers" first
+        when(jdbcTemplate.queryForObject(
+                contains("SELECT groups_profile_mapping FROM oidc_provider"),
+                eq(String.class), eq("tenant-123")))
+                .thenReturn("{\"developers\": \"Solution Manager\", \"admins\": \"System Administrator\"}");
+
+        when(jdbcTemplate.queryForObject(
+                contains("SELECT id FROM profile WHERE tenant_id = ? AND name = ?"),
+                eq(String.class), eq("tenant-123"), eq("Solution Manager")))
+                .thenReturn("solution-manager-profile-id");
+
+        when(jdbcTemplate.queryForObject(
+                contains("SELECT id FROM profile WHERE tenant_id = ? AND name = ?"),
+                eq(String.class), eq("tenant-123"), eq("System Administrator")))
+                .thenReturn("sysadmin-profile-id");
+
+        // Current profile is different
+        when(jdbcTemplate.queryForObject(
+                eq("SELECT profile_id FROM platform_user WHERE id = ?"),
+                eq(String.class), eq("user-uuid-1")))
+                .thenReturn("solution-manager-profile-id");
+
+        filter.syncProfileFromGroups("user-uuid-1", "tenant-123", "developers,admins");
+
+        // Should update to System Administrator despite "developers" being first
+        verify(jdbcTemplate).update(
+                eq("UPDATE platform_user SET profile_id = ?, updated_at = NOW() WHERE id = ?"),
+                eq("sysadmin-profile-id"), eq("user-uuid-1"));
+    }
 }

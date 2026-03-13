@@ -268,6 +268,11 @@ public class LoginTrackingFilter extends OncePerRequestFilter {
             Map<String, String> mapping = OBJECT_MAPPER.readValue(
                     mappingJson, new TypeReference<Map<String, String>>() {});
 
+            // Check all groups and prefer "System Administrator" over other matches.
+            // This ensures users in multiple groups (e.g. emf-admins + emf-developers)
+            // get the highest-privilege profile regardless of group ordering.
+            String bestProfileId = null;
+            String bestProfileName = null;
             for (String group : groups.split(",")) {
                 String profileName = mapping.get(group.trim());
                 if (profileName != null) {
@@ -275,10 +280,17 @@ public class LoginTrackingFilter extends OncePerRequestFilter {
                     if (profileId != null) {
                         log.debug("Mapped OIDC group '{}' to profile '{}' for tenant '{}'",
                                 group.trim(), profileName, tenantId);
-                        return profileId;
+                        if ("System Administrator".equals(profileName)) {
+                            return profileId; // Highest privilege — return immediately
+                        }
+                        if (bestProfileId == null) {
+                            bestProfileId = profileId;
+                            bestProfileName = profileName;
+                        }
                     }
                 }
             }
+            return bestProfileId;
         } catch (Exception e) {
             log.debug("Could not resolve profile from groups for tenant '{}': {}", tenantId, e.getMessage());
         }

@@ -426,6 +426,30 @@ class RouteAuthorizationFilterTest {
         }
 
         @Test
+        @DisplayName("Should skip collection-level Cerbos check for static routes")
+        void shouldSkipCollectionCheckForStaticRoutes() {
+            RouteDefinition staticRoute = new RouteDefinition("static-admin", "/api/admin/**",
+                    "http://worker:80", "admin");
+            when(routeRegistry.findByPath("/api/admin/collections")).thenReturn(Optional.of(staticRoute));
+
+            GatewayPrincipal principal = principalWithIdentity("user@test.com");
+            MockServerHttpRequest request = MockServerHttpRequest.get("/api/admin/collections").build();
+            MockServerWebExchange exchange = MockServerWebExchange.from(request);
+            exchange.getAttributes().put(PRINCIPAL_ATTR, principal);
+
+            when(cerbosService.checkSystemPermission(principal, "API_ACCESS"))
+                    .thenReturn(Mono.just(true));
+
+            StepVerifier.create(filter.filter(exchange, filterChain))
+                    .expectComplete()
+                    .verify();
+
+            // Should allow through after API_ACCESS check without collection-level check
+            verify(filterChain).filter(any());
+            verify(cerbosService, never()).checkObjectPermission(any(), any(), any());
+        }
+
+        @Test
         @DisplayName("Should forward identity headers to worker")
         void shouldForwardIdentityHeaders() {
             when(routeRegistry.findByPath("/api/users")).thenReturn(Optional.empty());

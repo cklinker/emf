@@ -42,7 +42,7 @@ public class CerbosPolicyGenerator {
         List<Map<String, Object>> definitions = new ArrayList<>();
         for (ProfileData profile : profiles) {
             Map<String, Object> def = new LinkedHashMap<>();
-            def.put("name", "profile:" + profile.id());
+            def.put("name", "profile_" + profile.id());
             def.put("parentRoles", List.of("user"));
 
             Map<String, Object> condition = new LinkedHashMap<>();
@@ -70,7 +70,7 @@ public class CerbosPolicyGenerator {
             for (Map.Entry<String, Boolean> entry : profile.systemPermissions().entrySet()) {
                 if (Boolean.TRUE.equals(entry.getValue())) {
                     permissionToRoles.computeIfAbsent(entry.getKey(), k -> new ArrayList<>())
-                            .add("profile:" + profile.id());
+                            .add("profile_" + profile.id());
                 }
             }
         }
@@ -102,7 +102,7 @@ public class CerbosPolicyGenerator {
                 for (ProfileData profile : profiles) {
                     Map<String, Boolean> objPerms = profile.objectPermissions().get(collectionId);
                     if (objPerms != null && isActionAllowed(objPerms, action)) {
-                        allowedRoles.add("profile:" + profile.id());
+                        allowedRoles.add("profile_" + profile.id());
                     }
                 }
                 if (!allowedRoles.isEmpty()) {
@@ -127,10 +127,10 @@ public class CerbosPolicyGenerator {
         List<String> modifyAllRoles = new ArrayList<>();
         for (ProfileData profile : profiles) {
             if (Boolean.TRUE.equals(profile.systemPermissions().get("VIEW_ALL_DATA"))) {
-                viewAllRoles.add("profile:" + profile.id());
+                viewAllRoles.add("profile_" + profile.id());
             }
             if (Boolean.TRUE.equals(profile.systemPermissions().get("MODIFY_ALL_DATA"))) {
-                modifyAllRoles.add("profile:" + profile.id());
+                modifyAllRoles.add("profile_" + profile.id());
             }
         }
 
@@ -188,7 +188,7 @@ public class CerbosPolicyGenerator {
                         Map<String, Object> rule = new LinkedHashMap<>();
                         rule.put("actions", List.of("read", "write"));
                         rule.put("effect", "EFFECT_DENY");
-                        rule.put("derivedRoles", List.of("profile:" + profile.id()));
+                        rule.put("derivedRoles", List.of("profile_" + profile.id()));
                         Map<String, Object> condition = new LinkedHashMap<>();
                         condition.put("match", Map.of("expr", fieldExpr));
                         rule.put("condition", condition);
@@ -198,7 +198,7 @@ public class CerbosPolicyGenerator {
                         Map<String, Object> rule = new LinkedHashMap<>();
                         rule.put("actions", List.of("write"));
                         rule.put("effect", "EFFECT_DENY");
-                        rule.put("derivedRoles", List.of("profile:" + profile.id()));
+                        rule.put("derivedRoles", List.of("profile_" + profile.id()));
                         Map<String, Object> condition = new LinkedHashMap<>();
                         condition.put("match", Map.of("expr", fieldExpr));
                         rule.put("condition", condition);
@@ -228,7 +228,7 @@ public class CerbosPolicyGenerator {
                 for (ProfileData profile : profiles) {
                     Map<String, Boolean> objPerms = profile.objectPermissions().get(collectionId);
                     if (objPerms != null && isActionAllowed(objPerms, action)) {
-                        allowedRoles.add("profile:" + profile.id());
+                        allowedRoles.add("profile_" + profile.id());
                     }
                 }
                 if (!allowedRoles.isEmpty()) {
@@ -249,10 +249,10 @@ public class CerbosPolicyGenerator {
         List<String> modifyAllRoles = new ArrayList<>();
         for (ProfileData profile : profiles) {
             if (Boolean.TRUE.equals(profile.systemPermissions().get("VIEW_ALL_DATA"))) {
-                viewAllRoles.add("profile:" + profile.id());
+                viewAllRoles.add("profile_" + profile.id());
             }
             if (Boolean.TRUE.equals(profile.systemPermissions().get("MODIFY_ALL_DATA"))) {
-                modifyAllRoles.add("profile:" + profile.id());
+                modifyAllRoles.add("profile_" + profile.id());
             }
         }
 
@@ -280,7 +280,7 @@ public class CerbosPolicyGenerator {
             rule.put("actions", List.of(customRule.action()));
             rule.put("effect", "EFFECT_DENY".equalsIgnoreCase(customRule.effect())
                     ? "EFFECT_DENY" : "EFFECT_ALLOW");
-            rule.put("derivedRoles", List.of("profile:" + customRule.profileId()));
+            rule.put("derivedRoles", List.of("profile_" + customRule.profileId()));
 
             String collExpr = "R.attr.collectionId == \"" + customRule.collectionId() + "\"";
             String celExpr = customRule.celExpression();

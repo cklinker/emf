@@ -27,11 +27,9 @@ import java.util.stream.Collectors;
  * Wraps Cerbos SDK calls with hard timeouts, thread interruption, and a
  * circuit breaker to prevent thread-pool exhaustion.
  *
- * <h3>Fail-open design</h3>
- * <p>When Cerbos is slow or unreachable, all checks return <b>allow</b>.
- * The gateway already validates JWTs, resolves tenant/profile identity,
- * and performs coarse-grained Cerbos checks — so fail-open at the worker
- * for fine-grained field/record checks is an acceptable trade-off.</p>
+ * <h3>Fail-closed design</h3>
+ * <p>When Cerbos is slow or unreachable, all checks return <b>deny</b>.
+ * Security first: no request should be allowed without explicit authorization.</p>
  */
 @Service
 public class CerbosAuthorizationService {
@@ -44,7 +42,7 @@ public class CerbosAuthorizationService {
     /** Consecutive failures before the circuit breaker opens. */
     private static final int CIRCUIT_BREAKER_THRESHOLD = 3;
 
-    /** Seconds to keep the circuit open (skip Cerbos) before retrying. */
+    /** Seconds to keep the circuit open (deny all) before retrying. */
     private static final long CIRCUIT_BREAKER_COOLDOWN_SECONDS = 30;
 
     private final CerbosBlockingClient cerbosClient;
@@ -67,8 +65,8 @@ public class CerbosAuthorizationService {
                                       String collectionId, String recordId,
                                       Map<String, Object> recordAttributes, String action) {
         if (isCircuitOpen()) {
-            log.debug("Cerbos circuit open — skipping record check (fail-open): user={} record={}", email, recordId);
-            return true;
+            log.warn("Cerbos circuit open — denying record check (fail-closed): user={} record={}", email, recordId);
+            return false;
         }
 
         Future<Boolean> future = cerbosExecutor.submit(() -> {
@@ -103,21 +101,21 @@ public class CerbosAuthorizationService {
         } catch (TimeoutException e) {
             future.cancel(true);
             recordFailure();
-            log.warn("Cerbos record check timed out (fail-open): user={} record={}", email, recordId);
-            return true;
+            log.error("Cerbos record check timed out (fail-closed): user={} record={}", email, recordId);
+            return false;
         } catch (Exception e) {
             future.cancel(true);
             recordFailure();
-            log.warn("Cerbos record check failed (fail-open): user={} record={} error={}", email, recordId, e.getMessage());
-            return true;
+            log.error("Cerbos record check failed (fail-closed): user={} record={} error={}", email, recordId, e.getMessage());
+            return false;
         }
     }
 
     public boolean checkFieldAccess(String email, String profileId, String tenantId,
                                      String collectionId, String fieldId, String action) {
         if (isCircuitOpen()) {
-            log.debug("Cerbos circuit open — skipping field check (fail-open): user={} field={}", email, fieldId);
-            return true;
+            log.warn("Cerbos circuit open — denying field check (fail-closed): user={} field={}", email, fieldId);
+            return false;
         }
 
         Future<Boolean> future = cerbosExecutor.submit(() -> {
@@ -143,13 +141,13 @@ public class CerbosAuthorizationService {
         } catch (TimeoutException e) {
             future.cancel(true);
             recordFailure();
-            log.warn("Cerbos field check timed out (fail-open): user={} field={}", email, fieldId);
-            return true;
+            log.error("Cerbos field check timed out (fail-closed): user={} field={}", email, fieldId);
+            return false;
         } catch (Exception e) {
             future.cancel(true);
             recordFailure();
-            log.warn("Cerbos field check failed (fail-open): user={} field={} error={}", email, fieldId, e.getMessage());
-            return true;
+            log.error("Cerbos field check failed (fail-closed): user={} field={} error={}", email, fieldId, e.getMessage());
+            return false;
         }
     }
 
@@ -160,7 +158,8 @@ public class CerbosAuthorizationService {
     public List<String> batchCheckFieldAccess(String email, String profileId, String tenantId,
                                                String collectionId, List<String> fieldIds, String action) {
         if (isCircuitOpen()) {
-            return fieldIds; // fail-open: allow all fields
+            log.warn("Cerbos circuit open — denying all field access (fail-closed): user={} collection={}", email, collectionId);
+            return List.of(); // fail-closed: deny all fields
         }
         if (fieldIds.isEmpty()) {
             return fieldIds;
@@ -189,7 +188,7 @@ public class CerbosAuthorizationService {
                                 allowed.add(fieldId);
                             }
                         },
-                        () -> allowed.add(fieldId) // fail-open if not found
+                        () -> log.warn("Cerbos batch field check: field not found in result (fail-closed): field={}", fieldId)
                 );
             }
             return allowed;
@@ -204,15 +203,15 @@ public class CerbosAuthorizationService {
         } catch (TimeoutException e) {
             future.cancel(true);
             recordFailure();
-            log.warn("Cerbos batch field check timed out (fail-open): user={} collection={} fields={}",
+            log.error("Cerbos batch field check timed out (fail-closed): user={} collection={} fields={}",
                     email, collectionId, fieldIds.size());
-            return fieldIds; // fail-open
+            return List.of(); // fail-closed: deny all fields
         } catch (Exception e) {
             future.cancel(true);
             recordFailure();
-            log.warn("Cerbos batch field check failed (fail-open): user={} collection={} error={}",
+            log.error("Cerbos batch field check failed (fail-closed): user={} collection={} error={}",
                     email, collectionId, e.getMessage());
-            return fieldIds; // fail-open
+            return List.of(); // fail-closed: deny all fields
         }
     }
 
@@ -223,9 +222,8 @@ public class CerbosAuthorizationService {
     public Set<String> batchCheckRecordAccess(String email, String profileId, String tenantId,
                                                String collectionId, List<Map<String, Object>> records, String action) {
         if (isCircuitOpen()) {
-            return records.stream()
-                    .map(r -> (String) r.get("id"))
-                    .collect(Collectors.toSet());
+            log.warn("Cerbos circuit open — denying all record access (fail-closed): user={} collection={}", email, collectionId);
+            return Set.of(); // fail-closed: deny all records
         }
         if (records.isEmpty()) {
             return Set.of();
@@ -263,8 +261,7 @@ public class CerbosAuthorizationService {
             for (Map<String, Object> record : records) {
                 String recordId = (String) record.get("id");
                 if (recordId == null) {
-                    allowed.add(""); // skip null IDs
-                    continue;
+                    continue; // null IDs are denied
                 }
                 result.find(recordId).ifPresentOrElse(
                         checkResult -> {
@@ -272,7 +269,7 @@ public class CerbosAuthorizationService {
                                 allowed.add(recordId);
                             }
                         },
-                        () -> allowed.add(recordId) // fail-open if not found
+                        () -> log.warn("Cerbos batch record check: record not found in result (fail-closed): record={}", recordId)
                 );
             }
             return allowed;
@@ -287,19 +284,15 @@ public class CerbosAuthorizationService {
         } catch (TimeoutException e) {
             future.cancel(true);
             recordFailure();
-            log.warn("Cerbos batch record check timed out (fail-open): user={} collection={} records={}",
+            log.error("Cerbos batch record check timed out (fail-closed): user={} collection={} records={}",
                     email, collectionId, records.size());
-            return records.stream()
-                    .map(r -> (String) r.get("id"))
-                    .collect(Collectors.toSet());
+            return Set.of(); // fail-closed: deny all records
         } catch (Exception e) {
             future.cancel(true);
             recordFailure();
-            log.warn("Cerbos batch record check failed (fail-open): user={} collection={} error={}",
+            log.error("Cerbos batch record check failed (fail-closed): user={} collection={} error={}",
                     email, collectionId, e.getMessage());
-            return records.stream()
-                    .map(r -> (String) r.get("id"))
-                    .collect(Collectors.toSet());
+            return Set.of(); // fail-closed: deny all records
         }
     }
 
@@ -327,7 +320,7 @@ public class CerbosAuthorizationService {
         if (failures >= CIRCUIT_BREAKER_THRESHOLD) {
             long until = System.currentTimeMillis() + (CIRCUIT_BREAKER_COOLDOWN_SECONDS * 1000);
             circuitOpenUntil.set(until);
-            log.warn("Cerbos circuit breaker OPEN — skipping checks for {}s after {} consecutive failures",
+            log.error("Cerbos circuit breaker OPEN — denying all checks for {}s after {} consecutive failures",
                     CIRCUIT_BREAKER_COOLDOWN_SECONDS, failures);
         }
     }

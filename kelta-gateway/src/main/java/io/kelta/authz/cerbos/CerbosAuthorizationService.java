@@ -43,9 +43,8 @@ import java.util.concurrent.atomic.AtomicLong;
  *       {@value #CIRCUIT_BREAKER_THRESHOLD} failures, Cerbos is bypassed for
  *       {@value #CIRCUIT_BREAKER_COOLDOWN_SECONDS}&nbsp;s, avoiding further
  *       thread consumption while Cerbos recovers.</li>
- *   <li>All failures result in <em>allow</em> (fail-open).  The gateway still
- *       validates JWTs and resolves tenant/profile identity, so this is an
- *       acceptable trade-off.</li>
+ *   <li>All failures result in <em>deny</em> (fail-closed).  Security first:
+ *       no request should be allowed without explicit authorization.</li>
  * </ol>
  */
 @Service
@@ -59,7 +58,7 @@ public class CerbosAuthorizationService {
     /** Consecutive failures before the circuit breaker opens. */
     private static final int CIRCUIT_BREAKER_THRESHOLD = 3;
 
-    /** Seconds to keep the circuit open (skip Cerbos) before retrying. */
+    /** Seconds to keep the circuit open (deny all) before retrying. */
     private static final long CIRCUIT_BREAKER_COOLDOWN_SECONDS = 30;
 
     private final CerbosBlockingClient cerbosClient;
@@ -82,9 +81,9 @@ public class CerbosAuthorizationService {
 
     public Mono<Boolean> checkSystemPermission(GatewayPrincipal principal, String permissionName) {
         if (isCircuitOpen()) {
-            log.debug("Cerbos circuit open — skipping system check (fail-open): user={} permission={}",
+            log.warn("Cerbos circuit open — denying system check (fail-closed): user={} permission={}",
                     principal.getUsername(), permissionName);
-            return Mono.just(true);
+            return Mono.just(false);
         }
 
         return Mono.fromCallable(() -> {
@@ -107,21 +106,21 @@ public class CerbosAuthorizationService {
             } catch (TimeoutException e) {
                 future.cancel(true); // interrupts the gRPC call, frees the thread
                 recordFailure();
-                log.warn("Cerbos system check timed out (fail-open): user={} permission={}",
+                log.error("Cerbos system check timed out (fail-closed): user={} permission={}",
                         principal.getUsername(), permissionName);
-                return true;
+                return false;
             } catch (Exception e) {
                 future.cancel(true);
                 recordFailure();
-                log.warn("Cerbos system check failed (fail-open): user={} permission={} error={}",
+                log.error("Cerbos system check failed (fail-closed): user={} permission={} error={}",
                         principal.getUsername(), permissionName, e.getMessage());
-                return true;
+                return false;
             }
         })
         .onErrorResume(e -> {
-            log.warn("Cerbos system check error (fail-open): user={} permission={} error={}",
+            log.error("Cerbos system check error (fail-closed): user={} permission={} error={}",
                     principal.getUsername(), permissionName, e.getMessage());
-            return Mono.just(true);
+            return Mono.just(false);
         });
     }
 
@@ -129,9 +128,9 @@ public class CerbosAuthorizationService {
                                                 String collectionId,
                                                 String action) {
         if (isCircuitOpen()) {
-            log.debug("Cerbos circuit open — skipping object check (fail-open): user={} collection={} action={}",
+            log.warn("Cerbos circuit open — denying object check (fail-closed): user={} collection={} action={}",
                     principal.getUsername(), collectionId, action);
-            return Mono.just(true);
+            return Mono.just(false);
         }
 
         return Mono.fromCallable(() -> {
@@ -154,21 +153,21 @@ public class CerbosAuthorizationService {
             } catch (TimeoutException e) {
                 future.cancel(true);
                 recordFailure();
-                log.warn("Cerbos object check timed out (fail-open): user={} collection={} action={}",
+                log.error("Cerbos object check timed out (fail-closed): user={} collection={} action={}",
                         principal.getUsername(), collectionId, action);
-                return true;
+                return false;
             } catch (Exception e) {
                 future.cancel(true);
                 recordFailure();
-                log.warn("Cerbos object check failed (fail-open): user={} collection={} action={} error={}",
+                log.error("Cerbos object check failed (fail-closed): user={} collection={} action={} error={}",
                         principal.getUsername(), collectionId, action, e.getMessage());
-                return true;
+                return false;
             }
         })
         .onErrorResume(e -> {
-            log.warn("Cerbos object check error (fail-open): user={} collection={} action={} error={}",
+            log.error("Cerbos object check error (fail-closed): user={} collection={} action={} error={}",
                     principal.getUsername(), collectionId, action, e.getMessage());
-            return Mono.just(true);
+            return Mono.just(false);
         });
     }
 
@@ -196,7 +195,7 @@ public class CerbosAuthorizationService {
         if (failures >= CIRCUIT_BREAKER_THRESHOLD) {
             long until = System.currentTimeMillis() + (CIRCUIT_BREAKER_COOLDOWN_SECONDS * 1000);
             circuitOpenUntil.set(until);
-            log.warn("Cerbos circuit breaker OPEN — skipping checks for {}s after {} consecutive failures",
+            log.error("Cerbos circuit breaker OPEN — denying all checks for {}s after {} consecutive failures",
                     CIRCUIT_BREAKER_COOLDOWN_SECONDS, failures);
         }
     }

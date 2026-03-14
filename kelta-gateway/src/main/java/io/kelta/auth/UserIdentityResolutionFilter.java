@@ -73,26 +73,27 @@ public class UserIdentityResolutionFilter implements GlobalFilter, Ordered {
         String cacheKey = CACHE_KEY_PREFIX + tenantId + ":" + email;
 
         return redisTemplate.opsForValue().get(cacheKey)
-                .flatMap(json -> parseIdentity(json, principal))
+                .flatMap(json -> {
+                    parseIdentity(json, principal);
+                    return Mono.just(json);
+                })
                 .switchIfEmpty(fetchFromWorker(tenantId, email, principal, cacheKey))
                 .then(chain.filter(exchange));
     }
 
-    private Mono<Void> parseIdentity(String json, GatewayPrincipal principal) {
+    private void parseIdentity(String json, GatewayPrincipal principal) {
         try {
             Map<String, String> identity = objectMapper.readValue(json,
                     new TypeReference<Map<String, String>>() {});
             principal.setProfileId(identity.get("profileId"));
             principal.setProfileName(identity.get("profileName"));
-            return Mono.empty();
         } catch (Exception e) {
             log.warn("Failed to parse cached user identity: {}", e.getMessage());
-            return Mono.empty();
         }
     }
 
-    private Mono<Void> fetchFromWorker(String tenantId, String email,
-                                        GatewayPrincipal principal, String cacheKey) {
+    private Mono<String> fetchFromWorker(String tenantId, String email,
+                                         GatewayPrincipal principal, String cacheKey) {
         return webClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/internal/user-identity")
@@ -102,9 +103,9 @@ public class UserIdentityResolutionFilter implements GlobalFilter, Ordered {
                 .retrieve()
                 .bodyToMono(String.class)
                 .flatMap(json -> {
-                    parseIdentity(json, principal).subscribe();
+                    parseIdentity(json, principal);
                     return redisTemplate.opsForValue().set(cacheKey, json, cacheTtl)
-                            .then();
+                            .thenReturn(json);
                 })
                 .onErrorResume(e -> {
                     log.warn("Failed to fetch user identity for {}/{}: {}",

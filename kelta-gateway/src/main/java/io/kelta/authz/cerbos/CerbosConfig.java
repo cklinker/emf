@@ -25,6 +25,7 @@ public class CerbosConfig {
         log.info("Connecting to Cerbos at {} (gRPC, plaintext)", target);
         return new CerbosClientBuilder(target)
                 .withPlaintext()
+                .withTimeout(java.time.Duration.ofSeconds(2))
                 .buildBlockingClient();
     }
 }

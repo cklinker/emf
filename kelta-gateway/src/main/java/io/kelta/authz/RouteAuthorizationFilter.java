@@ -147,6 +147,13 @@ public class RouteAuthorizationFilter implements GlobalFilter, Ordered {
                     String collectionName = route.get().getCollectionName();
                     exchange.getAttributes().put(RequestLoggingFilter.ROUTE_ATTR, collectionName);
 
+                    // Static routes (admin, me, metrics, search, etc.) are not
+                    // real collections — they only require the API_ACCESS check
+                    // above.  Skip the collection-level Cerbos check for them.
+                    if (collectionId.startsWith("static-")) {
+                        return forwardWithHeaders(exchange, chain, principal);
+                    }
+
                     // Map HTTP method to Cerbos action
                     String action = mapMethodToAction(exchange.getRequest().getMethod());
 

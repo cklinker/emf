@@ -339,7 +339,7 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
-    void shouldHandleUnexpectedExceptionsDuringValidation() {
+    void shouldPropagateUnexpectedExceptionsDuringValidation() {
         // Given
         String token = "valid.jwt.token";
         MockServerHttpRequest request = MockServerHttpRequest
@@ -354,11 +354,11 @@ class JwtAuthenticationFilterTest {
         // When
         Mono<Void> result = filter.filter(exchange, filterChain);
 
-        // Then
+        // Then — unexpected errors propagate so downstream error handlers can
+        // respond appropriately, rather than being swallowed as 401
         StepVerifier.create(result)
-            .verifyComplete();
+            .verifyError(RuntimeException.class);
 
-        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         verify(filterChain, never()).filter(any());
     }
     

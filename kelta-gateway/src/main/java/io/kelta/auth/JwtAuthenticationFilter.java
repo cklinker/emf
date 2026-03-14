@@ -99,36 +99,35 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
             return unauthorized(exchange, "Tenant context required for authentication");
         }
 
-        // Validate JWT with tenant-scoped issuer verification
+        // Validate JWT with tenant-scoped issuer verification.
+        // Error handlers are scoped to the decode+extract phase only — errors
+        // from downstream filters (e.g. Cerbos connection issues) must NOT be
+        // swallowed as 401 "Authentication failed".
         return jwtDecoder.decode(token, tenantId)
-            .flatMap(jwt -> {
-                try {
-                    GatewayPrincipal principal = principalExtractor.extractPrincipal(jwt);
-                    log.debug("Successfully authenticated user: {} for path: {}", principal.getUsername(), path);
-                    
-                    // Store principal in exchange attributes for downstream filters
-                    ServerWebExchange mutatedExchange = exchange.mutate()
-                        .request(exchange.getRequest())
-                        .build();
-                    mutatedExchange.getAttributes().put(PRINCIPAL_ATTRIBUTE, principal);
-                    
-                    return chain.filter(mutatedExchange);
-                } catch (IllegalArgumentException e) {
-                    log.error("Failed to extract principal from JWT for path: {}", path, e);
-                    metrics.recordAuthFailure(TenantResolutionFilter.getTenantSlug(exchange), "invalid_claims");
-                    return unauthorized(exchange, "Invalid JWT claims: " + e.getMessage());
-                }
+            .map(jwt -> {
+                GatewayPrincipal principal = principalExtractor.extractPrincipal(jwt);
+                log.debug("Successfully authenticated user: {} for path: {}", principal.getUsername(), path);
+
+                // Store principal in exchange attributes for downstream filters
+                ServerWebExchange mutatedExchange = exchange.mutate()
+                    .request(exchange.getRequest())
+                    .build();
+                mutatedExchange.getAttributes().put(PRINCIPAL_ATTRIBUTE, principal);
+                return mutatedExchange;
             })
             .onErrorResume(JwtException.class, e -> {
                 log.warn("JWT validation failed for path: {}: {}", path, e.getMessage());
                 metrics.recordAuthFailure(TenantResolutionFilter.getTenantSlug(exchange), "invalid_token");
-                return unauthorized(exchange, "Invalid or expired JWT token");
+                return unauthorized(exchange, "Invalid or expired JWT token")
+                        .then(Mono.empty());
             })
-            .onErrorResume(e -> {
-                log.error("Unexpected error during JWT validation for path: {}", path, e);
-                metrics.recordAuthFailure(TenantResolutionFilter.getTenantSlug(exchange), "invalid_token");
-                return unauthorized(exchange, "Authentication failed");
-            });
+            .onErrorResume(IllegalArgumentException.class, e -> {
+                log.error("Failed to extract principal from JWT for path: {}", path, e);
+                metrics.recordAuthFailure(TenantResolutionFilter.getTenantSlug(exchange), "invalid_claims");
+                return unauthorized(exchange, "Invalid JWT claims: " + e.getMessage())
+                        .then(Mono.empty());
+            })
+            .flatMap(chain::filter);
     }
     
     /**

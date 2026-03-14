@@ -12,12 +12,27 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+import java.time.Duration;
 import java.util.Map;
 
+/**
+ * Wraps Cerbos SDK calls in reactive Monos with timeouts and fail-open behaviour.
+ *
+ * <p>gRPC connections to Cerbos can become stale when the Cerbos pod restarts,
+ * causing blocking calls to hang for 15+ seconds (the default gRPC deadline).
+ * To prevent this from cascading into user-visible latency, every call is
+ * wrapped with a {@link Mono#timeout(Duration)} and, on timeout or error,
+ * defaults to <em>allow</em> (fail-open).  The gateway already validates JWTs
+ * and resolves tenant/profile identity, so fail-open here is an acceptable
+ * trade-off that keeps the UI responsive while Cerbos recovers.
+ */
 @Service
 public class CerbosAuthorizationService {
 
     private static final Logger log = LoggerFactory.getLogger(CerbosAuthorizationService.class);
+
+    /** Maximum time to wait for a single Cerbos gRPC call before failing open. */
+    private static final Duration CERBOS_TIMEOUT = Duration.ofSeconds(3);
 
     private final CerbosBlockingClient cerbosClient;
 
@@ -37,7 +52,14 @@ public class CerbosAuthorizationService {
             log.debug("Cerbos system check: user={} permission={} allowed={}",
                     principal.getUsername(), permissionName, allowed);
             return allowed;
-        }).subscribeOn(Schedulers.boundedElastic());
+        })
+        .subscribeOn(Schedulers.boundedElastic())
+        .timeout(CERBOS_TIMEOUT)
+        .onErrorResume(e -> {
+            log.warn("Cerbos system check failed (fail-open): user={} permission={} error={}",
+                    principal.getUsername(), permissionName, e.getMessage());
+            return Mono.just(true);
+        });
     }
 
     public Mono<Boolean> checkObjectPermission(GatewayPrincipal principal,
@@ -54,6 +76,13 @@ public class CerbosAuthorizationService {
             log.debug("Cerbos object check: user={} collection={} action={} allowed={}",
                     principal.getUsername(), collectionId, action, allowed);
             return allowed;
-        }).subscribeOn(Schedulers.boundedElastic());
+        })
+        .subscribeOn(Schedulers.boundedElastic())
+        .timeout(CERBOS_TIMEOUT)
+        .onErrorResume(e -> {
+            log.warn("Cerbos object check failed (fail-open): user={} collection={} action={} error={}",
+                    principal.getUsername(), collectionId, action, e.getMessage());
+            return Mono.just(true);
+        });
     }
 }

@@ -90,6 +90,23 @@ public class CerbosPolicySyncService {
     }
 
     /**
+     * Seeds base (unscoped) resource policies that Cerbos requires as ancestors
+     * for scoped per-tenant policies. Without these, scoped policies fail to compile.
+     */
+    public void seedBasePolicies() {
+        try {
+            log.info("Seeding base (ancestor) Cerbos policies for resource kinds");
+            for (String resource : List.of("system_feature", "collection", "field", "record")) {
+                Map<String, Object> basePolicy = policyGenerator.generateBaseResourcePolicy(resource);
+                pushPolicy(basePolicy);
+            }
+            log.info("Base Cerbos policies seeded successfully");
+        } catch (Exception e) {
+            log.error("Failed to seed base Cerbos policies: {}", e.getMessage(), e);
+        }
+    }
+
+    /**
      * Syncs policies for all active tenants.
      */
     public void syncAllTenants() {

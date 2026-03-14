@@ -324,6 +324,26 @@ public class CerbosPolicyGenerator {
         };
     }
 
+    /**
+     * Generates a base (unscoped) resource policy for a given resource kind.
+     *
+     * <p>Cerbos requires an ancestor (unscoped) policy to exist before scoped
+     * policies can compile. These base policies have no rules, effectively
+     * defaulting to deny unless a scoped policy grants access.
+     */
+    public Map<String, Object> generateBaseResourcePolicy(String resource) {
+        Map<String, Object> policy = new LinkedHashMap<>();
+        policy.put("apiVersion", "api.cerbos.dev/v1");
+
+        Map<String, Object> resourcePolicy = new LinkedHashMap<>();
+        resourcePolicy.put("version", "default");
+        resourcePolicy.put("resource", resource);
+        resourcePolicy.put("rules", List.of());
+
+        policy.put("resourcePolicy", resourcePolicy);
+        return policy;
+    }
+
     // =========================================================================
     // Data records for policy generation input
     // =========================================================================

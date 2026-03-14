@@ -26,6 +26,9 @@ public class CerbosPolicySeeder {
     public void seedPolicies() {
         log.info("Seeding Cerbos policies for all tenants on startup");
         try {
+            // Seed base (ancestor) policies first — Cerbos requires these
+            // before scoped per-tenant policies can compile
+            syncService.seedBasePolicies();
             syncService.syncAllTenants();
             log.info("Cerbos policy seeding complete");
         } catch (Exception e) {

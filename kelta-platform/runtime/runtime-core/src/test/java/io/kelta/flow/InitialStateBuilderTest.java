@@ -242,6 +242,70 @@ class InitialStateBuilderTest {
     }
 
     // -------------------------------------------------------------------------
+    // buildFromWebhook
+    // -------------------------------------------------------------------------
+
+    @Test
+    void buildFromWebhookContainsTriggerMetadata() {
+        Map<String, Object> payload = Map.of("orderId", "ord-123");
+        Map<String, String> headers = Map.of("content-type", "application/json");
+
+        Map<String, Object> state = builder.buildFromWebhook(
+                payload, headers, "tenant-1", "flow-1", "exec-1");
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> trigger = (Map<String, Object>) state.get("trigger");
+        assertEquals("WEBHOOK", trigger.get("type"));
+    }
+
+    @Test
+    void buildFromWebhookContainsInputAndHeaders() {
+        Map<String, Object> payload = Map.of("orderId", "ord-123", "amount", 42);
+        Map<String, String> headers = Map.of("content-type", "application/json", "user-agent", "TestAgent");
+
+        Map<String, Object> state = builder.buildFromWebhook(
+                payload, headers, "tenant-1", "flow-1", "exec-1");
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> input = (Map<String, Object>) state.get("input");
+        assertEquals("ord-123", input.get("orderId"));
+        assertEquals(42, input.get("amount"));
+
+        @SuppressWarnings("unchecked")
+        Map<String, String> stateHeaders = (Map<String, String>) state.get("headers");
+        assertEquals("application/json", stateHeaders.get("content-type"));
+        assertEquals("TestAgent", stateHeaders.get("user-agent"));
+    }
+
+    @Test
+    void buildFromWebhookHandlesNullPayloadAndHeaders() {
+        Map<String, Object> state = builder.buildFromWebhook(
+                null, null, "tenant-1", "flow-1", "exec-1");
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> input = (Map<String, Object>) state.get("input");
+        assertNotNull(input);
+        assertTrue(input.isEmpty());
+
+        @SuppressWarnings("unchecked")
+        Map<String, String> headers = (Map<String, String>) state.get("headers");
+        assertNotNull(headers);
+        assertTrue(headers.isEmpty());
+    }
+
+    @Test
+    void buildFromWebhookContainsContext() {
+        Map<String, Object> state = builder.buildFromWebhook(
+                Map.of(), Map.of(), "tenant-1", "flow-1", "exec-1");
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> context = (Map<String, Object>) state.get("context");
+        assertEquals("tenant-1", context.get("tenantId"));
+        assertEquals("flow-1", context.get("flowId"));
+        assertEquals("exec-1", context.get("executionId"));
+    }
+
+    // -------------------------------------------------------------------------
     // State structure verification
     // -------------------------------------------------------------------------
 
@@ -271,5 +335,13 @@ class InitialStateBuilderTest {
         assertTrue(schedState.containsKey("trigger"));
         assertTrue(schedState.containsKey("input"));
         assertTrue(schedState.containsKey("context"));
+
+        Map<String, Object> webhookState = builder.buildFromWebhook(
+                Map.of(), Map.of(), "tenant-1", "flow-1", "exec-1");
+        assertEquals(4, webhookState.size());
+        assertTrue(webhookState.containsKey("trigger"));
+        assertTrue(webhookState.containsKey("input"));
+        assertTrue(webhookState.containsKey("headers"));
+        assertTrue(webhookState.containsKey("context"));
     }
 }

@@ -32,6 +32,10 @@ public class FlowRepository {
             VALUES (?, ?, ?, ?::jsonb, ?, ?)
             """;
 
+    private static final String UPDATE_FLOW_TRIGGER_CONFIG = """
+            UPDATE flow SET trigger_config = ?::jsonb WHERE id = ?
+            """;
+
     private static final String UPDATE_FLOW_PUBLISHED_VERSION = """
             UPDATE flow SET published_version = ?, version = ? WHERE id = ?
             """;
@@ -75,6 +79,10 @@ public class FlowRepository {
                                    String definition, String changeSummary, String createdBy) {
         jdbcTemplate.update(INSERT_FLOW_VERSION,
                 versionId, flowId, versionNumber, definition, changeSummary, createdBy);
+    }
+
+    public void updateTriggerConfig(String flowId, String triggerConfigJson) {
+        jdbcTemplate.update(UPDATE_FLOW_TRIGGER_CONFIG, triggerConfigJson, flowId);
     }
 
     public void updateFlowPublishedVersion(String flowId, int version) {

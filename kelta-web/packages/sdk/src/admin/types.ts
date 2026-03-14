@@ -1482,6 +1482,13 @@ export interface SvixPortalResponse {
   serverUrl: string;
 }
 
+// --- Webhook URL ---
+
+export interface WebhookUrlResponse {
+  webhookUrl: string;
+  flowId: string;
+}
+
 // --- Connected Apps (Phase 5 Stream C) ---
 
 export interface ConnectedApp {

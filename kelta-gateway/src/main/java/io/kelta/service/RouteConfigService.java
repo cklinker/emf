@@ -191,6 +191,7 @@ public class RouteConfigService {
                 {"flows", "/api/flows/**", "flows"},
                 {"approval-processes", "/api/approval-processes/**", "approval-processes"},
                 {"svix", "/api/svix/**", "svix"},
+                {"webhooks", "/api/webhooks/**", "webhooks"},
                 {"connected-apps", "/api/connected-apps/**", "connected-apps"},
                 {"email-templates", "/api/email-templates/**", "email-templates"},
                 {"scripts", "/api/scripts/**", "scripts"},

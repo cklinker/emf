@@ -83,7 +83,12 @@ export function TriggerEditSheet({ open, onOpenChange, flow }: TriggerEditSheetP
         </SheetHeader>
 
         <div className="flex-1 overflow-y-auto px-4 py-4">
-          <TriggerFormRouter flowType={flow.flowType} config={config} onChange={setConfig} />
+          <TriggerFormRouter
+            flowType={flow.flowType}
+            config={config}
+            onChange={setConfig}
+            flowId={flow.id}
+          />
         </div>
 
         <SheetFooter className="px-4 pb-4">
@@ -103,10 +108,12 @@ function TriggerFormRouter({
   flowType,
   config,
   onChange,
+  flowId,
 }: {
   flowType: string
   config: Partial<TriggerConfig>
   onChange: (config: Partial<TriggerConfig>) => void
+  flowId?: string
 }) {
   switch (flowType) {
     case 'RECORD_TRIGGERED':
@@ -114,7 +121,7 @@ function TriggerFormRouter({
     case 'SCHEDULED':
       return <ScheduledTriggerForm config={config} onChange={onChange} />
     case 'AUTOLAUNCHED':
-      return <AutolaunchedTriggerForm config={config} onChange={onChange} />
+      return <AutolaunchedTriggerForm config={config} onChange={onChange} flowId={flowId} />
     case 'KAFKA_TRIGGERED':
       return <KafkaTriggerForm config={config} onChange={onChange} />
     default:

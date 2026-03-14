@@ -109,6 +109,7 @@ export type {
   ScriptExecutionLog,
   CreateScriptRequest,
   SvixPortalResponse,
+  WebhookUrlResponse,
   ConnectedApp,
   ConnectedAppCreatedResponse,
   CreateConnectedAppRequest,

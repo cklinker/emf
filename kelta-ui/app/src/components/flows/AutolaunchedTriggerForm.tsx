@@ -1,11 +1,16 @@
-import React from 'react'
+import React, { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Button } from '@/components/ui/button'
+import { Copy, Check } from 'lucide-react'
 import type { AutolaunchedTriggerConfig } from '@/pages/FlowDesignerPage/types'
+import { useApi } from '@/context/ApiContext'
 
 interface AutolaunchedTriggerFormProps {
   config: Partial<AutolaunchedTriggerConfig>
   onChange: (config: Partial<AutolaunchedTriggerConfig>) => void
+  flowId?: string
 }
 
 const AUTH_OPTIONS = [
@@ -18,9 +23,67 @@ const AUTH_OPTIONS = [
   },
 ]
 
-export function AutolaunchedTriggerForm({ config, onChange }: AutolaunchedTriggerFormProps) {
+export function AutolaunchedTriggerForm({
+  config,
+  onChange,
+  flowId,
+}: AutolaunchedTriggerFormProps) {
+  const { keltaClient } = useApi()
+  const [copied, setCopied] = useState(false)
+
+  const { data: webhookUrl, isLoading: loading } = useQuery({
+    queryKey: ['webhook-url', flowId],
+    queryFn: async () => {
+      const res = await keltaClient.admin.flows.getWebhookUrl(flowId!)
+      return res.webhookUrl
+    },
+    enabled: !!flowId,
+  })
+
+  const handleCopy = async () => {
+    if (!webhookUrl) return
+    await navigator.clipboard.writeText(webhookUrl)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
   return (
     <div className="flex flex-col gap-4">
+      {flowId && (
+        <div>
+          <Label className="text-sm">Webhook URL</Label>
+          {loading ? (
+            <div className="mt-1 text-xs text-muted-foreground">Loading webhook URL...</div>
+          ) : webhookUrl ? (
+            <div className="mt-1 flex items-center gap-2">
+              <code
+                data-testid="webhook-url"
+                className="flex-1 truncate rounded-md border bg-muted px-2 py-1.5 font-mono text-xs"
+              >
+                {webhookUrl}
+              </code>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 w-8 shrink-0 p-0"
+                onClick={handleCopy}
+                data-testid="copy-webhook-url"
+              >
+                {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+              </Button>
+            </div>
+          ) : (
+            <div className="mt-1 text-xs text-muted-foreground">
+              Save the flow to generate a webhook URL
+            </div>
+          )}
+          <p className="mt-1 text-xs text-muted-foreground">
+            Send POST requests to this URL to trigger the flow
+          </p>
+        </div>
+      )}
+
       <div>
         <Label htmlFor="webhook-path" className="text-sm">
           Webhook Path (optional)

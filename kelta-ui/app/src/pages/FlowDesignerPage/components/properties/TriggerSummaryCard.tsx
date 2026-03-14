@@ -1,6 +1,8 @@
-import React from 'react'
+import React, { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
-import { Database, Clock, Globe, Radio, Settings } from 'lucide-react'
+import { Database, Clock, Globe, Radio, Settings, Copy, Check } from 'lucide-react'
+import { useApi } from '@/context/ApiContext'
 import type { Flow } from '../../types'
 
 interface TriggerSummaryCardProps {
@@ -66,9 +68,27 @@ function parseTriggerConfig(flow: Flow): Record<string, string> {
 }
 
 export function TriggerSummaryCard({ flow, onEditTrigger }: TriggerSummaryCardProps) {
+  const { keltaClient } = useApi()
   const Icon = FLOW_TYPE_ICONS[flow.flowType] || Settings
   const label = FLOW_TYPE_LABELS[flow.flowType] || flow.flowType
   const trigger = parseTriggerConfig(flow)
+  const [copied, setCopied] = useState(false)
+
+  const { data: webhookUrl } = useQuery({
+    queryKey: ['webhook-url', flow.id],
+    queryFn: async () => {
+      const res = await keltaClient.admin.flows.getWebhookUrl(flow.id)
+      return res.webhookUrl
+    },
+    enabled: flow.flowType === 'AUTOLAUNCHED',
+  })
+
+  const handleCopy = async () => {
+    if (!webhookUrl) return
+    await navigator.clipboard.writeText(webhookUrl)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
 
   return (
     <div className="rounded-lg border border-border bg-muted/30 p-3">
@@ -95,6 +115,27 @@ export function TriggerSummaryCard({ flow, onEditTrigger }: TriggerSummaryCardPr
         </div>
       ) : (
         <div className="text-[11px] text-muted-foreground">No trigger configured</div>
+      )}
+
+      {flow.flowType === 'AUTOLAUNCHED' && webhookUrl && (
+        <div className="mt-2 border-t border-border pt-2">
+          <div className="flex items-center gap-1">
+            <span className="text-[11px] text-muted-foreground">Webhook URL</span>
+            <button
+              onClick={handleCopy}
+              className="ml-auto text-muted-foreground hover:text-foreground"
+              data-testid="copy-trigger-webhook-url"
+            >
+              {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+            </button>
+          </div>
+          <code
+            data-testid="trigger-webhook-url"
+            className="mt-0.5 block truncate font-mono text-[10px] text-foreground"
+          >
+            {webhookUrl}
+          </code>
+        </div>
       )}
     </div>
   )

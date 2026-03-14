@@ -86,6 +86,7 @@ import type {
   ScriptExecutionLog,
   CreateScriptRequest,
   SvixPortalResponse,
+  WebhookUrlResponse,
   ConnectedApp,
   ConnectedAppCreatedResponse,
   ConnectedAppToken,
@@ -1579,6 +1580,11 @@ export class AdminClient {
     getExecution: async (executionId: string): Promise<FlowExecution> => {
       const response = await this.axios.get(`/api/flow-executions/${executionId}`);
       return unwrapJsonApiResource<FlowExecution>(response.data);
+    },
+
+    getWebhookUrl: async (flowId: string): Promise<WebhookUrlResponse> => {
+      const response = await this.axios.get(`/api/flows/${flowId}/webhook-url`);
+      return unwrapJsonApiResource<WebhookUrlResponse>(response.data);
     },
   };
 

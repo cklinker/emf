@@ -103,6 +103,47 @@ public class InitialStateBuilder {
      * @param executionId   the execution ID
      * @return the initial state envelope
      */
+    /**
+     * Builds initial state from an incoming webhook request.
+     *
+     * @param payload     the webhook request body
+     * @param headers     selected headers from the webhook request
+     * @param tenantId    the tenant ID
+     * @param flowId      the flow being executed
+     * @param executionId the execution ID
+     * @return the initial state envelope
+     */
+    public Map<String, Object> buildFromWebhook(Map<String, Object> payload,
+                                                  Map<String, String> headers,
+                                                  String tenantId,
+                                                  String flowId, String executionId) {
+        Map<String, Object> state = new LinkedHashMap<>();
+
+        Map<String, Object> trigger = new LinkedHashMap<>();
+        trigger.put("type", "WEBHOOK");
+        state.put("trigger", trigger);
+
+        state.put("input", payload != null ? payload : Map.of());
+        state.put("headers", headers != null ? headers : Map.of());
+
+        Map<String, Object> context = new LinkedHashMap<>();
+        context.put("tenantId", tenantId);
+        context.put("flowId", flowId);
+        context.put("executionId", executionId);
+        state.put("context", context);
+
+        return state;
+    }
+
+    /**
+     * Builds initial state from a scheduled execution.
+     *
+     * @param triggerConfig the flow's trigger config (may contain inputData)
+     * @param tenantId      the tenant ID
+     * @param flowId        the flow being executed
+     * @param executionId   the execution ID
+     * @return the initial state envelope
+     */
     @SuppressWarnings("unchecked")
     public Map<String, Object> buildFromSchedule(Map<String, Object> triggerConfig,
                                                   String tenantId,

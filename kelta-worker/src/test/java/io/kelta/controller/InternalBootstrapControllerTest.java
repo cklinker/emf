@@ -327,180 +327,63 @@ class InternalBootstrapControllerTest {
         }
     }
 
-    // ==================== Permission Resolution Tests ====================
+    // ==================== User Identity Tests ====================
 
     @Nested
-    @DisplayName("GET /internal/permissions")
-    class PermissionsTests {
+    @DisplayName("GET /internal/user-identity")
+    class UserIdentityTests {
 
         @Test
-        @DisplayName("Should return 404 when user not found")
-        void returns404WhenUserNotFound() {
-            when(repository.findActiveUserByEmail("unknown@test.com", "tenant-1"))
-                    .thenReturn(Optional.empty());
+        @DisplayName("Should return user identity with profileId and profileName")
+        void returnsUserIdentity() {
+            Map<String, Object> identityRow = new HashMap<>();
+            identityRow.put("id", "user-1");
+            identityRow.put("profile_id", "profile-1");
+            identityRow.put("profile_name", "Standard User");
+
+            when(repository.findUserIdentity("user@test.com", "tenant-1"))
+                    .thenReturn(Optional.of(identityRow));
 
             ResponseEntity<Map<String, Object>> response =
-                    controller.resolvePermissions("unknown@test.com", "tenant-1");
-
-            assertThat(response.getStatusCode().value()).isEqualTo(404);
-        }
-
-        @Test
-        @DisplayName("Should return empty permissions when user has no profile")
-        void returnsEmptyPermissionsWhenNoProfile() {
-            Map<String, Object> userRow = new HashMap<>();
-            userRow.put("id", "user-1");
-            userRow.put("profile_id", null);
-
-            when(repository.findActiveUserByEmail("user@test.com", "tenant-1"))
-                    .thenReturn(Optional.of(userRow));
-            when(repository.findUserPermissionSetIds("user-1")).thenReturn(List.of());
-            when(repository.findUserGroupIds("user-1")).thenReturn(List.of());
-
-            ResponseEntity<Map<String, Object>> response =
-                    controller.resolvePermissions("user@test.com", "tenant-1");
+                    controller.getUserIdentity("user@test.com", "tenant-1");
 
             assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
             Map<String, Object> body = response.getBody();
             assertThat(body).isNotNull();
             assertThat(body.get("userId")).isEqualTo("user-1");
-
-            @SuppressWarnings("unchecked")
-            Map<String, Boolean> systemPerms = (Map<String, Boolean>) body.get("systemPermissions");
-            assertThat(systemPerms).isEmpty();
+            assertThat(body.get("profileId")).isEqualTo("profile-1");
+            assertThat(body.get("profileName")).isEqualTo("Standard User");
         }
 
         @Test
-        @DisplayName("Should load profile permissions")
-        void loadsProfilePermissions() {
-            Map<String, Object> userRow = new HashMap<>();
-            userRow.put("id", "user-1");
-            userRow.put("profile_id", "profile-1");
-
-            when(repository.findActiveUserByEmail("user@test.com", "tenant-1"))
-                    .thenReturn(Optional.of(userRow));
-            when(repository.findProfileSystemPermissions("profile-1"))
-                    .thenReturn(List.of(
-                            systemPermRow("API_ACCESS", true),
-                            systemPermRow("MANAGE_USERS", false)
-                    ));
-            when(repository.findProfileObjectPermissions("profile-1"))
-                    .thenReturn(List.of(
-                            objectPermRow("coll-1", true, true, false, false)
-                    ));
-            when(repository.findProfileFieldPermissions("profile-1"))
-                    .thenReturn(List.of(fieldPermRow("coll-1", "field-1", "VISIBLE")));
-            when(repository.findUserPermissionSetIds("user-1")).thenReturn(List.of());
-            when(repository.findUserGroupIds("user-1")).thenReturn(List.of());
+        @DisplayName("Should return 404 when user not found")
+        void returns404WhenUserNotFound() {
+            when(repository.findUserIdentity("unknown@test.com", "tenant-1"))
+                    .thenReturn(Optional.empty());
 
             ResponseEntity<Map<String, Object>> response =
-                    controller.resolvePermissions("user@test.com", "tenant-1");
+                    controller.getUserIdentity("unknown@test.com", "tenant-1");
+
+            assertThat(response.getStatusCode().value()).isEqualTo(404);
+        }
+
+        @Test
+        @DisplayName("Should handle null profile")
+        void handlesNullProfile() {
+            Map<String, Object> identityRow = new HashMap<>();
+            identityRow.put("id", "user-1");
+            identityRow.put("profile_id", null);
+            identityRow.put("profile_name", null);
+
+            when(repository.findUserIdentity("user@test.com", "tenant-1"))
+                    .thenReturn(Optional.of(identityRow));
+
+            ResponseEntity<Map<String, Object>> response =
+                    controller.getUserIdentity("user@test.com", "tenant-1");
 
             assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
-            Map<String, Object> body = response.getBody();
-
-            @SuppressWarnings("unchecked")
-            Map<String, Boolean> systemPerms = (Map<String, Boolean>) body.get("systemPermissions");
-            assertThat(systemPerms.get("API_ACCESS")).isTrue();
-            assertThat(systemPerms.containsKey("MANAGE_USERS")).isFalse();
-
-            @SuppressWarnings("unchecked")
-            Map<String, Map<String, Object>> objectPerms =
-                    (Map<String, Map<String, Object>>) body.get("objectPermissions");
-            assertThat(objectPerms.get("coll-1").get("canCreate")).isEqualTo(true);
-            assertThat(objectPerms.get("coll-1").get("canRead")).isEqualTo(true);
-            assertThat(objectPerms.get("coll-1").get("canEdit")).isEqualTo(false);
-
-            @SuppressWarnings("unchecked")
-            Map<String, Map<String, String>> fieldPerms =
-                    (Map<String, Map<String, String>>) body.get("fieldPermissions");
-            assertThat(fieldPerms.get("coll-1").get("field-1")).isEqualTo("VISIBLE");
-        }
-
-        @Test
-        @DisplayName("Should merge permission set permissions with most-permissive-wins")
-        void mergesPermissionSetsWithMostPermissiveWins() {
-            Map<String, Object> userRow = new HashMap<>();
-            userRow.put("id", "user-1");
-            userRow.put("profile_id", "profile-1");
-
-            when(repository.findActiveUserByEmail("user@test.com", "tenant-1"))
-                    .thenReturn(Optional.of(userRow));
-            when(repository.findProfileSystemPermissions("profile-1"))
-                    .thenReturn(List.of(systemPermRow("API_ACCESS", true)));
-            when(repository.findProfileObjectPermissions("profile-1"))
-                    .thenReturn(List.of(objectPermRow("coll-1", false, true, false, false)));
-            when(repository.findProfileFieldPermissions("profile-1"))
-                    .thenReturn(List.of(fieldPermRow("coll-1", "field-1", "READ_ONLY")));
-            when(repository.findUserPermissionSetIds("user-1"))
-                    .thenReturn(List.of(Map.of("permission_set_id", (Object) "ps-1")));
-            when(repository.findUserGroupIds("user-1")).thenReturn(List.of());
-            when(repository.findPermsetSystemPermissions("ps-1"))
-                    .thenReturn(List.of(systemPermRow("VIEW_ALL_DATA", true)));
-            when(repository.findPermsetObjectPermissions("ps-1"))
-                    .thenReturn(List.of(objectPermRow("coll-1", true, false, false, false)));
-            when(repository.findPermsetFieldPermissions("ps-1"))
-                    .thenReturn(List.of(fieldPermRow("coll-1", "field-1", "VISIBLE")));
-
-            ResponseEntity<Map<String, Object>> response =
-                    controller.resolvePermissions("user@test.com", "tenant-1");
-
-            Map<String, Object> body = response.getBody();
-
-            @SuppressWarnings("unchecked")
-            Map<String, Boolean> systemPerms = (Map<String, Boolean>) body.get("systemPermissions");
-            assertThat(systemPerms.get("API_ACCESS")).isTrue();
-            assertThat(systemPerms.get("VIEW_ALL_DATA")).isTrue();
-
-            @SuppressWarnings("unchecked")
-            Map<String, Map<String, Object>> objectPerms =
-                    (Map<String, Map<String, Object>>) body.get("objectPermissions");
-            assertThat(objectPerms.get("coll-1").get("canCreate")).isEqualTo(true);
-            assertThat(objectPerms.get("coll-1").get("canRead")).isEqualTo(true);
-
-            @SuppressWarnings("unchecked")
-            Map<String, Map<String, String>> fieldPerms =
-                    (Map<String, Map<String, String>>) body.get("fieldPermissions");
-            assertThat(fieldPerms.get("coll-1").get("field-1")).isEqualTo("VISIBLE");
-        }
-
-        @Test
-        @DisplayName("Should include group-inherited permission sets")
-        void includesGroupInheritedPermissionSets() {
-            Map<String, Object> userRow = new HashMap<>();
-            userRow.put("id", "user-1");
-            userRow.put("profile_id", null);
-
-            when(repository.findActiveUserByEmail("user@test.com", "tenant-1"))
-                    .thenReturn(Optional.of(userRow));
-            when(repository.findUserPermissionSetIds("user-1")).thenReturn(List.of());
-            when(repository.findUserGroupIds("user-1"))
-                    .thenReturn(List.of(Map.of("group_id", (Object) "group-1")));
-            when(repository.findGroupPermissionSetIds(List.of("group-1")))
-                    .thenReturn(List.of(Map.of("permission_set_id", (Object) "ps-group-1")));
-            when(repository.findPermsetSystemPermissions("ps-group-1"))
-                    .thenReturn(List.of(systemPermRow("API_ACCESS", true)));
-            when(repository.findPermsetObjectPermissions("ps-group-1"))
-                    .thenReturn(List.of(objectPermRow("coll-1", true, true, true, true)));
-            when(repository.findPermsetFieldPermissions("ps-group-1"))
-                    .thenReturn(List.of());
-
-            ResponseEntity<Map<String, Object>> response =
-                    controller.resolvePermissions("user@test.com", "tenant-1");
-
-            Map<String, Object> body = response.getBody();
-
-            @SuppressWarnings("unchecked")
-            Map<String, Boolean> systemPerms = (Map<String, Boolean>) body.get("systemPermissions");
-            assertThat(systemPerms.get("API_ACCESS")).isTrue();
-
-            @SuppressWarnings("unchecked")
-            Map<String, Map<String, Object>> objectPerms =
-                    (Map<String, Map<String, Object>>) body.get("objectPermissions");
-            assertThat(objectPerms.get("coll-1").get("canCreate")).isEqualTo(true);
-            assertThat(objectPerms.get("coll-1").get("canRead")).isEqualTo(true);
-            assertThat(objectPerms.get("coll-1").get("canEdit")).isEqualTo(true);
-            assertThat(objectPerms.get("coll-1").get("canDelete")).isEqualTo(true);
+            assertThat(response.getBody().get("profileId")).isNull();
+            assertThat(response.getBody().get("profileName")).isNull();
         }
     }
 
@@ -529,30 +412,4 @@ class InternalBootstrapControllerTest {
         return row;
     }
 
-    private Map<String, Object> systemPermRow(String name, boolean granted) {
-        Map<String, Object> row = new HashMap<>();
-        row.put("permission_name", name);
-        row.put("granted", granted);
-        return row;
-    }
-
-    private Map<String, Object> objectPermRow(String collectionId,
-                                                boolean canCreate, boolean canRead, boolean canEdit,
-                                                boolean canDelete) {
-        Map<String, Object> row = new HashMap<>();
-        row.put("collection_id", collectionId);
-        row.put("can_create", canCreate);
-        row.put("can_read", canRead);
-        row.put("can_edit", canEdit);
-        row.put("can_delete", canDelete);
-        return row;
-    }
-
-    private Map<String, Object> fieldPermRow(String collectionId, String fieldId, String visibility) {
-        Map<String, Object> row = new HashMap<>();
-        row.put("collection_id", collectionId);
-        row.put("field_id", fieldId);
-        row.put("visibility", visibility);
-        return row;
-    }
 }

@@ -146,6 +146,7 @@ function setupMocks(profileAttrs = mockProfileAttrs) {
     if (url.includes('/api/collections')) return Promise.resolve({ data: mockCollections })
     if (url.includes('/api/profiles/'))
       return Promise.resolve({ data: makeProfileResponse(profileAttrs) })
+    if (url.includes('/custom-rules')) return Promise.resolve({ data: [] })
     return Promise.resolve({ data: {} })
   })
 }

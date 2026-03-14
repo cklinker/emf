@@ -1,6 +1,5 @@
 package io.kelta.gateway.listener;
 
-import io.kelta.gateway.authz.PermissionResolutionService;
 import io.kelta.gateway.cache.GatewayCacheManager;
 import io.kelta.gateway.route.RouteRegistry;
 import io.kelta.runtime.event.ChangeType;
@@ -19,7 +18,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.cloud.gateway.event.RefreshRoutesEvent;
 import org.springframework.context.ApplicationEventPublisher;
-import reactor.core.publisher.Mono;
 
 import java.util.Map;
 
@@ -41,9 +39,6 @@ class SystemCollectionRouteListenerTest {
     private ApplicationEventPublisher applicationEventPublisher;
 
     @Mock
-    private PermissionResolutionService permissionResolutionService;
-
-    @Mock
     private GatewayCacheManager cacheManager;
 
     private ObjectMapper objectMapper;
@@ -54,8 +49,7 @@ class SystemCollectionRouteListenerTest {
         objectMapper = new ObjectMapper();
         objectMapper.registerModule(new JavaTimeModule());
         listener = new SystemCollectionRouteListener(
-                routeRegistry, applicationEventPublisher, objectMapper,
-                permissionResolutionService, cacheManager
+                routeRegistry, applicationEventPublisher, objectMapper, cacheManager
         );
     }
 
@@ -87,8 +81,6 @@ class SystemCollectionRouteListenerTest {
         @Test
         @DisplayName("Should not refresh routes for non-collections system collections")
         void shouldNotRefreshRoutesForNonCollections() throws Exception {
-            when(permissionResolutionService.evictPermissionCache("tenant-1"))
-                    .thenReturn(Mono.empty());
             String message = createEventMessage("users", "user-1", ChangeType.UPDATED);
 
             listener.onRecordChanged(message);
@@ -104,113 +96,6 @@ class SystemCollectionRouteListenerTest {
             listener.onRecordChanged(message);
 
             verify(applicationEventPublisher, never()).publishEvent(any(RefreshRoutesEvent.class));
-        }
-    }
-
-    @Nested
-    @DisplayName("Permission Cache Eviction Tests")
-    class PermissionCacheEvictionTests {
-
-        @Test
-        @DisplayName("Should evict permission cache when profiles collection changes")
-        void shouldEvictPermissionCacheForProfilesChange() throws Exception {
-            when(permissionResolutionService.evictPermissionCache("tenant-1"))
-                    .thenReturn(Mono.empty());
-
-            String message = createEventMessage("profiles", "profile-1", ChangeType.UPDATED);
-            listener.onRecordChanged(message);
-
-            verify(permissionResolutionService).evictPermissionCache("tenant-1");
-        }
-
-        @Test
-        @DisplayName("Should evict permission cache when permission-sets collection changes")
-        void shouldEvictPermissionCacheForPermissionSetsChange() throws Exception {
-            when(permissionResolutionService.evictPermissionCache("tenant-1"))
-                    .thenReturn(Mono.empty());
-
-            String message = createEventMessage("permission-sets", "ps-1", ChangeType.CREATED);
-            listener.onRecordChanged(message);
-
-            verify(permissionResolutionService).evictPermissionCache("tenant-1");
-        }
-
-        @Test
-        @DisplayName("Should evict permission cache when users collection changes")
-        void shouldEvictPermissionCacheForUsersChange() throws Exception {
-            when(permissionResolutionService.evictPermissionCache("tenant-1"))
-                    .thenReturn(Mono.empty());
-
-            String message = createEventMessage("users", "user-1", ChangeType.UPDATED);
-            listener.onRecordChanged(message);
-
-            verify(permissionResolutionService).evictPermissionCache("tenant-1");
-        }
-
-        @Test
-        @DisplayName("Should evict permission cache when profile-system-permissions changes")
-        void shouldEvictPermissionCacheForProfileSystemPermsChange() throws Exception {
-            when(permissionResolutionService.evictPermissionCache("tenant-1"))
-                    .thenReturn(Mono.empty());
-
-            String message = createEventMessage("profile-system-permissions", "psp-1", ChangeType.CREATED);
-            listener.onRecordChanged(message);
-
-            verify(permissionResolutionService).evictPermissionCache("tenant-1");
-        }
-
-        @Test
-        @DisplayName("Should evict permission cache when user-permission-sets changes")
-        void shouldEvictPermissionCacheForUserPermSetsChange() throws Exception {
-            when(permissionResolutionService.evictPermissionCache("tenant-1"))
-                    .thenReturn(Mono.empty());
-
-            String message = createEventMessage("user-permission-sets", "ups-1", ChangeType.DELETED);
-            listener.onRecordChanged(message);
-
-            verify(permissionResolutionService).evictPermissionCache("tenant-1");
-        }
-
-        @Test
-        @DisplayName("Should evict permission cache when group-memberships changes")
-        void shouldEvictPermissionCacheForGroupMembershipsChange() throws Exception {
-            when(permissionResolutionService.evictPermissionCache("tenant-1"))
-                    .thenReturn(Mono.empty());
-
-            String message = createEventMessage("group-memberships", "gm-1", ChangeType.CREATED);
-            listener.onRecordChanged(message);
-
-            verify(permissionResolutionService).evictPermissionCache("tenant-1");
-        }
-
-        @Test
-        @DisplayName("Should NOT evict permission cache for non-permission collections")
-        void shouldNotEvictPermissionCacheForNonPermissionCollections() throws Exception {
-            String message = createEventMessage("products", "prod-1", ChangeType.UPDATED);
-            listener.onRecordChanged(message);
-
-            verify(permissionResolutionService, never()).evictPermissionCache(any());
-        }
-
-        @Test
-        @DisplayName("Should NOT evict permission cache for collections change")
-        void shouldNotEvictPermissionCacheForCollectionsChange() throws Exception {
-            String message = createEventMessage("collections", "col-1", ChangeType.UPDATED);
-            listener.onRecordChanged(message);
-
-            verify(permissionResolutionService, never()).evictPermissionCache(any());
-        }
-
-        @Test
-        @DisplayName("Should work when permissionResolutionService is null")
-        void shouldWorkWhenPermissionServiceIsNull() throws Exception {
-            SystemCollectionRouteListener listenerNoPerms = new SystemCollectionRouteListener(
-                    routeRegistry, applicationEventPublisher, objectMapper, null, cacheManager
-            );
-
-            String message = createEventMessage("profiles", "profile-1", ChangeType.UPDATED);
-
-            assertDoesNotThrow(() -> listenerNoPerms.onRecordChanged(message));
         }
     }
 
@@ -232,16 +117,6 @@ class SystemCollectionRouteListenerTest {
         @DisplayName("Should NOT refresh governor limits for non-tenant collections")
         void shouldNotRefreshGovernorLimitsForNonTenantCollections() throws Exception {
             String message = createEventMessage("products", "prod-1", ChangeType.UPDATED);
-
-            listener.onRecordChanged(message);
-
-            verify(cacheManager, never()).refreshGovernorLimitsFromWorker();
-        }
-
-        @Test
-        @DisplayName("Should NOT refresh governor limits for collections change")
-        void shouldNotRefreshGovernorLimitsForCollectionsChange() throws Exception {
-            String message = createEventMessage("collections", "col-1", ChangeType.UPDATED);
 
             listener.onRecordChanged(message);
 

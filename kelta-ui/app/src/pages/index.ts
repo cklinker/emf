@@ -223,13 +223,6 @@ export { ProfilesPage } from './ProfilesPage'
 export { ProfileDetailPage } from './ProfileDetailPage'
 export type { ProfileDetailPageProps } from './ProfileDetailPage'
 
-// PermissionSetsPage - Permission sets management page
-export { PermissionSetsPage } from './PermissionSetsPage'
-
-// PermissionSetDetailPage - Permission set detail view page
-export { PermissionSetDetailPage } from './PermissionSetDetailPage'
-export type { PermissionSetDetailPageProps } from './PermissionSetDetailPage'
-
 // LoginHistoryPage - Login history management page
 export { LoginHistoryPage } from './LoginHistoryPage'
 

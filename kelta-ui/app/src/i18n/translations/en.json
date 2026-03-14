@@ -757,24 +757,6 @@
     "visibility": "Visibility",
     "noFieldPermissions": "No field permissions configured"
   },
-  "permissionSets": {
-    "title": "Permission Sets",
-    "create": "Create Permission Set",
-    "name": "Name",
-    "description": "Description",
-    "createSuccess": "Permission set created successfully",
-    "deleteSuccess": "Permission set deleted successfully",
-    "permissionsSaved": "Permissions saved successfully",
-    "noSets": "No permission sets found",
-    "selectSet": "Select a permission set to view its permissions",
-    "assignedUsers": "Assigned Users",
-    "assign": "Assign",
-    "unassign": "Unassign",
-    "selectUser": "Select a user...",
-    "noAssignedUsers": "No users assigned to this permission set.",
-    "userAssigned": "User assigned successfully",
-    "userUnassigned": "User unassigned successfully"
-  },
   "logs": {
     "viewLogs": "Logs",
     "viewDeliveries": "Deliveries",
@@ -913,7 +895,6 @@
     "sectionCollections": "Collections",
     "sectionFields": "Fields",
     "sectionProfiles": "Profiles",
-    "sectionPermissionSets": "Permission Sets",
     "sectionOIDC": "OIDC",
     "sectionTenants": "Tenants",
     "sectionSharing": "Sharing",

@@ -491,37 +491,6 @@ export interface SystemPermissionRequest {
 }
 
 /**
- * Permission set definition
- */
-export interface PermissionSet {
-  id: string;
-  name: string;
-  description?: string;
-  system: boolean;
-  objectPermissions?: ObjectPermission[];
-  fieldPermissions?: FieldPermissionEntry[];
-  systemPermissions?: SystemPermissionEntry[];
-  createdAt: string;
-  updatedAt: string;
-}
-
-/**
- * Request to create a permission set
- */
-export interface CreatePermissionSetRequest {
-  name: string;
-  description?: string;
-}
-
-/**
- * Request to update a permission set
- */
-export interface UpdatePermissionSetRequest {
-  name?: string;
-  description?: string;
-}
-
-/**
  * Organization-wide default
  */
 export interface OrgWideDefault {

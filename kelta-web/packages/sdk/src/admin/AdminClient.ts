@@ -29,9 +29,6 @@ import type {
   ObjectPermissionRequest,
   FieldPermissionRequest,
   SystemPermissionRequest,
-  PermissionSet,
-  CreatePermissionSetRequest,
-  UpdatePermissionSetRequest,
   OrgWideDefault,
   SetOwdRequest,
   SharingRule,
@@ -954,98 +951,6 @@ export class AdminClient {
           return this.axios.post('/api/profile-system-permissions', body);
         })
       );
-    },
-  };
-
-  // ---------------------------------------------------------------------------
-  // Permission sets
-  // ---------------------------------------------------------------------------
-
-  readonly permissionSets = {
-    list: async (): Promise<PermissionSet[]> => {
-      const response = await this.axios.get('/api/permission-sets');
-      return unwrapJsonApiList<PermissionSet>(response.data);
-    },
-
-    get: async (id: string): Promise<PermissionSet> => {
-      const response = await this.axios.get(`/api/permission-sets/${id}`);
-      return unwrapJsonApiResource<PermissionSet>(response.data);
-    },
-
-    create: async (request: CreatePermissionSetRequest): Promise<PermissionSet> => {
-      const body = toJsonApiBody('permission-sets', request as unknown as Record<string, unknown>);
-      const response = await this.axios.post('/api/permission-sets', body);
-      return unwrapJsonApiResource<PermissionSet>(response.data);
-    },
-
-    update: async (id: string, request: UpdatePermissionSetRequest): Promise<PermissionSet> => {
-      const body = toJsonApiBody(
-        'permission-sets',
-        request as unknown as Record<string, unknown>,
-        id
-      );
-      const response = await this.axios.patch(`/api/permission-sets/${id}`, body);
-      return unwrapJsonApiResource<PermissionSet>(response.data);
-    },
-
-    delete: async (id: string): Promise<void> => {
-      await this.axios.delete(`/api/permission-sets/${id}`);
-    },
-
-    setObjectPermissions: async (
-      id: string,
-      collectionId: string,
-      perms: ObjectPermissionRequest
-    ): Promise<void> => {
-      const body = toJsonApiBody('permset-object-permissions', {
-        ...(perms as unknown as Record<string, unknown>),
-        permissionSetId: id,
-        collectionId,
-      });
-      await this.axios.post('/api/permset-object-permissions', body);
-    },
-
-    setFieldPermissions: async (id: string, perms: FieldPermissionRequest[]): Promise<void> => {
-      await Promise.all(
-        perms.map((p) => {
-          const body = toJsonApiBody('permset-field-permissions', {
-            ...(p as unknown as Record<string, unknown>),
-            permissionSetId: id,
-          });
-          return this.axios.post('/api/permset-field-permissions', body);
-        })
-      );
-    },
-
-    setSystemPermissions: async (id: string, perms: SystemPermissionRequest[]): Promise<void> => {
-      await Promise.all(
-        perms.map((p) => {
-          const body = toJsonApiBody('permset-system-permissions', {
-            ...(p as unknown as Record<string, unknown>),
-            permissionSetId: id,
-          });
-          return this.axios.post('/api/permset-system-permissions', body);
-        })
-      );
-    },
-
-    assign: async (id: string, userId: string): Promise<void> => {
-      const body = toJsonApiBody('user-permission-sets', {
-        permissionSetId: id,
-        userId,
-      });
-      await this.axios.post('/api/user-permission-sets', body);
-    },
-
-    unassign: async (id: string, userId: string): Promise<void> => {
-      // Find the assignment record, then delete
-      const response = await this.axios.get(
-        `/api/user-permission-sets?filter[permissionSetId][eq]=${encodeURIComponent(id)}&filter[userId][eq]=${encodeURIComponent(userId)}`
-      );
-      const assignments = unwrapJsonApiList<{ id: string }>(response.data);
-      if (assignments.length > 0) {
-        await this.axios.delete(`/api/user-permission-sets/${assignments[0].id}`);
-      }
     },
   };
 

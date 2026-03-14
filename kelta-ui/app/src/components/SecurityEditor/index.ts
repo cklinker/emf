@@ -26,3 +26,15 @@ export type {
 // Effective Permissions Panel
 export { EffectivePermissionsPanel } from './EffectivePermissionsPanel'
 export type { EffectivePermissionsPanelProps } from './EffectivePermissionsPanel'
+
+// Custom Policy Editor
+export { CustomPolicyEditor } from './CustomPolicyEditor'
+export type { CustomPolicyEditorProps } from './CustomPolicyEditor'
+
+// CEL Expression Editor
+export { CelExpressionEditor } from './CelExpressionEditor'
+export type { CelExpressionEditorProps } from './CelExpressionEditor'
+
+// Policy Test Panel
+export { PolicyTestPanel } from './PolicyTestPanel'
+export type { PolicyTestPanelProps } from './PolicyTestPanel'

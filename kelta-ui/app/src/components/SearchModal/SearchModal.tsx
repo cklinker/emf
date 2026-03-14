@@ -125,13 +125,6 @@ const NAV_PAGES: SearchResult[] = [
     subtitle: 'Permission profiles',
     path: '/profiles',
   },
-  {
-    id: 'nav-permission-sets',
-    type: 'page',
-    title: 'Permission Sets',
-    subtitle: 'Permission set management',
-    path: '/permission-sets',
-  },
 ]
 
 const SEARCH_HISTORY_KEY = 'kelta_search_history'

@@ -28,7 +28,7 @@ export interface UseResourcesOptions {
   sort?: SortState
   /** Active filters */
   filters?: FilterCondition[]
-  /** Related resources to include (e.g. ["profile", "permissionSets"]) */
+  /** Related resources to include (e.g. ["profile", "profile-system-permissions"]) */
   include?: string[]
   /** Sparse fieldsets — fields to return per resource type (e.g. { users: ["name", "email"] }) */
   fields?: Record<string, string[]>

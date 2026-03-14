@@ -260,9 +260,9 @@ export function unwrapCollection<T extends Record<string, unknown> = Record<stri
 /**
  * Extract included resources from a JSON:API response, filtered by type.
  *
- * When using `?include=profile,permissionSets`, the response contains an
- * `included` array with all sideloaded resources. This function extracts
- * and flattens only the resources matching the requested type.
+ * When using `?include=profile,profile-system-permissions`, the response
+ * contains an `included` array with all sideloaded resources. This function
+ * extracts and flattens only the resources matching the requested type.
  *
  * Input:  extractIncluded(response, "profiles")
  * Output: [{ id: "p1", name: "Admin", ... }, { id: "p2", name: "User", ... }]

@@ -53,6 +53,14 @@ public class BootstrapRepository {
             LIMIT 1
             """;
 
+    private static final String SELECT_USER_IDENTITY = """
+            SELECT u.id, u.profile_id, p.name AS profile_name
+            FROM platform_user u
+            LEFT JOIN profile p ON u.profile_id = p.id
+            WHERE u.email = ? AND u.tenant_id = ? AND u.status = 'ACTIVE'
+            LIMIT 1
+            """;
+
     private static final String SELECT_PROFILE_SYSTEM_PERMISSIONS = """
             SELECT permission_name, granted
             FROM profile_system_permission WHERE profile_id = ?
@@ -68,28 +76,9 @@ public class BootstrapRepository {
             FROM profile_field_permission WHERE profile_id = ?
             """;
 
-    private static final String SELECT_USER_PERMSET_IDS = """
-            SELECT permission_set_id FROM user_permission_set WHERE user_id = ?
-            """;
-
     private static final String SELECT_USER_GROUP_IDS = """
             SELECT group_id FROM group_membership
             WHERE member_type = 'USER' AND member_id = ?
-            """;
-
-    private static final String SELECT_PERMSET_SYSTEM_PERMISSIONS = """
-            SELECT permission_name, granted
-            FROM permset_system_permission WHERE permission_set_id = ? AND granted = true
-            """;
-
-    private static final String SELECT_PERMSET_OBJECT_PERMISSIONS = """
-            SELECT collection_id, can_create, can_read, can_edit, can_delete
-            FROM permset_object_permission WHERE permission_set_id = ?
-            """;
-
-    private static final String SELECT_PERMSET_FIELD_PERMISSIONS = """
-            SELECT collection_id, field_id, visibility
-            FROM permset_field_permission WHERE permission_set_id = ?
             """;
 
     private final JdbcTemplate jdbcTemplate;
@@ -140,32 +129,13 @@ public class BootstrapRepository {
         return jdbcTemplate.queryForList(SELECT_PROFILE_FIELD_PERMISSIONS, profileId);
     }
 
-    public List<Map<String, Object>> findUserPermissionSetIds(String userId) {
-        return jdbcTemplate.queryForList(SELECT_USER_PERMSET_IDS, userId);
-    }
-
     public List<Map<String, Object>> findUserGroupIds(String userId) {
         return jdbcTemplate.queryForList(SELECT_USER_GROUP_IDS, userId);
     }
 
-    public List<Map<String, Object>> findGroupPermissionSetIds(List<String> groupIds) {
-        String placeholders = String.join(",",
-                groupIds.stream().map(id -> "?").toList());
-        String sql = String.format(
-                "SELECT DISTINCT permission_set_id FROM group_permission_set WHERE group_id IN (%s)",
-                placeholders);
-        return jdbcTemplate.queryForList(sql, groupIds.toArray());
-    }
-
-    public List<Map<String, Object>> findPermsetSystemPermissions(String permSetId) {
-        return jdbcTemplate.queryForList(SELECT_PERMSET_SYSTEM_PERMISSIONS, permSetId);
-    }
-
-    public List<Map<String, Object>> findPermsetObjectPermissions(String permSetId) {
-        return jdbcTemplate.queryForList(SELECT_PERMSET_OBJECT_PERMISSIONS, permSetId);
-    }
-
-    public List<Map<String, Object>> findPermsetFieldPermissions(String permSetId) {
-        return jdbcTemplate.queryForList(SELECT_PERMSET_FIELD_PERMISSIONS, permSetId);
+    public Optional<Map<String, Object>> findUserIdentity(String email, String tenantId) {
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                SELECT_USER_IDENTITY, email, tenantId);
+        return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));
     }
 }

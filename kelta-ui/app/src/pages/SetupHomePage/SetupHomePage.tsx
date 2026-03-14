@@ -71,12 +71,6 @@ const CATEGORIES: SetupCategory[] = [
         permission: 'MANAGE_USERS',
       },
       {
-        name: 'Permission Sets',
-        path: '/permission-sets',
-        description: 'Create additional permission grants',
-        permission: 'MANAGE_USERS',
-      },
-      {
         name: 'OIDC Providers',
         path: '/oidc-providers',
         description: 'Configure identity providers',

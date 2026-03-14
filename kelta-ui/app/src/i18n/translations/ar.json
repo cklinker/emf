@@ -543,17 +543,6 @@
     "visibility": "الرؤية",
     "noFieldPermissions": "لم يتم تكوين أذونات حقول"
   },
-  "permissionSets": {
-    "title": "مجموعات الأذونات",
-    "create": "إنشاء مجموعة أذونات",
-    "name": "الاسم",
-    "description": "الوصف",
-    "createSuccess": "تم إنشاء مجموعة الأذونات بنجاح",
-    "deleteSuccess": "تم حذف مجموعة الأذونات بنجاح",
-    "permissionsSaved": "تم حفظ الأذونات بنجاح",
-    "noSets": "لم يتم العثور على مجموعات أذونات",
-    "selectSet": "اختر مجموعة أذونات لعرض أذوناتها"
-  },
   "sharing": {
     "title": "إعدادات المشاركة",
     "owdTab": "الإعدادات الافتراضية للمؤسسة",
@@ -624,7 +613,6 @@
     "sectionCollections": "المجموعات",
     "sectionFields": "الحقول",
     "sectionProfiles": "الملفات الشخصية",
-    "sectionPermissionSets": "مجموعات الأذونات",
     "sectionOIDC": "OIDC",
     "sectionTenants": "المستأجرون",
     "sectionSharing": "المشاركة",

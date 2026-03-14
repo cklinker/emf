@@ -303,10 +303,6 @@ vi.mock('./pages', () => ({
   ),
   ProfilesPage: () => <div data-testid="profiles-page">Profiles Page</div>,
   ProfileDetailPage: () => <div data-testid="profile-detail-page">Profile Detail Page</div>,
-  PermissionSetsPage: () => <div data-testid="permission-sets-page">Permission Sets Page</div>,
-  PermissionSetDetailPage: () => (
-    <div data-testid="permission-set-detail-page">Permission Set Detail Page</div>
-  ),
   LoginHistoryPage: () => <div data-testid="login-history-page">Login History Page</div>,
   SecurityAuditPage: () => <div data-testid="security-audit-page">Security Audit Page</div>,
   TenantsPage: () => <div data-testid="tenants-page">Tenants Page</div>,

@@ -3,6 +3,7 @@ package io.kelta.gateway.authz;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.kelta.gateway.auth.GatewayPrincipal;
 import io.kelta.gateway.auth.PublicPathMatcher;
+import io.kelta.gateway.authz.cerbos.CerbosAuthorizationService;
 import io.kelta.gateway.metrics.GatewayMetrics;
 import io.kelta.gateway.route.RouteDefinition;
 import io.kelta.gateway.route.RouteRegistry;
@@ -21,20 +22,20 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 /**
  * Unit tests for {@link RouteAuthorizationFilter}.
  *
  * <p>Tests both authentication-only mode (permissions disabled) and
- * full object-permission enforcement mode (permissions enabled).
+ * full Cerbos-based authorization mode (permissions enabled).
  */
 @ExtendWith(MockitoExtension.class)
 class RouteAuthorizationFilterTest {
@@ -54,15 +55,27 @@ class RouteAuthorizationFilterTest {
     @Mock
     private GatewayFilterChain filterChain;
 
+    @Mock
+    private CerbosAuthorizationService cerbosService;
+
     @BeforeEach
     void setUp() {
         lenient().when(filterChain.filter(any(ServerWebExchange.class))).thenReturn(Mono.empty());
         lenient().when(publicPathMatcher.isPublicRequest(any(ServerWebExchange.class))).thenReturn(false);
     }
 
+    private GatewayPrincipal principalWithIdentity(String email) {
+        GatewayPrincipal principal = new GatewayPrincipal(email, List.of("USER"), Map.of());
+        principal.setProfileId("profile-1");
+        principal.setProfileName("Standard User");
+        principal.setTenantId("tenant-1");
+        return principal;
+    }
+
     @Test
     void shouldHaveOrderZero() {
-        RouteAuthorizationFilter filter = new RouteAuthorizationFilter(routeRegistry, false, publicPathMatcher, metrics, new ObjectMapper());
+        RouteAuthorizationFilter filter = new RouteAuthorizationFilter(
+                routeRegistry, false, publicPathMatcher, metrics, new ObjectMapper(), cerbosService);
         assertThat(filter.getOrder()).isEqualTo(0);
     }
 
@@ -78,7 +91,8 @@ class RouteAuthorizationFilterTest {
 
         @BeforeEach
         void setUp() {
-            filter = new RouteAuthorizationFilter(routeRegistry, false, publicPathMatcher, metrics, new ObjectMapper());
+            filter = new RouteAuthorizationFilter(
+                    routeRegistry, false, publicPathMatcher, metrics, new ObjectMapper(), cerbosService);
         }
 
         @Test
@@ -112,8 +126,8 @@ class RouteAuthorizationFilterTest {
         }
 
         @Test
-        @DisplayName("Should allow authenticated users")
-        void shouldAllowAuthenticatedUsers() {
+        @DisplayName("Should allow authenticated users without Cerbos check")
+        void shouldAllowAuthenticatedUsersWithoutCerbosCheck() {
             GatewayPrincipal principal = new GatewayPrincipal("user1", List.of("USER"), Map.of());
             MockServerHttpRequest request = MockServerHttpRequest.get("/api/users").build();
             MockServerWebExchange exchange = MockServerWebExchange.from(request);
@@ -123,43 +137,13 @@ class RouteAuthorizationFilterTest {
                     .expectComplete()
                     .verify();
 
-            verify(filterChain).filter(exchange);
-            assertThat(exchange.getResponse().getStatusCode()).isNull();
-        }
-
-        @Test
-        @DisplayName("Should allow authenticated users to any API path")
-        void shouldAllowAuthenticatedUsersToAnyApiPath() {
-            GatewayPrincipal principal = new GatewayPrincipal("admin1", List.of("ADMIN"), Map.of());
-            MockServerHttpRequest request = MockServerHttpRequest.get("/api/collections").build();
-            MockServerWebExchange exchange = MockServerWebExchange.from(request);
-            exchange.getAttributes().put(PRINCIPAL_ATTR, principal);
-
-            StepVerifier.create(filter.filter(exchange, filterChain))
-                    .expectComplete()
-                    .verify();
-
-            verify(filterChain).filter(exchange);
-        }
-
-        @Test
-        @DisplayName("Should return JSON error response on forbidden")
-        void shouldReturnJsonErrorResponseOnForbidden() {
-            MockServerHttpRequest request = MockServerHttpRequest.delete("/api/users/123").build();
-            MockServerWebExchange exchange = MockServerWebExchange.from(request);
-
-            StepVerifier.create(filter.filter(exchange, filterChain))
-                    .expectComplete()
-                    .verify();
-
-            assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
-            assertThat(exchange.getResponse().getHeaders().getContentType().toString())
-                    .contains("application/json");
+            verify(filterChain).filter(any());
+            verifyNoInteractions(cerbosService);
         }
     }
 
     // ================================================================
-    // Permissions enabled (object-level enforcement)
+    // Permissions enabled (Cerbos-based enforcement)
     // ================================================================
 
     @Nested
@@ -170,7 +154,8 @@ class RouteAuthorizationFilterTest {
 
         @BeforeEach
         void setUp() {
-            filter = new RouteAuthorizationFilter(routeRegistry, true, publicPathMatcher, metrics, new ObjectMapper());
+            filter = new RouteAuthorizationFilter(
+                    routeRegistry, true, publicPathMatcher, metrics, new ObjectMapper(), cerbosService);
         }
 
         @Test
@@ -186,7 +171,6 @@ class RouteAuthorizationFilterTest {
                     .verify();
 
             verify(filterChain).filter(exchange);
-            assertThat(exchange.getResponse().getStatusCode()).isNull();
         }
 
         @Test
@@ -203,53 +187,32 @@ class RouteAuthorizationFilterTest {
         }
 
         @Test
-        @DisplayName("Should allow allPermissive permissions (system administrator profile)")
-        void shouldAllowAllPermissive() {
+        @DisplayName("Should deny when principal has no profileId resolved")
+        void shouldDenyWhenNoProfileResolved() {
+            GatewayPrincipal principal = new GatewayPrincipal("user@test.com", List.of("USER"), Map.of());
+            // No profileId or tenantId set
             MockServerHttpRequest request = MockServerHttpRequest.get("/api/users").build();
             MockServerWebExchange exchange = MockServerWebExchange.from(request);
-            exchange.getAttributes().put(PRINCIPAL_ATTR,
-                    new GatewayPrincipal("admin@test.com", List.of("ADMIN"), Map.of()));
-            exchange.getAttributes().put(PermissionResolutionFilter.PERMISSIONS_ATTRIBUTE,
-                    ResolvedPermissions.allPermissive());
-
-            StepVerifier.create(filter.filter(exchange, filterChain))
-                    .expectComplete()
-                    .verify();
-
-            verify(filterChain).filter(exchange);
-        }
-
-        @Test
-        @DisplayName("Should fail-closed when no permissions attribute")
-        void shouldFailClosedWhenNoPermissions() {
-            MockServerHttpRequest request = MockServerHttpRequest.get("/api/users").build();
-            MockServerWebExchange exchange = MockServerWebExchange.from(request);
-            exchange.getAttributes().put(PRINCIPAL_ATTR,
-                    new GatewayPrincipal("user@test.com", List.of("USER"), Map.of()));
+            exchange.getAttributes().put(PRINCIPAL_ATTR, principal);
 
             StepVerifier.create(filter.filter(exchange, filterChain))
                     .expectComplete()
                     .verify();
 
             assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
-            verify(filterChain, never()).filter(exchange);
+            verifyNoInteractions(cerbosService);
         }
 
         @Test
         @DisplayName("Should deny when missing API_ACCESS system permission")
         void shouldDenyWithoutApiAccess() {
-            ResolvedPermissions perms = new ResolvedPermissions(
-                    "user-1",
-                    Map.of("API_ACCESS", false),
-                    Collections.emptyMap(),
-                    Collections.emptyMap()
-            );
-
+            GatewayPrincipal principal = principalWithIdentity("user@test.com");
             MockServerHttpRequest request = MockServerHttpRequest.get("/api/users").build();
             MockServerWebExchange exchange = MockServerWebExchange.from(request);
-            exchange.getAttributes().put(PRINCIPAL_ATTR,
-                    new GatewayPrincipal("user@test.com", List.of("USER"), Map.of()));
-            exchange.getAttributes().put(PermissionResolutionFilter.PERMISSIONS_ATTRIBUTE, perms);
+            exchange.getAttributes().put(PRINCIPAL_ATTR, principal);
+
+            when(cerbosService.checkSystemPermission(principal, "API_ACCESS"))
+                    .thenReturn(Mono.just(false));
 
             StepVerifier.create(filter.filter(exchange, filterChain))
                     .expectComplete()
@@ -259,74 +222,61 @@ class RouteAuthorizationFilterTest {
         }
 
         @Test
-        @DisplayName("Should allow non-API paths even without permissions")
+        @DisplayName("Should allow non-API paths with identity")
         void shouldAllowNonApiPaths() {
-            ResolvedPermissions perms = new ResolvedPermissions(
-                    "user-1",
-                    Map.of("API_ACCESS", true),
-                    Collections.emptyMap(),
-                    Collections.emptyMap()
-            );
-
+            GatewayPrincipal principal = principalWithIdentity("user@test.com");
             MockServerHttpRequest request = MockServerHttpRequest.get("/actuator/health").build();
             MockServerWebExchange exchange = MockServerWebExchange.from(request);
-            exchange.getAttributes().put(PRINCIPAL_ATTR,
-                    new GatewayPrincipal("user@test.com", List.of("USER"), Map.of()));
-            exchange.getAttributes().put(PermissionResolutionFilter.PERMISSIONS_ATTRIBUTE, perms);
+            exchange.getAttributes().put(PRINCIPAL_ATTR, principal);
 
             StepVerifier.create(filter.filter(exchange, filterChain))
                     .expectComplete()
                     .verify();
 
-            verify(filterChain).filter(exchange);
+            verify(filterChain).filter(any());
+            verifyNoInteractions(cerbosService);
         }
 
         @Test
-        @DisplayName("Should allow GET when user has canRead permission")
-        void shouldAllowGetWithReadPermission() {
+        @DisplayName("Should allow GET when Cerbos grants read")
+        void shouldAllowGetWithCerbosRead() {
             RouteDefinition route = new RouteDefinition("coll-1", "/api/users/**",
                     "http://worker:80", "users");
             when(routeRegistry.findByPath("/api/users")).thenReturn(Optional.of(route));
 
-            ResolvedPermissions perms = new ResolvedPermissions(
-                    "user-1",
-                    Map.of("API_ACCESS", true),
-                    Map.of("coll-1", new ObjectPermissions(false, true, false, false)),
-                    Collections.emptyMap()
-            );
-
+            GatewayPrincipal principal = principalWithIdentity("user@test.com");
             MockServerHttpRequest request = MockServerHttpRequest.get("/api/users").build();
             MockServerWebExchange exchange = MockServerWebExchange.from(request);
-            exchange.getAttributes().put(PRINCIPAL_ATTR,
-                    new GatewayPrincipal("user@test.com", List.of("USER"), Map.of()));
-            exchange.getAttributes().put(PermissionResolutionFilter.PERMISSIONS_ATTRIBUTE, perms);
+            exchange.getAttributes().put(PRINCIPAL_ATTR, principal);
+
+            when(cerbosService.checkSystemPermission(principal, "API_ACCESS"))
+                    .thenReturn(Mono.just(true));
+            when(cerbosService.checkObjectPermission(principal, "coll-1", "read"))
+                    .thenReturn(Mono.just(true));
 
             StepVerifier.create(filter.filter(exchange, filterChain))
                     .expectComplete()
                     .verify();
 
-            verify(filterChain).filter(exchange);
+            verify(filterChain).filter(any());
         }
 
         @Test
-        @DisplayName("Should deny GET when user lacks canRead permission")
-        void shouldDenyGetWithoutReadPermission() {
+        @DisplayName("Should deny GET when Cerbos denies read")
+        void shouldDenyGetWhenCerbosDeniesRead() {
             RouteDefinition route = new RouteDefinition("coll-1", "/api/users/**",
                     "http://worker:80", "users");
             when(routeRegistry.findByPath("/api/users")).thenReturn(Optional.of(route));
 
-            ResolvedPermissions perms = new ResolvedPermissions(
-                    "user-1",
-                    Map.of("API_ACCESS", true),
-                    Map.of("coll-1", new ObjectPermissions(true, false, true, true)),
-                    Collections.emptyMap()
-            );
-
+            GatewayPrincipal principal = principalWithIdentity("user@test.com");
             MockServerHttpRequest request = MockServerHttpRequest.get("/api/users").build();
             MockServerWebExchange exchange = MockServerWebExchange.from(request);
-            exchange.getAttributes().put(PRINCIPAL_ATTR,
-                    new GatewayPrincipal("user@test.com", List.of("USER"), Map.of()));
-            exchange.getAttributes().put(PermissionResolutionFilter.PERMISSIONS_ATTRIBUTE, perms);
+            exchange.getAttributes().put(PRINCIPAL_ATTR, principal);
+
+            when(cerbosService.checkSystemPermission(principal, "API_ACCESS"))
+                    .thenReturn(Mono.just(true));
+            when(cerbosService.checkObjectPermission(principal, "coll-1", "read"))
+                    .thenReturn(Mono.just(false));
 
             StepVerifier.create(filter.filter(exchange, filterChain))
                     .expectComplete()
@@ -336,51 +286,45 @@ class RouteAuthorizationFilterTest {
         }
 
         @Test
-        @DisplayName("Should allow POST when user has canCreate permission")
-        void shouldAllowPostWithCreatePermission() {
+        @DisplayName("Should allow POST when Cerbos grants create")
+        void shouldAllowPostWithCerbosCreate() {
             RouteDefinition route = new RouteDefinition("coll-1", "/api/users/**",
                     "http://worker:80", "users");
             when(routeRegistry.findByPath("/api/users")).thenReturn(Optional.of(route));
 
-            ResolvedPermissions perms = new ResolvedPermissions(
-                    "user-1",
-                    Map.of("API_ACCESS", true),
-                    Map.of("coll-1", new ObjectPermissions(true, true, false, false)),
-                    Collections.emptyMap()
-            );
-
+            GatewayPrincipal principal = principalWithIdentity("user@test.com");
             MockServerHttpRequest request = MockServerHttpRequest.post("/api/users").build();
             MockServerWebExchange exchange = MockServerWebExchange.from(request);
-            exchange.getAttributes().put(PRINCIPAL_ATTR,
-                    new GatewayPrincipal("user@test.com", List.of("USER"), Map.of()));
-            exchange.getAttributes().put(PermissionResolutionFilter.PERMISSIONS_ATTRIBUTE, perms);
+            exchange.getAttributes().put(PRINCIPAL_ATTR, principal);
+
+            when(cerbosService.checkSystemPermission(principal, "API_ACCESS"))
+                    .thenReturn(Mono.just(true));
+            when(cerbosService.checkObjectPermission(principal, "coll-1", "create"))
+                    .thenReturn(Mono.just(true));
 
             StepVerifier.create(filter.filter(exchange, filterChain))
                     .expectComplete()
                     .verify();
 
-            verify(filterChain).filter(exchange);
+            verify(filterChain).filter(any());
         }
 
         @Test
-        @DisplayName("Should deny POST when user lacks canCreate permission")
-        void shouldDenyPostWithoutCreatePermission() {
+        @DisplayName("Should deny POST when Cerbos denies create")
+        void shouldDenyPostWhenCerbosDeniesCreate() {
             RouteDefinition route = new RouteDefinition("coll-1", "/api/users/**",
                     "http://worker:80", "users");
             when(routeRegistry.findByPath("/api/users")).thenReturn(Optional.of(route));
 
-            ResolvedPermissions perms = new ResolvedPermissions(
-                    "user-1",
-                    Map.of("API_ACCESS", true),
-                    Map.of("coll-1", new ObjectPermissions(false, true, true, true)),
-                    Collections.emptyMap()
-            );
-
+            GatewayPrincipal principal = principalWithIdentity("user@test.com");
             MockServerHttpRequest request = MockServerHttpRequest.post("/api/users").build();
             MockServerWebExchange exchange = MockServerWebExchange.from(request);
-            exchange.getAttributes().put(PRINCIPAL_ATTR,
-                    new GatewayPrincipal("user@test.com", List.of("USER"), Map.of()));
-            exchange.getAttributes().put(PermissionResolutionFilter.PERMISSIONS_ATTRIBUTE, perms);
+            exchange.getAttributes().put(PRINCIPAL_ATTR, principal);
+
+            when(cerbosService.checkSystemPermission(principal, "API_ACCESS"))
+                    .thenReturn(Mono.just(true));
+            when(cerbosService.checkObjectPermission(principal, "coll-1", "create"))
+                    .thenReturn(Mono.just(false));
 
             StepVerifier.create(filter.filter(exchange, filterChain))
                     .expectComplete()
@@ -390,165 +334,75 @@ class RouteAuthorizationFilterTest {
         }
 
         @Test
-        @DisplayName("Should allow PUT when user has canEdit permission")
-        void shouldAllowPutWithEditPermission() {
+        @DisplayName("Should allow PUT when Cerbos grants edit")
+        void shouldAllowPutWithCerbosEdit() {
             RouteDefinition route = new RouteDefinition("coll-1", "/api/users/**",
                     "http://worker:80", "users");
             when(routeRegistry.findByPath("/api/users/123")).thenReturn(Optional.of(route));
 
-            ResolvedPermissions perms = new ResolvedPermissions(
-                    "user-1",
-                    Map.of("API_ACCESS", true),
-                    Map.of("coll-1", new ObjectPermissions(false, true, true, false)),
-                    Collections.emptyMap()
-            );
-
+            GatewayPrincipal principal = principalWithIdentity("user@test.com");
             MockServerHttpRequest request = MockServerHttpRequest.put("/api/users/123").build();
             MockServerWebExchange exchange = MockServerWebExchange.from(request);
-            exchange.getAttributes().put(PRINCIPAL_ATTR,
-                    new GatewayPrincipal("user@test.com", List.of("USER"), Map.of()));
-            exchange.getAttributes().put(PermissionResolutionFilter.PERMISSIONS_ATTRIBUTE, perms);
+            exchange.getAttributes().put(PRINCIPAL_ATTR, principal);
+
+            when(cerbosService.checkSystemPermission(principal, "API_ACCESS"))
+                    .thenReturn(Mono.just(true));
+            when(cerbosService.checkObjectPermission(principal, "coll-1", "edit"))
+                    .thenReturn(Mono.just(true));
 
             StepVerifier.create(filter.filter(exchange, filterChain))
                     .expectComplete()
                     .verify();
 
-            verify(filterChain).filter(exchange);
+            verify(filterChain).filter(any());
         }
 
         @Test
-        @DisplayName("Should allow PATCH when user has canEdit permission")
-        void shouldAllowPatchWithEditPermission() {
+        @DisplayName("Should allow DELETE when Cerbos grants delete")
+        void shouldAllowDeleteWithCerbosDelete() {
             RouteDefinition route = new RouteDefinition("coll-1", "/api/users/**",
                     "http://worker:80", "users");
             when(routeRegistry.findByPath("/api/users/123")).thenReturn(Optional.of(route));
 
-            ResolvedPermissions perms = new ResolvedPermissions(
-                    "user-1",
-                    Map.of("API_ACCESS", true),
-                    Map.of("coll-1", new ObjectPermissions(false, true, true, false)),
-                    Collections.emptyMap()
-            );
-
-            MockServerHttpRequest request = MockServerHttpRequest.patch("/api/users/123").build();
-            MockServerWebExchange exchange = MockServerWebExchange.from(request);
-            exchange.getAttributes().put(PRINCIPAL_ATTR,
-                    new GatewayPrincipal("user@test.com", List.of("USER"), Map.of()));
-            exchange.getAttributes().put(PermissionResolutionFilter.PERMISSIONS_ATTRIBUTE, perms);
-
-            StepVerifier.create(filter.filter(exchange, filterChain))
-                    .expectComplete()
-                    .verify();
-
-            verify(filterChain).filter(exchange);
-        }
-
-        @Test
-        @DisplayName("Should allow DELETE when user has canDelete permission")
-        void shouldAllowDeleteWithDeletePermission() {
-            RouteDefinition route = new RouteDefinition("coll-1", "/api/users/**",
-                    "http://worker:80", "users");
-            when(routeRegistry.findByPath("/api/users/123")).thenReturn(Optional.of(route));
-
-            ResolvedPermissions perms = new ResolvedPermissions(
-                    "user-1",
-                    Map.of("API_ACCESS", true),
-                    Map.of("coll-1", new ObjectPermissions(false, true, false, true)),
-                    Collections.emptyMap()
-            );
-
+            GatewayPrincipal principal = principalWithIdentity("user@test.com");
             MockServerHttpRequest request = MockServerHttpRequest.delete("/api/users/123").build();
             MockServerWebExchange exchange = MockServerWebExchange.from(request);
-            exchange.getAttributes().put(PRINCIPAL_ATTR,
-                    new GatewayPrincipal("user@test.com", List.of("USER"), Map.of()));
-            exchange.getAttributes().put(PermissionResolutionFilter.PERMISSIONS_ATTRIBUTE, perms);
+            exchange.getAttributes().put(PRINCIPAL_ATTR, principal);
+
+            when(cerbosService.checkSystemPermission(principal, "API_ACCESS"))
+                    .thenReturn(Mono.just(true));
+            when(cerbosService.checkObjectPermission(principal, "coll-1", "delete"))
+                    .thenReturn(Mono.just(true));
 
             StepVerifier.create(filter.filter(exchange, filterChain))
                     .expectComplete()
                     .verify();
 
-            verify(filterChain).filter(exchange);
+            verify(filterChain).filter(any());
         }
 
         @Test
-        @DisplayName("Should deny DELETE when user lacks canDelete permission")
-        void shouldDenyDeleteWithoutDeletePermission() {
+        @DisplayName("Should deny DELETE when Cerbos denies delete")
+        void shouldDenyDeleteWhenCerbosDeniesDelete() {
             RouteDefinition route = new RouteDefinition("coll-1", "/api/users/**",
                     "http://worker:80", "users");
             when(routeRegistry.findByPath("/api/users/123")).thenReturn(Optional.of(route));
 
-            ResolvedPermissions perms = new ResolvedPermissions(
-                    "user-1",
-                    Map.of("API_ACCESS", true),
-                    Map.of("coll-1", new ObjectPermissions(true, true, true, false)),
-                    Collections.emptyMap()
-            );
-
+            GatewayPrincipal principal = principalWithIdentity("user@test.com");
             MockServerHttpRequest request = MockServerHttpRequest.delete("/api/users/123").build();
             MockServerWebExchange exchange = MockServerWebExchange.from(request);
-            exchange.getAttributes().put(PRINCIPAL_ATTR,
-                    new GatewayPrincipal("user@test.com", List.of("USER"), Map.of()));
-            exchange.getAttributes().put(PermissionResolutionFilter.PERMISSIONS_ATTRIBUTE, perms);
+            exchange.getAttributes().put(PRINCIPAL_ATTR, principal);
+
+            when(cerbosService.checkSystemPermission(principal, "API_ACCESS"))
+                    .thenReturn(Mono.just(true));
+            when(cerbosService.checkObjectPermission(principal, "coll-1", "delete"))
+                    .thenReturn(Mono.just(false));
 
             StepVerifier.create(filter.filter(exchange, filterChain))
                     .expectComplete()
                     .verify();
 
             assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
-        }
-
-        @Test
-        @DisplayName("Should allow GET with VIEW_ALL_DATA system permission override")
-        void shouldAllowGetWithViewAllDataOverride() {
-            RouteDefinition route = new RouteDefinition("coll-1", "/api/users/**",
-                    "http://worker:80", "users");
-            when(routeRegistry.findByPath("/api/users")).thenReturn(Optional.of(route));
-
-            ResolvedPermissions perms = new ResolvedPermissions(
-                    "user-1",
-                    Map.of("API_ACCESS", true, "VIEW_ALL_DATA", true),
-                    Map.of("coll-1", new ObjectPermissions(false, false, false, false)),
-                    Collections.emptyMap()
-            );
-
-            MockServerHttpRequest request = MockServerHttpRequest.get("/api/users").build();
-            MockServerWebExchange exchange = MockServerWebExchange.from(request);
-            exchange.getAttributes().put(PRINCIPAL_ATTR,
-                    new GatewayPrincipal("user@test.com", List.of("USER"), Map.of()));
-            exchange.getAttributes().put(PermissionResolutionFilter.PERMISSIONS_ATTRIBUTE, perms);
-
-            StepVerifier.create(filter.filter(exchange, filterChain))
-                    .expectComplete()
-                    .verify();
-
-            verify(filterChain).filter(exchange);
-        }
-
-        @Test
-        @DisplayName("Should allow POST with MODIFY_ALL_DATA system permission override")
-        void shouldAllowPostWithModifyAllDataOverride() {
-            RouteDefinition route = new RouteDefinition("coll-1", "/api/users/**",
-                    "http://worker:80", "users");
-            when(routeRegistry.findByPath("/api/users")).thenReturn(Optional.of(route));
-
-            ResolvedPermissions perms = new ResolvedPermissions(
-                    "user-1",
-                    Map.of("API_ACCESS", true, "MODIFY_ALL_DATA", true),
-                    Map.of("coll-1", new ObjectPermissions(false, false, false, false)),
-                    Collections.emptyMap()
-            );
-
-            MockServerHttpRequest request = MockServerHttpRequest.post("/api/users").build();
-            MockServerWebExchange exchange = MockServerWebExchange.from(request);
-            exchange.getAttributes().put(PRINCIPAL_ATTR,
-                    new GatewayPrincipal("user@test.com", List.of("USER"), Map.of()));
-            exchange.getAttributes().put(PermissionResolutionFilter.PERMISSIONS_ATTRIBUTE, perms);
-
-            StepVerifier.create(filter.filter(exchange, filterChain))
-                    .expectComplete()
-                    .verify();
-
-            verify(filterChain).filter(exchange);
         }
 
         @Test
@@ -556,51 +410,45 @@ class RouteAuthorizationFilterTest {
         void shouldAllowThroughWhenNoRouteFound() {
             when(routeRegistry.findByPath("/api/unknown")).thenReturn(Optional.empty());
 
-            ResolvedPermissions perms = new ResolvedPermissions(
-                    "user-1",
-                    Map.of("API_ACCESS", true),
-                    Collections.emptyMap(),
-                    Collections.emptyMap()
-            );
-
+            GatewayPrincipal principal = principalWithIdentity("user@test.com");
             MockServerHttpRequest request = MockServerHttpRequest.get("/api/unknown").build();
             MockServerWebExchange exchange = MockServerWebExchange.from(request);
-            exchange.getAttributes().put(PRINCIPAL_ATTR,
-                    new GatewayPrincipal("user@test.com", List.of("USER"), Map.of()));
-            exchange.getAttributes().put(PermissionResolutionFilter.PERMISSIONS_ATTRIBUTE, perms);
+            exchange.getAttributes().put(PRINCIPAL_ATTR, principal);
+
+            when(cerbosService.checkSystemPermission(principal, "API_ACCESS"))
+                    .thenReturn(Mono.just(true));
 
             StepVerifier.create(filter.filter(exchange, filterChain))
                     .expectComplete()
                     .verify();
 
-            verify(filterChain).filter(exchange);
+            verify(filterChain).filter(any());
         }
 
         @Test
-        @DisplayName("Should deny when collection has no object permissions configured")
-        void shouldDenyWhenNoObjectPermissionsForCollection() {
-            RouteDefinition route = new RouteDefinition("coll-99", "/api/products/**",
-                    "http://worker:80", "products");
-            when(routeRegistry.findByPath("/api/products")).thenReturn(Optional.of(route));
+        @DisplayName("Should forward identity headers to worker")
+        void shouldForwardIdentityHeaders() {
+            when(routeRegistry.findByPath("/api/users")).thenReturn(Optional.empty());
 
-            ResolvedPermissions perms = new ResolvedPermissions(
-                    "user-1",
-                    Map.of("API_ACCESS", true),
-                    Collections.emptyMap(),
-                    Collections.emptyMap()
-            );
-
-            MockServerHttpRequest request = MockServerHttpRequest.get("/api/products").build();
+            GatewayPrincipal principal = principalWithIdentity("user@test.com");
+            MockServerHttpRequest request = MockServerHttpRequest.get("/api/users").build();
             MockServerWebExchange exchange = MockServerWebExchange.from(request);
-            exchange.getAttributes().put(PRINCIPAL_ATTR,
-                    new GatewayPrincipal("user@test.com", List.of("USER"), Map.of()));
-            exchange.getAttributes().put(PermissionResolutionFilter.PERMISSIONS_ATTRIBUTE, perms);
+            exchange.getAttributes().put(PRINCIPAL_ATTR, principal);
+
+            when(cerbosService.checkSystemPermission(principal, "API_ACCESS"))
+                    .thenReturn(Mono.just(true));
 
             StepVerifier.create(filter.filter(exchange, filterChain))
                     .expectComplete()
                     .verify();
 
-            assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+            // Verify the chain was called with mutated exchange containing headers
+            verify(filterChain).filter(argThat(ex -> {
+                ServerWebExchange mutated = (ServerWebExchange) ex;
+                return "user@test.com".equals(mutated.getRequest().getHeaders().getFirst("X-User-Email"))
+                        && "profile-1".equals(mutated.getRequest().getHeaders().getFirst("X-User-Profile-Id"))
+                        && "tenant-1".equals(mutated.getRequest().getHeaders().getFirst("X-Cerbos-Scope"));
+            }));
         }
     }
 }

@@ -18,7 +18,7 @@ export interface UseResourceOptions {
   resource: string | undefined
   /** Record ID */
   id: string | undefined
-  /** Related resources to include (e.g. ["profile", "permissionSets"]) */
+  /** Related resources to include (e.g. ["profile", "profile-system-permissions"]) */
   include?: string[]
   /** Sparse fieldsets — fields to return per resource type */
   fields?: Record<string, string[]>

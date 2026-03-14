@@ -16,6 +16,8 @@ import { useI18n } from '../../context/I18nContext'
 import { useToast, ConfirmDialog, LoadingSpinner, ErrorMessage } from '../../components'
 import { SystemPermissionChecklist } from '@/components/SecurityEditor'
 import { ObjectPermissionMatrix } from '@/components/SecurityEditor'
+import { CustomPolicyEditor } from '@/components/SecurityEditor'
+import { PolicyTestPanel } from '@/components/SecurityEditor'
 import type { ObjectPermission } from '@/components/SecurityEditor'
 import { useCollectionSummaries } from '@/hooks/useCollectionSummaries'
 import { useExtractIncluded } from '@/hooks/useIncludedResources'
@@ -373,6 +375,27 @@ export function ProfileDetailPage({
             readOnly={true}
             testId="object-permissions"
           />
+        </section>
+      )}
+
+      {/* Custom Authorization Rules */}
+      {!profile.isSystem && (
+        <section data-testid="custom-rules-section">
+          <h2 className="mb-4 text-lg font-semibold text-foreground">Custom Authorization Rules</h2>
+          <CustomPolicyEditor
+            profileId={id!}
+            tenantId=""
+            readOnly={profile.isSystem}
+            testId="custom-rules"
+          />
+        </section>
+      )}
+
+      {/* Policy Test */}
+      {!profile.isSystem && (
+        <section data-testid="policy-test-section">
+          <h2 className="mb-4 text-lg font-semibold text-foreground">Test Policy</h2>
+          <PolicyTestPanel profileId={id} testId="policy-test" />
         </section>
       )}
 

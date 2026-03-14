@@ -103,6 +103,13 @@
             <artifactId>micrometer-tracing-bridge-otel</artifactId>
         </dependency>
 
+        <!-- Cerbos SDK for authorization -->
+        <dependency>
+            <groupId>dev.cerbos</groupId>
+            <artifactId>cerbos-sdk-java</artifactId>
+            <version>0.12.0</version>
+        </dependency>
+
         <!-- Caffeine for in-memory caching -->
         <dependency>
             <groupId>com.github.ben-manes.caffeine</groupId>

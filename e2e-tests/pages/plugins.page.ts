@@ -17,7 +17,9 @@ export class PluginsPage extends BasePage {
 
   async goto(): Promise<void> {
     await this.page.goto(this.tenantUrl("/plugins"));
-    await this.waitForLoadingComplete();
+    await this.waitForContentReady(
+      this.pluginsPage.or(this.page.getByText(/insufficient permissions/i)),
+    );
   }
 
   async getPluginCount(): Promise<string | null> {

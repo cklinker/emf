@@ -1,6 +1,7 @@
 package io.kelta.worker.service;
 
 import dev.cerbos.sdk.CerbosBlockingClient;
+import dev.cerbos.sdk.CheckResourcesResult;
 import dev.cerbos.sdk.CheckResult;
 import dev.cerbos.sdk.builders.AttributeValue;
 import dev.cerbos.sdk.builders.Principal;
@@ -9,8 +10,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -18,6 +21,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 
 /**
  * Wraps Cerbos SDK calls with hard timeouts, thread interruption, and a
@@ -149,14 +153,154 @@ public class CerbosAuthorizationService {
         }
     }
 
+    /**
+     * Batch-checks field access for multiple fields in a single Cerbos gRPC call.
+     * Returns the list of fieldIds that are ALLOWED.
+     */
     public List<String> batchCheckFieldAccess(String email, String profileId, String tenantId,
                                                String collectionId, List<String> fieldIds, String action) {
         if (isCircuitOpen()) {
             return fieldIds; // fail-open: allow all fields
         }
-        return fieldIds.stream()
-                .filter(fieldId -> checkFieldAccess(email, profileId, tenantId, collectionId, fieldId, action))
-                .toList();
+        if (fieldIds.isEmpty()) {
+            return fieldIds;
+        }
+
+        Future<List<String>> future = cerbosExecutor.submit(() -> {
+            Principal principal = Principal.newInstance(email, "user")
+                    .withAttribute("profileId", stringAttr(profileId))
+                    .withAttribute("tenantId", stringAttr(tenantId));
+
+            var batchRequest = cerbosClient.batch(principal);
+            for (String fieldId : fieldIds) {
+                Resource resource = Resource.newInstance("field", fieldId)
+                        .withAttribute("collectionId", AttributeValue.stringValue(collectionId))
+                        .withAttribute("fieldId", AttributeValue.stringValue(fieldId))
+                        .withScope(tenantId);
+                batchRequest.addResourceAndActions(resource, action);
+            }
+
+            CheckResourcesResult result = batchRequest.check();
+            List<String> allowed = new ArrayList<>();
+            for (String fieldId : fieldIds) {
+                result.find(fieldId).ifPresentOrElse(
+                        checkResult -> {
+                            if (checkResult.isAllowed(action)) {
+                                allowed.add(fieldId);
+                            }
+                        },
+                        () -> allowed.add(fieldId) // fail-open if not found
+                );
+            }
+            return allowed;
+        });
+
+        try {
+            List<String> allowed = future.get(CERBOS_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            recordSuccess();
+            log.debug("Cerbos batch field check: user={} collection={} fields={} allowed={}",
+                    email, collectionId, fieldIds.size(), allowed.size());
+            return allowed;
+        } catch (TimeoutException e) {
+            future.cancel(true);
+            recordFailure();
+            log.warn("Cerbos batch field check timed out (fail-open): user={} collection={} fields={}",
+                    email, collectionId, fieldIds.size());
+            return fieldIds; // fail-open
+        } catch (Exception e) {
+            future.cancel(true);
+            recordFailure();
+            log.warn("Cerbos batch field check failed (fail-open): user={} collection={} error={}",
+                    email, collectionId, e.getMessage());
+            return fieldIds; // fail-open
+        }
+    }
+
+    /**
+     * Batch-checks record access for multiple records in a single Cerbos gRPC call.
+     * Returns the set of recordIds that are ALLOWED.
+     */
+    public Set<String> batchCheckRecordAccess(String email, String profileId, String tenantId,
+                                               String collectionId, List<Map<String, Object>> records, String action) {
+        if (isCircuitOpen()) {
+            return records.stream()
+                    .map(r -> (String) r.get("id"))
+                    .collect(Collectors.toSet());
+        }
+        if (records.isEmpty()) {
+            return Set.of();
+        }
+
+        Future<Set<String>> future = cerbosExecutor.submit(() -> {
+            Principal principal = Principal.newInstance(email, "user")
+                    .withAttribute("profileId", stringAttr(profileId))
+                    .withAttribute("tenantId", stringAttr(tenantId));
+
+            var batchRequest = cerbosClient.batch(principal);
+            for (Map<String, Object> record : records) {
+                String recordId = (String) record.get("id");
+                if (recordId == null) continue;
+
+                Resource resource = Resource.newInstance("record", recordId)
+                        .withAttribute("collectionId", AttributeValue.stringValue(collectionId))
+                        .withAttribute("tenantId", stringAttr(tenantId));
+
+                @SuppressWarnings("unchecked")
+                Map<String, Object> attrs = (Map<String, Object>) record.get("attributes");
+                if (attrs != null) {
+                    for (Map.Entry<String, Object> entry : attrs.entrySet()) {
+                        if (entry.getValue() != null) {
+                            resource = resource.withAttribute(entry.getKey(), toAttributeValue(entry.getValue()));
+                        }
+                    }
+                }
+                resource = resource.withScope(tenantId);
+                batchRequest.addResourceAndActions(resource, action);
+            }
+
+            CheckResourcesResult result = batchRequest.check();
+            Set<String> allowed = new java.util.HashSet<>();
+            for (Map<String, Object> record : records) {
+                String recordId = (String) record.get("id");
+                if (recordId == null) {
+                    allowed.add(""); // skip null IDs
+                    continue;
+                }
+                result.find(recordId).ifPresentOrElse(
+                        checkResult -> {
+                            if (checkResult.isAllowed(action)) {
+                                allowed.add(recordId);
+                            }
+                        },
+                        () -> allowed.add(recordId) // fail-open if not found
+                );
+            }
+            return allowed;
+        });
+
+        try {
+            Set<String> allowed = future.get(CERBOS_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            recordSuccess();
+            log.debug("Cerbos batch record check: user={} collection={} records={} allowed={}",
+                    email, collectionId, records.size(), allowed.size());
+            return allowed;
+        } catch (TimeoutException e) {
+            future.cancel(true);
+            recordFailure();
+            log.warn("Cerbos batch record check timed out (fail-open): user={} collection={} records={}",
+                    email, collectionId, records.size());
+            return records.stream()
+                    .map(r -> (String) r.get("id"))
+                    .collect(Collectors.toSet());
+        } catch (Exception e) {
+            future.cancel(true);
+            recordFailure();
+            log.warn("Cerbos batch record check failed (fail-open): user={} collection={} error={}",
+                    email, collectionId, e.getMessage());
+            return records.stream()
+                    .map(r -> (String) r.get("id"))
+                    .collect(Collectors.toSet());
+        }
     }
 
     // ── Circuit breaker helpers ──────────────────────────────────────────

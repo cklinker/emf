@@ -124,18 +124,24 @@ public class CerbosFieldSecurityAdvice implements ResponseBodyAdvice<Object> {
         }
 
         Map<String, Object> attributes = (Map<String, Object>) attrMap;
-        Set<String> fieldsToRemove = new HashSet<>();
 
-        for (String fieldId : attributes.keySet()) {
-            // Skip system fields (createdAt, updatedAt, etc.)
-            if (isSystemField(fieldId)) {
-                continue;
-            }
-            if (!authzService.checkFieldAccess(email, profileId, tenantId,
-                    collectionId, fieldId, "read")) {
-                fieldsToRemove.add(fieldId);
-            }
+        // Collect non-system fields to check
+        List<String> fieldsToCheck = attributes.keySet().stream()
+                .filter(fieldId -> !isSystemField(fieldId))
+                .toList();
+
+        if (fieldsToCheck.isEmpty()) {
+            return;
         }
+
+        // Single batched Cerbos call for all fields
+        List<String> allowedFields = authzService.batchCheckFieldAccess(
+                email, profileId, tenantId, collectionId, fieldsToCheck, "read");
+
+        Set<String> allowedSet = new HashSet<>(allowedFields);
+        List<String> fieldsToRemove = fieldsToCheck.stream()
+                .filter(f -> !allowedSet.contains(f))
+                .toList();
 
         if (!fieldsToRemove.isEmpty()) {
             log.debug("Stripping {} hidden fields from {} for user={}",

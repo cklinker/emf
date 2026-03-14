@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyAdvice;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Filters records from API responses based on Cerbos record-level authorization.
@@ -87,16 +88,25 @@ public class CerbosRecordAuthorizationAdvice implements ResponseBodyAdvice<Objec
         String action = mapMethodToAction(httpRequest.getMethod());
 
         if (data instanceof List<?> records) {
-            List<Map<String, Object>> filtered = new ArrayList<>();
+            // Collect all records for a single batched Cerbos call
+            List<Map<String, Object>> typedRecords = new ArrayList<>();
             for (Object record : records) {
                 if (record instanceof Map<?, ?> recordMap) {
-                    Map<String, Object> typedRecord = (Map<String, Object>) recordMap;
-                    if (isRecordAllowed(email, profileId, tenantId, collectionId, typedRecord, action)) {
-                        filtered.add(typedRecord);
-                    }
+                    typedRecords.add((Map<String, Object>) recordMap);
                 }
             }
-            int removed = records.size() - filtered.size();
+
+            Set<String> allowedIds = authzService.batchCheckRecordAccess(
+                    email, profileId, tenantId, collectionId, typedRecords, action);
+
+            List<Map<String, Object>> filtered = typedRecords.stream()
+                    .filter(r -> {
+                        String id = (String) r.get("id");
+                        return id == null || allowedIds.contains(id);
+                    })
+                    .toList();
+
+            int removed = typedRecords.size() - filtered.size();
             if (removed > 0) {
                 log.debug("Filtered {} records from response for user={} collection={}",
                         removed, email, collectionId);

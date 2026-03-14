@@ -1,11 +1,21 @@
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../context'
 import { useApi } from '../context/ApiContext'
+import type { ObjectPermissions } from './useObjectPermissions'
 
 /**
  * System-level permission flags for the current user.
  */
 export type SystemPermissions = Record<string, boolean>
+
+/**
+ * Full permissions response from /api/me/permissions.
+ */
+export interface MyPermissionsResponse {
+  systemPermissions: SystemPermissions
+  objectPermissions: Record<string, ObjectPermissions>
+  fieldPermissions: Record<string, Record<string, string>>
+}
 
 export interface UseSystemPermissionsReturn {
   permissions: SystemPermissions
@@ -13,6 +23,9 @@ export interface UseSystemPermissionsReturn {
   isLoading: boolean
   error: Error | null
 }
+
+/** Query key used by all permission hooks to share the same cache entry. */
+export const MY_PERMISSIONS_QUERY_KEY = ['my-permissions'] as const
 
 /**
  * Hook that fetches the current user's system-level permissions
@@ -23,11 +36,21 @@ export function useSystemPermissions(): UseSystemPermissionsReturn {
   const { user } = useAuth()
   const { keltaClient } = useApi()
 
-  const { data, isLoading, error } = useQuery<SystemPermissions>({
-    queryKey: ['my-permissions', 'system'],
+  const { data, isLoading, error } = useQuery<MyPermissionsResponse>({
+    queryKey: MY_PERMISSIONS_QUERY_KEY,
     queryFn: async () => {
       const response = await keltaClient.getAxiosInstance().get('/api/me/permissions')
-      return (response.data?.systemPermissions ?? {}) as SystemPermissions
+      return {
+        systemPermissions: (response.data?.systemPermissions ?? {}) as SystemPermissions,
+        objectPermissions: (response.data?.objectPermissions ?? {}) as Record<
+          string,
+          ObjectPermissions
+        >,
+        fieldPermissions: (response.data?.fieldPermissions ?? {}) as Record<
+          string,
+          Record<string, string>
+        >,
+      }
     },
     enabled: !!user,
     staleTime: 5 * 60 * 1000,
@@ -35,7 +58,7 @@ export function useSystemPermissions(): UseSystemPermissionsReturn {
     retryDelay: 1000,
   })
 
-  const permissions: SystemPermissions = data ?? {}
+  const permissions: SystemPermissions = data?.systemPermissions ?? {}
 
   const hasPermission = (permission: string): boolean => {
     return permissions[permission] === true

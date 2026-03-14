@@ -108,7 +108,9 @@ export {
 // System-level permission hook (feature access per user)
 export {
   useSystemPermissions,
+  MY_PERMISSIONS_QUERY_KEY,
   type SystemPermissions,
+  type MyPermissionsResponse,
   type UseSystemPermissionsReturn,
 } from './useSystemPermissions'
 

@@ -105,7 +105,10 @@ public class CerbosPolicySyncService {
     }
 
     private void pushPolicy(Map<String, Object> policy) throws Exception {
-        String json = objectMapper.writeValueAsString(policy);
+        // Cerbos Admin API expects {"policies": [...]} wrapper
+        Map<String, Object> wrapper = new LinkedHashMap<>();
+        wrapper.put("policies", List.of(policy));
+        String json = objectMapper.writeValueAsString(wrapper);
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(cerbosAdminUrl + "/admin/policy"))

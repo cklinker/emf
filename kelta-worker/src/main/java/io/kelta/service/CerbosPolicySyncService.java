@@ -13,6 +13,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.*;
+import java.util.Base64;
 
 /**
  * Synchronizes Cerbos policies from profile data.
@@ -35,6 +36,7 @@ public class CerbosPolicySyncService {
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
     private final String cerbosAdminUrl;
+    private final String cerbosAdminAuth;
 
     public CerbosPolicySyncService(
             JdbcTemplate jdbcTemplate,
@@ -42,13 +44,17 @@ public class CerbosPolicySyncService {
             CerbosPolicyGenerator policyGenerator,
             ObjectMapper objectMapper,
             @Value("${kelta.worker.cerbos.host:cerbos.emf.svc.cluster.local}") String cerbosHost,
-            @Value("${kelta.worker.cerbos.http-port:3592}") int cerbosHttpPort) {
+            @Value("${kelta.worker.cerbos.http-port:3592}") int cerbosHttpPort,
+            @Value("${kelta.worker.cerbos.admin-username:cerbos}") String adminUsername,
+            @Value("${kelta.worker.cerbos.admin-password:cerbosAdmin2026}") String adminPassword) {
         this.jdbcTemplate = jdbcTemplate;
         this.bootstrapRepository = bootstrapRepository;
         this.policyGenerator = policyGenerator;
         this.objectMapper = objectMapper;
         this.httpClient = HttpClient.newHttpClient();
         this.cerbosAdminUrl = "http://" + cerbosHost + ":" + cerbosHttpPort;
+        this.cerbosAdminAuth = "Basic " + Base64.getEncoder()
+                .encodeToString((adminUsername + ":" + adminPassword).getBytes());
     }
 
     /**
@@ -104,6 +110,7 @@ public class CerbosPolicySyncService {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(cerbosAdminUrl + "/admin/policy"))
                 .header("Content-Type", "application/json")
+                .header("Authorization", cerbosAdminAuth)
                 .PUT(HttpRequest.BodyPublishers.ofString(json))
                 .build();
 

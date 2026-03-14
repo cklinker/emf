@@ -53,6 +53,14 @@ const STORAGE_KEYS = {
 // Token refresh buffer (refresh 30 seconds before expiry)
 const TOKEN_REFRESH_BUFFER_MS = 30 * 1000
 
+// Cooldown after a failed refresh attempt (don't retry for 30 seconds)
+const REFRESH_FAILURE_COOLDOWN_MS = 30 * 1000
+
+// Module-level state for refresh deduplication and failure tracking.
+// Shared across all callers within the same page load.
+let inflightRefreshPromise: Promise<StoredTokens | null> | null = null
+let lastRefreshFailureTime: number = 0
+
 /**
  * Generate a random string for state/nonce/code_verifier
  */
@@ -219,9 +227,10 @@ export function AuthProvider({
   }, [])
 
   /**
-   * Refresh the access token using the refresh token
+   * Perform the actual token refresh (called only by refreshAccessToken).
+   * This function is NOT deduplication-aware — callers must go through refreshAccessToken.
    */
-  const refreshAccessToken = useCallback(async (): Promise<StoredTokens | null> => {
+  const doRefresh = useCallback(async (): Promise<StoredTokens | null> => {
     const storedTokens = getStoredTokens()
     if (!storedTokens?.refreshToken) {
       return null
@@ -257,6 +266,12 @@ export function AuthProvider({
 
       if (!response.ok) {
         console.error('[Auth] Token refresh failed:', response.statusText)
+        // Clear the invalid refresh token to prevent further attempts
+        const clearedTokens: StoredTokens = {
+          ...storedTokens,
+          refreshToken: undefined,
+        }
+        storeTokens(clearedTokens)
         return null
       }
 
@@ -280,6 +295,46 @@ export function AuthProvider({
       return null
     }
   }, [providers, fetchDiscoveryDocument])
+
+  /**
+   * Refresh the access token using the refresh token.
+   * Deduplicates concurrent calls — only one refresh request is in-flight at a time.
+   * Enforces a cooldown after failures to prevent retry storms.
+   */
+  const refreshAccessToken = useCallback(async (): Promise<StoredTokens | null> => {
+    // If we recently failed, don't try again until the cooldown expires
+    if (lastRefreshFailureTime > 0) {
+      const elapsed = Date.now() - lastRefreshFailureTime
+      if (elapsed < REFRESH_FAILURE_COOLDOWN_MS) {
+        return null
+      }
+    }
+
+    // If a refresh is already in-flight, wait for it instead of making a new request
+    if (inflightRefreshPromise) {
+      return inflightRefreshPromise
+    }
+
+    // Start the refresh and share the promise with any concurrent callers
+    inflightRefreshPromise = doRefresh().then(
+      (result) => {
+        inflightRefreshPromise = null
+        if (!result) {
+          lastRefreshFailureTime = Date.now()
+        } else {
+          lastRefreshFailureTime = 0
+        }
+        return result
+      },
+      (err) => {
+        inflightRefreshPromise = null
+        lastRefreshFailureTime = Date.now()
+        throw err
+      }
+    )
+
+    return inflightRefreshPromise
+  }, [doRefresh])
 
   /**
    * Schedule a proactive token refresh before the token expires.

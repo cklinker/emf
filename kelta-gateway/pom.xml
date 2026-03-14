@@ -108,19 +108,12 @@
             <groupId>dev.cerbos</groupId>
             <artifactId>cerbos-sdk-java</artifactId>
             <version>0.12.0</version>
-            <exclusions>
-                <!-- Exclude shaded gRPC Netty — Spring Cloud Gateway's GrpcSslConfigurer
-                     expects io.grpc.netty.NettyChannelBuilder from the non-shaded artifact.
-                     The shaded variant triggers auto-configuration but doesn't provide that class. -->
-                <exclusion>
-                    <groupId>io.grpc</groupId>
-                    <artifactId>grpc-netty-shaded</artifactId>
-                </exclusion>
-            </exclusions>
         </dependency>
 
-        <!-- Non-shaded gRPC Netty — required by both Cerbos SDK (gRPC transport) and
-             Spring Cloud Gateway (GrpcSslConfigurer auto-configuration) -->
+        <!-- Non-shaded gRPC Netty — Spring Cloud Gateway's GrpcSslConfigurer auto-configuration
+             requires io.grpc.netty.NettyChannelBuilder which only exists in grpc-netty (not the
+             shaded variant bundled by Cerbos SDK). Both artifacts coexist safely since they use
+             different package namespaces. -->
         <dependency>
             <groupId>io.grpc</groupId>
             <artifactId>grpc-netty</artifactId>

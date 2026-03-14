@@ -62,7 +62,8 @@ public class CerbosFieldSecurityAdvice implements ResponseBodyAdvice<Object> {
         HttpServletRequest httpRequest = servletRequest.getServletRequest();
         String path = httpRequest.getRequestURI();
 
-        if (!path.startsWith("/api/") || path.startsWith("/api/admin/") || path.startsWith("/api/me/")) {
+        if (!path.startsWith("/api/") || path.startsWith("/api/admin/") || path.startsWith("/api/me/")
+                || isMetadataPath(path)) {
             return body;
         }
 
@@ -148,6 +149,22 @@ public class CerbosFieldSecurityAdvice implements ResponseBodyAdvice<Object> {
     private boolean isSystemField(String fieldId) {
         return "createdAt".equals(fieldId) || "updatedAt".equals(fieldId)
                 || "createdBy".equals(fieldId) || "updatedBy".equals(fieldId);
+    }
+
+    /**
+     * Checks if the path is a platform metadata endpoint (collections, profiles, etc.)
+     * that should not have field-level security applied. These endpoints return
+     * collection definitions and system configuration, not user records.
+     */
+    private boolean isMetadataPath(String path) {
+        return path.startsWith("/api/collections")
+                || path.startsWith("/api/profiles")
+                || path.startsWith("/api/security-audit-logs")
+                || path.startsWith("/api/plugins")
+                || path.startsWith("/api/oidc")
+                || path.startsWith("/api/tenants")
+                || path.startsWith("/api/metrics")
+                || path.startsWith("/api/flows");
     }
 
     private String extractCollectionId(String path) {

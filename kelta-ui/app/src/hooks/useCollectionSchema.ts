@@ -8,7 +8,7 @@
  * to UI form (lowercase).
  */
 
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useApi } from '../context/ApiContext'
 import { unwrapResource, extractIncluded } from '../utils/jsonapi'
 import type { ApiClient } from '../services/apiClient'
@@ -166,21 +166,41 @@ export interface UseCollectionSchemaReturn {
  */
 export function useCollectionSchema(collectionName: string | undefined): UseCollectionSchemaReturn {
   const { apiClient } = useApi()
+  const queryClient = useQueryClient()
+
+  // The CollectionStoreProvider bulk-loads all collections and pre-populates
+  // this query's cache via setQueryData(['collection-schema', name]).
+  // To avoid a redundant per-collection fetch, we only enable our own queryFn
+  // if the store has finished loading AND didn't populate our cache entry
+  // (e.g., the collection doesn't exist in the bulk response).
+  const storeQuery = queryClient.getQueryState(['collection-store'])
+  const storeIsLoading = storeQuery != null && storeQuery.status === 'pending'
+  const cachedData = collectionName
+    ? queryClient.getQueryData<CollectionSchema>(['collection-schema', collectionName])
+    : undefined
 
   const {
     data: schema,
-    isLoading,
+    isLoading: queryIsLoading,
     error,
   } = useQuery({
     queryKey: ['collection-schema', collectionName],
     queryFn: () => fetchCollectionSchema(apiClient, collectionName!),
-    enabled: !!collectionName,
+    // Don't fetch if:
+    // 1. No collection name provided, OR
+    // 2. The store is still loading (it will populate our cache when done), OR
+    // 3. Data is already in the cache (from the store's setQueryData)
+    enabled: !!collectionName && !storeIsLoading && !cachedData,
     staleTime: 5 * 60 * 1000, // 5 minutes — metadata changes rarely
   })
 
+  // Use cached data from the store if the query hasn't fetched its own
+  const resolvedSchema = schema ?? cachedData
+  const isLoading = !resolvedSchema && (queryIsLoading || storeIsLoading)
+
   return {
-    schema,
-    fields: schema?.fields ?? [],
+    schema: resolvedSchema,
+    fields: resolvedSchema?.fields ?? [],
     isLoading,
     error: error as Error | null,
   }

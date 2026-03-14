@@ -83,6 +83,12 @@ public class RouteConfigService {
 
         fetchBootstrapConfig()
                 .doOnNext(config -> {
+                    // Register static routes FIRST — these are default routes for
+                    // admin/config endpoints.  Bootstrap collection routes are
+                    // registered afterwards and will overwrite any static route
+                    // that shares the same path (bootstrap routes are more specific).
+                    registerStaticRoutes();
+
                     if (config.getCollections() != null) {
                         int validRoutes = 0;
                         int invalidRoutes = 0;
@@ -103,11 +109,6 @@ public class RouteConfigService {
                     } else {
                         logger.warn("No collections found in bootstrap configuration");
                     }
-
-                    // Register static routes for non-collection API endpoints
-                    // that are served by the worker but not returned in the
-                    // bootstrap collection list (e.g., computed/aggregate endpoints).
-                    registerStaticRoutes();
 
                     // Load per-tenant governor limits for rate limiting
                     if (config.getGovernorLimits() != null) {
@@ -164,12 +165,41 @@ public class RouteConfigService {
      */
     private void registerStaticRoutes() {
         String[][] staticRoutes = {
-                {"governor-limits", "/api/governor-limits/**", "governor-limits"},
-                {"modules", "/api/modules/**", "modules"},
-                {"metrics", "/api/metrics/**", "metrics"},
-                {"search", "/api/_search/**", "_search"},
+                // Core admin/config endpoints (not data collections)
                 {"admin", "/api/admin/**", "admin"},
                 {"me", "/api/me/**", "me"},
+                {"metrics", "/api/metrics/**", "metrics"},
+                {"search", "/api/_search/**", "_search"},
+                // Setup & customization
+                {"collections", "/api/collections/**", "collections"},
+                {"modules", "/api/modules/**", "modules"},
+                {"global-picklists", "/api/global-picklists/**", "global-picklists"},
+                {"governor-limits", "/api/governor-limits/**", "governor-limits"},
+                {"page-layouts", "/api/page-layouts/**", "page-layouts"},
+                {"list-views", "/api/list-views/**", "list-views"},
+                {"ui-pages", "/api/ui-pages/**", "ui-pages"},
+                {"ui-menus", "/api/ui-menus/**", "ui-menus"},
+                // Security & identity
+                {"profiles", "/api/profiles/**", "profiles"},
+                {"users", "/api/users/**", "users"},
+                {"oidc-providers", "/api/oidc-providers/**", "oidc-providers"},
+                {"tenants", "/api/tenants/**", "tenants"},
+                {"login-history", "/api/login-history/**", "login-history"},
+                {"security-audit-logs", "/api/security-audit-logs/**", "security-audit-logs"},
+                {"setup-audit-entries", "/api/setup-audit-entries/**", "setup-audit-entries"},
+                // Automation & integration
+                {"flows", "/api/flows/**", "flows"},
+                {"approval-processes", "/api/approval-processes/**", "approval-processes"},
+                {"webhooks", "/api/webhooks/**", "webhooks"},
+                {"connected-apps", "/api/connected-apps/**", "connected-apps"},
+                {"email-templates", "/api/email-templates/**", "email-templates"},
+                {"scripts", "/api/scripts/**", "scripts"},
+                {"scheduled-jobs", "/api/scheduled-jobs/**", "scheduled-jobs"},
+                // Reporting & monitoring
+                {"reports", "/api/reports/**", "reports"},
+                {"dashboards", "/api/dashboards/**", "dashboards"},
+                {"bulk-jobs", "/api/bulk-jobs/**", "bulk-jobs"},
+                {"migration-runs", "/api/migration-runs/**", "migration-runs"},
         };
 
         for (String[] routeDef : staticRoutes) {

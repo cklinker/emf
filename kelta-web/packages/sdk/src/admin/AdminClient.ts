@@ -85,9 +85,7 @@ import type {
   Script,
   ScriptExecutionLog,
   CreateScriptRequest,
-  Webhook,
-  WebhookDelivery,
-  CreateWebhookRequest,
+  SvixPortalResponse,
   ConnectedApp,
   ConnectedAppCreatedResponse,
   ConnectedAppToken,
@@ -1679,43 +1677,13 @@ export class AdminClient {
   };
 
   // ---------------------------------------------------------------------------
-  // Webhooks (already on /api/)
+  // Svix Webhook Portal
   // ---------------------------------------------------------------------------
 
-  readonly webhooks = {
-    list: async (_tenantId?: string): Promise<Webhook[]> => {
-      const response = await this.axios.get('/api/webhooks');
-      return unwrapJsonApiList<Webhook>(response.data);
-    },
-
-    get: async (id: string): Promise<Webhook> => {
-      const response = await this.axios.get(`/api/webhooks/${id}`);
-      return unwrapJsonApiResource<Webhook>(response.data);
-    },
-
-    create: async (
-      _tenantId: string,
-      _userId: string,
-      request: CreateWebhookRequest
-    ): Promise<Webhook> => {
-      const body = toJsonApiBody('webhooks', request as unknown as Record<string, unknown>);
-      const response = await this.axios.post('/api/webhooks', body);
-      return unwrapJsonApiResource<Webhook>(response.data);
-    },
-
-    update: async (id: string, request: Partial<CreateWebhookRequest>): Promise<Webhook> => {
-      const body = toJsonApiBody('webhooks', request as unknown as Record<string, unknown>, id);
-      const response = await this.axios.patch(`/api/webhooks/${id}`, body);
-      return unwrapJsonApiResource<Webhook>(response.data);
-    },
-
-    delete: async (id: string): Promise<void> => {
-      await this.axios.delete(`/api/webhooks/${id}`);
-    },
-
-    listDeliveries: async (id: string): Promise<WebhookDelivery[]> => {
-      const response = await this.axios.get(`/api/webhooks/${id}/webhook-deliveries`);
-      return unwrapJsonApiList<WebhookDelivery>(response.data);
+  readonly svix = {
+    getPortalUrl: async (): Promise<SvixPortalResponse> => {
+      const response = await this.axios.get<SvixPortalResponse>('/api/svix/portal');
+      return response.data;
     },
   };
 

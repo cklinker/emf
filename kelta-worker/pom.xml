@@ -163,6 +163,13 @@
             <version>0.12.0</version>
         </dependency>
 
+        <!-- Svix SDK for webhook delivery -->
+        <dependency>
+            <groupId>com.svix</groupId>
+            <artifactId>svix</artifactId>
+            <version>1.68.0</version>
+        </dependency>
+
         <!-- Jackson -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>

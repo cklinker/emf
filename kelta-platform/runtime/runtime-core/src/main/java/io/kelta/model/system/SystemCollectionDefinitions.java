@@ -101,7 +101,6 @@ public final class SystemCollectionDefinitions {
 
         // Communication
         definitions.add(emailTemplates());
-        definitions.add(webhooks());
 
         // Integration
         definitions.add(connectedApps());
@@ -133,7 +132,6 @@ public final class SystemCollectionDefinitions {
         definitions.add(jobExecutionLogs());
         definitions.add(bulkJobResults());
         definitions.add(emailLogs());
-        definitions.add(webhookDeliveries());
         definitions.add(loginHistory());
         definitions.add(collectionVersions());
         definitions.add(fieldVersions());
@@ -513,21 +511,6 @@ public final class SystemCollectionDefinitions {
             .build();
     }
 
-    public static CollectionDefinition webhooks() {
-        return systemBuilder("webhooks", "Webhooks", "webhook")
-            .displayFieldName("name")
-            .addField(FieldDefinition.requiredString("name", 200))
-            .addField(FieldDefinition.requiredString("url", 2048))
-            .addField(FieldDefinition.requiredJson("events"))
-            .addField(FieldDefinition.string("collectionId").withColumnName("collection_id"))
-            .addField(FieldDefinition.string("filterFormula").withColumnName("filter_formula"))
-            .addField(FieldDefinition.json("headers"))
-            .addField(FieldDefinition.string("secret", 200))
-            .addField(FieldDefinition.bool("active"))
-            .addField(FieldDefinition.json("retryPolicy").withColumnName("retry_policy"))
-            .build();
-    }
-
     // =========================================================================
     // Integration Collections
     // =========================================================================
@@ -813,25 +796,6 @@ public final class SystemCollectionDefinitions {
             .addField(FieldDefinition.string("sourceId", 36).withColumnName("source_id"))
             .addField(FieldDefinition.text("errorMessage").withColumnName("error_message"))
             .addField(FieldDefinition.datetime("sentAt").withColumnName("sent_at"))
-            .build();
-    }
-
-    public static CollectionDefinition webhookDeliveries() {
-        return readOnlySystemBuilder("webhook-deliveries", "Webhook Deliveries", "webhook_delivery")
-            .tenantScoped(false)
-            .addField(FieldDefinition.masterDetail("webhookId", "webhooks", "Webhook")
-                .withColumnName("webhook_id"))
-            .addField(FieldDefinition.string("eventType").withColumnName("event_type"))
-            .addField(FieldDefinition.json("payload"))
-            .addField(FieldDefinition.integer("responseStatus")
-                .withColumnName("response_status"))
-            .addField(FieldDefinition.text("responseBody").withColumnName("response_body"))
-            .addField(FieldDefinition.integer("attemptCount")
-                .withColumnName("attempt_count"))
-            .addField(FieldDefinition.string("status"))
-            .addField(FieldDefinition.datetime("nextRetryAt").withColumnName("next_retry_at"))
-            .addField(FieldDefinition.datetime("deliveredAt")
-                .withColumnName("delivered_at"))
             .build();
     }
 

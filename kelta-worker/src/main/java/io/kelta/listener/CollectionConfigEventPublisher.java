@@ -59,13 +59,13 @@ public class CollectionConfigEventPublisher implements BeforeSaveHook {
 
     @Override
     public void afterCreate(Map<String, Object> record, String tenantId) {
-        publishEvent(record, ChangeType.CREATED);
+        publishEvent(record, ChangeType.CREATED, tenantId);
     }
 
     @Override
     public void afterUpdate(String id, Map<String, Object> record,
                              Map<String, Object> previous, String tenantId) {
-        publishEvent(record, ChangeType.UPDATED);
+        publishEvent(record, ChangeType.UPDATED, tenantId);
     }
 
     @Override
@@ -73,10 +73,10 @@ public class CollectionConfigEventPublisher implements BeforeSaveHook {
         CollectionChangedPayload payload = new CollectionChangedPayload();
         payload.setId(id);
         payload.setChangeType(ChangeType.DELETED);
-        sendToKafka(payload);
+        sendToKafka(payload, tenantId);
     }
 
-    private void publishEvent(Map<String, Object> record, ChangeType changeType) {
+    private void publishEvent(Map<String, Object> record, ChangeType changeType, String tenantId) {
         CollectionChangedPayload payload = new CollectionChangedPayload();
         payload.setId(getString(record, "id"));
         payload.setName(getString(record, "name"));
@@ -96,13 +96,14 @@ public class CollectionConfigEventPublisher implements BeforeSaveHook {
             payload.setCurrentVersion(n.intValue());
         }
 
-        sendToKafka(payload);
+        sendToKafka(payload, tenantId);
     }
 
-    private void sendToKafka(CollectionChangedPayload payload) {
+    private void sendToKafka(CollectionChangedPayload payload, String tenantId) {
         try {
             PlatformEvent<CollectionChangedPayload> event =
                     EventFactory.createEvent(TOPIC, payload);
+            event.setTenantId(tenantId);
             String json = objectMapper.writeValueAsString(event);
             String key = payload.getId();
 

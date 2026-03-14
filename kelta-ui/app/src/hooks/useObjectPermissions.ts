@@ -1,15 +1,16 @@
 /**
  * useObjectPermissions Hook
  *
- * Returns CRUD permission flags for a given collection. Returns permissive
- * defaults since the permissions endpoint is not yet available via JSON:API.
- * The UI degrades gracefully with all permissions allowed.
+ * Returns CRUD permission flags for a given collection. Reads from the shared
+ * /api/me/permissions cache populated by useSystemPermissions.
  *
- * The hook uses React Query with a long stale time (5 min) since permissions
- * change infrequently.
+ * Collections not present in the response default to all-permitted so the UI
+ * degrades gracefully (the gateway still enforces at the API level).
  */
 
-import { useQuery } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
+import type { MyPermissionsResponse } from './useSystemPermissions'
+import { MY_PERMISSIONS_QUERY_KEY } from './useSystemPermissions'
 
 /**
  * Object-level CRUD permission flags.
@@ -27,7 +28,7 @@ export interface UseObjectPermissionsReturn {
   error: Error | null
 }
 
-/** Default permissive permissions (used when backend hasn't implemented the endpoint) */
+/** Default permissive permissions (used when collection has no explicit permissions) */
 const PERMISSIVE_DEFAULTS: ObjectPermissions = {
   canCreate: true,
   canRead: true,
@@ -36,17 +37,8 @@ const PERMISSIVE_DEFAULTS: ObjectPermissions = {
 }
 
 /**
- * Return permissive object permissions.
- * Permissions endpoint is not yet available via JSON:API — fall back
- * to permissive defaults so the UI works without the permission backend.
- */
-async function fetchObjectPermissions(): Promise<ObjectPermissions> {
-  // Permissions are not yet available via JSON:API — return permissive defaults
-  return PERMISSIVE_DEFAULTS
-}
-
-/**
  * Hook to fetch effective object permissions for a collection.
+ * Reads from the shared my-permissions cache.
  *
  * @param collectionName - The collection API name
  * @returns Permission flags, loading state, and error
@@ -54,17 +46,17 @@ async function fetchObjectPermissions(): Promise<ObjectPermissions> {
 export function useObjectPermissions(
   collectionName: string | undefined
 ): UseObjectPermissionsReturn {
-  const { data, isLoading, error } = useQuery({
-    queryKey: ['object-permissions', collectionName],
-    queryFn: () => fetchObjectPermissions(),
-    enabled: !!collectionName,
-    staleTime: 5 * 60 * 1000, // 5 minutes — permissions change rarely
-    retry: false, // Don't retry on failure (likely 404)
-  })
+  const queryClient = useQueryClient()
+  const cached = queryClient.getQueryData<MyPermissionsResponse>(MY_PERMISSIONS_QUERY_KEY)
+
+  const permissions =
+    collectionName && cached?.objectPermissions?.[collectionName]
+      ? cached.objectPermissions[collectionName]
+      : PERMISSIVE_DEFAULTS
 
   return {
-    permissions: data ?? PERMISSIVE_DEFAULTS,
-    isLoading,
-    error: error as Error | null,
+    permissions,
+    isLoading: !cached,
+    error: null,
   }
 }

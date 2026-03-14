@@ -2,8 +2,8 @@
  * useFieldPermissions Hook
  *
  * Returns field-level visibility for each field in a collection.
- * Returns all-visible defaults since the permissions endpoint
- * is not yet available via JSON:API. Falls back gracefully.
+ * Reads from the shared /api/me/permissions cache populated by
+ * useSystemPermissions.
  *
  * Field visibility values:
  * - VISIBLE: field is shown and editable
@@ -12,7 +12,9 @@
  */
 
 import { useMemo } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
+import type { MyPermissionsResponse } from './useSystemPermissions'
+import { MY_PERMISSIONS_QUERY_KEY } from './useSystemPermissions'
 
 /**
  * Field visibility level.
@@ -37,46 +39,31 @@ export interface UseFieldPermissionsReturn {
   error: Error | null
 }
 
-interface FieldPermissionResponse {
-  fieldId: string
-  fieldName: string
-  visibility: FieldVisibility
-}
-
-/**
- * Fetch effective field permissions for the current user on a collection.
- * Returns empty array (all fields visible) — permissions endpoint
- * is not yet available via JSON:API.
- */
-async function fetchFieldPermissions(): Promise<FieldPermissionResponse[]> {
-  // Permissions are not yet available via JSON:API — return empty (all fields default to VISIBLE)
-  return []
-}
-
 /**
  * Hook to fetch effective field permissions for a collection.
+ * Reads from the shared my-permissions cache.
  *
  * @param collectionName - The collection API name
  * @returns Field permission map and helper functions
  */
 export function useFieldPermissions(collectionName: string | undefined): UseFieldPermissionsReturn {
-  const { data, isLoading, error } = useQuery({
-    queryKey: ['field-permissions', collectionName],
-    queryFn: () => fetchFieldPermissions(),
-    enabled: !!collectionName,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    retry: false,
-  })
+  const queryClient = useQueryClient()
+  const cached = queryClient.getQueryData<MyPermissionsResponse>(MY_PERMISSIONS_QUERY_KEY)
+
+  const rawFieldPerms =
+    collectionName && cached?.fieldPermissions?.[collectionName]
+      ? cached.fieldPermissions[collectionName]
+      : undefined
 
   const fieldPermissions = useMemo(() => {
     const map = new Map<string, FieldVisibility>()
-    if (data) {
-      for (const entry of data) {
-        map.set(entry.fieldName, entry.visibility)
+    if (rawFieldPerms) {
+      for (const [fieldName, visibility] of Object.entries(rawFieldPerms)) {
+        map.set(fieldName, visibility as FieldVisibility)
       }
     }
     return map
-  }, [data])
+  }, [rawFieldPerms])
 
   const getFieldVisibility = useMemo(() => {
     return (fieldName: string): FieldVisibility => {
@@ -101,7 +88,7 @@ export function useFieldPermissions(collectionName: string | undefined): UseFiel
     getFieldVisibility,
     isFieldVisible,
     isFieldEditable,
-    isLoading,
-    error: error as Error | null,
+    isLoading: !cached,
+    error: null,
   }
 }

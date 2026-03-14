@@ -2,8 +2,8 @@
  * useCollectionPermissions Hook
  *
  * Returns both object-level CRUD permissions and field-level visibility
- * for a collection. Returns permissive defaults since the combined
- * permissions endpoint is not yet available via JSON:API.
+ * for a collection. Reads from the shared /api/me/permissions cache
+ * populated by useSystemPermissions.
  *
  * The individual hooks (useObjectPermissions, useFieldPermissions) still
  * exist for backward compatibility but app route pages should prefer
@@ -11,19 +11,15 @@
  */
 
 import { useMemo } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import type { ObjectPermissions } from './useObjectPermissions'
+import type { MyPermissionsResponse } from './useSystemPermissions'
+import { MY_PERMISSIONS_QUERY_KEY } from './useSystemPermissions'
 
 /**
  * Field visibility level.
  */
 export type FieldVisibility = 'VISIBLE' | 'READ_ONLY' | 'HIDDEN'
-
-/** Combined response from the backend */
-interface CollectionPermissionsResponse {
-  objectPermissions: ObjectPermissions
-  fieldPermissions: Record<string, string>
-}
 
 export interface UseCollectionPermissionsReturn {
   /** Object-level CRUD permission flags */
@@ -40,7 +36,7 @@ export interface UseCollectionPermissionsReturn {
   error: Error | null
 }
 
-/** Default permissive permissions (used when backend hasn't implemented the endpoint) */
+/** Default permissive permissions (used when collection has no explicit permissions) */
 const PERMISSIVE_DEFAULTS: ObjectPermissions = {
   canCreate: true,
   canRead: true,
@@ -49,21 +45,8 @@ const PERMISSIVE_DEFAULTS: ObjectPermissions = {
 }
 
 /**
- * Return permissive combined object + field permissions.
- * Permissions endpoint is not yet available via JSON:API — fall back
- * to permissive defaults so the UI works without the permission backend.
- */
-async function fetchCollectionPermissions(): Promise<CollectionPermissionsResponse> {
-  // Permissions are not yet available via JSON:API — return permissive defaults
-  return {
-    objectPermissions: PERMISSIVE_DEFAULTS,
-    fieldPermissions: {},
-  }
-}
-
-/**
  * Hook to fetch combined object + field permissions for a collection.
- * Makes a single API call instead of two separate calls.
+ * Reads from the shared my-permissions cache.
  *
  * @param collectionName - The collection API name
  * @returns Combined permission data and helper functions
@@ -71,23 +54,28 @@ async function fetchCollectionPermissions(): Promise<CollectionPermissionsRespon
 export function useCollectionPermissions(
   collectionName: string | undefined
 ): UseCollectionPermissionsReturn {
-  const { data, isLoading, error } = useQuery({
-    queryKey: ['collection-permissions', collectionName],
-    queryFn: () => fetchCollectionPermissions(),
-    enabled: !!collectionName,
-    staleTime: 5 * 60 * 1000, // 5 minutes — permissions change rarely
-    retry: false,
-  })
+  const queryClient = useQueryClient()
+  const cached = queryClient.getQueryData<MyPermissionsResponse>(MY_PERMISSIONS_QUERY_KEY)
+
+  const objectPerms =
+    collectionName && cached?.objectPermissions?.[collectionName]
+      ? cached.objectPermissions[collectionName]
+      : PERMISSIVE_DEFAULTS
+
+  const rawFieldPerms =
+    collectionName && cached?.fieldPermissions?.[collectionName]
+      ? cached.fieldPermissions[collectionName]
+      : undefined
 
   const fieldPermissions = useMemo(() => {
     const map = new Map<string, FieldVisibility>()
-    if (data?.fieldPermissions) {
-      for (const [fieldName, visibility] of Object.entries(data.fieldPermissions)) {
+    if (rawFieldPerms) {
+      for (const [fieldName, visibility] of Object.entries(rawFieldPerms)) {
         map.set(fieldName, visibility as FieldVisibility)
       }
     }
     return map
-  }, [data])
+  }, [rawFieldPerms])
 
   const getFieldVisibility = useMemo(() => {
     return (fieldName: string): FieldVisibility => {
@@ -108,12 +96,12 @@ export function useCollectionPermissions(
   }, [getFieldVisibility])
 
   return {
-    permissions: data?.objectPermissions ?? PERMISSIVE_DEFAULTS,
+    permissions: objectPerms,
     fieldPermissions,
     getFieldVisibility,
     isFieldVisible,
     isFieldEditable,
-    isLoading,
-    error: error as Error | null,
+    isLoading: !cached,
+    error: null,
   }
 }

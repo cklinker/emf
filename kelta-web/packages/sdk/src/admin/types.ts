@@ -1477,7 +1477,9 @@ export interface CreateScriptTriggerRequest {
 // --- Svix Webhook Portal ---
 
 export interface SvixPortalResponse {
-  url: string;
+  token: string;
+  appId: string;
+  serverUrl: string;
 }
 
 // --- Connected Apps (Phase 5 Stream C) ---

@@ -38,6 +38,7 @@ kelta:
       grpc-port: ${CERBOS_GRPC_PORT:3593}
   svix:
     server-url: ${SVIX_SERVER_URL:http://localhost:8071}
+    public-url: ${SVIX_PUBLIC_URL:${SVIX_SERVER_URL:http://localhost:8071}}
     auth-token: ${SVIX_AUTH_TOKEN:}
   opensearch:
     url: ${OPENSEARCH_URL:http://localhost:9200}

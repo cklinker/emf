@@ -1681,7 +1681,7 @@ export class AdminClient {
   // ---------------------------------------------------------------------------
 
   readonly svix = {
-    getPortalUrl: async (): Promise<SvixPortalResponse> => {
+    getPortalAccess: async (): Promise<SvixPortalResponse> => {
       const response = await this.axios.get<SvixPortalResponse>('/api/svix/portal');
       return response.data;
     },

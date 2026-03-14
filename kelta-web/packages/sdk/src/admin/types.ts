@@ -1474,49 +1474,10 @@ export interface CreateScriptTriggerRequest {
   active?: boolean;
 }
 
-// --- Webhooks (Phase 5 Stream B) ---
+// --- Svix Webhook Portal ---
 
-export interface Webhook {
-  id: string;
-  tenantId: string;
-  name: string;
+export interface SvixPortalResponse {
   url: string;
-  events: string;
-  collectionId?: string;
-  filterFormula?: string;
-  headers?: string;
-  secret?: string;
-  active: boolean;
-  retryPolicy?: string;
-  createdBy: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface WebhookDelivery {
-  id: string;
-  webhookId: string;
-  eventType: string;
-  payload: string;
-  responseStatus?: number;
-  responseBody?: string;
-  attemptCount: number;
-  status: 'PENDING' | 'DELIVERED' | 'FAILED' | 'RETRYING';
-  nextRetryAt?: string;
-  createdAt: string;
-  deliveredAt?: string;
-}
-
-export interface CreateWebhookRequest {
-  name: string;
-  url: string;
-  events: string;
-  collectionId?: string;
-  filterFormula?: string;
-  headers?: string;
-  secret?: string;
-  active?: boolean;
-  retryPolicy?: string;
 }
 
 // --- Connected Apps (Phase 5 Stream C) ---

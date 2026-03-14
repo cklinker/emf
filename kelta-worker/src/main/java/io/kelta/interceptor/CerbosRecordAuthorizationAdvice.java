@@ -60,8 +60,9 @@ public class CerbosRecordAuthorizationAdvice implements ResponseBodyAdvice<Objec
         HttpServletRequest httpRequest = servletRequest.getServletRequest();
         String path = httpRequest.getRequestURI();
 
-        // Only apply to collection API paths
-        if (!path.startsWith("/api/") || path.startsWith("/api/admin/") || path.startsWith("/api/me/")) {
+        // Only apply to collection API paths (user record data, not metadata)
+        if (!path.startsWith("/api/") || path.startsWith("/api/admin/") || path.startsWith("/api/me/")
+                || isMetadataPath(path)) {
             return body;
         }
 
@@ -128,6 +129,21 @@ public class CerbosRecordAuthorizationAdvice implements ResponseBodyAdvice<Objec
 
         return authzService.checkRecordAccess(email, profileId, tenantId,
                 collectionId, recordId, attributes, action);
+    }
+
+    /**
+     * Checks if the path is a platform metadata endpoint that should not have
+     * record-level authorization applied.
+     */
+    private boolean isMetadataPath(String path) {
+        return path.startsWith("/api/collections")
+                || path.startsWith("/api/profiles")
+                || path.startsWith("/api/security-audit-logs")
+                || path.startsWith("/api/plugins")
+                || path.startsWith("/api/oidc")
+                || path.startsWith("/api/tenants")
+                || path.startsWith("/api/metrics")
+                || path.startsWith("/api/flows");
     }
 
     private String extractCollectionId(String path) {

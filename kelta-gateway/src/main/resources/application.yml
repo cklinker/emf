@@ -84,6 +84,11 @@ kelta:
     # fetched from the worker during bootstrap.
     # See GatewayCacheManager for details.
 
+    # Cerbos authorization engine
+    cerbos:
+      host: ${CERBOS_HOST:cerbos.emf.svc.cluster.local}
+      grpc-port: ${CERBOS_GRPC_PORT:3593}
+
     # Security settings
     security:
       jwt-clock-skew-seconds: 30   # Tolerance for clock drift between gateway and IdP

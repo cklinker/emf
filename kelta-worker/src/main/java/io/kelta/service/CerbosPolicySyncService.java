@@ -1,0 +1,272 @@
+package io.kelta.worker.service;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.kelta.worker.repository.BootstrapRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Service;
+
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.util.*;
+
+/**
+ * Synchronizes Cerbos policies from profile data.
+ *
+ * <p>When profiles change, this service:
+ * <ol>
+ *   <li>Loads all profiles and their permissions for the tenant</li>
+ *   <li>Generates Cerbos policy JSON via {@link CerbosPolicyGenerator}</li>
+ *   <li>Pushes policies to Cerbos Admin API</li>
+ * </ol>
+ */
+@Service
+public class CerbosPolicySyncService {
+
+    private static final Logger log = LoggerFactory.getLogger(CerbosPolicySyncService.class);
+
+    private final JdbcTemplate jdbcTemplate;
+    private final BootstrapRepository bootstrapRepository;
+    private final CerbosPolicyGenerator policyGenerator;
+    private final ObjectMapper objectMapper;
+    private final HttpClient httpClient;
+    private final String cerbosAdminUrl;
+
+    public CerbosPolicySyncService(
+            JdbcTemplate jdbcTemplate,
+            BootstrapRepository bootstrapRepository,
+            CerbosPolicyGenerator policyGenerator,
+            ObjectMapper objectMapper,
+            @Value("${kelta.worker.cerbos.host:cerbos.emf.svc.cluster.local}") String cerbosHost,
+            @Value("${kelta.worker.cerbos.http-port:3592}") int cerbosHttpPort) {
+        this.jdbcTemplate = jdbcTemplate;
+        this.bootstrapRepository = bootstrapRepository;
+        this.policyGenerator = policyGenerator;
+        this.objectMapper = objectMapper;
+        this.httpClient = HttpClient.newHttpClient();
+        this.cerbosAdminUrl = "http://" + cerbosHost + ":" + cerbosHttpPort;
+    }
+
+    /**
+     * Syncs all Cerbos policies for a tenant.
+     */
+    public void syncTenant(String tenantId) {
+        try {
+            log.info("Syncing Cerbos policies for tenant {}", tenantId);
+
+            List<CerbosPolicyGenerator.ProfileData> profiles = loadProfilesForTenant(tenantId);
+            List<String> collectionIds = loadCollectionIdsForTenant(tenantId);
+            List<CerbosPolicyGenerator.CustomRule> customRules = loadCustomRulesForTenant(tenantId);
+
+            // Generate policies
+            Map<String, Object> derivedRoles = policyGenerator.generateDerivedRoles(tenantId, profiles);
+            Map<String, Object> systemPolicy = policyGenerator.generateSystemFeaturePolicy(tenantId, profiles);
+            Map<String, Object> collectionPolicy = policyGenerator.generateCollectionPolicy(tenantId, profiles, collectionIds);
+            Map<String, Object> fieldPolicy = policyGenerator.generateFieldPolicy(tenantId, profiles);
+            Map<String, Object> recordPolicy = policyGenerator.generateRecordPolicy(tenantId, profiles, collectionIds, customRules);
+
+            // Push to Cerbos Admin API
+            pushPolicy(derivedRoles);
+            pushPolicy(systemPolicy);
+            pushPolicy(collectionPolicy);
+            pushPolicy(fieldPolicy);
+            pushPolicy(recordPolicy);
+
+            log.info("Cerbos policies synced for tenant {} ({} profiles, {} collections)",
+                    tenantId, profiles.size(), collectionIds.size());
+        } catch (Exception e) {
+            log.error("Failed to sync Cerbos policies for tenant {}: {}", tenantId, e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Syncs policies for all active tenants.
+     */
+    public void syncAllTenants() {
+        List<Map<String, Object>> tenants = bootstrapRepository.findRoutableTenants();
+        log.info("Syncing Cerbos policies for {} tenants", tenants.size());
+
+        for (Map<String, Object> tenant : tenants) {
+            String tenantId = (String) tenant.get("id");
+            if (tenantId != null) {
+                syncTenant(tenantId);
+            }
+        }
+    }
+
+    private void pushPolicy(Map<String, Object> policy) throws Exception {
+        String json = objectMapper.writeValueAsString(policy);
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(cerbosAdminUrl + "/admin/policy"))
+                .header("Content-Type", "application/json")
+                .PUT(HttpRequest.BodyPublishers.ofString(json))
+                .build();
+
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+        if (response.statusCode() >= 200 && response.statusCode() < 300) {
+            log.debug("Cerbos policy pushed successfully");
+        } else {
+            log.warn("Cerbos Admin API returned {}: {}", response.statusCode(), response.body());
+        }
+    }
+
+    private List<CerbosPolicyGenerator.ProfileData> loadProfilesForTenant(String tenantId) {
+        String sql = "SELECT id, name FROM profile WHERE tenant_id = ?";
+        List<Map<String, Object>> profileRows = jdbcTemplate.queryForList(sql, tenantId);
+
+        List<CerbosPolicyGenerator.ProfileData> profiles = new ArrayList<>();
+        for (Map<String, Object> row : profileRows) {
+            String profileId = (String) row.get("id");
+            String name = (String) row.get("name");
+
+            Map<String, Boolean> systemPerms = loadProfileSystemPerms(profileId);
+            Map<String, Map<String, Boolean>> objectPerms = loadProfileObjectPerms(profileId);
+            Map<String, Map<String, String>> fieldPerms = loadProfileFieldPerms(profileId);
+
+            profiles.add(new CerbosPolicyGenerator.ProfileData(
+                    profileId, name, systemPerms, objectPerms, fieldPerms));
+        }
+
+        return profiles;
+    }
+
+    private Map<String, Boolean> loadProfileSystemPerms(String profileId) {
+        Map<String, Boolean> perms = new LinkedHashMap<>();
+        for (Map<String, Object> row : bootstrapRepository.findProfileSystemPermissions(profileId)) {
+            String name = (String) row.get("permission_name");
+            Boolean granted = toBoolean(row.get("granted"));
+            if (name != null && Boolean.TRUE.equals(granted)) {
+                perms.put(name, true);
+            }
+        }
+        return perms;
+    }
+
+    private Map<String, Map<String, Boolean>> loadProfileObjectPerms(String profileId) {
+        Map<String, Map<String, Boolean>> perms = new LinkedHashMap<>();
+        for (Map<String, Object> row : bootstrapRepository.findProfileObjectPermissions(profileId)) {
+            String collectionId = (String) row.get("collection_id");
+            if (collectionId == null) continue;
+
+            Map<String, Boolean> objPerms = new LinkedHashMap<>();
+            objPerms.put("canCreate", toBoolean(row.get("can_create")));
+            objPerms.put("canRead", toBoolean(row.get("can_read")));
+            objPerms.put("canEdit", toBoolean(row.get("can_edit")));
+            objPerms.put("canDelete", toBoolean(row.get("can_delete")));
+            perms.put(collectionId, objPerms);
+        }
+        return perms;
+    }
+
+    private Map<String, Map<String, String>> loadProfileFieldPerms(String profileId) {
+        Map<String, Map<String, String>> perms = new LinkedHashMap<>();
+        for (Map<String, Object> row : bootstrapRepository.findProfileFieldPermissions(profileId)) {
+            String collectionId = (String) row.get("collection_id");
+            String fieldId = (String) row.get("field_id");
+            String visibility = (String) row.get("visibility");
+            if (collectionId == null || fieldId == null || visibility == null) continue;
+
+            perms.computeIfAbsent(collectionId, k -> new LinkedHashMap<>())
+                    .put(fieldId, visibility);
+        }
+        return perms;
+    }
+
+    private List<String> loadCollectionIdsForTenant(String tenantId) {
+        List<Map<String, Object>> collections = bootstrapRepository.findActiveCollections();
+        return collections.stream()
+                .map(row -> (String) row.get("id"))
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
+    private List<CerbosPolicyGenerator.CustomRule> loadCustomRulesForTenant(String tenantId) {
+        try {
+            String sql = "SELECT id, profile_id, collection_id, action, effect, condition_json, enabled " +
+                    "FROM profile_custom_rules WHERE tenant_id = ?";
+            List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, tenantId);
+
+            List<CerbosPolicyGenerator.CustomRule> rules = new ArrayList<>();
+            for (Map<String, Object> row : rows) {
+                String conditionJson = row.get("condition_json") != null
+                        ? row.get("condition_json").toString() : null;
+                String celExpression = extractCelExpression(conditionJson);
+
+                rules.add(new CerbosPolicyGenerator.CustomRule(
+                        (String) row.get("id"),
+                        (String) row.get("profile_id"),
+                        (String) row.get("collection_id"),
+                        (String) row.get("action"),
+                        (String) row.get("effect"),
+                        celExpression,
+                        toBoolean(row.get("enabled"))
+                ));
+            }
+            return rules;
+        } catch (Exception e) {
+            // Table may not exist yet during migration
+            log.debug("Could not load custom rules (table may not exist yet): {}", e.getMessage());
+            return Collections.emptyList();
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private String extractCelExpression(String conditionJson) {
+        if (conditionJson == null || conditionJson.isBlank()) return null;
+        try {
+            Map<String, Object> condition = objectMapper.readValue(conditionJson, Map.class);
+            // CEL type: {expression: "..."}
+            if (condition.containsKey("expression")) {
+                return (String) condition.get("expression");
+            }
+            // Visual type: {field, operator, value} — convert to CEL
+            String field = (String) condition.get("field");
+            String operator = (String) condition.get("operator");
+            Object value = condition.get("value");
+            if (field != null && operator != null) {
+                return convertVisualToCel(field, operator, value);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to parse condition JSON: {}", e.getMessage());
+        }
+        return null;
+    }
+
+    private String convertVisualToCel(String field, String operator, Object value) {
+        String attrRef = "R.attr." + field;
+        return switch (operator) {
+            case "equals" -> {
+                if ("$CURRENT_USER".equals(value)) yield attrRef + " == P.id";
+                yield attrRef + " == \"" + value + "\"";
+            }
+            case "not_equals" -> attrRef + " != \"" + value + "\"";
+            case "in" -> {
+                if (value instanceof List<?> list) {
+                    String items = list.stream()
+                            .map(v -> "\"" + v + "\"")
+                            .reduce((a, b) -> a + ", " + b)
+                            .orElse("");
+                    yield attrRef + " in [" + items + "]";
+                }
+                yield attrRef + " in " + value;
+            }
+            case "greater_than" -> "double(" + attrRef + ") > " + value;
+            case "less_than" -> "double(" + attrRef + ") < " + value;
+            case "contains" -> attrRef + ".contains(\"" + value + "\")";
+            default -> attrRef + " == \"" + value + "\"";
+        };
+    }
+
+    private Boolean toBoolean(Object value) {
+        if (value instanceof Boolean b) return b;
+        if (value instanceof Number n) return n.intValue() != 0;
+        if (value instanceof String s) return Boolean.parseBoolean(s);
+        return false;
+    }
+}

@@ -89,7 +89,6 @@ export function SetupAuditTrailPage({ className }: SetupAuditTrailPageProps): Re
             <option value="Collections">{t('audit.sectionCollections')}</option>
             <option value="Fields">{t('audit.sectionFields')}</option>
             <option value="Profiles">{t('audit.sectionProfiles')}</option>
-            <option value="PermissionSets">{t('audit.sectionPermissionSets')}</option>
             <option value="OIDC">{t('audit.sectionOIDC')}</option>
             <option value="Tenants">{t('audit.sectionTenants')}</option>
             <option value="Sharing">{t('audit.sectionSharing')}</option>

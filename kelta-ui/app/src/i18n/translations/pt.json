@@ -757,24 +757,6 @@
     "visibility": "Visibilidade",
     "noFieldPermissions": "Nenhuma permissao de campo configurada"
   },
-  "permissionSets": {
-    "title": "Conjuntos de Permissoes",
-    "create": "Criar Conjunto de Permissoes",
-    "name": "Nome",
-    "description": "Descricao",
-    "createSuccess": "Conjunto de permissoes criado com sucesso",
-    "deleteSuccess": "Conjunto de permissoes excluido com sucesso",
-    "permissionsSaved": "Permissoes salvas com sucesso",
-    "noSets": "Nenhum conjunto de permissoes encontrado",
-    "selectSet": "Selecione um conjunto de permissoes para ver suas permissoes",
-    "assignedUsers": "Usuarios Atribuidos",
-    "assign": "Atribuir",
-    "unassign": "Desatribuir",
-    "selectUser": "Selecione um usuario...",
-    "noAssignedUsers": "Nenhum usuario atribuido a este conjunto de permissoes.",
-    "userAssigned": "Usuario atribuido com sucesso",
-    "userUnassigned": "Usuario desatribuido com sucesso"
-  },
   "logs": {
     "viewLogs": "Logs",
     "viewDeliveries": "Entregas",
@@ -913,7 +895,6 @@
     "sectionCollections": "Colecoes",
     "sectionFields": "Campos",
     "sectionProfiles": "Perfis",
-    "sectionPermissionSets": "Conjuntos de Permissoes",
     "sectionOIDC": "OIDC",
     "sectionTenants": "Inquilinos",
     "sectionSharing": "Compartilhamento",

@@ -16,7 +16,9 @@ import io.kelta.runtime.workflow.module.ModuleRegistry;
 import io.kelta.worker.flow.JdbcFlowStore;
 import io.kelta.worker.listener.CollectionConfigEventPublisher;
 import io.kelta.worker.listener.FieldConfigEventPublisher;
+import io.kelta.worker.listener.CerbosPolicySyncHook;
 import io.kelta.worker.service.AuditBeforeSaveHook;
+import io.kelta.worker.service.CerbosPolicySyncService;
 import io.kelta.worker.service.SetupAuditService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -180,6 +182,15 @@ public class FlowConfig {
     // ---------------------------------------------------------------------------
     // Audit hook — records setup changes to the setup_audit_trail table
     // ---------------------------------------------------------------------------
+
+    @Bean
+    public CerbosPolicySyncHook cerbosPolicySyncHook(
+            BeforeSaveHookRegistry hookRegistry,
+            CerbosPolicySyncService syncService) {
+        CerbosPolicySyncHook hook = new CerbosPolicySyncHook(syncService);
+        hookRegistry.register(hook);
+        return hook;
+    }
 
     @Bean
     public AuditBeforeSaveHook auditBeforeSaveHook(

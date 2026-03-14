@@ -757,24 +757,6 @@
     "visibility": "Sichtbarkeit",
     "noFieldPermissions": "Keine Feldberechtigungen konfiguriert"
   },
-  "permissionSets": {
-    "title": "Berechtigungssätze",
-    "create": "Berechtigungssatz erstellen",
-    "name": "Name",
-    "description": "Beschreibung",
-    "createSuccess": "Berechtigungssatz erfolgreich erstellt",
-    "deleteSuccess": "Berechtigungssatz erfolgreich gelöscht",
-    "permissionsSaved": "Berechtigungen erfolgreich gespeichert",
-    "noSets": "Keine Berechtigungssätze gefunden",
-    "selectSet": "Wählen Sie einen Berechtigungssatz, um seine Berechtigungen anzuzeigen",
-    "assignedUsers": "Zugewiesene Benutzer",
-    "assign": "Zuweisen",
-    "unassign": "Zuweisung aufheben",
-    "selectUser": "Benutzer auswählen...",
-    "noAssignedUsers": "Keine Benutzer diesem Berechtigungssatz zugewiesen.",
-    "userAssigned": "Benutzer erfolgreich zugewiesen",
-    "userUnassigned": "Benutzerzuweisung erfolgreich aufgehoben"
-  },
   "logs": {
     "viewLogs": "Protokolle",
     "viewDeliveries": "Zustellungen",
@@ -913,7 +895,6 @@
     "sectionCollections": "Sammlungen",
     "sectionFields": "Felder",
     "sectionProfiles": "Profile",
-    "sectionPermissionSets": "Berechtigungssätze",
     "sectionOIDC": "OIDC",
     "sectionTenants": "Mandanten",
     "sectionSharing": "Freigabe",

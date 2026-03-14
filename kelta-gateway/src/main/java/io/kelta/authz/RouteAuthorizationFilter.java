@@ -3,6 +3,7 @@ package io.kelta.gateway.authz;
 import io.kelta.gateway.auth.GatewayPrincipal;
 import io.kelta.gateway.auth.JwtAuthenticationFilter;
 import io.kelta.gateway.auth.PublicPathMatcher;
+import io.kelta.gateway.authz.cerbos.CerbosAuthorizationService;
 import io.kelta.gateway.filter.RequestLoggingFilter;
 import io.kelta.gateway.filter.TenantResolutionFilter;
 import io.kelta.gateway.metrics.GatewayMetrics;
@@ -29,25 +30,23 @@ import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
 /**
- * Global filter that enforces route-level authorization.
+ * Global filter that enforces route-level authorization via Cerbos.
  *
  * <p>When {@code kelta.gateway.security.permissions-enabled} is false,
  * this filter only checks that the user is authenticated (valid JWT required).
  * Defaults to enabled (true).
  *
- * <p>When permissions are enabled, this filter additionally checks object-level
- * permissions for API paths:
+ * <p>When permissions are enabled, this filter checks:
  * <ul>
- *   <li>GET/HEAD/OPTIONS require {@code canRead}</li>
- *   <li>POST requires {@code canCreate}</li>
- *   <li>PUT/PATCH require {@code canEdit}</li>
- *   <li>DELETE requires {@code canDelete}</li>
+ *   <li>API_ACCESS system permission via Cerbos</li>
+ *   <li>Object-level CRUD permissions via Cerbos (read/create/edit/delete on collection)</li>
  * </ul>
  *
- * <p>System permissions {@code VIEW_ALL_DATA} and {@code MODIFY_ALL_DATA} serve
- * as overrides for read and write operations respectively.
+ * <p>System permission overrides (VIEW_ALL_DATA, MODIFY_ALL_DATA) are encoded
+ * in the generated Cerbos policies and handled transparently by Cerbos.
  *
- * <p>Actuator and internal paths are excluded from authentication requirements.
+ * <p>After authorization succeeds, forwards identity headers to the worker:
+ * {@code X-User-Profile-Id}, {@code X-User-Email}, {@code X-Cerbos-Scope}.
  */
 @Component
 public class RouteAuthorizationFilter implements GlobalFilter, Ordered {
@@ -59,18 +58,21 @@ public class RouteAuthorizationFilter implements GlobalFilter, Ordered {
     private final PublicPathMatcher publicPathMatcher;
     private final GatewayMetrics metrics;
     private final ObjectMapper objectMapper;
+    private final CerbosAuthorizationService cerbosService;
 
     public RouteAuthorizationFilter(
             RouteRegistry routeRegistry,
             @Value("${kelta.gateway.security.permissions-enabled:true}") boolean permissionsEnabled,
             PublicPathMatcher publicPathMatcher,
             GatewayMetrics metrics,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            CerbosAuthorizationService cerbosService) {
         this.routeRegistry = routeRegistry;
         this.permissionsEnabled = permissionsEnabled;
         this.publicPathMatcher = publicPathMatcher;
         this.metrics = metrics;
         this.objectMapper = objectMapper;
+        this.cerbosService = cerbosService;
     }
 
     @Override
@@ -96,98 +98,101 @@ public class RouteAuthorizationFilter implements GlobalFilter, Ordered {
 
         // If permissions enforcement is disabled, allow all authenticated users
         if (!permissionsEnabled) {
-            // Still set route attribute for metrics if we can find the route
             setRouteAttribute(exchange, path);
-            return chain.filter(exchange);
+            return forwardWithHeaders(exchange, chain, principal);
+        }
+
+        // Check that principal has identity resolved (profileId required for Cerbos)
+        if (principal.getProfileId() == null || principal.getTenantId() == null) {
+            log.warn("No profile/tenant resolved for user {} on path: {}", principal.getUsername(), path);
+            String tenantSlug = TenantResolutionFilter.getTenantSlug(exchange);
+            String method = exchange.getRequest().getMethod() != null ? exchange.getRequest().getMethod().name() : "unknown";
+            metrics.recordAuthzDenied(tenantSlug, "unknown", method);
+            return forbidden(exchange, "User identity not resolved");
         }
 
         // Check object-level permissions for API paths
         if (path.startsWith("/api/")) {
-            return checkObjectPermissions(exchange, chain, path);
+            return checkWithCerbos(exchange, chain, path, principal);
         }
 
-        return chain.filter(exchange);
+        return forwardWithHeaders(exchange, chain, principal);
     }
 
-    private Mono<Void> checkObjectPermissions(ServerWebExchange exchange,
-                                               GatewayFilterChain chain,
-                                               String path) {
-        ResolvedPermissions permissions = PermissionResolutionFilter.getPermissions(exchange);
-        if (permissions == null) {
-            // No permissions resolved and no tenant context — deny access
-            log.warn("No permissions resolved for path: {}", path);
-            String tenantSlug = TenantResolutionFilter.getTenantSlug(exchange);
-            String methodStr = exchange.getRequest().getMethod() != null ? exchange.getRequest().getMethod().name() : "unknown";
-            metrics.recordAuthzDenied(tenantSlug, "unknown", methodStr);
-            return forbidden(exchange, "Permission resolution unavailable");
-        }
+    private Mono<Void> checkWithCerbos(ServerWebExchange exchange,
+                                        GatewayFilterChain chain,
+                                        String path,
+                                        GatewayPrincipal principal) {
+        String tenantSlug = TenantResolutionFilter.getTenantSlug(exchange);
+        String methodStr = exchange.getRequest().getMethod() != null ? exchange.getRequest().getMethod().name() : "unknown";
 
-        // Deny if permission resolution failed (fail-closed)
-        if (permissions.isDenied()) {
-            log.warn("Permission resolution failed (fail-closed) for path: {}", path);
-            String tenantSlug = TenantResolutionFilter.getTenantSlug(exchange);
-            String methodStr = exchange.getRequest().getMethod() != null ? exchange.getRequest().getMethod().name() : "unknown";
-            metrics.recordAuthzDenied(tenantSlug, "unknown", methodStr);
-            return forbidden(exchange, "Permission resolution unavailable");
-        }
+        // 1. Check API_ACCESS system permission
+        return cerbosService.checkSystemPermission(principal, "API_ACCESS")
+                .flatMap(apiAccessAllowed -> {
+                    if (!apiAccessAllowed) {
+                        log.warn("User {} denied API access (no API_ACCESS) for path: {}",
+                                principal.getUsername(), path);
+                        metrics.recordAuthzDenied(tenantSlug, "unknown", methodStr);
+                        return forbidden(exchange, "API access not permitted");
+                    }
 
-        // All-permissive bypasses all checks (platform admin, disabled)
-        if (permissions.isAllPermissive()) {
-            setRouteAttribute(exchange, path);
-            return chain.filter(exchange);
-        }
+                    // 2. Look up the route to get collection info
+                    Optional<RouteDefinition> route = routeRegistry.findByPath(path);
+                    if (route.isEmpty()) {
+                        // No route found — not a collection API call, allow through
+                        return forwardWithHeaders(exchange, chain, principal);
+                    }
 
-        // Check API_ACCESS system permission
-        if (!permissions.hasSystemPermission("API_ACCESS")) {
-            log.warn("User denied API access (no API_ACCESS permission) for path: {}", path);
-            String tenantSlug = TenantResolutionFilter.getTenantSlug(exchange);
-            String method = exchange.getRequest().getMethod() != null ? exchange.getRequest().getMethod().name() : "unknown";
-            metrics.recordAuthzDenied(tenantSlug, "unknown", method);
-            return forbidden(exchange, "API access not permitted");
-        }
+                    String collectionId = route.get().getId();
+                    String collectionName = route.get().getCollectionName();
+                    exchange.getAttributes().put(RequestLoggingFilter.ROUTE_ATTR, collectionName);
 
-        // Look up the route to get collection info
-        Optional<RouteDefinition> route = routeRegistry.findByPath(path);
-        if (route.isEmpty()) {
-            // No route found — not a collection API call, allow through
-            return chain.filter(exchange);
-        }
+                    // Map HTTP method to Cerbos action
+                    String action = mapMethodToAction(exchange.getRequest().getMethod());
 
-        String collectionId = route.get().getId();
-        String collectionName = route.get().getCollectionName();
-        ObjectPermissions objPerms = permissions.getObjectPermissions(collectionId);
-        HttpMethod method = exchange.getRequest().getMethod();
+                    // 3. Check collection-level permission
+                    return cerbosService.checkObjectPermission(principal, collectionId, action)
+                            .flatMap(allowed -> {
+                                if (!allowed) {
+                                    log.warn("User {} denied {} on collection '{}' (id={})",
+                                            principal.getUsername(), action, collectionName, collectionId);
+                                    metrics.recordAuthzDenied(tenantSlug, collectionName, methodStr);
+                                    return forbidden(exchange,
+                                            "Insufficient permissions for " + action + " on " + collectionName);
+                                }
+                                return forwardWithHeaders(exchange, chain, principal);
+                            });
+                });
+    }
 
-        // Set route attribute for RequestLoggingFilter metrics
-        exchange.getAttributes().put(RequestLoggingFilter.ROUTE_ATTR, collectionName);
+    /**
+     * Forwards the request to the worker with identity headers for fine-grained checks.
+     */
+    private Mono<Void> forwardWithHeaders(ServerWebExchange exchange,
+                                           GatewayFilterChain chain,
+                                           GatewayPrincipal principal) {
+        ServerWebExchange mutated = exchange.mutate()
+                .request(r -> r
+                        .header("X-User-Email", principal.getUsername())
+                        .header("X-User-Profile-Id", principal.getProfileId() != null ? principal.getProfileId() : "")
+                        .header("X-User-Profile-Name", principal.getProfileName() != null ? principal.getProfileName() : "")
+                        .header("X-Cerbos-Scope", principal.getTenantId() != null ? principal.getTenantId() : ""))
+                .build();
+        return chain.filter(mutated);
+    }
 
-        boolean allowed = isAllowed(method, objPerms);
-
-        // System permission overrides
-        if (!allowed) {
-            if (isReadMethod(method)) {
-                allowed = permissions.hasSystemPermission("VIEW_ALL_DATA");
-            } else {
-                allowed = permissions.hasSystemPermission("MODIFY_ALL_DATA");
-            }
-        }
-
-        if (!allowed) {
-            log.warn("User denied {} on collection '{}' (id={}): insufficient object permissions",
-                    method, collectionName, collectionId);
-            String tenantSlug = TenantResolutionFilter.getTenantSlug(exchange);
-            String methodStr = method != null ? method.name() : "unknown";
-            metrics.recordAuthzDenied(tenantSlug, collectionName, methodStr);
-            return forbidden(exchange,
-                    "Insufficient permissions for " + method + " on " + collectionName);
-        }
-
-        return chain.filter(exchange);
+    private String mapMethodToAction(HttpMethod method) {
+        if (method == null) return "read";
+        return switch (method.name()) {
+            case "POST" -> "create";
+            case "PUT", "PATCH" -> "edit";
+            case "DELETE" -> "delete";
+            default -> "read";
+        };
     }
 
     /**
      * Sets the route attribute on the exchange for downstream metric recording.
-     * Looks up the route by path and stores the collection name.
      */
     private void setRouteAttribute(ServerWebExchange exchange, String path) {
         if (path != null && path.startsWith("/api/")) {
@@ -197,33 +202,10 @@ public class RouteAuthorizationFilter implements GlobalFilter, Ordered {
         }
     }
 
-    private boolean isAllowed(HttpMethod method, ObjectPermissions perms) {
-        if (method == null) return false;
-        if (method == HttpMethod.GET || method == HttpMethod.HEAD || method == HttpMethod.OPTIONS) {
-            return perms.canRead();
-        }
-        if (method == HttpMethod.POST) {
-            return perms.canCreate();
-        }
-        if (method == HttpMethod.PUT || method == HttpMethod.PATCH) {
-            return perms.canEdit();
-        }
-        if (method == HttpMethod.DELETE) {
-            return perms.canDelete();
-        }
-        return false;
-    }
-
-    private boolean isReadMethod(HttpMethod method) {
-        return method == HttpMethod.GET || method == HttpMethod.HEAD || method == HttpMethod.OPTIONS;
-    }
-
     private Mono<Void> forbidden(ServerWebExchange exchange, String message) {
         exchange.getResponse().setStatusCode(HttpStatus.FORBIDDEN);
         exchange.getResponse().getHeaders().add(HttpHeaders.CONTENT_TYPE, "application/json");
 
-        // Use Jackson to safely serialize — prevents JSON injection via untrusted
-        // values in message or request path.
         ObjectNode error = objectMapper.createObjectNode();
         error.put("status", "403");
         error.put("code", "FORBIDDEN");

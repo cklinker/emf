@@ -14,6 +14,9 @@ public class GatewayPrincipal {
     private final String username;
     private final List<String> groups;
     private final Map<String, Object> claims;
+    private String profileId;
+    private String profileName;
+    private String tenantId;
 
     /**
      * Creates a new GatewayPrincipal.
@@ -65,6 +68,30 @@ public class GatewayPrincipal {
         return groups.contains(group);
     }
 
+    public String getProfileId() {
+        return profileId;
+    }
+
+    public void setProfileId(String profileId) {
+        this.profileId = profileId;
+    }
+
+    public String getProfileName() {
+        return profileName;
+    }
+
+    public void setProfileName(String profileName) {
+        this.profileName = profileName;
+    }
+
+    public String getTenantId() {
+        return tenantId;
+    }
+
+    public void setTenantId(String tenantId) {
+        this.tenantId = tenantId;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -85,6 +112,9 @@ public class GatewayPrincipal {
         return "GatewayPrincipal{" +
                "username='" + username + '\'' +
                ", groups=" + groups +
+               ", profileId='" + profileId + '\'' +
+               ", profileName='" + profileName + '\'' +
+               ", tenantId='" + tenantId + '\'' +
                ", claims=" + claims.keySet() +
                '}';
     }

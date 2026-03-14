@@ -757,24 +757,6 @@
     "visibility": "Visibilité",
     "noFieldPermissions": "Aucune permission sur les champs configurée"
   },
-  "permissionSets": {
-    "title": "Jeux de permissions",
-    "create": "Créer un jeu de permissions",
-    "name": "Nom",
-    "description": "Description",
-    "createSuccess": "Jeu de permissions créé avec succès",
-    "deleteSuccess": "Jeu de permissions supprimé avec succès",
-    "permissionsSaved": "Permissions enregistrées avec succès",
-    "noSets": "Aucun jeu de permissions trouvé",
-    "selectSet": "Sélectionnez un jeu de permissions pour voir ses permissions",
-    "assignedUsers": "Utilisateurs assignés",
-    "assign": "Assigner",
-    "unassign": "Désassigner",
-    "selectUser": "Sélectionner un utilisateur...",
-    "noAssignedUsers": "Aucun utilisateur assigné à ce jeu de permissions.",
-    "userAssigned": "Utilisateur assigné avec succès",
-    "userUnassigned": "Utilisateur désassigné avec succès"
-  },
   "logs": {
     "viewLogs": "Journaux",
     "viewDeliveries": "Livraisons",
@@ -913,7 +895,6 @@
     "sectionCollections": "Collections",
     "sectionFields": "Champs",
     "sectionProfiles": "Profils",
-    "sectionPermissionSets": "Jeux de permissions",
     "sectionOIDC": "OIDC",
     "sectionTenants": "Locataires",
     "sectionSharing": "Partage",

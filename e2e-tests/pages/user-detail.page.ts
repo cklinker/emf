@@ -8,8 +8,6 @@ export class UserDetailPage extends BasePage {
   readonly securityTab: Locator;
   readonly loginHistoryTab: Locator;
   readonly profileSelect: Locator;
-  readonly assignPermissionSetButton: Locator;
-  readonly permissionSetsList: Locator;
 
   constructor(page: Page, tenantSlug?: string) {
     super(page, tenantSlug);
@@ -23,10 +21,6 @@ export class UserDetailPage extends BasePage {
       name: /login history/i,
     });
     this.profileSelect = this.testId("profile-select");
-    this.assignPermissionSetButton = this.testId(
-      "assign-permission-set-button",
-    );
-    this.permissionSetsList = this.testId("permission-sets-list");
   }
 
   async goto(id: string): Promise<void> {

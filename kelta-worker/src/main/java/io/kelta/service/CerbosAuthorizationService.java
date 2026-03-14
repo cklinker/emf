@@ -43,7 +43,7 @@ public class CerbosAuthorizationService {
     private static final int CIRCUIT_BREAKER_THRESHOLD = 3;
 
     /** Seconds to keep the circuit open (deny all) before retrying. */
-    private static final long CIRCUIT_BREAKER_COOLDOWN_SECONDS = 30;
+    private static final long CIRCUIT_BREAKER_COOLDOWN_SECONDS = 10;
 
     private final CerbosBlockingClient cerbosClient;
     private final ExecutorService cerbosExecutor;

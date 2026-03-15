@@ -33,6 +33,7 @@ vi.mock('../../context/I18nContext', () => ({
         'sidebar.tools': 'Tools',
         'sidebar.reports': 'Reports',
         'sidebar.dashboards': 'Dashboards',
+        'sidebar.analytics': 'Analytics',
         'sidebar.setup': 'Setup',
         'sidebar.systemHealth': 'System Health',
         'sidebar.monitoring': 'Monitoring',
@@ -240,16 +241,10 @@ describe('Sidebar', () => {
   })
 
   describe('Tools Section', () => {
-    it('should render Reports link', () => {
+    it('should render Analytics link', () => {
       renderSidebar({ menus: [] })
-      expect(screen.getByTestId('menu-item-reports')).toBeInTheDocument()
-      expect(screen.getByText('Reports')).toBeInTheDocument()
-    })
-
-    it('should render Dashboards link', () => {
-      renderSidebar({ menus: [] })
-      expect(screen.getByTestId('menu-item-dashboards')).toBeInTheDocument()
-      expect(screen.getByText('Dashboards')).toBeInTheDocument()
+      expect(screen.getByTestId('menu-item-analytics')).toBeInTheDocument()
+      expect(screen.getByText('Analytics')).toBeInTheDocument()
     })
   })
 
@@ -495,7 +490,7 @@ describe('Sidebar', () => {
     it('should hide menu item labels when collapsed', () => {
       renderSidebar({ menus: sampleMenus, collapsed: true })
       expect(screen.queryByText('Home')).not.toBeInTheDocument()
-      expect(screen.queryByText('Reports')).not.toBeInTheDocument()
+      expect(screen.queryByText('Analytics')).not.toBeInTheDocument()
     })
 
     it('should still show icons when collapsed', () => {

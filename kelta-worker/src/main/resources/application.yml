@@ -41,6 +41,11 @@ kelta:
     server-url: ${SVIX_SERVER_URL:http://localhost:8071}
     public-url: ${SVIX_PUBLIC_URL:${SVIX_SERVER_URL:http://localhost:8071}}
     auth-token: ${SVIX_AUTH_TOKEN:}
+  superset:
+    url: ${SUPERSET_URL:}
+    public-url: ${SUPERSET_PUBLIC_URL:${SUPERSET_URL:}}
+    admin-username: ${SUPERSET_ADMIN_USERNAME:admin}
+    admin-password: ${SUPERSET_ADMIN_PASSWORD:}
   opensearch:
     url: ${OPENSEARCH_URL:http://localhost:9200}
     index-prefix: ${OPENSEARCH_INDEX_PREFIX:kelta}

@@ -1482,6 +1482,29 @@ export interface SvixPortalResponse {
   serverUrl: string;
 }
 
+// --- Superset ---
+
+export interface SupersetGuestTokenResponse {
+  token: string;
+  supersetDomain: string;
+}
+
+export interface SupersetDashboard {
+  id: number;
+  dashboard_title: string;
+  url: string;
+  status: string;
+  published: boolean;
+  changed_on_utc: string;
+}
+
+export interface SupersetDataset {
+  id: number;
+  table_name: string;
+  database_name: string;
+  changed_on_utc: string;
+}
+
 // --- Webhook URL ---
 
 export interface WebhookUrlResponse {

@@ -86,6 +86,9 @@ import type {
   ScriptExecutionLog,
   CreateScriptRequest,
   SvixPortalResponse,
+  SupersetGuestTokenResponse,
+  SupersetDashboard,
+  SupersetDataset,
   WebhookUrlResponse,
   ConnectedApp,
   ConnectedAppCreatedResponse,
@@ -1690,6 +1693,34 @@ export class AdminClient {
     getPortalAccess: async (): Promise<SvixPortalResponse> => {
       const response = await this.axios.get<SvixPortalResponse>('/api/svix/portal');
       return response.data;
+    },
+  };
+
+  // ---------------------------------------------------------------------------
+  // Superset Analytics
+  // ---------------------------------------------------------------------------
+
+  readonly superset = {
+    getGuestToken: async (dashboardId: string): Promise<SupersetGuestTokenResponse> => {
+      const response = await this.axios.post<SupersetGuestTokenResponse>(
+        '/api/superset/guest-token',
+        { dashboardId }
+      );
+      return response.data;
+    },
+
+    listDashboards: async (): Promise<SupersetDashboard[]> => {
+      const response = await this.axios.get<SupersetDashboard[]>('/api/superset/dashboards');
+      return response.data;
+    },
+
+    listDatasets: async (): Promise<SupersetDataset[]> => {
+      const response = await this.axios.get<SupersetDataset[]>('/api/superset/datasets');
+      return response.data;
+    },
+
+    syncDatasets: async (): Promise<void> => {
+      await this.axios.post('/api/superset/datasets/sync');
     },
   };
 

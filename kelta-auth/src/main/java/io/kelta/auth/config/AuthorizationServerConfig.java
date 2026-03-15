@@ -32,12 +32,18 @@ import org.springframework.security.web.util.matcher.RequestMatcher;
 
 import io.kelta.auth.controller.ForcePasswordChangeController;
 
+import org.springframework.security.authentication.AuthenticationProvider;
+import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationProvider;
+import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationValidator;
+
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.text.ParseException;
+import java.util.List;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 @Configuration
 public class AuthorizationServerConfig {
@@ -50,7 +56,10 @@ public class AuthorizationServerConfig {
         // are included in the security matcher for this chain.
         OAuth2AuthorizationServerConfigurer authorizationServerConfigurer =
                 new OAuth2AuthorizationServerConfigurer();
-        authorizationServerConfigurer.oidc(Customizer.withDefaults());
+        authorizationServerConfigurer
+                .oidc(Customizer.withDefaults())
+                .authorizationEndpoint(endpoint -> endpoint
+                        .authenticationProviders(configureRedirectUriValidator()));
 
         RequestMatcher endpointsMatcher = authorizationServerConfigurer.getEndpointsMatcher();
 
@@ -156,6 +165,20 @@ public class AuthorizationServerConfig {
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
+    }
+
+    /**
+     * Replaces the default redirect_uri validator on the authorization code request
+     * authentication provider with our multi-tenant-aware validator.
+     */
+    private Consumer<List<AuthenticationProvider>> configureRedirectUriValidator() {
+        return authenticationProviders -> {
+            for (AuthenticationProvider provider : authenticationProviders) {
+                if (provider instanceof OAuth2AuthorizationCodeRequestAuthenticationProvider authCodeProvider) {
+                    authCodeProvider.setAuthenticationValidator(new PlatformRedirectUriValidator());
+                }
+            }
+        };
     }
 
     private static RSAKey generateRsaKey() {

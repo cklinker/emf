@@ -40,7 +40,58 @@ public class ConnectedAppRegistrar implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
+        registerPlatformClient();
         registerSupersetClient();
+    }
+
+    /**
+     * Registers the platform UI as a public OAuth2 client.
+     * The UI is a browser SPA that uses PKCE (no client secret).
+     * Redirect URIs cover all tenant slugs: {ui-base-url}/{tenant}/auth/callback
+     */
+    private void registerPlatformClient() {
+        String clientId = "kelta-platform";
+
+        RegisteredClient existing = clientRepository.findByClientId(clientId);
+        if (existing != null) {
+            log.info("Platform OAuth2 client '{}' already registered (id={})", clientId, existing.getId());
+            return;
+        }
+
+        String uiBaseUrl = properties.getUiBaseUrl();
+        if (uiBaseUrl == null || uiBaseUrl.isBlank()) {
+            uiBaseUrl = "http://localhost:5173";
+        }
+        // Remove trailing slash
+        if (uiBaseUrl.endsWith("/")) {
+            uiBaseUrl = uiBaseUrl.substring(0, uiBaseUrl.length() - 1);
+        }
+
+        RegisteredClient platformClient = RegisteredClient.withId(UUID.randomUUID().toString())
+                .clientId(clientId)
+                .clientName("Kelta Platform UI")
+                .clientAuthenticationMethod(ClientAuthenticationMethod.NONE)
+                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
+                // Base redirect URI — the actual tenant-scoped URI is validated by
+                // PlatformRedirectUriValidator which allows any path under this origin
+                .redirectUri(uiBaseUrl + "/auth/callback")
+                .scope(OidcScopes.OPENID)
+                .scope(OidcScopes.PROFILE)
+                .scope("email")
+                .clientSettings(ClientSettings.builder()
+                        .requireAuthorizationConsent(false)
+                        .requireProofKey(true)
+                        .build())
+                .tokenSettings(TokenSettings.builder()
+                        .accessTokenTimeToLive(Duration.ofHours(1))
+                        .refreshTokenTimeToLive(Duration.ofHours(8))
+                        .reuseRefreshTokens(false)
+                        .build())
+                .build();
+
+        clientRepository.save(platformClient);
+        log.info("Registered Platform OAuth2 client '{}' with redirect URIs under '{}'", clientId, uiBaseUrl);
     }
 
     private void registerSupersetClient() {

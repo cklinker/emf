@@ -199,6 +199,7 @@ public class RouteConfigService {
                 // Reporting & monitoring
                 {"reports", "/api/reports/**", "reports"},
                 {"dashboards", "/api/dashboards/**", "dashboards"},
+                {"superset", "/api/superset/**", "superset"},
                 {"bulk-jobs", "/api/bulk-jobs/**", "bulk-jobs"},
                 {"migration-runs", "/api/migration-runs/**", "migration-runs"},
         };

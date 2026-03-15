@@ -71,11 +71,7 @@ export function AnalyticsPage({
             Refresh
           </Button>
           <Button variant="outline" size="sm" asChild>
-            <a
-              href={supersetUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
+            <a href={supersetUrl} target="_blank" rel="noopener noreferrer">
               <ExternalLink className="mr-1 h-4 w-4" />
               Open in Superset
             </a>
@@ -106,11 +102,7 @@ export function AnalyticsPage({
             viewing.
           </p>
           <Button variant="outline" className="mt-4" asChild>
-            <a
-              href={supersetUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
+            <a href={supersetUrl} target="_blank" rel="noopener noreferrer">
               <ExternalLink className="mr-1 h-4 w-4" />
               Create in Superset
             </a>

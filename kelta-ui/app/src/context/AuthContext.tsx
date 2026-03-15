@@ -417,13 +417,13 @@ export function AuthProvider({
 
       setError(null)
 
-      // If no provider specified and multiple providers available, redirect to selection
+      // If no provider specified and multiple providers available, redirect to login page
       if (!providerId && providers.length > 1) {
         // Store current path for redirect after auth
         sessionStorage.setItem(STORAGE_KEYS.REDIRECT_PATH, window.location.pathname)
         loginInProgress = false
         const slug = getTenantSlug()
-        window.location.href = `/${slug}/auth/select-provider`
+        window.location.href = `/${slug}/login`
         return
       }
 
@@ -506,8 +506,7 @@ export function AuthProvider({
     sessionStorage.setItem(STORAGE_KEYS.JUST_LOGGED_OUT, 'true')
 
     // Clear SSO session with kelta-auth (fire-and-forget)
-    const authBaseUrl =
-      (window as Record<string, unknown>).__KELTA_AUTH_URL__ as string | undefined
+    const authBaseUrl = (window as Record<string, unknown>).__KELTA_AUTH_URL__ as string | undefined
     if (authBaseUrl) {
       fetch(`${authBaseUrl}/auth/session`, {
         method: 'DELETE',
@@ -638,8 +637,9 @@ export function AuthProvider({
 
       // Establish SSO session with kelta-auth for connected app SSO (fire-and-forget).
       // Skip if the user logged in via kelta-auth itself (session already exists).
-      const authBaseUrl =
-        (window as Record<string, unknown>).__KELTA_AUTH_URL__ as string | undefined
+      const authBaseUrl = (window as Record<string, unknown>).__KELTA_AUTH_URL__ as
+        | string
+        | undefined
       if (authBaseUrl) {
         const currentProviderId = sessionStorage.getItem(STORAGE_KEYS.PROVIDER_ID)
         const currentProvider = availableProviders.find((p) => p.id === currentProviderId)
@@ -653,9 +653,7 @@ export function AuthProvider({
               'X-Tenant-Slug': getTenantSlug(),
             },
             credentials: 'include',
-          }).catch((err: unknown) =>
-            console.warn('[Auth] SSO session establishment failed:', err)
-          )
+          }).catch((err: unknown) => console.warn('[Auth] SSO session establishment failed:', err))
         }
       }
 

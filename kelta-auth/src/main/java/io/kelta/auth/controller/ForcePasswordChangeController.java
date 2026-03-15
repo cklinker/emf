@@ -83,13 +83,13 @@ public class ForcePasswordChangeController {
             return "change-password";
         }
 
-        // Update password and clear force flag
+        // Update password and clear force flag for ALL tenant records with this email
         String newHash = passwordEncoder.encode(newPassword);
-        String userId = (String) results.get(0).get("user_id");
         jdbcTemplate.update(
                 "UPDATE user_credential SET password_hash = ?, password_changed_at = NOW(), " +
-                        "force_change_on_login = false, updated_at = NOW() WHERE user_id = ?",
-                newHash, userId
+                        "force_change_on_login = false, updated_at = NOW() " +
+                        "WHERE user_id IN (SELECT id FROM platform_user WHERE email = ? AND status = 'ACTIVE')",
+                newHash, email
         );
 
         session.removeAttribute(SESSION_ATTR_EMAIL);

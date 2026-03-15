@@ -100,7 +100,7 @@ public class AuthorizationServerConfig {
                 .formLogin(form -> form
                         .loginPage("/login")
                         .loginProcessingUrl("/login")
-                        .defaultSuccessUrl("/", true)
+                        .defaultSuccessUrl("/", false)
                         .failureHandler((request, response, exception) -> {
                             if (exception.getCause() instanceof CredentialsExpiredException
                                     || exception instanceof CredentialsExpiredException) {

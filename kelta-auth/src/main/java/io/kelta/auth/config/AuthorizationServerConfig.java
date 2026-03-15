@@ -28,6 +28,7 @@ import org.springframework.security.authentication.CredentialsExpiredException;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 
 import io.kelta.auth.controller.ForcePasswordChangeController;
 
@@ -44,17 +45,26 @@ public class AuthorizationServerConfig {
     @Bean
     @Order(1)
     public SecurityFilterChain authorizationServerSecurityFilterChain(HttpSecurity http) throws Exception {
-        OAuth2AuthorizationServerConfiguration.applyDefaultSecurity(http);
+        // Configure OIDC on the configurer BEFORE capturing endpoint matchers,
+        // so that OIDC discovery endpoints (/.well-known/openid-configuration)
+        // are included in the security matcher for this chain.
+        OAuth2AuthorizationServerConfigurer authorizationServerConfigurer =
+                new OAuth2AuthorizationServerConfigurer();
+        authorizationServerConfigurer.oidc(Customizer.withDefaults());
 
-        http.getConfigurer(OAuth2AuthorizationServerConfigurer.class)
-                .oidc(Customizer.withDefaults());
+        RequestMatcher endpointsMatcher = authorizationServerConfigurer.getEndpointsMatcher();
 
-        http.cors(Customizer.withDefaults())
+        http
+            .securityMatcher(endpointsMatcher)
+            .authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated())
+            .csrf(csrf -> csrf.ignoringRequestMatchers(endpointsMatcher))
+            .cors(Customizer.withDefaults())
             .exceptionHandling(exceptions -> exceptions
                 .defaultAuthenticationEntryPointFor(
                         new LoginUrlAuthenticationEntryPoint("/login"),
                         new MediaTypeRequestMatcher(MediaType.TEXT_HTML)
-                ));
+                ))
+            .with(authorizationServerConfigurer, Customizer.withDefaults());
 
         return http.build();
     }

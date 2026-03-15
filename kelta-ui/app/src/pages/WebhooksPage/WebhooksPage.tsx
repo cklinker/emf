@@ -2,12 +2,13 @@ import React, { useState, useEffect, useCallback } from 'react'
 import {
   SvixProvider,
   useEndpoints,
-  useNewEndpoint,
   useEndpointMessageAttempts,
   useEndpointFunctions,
   useEventTypes,
+  useSvix,
 } from 'svix-react'
-import type { EndpointOut, MessageAttemptOut } from 'svix'
+import type { EndpointIn, EndpointOut, MessageAttemptOut } from 'svix'
+import { useQuery } from '@tanstack/react-query'
 import { useApi } from '../../context/ApiContext'
 import { LoadingSpinner, ErrorMessage } from '../../components'
 import { Button } from '@/components/ui/button'
@@ -214,6 +215,21 @@ function EndpointList({ onSelect }: { onSelect: (ep: EndpointOut) => void }) {
                   )}
                 </div>
               )}
+              {ep.channels && ep.channels.length > 0 && (
+                <div className="mt-1 flex flex-wrap gap-1">
+                  <span className="text-xs text-muted-foreground mr-1">Collections:</span>
+                  {ep.channels.slice(0, 3).map((ch) => (
+                    <Badge key={ch} variant="secondary" className="text-xs">
+                      {ch}
+                    </Badge>
+                  ))}
+                  {ep.channels.length > 3 && (
+                    <Badge variant="secondary" className="text-xs">
+                      +{ep.channels.length - 3} more
+                    </Badge>
+                  )}
+                </div>
+              )}
             </div>
             <svg
               className="h-5 w-5 shrink-0 text-muted-foreground"
@@ -311,6 +327,18 @@ function EndpointDetail({ endpoint, onBack }: { endpoint: EndpointOut; onBack: (
               {endpoint.filterTypes.map((t) => (
                 <Badge key={t} variant="outline" className="text-xs">
                   {t}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
+        {endpoint.channels && endpoint.channels.length > 0 && (
+          <div className="rounded-lg border bg-card p-4">
+            <p className="text-sm font-medium text-muted-foreground">Collection Filter</p>
+            <div className="mt-1 flex flex-wrap gap-1">
+              {endpoint.channels.map((ch) => (
+                <Badge key={ch} variant="secondary" className="text-xs">
+                  {ch}
                 </Badge>
               ))}
             </div>
@@ -481,42 +509,64 @@ function CreateEndpointDialog({
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
-  const {
-    url,
-    description,
-    eventTypes: selectedEventTypes,
-    rateLimitPerSecond,
-    createEndpoint,
-  } = useNewEndpoint()
+  const { svix, appId } = useSvix()
+  const { keltaClient } = useApi()
   const eventTypes = useEventTypes({ limit: 100 })
+  const endpoints = useEndpoints({ limit: 50 })
+
+  const [endpointUrl, setEndpointUrl] = useState('')
+  const [endpointDescription, setEndpointDescription] = useState('')
+  const [selectedEventTypes, setSelectedEventTypes] = useState<string[]>([])
+  const [selectedChannels, setSelectedChannels] = useState<string[]>([])
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
 
+  const { data: collections } = useQuery({
+    queryKey: ['collections-for-webhook-filter'],
+    queryFn: async () => {
+      const result = await keltaClient.admin.collections.list()
+      return result
+    },
+  })
+
   const handleCreate = useCallback(async () => {
-    if (!url.value.trim()) {
+    if (!endpointUrl.trim()) {
       setCreateError('URL is required')
       return
     }
     setCreating(true)
     setCreateError(null)
     try {
-      const result = await createEndpoint()
-      if (result.error) {
-        setCreateError(result.error.message)
-      } else {
-        onOpenChange(false)
-        // Reset form
-        url.setValue('')
-        description.setValue('')
-        selectedEventTypes.setValue([])
-        rateLimitPerSecond.setValue(undefined)
+      const endpointIn: EndpointIn = {
+        url: endpointUrl,
+        description: endpointDescription || undefined,
+        filterTypes: selectedEventTypes.length > 0 ? selectedEventTypes : undefined,
+        channels: selectedChannels.length > 0 ? selectedChannels : undefined,
       }
+      await svix.endpoint.create(appId, endpointIn)
+      onOpenChange(false)
+      // Reset form
+      setEndpointUrl('')
+      setEndpointDescription('')
+      setSelectedEventTypes([])
+      setSelectedChannels([])
+      // Reload endpoints list
+      endpoints.reload()
     } catch (err) {
       setCreateError(err instanceof Error ? err.message : 'Failed to create endpoint')
     } finally {
       setCreating(false)
     }
-  }, [url, description, selectedEventTypes, rateLimitPerSecond, createEndpoint, onOpenChange])
+  }, [
+    endpointUrl,
+    endpointDescription,
+    selectedEventTypes,
+    selectedChannels,
+    svix,
+    appId,
+    onOpenChange,
+    endpoints,
+  ])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -534,8 +584,8 @@ function CreateEndpointDialog({
             <Input
               id="endpoint-url"
               placeholder="https://example.com/webhooks"
-              value={url.value}
-              onChange={(e) => url.setValue(e.target.value)}
+              value={endpointUrl}
+              onChange={(e) => setEndpointUrl(e.target.value)}
             />
           </div>
 
@@ -544,8 +594,8 @@ function CreateEndpointDialog({
             <Input
               id="endpoint-description"
               placeholder="My webhook endpoint"
-              value={description.value}
-              onChange={(e) => description.setValue(e.target.value)}
+              value={endpointDescription}
+              onChange={(e) => setEndpointDescription(e.target.value)}
             />
           </div>
 
@@ -564,14 +614,12 @@ function CreateEndpointDialog({
                     <input
                       type="checkbox"
                       className="rounded border-input"
-                      checked={selectedEventTypes.value.includes(et.name)}
+                      checked={selectedEventTypes.includes(et.name)}
                       onChange={(e) => {
                         if (e.target.checked) {
-                          selectedEventTypes.setValue([...selectedEventTypes.value, et.name])
+                          setSelectedEventTypes([...selectedEventTypes, et.name])
                         } else {
-                          selectedEventTypes.setValue(
-                            selectedEventTypes.value.filter((n) => n !== et.name)
-                          )
+                          setSelectedEventTypes(selectedEventTypes.filter((n) => n !== et.name))
                         }
                       }}
                     />
@@ -579,6 +627,38 @@ function CreateEndpointDialog({
                     {et.description && (
                       <span className="text-xs text-muted-foreground">- {et.description}</span>
                     )}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {collections && collections.length > 0 && (
+            <div className="space-y-2">
+              <Label>Collection Filter</Label>
+              <p className="text-xs text-muted-foreground">
+                Only receive events for selected collections. Leave empty for all collections.
+              </p>
+              <div className="max-h-[200px] space-y-1 overflow-y-auto rounded-md border p-3">
+                {collections.map((col) => (
+                  <label
+                    key={col.id}
+                    className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
+                  >
+                    <input
+                      type="checkbox"
+                      className="rounded border-input"
+                      checked={selectedChannels.includes(col.name)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedChannels([...selectedChannels, col.name])
+                        } else {
+                          setSelectedChannels(selectedChannels.filter((n) => n !== col.name))
+                        }
+                      }}
+                    />
+                    <span className="text-foreground">{col.displayName || col.name}</span>
+                    <span className="text-xs text-muted-foreground">({col.name})</span>
                   </label>
                 ))}
               </div>

@@ -39,4 +39,16 @@ test.describe("Webhooks", () => {
       await webhooksPage.eventCatalogTab.click();
     }
   });
+
+  test("add endpoint dialog shows collection filter", async ({ page }) => {
+    const webhooksPage = new WebhooksPage(page);
+    await webhooksPage.goto();
+    await expect(webhooksPage.webhooksPage).toBeVisible();
+
+    // Click the Add Endpoint button to open the dialog
+    await webhooksPage.addEndpointButton.click();
+
+    // The dialog should show the collection filter section
+    await expect(webhooksPage.collectionFilterSection).toBeVisible();
+  });
 });

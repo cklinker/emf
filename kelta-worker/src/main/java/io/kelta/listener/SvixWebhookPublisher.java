@@ -13,6 +13,7 @@ import org.springframework.kafka.annotation.KafkaListener;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Kafka consumer that bridges collection change events to Svix for
@@ -82,6 +83,11 @@ public class SvixWebhookPublisher {
             messageIn.setEventType(eventType);
             messageIn.setPayload(payloadJson);
             messageIn.setEventId(event.getEventId());
+
+            // Include collection name as a channel so endpoints can filter by collection
+            if (payload.getName() != null && !payload.getName().isBlank()) {
+                messageIn.setChannels(Set.of(payload.getName()));
+            }
 
             svix.getMessage().create(tenantId, messageIn);
             log.info("Published Svix webhook: type={}, tenant={}, collection={}",

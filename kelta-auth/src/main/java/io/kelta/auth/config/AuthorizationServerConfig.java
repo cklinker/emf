@@ -128,7 +128,23 @@ public class AuthorizationServerConfig {
     @Bean
     public OAuth2AuthorizationService authorizationService(
             JdbcTemplate jdbcTemplate, RegisteredClientRepository registeredClientRepository) {
-        return new JdbcOAuth2AuthorizationService(jdbcTemplate, registeredClientRepository);
+        JdbcOAuth2AuthorizationService service =
+                new JdbcOAuth2AuthorizationService(jdbcTemplate, registeredClientRepository);
+
+        // Register KeltaUserDetails in the Jackson allowlist so the JDBC service
+        // can serialize/deserialize the principal stored in authorization records.
+        JdbcOAuth2AuthorizationService.OAuth2AuthorizationRowMapper rowMapper =
+                new JdbcOAuth2AuthorizationService.OAuth2AuthorizationRowMapper(registeredClientRepository);
+        com.fasterxml.jackson.databind.ObjectMapper objectMapper =
+                new com.fasterxml.jackson.databind.ObjectMapper();
+        ClassLoader classLoader = JdbcOAuth2AuthorizationService.class.getClassLoader();
+        objectMapper.registerModules(org.springframework.security.jackson2.SecurityJackson2Modules.getModules(classLoader));
+        objectMapper.registerModule(new org.springframework.security.oauth2.server.authorization.jackson2.OAuth2AuthorizationServerJackson2Module());
+        objectMapper.addMixIn(io.kelta.auth.model.KeltaUserDetails.class, io.kelta.auth.model.KeltaUserDetailsMixin.class);
+        rowMapper.setObjectMapper(objectMapper);
+        service.setAuthorizationRowMapper(rowMapper);
+
+        return service;
     }
 
     @Bean

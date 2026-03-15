@@ -18,6 +18,7 @@
 import React, { createContext, useContext, useMemo, useCallback } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useApi } from './ApiContext'
+import { useAuth } from './AuthContext'
 import type { CollectionSchema, FieldDefinition } from '../hooks/useCollectionSchema'
 
 /** Extended field definition with parent collection reference */
@@ -186,9 +187,11 @@ export function CollectionStoreProvider({
   children,
 }: CollectionStoreProviderProps): React.ReactElement {
   const { apiClient } = useApi()
+  const { isAuthenticated } = useAuth()
   const queryClient = useQueryClient()
 
-  // Single API call to load all collections with their fields
+  // Single API call to load all collections with their fields.
+  // Only runs when the user is authenticated — prevents 401 loops on the login page.
   const { data: schemas = [], isLoading } = useQuery({
     queryKey: ['collection-store'],
     queryFn: async () => {
@@ -205,6 +208,7 @@ export function CollectionStoreProvider({
       return parsed
     },
     staleTime: 5 * 60 * 1000, // 5 minutes — metadata rarely changes
+    enabled: isAuthenticated,
   })
 
   // Build lookup maps

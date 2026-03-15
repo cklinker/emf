@@ -2,40 +2,40 @@ import { test, expect } from "../../../fixtures";
 import { waitForAnyVisible } from "../../../helpers/wait-helpers";
 
 test.describe("Reports", () => {
-  test("displays reports page", async ({ page }) => {
+  test("displays analytics page", async ({ page }) => {
     await page.goto("/default/reports");
     await page.waitForLoadState("load");
 
     await expect(page).toHaveURL(/\/reports/);
     const found = await waitForAnyVisible([
-      page.getByRole("heading", { name: /reports/i }),
-      page.getByTestId("reports-page"),
+      page.getByRole("heading", { name: /analytics/i }),
+      page.getByTestId("analytics-page"),
       page.getByTestId("error-message"),
     ]);
     expect(found).toBe(true);
   });
 
-  test("has create report button", async ({ page }) => {
+  test("has open in superset button", async ({ page }) => {
     await page.goto("/default/reports");
     await page.waitForLoadState("load");
 
     const found = await waitForAnyVisible([
-      page.getByRole("button", { name: /create report/i }),
+      page.getByRole("link", { name: /open in superset/i }),
       page.getByTestId("error-message"),
-      page.getByTestId("reports-page"),
+      page.getByTestId("analytics-page"),
     ]);
     expect(found).toBe(true);
   });
 
-  test("shows reports list or empty state", async ({ page }) => {
+  test("shows dashboards or empty state", async ({ page }) => {
     await page.goto("/default/reports");
     await page.waitForLoadState("load");
 
     const found = await waitForAnyVisible([
-      page.locator("table, [role='grid']"),
-      page.getByTestId("empty-state"),
+      page.getByText(/no dashboards available/i),
+      page.getByRole("button", { name: /dashboard/i }),
       page.getByTestId("error-message"),
-      page.getByTestId("reports-page"),
+      page.getByTestId("analytics-page"),
     ]);
     expect(found).toBe(true);
   });

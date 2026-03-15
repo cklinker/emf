@@ -88,14 +88,20 @@ CREATE TABLE oauth2_authorization_consent (
     CONSTRAINT pk_oauth2_authorization_consent PRIMARY KEY (registered_client_id, principal_name)
 );
 
--- Register kelta-auth as an available OIDC provider for tenants using the internal IdP
--- Tenants can be assigned this provider when they don't bring their own
-INSERT INTO oidc_provider (id, name, issuer, jwks_uri, client_id, active, created_at)
-SELECT 'kelta-internal-idp',
+-- Register kelta-auth as an available OIDC provider for every existing tenant.
+-- Each tenant gets its own provider record so they can independently configure
+-- claim mappings or disable it without affecting other tenants.
+INSERT INTO oidc_provider (id, tenant_id, name, issuer, jwks_uri, client_id, active, created_at)
+SELECT t.id || '-kelta-internal',
+       t.id,
        'Kelta Platform (Internal)',
        'https://auth.rzware.com',
        'https://auth.rzware.com/oauth2/jwks',
        'kelta-platform',
        true,
        CURRENT_TIMESTAMP
-WHERE NOT EXISTS (SELECT 1 FROM oidc_provider WHERE id = 'kelta-internal-idp');
+FROM tenant t
+WHERE NOT EXISTS (
+    SELECT 1 FROM oidc_provider op
+    WHERE op.tenant_id = t.id AND op.issuer = 'https://auth.rzware.com'
+);

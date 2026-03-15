@@ -83,8 +83,7 @@ import {
   PicklistsPage,
   PageLayoutsPage,
   ListViewsPage,
-  ReportsPage,
-  DashboardsPage,
+  AnalyticsPage,
   ApprovalProcessesPage,
   FlowsPage,
   FlowDesignerPage,
@@ -667,25 +666,35 @@ function TenantRoutes(): React.ReactElement {
         }
       />
 
-      {/* Reports route */}
+      {/* Analytics route (replaces Reports + Dashboards with Superset) */}
       <Route
-        path="reports"
+        path="analytics"
         element={
           <AdminPageRoute>
             <RequirePermission permission="MANAGE_REPORTS">
-              <ReportsPage />
+              <AnalyticsPage />
             </RequirePermission>
           </AdminPageRoute>
         }
       />
 
-      {/* Dashboards route */}
+      {/* Legacy routes — redirect to analytics */}
+      <Route
+        path="reports"
+        element={
+          <AdminPageRoute>
+            <RequirePermission permission="MANAGE_REPORTS">
+              <AnalyticsPage />
+            </RequirePermission>
+          </AdminPageRoute>
+        }
+      />
       <Route
         path="dashboards"
         element={
           <AdminPageRoute>
             <RequirePermission permission="MANAGE_REPORTS">
-              <DashboardsPage />
+              <AnalyticsPage />
             </RequirePermission>
           </AdminPageRoute>
         }

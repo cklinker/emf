@@ -227,15 +227,9 @@ const CATEGORIES: SetupCategory[] = [
     icon: <BarChart3 size={20} />,
     items: [
       {
-        name: 'Reports',
-        path: '/reports',
-        description: 'Build and manage reports',
-        permission: 'MANAGE_REPORTS',
-      },
-      {
-        name: 'Dashboards',
-        path: '/dashboards',
-        description: 'Create visual dashboards',
+        name: 'Analytics',
+        path: '/analytics',
+        description: 'View dashboards and reports powered by Superset',
         permission: 'MANAGE_REPORTS',
       },
     ],
@@ -324,15 +318,9 @@ export function SetupHomePage({ testId = 'setup-home-page' }: SetupHomePageProps
     staleTime: 300000,
   })
 
-  const { data: reportsData } = useQuery({
-    queryKey: ['setup-stats-reports'],
-    queryFn: () => keltaClient.admin.reports.list(),
-    staleTime: 300000,
-  })
-
-  const { data: dashboardsData } = useQuery({
-    queryKey: ['setup-stats-dashboards'],
-    queryFn: () => keltaClient.admin.dashboards.list(),
+  const { data: analyticsData } = useQuery({
+    queryKey: ['setup-stats-analytics'],
+    queryFn: () => keltaClient.admin.superset.listDashboards().catch(() => []),
     staleTime: 300000,
   })
 
@@ -347,15 +335,11 @@ export function SetupHomePage({ testId = 'setup-home-page' }: SetupHomePageProps
         value: extractCount(usersData),
       },
       {
-        label: t('setup.stats.reports'),
-        value: extractCount(reportsData),
-      },
-      {
         label: t('setup.stats.dashboards'),
-        value: extractCount(dashboardsData),
+        value: analyticsData?.length ?? 0,
       },
     ],
-    [collectionSummaries, usersData, reportsData, dashboardsData, t]
+    [collectionSummaries, usersData, analyticsData, t]
   )
 
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {

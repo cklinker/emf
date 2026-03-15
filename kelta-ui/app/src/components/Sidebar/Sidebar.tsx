@@ -352,7 +352,7 @@ function MenuItem({ item, level, collapsed, onItemClick }: MenuItemProps): JSX.E
  *
  * Sections:
  * 1. My Workspace - Home, favorite collections, All Collections
- * 2. Tools - Reports, Dashboards
+ * 2. Tools - Analytics
  * 3. Setup (collapsed by default) - All admin pages grouped by category
  */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -500,21 +500,10 @@ export function Sidebar({ menus, collapsed, onToggle, onItemClick }: SidebarProp
         <ul className="list-none m-0 p-0" role="menubar" aria-label={t('sidebar.tools')}>
           <MenuItem
             item={{
-              id: 'reports',
-              label: t('sidebar.reports'),
-              path: `/${getTenantSlug()}/reports`,
+              id: 'analytics',
+              label: t('sidebar.analytics'),
+              path: `/${getTenantSlug()}/analytics`,
               icon: 'report',
-            }}
-            level={0}
-            collapsed={collapsed}
-            onItemClick={onItemClick}
-          />
-          <MenuItem
-            item={{
-              id: 'dashboards',
-              label: t('sidebar.dashboards'),
-              path: `/${getTenantSlug()}/dashboards`,
-              icon: 'dashboard',
             }}
             level={0}
             collapsed={collapsed}

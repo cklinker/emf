@@ -170,6 +170,10 @@ export type { ReportsPageProps } from './ReportsPage'
 export { DashboardsPage } from './DashboardsPage'
 export type { DashboardsPageProps } from './DashboardsPage'
 
+// AnalyticsPage - Superset-powered analytics dashboards
+export { AnalyticsPage } from './AnalyticsPage'
+export type { AnalyticsPageProps } from './AnalyticsPage'
+
 // ApprovalProcessesPage - Approval processes management page
 export { ApprovalProcessesPage } from './ApprovalProcessesPage'
 export type { ApprovalProcessesPageProps } from './ApprovalProcessesPage'

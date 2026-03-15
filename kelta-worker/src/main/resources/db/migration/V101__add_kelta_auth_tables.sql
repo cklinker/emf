@@ -92,7 +92,7 @@ CREATE TABLE oauth2_authorization_consent (
 -- Each tenant gets its own provider record so they can independently configure
 -- claim mappings or disable it without affecting other tenants.
 INSERT INTO oidc_provider (id, tenant_id, name, issuer, jwks_uri, client_id, active, created_at)
-SELECT t.id || '-kelta-internal',
+SELECT gen_random_uuid()::text,
        t.id,
        'Kelta Platform (Internal)',
        'https://auth.rzware.com',

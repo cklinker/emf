@@ -9,7 +9,7 @@
  */
 
 import React, { useState, useCallback } from 'react'
-import { Plus, Trash2, ToggleLeft, ToggleRight } from 'lucide-react'
+import { Plus, Trash2, Pencil, ToggleLeft, ToggleRight } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useApi } from '@/context/ApiContext'
 import { useCollectionSummaries } from '@/hooks/useCollectionSummaries'
@@ -71,6 +71,28 @@ export interface CustomPolicyEditorProps {
   testId?: string
 }
 
+interface RuleFormState {
+  collectionId: string
+  action: string
+  effect: string
+  field: string
+  operator: string
+  value: string
+  celExpression: string
+  enabled: boolean
+}
+
+const EMPTY_FORM: RuleFormState = {
+  collectionId: '',
+  action: 'read',
+  effect: 'deny',
+  field: '',
+  operator: 'equals',
+  value: '',
+  celExpression: '',
+  enabled: true,
+}
+
 export function CustomPolicyEditor({
   profileId,
   tenantId,
@@ -106,6 +128,20 @@ export function CustomPolicyEditor({
     },
   })
 
+  // Update rule mutation
+  const updateMutation = useMutation({
+    mutationFn: async ({ ruleId, data }: { ruleId: string; data: Partial<CustomRule> }) => {
+      return apiClient.put(`/api/admin/profiles/${profileId}/custom-rules/${ruleId}`, data)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['custom-rules', profileId] })
+      showToast('Rule updated successfully', 'success')
+    },
+    onError: (error: Error) => {
+      showToast(error.message || 'Failed to update rule', 'error')
+    },
+  })
+
   // Delete rule mutation
   const deleteMutation = useMutation({
     mutationFn: async (ruleId: string) => {
@@ -120,45 +156,67 @@ export function CustomPolicyEditor({
     },
   })
 
-  // New rule form state
+  // Form state
   const [showForm, setShowForm] = useState(false)
   const [isAdvanced, setIsAdvanced] = useState(false)
-  const [newRule, setNewRule] = useState({
-    collectionId: '',
-    action: 'read' as string,
-    effect: 'deny' as string,
-    field: '',
-    operator: 'equals',
-    value: '',
-    celExpression: '',
-  })
+  const [editingRuleId, setEditingRuleId] = useState<string | null>(null)
+  const [formData, setFormData] = useState<RuleFormState>(EMPTY_FORM)
 
-  const handleCreateRule = useCallback(() => {
+  const resetForm = useCallback(() => {
+    setShowForm(false)
+    setEditingRuleId(null)
+    setIsAdvanced(false)
+    setFormData(EMPTY_FORM)
+  }, [])
+
+  const handleAddNew = useCallback(() => {
+    setEditingRuleId(null)
+    setFormData(EMPTY_FORM)
+    setIsAdvanced(false)
+    setShowForm(true)
+  }, [])
+
+  const handleEditRule = useCallback((rule: CustomRule) => {
+    const isCel = rule.conditionType === 'cel'
+    const condition = rule.condition as VisualCondition | CelCondition
+    setEditingRuleId(rule.id)
+    setIsAdvanced(isCel)
+    setFormData({
+      collectionId: rule.collectionId,
+      action: rule.action,
+      effect: rule.effect,
+      field: isCel ? '' : ((condition as VisualCondition).field ?? ''),
+      operator: isCel ? 'equals' : ((condition as VisualCondition).operator ?? 'equals'),
+      value: isCel ? '' : ((condition as VisualCondition).value ?? ''),
+      celExpression: isCel ? ((condition as CelCondition).expression ?? '') : '',
+      enabled: rule.enabled,
+    })
+    setShowForm(true)
+  }, [])
+
+  const handleSaveRule = useCallback(() => {
     const condition = isAdvanced
-      ? { expression: newRule.celExpression }
-      : { field: newRule.field, operator: newRule.operator, value: newRule.value }
+      ? { expression: formData.celExpression }
+      : { field: formData.field, operator: formData.operator, value: formData.value }
 
-    createMutation.mutate({
+    const ruleData: Partial<CustomRule> = {
       tenantId,
-      collectionId: newRule.collectionId,
-      action: newRule.action,
-      effect: newRule.effect,
+      collectionId: formData.collectionId,
+      action: formData.action,
+      effect: formData.effect,
       conditionType: isAdvanced ? 'cel' : 'visual',
       condition,
-      enabled: true,
-    })
+      enabled: formData.enabled,
+    }
 
-    setShowForm(false)
-    setNewRule({
-      collectionId: '',
-      action: 'read',
-      effect: 'deny',
-      field: '',
-      operator: 'equals',
-      value: '',
-      celExpression: '',
-    })
-  }, [createMutation, tenantId, newRule, isAdvanced])
+    if (editingRuleId) {
+      updateMutation.mutate({ ruleId: editingRuleId, data: ruleData })
+    } else {
+      createMutation.mutate(ruleData)
+    }
+
+    resetForm()
+  }, [createMutation, updateMutation, editingRuleId, tenantId, formData, isAdvanced, resetForm])
 
   const getCollectionName = useCallback(
     (collectionId: string) => {
@@ -168,6 +226,8 @@ export function CustomPolicyEditor({
     [collections]
   )
 
+  const isSaving = createMutation.isPending || updateMutation.isPending
+
   return (
     <div className="space-y-4" data-testid={testId}>
       <div className="flex items-center justify-between">
@@ -176,7 +236,8 @@ export function CustomPolicyEditor({
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setShowForm(!showForm)}
+            onClick={handleAddNew}
+            disabled={showForm}
             data-testid={`${testId}-add-button`}
           >
             <Plus size={14} className="mr-1" />
@@ -185,18 +246,21 @@ export function CustomPolicyEditor({
         )}
       </div>
 
-      {/* New rule form */}
+      {/* Rule form (create or edit) */}
       {showForm && (
         <div
           className="space-y-3 rounded-lg border border-border bg-card p-4"
           data-testid={`${testId}-form`}
         >
+          <div className="text-sm font-medium text-foreground">
+            {editingRuleId ? 'Edit Rule' : 'New Rule'}
+          </div>
           <div className="grid grid-cols-3 gap-3">
             <div>
               <Label className="mb-1 text-xs">Collection</Label>
               <Select
-                value={newRule.collectionId}
-                onValueChange={(v) => setNewRule((prev) => ({ ...prev, collectionId: v }))}
+                value={formData.collectionId}
+                onValueChange={(v) => setFormData((prev) => ({ ...prev, collectionId: v }))}
               >
                 <SelectTrigger data-testid={`${testId}-collection-select`}>
                   <SelectValue placeholder="Select collection" />
@@ -213,8 +277,8 @@ export function CustomPolicyEditor({
             <div>
               <Label className="mb-1 text-xs">Action</Label>
               <Select
-                value={newRule.action}
-                onValueChange={(v) => setNewRule((prev) => ({ ...prev, action: v }))}
+                value={formData.action}
+                onValueChange={(v) => setFormData((prev) => ({ ...prev, action: v }))}
               >
                 <SelectTrigger data-testid={`${testId}-action-select`}>
                   <SelectValue />
@@ -231,8 +295,8 @@ export function CustomPolicyEditor({
             <div>
               <Label className="mb-1 text-xs">Effect</Label>
               <Select
-                value={newRule.effect}
-                onValueChange={(v) => setNewRule((prev) => ({ ...prev, effect: v }))}
+                value={formData.effect}
+                onValueChange={(v) => setFormData((prev) => ({ ...prev, effect: v }))}
               >
                 <SelectTrigger data-testid={`${testId}-effect-select`}>
                   <SelectValue />
@@ -263,8 +327,8 @@ export function CustomPolicyEditor({
           {/* Condition editor */}
           {isAdvanced ? (
             <CelExpressionEditor
-              value={newRule.celExpression}
-              onChange={(v) => setNewRule((prev) => ({ ...prev, celExpression: v }))}
+              value={formData.celExpression}
+              onChange={(v) => setFormData((prev) => ({ ...prev, celExpression: v }))}
               testId={`${testId}-cel`}
             />
           ) : (
@@ -272,8 +336,8 @@ export function CustomPolicyEditor({
               <div>
                 <Label className="mb-1 text-xs">Field</Label>
                 <Input
-                  value={newRule.field}
-                  onChange={(e) => setNewRule((prev) => ({ ...prev, field: e.target.value }))}
+                  value={formData.field}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, field: e.target.value }))}
                   placeholder="e.g., status"
                   data-testid={`${testId}-field-input`}
                 />
@@ -281,8 +345,8 @@ export function CustomPolicyEditor({
               <div>
                 <Label className="mb-1 text-xs">Operator</Label>
                 <Select
-                  value={newRule.operator}
-                  onValueChange={(v) => setNewRule((prev) => ({ ...prev, operator: v }))}
+                  value={formData.operator}
+                  onValueChange={(v) => setFormData((prev) => ({ ...prev, operator: v }))}
                 >
                   <SelectTrigger data-testid={`${testId}-operator-select`}>
                     <SelectValue />
@@ -299,8 +363,8 @@ export function CustomPolicyEditor({
               <div>
                 <Label className="mb-1 text-xs">Value</Label>
                 <Input
-                  value={newRule.value}
-                  onChange={(e) => setNewRule((prev) => ({ ...prev, value: e.target.value }))}
+                  value={formData.value}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, value: e.target.value }))}
                   placeholder="e.g., closed"
                   data-testid={`${testId}-value-input`}
                 />
@@ -308,17 +372,31 @@ export function CustomPolicyEditor({
             </div>
           )}
 
+          {/* Enabled toggle for edits */}
+          {editingRuleId && (
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={formData.enabled}
+                onCheckedChange={(v) => setFormData((prev) => ({ ...prev, enabled: v }))}
+                data-testid={`${testId}-enabled-toggle`}
+              />
+              <Label className="text-xs text-muted-foreground">
+                {formData.enabled ? 'Enabled' : 'Disabled'}
+              </Label>
+            </div>
+          )}
+
           <div className="flex justify-end gap-2">
-            <Button variant="outline" size="sm" onClick={() => setShowForm(false)}>
+            <Button variant="outline" size="sm" onClick={resetForm}>
               Cancel
             </Button>
             <Button
               size="sm"
-              onClick={handleCreateRule}
-              disabled={createMutation.isPending}
+              onClick={handleSaveRule}
+              disabled={isSaving}
               data-testid={`${testId}-save-button`}
             >
-              {createMutation.isPending ? 'Creating...' : 'Create Rule'}
+              {isSaving ? 'Saving...' : editingRuleId ? 'Update Rule' : 'Create Rule'}
             </Button>
           </div>
         </div>
@@ -327,7 +405,7 @@ export function CustomPolicyEditor({
       {/* Existing rules list */}
       {rules.length === 0 ? (
         <div className="rounded-lg border border-border bg-card px-4 py-8 text-center text-sm text-muted-foreground">
-          No custom rules defined. Click "Add Rule" to create one.
+          No custom rules defined. Click &quot;Add Rule&quot; to create one.
         </div>
       ) : (
         <div className="space-y-2">
@@ -362,15 +440,26 @@ export function CustomPolicyEditor({
                 </div>
               </div>
               {!readOnly && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => deleteMutation.mutate(rule.id)}
-                  disabled={deleteMutation.isPending}
-                  data-testid={`${testId}-delete-${rule.id}`}
-                >
-                  <Trash2 size={14} />
-                </Button>
+                <div className="flex gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleEditRule(rule)}
+                    disabled={showForm}
+                    data-testid={`${testId}-edit-${rule.id}`}
+                  >
+                    <Pencil size={14} />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => deleteMutation.mutate(rule.id)}
+                    disabled={deleteMutation.isPending}
+                    data-testid={`${testId}-delete-${rule.id}`}
+                  >
+                    <Trash2 size={14} />
+                  </Button>
+                </div>
               )}
             </div>
           ))}

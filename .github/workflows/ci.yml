@@ -61,6 +61,9 @@ jobs:
       - name: Test Worker
         run: mvn verify -f kelta-worker/pom.xml -B
 
+      - name: Test Auth Server
+        run: mvn verify -f kelta-auth/pom.xml -B
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
@@ -69,6 +72,7 @@ jobs:
           path: |
             kelta-gateway/target/surefire-reports/
             kelta-worker/target/surefire-reports/
+            kelta-auth/target/surefire-reports/
           retention-days: 7
 
       - name: Upload coverage reports

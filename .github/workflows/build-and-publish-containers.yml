@@ -7,6 +7,7 @@ on:
       - 'kelta-gateway/**'
       - 'kelta-platform/runtime/**'
       - 'kelta-worker/**'
+      - 'kelta-auth/**'
       - 'kelta-web/**'
       - 'kelta-ui/**'
       - 'e2e-tests/**'
@@ -80,6 +81,9 @@ jobs:
       - name: Test Worker
         run: mvn verify -f kelta-worker/pom.xml -B
 
+      - name: Test Auth Server
+        run: mvn verify -f kelta-auth/pom.xml -B
+
   # ===========================================================================
   # Test Frontend
   # ===========================================================================
@@ -130,6 +134,9 @@ jobs:
           - service: worker
             dockerfile: kelta-worker/Dockerfile
             image: kelta-worker
+          - service: auth
+            dockerfile: kelta-auth/Dockerfile
+            image: kelta-auth
           - service: ui
             dockerfile: kelta-ui/Dockerfile
             image: kelta-ui
@@ -220,6 +227,11 @@ jobs:
               # Update worker deployment
               if [ -f "$DIR/worker-deployment.yaml" ]; then
                 sed -i "s|image: cklinker/${PREFIX}-worker:.*|image: cklinker/${PREFIX}-worker:${IMAGE_TAG}|g" "$DIR/worker-deployment.yaml"
+              fi
+
+              # Update auth server deployment
+              if [ -f "$DIR/auth-deployment.yaml" ]; then
+                sed -i "s|image: cklinker/${PREFIX}-auth:.*|image: cklinker/${PREFIX}-auth:${IMAGE_TAG}|g" "$DIR/auth-deployment.yaml"
               fi
             fi
           done

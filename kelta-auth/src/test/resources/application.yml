@@ -1,0 +1,31 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=false
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+  session:
+    store-type: none
+
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema-test.sql
+
+kelta:
+  auth:
+    issuer-uri: http://localhost:8080
+    worker-url: http://localhost:8081
+    cookie-domain: localhost
+    ui-base-url: http://localhost:5173
+    cors-allowed-origins: http://localhost:5173
+
+logging:
+  level:
+    io.kelta.auth: DEBUG

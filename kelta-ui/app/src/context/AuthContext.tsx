@@ -505,6 +505,16 @@ export function AuthProvider({
     // and it's more reliable than URL params which the IdP may strip.
     sessionStorage.setItem(STORAGE_KEYS.JUST_LOGGED_OUT, 'true')
 
+    // Clear SSO session with kelta-auth (fire-and-forget)
+    const authBaseUrl =
+      (window as Record<string, unknown>).__KELTA_AUTH_URL__ as string | undefined
+    if (authBaseUrl) {
+      fetch(`${authBaseUrl}/auth/session`, {
+        method: 'DELETE',
+        credentials: 'include',
+      }).catch((err: unknown) => console.warn('[Auth] SSO session cleanup failed:', err))
+    }
+
     // Clear local auth state
     clearAuthStorage()
     setUser(null)
@@ -624,6 +634,29 @@ export function AuthProvider({
         setUser(newUser)
       } else {
         throw new Error('Failed to extract user information from tokens')
+      }
+
+      // Establish SSO session with kelta-auth for connected app SSO (fire-and-forget).
+      // Skip if the user logged in via kelta-auth itself (session already exists).
+      const authBaseUrl =
+        (window as Record<string, unknown>).__KELTA_AUTH_URL__ as string | undefined
+      if (authBaseUrl) {
+        const currentProviderId = sessionStorage.getItem(STORAGE_KEYS.PROVIDER_ID)
+        const currentProvider = availableProviders.find((p) => p.id === currentProviderId)
+        const isInternalProvider =
+          currentProvider && currentProvider.name === 'Kelta Platform (Internal)'
+        if (!isInternalProvider) {
+          fetch(`${authBaseUrl}/auth/session`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${tokens.accessToken}`,
+              'X-Tenant-Slug': getTenantSlug(),
+            },
+            credentials: 'include',
+          }).catch((err: unknown) =>
+            console.warn('[Auth] SSO session establishment failed:', err)
+          )
+        }
       }
 
       // Clean up temporary storage

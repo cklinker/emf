@@ -49,7 +49,8 @@ public class AuthorizationServerConfig {
         http.getConfigurer(OAuth2AuthorizationServerConfigurer.class)
                 .oidc(Customizer.withDefaults());
 
-        http.exceptionHandling(exceptions -> exceptions
+        http.cors(Customizer.withDefaults())
+            .exceptionHandling(exceptions -> exceptions
                 .defaultAuthenticationEntryPointFor(
                         new LoginUrlAuthenticationEntryPoint("/login"),
                         new MediaTypeRequestMatcher(MediaType.TEXT_HTML)
@@ -62,6 +63,7 @@ public class AuthorizationServerConfig {
     @Order(2)
     public SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http) throws Exception {
         http
+                .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(
                                 "/login",

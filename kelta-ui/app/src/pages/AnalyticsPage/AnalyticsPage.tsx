@@ -12,11 +12,19 @@ export interface AnalyticsPageProps {
   testId?: string
 }
 
+function getSupersetUrl(): string {
+  return (
+    ((window as Record<string, unknown>).__SUPERSET_URL__ as string | undefined) ||
+    `${window.location.protocol}//superset.rzware.com`
+  )
+}
+
 export function AnalyticsPage({
   testId = 'analytics-page',
 }: AnalyticsPageProps): React.ReactElement {
   const { keltaClient } = useApi()
   const [selectedDashboard, setSelectedDashboard] = useState<SupersetDashboard | null>(null)
+  const supersetUrl = getSupersetUrl()
 
   const {
     data: dashboards,
@@ -64,7 +72,7 @@ export function AnalyticsPage({
           </Button>
           <Button variant="outline" size="sm" asChild>
             <a
-              href={`${window.location.protocol}//superset.rzware.com`}
+              href={supersetUrl}
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -99,7 +107,7 @@ export function AnalyticsPage({
           </p>
           <Button variant="outline" className="mt-4" asChild>
             <a
-              href={`${window.location.protocol}//superset.rzware.com`}
+              href={supersetUrl}
               target="_blank"
               rel="noopener noreferrer"
             >

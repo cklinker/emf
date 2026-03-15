@@ -1,0 +1,57 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  application:
+    name: kelta-auth
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/kelta}
+    username: ${DB_USERNAME:kelta}
+    password: ${DB_PASSWORD:kelta}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+  session:
+    store-type: redis
+    redis:
+      namespace: kelta:auth:session
+    timeout: 8h
+
+  thymeleaf:
+    cache: true
+
+kelta:
+  auth:
+    issuer-uri: ${KELTA_AUTH_ISSUER_URI:http://localhost:8080}
+    worker-url: ${WORKER_SERVICE_URL:http://localhost:8081}
+    # Cookie domain for SSO across subdomains (e.g., .rzware.com)
+    cookie-domain: ${COOKIE_DOMAIN:localhost}
+    # RSA key for JWT signing (JWK JSON format)
+    jwk-set: ${JWK_SET:}
+    # UI login redirect URL pattern
+    ui-base-url: ${UI_BASE_URL:http://localhost:5173}
+    # CORS allowed origins
+    cors-allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when-authorized
+      probes:
+        enabled: true
+
+logging:
+  level:
+    io.kelta.auth: ${LOG_LEVEL:INFO}
+    org.springframework.security: ${SECURITY_LOG_LEVEL:WARN}

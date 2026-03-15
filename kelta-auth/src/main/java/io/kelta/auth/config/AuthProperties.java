@@ -13,6 +13,9 @@ public class AuthProperties {
     private String jwkSet;
     private String uiBaseUrl;
     private String corsAllowedOrigins;
+    private String supersetClientId;
+    private String supersetClientSecret;
+    private String supersetRedirectUri;
 
     public String getIssuerUri() { return issuerUri; }
     public void setIssuerUri(String issuerUri) { this.issuerUri = issuerUri; }
@@ -31,4 +34,13 @@ public class AuthProperties {
 
     public String getCorsAllowedOrigins() { return corsAllowedOrigins; }
     public void setCorsAllowedOrigins(String corsAllowedOrigins) { this.corsAllowedOrigins = corsAllowedOrigins; }
+
+    public String getSupersetClientId() { return supersetClientId; }
+    public void setSupersetClientId(String supersetClientId) { this.supersetClientId = supersetClientId; }
+
+    public String getSupersetClientSecret() { return supersetClientSecret; }
+    public void setSupersetClientSecret(String supersetClientSecret) { this.supersetClientSecret = supersetClientSecret; }
+
+    public String getSupersetRedirectUri() { return supersetRedirectUri; }
+    public void setSupersetRedirectUri(String supersetRedirectUri) { this.supersetRedirectUri = supersetRedirectUri; }
 }

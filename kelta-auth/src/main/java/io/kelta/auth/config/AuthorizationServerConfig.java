@@ -24,9 +24,12 @@ import org.springframework.security.oauth2.server.authorization.client.Registere
 import org.springframework.security.oauth2.server.authorization.config.annotation.web.configuration.OAuth2AuthorizationServerConfiguration;
 import org.springframework.security.oauth2.server.authorization.config.annotation.web.configurers.OAuth2AuthorizationServerConfigurer;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
+import org.springframework.security.authentication.CredentialsExpiredException;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
+
+import io.kelta.auth.controller.ForcePasswordChangeController;
 
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
@@ -62,6 +65,7 @@ public class AuthorizationServerConfig {
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(
                                 "/login",
+                                "/change-password",
                                 "/actuator/health",
                                 "/actuator/health/**",
                                 "/auth/session",
@@ -76,6 +80,17 @@ public class AuthorizationServerConfig {
                         .loginPage("/login")
                         .loginProcessingUrl("/login")
                         .defaultSuccessUrl("/", true)
+                        .failureHandler((request, response, exception) -> {
+                            if (exception.getCause() instanceof CredentialsExpiredException
+                                    || exception instanceof CredentialsExpiredException) {
+                                String email = request.getParameter("username");
+                                request.getSession().setAttribute(
+                                        ForcePasswordChangeController.SESSION_ATTR_EMAIL, email);
+                                response.sendRedirect("/change-password");
+                            } else {
+                                response.sendRedirect("/login?error");
+                            }
+                        })
                 )
                 .csrf(csrf -> csrf
                         .ignoringRequestMatchers("/auth/session")

@@ -64,18 +64,32 @@ Bring your own identity provider. Kelta supports any OIDC-compliant provider out
 
 ### Role-Based Access Control | Complete
 
-A multi-layer permission model that gives you fine-grained control over who can see and do what.
+A multi-layer permission model that gives you fine-grained control over who can see and do what. Enforcement powered by the Cerbos Policy Engine (see below).
 
 - **Profiles** (one per user): Named permission bundles with system permissions (15 types including `VIEW_SETUP`, `MANAGE_USERS`, `API_ACCESS`, `VIEW_ALL_DATA`, `MODIFY_ALL_DATA`), object permissions (`canCreate`, `canRead`, `canEdit`, `canDelete`, `canViewAll`, `canModifyAll` per collection), and field permissions (`VISIBLE`, `READ_ONLY`, `HIDDEN` per field per collection)
 - **Permission Sets** (additive, many per user): Same permission types as profiles, assignable directly to users or inherited through groups
 - **Groups**: Users belong to multiple groups, groups can be nested, and groups can carry permission sets that cascade to all members
 - **Resolution**: Most-permissive-wins (OR logic) across all applicable permission sets and profiles
-- **Gateway enforcement**: Object-level CRUD permissions checked per request with configurable cache TTL (default 5 minutes)
+- **Custom rules**: Per-profile ABAC rules with CEL expressions for fine-grained conditional access control
 - **7 built-in profiles**: System Administrator, Standard User, Read Only, Marketing User, Contract Manager, Solution Manager, Minimum Access
 
 > **TODO**
 > - Field-level security (HIDDEN fields) is resolved but not yet stripped from API responses
 > - Permission enforcement defaults to disabled (`permissions-enabled=false`) — needs production-ready default
+
+---
+
+### Cerbos Policy Engine | Complete
+
+Fine-grained authorization powered by Cerbos PDP, providing ABAC policy evaluation at every layer of the platform.
+
+- **Automatic policy generation**: `CerbosPolicyGenerator` produces per-tenant Cerbos policies — derived roles and resource policies for system features, collections, fields, and records — all generated from the RBAC model above
+- **Policy sync**: `CerbosPolicySyncService` pushes policies to the Cerbos Admin API whenever profiles or permissions change, with bootstrap seeding on startup via `CerbosPolicySeeder`
+- **Gateway enforcement**: `RouteAuthorizationFilter` calls Cerbos for every authenticated request to enforce object-level CRUD permissions at the API gateway
+- **Worker enforcement**: `CerbosRecordAuthorizationAdvice` and `CerbosFieldSecurityAdvice` interceptors enforce record-level and field-level security at the service layer
+- **Circuit breaker**: Fail-closed design — after 3 consecutive Cerbos failures, the circuit opens for 10 seconds (all checks denied). 2-second timeout per gRPC call. Auto-recovers when Cerbos becomes available
+- **Custom ABAC rules**: `CustomRuleController` at `/api/admin/profiles/{profileId}/custom-rules` provides full CRUD for custom rules per profile, converted to CEL conditions in Cerbos policies
+- **Authorization testing**: `AuthorizationTestController` at `/api/admin/authorization/test` for debugging permission decisions, with `PolicyTestPanel` in the admin UI
 
 ---
 
@@ -146,23 +160,28 @@ A full state-machine automation engine inspired by AWS Step Functions, with a vi
 - Configurable thread pool and flow-level timeout (default 3600s)
 - Retry with exponential backoff, catch-and-redirect error handling
 - Flow versioning with publish lifecycle and version history
+- Cancel, retry, and execution detail inspection via API
 
 **Visual Designer:**
 - React Flow-based canvas with drag-and-drop node composition
-- Steps palette with all state types grouped by category
-- Properties panel for every state and action type
+- Steps palette with all state types grouped by category (Task, Choice, Control, Terminal)
+- Properties panel for every state and action type (30 property editors)
 - Trigger configuration (inline editing)
 - Test execution dialog with custom input
 - Execution history tab with visual step timeline and detail drilldown
+- Debug tab for runtime inspection
 
 **Triggers:**
 
 | Trigger | Status |
 |---------|--------|
 | Record-Triggered (on create/update/delete with filter formulas) | Working |
-| API / Webhook (POST with input validation, HMAC verification) | Working |
+| API / Webhook (`POST /api/webhooks/{flowId}` with request body mapping, header capture) | Working |
 | Scheduled (cron expression with timezone) | TODO |
 | Kafka-Triggered (key/message filter with dynamic consumer) | TODO |
+
+**Workflow Migration:**
+- `WorkflowMigrationController` migrates legacy workflow rules to modern flow definitions — migrate individual rules or all at once via `/api/admin/migrate-workflow-rules`
 
 > **TODO**
 > - SCHEDULED trigger: No cron runner wired — flows with cron expressions are not dispatched
@@ -193,7 +212,7 @@ A purpose-built observability stack with 7 fully implemented monitoring pages in
 - Request log search with filters for method, status, path, traceId, userId, and time range
 
 **Log Aggregation:**
-- Custom Logback appender ships logs to OpenSearch via bulk NDJSON
+- Custom Logback appender (`OpenSearchLogAppender`) ships logs to OpenSearch via bulk NDJSON
 - Batched writes with configurable batch size and flush interval
 - MDC enrichment with traceId, spanId, tenantId, userId
 - Log search with level, service, and query text filtering
@@ -208,10 +227,11 @@ A purpose-built observability stack with 7 fully implemented monitoring pages in
 - 24-hour summary cards
 
 **Audit:**
-- Setup audit trail (who changed what configuration and when, with before/after values)
+- Setup audit trail (who changed what configuration and when, with before/after values) via `OpenSearchAuditService`
 - Security audit log (permission changes, access violations)
 - Login history (all authentication attempts with timestamps and IP)
 - User activity page with per-user request and audit event analysis
+- Audit data queryable via `OpenSearchQueryService`
 
 **Prometheus Metrics:**
 - `kelta_worker_request_total{collection, method, status}`
@@ -219,21 +239,24 @@ A purpose-built observability stack with 7 fully implemented monitoring pages in
 - `kelta_worker_error_total{collection, error_type}`
 - Active collection gauge for HPA autoscaling
 
-**Retention:**
+**Observability Settings:**
 - Configurable per-tenant retention periods (default: 30 days traces/logs, 90 days audit)
 - Enforced via OpenSearch ISM policies
+- Admin UI page for managing observability configuration
 
 ---
 
-### Integration | Partial
+### Integration | Complete
 
-Connect Kelta to your existing systems with HTTP callouts, webhooks, and event streaming.
+Connect Kelta to your existing systems with HTTP callouts, webhooks, event streaming, embedded analytics, and outbound webhook delivery.
 
 **Working:**
 - **HTTP Callout**: Generic HTTP requests from flows with header, method, and body templating via merge fields
 - **Outbound Message**: Structured webhook payloads (XML/JSON) to external systems
 - **Kafka Event Publishing**: Publish custom events to arbitrary Kafka topics from any flow
-- **Inbound Webhooks**: Flows with AUTOLAUNCHED type get dedicated `POST /api/webhooks/{path}` endpoints with HMAC signature verification
+- **Inbound Webhooks**: Flows with AUTOLAUNCHED type get dedicated `POST /api/webhooks/{flowId}` endpoints with request body mapping and header capture (content-type, user-agent)
+- **Outbound Webhooks (Svix)**: Outbound webhook delivery via Svix with event type mapping (`collection.created`, `collection.updated`, etc.), multi-tenant isolation, and management portal UI. `SvixWebhookPublisher` bridges Kafka config events to Svix. `SvixTenantLifecycleHook` initializes a Svix application per tenant on creation.
+- **Embedded Analytics (Apache Superset)**: Embedded dashboards with guest token authentication, automatic dataset sync from collections, and tenant-isolated Superset management. `SupersetTenantLifecycleHook` initializes Superset resources on tenant creation. See Embedded Analytics section below.
 - **Merge Field Templating**: DataPath system for dot-notation traversal across relationship boundaries
 
 > **TODO**
@@ -243,13 +266,25 @@ Connect Kelta to your existing systems with HTTP callouts, webhooks, and event s
 
 ---
 
+### Embedded Analytics | Complete
+
+Embed interactive dashboards and reports directly into the platform using Apache Superset.
+
+- **Guest token generation**: `SupersetController` at `/api/superset/guest-token` generates scoped guest tokens for embedding dashboards with tenant-level row-level security
+- **Dashboard discovery**: `GET /api/superset/dashboards` lists available dashboards for the current tenant
+- **Dataset sync**: `POST /api/superset/datasets/sync` synchronizes collection schemas to Superset datasets. `SupersetCollectionSyncListener` triggers sync automatically when collections change via Kafka events
+- **Tenant isolation**: `SupersetTenantService` manages per-tenant Superset resources. `SupersetTenantLifecycleHook` provisions Superset access on tenant creation
+- **Frontend embedding**: `SupersetEmbed` component renders dashboards inline. `AnalyticsPage` and `DashboardPage` provide dedicated analytics views in the admin UI
+
+---
+
 ### Extensibility & Modules | Partial
 
 Extend the platform with custom action handlers, before-save hooks, and frontend components.
 
 **Working:**
 - **Module SPI**: `KeltaModule` interface with `getActionHandlers()`, `getBeforeSaveHooks()`, `onStartup(ModuleContext)` lifecycle
-- **3 built-in compile-time modules**: Core Actions (8 handlers), Integration (7 handlers), Schema Lifecycle (hooks)
+- **3 built-in compile-time modules**: Core Actions (8 handlers), Integration (7 handlers), Schema Lifecycle (hooks for tenant, collection, field, user, and profile lifecycle)
 - **Module lifecycle management**: Install, enable, disable, uninstall per tenant with status tracking and Kafka event propagation across pods
 - **ModuleContext**: Provides QueryEngine, CollectionRegistry, FormulaEvaluator, and extensible service map to modules
 - **Frontend Plugin SDK** (`@kelta/plugin-sdk`): `BasePlugin` abstract class with `init`/`mount`/`unmount` lifecycle, `ComponentRegistry` for custom field renderers and page components
@@ -368,8 +403,13 @@ Everything developers need to build on top of Kelta.
 - **Error taxonomy**: `ValidationError`, `AuthenticationError`, `AuthorizationError`, `NotFoundError`, `ServerError`, `NetworkError`
 - **OpenAPI type generation**: `generateTypesFromUrl()` and `generateTypesFromSpec()`
 - **Zod schemas** for all API response types
-- **40+ admin UI pages** — all fully implemented with real data fetching, forms with validation, and loading/error/empty states
+- **65+ admin and end-user UI pages** — all fully implemented with real data fetching, forms with validation, and loading/error/empty states
 - **Page layout system**: Drag-and-drop layout editor with field palette, property panel, conditional visibility rules, related list configuration, and mobile preview
+- **End-user application shell**: Dedicated `EndUserShell` with top navigation, global search, and purpose-built pages for object browsing (list, detail, form), custom pages, and an app home dashboard
+- **Internationalization (i18n)**: `I18nContext` with `useTranslation` hook supporting multiple languages
+- **Theme system**: Dark/light mode toggle via `ThemeContext`, persisted in user preferences
+- **Accessibility**: Skip links, ARIA live regions, table keyboard navigation, global keyboard shortcuts with `KeyboardShortcutsHelp` dialog
+- **OpenTelemetry instrumentation**: Frontend telemetry via OpenTelemetry SDK for end-to-end tracing
 
 ---
 
@@ -382,6 +422,7 @@ Production-ready infrastructure patterns baked into the platform.
 - **Multi-layer caching**: Caffeine (in-process) -> Redis -> worker backend, with Kafka-driven cache invalidation
 - **Dual-layer rate limiting**: Per-tenant fixed-window (Redis) + governor limit daily quota
 - **Dynamic route management**: Gateway routes updated in real-time via Kafka events — no restart on schema changes
+- **Security headers**: `SecurityHeadersFilter` adds standard security headers (X-Content-Type-Options, X-Frame-Options, etc.) to all responses
 - **Health endpoints**: `/actuator/health` with Redis and Kafka connectivity checks, worker reachability monitoring from gateway
 - **Prometheus metrics**: Request counts, latency histograms, error counters, and active collection gauges for HPA autoscaling
 - **Kubernetes-native**: Deployed via ArgoCD with standard deployment manifests
@@ -392,15 +433,76 @@ Production-ready infrastructure patterns baked into the platform.
 
 | Component | Technology | Role |
 |-----------|-----------|------|
-| Gateway | Java 21, Spring Cloud Gateway (reactive) | API ingress: JWT auth, tenant resolution, rate limiting, permission enforcement, JSON:API processing |
-| Worker | Java 21, Spring Boot 3.2 | Business logic engine: CRUD, workflows, flows, schema management |
-| Admin UI | React, Vite, TypeScript | Full-featured admin console and app runtime |
+| Gateway | Java 21, Spring Cloud Gateway (reactive) | API ingress: JWT auth, tenant resolution, rate limiting, Cerbos authorization, JSON:API processing |
+| Worker | Java 21, Spring Boot 3.2 | Business logic engine: CRUD, workflows, flows, schema management, integrations |
+| Admin UI | React 19, Vite, TypeScript | Full-featured admin console and end-user app runtime |
 | SDK | TypeScript | Client library with typed access to all APIs |
-| Database | PostgreSQL 15 | Primary data store (91 Flyway migrations) |
+| Database | PostgreSQL 15 | Primary data store (99 Flyway migrations) |
 | Cache | Redis 7 | Rate limiting, caching (routes, permissions, JSON:API responses) |
 | Messaging | Kafka 3.7 (KRaft) | Event streaming (record changes, config changes, module events) |
 | Identity | Keycloak 23 (or any OIDC provider) | Authentication and identity management |
+| Authorization | Cerbos PDP | Fine-grained ABAC policy evaluation with per-tenant resource policies |
 | Observability | OpenSearch, Jaeger, OpenTelemetry | Traces, logs, audit events, metrics |
+| Analytics | Apache Superset | Embedded dashboards with guest token auth and automatic dataset sync |
+| Webhooks | Svix | Outbound webhook delivery with event type mapping and tenant isolation |
+
+---
+
+## Enterprise Readiness
+
+What SMB and larger enterprises need from an application platform, and where Kelta stands.
+
+### Delivered
+
+| Capability | How Kelta Delivers It |
+|------------|----------------------|
+| **Multi-Tenancy** | URL-based tenant routing, PostgreSQL schema isolation, Row Level Security on every table |
+| **Fine-Grained Access Control** | RBAC profiles + permission sets + groups, enforced by Cerbos PDP at gateway and service layers |
+| **Audit & Compliance** | Setup audit trails, security audit logs, login history — all shipped to OpenSearch with configurable retention |
+| **SSO / Identity Federation** | Multi-provider OIDC support with per-provider claim mapping; Keycloak default, any compliant provider supported |
+| **API-First Architecture** | Every collection auto-generates a JSON:API endpoint with filtering, sorting, pagination, includes, and sparse fieldsets |
+| **Workflow Automation** | Visual Flow Builder with 15 action handlers, 8 state types, retry/catch error handling, and durable execution |
+| **Data Encryption** | AES-256-GCM field-level encryption with per-tenant key derivation; PostgreSQL RLS for row-level isolation |
+| **Rate Limiting & Quotas** | Dual-layer rate limiting (per-route + daily governor quota) with configurable per-tenant limits |
+| **Embedded Analytics** | Apache Superset integration with guest tokens, automatic dataset sync, and tenant-isolated dashboards |
+| **Webhook Integrations** | Inbound webhooks (flow triggers) and outbound webhooks (Svix) with event type mapping and HMAC verification |
+| **Full-Text Search** | PostgreSQL tsvector-backed search with per-field indexing control, Kafka-driven index maintenance |
+| **Observability** | OpenTelemetry tracing, OpenSearch log aggregation, Prometheus metrics, 7 monitoring pages in admin UI |
+| **Extensibility** | Module SPI for backend extensions, Plugin SDK for frontend customization, Kafka event streaming for integration |
+| **Internationalization** | Multi-language support with translation framework |
+| **Accessibility** | WCAG patterns: skip links, ARIA live regions, keyboard navigation, screen reader support |
+| **Dynamic Schema** | Runtime data model changes with no deployments — create collections, fields, relationships, and validation rules on the fly |
+| **Low-Code Builder Tools** | Visual flow designer, page layout editor, page builder, collection wizard, field editor |
+| **Governor Limits** | Per-tenant resource quotas (API calls, storage, users, collections, fields) with real-time usage tracking |
+
+### In Progress
+
+| Capability | Current State | What Remains |
+|------------|--------------|-------------|
+| **Email / Notifications** | SPI defined, no-op implementation | Wire SMTP, SendGrid, or SES provider |
+| **Approval Workflows** | Full UI built | Backend submit/approve/reject logic, record locking |
+| **Scheduled Automation** | Full UI built, cron config stored | Cron dispatcher to trigger flows and jobs on schedule |
+| **Bulk Data Operations** | Full UI built | Backend batch processor, file upload/download |
+| **Report Execution** | Full UI built, config stored | Query engine to execute report definitions, export to CSV/PDF |
+| **OAuth Server (Connected Apps)** | Data model exists | Authorization server endpoints (`/oauth/token`, `/oauth/authorize`) |
+| **Server-Side Scripting** | SPI defined, no-op implementation | GraalVM or equivalent script engine |
+| **File Uploads** | S3 download URLs work | Presigned PUT URL generation, upload endpoint |
+| **Configuration Packages** | Full UI built | Backend export/import/preview/history endpoints |
+| **Record Type Enforcement** | Data model and UI exist | Runtime picklist restriction and layout association |
+
+### Enterprise Gaps to Address
+
+| Capability | Why Enterprises Need It |
+|------------|------------------------|
+| **SCIM Provisioning** | Automated user/group sync from identity providers — eliminates manual user management |
+| **High Availability Documentation** | Documented HA architecture, failover procedures, and RTO/RPO guarantees for compliance reviews |
+| **Data Export & Backup** | Scheduled data exports, point-in-time recovery documentation, and tenant data portability |
+| **SLA & Uptime Commitments** | Formal SLA documentation with uptime targets, incident response procedures, and escalation paths |
+| **IP Allowlisting** | Restrict API access to approved IP ranges per tenant for network-level security |
+| **Sandbox Environments** | Isolated development/staging environments with metadata promotion between them |
+| **Change Sets / CI-CD for Metadata** | Versioned metadata deployments between environments (partially addressed by Configuration Packages) |
+| **Data Masking** | Mask sensitive fields in non-production environments for safe development and testing |
+| **Delegated Administration** | Allow tenant admins to manage their own users, roles, and configuration without platform-level access |
 
 ---
 
@@ -433,3 +535,10 @@ Production-ready infrastructure patterns baked into the platform.
 - [ ] **Runtime module JAR loading**: Implement ClassLoader-based JAR loading with S3 storage and sandboxing
 - [ ] **Plugin SDK host wiring**: Wire `ComponentRegistry` into the admin UI to discover and render custom field renderers and page components
 - [ ] **Record type enforcement**: Enforce picklist value restrictions and field defaults based on record type during create/update
+
+### Enterprise Readiness
+
+- [ ] **SCIM provisioning**: Implement SCIM 2.0 endpoints for automated user/group sync from identity providers
+- [ ] **HA documentation**: Document high availability architecture, failover, and RTO/RPO guarantees
+- [ ] **Data export & backup**: Build scheduled data export and tenant data portability tooling
+- [ ] **Sandbox environments**: Support isolated dev/staging environments with metadata promotion

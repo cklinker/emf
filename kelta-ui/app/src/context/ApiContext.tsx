@@ -17,6 +17,7 @@ import { KeltaClient } from '@kelta/sdk'
 import type { TokenProvider } from '@kelta/sdk'
 import { ApiClient } from '../services/apiClient'
 import { useAuth } from './AuthContext'
+import { getTenantSlug } from './TenantContext'
 
 interface ApiContextValue {
   apiClient: ApiClient
@@ -86,9 +87,15 @@ export function ApiProvider({ children, baseUrl = '' }: ApiProviderProps): React
             }
             return await client.getAxiosInstance().request(retryConfig)
           } catch {
-            // Refresh failed — redirect to login
-            console.warn('[API] Token refresh failed on 401, triggering re-authentication')
-            login()
+            // Refresh failed — clear tokens and redirect to login page.
+            // We intentionally do NOT call login() here because login() without
+            // a provider ID triggers a redirect to /login when multiple providers
+            // are configured, which causes an infinite redirect loop if the 401
+            // originated from a component that fires on the login page.
+            console.warn('[API] Token refresh failed on 401, redirecting to login')
+            sessionStorage.removeItem('kelta_auth_tokens')
+            const slug = getTenantSlug()
+            window.location.assign(`/${slug}/login`)
           }
         }
         return Promise.reject(error)

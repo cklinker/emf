@@ -6,9 +6,13 @@ import org.slf4j.LoggerFactory;
 /**
  * Manages the lifecycle of Superset database connections per tenant.
  *
- * <p>Each tenant maps to a Superset database connection configured with
- * the tenant's schema on the search_path and RLS session variable
- * ({@code app.current_tenant_id}) set to the tenant UUID.
+ * <p>Each tenant maps to a dedicated PostgreSQL user and a Superset database
+ * connection. The PostgreSQL user has:
+ * <ul>
+ *   <li>Access restricted to {@code public} + tenant schema only</li>
+ *   <li>A hardcoded {@code app.current_tenant_id} session variable for RLS</li>
+ *   <li>A {@code search_path} scoped to the tenant schema + public</li>
+ * </ul>
  *
  * @since 1.0.0
  */
@@ -16,16 +20,17 @@ public class SupersetTenantService {
 
     private static final Logger log = LoggerFactory.getLogger(SupersetTenantService.class);
 
-    private static final String READER_PASSWORD = "superset_reader";
-
     private final SupersetApiClient apiClient;
+    private final SupersetDatabaseUserService dbUserService;
 
-    public SupersetTenantService(SupersetApiClient apiClient) {
+    public SupersetTenantService(SupersetApiClient apiClient,
+                                  SupersetDatabaseUserService dbUserService) {
         this.apiClient = apiClient;
+        this.dbUserService = dbUserService;
     }
 
     /**
-     * Ensures a Superset database connection exists for the given tenant.
+     * Ensures a per-tenant PostgreSQL user and Superset database connection exist.
      *
      * @param tenantId   the tenant UUID
      * @param tenantSlug the tenant slug (used as schema name and connection name)
@@ -39,10 +44,15 @@ public class SupersetTenantService {
                 return;
             }
 
-            int dbId = apiClient.createDatabaseConnection(tenantId, tenantSlug, READER_PASSWORD);
+            // 1. Create a dedicated PostgreSQL user for this tenant
+            String password = dbUserService.ensureTenantUser(tenantId, tenantSlug);
+            String username = SupersetDatabaseUserService.toUsername(tenantSlug);
+
+            // 2. Create the Superset database connection using the tenant-specific user
+            int dbId = apiClient.createDatabaseConnection(tenantId, tenantSlug, username, password);
             if (dbId > 0) {
-                log.info("Created Superset database connection for tenant '{}' (dbId={})",
-                        tenantSlug, dbId);
+                log.info("Created Superset database connection for tenant '{}' (dbId={}, pgUser={})",
+                        tenantSlug, dbId, username);
             } else {
                 log.error("Failed to create Superset database connection for tenant '{}'", tenantSlug);
             }
@@ -53,7 +63,7 @@ public class SupersetTenantService {
     }
 
     /**
-     * Deletes the Superset database connection for a tenant.
+     * Deletes the Superset database connection and PostgreSQL user for a tenant.
      *
      * @param tenantSlug the tenant slug
      */
@@ -64,6 +74,9 @@ public class SupersetTenantService {
                 apiClient.deleteDatabaseConnection(dbId);
                 log.info("Deleted Superset database connection for tenant '{}'", tenantSlug);
             }
+
+            // Drop the per-tenant PostgreSQL user
+            dbUserService.dropTenantUser(tenantSlug);
         } catch (Exception e) {
             log.error("Failed to delete Superset database connection for tenant '{}': {}",
                     tenantSlug, e.getMessage());

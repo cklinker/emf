@@ -11,23 +11,29 @@ import static org.mockito.Mockito.*;
 class SupersetTenantServiceTest {
 
     private SupersetApiClient apiClient;
+    private SupersetDatabaseUserService dbUserService;
     private SupersetTenantService service;
 
     @BeforeEach
     void setUp() {
         apiClient = mock(SupersetApiClient.class);
-        service = new SupersetTenantService(apiClient);
+        dbUserService = mock(SupersetDatabaseUserService.class);
+        service = new SupersetTenantService(apiClient, dbUserService);
     }
 
     @Test
-    @DisplayName("creates database connection for new tenant")
+    @DisplayName("creates per-tenant PG user and database connection for new tenant")
     void createsDatabaseConnection() {
         when(apiClient.findDatabaseId("acme")).thenReturn(-1);
-        when(apiClient.createDatabaseConnection(anyString(), eq("acme"), anyString())).thenReturn(42);
+        when(dbUserService.ensureTenantUser("tenant-uuid", "acme")).thenReturn("generated-password");
+        when(apiClient.createDatabaseConnection(anyString(), eq("acme"), anyString(), anyString()))
+                .thenReturn(42);
 
         service.ensureDatabaseConnection("tenant-uuid", "acme");
 
-        verify(apiClient).createDatabaseConnection("tenant-uuid", "acme", "superset_reader");
+        verify(dbUserService).ensureTenantUser("tenant-uuid", "acme");
+        verify(apiClient).createDatabaseConnection("tenant-uuid", "acme",
+                "superset_acme", "generated-password");
     }
 
     @Test
@@ -37,17 +43,20 @@ class SupersetTenantServiceTest {
 
         service.ensureDatabaseConnection("tenant-uuid", "acme");
 
-        verify(apiClient, never()).createDatabaseConnection(anyString(), anyString(), anyString());
+        verify(apiClient, never()).createDatabaseConnection(anyString(), anyString(),
+                anyString(), anyString());
+        verify(dbUserService, never()).ensureTenantUser(anyString(), anyString());
     }
 
     @Test
-    @DisplayName("deletes database connection for tenant")
+    @DisplayName("deletes database connection and PG user for tenant")
     void deletesDatabaseConnection() {
         when(apiClient.findDatabaseId("acme")).thenReturn(42);
 
         service.deleteDatabaseConnection("acme");
 
         verify(apiClient).deleteDatabaseConnection(42);
+        verify(dbUserService).dropTenantUser("acme");
     }
 
     @Test
@@ -58,5 +67,6 @@ class SupersetTenantServiceTest {
         service.deleteDatabaseConnection("acme");
 
         verify(apiClient, never()).deleteDatabaseConnection(anyInt());
+        verify(dbUserService).dropTenantUser("acme");
     }
 }

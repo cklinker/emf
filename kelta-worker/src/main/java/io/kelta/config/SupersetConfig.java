@@ -5,6 +5,7 @@ import io.kelta.runtime.workflow.BeforeSaveHookRegistry;
 import io.kelta.worker.listener.SupersetCollectionSyncListener;
 import io.kelta.worker.listener.SupersetTenantLifecycleHook;
 import io.kelta.worker.service.SupersetApiClient;
+import io.kelta.worker.service.SupersetDatabaseUserService;
 import io.kelta.worker.service.SupersetDatasetService;
 import io.kelta.worker.service.SupersetGuestTokenService;
 import io.kelta.worker.service.SupersetTenantService;
@@ -54,8 +55,14 @@ public class SupersetConfig {
     }
 
     @Bean
-    public SupersetTenantService supersetTenantService(SupersetApiClient apiClient) {
-        return new SupersetTenantService(apiClient);
+    public SupersetDatabaseUserService supersetDatabaseUserService(JdbcTemplate jdbcTemplate) {
+        return new SupersetDatabaseUserService(jdbcTemplate);
+    }
+
+    @Bean
+    public SupersetTenantService supersetTenantService(SupersetApiClient apiClient,
+                                                        SupersetDatabaseUserService dbUserService) {
+        return new SupersetTenantService(apiClient, dbUserService);
     }
 
     @Bean

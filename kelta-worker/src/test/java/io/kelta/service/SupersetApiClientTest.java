@@ -91,7 +91,7 @@ class SupersetApiClientTest {
     }
 
     @Test
-    @DisplayName("creates database connection with tenant-scoped settings")
+    @DisplayName("creates database connection with per-tenant PostgreSQL user")
     void createDatabaseConnection() {
         mockAuthentication();
 
@@ -102,7 +102,8 @@ class SupersetApiClientTest {
                 any(Class.class)
         )).thenReturn(ResponseEntity.ok(Map.of("id", 42)));
 
-        int dbId = client.createDatabaseConnection("tenant-uuid", "acme", "reader_pass");
+        int dbId = client.createDatabaseConnection("tenant-uuid", "acme",
+                "superset_acme", "generated-pass");
 
         assertEquals(42, dbId);
     }
@@ -119,7 +120,8 @@ class SupersetApiClientTest {
                 any(Class.class)
         )).thenThrow(new RuntimeException("Conflict"));
 
-        int dbId = client.createDatabaseConnection("tenant-uuid", "acme", "reader_pass");
+        int dbId = client.createDatabaseConnection("tenant-uuid", "acme",
+                "superset_acme", "generated-pass");
 
         assertEquals(-1, dbId);
     }

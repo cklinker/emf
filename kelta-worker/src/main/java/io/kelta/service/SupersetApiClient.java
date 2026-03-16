@@ -79,27 +79,28 @@ public class SupersetApiClient {
     // ----------------------------------------------------------------
 
     /**
-     * Creates a database connection in Superset for a tenant.
+     * Creates a database connection in Superset for a tenant using a
+     * dedicated per-tenant PostgreSQL user.
+     *
+     * <p>The PostgreSQL user already has {@code search_path} and
+     * {@code app.current_tenant_id} configured via {@code ALTER ROLE ... SET},
+     * so no extra connection options are needed.
      *
      * @param tenantId   the tenant UUID
      * @param tenantSlug the tenant slug (used as schema name)
-     * @param dbPassword the password for the superset_reader DB user
+     * @param dbUsername the per-tenant PostgreSQL username
+     * @param dbPassword the password for the per-tenant DB user
      * @return the database connection ID, or -1 on failure
      */
-    public int createDatabaseConnection(String tenantId, String tenantSlug, String dbPassword) {
-        var extra = String.format(
-                "{\"engine_params\":{\"connect_args\":{\"options\":\"-c search_path=\\\"%s\\\",public -c app.current_tenant_id=%s\"}}}",
-                tenantSlug, tenantId
-        );
-
+    public int createDatabaseConnection(String tenantId, String tenantSlug,
+                                         String dbUsername, String dbPassword) {
         var body = Map.of(
                 "database_name", "kelta-" + tenantSlug,
                 "engine", "postgresql",
                 "sqlalchemy_uri", String.format(
-                        "postgresql://superset_reader:%s@192.168.0.6:5432/emf_control_plane",
-                        dbPassword
+                        "postgresql://%s:%s@192.168.0.6:5432/emf_control_plane",
+                        dbUsername, dbPassword
                 ),
-                "extra", extra,
                 "expose_in_sqllab", true,
                 "allow_ctas", false,
                 "allow_cvas", false,
@@ -110,7 +111,8 @@ public class SupersetApiClient {
         var response = executeWithAuth(HttpMethod.POST, "/api/v1/database/", body, Map.class);
         if (response != null && response.get("id") != null) {
             int dbId = ((Number) response.get("id")).intValue();
-            log.info("Created Superset database connection for tenant '{}' (dbId={})", tenantSlug, dbId);
+            log.info("Created Superset database connection for tenant '{}' (dbId={}, pgUser={})",
+                    tenantSlug, dbId, dbUsername);
             return dbId;
         }
         return -1;

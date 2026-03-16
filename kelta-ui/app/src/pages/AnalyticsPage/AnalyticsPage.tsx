@@ -47,8 +47,11 @@ export function AnalyticsPage({
           </Button>
           <h2 className="text-lg font-semibold">{selectedDashboard.dashboard_title}</h2>
         </div>
-        <div className="flex-1 p-4">
-          <SupersetEmbed dashboardId={String(selectedDashboard.id)} className="rounded-lg border" />
+        <div className="min-h-0 flex-1 p-4">
+          <SupersetEmbed
+            dashboardId={selectedDashboard.embedded_id || String(selectedDashboard.id)}
+            className="rounded-lg border"
+          />
         </div>
       </div>
     )

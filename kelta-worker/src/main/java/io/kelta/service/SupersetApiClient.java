@@ -204,7 +204,7 @@ public class SupersetApiClient {
     // ----------------------------------------------------------------
 
     /**
-     * Lists all dashboards in Superset.
+     * Lists all dashboards in Superset, enriched with embedded UUIDs.
      */
     @SuppressWarnings("unchecked")
     public List<Map<String, Object>> listDashboards() {
@@ -213,9 +213,36 @@ public class SupersetApiClient {
                 null, Map.class);
 
         if (response != null && response.get("result") != null) {
-            return (List<Map<String, Object>>) response.get("result");
+            var dashboards = (List<Map<String, Object>>) response.get("result");
+            // Enrich each dashboard with its embedded UUID
+            for (var dashboard : dashboards) {
+                Object idObj = dashboard.get("id");
+                if (idObj != null) {
+                    String embeddedUuid = getEmbeddedUuid(((Number) idObj).intValue());
+                    if (embeddedUuid != null) {
+                        dashboard.put("embedded_id", embeddedUuid);
+                    }
+                }
+            }
+            return dashboards;
         }
         return List.of();
+    }
+
+    /**
+     * Gets the embedded UUID for a dashboard, or null if not embedded.
+     */
+    @SuppressWarnings("unchecked")
+    public String getEmbeddedUuid(int dashboardId) {
+        var response = executeWithAuth(HttpMethod.GET,
+                "/api/v1/dashboard/" + dashboardId + "/embedded",
+                null, Map.class);
+
+        if (response != null && response.get("result") != null) {
+            var result = (Map<String, Object>) response.get("result");
+            return (String) result.get("uuid");
+        }
+        return null;
     }
 
     // ----------------------------------------------------------------

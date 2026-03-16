@@ -94,6 +94,11 @@ public class SupersetApiClient {
      */
     public int createDatabaseConnection(String tenantId, String tenantSlug,
                                          String dbUsername, String dbPassword) {
+        // Tell Superset to only show public + tenant schema in the schema dropdown
+        var extra = String.format(
+                "{\"default_schemas\":[\"public\",\"%s\"]}", tenantSlug
+        );
+
         var body = Map.of(
                 "database_name", "kelta-" + tenantSlug,
                 "engine", "postgresql",
@@ -101,6 +106,7 @@ public class SupersetApiClient {
                         "postgresql://%s:%s@192.168.0.6:5432/emf_control_plane",
                         dbUsername, dbPassword
                 ),
+                "extra", extra,
                 "expose_in_sqllab", true,
                 "allow_ctas", false,
                 "allow_cvas", false,

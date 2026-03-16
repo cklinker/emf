@@ -78,7 +78,8 @@ export function SupersetEmbed({
   return (
     <div
       ref={containerRef}
-      className={`h-full w-full min-h-[600px] ${className}`}
+      className={`h-full w-full ${className}`}
+      style={{ minHeight: 600 }}
       data-testid={testId}
     />
   )

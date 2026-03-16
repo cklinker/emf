@@ -1496,6 +1496,7 @@ export interface SupersetDashboard {
   status: string;
   published: boolean;
   changed_on_utc: string;
+  embedded_id?: string;
 }
 
 export interface SupersetDataset {

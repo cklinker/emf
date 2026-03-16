@@ -75,12 +75,5 @@ export function SupersetEmbed({
     }
   }, [dashboardId, keltaClient, fetchGuestToken])
 
-  return (
-    <div
-      ref={containerRef}
-      className={`h-full w-full ${className}`}
-      style={{ minHeight: 600 }}
-      data-testid={testId}
-    />
-  )
+  return <div ref={containerRef} className={`h-full w-full ${className}`} data-testid={testId} />
 }

@@ -1,3 +1,4 @@
+# Harbor registry integration
 spring:
   application:
     name: kelta-gateway

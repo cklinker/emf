@@ -19,14 +19,18 @@ import org.springframework.core.env.Environment;
  * }</pre>
  */
 @Configuration
-@ConditionalOnProperty(name = "kelta.encryption.key")
 public class EncryptionAutoConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(EncryptionAutoConfiguration.class);
 
     @Bean
+    @ConditionalOnProperty(name = "kelta.encryption.key")
     public EncryptionService encryptionService(Environment env) {
         String key = env.getProperty("kelta.encryption.key");
+        if (key == null || key.isBlank()) {
+            log.info("EncryptionService not configured — kelta.encryption.key is empty");
+            return null;
+        }
         log.info("EncryptionService initialized with AES-256-GCM");
         return new EncryptionService(key);
     }

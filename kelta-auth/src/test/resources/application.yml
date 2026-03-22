@@ -17,6 +17,9 @@ spring:
     init:
       mode: always
       schema-locations: classpath:schema-test.sql
+      # Spring Auth Server's default schema also runs; continue-on-error handles
+      # the "table already exists" conflict between our schema and theirs.
+      continue-on-error: true
 
 kelta:
   auth:

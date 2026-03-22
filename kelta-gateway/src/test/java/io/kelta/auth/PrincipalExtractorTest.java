@@ -302,6 +302,44 @@ class PrincipalExtractorTest {
         assertEquals("Test User", principal.getClaims().get("name"));
     }
     
+    @Test
+    void testExtractPrincipalWithKeltaAuthClaims() {
+        Map<String, Object> claims = Map.of(
+            "preferred_username", "user@example.com",
+            "sub", "user-uuid",
+            "email", "user@example.com",
+            "tenant_id", "tenant-123",
+            "profile_id", "profile-456",
+            "profile_name", "System Administrator",
+            "auth_method", "internal"
+        );
+
+        Jwt jwt = createJwt(claims);
+        GatewayPrincipal principal = extractor.extractPrincipal(jwt);
+
+        assertEquals("user@example.com", principal.getUsername());
+        assertEquals("tenant-123", principal.getTenantId());
+        assertEquals("profile-456", principal.getProfileId());
+        assertEquals("System Administrator", principal.getProfileName());
+    }
+
+    @Test
+    void testExtractPrincipalWithoutKeltaAuthClaims() {
+        Map<String, Object> claims = Map.of(
+            "preferred_username", "user@example.com",
+            "sub", "user-uuid",
+            "roles", List.of("admin")
+        );
+
+        Jwt jwt = createJwt(claims);
+        GatewayPrincipal principal = extractor.extractPrincipal(jwt);
+
+        assertEquals("user@example.com", principal.getUsername());
+        assertNull(principal.getTenantId());
+        assertNull(principal.getProfileId());
+        assertNull(principal.getProfileName());
+    }
+
     /**
      * Helper method to create a JWT with the given claims.
      */

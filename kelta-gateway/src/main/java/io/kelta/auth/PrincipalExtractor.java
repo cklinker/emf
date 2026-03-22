@@ -35,12 +35,30 @@ public class PrincipalExtractor {
         if (jwt == null) {
             throw new IllegalArgumentException("JWT cannot be null");
         }
-        
+
         String username = extractUsername(jwt);
         List<String> groups = extractGroups(jwt);
         Map<String, Object> claims = jwt.getClaims();
 
-        return new GatewayPrincipal(username, groups, claims);
+        GatewayPrincipal principal = new GatewayPrincipal(username, groups, claims);
+
+        // Extract profile_id, profile_name, and tenant_id directly from JWT claims
+        // when present (kelta-auth tokens include these). This eliminates the need
+        // for UserIdentityResolutionFilter to make a separate worker call.
+        String profileId = jwt.getClaimAsString("profile_id");
+        if (profileId != null && !profileId.isEmpty()) {
+            principal.setProfileId(profileId);
+        }
+        String profileName = jwt.getClaimAsString("profile_name");
+        if (profileName != null && !profileName.isEmpty()) {
+            principal.setProfileName(profileName);
+        }
+        String tenantId = jwt.getClaimAsString("tenant_id");
+        if (tenantId != null && !tenantId.isEmpty()) {
+            principal.setTenantId(tenantId);
+        }
+
+        return principal;
     }
     
     /**

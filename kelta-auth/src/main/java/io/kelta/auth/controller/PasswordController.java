@@ -1,5 +1,7 @@
 package io.kelta.auth.controller;
 
+import io.kelta.auth.config.AuthProperties;
+import io.kelta.auth.service.WorkerClient;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -24,10 +26,17 @@ public class PasswordController {
 
     private final JdbcTemplate jdbcTemplate;
     private final PasswordEncoder passwordEncoder;
+    private final WorkerClient workerClient;
+    private final String uiBaseUrl;
 
-    public PasswordController(JdbcTemplate jdbcTemplate, PasswordEncoder passwordEncoder) {
+    public PasswordController(JdbcTemplate jdbcTemplate,
+                              PasswordEncoder passwordEncoder,
+                              WorkerClient workerClient,
+                              AuthProperties authProperties) {
         this.jdbcTemplate = jdbcTemplate;
         this.passwordEncoder = passwordEncoder;
+        this.workerClient = workerClient;
+        this.uiBaseUrl = authProperties.getUiBaseUrl();
     }
 
     public record ChangePasswordRequest(
@@ -80,6 +89,13 @@ public class PasswordController {
     public ResponseEntity<Map<String, String>> requestPasswordReset(
             @Valid @RequestBody ResetRequestBody request) {
 
+        // Invalidate any existing reset token before generating a new one
+        jdbcTemplate.update(
+                "UPDATE user_credential SET reset_token = NULL, reset_token_expires_at = NULL " +
+                        "WHERE user_id = (SELECT id FROM platform_user WHERE email = ? AND status = 'ACTIVE')",
+                request.email()
+        );
+
         // Generate reset token
         String resetToken = UUID.randomUUID().toString();
         Instant expiresAt = Instant.now().plusSeconds(3600); // 1 hour
@@ -93,7 +109,7 @@ public class PasswordController {
         // Always return success to prevent email enumeration
         if (updated > 0) {
             log.info("Password reset requested for {}", request.email());
-            // TODO: Send reset email via worker's email service
+            sendPasswordResetEmail(request.email(), resetToken);
         }
 
         return ResponseEntity.ok(Map.of("status", "ok",
@@ -135,5 +151,33 @@ public class PasswordController {
 
         log.info("Password reset completed for user_id {}", userId);
         return ResponseEntity.ok(Map.of("status", "ok"));
+    }
+
+    private void sendPasswordResetEmail(String email, String resetToken) {
+        try {
+            // Resolve tenant ID from the user's record
+            var tenantResults = jdbcTemplate.queryForList(
+                    "SELECT pu.tenant_id FROM platform_user pu WHERE pu.email = ? AND pu.status = 'ACTIVE'",
+                    email
+            );
+            String tenantId = tenantResults.isEmpty() ? "system" : (String) tenantResults.get(0).get("tenant_id");
+
+            String resetLink = uiBaseUrl + "/reset-password?token=" + resetToken + "&email=" + email;
+            String subject = "Reset your password";
+            String body = """
+                    <html><body>
+                    <h2>Password Reset</h2>
+                    <p>You requested a password reset. Click the link below to set a new password:</p>
+                    <p><a href="%s">Reset Password</a></p>
+                    <p>This link expires in 1 hour. If you did not request this, ignore this email.</p>
+                    </body></html>
+                    """.formatted(resetLink);
+
+            workerClient.sendEmail(tenantId, email, subject, body, "PASSWORD_RESET");
+            log.info("Password reset email queued for {}", email);
+        } catch (Exception e) {
+            // Log but don't fail the reset request — prevent email enumeration
+            log.error("Failed to send password reset email to {}: {}", email, e.getMessage());
+        }
     }
 }

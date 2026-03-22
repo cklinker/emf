@@ -27,6 +27,14 @@ spring:
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+  mail:
+    host: ${SMTP_HOST:localhost}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      mail.smtp.auth: ${SMTP_AUTH:true}
+      mail.smtp.starttls.enable: ${SMTP_STARTTLS:true}
   lifecycle:
     timeout-per-shutdown-phase: 30s
 
@@ -50,6 +58,12 @@ kelta:
     public-url: ${SUPERSET_PUBLIC_URL:${SUPERSET_URL:}}
     admin-username: ${SUPERSET_ADMIN_USERNAME:admin}
     admin-password: ${SUPERSET_ADMIN_PASSWORD:}
+  email:
+    from-address: ${EMAIL_FROM_ADDRESS:noreply@kelta.io}
+    from-name: ${EMAIL_FROM_NAME:Kelta Platform}
+    enabled: ${EMAIL_ENABLED:true}
+  internal:
+    token: ${KELTA_INTERNAL_TOKEN:}
   opensearch:
     url: ${OPENSEARCH_URL:http://localhost:9200}
     index-prefix: ${OPENSEARCH_INDEX_PREFIX:kelta}

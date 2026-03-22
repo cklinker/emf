@@ -46,6 +46,10 @@ public class KeltaTokenCustomizer implements OAuth2TokenCustomizer<JwtEncodingCo
             claims.put("preferred_username", userDetails.getEmail());
             claims.put("tenant_id", userDetails.getTenantId());
             claims.put("profile_id", userDetails.getProfileId());
+            // Indicate whether this user authenticated via internal login or SSO
+            String authMethod = (userDetails.getPassword() == null || userDetails.getPassword().isEmpty())
+                    ? "sso" : "internal";
+            claims.put("auth_method", authMethod);
         });
     }
 }

@@ -33,17 +33,36 @@ public class BootstrapRepository {
 
     private static final String SELECT_OIDC_PROVIDER_BY_ISSUER = """
             SELECT id, name, issuer, jwks_uri, audience, active,
-                   client_id, roles_claim, roles_mapping,
-                   groups_claim, groups_profile_mapping
+                   client_id, client_secret_enc, roles_claim, roles_mapping,
+                   groups_claim, groups_profile_mapping,
+                   authorization_uri, token_uri, userinfo_uri, end_session_uri,
+                   discovery_status
             FROM oidc_provider WHERE issuer = ? AND active = true
             LIMIT 1
             """;
 
     private static final String SELECT_OIDC_PROVIDER_BY_ISSUER_AND_TENANT = """
             SELECT id, name, issuer, jwks_uri, audience, active,
-                   client_id, roles_claim, roles_mapping,
-                   groups_claim, groups_profile_mapping
+                   client_id, client_secret_enc, roles_claim, roles_mapping,
+                   groups_claim, groups_profile_mapping,
+                   authorization_uri, token_uri, userinfo_uri, end_session_uri,
+                   discovery_status
             FROM oidc_provider WHERE issuer = ? AND tenant_id = ? AND active = true
+            LIMIT 1
+            """;
+
+    private static final String SELECT_ACTIVE_OIDC_PROVIDERS_BY_TENANT = """
+            SELECT id, name, issuer, jwks_uri, audience, active,
+                   client_id, client_secret_enc, roles_claim, roles_mapping,
+                   groups_claim, groups_profile_mapping,
+                   authorization_uri, token_uri, userinfo_uri, end_session_uri,
+                   discovery_status, email_claim, username_claim, name_claim
+            FROM oidc_provider WHERE tenant_id = ? AND active = true
+            """;
+
+    private static final String SELECT_USER_BY_EMAIL_ANY_STATUS = """
+            SELECT id, profile_id, status FROM platform_user
+            WHERE email = ? AND tenant_id = ?
             LIMIT 1
             """;
 
@@ -87,6 +106,10 @@ public class BootstrapRepository {
         this.jdbcTemplate = jdbcTemplate;
     }
 
+    public JdbcTemplate getJdbcTemplate() {
+        return jdbcTemplate;
+    }
+
     public List<Map<String, Object>> findActiveCollections() {
         return jdbcTemplate.queryForList(SELECT_ACTIVE_COLLECTIONS);
     }
@@ -108,6 +131,16 @@ public class BootstrapRepository {
     public Optional<Map<String, Object>> findOidcProviderByIssuerAndTenant(String issuer, String tenantId) {
         List<Map<String, Object>> rows = jdbcTemplate.queryForList(
                 SELECT_OIDC_PROVIDER_BY_ISSUER_AND_TENANT, issuer, tenantId);
+        return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));
+    }
+
+    public List<Map<String, Object>> findActiveOidcProvidersByTenant(String tenantId) {
+        return jdbcTemplate.queryForList(SELECT_ACTIVE_OIDC_PROVIDERS_BY_TENANT, tenantId);
+    }
+
+    public Optional<Map<String, Object>> findUserByEmailAnyStatus(String email, String tenantId) {
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                SELECT_USER_BY_EMAIL_ANY_STATUS, email, tenantId);
         return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));
     }
 

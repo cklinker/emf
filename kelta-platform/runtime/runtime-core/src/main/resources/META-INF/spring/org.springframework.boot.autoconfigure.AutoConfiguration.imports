@@ -1,1 +1,2 @@
 io.kelta.runtime.config.KeltaRuntimeAutoConfiguration
+io.kelta.crypto.EncryptionAutoConfiguration

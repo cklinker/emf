@@ -32,12 +32,21 @@ export interface OIDCProvider {
   active: boolean
   createdAt: string
   updatedAt: string
-  // Claim mapping fields (Requirements 6.1, 6.2)
+  // OIDC Discovery endpoint overrides
+  jwksUri?: string
+  authorizationUri?: string
+  tokenUri?: string
+  userinfoUri?: string
+  endSessionUri?: string
+  discoveryStatus?: string
+  // Claim mapping fields
   rolesClaim?: string
   rolesMapping?: string
   emailClaim?: string
   usernameClaim?: string
   nameClaim?: string
+  groupsClaim?: string
+  groupsProfileMapping?: string
 }
 
 /**
@@ -49,12 +58,20 @@ interface OIDCProviderFormData {
   clientId: string
   clientSecret: string
   scopes: string
-  // Claim mapping fields (Requirements 6.1, 6.2)
+  // OIDC Discovery endpoint overrides
+  jwksUri?: string
+  authorizationUri?: string
+  tokenUri?: string
+  userinfoUri?: string
+  endSessionUri?: string
+  // Claim mapping fields
   rolesClaim?: string
   rolesMapping?: string
   emailClaim?: string
   usernameClaim?: string
   nameClaim?: string
+  groupsClaim?: string
+  groupsProfileMapping?: string
 }
 
 /**
@@ -66,12 +83,14 @@ interface FormErrors {
   clientId?: string
   clientSecret?: string
   scopes?: string
-  // Claim mapping error fields (Requirement 6.6)
+  // Claim mapping error fields
   rolesClaim?: string
   rolesMapping?: string
   emailClaim?: string
   usernameClaim?: string
   nameClaim?: string
+  groupsClaim?: string
+  groupsProfileMapping?: string
 }
 
 /**
@@ -187,12 +206,20 @@ function OIDCProviderForm({
     clientId: provider?.clientId ?? '',
     clientSecret: '',
     scopes: provider?.scopes?.join(', ') ?? 'openid, profile, email, roles',
-    // Claim mapping fields (Requirement 6.7)
+    // OIDC Discovery endpoint overrides
+    jwksUri: provider?.jwksUri ?? '',
+    authorizationUri: provider?.authorizationUri ?? '',
+    tokenUri: provider?.tokenUri ?? '',
+    userinfoUri: provider?.userinfoUri ?? '',
+    endSessionUri: provider?.endSessionUri ?? '',
+    // Claim mapping fields
     rolesClaim: provider?.rolesClaim ?? '',
     rolesMapping: provider?.rolesMapping ?? '',
     emailClaim: provider?.emailClaim ?? '',
     usernameClaim: provider?.usernameClaim ?? '',
     nameClaim: provider?.nameClaim ?? '',
+    groupsClaim: provider?.groupsClaim ?? '',
+    groupsProfileMapping: provider?.groupsProfileMapping ?? '',
   })
   const [errors, setErrors] = useState<FormErrors>({})
   const [touched, setTouched] = useState<Record<string, boolean>>({})
@@ -601,6 +628,142 @@ function OIDCProviderForm({
                   {errors.nameClaim}
                 </span>
               )}
+            </div>
+
+            {/* Groups Claim Field */}
+            <div className="flex flex-col gap-1">
+              <label htmlFor="oidc-groups-claim" className="text-sm font-medium text-foreground">
+                Groups Claim
+              </label>
+              <input
+                id="oidc-groups-claim"
+                type="text"
+                className={inputClassName('groupsClaim')}
+                value={formData.groupsClaim || ''}
+                onChange={(e) => handleChange('groupsClaim', e.target.value)}
+                onBlur={() => handleBlur('groupsClaim')}
+                placeholder="groups (default)"
+                aria-describedby="oidc-groups-claim-hint"
+                disabled={isSubmitting}
+                data-testid="oidc-groups-claim-input"
+              />
+              <span id="oidc-groups-claim-hint" className="mt-1 text-xs text-muted-foreground">
+                Path to groups claim in the JWT token (e.g., groups, memberOf)
+              </span>
+            </div>
+
+            {/* Groups Profile Mapping Field */}
+            <div className="flex flex-col gap-1">
+              <label htmlFor="oidc-groups-profile-mapping" className="text-sm font-medium text-foreground">
+                Groups to Profile Mapping
+              </label>
+              <textarea
+                id="oidc-groups-profile-mapping"
+                className={textareaClassName('groupsProfileMapping')}
+                value={formData.groupsProfileMapping || ''}
+                onChange={(e) => handleChange('groupsProfileMapping', e.target.value)}
+                onBlur={() => handleBlur('groupsProfileMapping')}
+                placeholder='{"admin-group": "System Administrator", "user-group": "Standard User"}'
+                rows={4}
+                aria-describedby="oidc-groups-profile-mapping-hint"
+                disabled={isSubmitting}
+                data-testid="oidc-groups-profile-mapping-input"
+              />
+              <span id="oidc-groups-profile-mapping-hint" className="mt-1 text-xs text-muted-foreground">
+                JSON mapping of OIDC group names to internal profile names. Users without a match require manual profile assignment.
+              </span>
+            </div>
+
+            {/* OIDC Discovery Endpoint Overrides */}
+            <div className="mt-2 border-t border-border pt-4">
+              <h3 className="mb-3 text-sm font-semibold text-foreground">
+                Endpoint Overrides
+              </h3>
+              <p className="mb-3 text-xs text-muted-foreground">
+                Leave blank to auto-discover from the issuer URL. Override when Discovery is unavailable.
+              </p>
+
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="oidc-jwks-uri" className="text-xs font-medium text-muted-foreground">
+                    JWKS URI
+                  </label>
+                  <input
+                    id="oidc-jwks-uri"
+                    type="url"
+                    className={inputClassName('name')}
+                    value={formData.jwksUri || ''}
+                    onChange={(e) => handleChange('jwksUri', e.target.value)}
+                    placeholder="Auto-discovered from issuer"
+                    disabled={isSubmitting}
+                    data-testid="oidc-jwks-uri-input"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="oidc-authorization-uri" className="text-xs font-medium text-muted-foreground">
+                    Authorization URI
+                  </label>
+                  <input
+                    id="oidc-authorization-uri"
+                    type="url"
+                    className={inputClassName('name')}
+                    value={formData.authorizationUri || ''}
+                    onChange={(e) => handleChange('authorizationUri', e.target.value)}
+                    placeholder="Auto-discovered from issuer"
+                    disabled={isSubmitting}
+                    data-testid="oidc-authorization-uri-input"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="oidc-token-uri" className="text-xs font-medium text-muted-foreground">
+                    Token URI
+                  </label>
+                  <input
+                    id="oidc-token-uri"
+                    type="url"
+                    className={inputClassName('name')}
+                    value={formData.tokenUri || ''}
+                    onChange={(e) => handleChange('tokenUri', e.target.value)}
+                    placeholder="Auto-discovered from issuer"
+                    disabled={isSubmitting}
+                    data-testid="oidc-token-uri-input"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="oidc-userinfo-uri" className="text-xs font-medium text-muted-foreground">
+                    UserInfo URI
+                  </label>
+                  <input
+                    id="oidc-userinfo-uri"
+                    type="url"
+                    className={inputClassName('name')}
+                    value={formData.userinfoUri || ''}
+                    onChange={(e) => handleChange('userinfoUri', e.target.value)}
+                    placeholder="Auto-discovered from issuer"
+                    disabled={isSubmitting}
+                    data-testid="oidc-userinfo-uri-input"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="oidc-end-session-uri" className="text-xs font-medium text-muted-foreground">
+                    End Session URI
+                  </label>
+                  <input
+                    id="oidc-end-session-uri"
+                    type="url"
+                    className={inputClassName('name')}
+                    value={formData.endSessionUri || ''}
+                    onChange={(e) => handleChange('endSessionUri', e.target.value)}
+                    placeholder="Auto-discovered from issuer"
+                    disabled={isSubmitting}
+                    data-testid="oidc-end-session-uri-input"
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Form Actions */}

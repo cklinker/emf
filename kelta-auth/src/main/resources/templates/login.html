@@ -116,6 +116,62 @@
             background: #4338ca;
         }
 
+        .divider {
+            display: flex;
+            align-items: center;
+            margin: 1.5rem 0;
+            color: #52525b;
+            font-size: 0.8125rem;
+        }
+
+        .divider::before,
+        .divider::after {
+            content: '';
+            flex: 1;
+            border-bottom: 1px solid #27272a;
+        }
+
+        .divider span {
+            padding: 0 1rem;
+        }
+
+        .sso-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .btn-sso {
+            width: 100%;
+            padding: 0.625rem 1rem;
+            background: #27272a;
+            color: #e4e4e7;
+            border: 1px solid #3f3f46;
+            border-radius: 0.5rem;
+            font-size: 0.9375rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s;
+            text-decoration: none;
+            text-align: center;
+            display: block;
+        }
+
+        .btn-sso:hover {
+            background: #3f3f46;
+            border-color: #52525b;
+        }
+
+        .alert-warning {
+            background: #422006;
+            border: 1px solid #78350f;
+            color: #fde68a;
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            margin-bottom: 1.5rem;
+        }
+
         .footer {
             text-align: center;
             margin-top: 1.5rem;
@@ -136,8 +192,29 @@
                 Invalid email or password. Please try again.
             </div>
 
+            <div th:if="${param.containsKey('pending_activation')}" class="alert-warning">
+                Your account is pending activation. Please contact your administrator to assign a profile.
+            </div>
+
+            <div th:if="${param.containsKey('federation')}" class="alert-error">
+                SSO login failed. Please try again or contact your administrator.
+            </div>
+
             <div th:if="${param.passwordChanged}" class="alert-success">
                 Password changed successfully. Please sign in with your new password.
+            </div>
+
+            <!-- SSO Provider Buttons -->
+            <div th:if="${ssoProviders != null and !ssoProviders.isEmpty()}" class="sso-buttons">
+                <a th:each="provider : ${ssoProviders}"
+                   th:href="@{/oauth2/authorization/{regId}(regId=${provider.registrationId})}"
+                   th:text="'Sign in with ' + ${provider.name}"
+                   class="btn-sso">
+                </a>
+            </div>
+
+            <div th:if="${ssoProviders != null and !ssoProviders.isEmpty()}" class="divider">
+                <span>or sign in with email</span>
             </div>
 
             <form th:action="@{/login}" method="post">

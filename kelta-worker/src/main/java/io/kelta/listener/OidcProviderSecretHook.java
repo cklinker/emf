@@ -1,0 +1,89 @@
+package io.kelta.worker.listener;
+
+import io.kelta.crypto.EncryptionService;
+import io.kelta.runtime.workflow.BeforeSaveHook;
+import io.kelta.runtime.workflow.BeforeSaveResult;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.stereotype.Component;
+
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * Encrypts the OIDC provider client secret before it is persisted.
+ *
+ * <p>The UI sends a plaintext {@code clientSecret} field. This hook:
+ * <ol>
+ *   <li>Encrypts it into {@code clientSecretEnc} using AES-256-GCM</li>
+ *   <li>Removes the plaintext from the record so it is never stored</li>
+ * </ol>
+ *
+ * <p>On reads, {@code clientSecretEnc} is masked (not returned as plaintext) by
+ * the response transformer. The encrypted value is only decrypted internally
+ * when kelta-auth needs to perform token exchange with the external IdP.
+ */
+@Component
+@ConditionalOnBean(EncryptionService.class)
+public class OidcProviderSecretHook implements BeforeSaveHook {
+
+    private static final Logger log = LoggerFactory.getLogger(OidcProviderSecretHook.class);
+    private static final String COLLECTION = "oidc-providers";
+    private static final String CLIENT_SECRET_FIELD = "clientSecret";
+    private static final String CLIENT_SECRET_ENC_FIELD = "clientSecretEnc";
+
+    private final EncryptionService encryptionService;
+
+    public OidcProviderSecretHook(EncryptionService encryptionService) {
+        this.encryptionService = encryptionService;
+    }
+
+    @Override
+    public String getCollectionName() {
+        return COLLECTION;
+    }
+
+    @Override
+    public int getOrder() {
+        return -100; // Run early, before audit hooks
+    }
+
+    @Override
+    public BeforeSaveResult beforeCreate(Map<String, Object> record, String tenantId) {
+        return encryptSecret(record);
+    }
+
+    @Override
+    public BeforeSaveResult beforeUpdate(String id, Map<String, Object> record,
+                                          Map<String, Object> previous, String tenantId) {
+        return encryptSecret(record);
+    }
+
+    private BeforeSaveResult encryptSecret(Map<String, Object> record) {
+        Object clientSecret = record.get(CLIENT_SECRET_FIELD);
+        if (clientSecret == null) {
+            return BeforeSaveResult.ok();
+        }
+
+        String secretValue = clientSecret.toString();
+        if (secretValue.isBlank()) {
+            return BeforeSaveResult.ok();
+        }
+
+        // Don't re-encrypt already encrypted values
+        if (EncryptionService.isEncrypted(secretValue)) {
+            return BeforeSaveResult.ok();
+        }
+
+        log.debug("Encrypting client secret for OIDC provider");
+        String encrypted = encryptionService.encrypt(secretValue);
+
+        Map<String, Object> updates = new HashMap<>();
+        updates.put(CLIENT_SECRET_ENC_FIELD, encrypted);
+        // Remove plaintext so it never reaches the storage adapter
+        record.remove(CLIENT_SECRET_FIELD);
+
+        return BeforeSaveResult.withFieldUpdates(updates);
+    }
+}

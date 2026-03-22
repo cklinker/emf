@@ -104,15 +104,24 @@ public class SecurityConfig {
     }
 
     /**
-     * Creates a DynamicReactiveJwtDecoder bean that supports multi-provider JWT validation.
-     * Resolves the correct JWKS URI based on the token's issuer claim.
-     * Falls back to the configured default issuer if no provider is found.
+     * Creates the JWT decoder bean.
      *
-     * <p>OIDC provider info is fetched from the worker's internal API
-     * ({@code /internal/oidc/by-issuer}).
+     * <p>When {@code kelta.gateway.security.single-issuer} is true (default), uses a
+     * simple {@link NimbusReactiveJwtDecoder} pointing at the configured issuer's JWKS.
+     * This is the recommended mode when kelta-auth is the sole token issuer.
+     *
+     * <p>When false, uses the legacy {@link DynamicReactiveJwtDecoder} that resolves
+     * JWKS URIs dynamically from the worker's OIDC provider database (multi-issuer).
      */
     @Bean
-    public DynamicReactiveJwtDecoder jwtDecoder(@Nullable ReactiveStringRedisTemplate redisTemplate) {
+    public DynamicReactiveJwtDecoder jwtDecoder(
+            @Nullable ReactiveStringRedisTemplate redisTemplate,
+            @Value("${kelta.gateway.security.single-issuer:true}") boolean singleIssuer) {
+
+        if (singleIssuer) {
+            log.info("Gateway configured for single-issuer mode: {}", issuerUri);
+        }
+
         WebClient workerClient = WebClient.builder()
                 .baseUrl(workerServiceUrl)
                 .build();

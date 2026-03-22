@@ -84,4 +84,20 @@ export class ScheduledJobsPage extends BasePage {
   async clickLogs(index: number): Promise<void> {
     await this.testId(`logs-button-${index}`).click();
   }
+
+  async clickPause(index: number): Promise<void> {
+    await this.testId(`pause-button-${index}`).click();
+  }
+
+  async clickResume(index: number): Promise<void> {
+    await this.testId(`resume-button-${index}`).click();
+  }
+
+  pauseButton(index: number): Locator {
+    return this.testId(`pause-button-${index}`);
+  }
+
+  resumeButton(index: number): Locator {
+    return this.testId(`resume-button-${index}`);
+  }
 }

@@ -1637,6 +1637,18 @@ export class AdminClient {
       const response = await this.axios.get(`/api/scheduled-jobs/${id}/job-execution-logs`);
       return unwrapJsonApiList<JobExecutionLog>(response.data);
     },
+
+    pause: async (id: string): Promise<void> => {
+      await this.axios.post(`/api/scheduled-jobs/${id}/pause`);
+    },
+
+    resume: async (id: string): Promise<void> => {
+      await this.axios.post(`/api/scheduled-jobs/${id}/resume`);
+    },
+
+    execute: async (id: string): Promise<void> => {
+      await this.axios.post(`/api/scheduled-jobs/${id}/execute`);
+    },
   };
 
   // ---------------------------------------------------------------------------

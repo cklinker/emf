@@ -62,4 +62,34 @@ test.describe("Scheduled Jobs", () => {
       timeout: 5000,
     });
   });
+
+  test("shows pause button for active jobs", async ({ page }) => {
+    const scheduledJobsPage = new ScheduledJobsPage(page);
+    await scheduledJobsPage.goto();
+    await scheduledJobsPage.waitForTableLoaded();
+
+    const rowCount = await scheduledJobsPage.getRowCount();
+    if (rowCount > 0) {
+      // Active jobs should show Pause button (or Resume if inactive)
+      const pauseOrResume = page.getByTestId("pause-button-0").or(
+        page.getByTestId("resume-button-0"),
+      );
+      await expect(pauseOrResume).toBeVisible();
+    }
+  });
+
+  test("shows execution logs modal", async ({ page }) => {
+    const scheduledJobsPage = new ScheduledJobsPage(page);
+    await scheduledJobsPage.goto();
+    await scheduledJobsPage.waitForTableLoaded();
+
+    const rowCount = await scheduledJobsPage.getRowCount();
+    if (rowCount > 0) {
+      await scheduledJobsPage.clickLogs(0);
+      // Execution log modal should appear
+      await expect(page.getByText("Scheduled Job Logs")).toBeVisible({
+        timeout: 5000,
+      });
+    }
+  });
 });

@@ -536,6 +536,28 @@ export function ScheduledJobsPage({
     setScheduledJobToDelete(null)
   }, [])
 
+  const pauseMutation = useMutation({
+    mutationFn: (id: string) => keltaClient.admin.scheduledJobs.pause(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['scheduled-jobs'] })
+      showToast('Scheduled job paused', 'success')
+    },
+    onError: (err: Error) => {
+      showToast(err.message || 'Failed to pause job', 'error')
+    },
+  })
+
+  const resumeMutation = useMutation({
+    mutationFn: (id: string) => keltaClient.admin.scheduledJobs.resume(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['scheduled-jobs'] })
+      showToast('Scheduled job resumed', 'success')
+    },
+    onError: (err: Error) => {
+      showToast(err.message || 'Failed to resume job', 'error')
+    },
+  })
+
   if (isLoading) {
     return (
       <div className="mx-auto max-w-[1400px] space-y-6 p-6 lg:p-8" data-testid={testId}>
@@ -694,6 +716,31 @@ export function ScheduledJobsPage({
                   </td>
                   <td role="gridcell" className="px-4 py-3 text-right text-sm">
                     <div className="flex justify-end gap-2">
+                      {scheduledJob.active ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => pauseMutation.mutate(scheduledJob.id)}
+                          disabled={pauseMutation.isPending}
+                          aria-label={`Pause ${scheduledJob.name}`}
+                          data-testid={`pause-button-${index}`}
+                        >
+                          Pause
+                        </Button>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => resumeMutation.mutate(scheduledJob.id)}
+                          disabled={resumeMutation.isPending}
+                          aria-label={`Resume ${scheduledJob.name}`}
+                          data-testid={`resume-button-${index}`}
+                        >
+                          Resume
+                        </Button>
+                      )}
                       <Button
                         type="button"
                         variant="outline"

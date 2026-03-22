@@ -64,6 +64,9 @@ kelta:
     enabled: ${EMAIL_ENABLED:true}
   internal:
     token: ${KELTA_INTERNAL_TOKEN:}
+  scheduler:
+    enabled: ${SCHEDULER_ENABLED:true}
+    poll-interval-ms: ${SCHEDULER_POLL_INTERVAL_MS:60000}
   opensearch:
     url: ${OPENSEARCH_URL:http://localhost:9200}
     index-prefix: ${OPENSEARCH_INDEX_PREFIX:kelta}

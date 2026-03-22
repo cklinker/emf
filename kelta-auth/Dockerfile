@@ -1,11 +1,44 @@
 # Multi-stage build for Kelta Auth Server
 
 # =============================================================================
-# Stage 1: Build the application
+# Stage 1: Build runtime-core dependency
+# =============================================================================
+FROM maven:3.9-eclipse-temurin-21 AS runtime-builder
+
+WORKDIR /kelta-platform
+
+# Copy only POMs first for dependency layer caching
+COPY kelta-platform/pom.xml ./
+COPY kelta-platform/runtime/pom.xml ./runtime/
+COPY kelta-platform/runtime/runtime-core/pom.xml ./runtime/runtime-core/
+COPY kelta-platform/runtime/runtime-events/pom.xml ./runtime/runtime-events/
+COPY kelta-platform/runtime/runtime-jsonapi/pom.xml ./runtime/runtime-jsonapi/
+COPY kelta-platform/runtime/runtime-module-core/pom.xml ./runtime/runtime-module-core/
+COPY kelta-platform/runtime/runtime-module-integration/pom.xml ./runtime/runtime-module-integration/
+COPY kelta-platform/runtime/runtime-module-schema/pom.xml ./runtime/runtime-module-schema/
+
+# Download runtime dependencies (cached unless pom.xml changes)
+RUN mvn dependency:go-offline -B -pl runtime/runtime-core,runtime/runtime-events,runtime/runtime-jsonapi -am || true
+
+# Copy source and build runtime modules
+COPY kelta-platform/runtime/runtime-core/src ./runtime/runtime-core/src
+COPY kelta-platform/runtime/runtime-events/src ./runtime/runtime-events/src
+COPY kelta-platform/runtime/runtime-jsonapi/src ./runtime/runtime-jsonapi/src
+COPY kelta-platform/runtime/runtime-module-core/src ./runtime/runtime-module-core/src
+COPY kelta-platform/runtime/runtime-module-integration/src ./runtime/runtime-module-integration/src
+COPY kelta-platform/runtime/runtime-module-schema/src ./runtime/runtime-module-schema/src
+
+RUN mvn clean install -DskipTests -B -pl runtime/runtime-core,runtime/runtime-events,runtime/runtime-jsonapi,runtime/runtime-module-core,runtime/runtime-module-integration,runtime/runtime-module-schema -am
+
+# =============================================================================
+# Stage 2: Build the auth application
 # =============================================================================
 FROM maven:3.9-eclipse-temurin-21 AS builder
 
 WORKDIR /build
+
+# Copy runtime artifacts from previous stage
+COPY --from=runtime-builder /root/.m2/repository/io/kelta /root/.m2/repository/io/kelta
 
 # Copy POM first for dependency layer caching
 COPY kelta-auth/pom.xml .
@@ -19,7 +52,7 @@ RUN mvn clean package -DskipTests -B && \
     mv target/kelta-auth-*.jar target/kelta-auth.jar
 
 # =============================================================================
-# Stage 2: Runtime image
+# Stage 3: Runtime image
 # =============================================================================
 FROM eclipse-temurin:21-jre
 

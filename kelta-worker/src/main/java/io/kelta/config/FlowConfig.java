@@ -4,6 +4,7 @@ import io.kelta.runtime.flow.*;
 import io.kelta.runtime.formula.FormulaEvaluator;
 import io.kelta.runtime.module.core.CoreActionsModule;
 import io.kelta.runtime.module.integration.IntegrationModule;
+import io.kelta.runtime.module.integration.spi.EmailService;
 import io.kelta.runtime.module.schema.SchemaLifecycleModule;
 import io.kelta.runtime.query.QueryEngine;
 import io.kelta.runtime.registry.CollectionRegistry;
@@ -134,15 +135,23 @@ public class FlowConfig {
                                           @Autowired(required = false) FormulaEvaluator formulaEvaluator,
                                           ObjectMapper objectMapper,
                                           FlowEngine flowEngine,
-                                          RollupSummaryService rollupSummaryService) {
+                                          RollupSummaryService rollupSummaryService,
+                                          @Autowired(required = false) EmailService emailService) {
         ModuleRegistry registry = new ModuleRegistry(actionHandlerRegistry, beforeSaveHookRegistry);
 
         if (discoveredModules != null && !discoveredModules.isEmpty()) {
+            var extensions = new java.util.HashMap<>(Map.of(
+                    FlowEngine.class, (Object) flowEngine,
+                    RollupSummaryService.class, (Object) rollupSummaryService));
+
+            if (emailService != null) {
+                extensions.put(EmailService.class, emailService);
+                log.info("EmailService wired into module context — flow email alerts will use real delivery");
+            }
+
             ModuleContext context = new ModuleContext(
                 queryEngine, collectionRegistry, formulaEvaluator, objectMapper,
-                actionHandlerRegistry, Map.of(
-                    FlowEngine.class, flowEngine,
-                    RollupSummaryService.class, rollupSummaryService));
+                actionHandlerRegistry, extensions);
 
             registry.initialize(discoveredModules, context);
             log.info("Module system initialized with {} modules", discoveredModules.size());

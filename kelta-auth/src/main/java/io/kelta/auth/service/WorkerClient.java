@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.kelta.auth.config.AuthProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
@@ -20,12 +22,46 @@ public class WorkerClient {
 
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
+    private final String internalToken;
 
-    public WorkerClient(AuthProperties properties, ObjectMapper objectMapper) {
+    public WorkerClient(AuthProperties properties,
+                        ObjectMapper objectMapper,
+                        @Value("${kelta.internal.token:}") String internalToken) {
         this.restClient = RestClient.builder()
                 .baseUrl(properties.getWorkerUrl())
                 .build();
         this.objectMapper = objectMapper;
+        this.internalToken = internalToken;
+    }
+
+    /**
+     * Sends an email via the worker's internal email endpoint.
+     *
+     * @return true if the email was successfully queued, false on failure
+     */
+    public boolean sendEmail(String tenantId, String to, String subject, String body, String source) {
+        try {
+            Map<String, String> requestBody = Map.of(
+                    "tenantId", tenantId,
+                    "to", to,
+                    "subject", subject,
+                    "body", body,
+                    "source", source
+            );
+
+            restClient.post()
+                    .uri("/api/internal/email/send")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .header("X-Internal-Token", internalToken)
+                    .body(requestBody)
+                    .retrieve()
+                    .body(JsonNode.class);
+
+            return true;
+        } catch (Exception e) {
+            log.error("Failed to send email via worker: to={}, source={}, error={}", to, source, e.getMessage());
+            return false;
+        }
     }
 
     public record OidcProviderInfo(

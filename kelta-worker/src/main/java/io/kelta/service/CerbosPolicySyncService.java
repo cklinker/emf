@@ -6,12 +6,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Instant;
 import java.util.*;
 import java.util.Base64;
 
@@ -30,11 +32,14 @@ public class CerbosPolicySyncService {
 
     private static final Logger log = LoggerFactory.getLogger(CerbosPolicySyncService.class);
 
+    static final String POLICY_CHANGED_TOPIC = "kelta.cerbos.policies.changed";
+
     private final JdbcTemplate jdbcTemplate;
     private final BootstrapRepository bootstrapRepository;
     private final CerbosPolicyGenerator policyGenerator;
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
+    private final KafkaTemplate<String, String> kafkaTemplate;
     private final String cerbosAdminUrl;
     private final String cerbosAdminAuth;
 
@@ -43,6 +48,7 @@ public class CerbosPolicySyncService {
             BootstrapRepository bootstrapRepository,
             CerbosPolicyGenerator policyGenerator,
             ObjectMapper objectMapper,
+            KafkaTemplate<String, String> kafkaTemplate,
             @Value("${kelta.worker.cerbos.host:cerbos.emf.svc.cluster.local}") String cerbosHost,
             @Value("${kelta.worker.cerbos.http-port:3592}") int cerbosHttpPort,
             @Value("${kelta.worker.cerbos.admin-username:cerbos}") String adminUsername,
@@ -51,6 +57,7 @@ public class CerbosPolicySyncService {
         this.bootstrapRepository = bootstrapRepository;
         this.policyGenerator = policyGenerator;
         this.objectMapper = objectMapper;
+        this.kafkaTemplate = kafkaTemplate;
         this.httpClient = HttpClient.newHttpClient();
         this.cerbosAdminUrl = "http://" + cerbosHost + ":" + cerbosHttpPort;
         this.cerbosAdminAuth = "Basic " + Base64.getEncoder()
@@ -84,6 +91,8 @@ public class CerbosPolicySyncService {
 
             log.info("Cerbos policies synced for tenant {} ({} profiles, {} collections)",
                     tenantId, profiles.size(), collectionIds.size());
+
+            publishPolicyChangedEvent(tenantId);
         } catch (Exception e) {
             log.error("Failed to sync Cerbos policies for tenant {}: {}", tenantId, e.getMessage(), e);
         }
@@ -288,6 +297,28 @@ public class CerbosPolicySyncService {
             case "contains" -> attrRef + ".contains(\"" + value + "\")";
             default -> attrRef + " == \"" + value + "\"";
         };
+    }
+
+    private void publishPolicyChangedEvent(String tenantId) {
+        try {
+            Map<String, String> payload = Map.of(
+                    "tenantId", tenantId,
+                    "syncedAt", Instant.now().toString()
+            );
+            String json = objectMapper.writeValueAsString(payload);
+            kafkaTemplate.send(POLICY_CHANGED_TOPIC, tenantId, json)
+                    .whenComplete((result, ex) -> {
+                        if (ex != null) {
+                            log.error("Failed to publish policy changed event for tenant {}: {}",
+                                    tenantId, ex.getMessage());
+                        } else {
+                            log.debug("Published policy changed event for tenant {}", tenantId);
+                        }
+                    });
+        } catch (Exception e) {
+            log.error("Failed to serialize policy changed event for tenant {}: {}",
+                    tenantId, e.getMessage());
+        }
     }
 
     private Boolean toBoolean(Object value) {

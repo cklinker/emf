@@ -1,16 +1,21 @@
 package io.kelta.gateway.authz.cerbos;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import dev.cerbos.sdk.CerbosBlockingClient;
 import dev.cerbos.sdk.CheckResult;
 import dev.cerbos.sdk.builders.AttributeValue;
 import dev.cerbos.sdk.builders.Principal;
 import dev.cerbos.sdk.builders.Resource;
 import io.kelta.gateway.auth.GatewayPrincipal;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
+import java.time.Duration;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -20,32 +25,16 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Wraps Cerbos SDK calls with hard timeouts, thread interruption, and a
- * circuit breaker to prevent thread-pool exhaustion.
+ * Wraps Cerbos SDK calls with caching, hard timeouts, thread interruption,
+ * and a circuit breaker to prevent thread-pool exhaustion.
  *
- * <h3>Problem solved</h3>
- * <p>{@code CerbosBlockingClient.check()} is a blocking gRPC call.  When the
- * Cerbos pod restarts or becomes unresponsive, the call blocks for up to the
- * default gRPC deadline (typically 15&nbsp;s).  A simple
- * {@code Mono.timeout()} does <em>not</em> free the underlying
- * {@code boundedElastic} thread &mdash; the gRPC call keeps running, and over
- * many concurrent requests the thread pool is exhausted, causing cascading
- * latency across all gateway routes.</p>
+ * <p>Authorization results are cached in-memory (Caffeine) and invalidated
+ * via Kafka events when Cerbos policies change. A safety-net TTL of 10 minutes
+ * handles edge cases like missed events.
  *
- * <h3>Approach</h3>
- * <ol>
- *   <li>Each Cerbos call runs on a dedicated {@link ExecutorService} via
- *       {@link Future#get(long, TimeUnit)}.  On timeout,
- *       {@link Future#cancel(boolean) cancel(true)} interrupts the thread,
- *       which the gRPC stub honours by throwing a cancelled-status exception
- *       and releasing the thread.</li>
- *   <li>A lightweight circuit breaker tracks consecutive failures.  After
- *       {@value #CIRCUIT_BREAKER_THRESHOLD} failures, Cerbos is bypassed for
- *       {@value #CIRCUIT_BREAKER_COOLDOWN_SECONDS}&nbsp;s, avoiding further
- *       thread consumption while Cerbos recovers.</li>
- *   <li>All failures result in <em>deny</em> (fail-closed).  Security first:
- *       no request should be allowed without explicit authorization.</li>
- * </ol>
+ * <h3>Fail-closed design</h3>
+ * <p>All failures (timeouts, errors, circuit breaker open) result in deny.
+ * Only successful Cerbos responses that return ALLOW are cached as {@code true}.
  */
 @Service
 public class CerbosAuthorizationService {
@@ -61,22 +50,51 @@ public class CerbosAuthorizationService {
     /** Seconds to keep the circuit open (deny all) before retrying. */
     private static final long CIRCUIT_BREAKER_COOLDOWN_SECONDS = 10;
 
+    /** Safety-net TTL for cache entries (primary invalidation is event-driven). */
+    private static final Duration CACHE_TTL = Duration.ofMinutes(10);
+
+    private static final int CACHE_MAX_SIZE = 10_000;
+
     private final CerbosBlockingClient cerbosClient;
     private final ExecutorService cerbosExecutor;
+
+    // Cache: key = "tenantId:profileId:permission" or "tenantId:profileId:collectionId:action"
+    private final Cache<String, Boolean> permissionCache;
+
+    // Metrics
+    private final Counter cacheHits;
+    private final Counter cacheMisses;
+    private final Counter cacheEvictions;
 
     // Circuit breaker state
     private final AtomicInteger consecutiveFailures = new AtomicInteger(0);
     private final AtomicLong circuitOpenUntil = new AtomicLong(0);
 
-    public CerbosAuthorizationService(CerbosBlockingClient cerbosClient) {
+    public CerbosAuthorizationService(CerbosBlockingClient cerbosClient, MeterRegistry meterRegistry) {
         this.cerbosClient = cerbosClient;
-        // Cached thread pool: threads are created on demand and reused.
-        // Idle threads are reclaimed after 60 s.
         this.cerbosExecutor = Executors.newCachedThreadPool(r -> {
             Thread t = new Thread(r, "cerbos-check");
             t.setDaemon(true);
             return t;
         });
+
+        this.permissionCache = Caffeine.newBuilder()
+                .maximumSize(CACHE_MAX_SIZE)
+                .expireAfterWrite(CACHE_TTL)
+                .recordStats()
+                .build();
+
+        this.cacheHits = Counter.builder("cerbos.cache.hits")
+                .tag("service", "gateway")
+                .register(meterRegistry);
+        this.cacheMisses = Counter.builder("cerbos.cache.misses")
+                .tag("service", "gateway")
+                .register(meterRegistry);
+        this.cacheEvictions = Counter.builder("cerbos.cache.evictions")
+                .tag("service", "gateway")
+                .register(meterRegistry);
+
+        meterRegistry.gauge("cerbos.cache.size", permissionCache, Cache::estimatedSize);
     }
 
     public Mono<Boolean> checkSystemPermission(GatewayPrincipal principal, String permissionName) {
@@ -85,6 +103,16 @@ public class CerbosAuthorizationService {
                     principal.getUsername(), permissionName);
             return Mono.just(false);
         }
+
+        String cacheKey = systemCacheKey(principal.getTenantId(), principal.getProfileId(), permissionName);
+        Boolean cached = permissionCache.getIfPresent(cacheKey);
+        if (cached != null) {
+            cacheHits.increment();
+            log.debug("Cerbos system check (cached): user={} permission={} allowed={}",
+                    principal.getUsername(), permissionName, cached);
+            return Mono.just(cached);
+        }
+        cacheMisses.increment();
 
         return Mono.fromCallable(() -> {
             Future<Boolean> future = cerbosExecutor.submit(() -> {
@@ -100,11 +128,12 @@ public class CerbosAuthorizationService {
             try {
                 boolean allowed = future.get(CERBOS_TIMEOUT_SECONDS, TimeUnit.SECONDS);
                 recordSuccess();
+                permissionCache.put(cacheKey, allowed);
                 log.debug("Cerbos system check: user={} permission={} allowed={}",
                         principal.getUsername(), permissionName, allowed);
                 return allowed;
             } catch (TimeoutException e) {
-                future.cancel(true); // interrupts the gRPC call, frees the thread
+                future.cancel(true);
                 recordFailure();
                 log.error("Cerbos system check timed out (fail-closed): user={} permission={}",
                         principal.getUsername(), permissionName);
@@ -133,6 +162,16 @@ public class CerbosAuthorizationService {
             return Mono.just(false);
         }
 
+        String cacheKey = objectCacheKey(principal.getTenantId(), principal.getProfileId(), collectionId, action);
+        Boolean cached = permissionCache.getIfPresent(cacheKey);
+        if (cached != null) {
+            cacheHits.increment();
+            log.debug("Cerbos object check (cached): user={} collection={} action={} allowed={}",
+                    principal.getUsername(), collectionId, action, cached);
+            return Mono.just(cached);
+        }
+        cacheMisses.increment();
+
         return Mono.fromCallable(() -> {
             Future<Boolean> future = cerbosExecutor.submit(() -> {
                 Principal cerbosPrincipal = CerbosPrincipalBuilder.build(principal);
@@ -147,6 +186,7 @@ public class CerbosAuthorizationService {
             try {
                 boolean allowed = future.get(CERBOS_TIMEOUT_SECONDS, TimeUnit.SECONDS);
                 recordSuccess();
+                permissionCache.put(cacheKey, allowed);
                 log.debug("Cerbos object check: user={} collection={} action={} allowed={}",
                         principal.getUsername(), collectionId, action, allowed);
                 return allowed;
@@ -171,13 +211,39 @@ public class CerbosAuthorizationService {
         });
     }
 
+    /**
+     * Evicts all cached permission entries for a tenant.
+     * Called by {@link io.kelta.gateway.listener.CerbosCacheInvalidationListener}
+     * when Cerbos policies are re-synced for a tenant.
+     */
+    public void evictForTenant(String tenantId) {
+        long evicted = permissionCache.asMap().keySet().stream()
+                .filter(key -> key.startsWith(tenantId + ":"))
+                .peek(permissionCache::invalidate)
+                .count();
+        if (evicted > 0) {
+            cacheEvictions.increment(evicted);
+            log.info("Evicted {} cached permission entries for tenant {}", evicted, tenantId);
+        }
+    }
+
+    // ── Cache key builders ──────────────────────────────────────────────
+
+    private static String systemCacheKey(String tenantId, String profileId, String permission) {
+        return tenantId + ":" + profileId + ":system:" + permission;
+    }
+
+    private static String objectCacheKey(String tenantId, String profileId,
+                                          String collectionId, String action) {
+        return tenantId + ":" + profileId + ":object:" + collectionId + ":" + action;
+    }
+
     // ── Circuit breaker helpers ──────────────────────────────────────────
 
     private boolean isCircuitOpen() {
         long openUntil = circuitOpenUntil.get();
         if (openUntil == 0) return false;
         if (System.currentTimeMillis() < openUntil) return true;
-        // Cooldown expired — close the circuit and allow one probe
         circuitOpenUntil.set(0);
         consecutiveFailures.set(0);
         log.info("Cerbos circuit breaker closed — resuming checks");

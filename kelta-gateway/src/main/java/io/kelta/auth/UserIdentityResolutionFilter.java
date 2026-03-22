@@ -66,8 +66,17 @@ public class UserIdentityResolutionFilter implements GlobalFilter, Ordered {
             return chain.filter(exchange);
         }
 
-        // Set tenantId on principal from URL resolution
-        principal.setTenantId(tenantId);
+        // Set tenantId on principal from URL resolution (if not already set from JWT claims)
+        if (principal.getTenantId() == null) {
+            principal.setTenantId(tenantId);
+        }
+
+        // Skip worker lookup when profile is already in the JWT claims (kelta-auth tokens).
+        // This eliminates the synchronous worker call per request for kelta-auth-issued tokens.
+        if (principal.getProfileId() != null && !principal.getProfileId().isEmpty()) {
+            log.debug("Profile already resolved from JWT claims for user: {}", principal.getUsername());
+            return chain.filter(exchange);
+        }
 
         String email = principal.getUsername();
         String cacheKey = CACHE_KEY_PREFIX + tenantId + ":" + email;

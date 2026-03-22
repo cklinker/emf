@@ -1,15 +1,20 @@
 package io.kelta.worker.service;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import dev.cerbos.sdk.CerbosBlockingClient;
 import dev.cerbos.sdk.CheckResourcesResult;
 import dev.cerbos.sdk.CheckResult;
 import dev.cerbos.sdk.builders.AttributeValue;
 import dev.cerbos.sdk.builders.Principal;
 import dev.cerbos.sdk.builders.Resource;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -24,8 +29,12 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 /**
- * Wraps Cerbos SDK calls with hard timeouts, thread interruption, and a
- * circuit breaker to prevent thread-pool exhaustion.
+ * Wraps Cerbos SDK calls with caching, hard timeouts, thread interruption,
+ * and a circuit breaker to prevent thread-pool exhaustion.
+ *
+ * <p>Field access results are cached in-memory (Caffeine) and invalidated
+ * via Kafka events when Cerbos policies change. Record access checks are
+ * NOT cached because they depend on record attributes (ABAC/CEL rules).
  *
  * <h3>Fail-closed design</h3>
  * <p>When Cerbos is slow or unreachable, all checks return <b>deny</b>.
@@ -45,20 +54,51 @@ public class CerbosAuthorizationService {
     /** Seconds to keep the circuit open (deny all) before retrying. */
     private static final long CIRCUIT_BREAKER_COOLDOWN_SECONDS = 10;
 
+    /** Safety-net TTL for cache entries (primary invalidation is event-driven). */
+    private static final Duration CACHE_TTL = Duration.ofMinutes(10);
+
+    private static final int CACHE_MAX_SIZE = 5_000;
+
     private final CerbosBlockingClient cerbosClient;
     private final ExecutorService cerbosExecutor;
+
+    // Cache for field access: key = "tenantId:profileId:collectionId" → allowed field IDs
+    private final Cache<String, List<String>> fieldAccessCache;
+
+    // Metrics
+    private final Counter cacheHits;
+    private final Counter cacheMisses;
+    private final Counter cacheEvictions;
 
     // Circuit breaker state
     private final AtomicInteger consecutiveFailures = new AtomicInteger(0);
     private final AtomicLong circuitOpenUntil = new AtomicLong(0);
 
-    public CerbosAuthorizationService(CerbosBlockingClient cerbosClient) {
+    public CerbosAuthorizationService(CerbosBlockingClient cerbosClient, MeterRegistry meterRegistry) {
         this.cerbosClient = cerbosClient;
         this.cerbosExecutor = Executors.newCachedThreadPool(r -> {
             Thread t = new Thread(r, "cerbos-worker-check");
             t.setDaemon(true);
             return t;
         });
+
+        this.fieldAccessCache = Caffeine.newBuilder()
+                .maximumSize(CACHE_MAX_SIZE)
+                .expireAfterWrite(CACHE_TTL)
+                .recordStats()
+                .build();
+
+        this.cacheHits = Counter.builder("cerbos.cache.hits")
+                .tag("service", "worker")
+                .register(meterRegistry);
+        this.cacheMisses = Counter.builder("cerbos.cache.misses")
+                .tag("service", "worker")
+                .register(meterRegistry);
+        this.cacheEvictions = Counter.builder("cerbos.cache.evictions")
+                .tag("service", "worker")
+                .register(meterRegistry);
+
+        meterRegistry.gauge("cerbos.cache.size", fieldAccessCache, Cache::estimatedSize);
     }
 
     public boolean checkRecordAccess(String email, String profileId, String tenantId,
@@ -153,17 +193,36 @@ public class CerbosAuthorizationService {
 
     /**
      * Batch-checks field access for multiple fields in a single Cerbos gRPC call.
-     * Returns the list of fieldIds that are ALLOWED.
+     * Results are cached per (tenant, profile, collection) since field permissions
+     * don't depend on record data.
+     *
+     * @return the list of fieldIds that are ALLOWED
      */
     public List<String> batchCheckFieldAccess(String email, String profileId, String tenantId,
                                                String collectionId, List<String> fieldIds, String action) {
         if (isCircuitOpen()) {
             log.warn("Cerbos circuit open — denying all field access (fail-closed): user={} collection={}", email, collectionId);
-            return List.of(); // fail-closed: deny all fields
+            return List.of();
         }
         if (fieldIds.isEmpty()) {
             return fieldIds;
         }
+
+        // Check cache: if we have a cached result for this (tenant, profile, collection),
+        // filter the requested fieldIds against it.
+        String cacheKey = fieldCacheKey(tenantId, profileId, collectionId);
+        List<String> cachedAllowed = fieldAccessCache.getIfPresent(cacheKey);
+        if (cachedAllowed != null) {
+            cacheHits.increment();
+            Set<String> allowedSet = Set.copyOf(cachedAllowed);
+            List<String> result = fieldIds.stream()
+                    .filter(allowedSet::contains)
+                    .toList();
+            log.debug("Cerbos batch field check (cached): user={} collection={} fields={} allowed={}",
+                    email, collectionId, fieldIds.size(), result.size());
+            return result;
+        }
+        cacheMisses.increment();
 
         Future<List<String>> future = cerbosExecutor.submit(() -> {
             Principal principal = Principal.newInstance(email, "user")
@@ -197,6 +256,8 @@ public class CerbosAuthorizationService {
         try {
             List<String> allowed = future.get(CERBOS_TIMEOUT_SECONDS, TimeUnit.SECONDS);
             recordSuccess();
+            // Cache the allowed fields for this (tenant, profile, collection)
+            fieldAccessCache.put(cacheKey, List.copyOf(allowed));
             log.debug("Cerbos batch field check: user={} collection={} fields={} allowed={}",
                     email, collectionId, fieldIds.size(), allowed.size());
             return allowed;
@@ -205,25 +266,27 @@ public class CerbosAuthorizationService {
             recordFailure();
             log.error("Cerbos batch field check timed out (fail-closed): user={} collection={} fields={}",
                     email, collectionId, fieldIds.size());
-            return List.of(); // fail-closed: deny all fields
+            return List.of();
         } catch (Exception e) {
             future.cancel(true);
             recordFailure();
             log.error("Cerbos batch field check failed (fail-closed): user={} collection={} error={}",
                     email, collectionId, e.getMessage());
-            return List.of(); // fail-closed: deny all fields
+            return List.of();
         }
     }
 
     /**
      * Batch-checks record access for multiple records in a single Cerbos gRPC call.
-     * Returns the set of recordIds that are ALLOWED.
+     * NOT cached because record checks depend on record attributes (ABAC/CEL rules).
+     *
+     * @return the set of recordIds that are ALLOWED
      */
     public Set<String> batchCheckRecordAccess(String email, String profileId, String tenantId,
                                                String collectionId, List<Map<String, Object>> records, String action) {
         if (isCircuitOpen()) {
             log.warn("Cerbos circuit open — denying all record access (fail-closed): user={} collection={}", email, collectionId);
-            return Set.of(); // fail-closed: deny all records
+            return Set.of();
         }
         if (records.isEmpty()) {
             return Set.of();
@@ -261,7 +324,7 @@ public class CerbosAuthorizationService {
             for (Map<String, Object> record : records) {
                 String recordId = (String) record.get("id");
                 if (recordId == null) {
-                    continue; // null IDs are denied
+                    continue;
                 }
                 result.find(recordId).ifPresentOrElse(
                         checkResult -> {
@@ -286,14 +349,35 @@ public class CerbosAuthorizationService {
             recordFailure();
             log.error("Cerbos batch record check timed out (fail-closed): user={} collection={} records={}",
                     email, collectionId, records.size());
-            return Set.of(); // fail-closed: deny all records
+            return Set.of();
         } catch (Exception e) {
             future.cancel(true);
             recordFailure();
             log.error("Cerbos batch record check failed (fail-closed): user={} collection={} error={}",
                     email, collectionId, e.getMessage());
-            return Set.of(); // fail-closed: deny all records
+            return Set.of();
         }
+    }
+
+    /**
+     * Evicts all cached field access entries for a tenant.
+     * Called when Cerbos policies are re-synced for a tenant.
+     */
+    public void evictForTenant(String tenantId) {
+        long evicted = fieldAccessCache.asMap().keySet().stream()
+                .filter(key -> key.startsWith(tenantId + ":"))
+                .peek(fieldAccessCache::invalidate)
+                .count();
+        if (evicted > 0) {
+            cacheEvictions.increment(evicted);
+            log.info("Evicted {} cached field access entries for tenant {}", evicted, tenantId);
+        }
+    }
+
+    // ── Cache key builders ──────────────────────────────────────────────
+
+    private static String fieldCacheKey(String tenantId, String profileId, String collectionId) {
+        return tenantId + ":" + profileId + ":" + collectionId;
     }
 
     // ── Circuit breaker helpers ──────────────────────────────────────────
@@ -302,7 +386,6 @@ public class CerbosAuthorizationService {
         long openUntil = circuitOpenUntil.get();
         if (openUntil == 0) return false;
         if (System.currentTimeMillis() < openUntil) return true;
-        // Cooldown expired — close the circuit and allow one probe
         circuitOpenUntil.set(0);
         consecutiveFailures.set(0);
         log.info("Cerbos circuit breaker closed — resuming checks");

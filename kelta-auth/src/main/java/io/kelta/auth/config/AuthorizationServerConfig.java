@@ -31,8 +31,16 @@ import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 
 import io.kelta.auth.controller.ForcePasswordChangeController;
+import io.kelta.auth.federation.DynamicClientRegistrationRepository;
+import io.kelta.auth.federation.FederatedLoginSuccessHandler;
+import io.kelta.auth.federation.FederatedUserMapper;
+import io.kelta.auth.service.OidcDiscoveryService;
+import io.kelta.auth.service.WorkerClient;
+import io.kelta.crypto.EncryptionService;
 
 import org.springframework.security.authentication.AuthenticationProvider;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationProvider;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationValidator;
 
@@ -80,7 +88,12 @@ public class AuthorizationServerConfig {
 
     @Bean
     @Order(2)
-    public SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain defaultSecurityFilterChain(
+            HttpSecurity http,
+            @org.springframework.beans.factory.annotation.Autowired(required = false)
+            FederatedUserMapper federatedUserMapper,
+            WorkerClient workerClient,
+            ClientRegistrationRepository clientRegistrationRepository) throws Exception {
         http
                 .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(authorize -> authorize
@@ -117,7 +130,37 @@ public class AuthorizationServerConfig {
                         .ignoringRequestMatchers("/auth/session")
                 );
 
+        // Enable federated OAuth2 login only when federation is configured
+        if (federatedUserMapper != null
+                && clientRegistrationRepository instanceof DynamicClientRegistrationRepository) {
+            http.oauth2Login(oauth2 -> oauth2
+                    .loginPage("/login")
+                    .clientRegistrationRepository(clientRegistrationRepository)
+                    .successHandler(new FederatedLoginSuccessHandler(
+                            federatedUserMapper, workerClient))
+            );
+        }
+
         return http.build();
+    }
+
+    @Bean
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnBean(EncryptionService.class)
+    public ClientRegistrationRepository clientRegistrationRepository(
+            WorkerClient workerClient,
+            OidcDiscoveryService discoveryService,
+            EncryptionService encryptionService) {
+        return new DynamicClientRegistrationRepository(workerClient, discoveryService, encryptionService);
+    }
+
+    /**
+     * Fallback empty client registration repository when encryption is not configured.
+     * This allows the application to start without federation support in development/test.
+     */
+    @Bean
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean(ClientRegistrationRepository.class)
+    public ClientRegistrationRepository noOpClientRegistrationRepository() {
+        return registrationId -> null;
     }
 
     @Bean

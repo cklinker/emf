@@ -5,10 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
 
@@ -167,10 +164,16 @@ public class InternalBootstrapController {
         response.put("jwksUri", provider.get("jwks_uri"));
         response.put("audience", provider.get("audience"));
         response.put("clientId", provider.get("client_id"));
+        response.put("clientSecretEnc", provider.get("client_secret_enc"));
         response.put("rolesClaim", provider.get("roles_claim"));
         response.put("rolesMapping", provider.get("roles_mapping"));
         response.put("groupsClaim", provider.get("groups_claim"));
         response.put("groupsProfileMapping", provider.get("groups_profile_mapping"));
+        response.put("authorizationUri", provider.get("authorization_uri"));
+        response.put("tokenUri", provider.get("token_uri"));
+        response.put("userinfoUri", provider.get("userinfo_uri"));
+        response.put("endSessionUri", provider.get("end_session_uri"));
+        response.put("discoveryStatus", provider.get("discovery_status"));
 
         return ResponseEntity.ok(response);
     }
@@ -203,6 +206,136 @@ public class InternalBootstrapController {
         response.put("userId", row.get("id"));
         response.put("profileId", row.get("profile_id"));
         response.put("profileName", row.get("profile_name"));
+
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Lists all active OIDC providers for a tenant.
+     *
+     * <p>Used by kelta-auth to build the federated login page and
+     * dynamic client registrations for each tenant.
+     *
+     * @param tenantId the tenant UUID
+     * @return list of active OIDC provider configurations
+     */
+    @GetMapping("/oidc/providers")
+    public ResponseEntity<List<Map<String, Object>>> getOidcProvidersByTenant(
+            @RequestParam String tenantId) {
+        log.debug("Internal lookup: OIDC providers for tenant={}", tenantId);
+
+        List<Map<String, Object>> providers = repository.findActiveOidcProvidersByTenant(tenantId);
+        List<Map<String, Object>> result = new ArrayList<>();
+
+        for (Map<String, Object> provider : providers) {
+            Map<String, Object> response = new LinkedHashMap<>();
+            response.put("id", provider.get("id"));
+            response.put("name", provider.get("name"));
+            response.put("issuer", provider.get("issuer"));
+            response.put("jwksUri", provider.get("jwks_uri"));
+            response.put("audience", provider.get("audience"));
+            response.put("clientId", provider.get("client_id"));
+            response.put("clientSecretEnc", provider.get("client_secret_enc"));
+            response.put("rolesClaim", provider.get("roles_claim"));
+            response.put("rolesMapping", provider.get("roles_mapping"));
+            response.put("groupsClaim", provider.get("groups_claim"));
+            response.put("groupsProfileMapping", provider.get("groups_profile_mapping"));
+            response.put("authorizationUri", provider.get("authorization_uri"));
+            response.put("tokenUri", provider.get("token_uri"));
+            response.put("userinfoUri", provider.get("userinfo_uri"));
+            response.put("endSessionUri", provider.get("end_session_uri"));
+            response.put("discoveryStatus", provider.get("discovery_status"));
+            response.put("emailClaim", provider.get("email_claim"));
+            response.put("usernameClaim", provider.get("username_claim"));
+            response.put("nameClaim", provider.get("name_claim"));
+            result.add(response);
+        }
+
+        return ResponseEntity.ok(result);
+    }
+
+    /**
+     * Creates or updates a user during JIT (Just-In-Time) provisioning from SSO login.
+     *
+     * <p>If the user already exists:
+     * <ul>
+     *   <li>Updates last_login_at and login_count</li>
+     *   <li>Returns the existing user identity</li>
+     * </ul>
+     *
+     * <p>If the user does not exist:
+     * <ul>
+     *   <li>Creates with the provided profile (if matched from groups)</li>
+     *   <li>Creates as PENDING_ACTIVATION if no profile matched</li>
+     * </ul>
+     *
+     * @param body contains email, tenantId, firstName, lastName, profileId (nullable)
+     * @return user identity with userId, profileId, profileName, status
+     */
+    @PostMapping("/user-identity/jit")
+    public ResponseEntity<Map<String, Object>> jitProvisionUser(
+            @RequestBody Map<String, Object> body) {
+        String email = (String) body.get("email");
+        String tenantId = (String) body.get("tenantId");
+        String firstName = (String) body.get("firstName");
+        String lastName = (String) body.get("lastName");
+        String profileId = (String) body.get("profileId");
+
+        log.info("JIT provision: email={} tenant={} profileId={}", email, tenantId, profileId);
+
+        // Check if user already exists (any status)
+        Optional<Map<String, Object>> existingOpt = repository.findUserByEmailAnyStatus(email, tenantId);
+
+        if (existingOpt.isPresent()) {
+            Map<String, Object> existing = existingOpt.get();
+            String status = (String) existing.get("status");
+
+            // Update last login
+            repository.getJdbcTemplate().update(
+                    "UPDATE platform_user SET last_login_at = CURRENT_TIMESTAMP, login_count = login_count + 1 WHERE id = ?",
+                    existing.get("id"));
+
+            Map<String, Object> response = new LinkedHashMap<>();
+            response.put("userId", existing.get("id"));
+            response.put("profileId", existing.get("profile_id"));
+            response.put("status", status);
+            response.put("created", false);
+
+            // Re-resolve profile name
+            Optional<Map<String, Object>> identityOpt = repository.findUserIdentity(email, tenantId);
+            if (identityOpt.isPresent()) {
+                response.put("profileName", identityOpt.get().get("profile_name"));
+            }
+
+            return ResponseEntity.ok(response);
+        }
+
+        // Create new user via JIT provisioning
+        String userId = UUID.randomUUID().toString();
+        String status = profileId != null ? "ACTIVE" : "PENDING_ACTIVATION";
+
+        repository.getJdbcTemplate().update("""
+                INSERT INTO platform_user (id, tenant_id, email, username, first_name, last_name,
+                    profile_id, status, last_login_at, login_count, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """,
+                userId, tenantId, email, email, firstName, lastName, profileId, status);
+
+        log.info("JIT provisioned user: id={} email={} status={}", userId, email, status);
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("userId", userId);
+        response.put("profileId", profileId);
+        response.put("status", status);
+        response.put("created", true);
+
+        // Resolve profile name if profile was assigned
+        if (profileId != null) {
+            Optional<Map<String, Object>> identityOpt = repository.findUserIdentity(email, tenantId);
+            if (identityOpt.isPresent()) {
+                response.put("profileName", identityOpt.get().get("profile_name"));
+            }
+        }
 
         return ResponseEntity.ok(response);
     }

@@ -335,6 +335,7 @@ export function UsersPage({ testId = 'users-page' }: UsersPageProps) {
           <option value="ACTIVE">{t('users.statusActive')}</option>
           <option value="INACTIVE">{t('users.statusInactive')}</option>
           <option value="LOCKED">{t('users.statusLocked')}</option>
+          <option value="PENDING_ACTIVATION">Pending Activation</option>
         </select>
       </div>
 

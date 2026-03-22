@@ -31,6 +31,10 @@ spring:
     timeout-per-shutdown-phase: 30s
 
 kelta:
+  # AES-256 master key for envelope encryption (Base64-encoded 32 bytes)
+  # Generate with: openssl rand -base64 32
+  encryption:
+    key: ${KELTA_ENCRYPTION_KEY:}
   external-base-url: ${EXTERNAL_BASE_URL:http://localhost:8080}
   worker:
     id: ${WORKER_ID:}

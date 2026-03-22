@@ -162,9 +162,25 @@ export interface OIDCProvider {
   name: string;
   issuer: string;
   clientId: string;
-  clientSecret: string;
+  clientSecret?: string;
+  clientSecretEnc?: string;
   scopes: string[];
-  enabled: boolean;
+  active: boolean;
+  // OIDC Discovery endpoint overrides (auto-discovered from issuer when null)
+  jwksUri?: string;
+  authorizationUri?: string;
+  tokenUri?: string;
+  userinfoUri?: string;
+  endSessionUri?: string;
+  discoveryStatus?: string;
+  // Claim mappings
+  rolesClaim?: string;
+  rolesMapping?: string;
+  emailClaim?: string;
+  usernameClaim?: string;
+  nameClaim?: string;
+  groupsClaim?: string;
+  groupsProfileMapping?: string;
 }
 
 /**

@@ -14,6 +14,8 @@ public class KeltaSession implements Serializable {
     private String displayName;
     private List<String> groups;
     private String authSource; // "external" or "internal"
+    private String authMethod; // "internal", "sso:okta", "sso:entra", etc.
+    private String idpSessionId; // External IdP session ID for back-channel logout
     private Instant createdAt;
 
     public KeltaSession() {}
@@ -56,6 +58,12 @@ public class KeltaSession implements Serializable {
     public String getAuthSource() { return authSource; }
     public void setAuthSource(String authSource) { this.authSource = authSource; }
 
+    public String getAuthMethod() { return authMethod; }
+    public void setAuthMethod(String authMethod) { this.authMethod = authMethod; }
+
+    public String getIdpSessionId() { return idpSessionId; }
+    public void setIdpSessionId(String idpSessionId) { this.idpSessionId = idpSessionId; }
+
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
 
@@ -70,6 +78,8 @@ public class KeltaSession implements Serializable {
         private String displayName;
         private List<String> groups;
         private String authSource;
+        private String authMethod;
+        private String idpSessionId;
         private Instant createdAt;
 
         public Builder email(String email) { this.email = email; return this; }
@@ -80,11 +90,16 @@ public class KeltaSession implements Serializable {
         public Builder displayName(String displayName) { this.displayName = displayName; return this; }
         public Builder groups(List<String> groups) { this.groups = groups; return this; }
         public Builder authSource(String authSource) { this.authSource = authSource; return this; }
+        public Builder authMethod(String authMethod) { this.authMethod = authMethod; return this; }
+        public Builder idpSessionId(String idpSessionId) { this.idpSessionId = idpSessionId; return this; }
         public Builder createdAt(Instant createdAt) { this.createdAt = createdAt; return this; }
 
         public KeltaSession build() {
-            return new KeltaSession(email, tenantId, tenantSlug, profileId, profileName,
-                    displayName, groups, authSource, createdAt);
+            KeltaSession session = new KeltaSession(email, tenantId, tenantSlug, profileId,
+                    profileName, displayName, groups, authSource, createdAt);
+            session.setAuthMethod(authMethod);
+            session.setIdpSessionId(idpSessionId);
+            return session;
         }
     }
 }

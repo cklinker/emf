@@ -44,6 +44,9 @@ public class SecurityHeadersFilter implements GlobalFilter, Ordered {
             headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
             headers.set("Cache-Control", "no-store");
             headers.set("Pragma", "no-cache");
+            headers.set("Content-Security-Policy",
+                    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
+                    "img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'");
 
             log.debug("Added security headers to response for path: {}",
                     exchange.getRequest().getPath().value());

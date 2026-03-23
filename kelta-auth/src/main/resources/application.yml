@@ -23,6 +23,10 @@ spring:
     redis:
       namespace: kelta:auth:session
     timeout: 8h
+    cookie:
+      http-only: true
+      secure: true
+      same-site: strict
 
   thymeleaf:
     cache: true

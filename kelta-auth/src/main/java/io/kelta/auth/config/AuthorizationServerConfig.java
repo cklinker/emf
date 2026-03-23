@@ -1,5 +1,8 @@
 package io.kelta.auth.config;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
@@ -55,6 +58,8 @@ import java.util.function.Consumer;
 
 @Configuration
 public class AuthorizationServerConfig {
+
+    private static final Logger log = LoggerFactory.getLogger(AuthorizationServerConfig.class);
 
     @Bean
     @Order(1)
@@ -154,13 +159,20 @@ public class AuthorizationServerConfig {
     }
 
     /**
-     * Fallback empty client registration repository when encryption is not configured.
-     * This allows the application to start without federation support in development/test.
+     * Fallback client registration repository when encryption is not configured.
+     * Federation is disabled — any attempt to use an OIDC provider will fail fast
+     * with a clear error message rather than silently operating without encryption.
      */
     @Bean
     @org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean(ClientRegistrationRepository.class)
     public ClientRegistrationRepository noOpClientRegistrationRepository() {
-        return registrationId -> null;
+        log.warn("EncryptionService not configured (KELTA_ENCRYPTION_KEY not set). "
+                + "OAuth2 federation is DISABLED. Set KELTA_ENCRYPTION_KEY to enable OIDC provider federation.");
+        return registrationId -> {
+            throw new IllegalStateException(
+                    "OAuth2 federation is disabled because KELTA_ENCRYPTION_KEY is not configured. "
+                    + "Set the KELTA_ENCRYPTION_KEY environment variable to enable OIDC provider federation.");
+        };
     }
 
     @Bean

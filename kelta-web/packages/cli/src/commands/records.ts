@@ -12,11 +12,10 @@ export function registerRecordCommands(program: Command): void {
     .option('--size <number>', 'Page size', '25')
     .action(async (collection: string, opts: { json?: boolean; page: string; size: string }) => {
       const client = createClient();
-      const res = await client.get(`/api/${collection}`, {
+      const res = await client.get<unknown>(`/api/${collection}`, {
         params: { 'page[number]': opts.page, 'page[size]': opts.size },
       });
-
-      handleResponse(res, opts.json);
+      handleResponse(res.status, res.data, opts.json);
     });
 
   records
@@ -25,8 +24,8 @@ export function registerRecordCommands(program: Command): void {
     .option('--json', 'Output raw JSON')
     .action(async (collection: string, id: string, opts: { json?: boolean }) => {
       const client = createClient();
-      const res = await client.get(`/api/${collection}/${id}`);
-      handleResponse(res, opts.json);
+      const res = await client.get<unknown>(`/api/${collection}/${id}`);
+      handleResponse(res.status, res.data, opts.json);
     });
 
   records
@@ -36,11 +35,11 @@ export function registerRecordCommands(program: Command): void {
     .option('--json', 'Output raw JSON')
     .action(async (collection: string, opts: { data: string; json?: boolean }) => {
       const client = createClient();
-      const attributes = JSON.parse(opts.data);
-      const res = await client.post(`/api/${collection}`, {
+      const attributes = JSON.parse(opts.data) as Record<string, unknown>;
+      const res = await client.post<unknown>(`/api/${collection}`, {
         data: { type: collection, attributes },
       });
-      handleResponse(res, opts.json);
+      handleResponse(res.status, res.data, opts.json);
     });
 
   records
@@ -50,11 +49,11 @@ export function registerRecordCommands(program: Command): void {
     .option('--json', 'Output raw JSON')
     .action(async (collection: string, id: string, opts: { data: string; json?: boolean }) => {
       const client = createClient();
-      const attributes = JSON.parse(opts.data);
-      const res = await client.patch(`/api/${collection}/${id}`, {
+      const attributes = JSON.parse(opts.data) as Record<string, unknown>;
+      const res = await client.patch<unknown>(`/api/${collection}/${id}`, {
         data: { type: collection, id, attributes },
       });
-      handleResponse(res, opts.json);
+      handleResponse(res.status, res.data, opts.json);
     });
 
   records
@@ -62,26 +61,22 @@ export function registerRecordCommands(program: Command): void {
     .description('Delete a record')
     .action(async (collection: string, id: string) => {
       const client = createClient();
-      const res = await client.delete(`/api/${collection}/${id}`);
+      const res = await client.delete<unknown>(`/api/${collection}/${id}`);
 
       if (res.status === 204 || res.status === 200) {
-        console.log(`Deleted ${collection}/${id}`);
+        process.stdout.write(`Deleted ${collection}/${id}\n`);
       } else {
-        console.error(`Error ${res.status}: ${JSON.stringify(res.data)}`);
+        process.stderr.write(`Error ${String(res.status)}: ${JSON.stringify(res.data)}\n`);
         process.exit(1);
       }
     });
 }
 
-function handleResponse(res: { status: number; data: unknown }, json?: boolean): void {
-  if (res.status >= 400) {
-    console.error(`Error ${res.status}: ${JSON.stringify(res.data, null, 2)}`);
+function handleResponse(status: number, data: unknown, _json?: boolean): void {
+  if (status >= 400) {
+    process.stderr.write(`Error ${String(status)}: ${JSON.stringify(data, null, 2)}\n`);
     process.exit(1);
   }
 
-  if (json) {
-    console.log(JSON.stringify(res.data, null, 2));
-  } else {
-    console.log(JSON.stringify(res.data, null, 2));
-  }
+  process.stdout.write(JSON.stringify(data, null, 2) + '\n');
 }

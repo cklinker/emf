@@ -202,6 +202,12 @@ public class RouteConfigService {
                 {"superset", "/api/superset/**", "superset"},
                 {"bulk-jobs", "/api/bulk-jobs/**", "bulk-jobs"},
                 {"migration-runs", "/api/migration-runs/**", "migration-runs"},
+                // Developer tools & media
+                {"docs", "/api/docs/**", "docs"},
+                {"files", "/api/files/**", "files"},
+                {"images", "/api/images/**", "images"},
+                {"operations", "/api/operations/**", "operations"},
+                {"devices", "/api/devices/**", "devices"},
         };
 
         for (String[] routeDef : staticRoutes) {

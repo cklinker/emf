@@ -12,8 +12,9 @@ This is the Kelta Enterprise Platform monorepo. When working on tasks, follow th
 kelta-platform/runtime/runtime-core   # Core runtime library (Java, JAR)
 kelta-platform/runtime/runtime-events # Shared Kafka event classes (Java, JAR)
 kelta-gateway                         # Spring Cloud Gateway service (Java)
+kelta-auth                            # Internal OIDC provider, identity brokering, MFA (Java)
 kelta-worker                          # Worker service (Java, owns DB migrations)
-kelta-web                             # Frontend SDK, components, plugin-sdk (TypeScript/React)
+kelta-web                             # Frontend SDK, components, plugin-sdk, CLI (TypeScript/React)
 kelta-ui/app                          # Admin/builder UI (TypeScript/React/Vite)
 ```
 
@@ -164,7 +165,7 @@ gh pr merge --auto --squash
 
 | Fact | Value |
 |------|-------|
-| Flyway migration ranges | V1-V65 in kelta-worker/src/main/resources/db/migration/ |
+| Flyway migration ranges | V1-V111 in kelta-worker/src/main/resources/db/migration/ |
 | FieldType enum (runtime-core) | STRING, INTEGER, LONG, DOUBLE, BOOLEAN, DATE, DATETIME, JSON |
 | FieldService VALID_FIELD_TYPES | "string", "number", "boolean", "date", "datetime", "reference", "array", "object" |
 | Worker "number" field type maps to | runtime DOUBLE (not INTEGER) |
@@ -176,8 +177,11 @@ gh pr merge --auto --squash
 
 - `EPIC-PHASE1.md` — Phase 1: Multi-Tenancy and Permission Foundation
 - `EPIC-PHASE2.md` — Phase 2: Enhanced Object Model and Validation
+- `EPIC-WORKFLOWS.md` — Flow Engine vision and architecture
 - `TODO.md` — High-level implementation plan for all 6 phases
 - `Specifications.MD` — Platform specifications
+- `FEATURES.md` — Complete platform capability inventory with status tracking
+- `MARKETING.md` — Marketing-oriented feature document for the website
 
 As new phases are planned, their EPIC documents will follow the pattern `EPIC-PHASE<N>.md`.
 
@@ -198,6 +202,7 @@ The platform is deployed via ArgoCD to a local Kubernetes cluster. Use `kubectl`
 |----------|-------|
 | Namespace | `kelta` |
 | Gateway | `deployment/kelta-gateway` |
+| Auth | `deployment/kelta-auth` |
 | Worker | `deployment/kelta-worker` |
 
 ### Useful Commands

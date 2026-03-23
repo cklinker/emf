@@ -1,6 +1,7 @@
 package io.kelta.worker.controller;
 
 import io.kelta.runtime.context.TenantContext;
+import io.kelta.runtime.router.UserIdResolver;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -24,13 +25,16 @@ class PersonalAccessTokenControllerTest {
     @Mock private JdbcTemplate jdbcTemplate;
     @Mock private StringRedisTemplate redisTemplate;
     @Mock private ValueOperations<String, String> valueOps;
+    @Mock private UserIdResolver userIdResolver;
 
     private PersonalAccessTokenController controller;
 
     @BeforeEach
     void setUp() {
-        controller = new PersonalAccessTokenController(jdbcTemplate, redisTemplate);
+        controller = new PersonalAccessTokenController(jdbcTemplate, redisTemplate, userIdResolver);
         TenantContext.set("tenant-1");
+        // Default: resolve email to UUID
+        lenient().when(userIdResolver.resolve(eq("user-1"), eq("tenant-1"))).thenReturn("user-1");
     }
 
     @AfterEach

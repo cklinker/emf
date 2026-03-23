@@ -44,7 +44,9 @@ export function registerCollectionCommands(program: Command): void {
         return;
       }
 
-      process.stdout.write(`${'Name'.padEnd(30)} ${'Display Name'.padEnd(30)} ${'Fields'.padEnd(8)} Read-Only\n`);
+      process.stdout.write(
+        `${'Name'.padEnd(30)} ${'Display Name'.padEnd(30)} ${'Fields'.padEnd(8)} Read-Only\n`
+      );
       process.stdout.write('-'.repeat(80) + '\n');
       for (const col of data) {
         const attrs: CollectionAttrs = col.attributes ?? {};
@@ -83,7 +85,9 @@ export function registerCollectionCommands(program: Command): void {
       process.stdout.write(`  ${'Name'.padEnd(25)} ${'Type'.padEnd(15)} Nullable\n`);
       process.stdout.write(`  ${'-'.repeat(50)}\n`);
       for (const field of attrs.fields ?? []) {
-        process.stdout.write(`  ${field.name.padEnd(25)} ${field.type.padEnd(15)} ${field.nullable ? 'Yes' : 'No'}\n`);
+        process.stdout.write(
+          `  ${field.name.padEnd(25)} ${field.type.padEnd(15)} ${field.nullable ? 'Yes' : 'No'}\n`
+        );
       }
     });
 }

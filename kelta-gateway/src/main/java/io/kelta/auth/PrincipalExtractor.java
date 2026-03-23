@@ -58,6 +58,19 @@ public class PrincipalExtractor {
             principal.setTenantId(tenantId);
         }
 
+        // Detect connected app (client_credentials) tokens
+        String authMethod = jwt.getClaimAsString("auth_method");
+        if ("api_key".equals(authMethod)) {
+            String connectedAppId = jwt.getClaimAsString("connected_app_id");
+            if (connectedAppId != null && !connectedAppId.isEmpty()) {
+                principal.setConnectedAppId(connectedAppId);
+            }
+            String appScopes = jwt.getClaimAsString("app_scopes");
+            if (appScopes != null && !appScopes.isEmpty()) {
+                principal.setAppScopes(appScopes);
+            }
+        }
+
         return principal;
     }
     

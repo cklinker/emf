@@ -19,6 +19,7 @@ import {
   Settings,
   ArrowLeft,
   Check,
+  Key,
 } from 'lucide-react'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import {
@@ -114,6 +115,10 @@ export function UserMenu({
 
   const handleNavigateToApp = useCallback(() => {
     navigate(`/${tenantSlug}/app`)
+  }, [navigate, tenantSlug])
+
+  const handleNavigateToTokens = useCallback(() => {
+    navigate(`/${tenantSlug}/app/api-tokens`)
   }, [navigate, tenantSlug])
 
   return (
@@ -227,6 +232,12 @@ export function UserMenu({
         <DropdownMenuItem data-testid="profile-menu-item">
           <UserIcon className="mr-2 h-4 w-4" />
           {t('userMenu.profile')}
+        </DropdownMenuItem>
+
+        {/* API Tokens */}
+        <DropdownMenuItem onClick={handleNavigateToTokens} data-testid="api-tokens-menu-item">
+          <Key className="mr-2 h-4 w-4" />
+          API Tokens
         </DropdownMenuItem>
 
         {/* Context-specific navigation */}

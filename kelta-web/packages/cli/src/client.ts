@@ -35,7 +35,9 @@ export function createClient(configOverride?: Partial<KeltaConfig>): AxiosInstan
   const tenant = configOverride?.tenant || config?.tenant;
 
   if (!url || !token || !tenant) {
-    process.stderr.write('Not authenticated. Run: kelta auth login --url <url> --tenant <slug> --token <token>\n');
+    process.stderr.write(
+      'Not authenticated. Run: kelta auth login --url <url> --tenant <slug> --token <token>\n'
+    );
     process.exit(1);
   }
 

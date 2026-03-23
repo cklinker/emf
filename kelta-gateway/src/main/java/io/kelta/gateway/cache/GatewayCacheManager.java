@@ -59,6 +59,7 @@ public class GatewayCacheManager {
 
     private final Cache<String, String> tenantSlugCache;
     private final Cache<String, Integer> governorLimitCache;
+    private final Cache<String, String> customDomainCache; // domain → tenantSlug
     private final WebClient webClient;
 
     public GatewayCacheManager(
@@ -76,6 +77,11 @@ public class GatewayCacheManager {
         this.governorLimitCache = Caffeine.newBuilder()
                 .maximumSize(10_000)
                 .recordStats()
+                .build();
+
+        this.customDomainCache = Caffeine.newBuilder()
+                .expireAfterWrite(10, TimeUnit.MINUTES)
+                .maximumSize(10_000)
                 .build();
     }
 
@@ -239,5 +245,49 @@ public class GatewayCacheManager {
         } catch (Exception e) {
             log.warn("Failed to refresh governor limit cache from worker: {}", e.getMessage());
         }
+    }
+
+    // ── Custom Domain Cache ───────────────────────────────────────────────
+
+    /**
+     * Resolves a custom domain to a tenant slug.
+     *
+     * @param domain the custom domain (e.g., "app.acme.com")
+     * @return the tenant slug if the domain is registered, empty otherwise
+     */
+    public Optional<String> resolveCustomDomain(String domain) {
+        String slug = customDomainCache.getIfPresent(domain);
+        if (slug != null) return Optional.of(slug);
+
+        // Try loading from worker on cache miss
+        try {
+            String resolved = webClient.get()
+                    .uri("/internal/domains/resolve?domain={domain}", domain)
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .block(Duration.ofSeconds(2));
+            if (resolved != null && !resolved.isBlank()) {
+                customDomainCache.put(domain, resolved);
+                return Optional.of(resolved);
+            }
+        } catch (Exception e) {
+            log.debug("Custom domain lookup failed for {}: {}", domain, e.getMessage());
+        }
+
+        return Optional.empty();
+    }
+
+    /**
+     * Registers a custom domain mapping in the local cache.
+     */
+    public void registerCustomDomain(String domain, String tenantSlug) {
+        customDomainCache.put(domain, tenantSlug);
+    }
+
+    /**
+     * Removes a custom domain mapping from the local cache.
+     */
+    public void removeCustomDomain(String domain) {
+        customDomainCache.invalidate(domain);
     }
 }

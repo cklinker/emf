@@ -17,6 +17,8 @@ public class GatewayPrincipal {
     private String profileId;
     private String profileName;
     private String tenantId;
+    private String connectedAppId;
+    private String appScopes;
 
     /**
      * Creates a new GatewayPrincipal.
@@ -90,6 +92,29 @@ public class GatewayPrincipal {
 
     public void setTenantId(String tenantId) {
         this.tenantId = tenantId;
+    }
+
+    public String getConnectedAppId() {
+        return connectedAppId;
+    }
+
+    public void setConnectedAppId(String connectedAppId) {
+        this.connectedAppId = connectedAppId;
+    }
+
+    public String getAppScopes() {
+        return appScopes;
+    }
+
+    public void setAppScopes(String appScopes) {
+        this.appScopes = appScopes;
+    }
+
+    /**
+     * Returns true if this principal represents a connected app (machine identity).
+     */
+    public boolean isConnectedApp() {
+        return connectedAppId != null && !connectedAppId.isEmpty();
     }
 
     @Override

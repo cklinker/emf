@@ -47,4 +47,78 @@ test.describe("Connected Apps", () => {
     await expect(connectedAppsPage.nameInput).toBeVisible();
     await expect(connectedAppsPage.descriptionInput).toBeVisible();
   });
+
+  test("shows tokens button for connected apps", async ({ page }) => {
+    const connectedAppsPage = new ConnectedAppsPage(page);
+    await connectedAppsPage.goto();
+    await page.waitForLoadState("load");
+
+    const hasApps = await waitForAnyVisible([
+      connectedAppsPage.table,
+      page.getByTestId("empty-state"),
+    ]);
+
+    if (hasApps && (await connectedAppsPage.table.isVisible())) {
+      const tokensButton = page.getByTestId("tokens-button-0");
+      await expect(tokensButton).toBeVisible({ timeout: 5000 });
+    }
+  });
+
+  test("shows audit button for connected apps", async ({ page }) => {
+    const connectedAppsPage = new ConnectedAppsPage(page);
+    await connectedAppsPage.goto();
+    await page.waitForLoadState("load");
+
+    const hasApps = await waitForAnyVisible([
+      connectedAppsPage.table,
+      page.getByTestId("empty-state"),
+    ]);
+
+    if (hasApps && (await connectedAppsPage.table.isVisible())) {
+      const auditButton = page.getByTestId("audit-button-0");
+      await expect(auditButton).toBeVisible({ timeout: 5000 });
+    }
+  });
+
+  test("opens tokens modal when tokens button clicked", async ({ page }) => {
+    const connectedAppsPage = new ConnectedAppsPage(page);
+    await connectedAppsPage.goto();
+    await page.waitForLoadState("load");
+
+    const hasApps = await waitForAnyVisible([
+      connectedAppsPage.table,
+      page.getByTestId("empty-state"),
+    ]);
+
+    if (hasApps && (await connectedAppsPage.table.isVisible())) {
+      const tokensButton = page.getByTestId("tokens-button-0");
+      if (await tokensButton.isVisible()) {
+        await tokensButton.click();
+        await expect(page.getByTestId("tokens-modal-overlay")).toBeVisible({
+          timeout: 5000,
+        });
+      }
+    }
+  });
+
+  test("opens audit modal when audit button clicked", async ({ page }) => {
+    const connectedAppsPage = new ConnectedAppsPage(page);
+    await connectedAppsPage.goto();
+    await page.waitForLoadState("load");
+
+    const hasApps = await waitForAnyVisible([
+      connectedAppsPage.table,
+      page.getByTestId("empty-state"),
+    ]);
+
+    if (hasApps && (await connectedAppsPage.table.isVisible())) {
+      const auditButton = page.getByTestId("audit-button-0");
+      if (await auditButton.isVisible()) {
+        await auditButton.click();
+        await expect(page.getByTestId("audit-modal-overlay")).toBeVisible({
+          timeout: 5000,
+        });
+      }
+    }
+  });
 });

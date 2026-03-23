@@ -451,6 +451,10 @@ export function ConnectedAppsPage({
   const [editingApp, setEditingApp] = useState<ConnectedApp | undefined>(undefined)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [appToDelete, setAppToDelete] = useState<ConnectedApp | null>(null)
+  const [tokensAppId, setTokensAppId] = useState<string | null>(null)
+  const [tokensAppName, setTokensAppName] = useState('')
+  const [auditAppId, setAuditAppId] = useState<string | null>(null)
+  const [auditAppName, setAuditAppName] = useState('')
   const [createdCredentials, setCreatedCredentials] = useState<{
     clientId: string
     clientSecret: string
@@ -467,6 +471,28 @@ export function ConnectedAppsPage({
   })
 
   const appList: ConnectedApp[] = connectedApps ?? []
+
+  const { data: tokens, isLoading: tokensLoading } = useQuery({
+    queryKey: ['connected-app-tokens', tokensAppId],
+    queryFn: () => keltaClient.admin.connectedApps.listTokens(tokensAppId!),
+    enabled: !!tokensAppId,
+  })
+
+  const { data: auditEntries } = useQuery({
+    queryKey: ['connected-app-audit', auditAppId],
+    queryFn: () => keltaClient.admin.connectedApps.listAudit(auditAppId!),
+    enabled: !!auditAppId,
+  })
+
+  const revokeTokenMutation = useMutation({
+    mutationFn: ({ appId, tokenId }: { appId: string; tokenId: string }) =>
+      keltaClient.admin.connectedApps.revokeToken(appId, tokenId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['connected-app-tokens', tokensAppId] })
+      showToast('Token revoked', 'success')
+    },
+    onError: (err: Error) => showToast(err.message || 'Failed to revoke token', 'error'),
+  })
 
   const createMutation = useMutation({
     mutationFn: (data: ConnectedAppFormData) =>
@@ -710,6 +736,30 @@ export function ConnectedAppsPage({
                       <button
                         type="button"
                         className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-primary hover:border-primary hover:bg-muted"
+                        onClick={() => {
+                          setTokensAppId(app.id)
+                          setTokensAppName(app.name)
+                        }}
+                        aria-label={`Manage tokens for ${app.name}`}
+                        data-testid={`tokens-button-${index}`}
+                      >
+                        Tokens
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-primary hover:border-primary hover:bg-muted"
+                        onClick={() => {
+                          setAuditAppId(app.id)
+                          setAuditAppName(app.name)
+                        }}
+                        aria-label={`View audit trail for ${app.name}`}
+                        data-testid={`audit-button-${index}`}
+                      >
+                        Audit
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-primary hover:border-primary hover:bg-muted"
                         onClick={() => handleEdit(app)}
                         aria-label={`Edit ${app.name}`}
                         data-testid={`edit-button-${index}`}
@@ -760,6 +810,114 @@ export function ConnectedAppsPage({
         onCancel={handleDeleteCancel}
         variant="danger"
       />
+
+      {/* Token Management Modal */}
+      {tokensAppId && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={(e) => e.target === e.currentTarget && setTokensAppId(null)}
+          role="presentation"
+          data-testid="tokens-modal-overlay"
+        >
+          <div className="w-full max-w-[700px] max-h-[80vh] overflow-y-auto rounded-lg bg-background shadow-xl" role="dialog" aria-modal="true">
+            <div className="flex items-center justify-between border-b border-border p-6">
+              <h2 className="text-lg font-semibold text-foreground">Tokens — {tokensAppName}</h2>
+              <button type="button" className="rounded p-2 text-2xl leading-none text-muted-foreground hover:bg-muted" onClick={() => setTokensAppId(null)} aria-label="Close">&times;</button>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-muted-foreground">Use <code>client_id</code> and <code>client_secret</code> with <code>grant_type=client_credentials</code> at the OAuth2 token endpoint to obtain access tokens.</p>
+              {tokensLoading ? (
+                <LoadingSpinner size="small" label="Loading tokens..." />
+              ) : (
+                <table className="w-full border-collapse text-sm">
+                  <thead>
+                    <tr className="bg-muted">
+                      <th className="border-b border-border px-3 py-2 text-left text-xs font-semibold uppercase text-muted-foreground">Scopes</th>
+                      <th className="border-b border-border px-3 py-2 text-left text-xs font-semibold uppercase text-muted-foreground">Issued</th>
+                      <th className="border-b border-border px-3 py-2 text-left text-xs font-semibold uppercase text-muted-foreground">Expires</th>
+                      <th className="border-b border-border px-3 py-2 text-left text-xs font-semibold uppercase text-muted-foreground">Status</th>
+                      <th className="border-b border-border px-3 py-2 text-right text-xs font-semibold uppercase text-muted-foreground">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(tokens ?? []).map((token) => (
+                      <tr key={token.id} className="border-b border-border last:border-0">
+                        <td className="px-3 py-2">{token.scopes || '-'}</td>
+                        <td className="px-3 py-2">{token.issuedAt ? formatDate(new Date(token.issuedAt), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}</td>
+                        <td className="px-3 py-2">{token.expiresAt ? formatDate(new Date(token.expiresAt), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}</td>
+                        <td className="px-3 py-2">
+                          <span className={cn('inline-block rounded-full px-2 py-0.5 text-xs font-semibold', token.revoked ? 'bg-destructive/10 text-destructive' : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300')}>
+                            {token.revoked ? 'Revoked' : 'Active'}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          {!token.revoked && (
+                            <button
+                              type="button"
+                              className="rounded-md border border-destructive/30 px-2 py-1 text-xs text-destructive hover:bg-destructive/10"
+                              onClick={() => revokeTokenMutation.mutate({ appId: tokensAppId, tokenId: token.id })}
+                              data-testid={`revoke-token-${token.id}`}
+                            >
+                              Revoke
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                    {(tokens ?? []).length === 0 && (
+                      <tr><td colSpan={5} className="px-3 py-6 text-center text-muted-foreground">No tokens found.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Audit Trail Modal */}
+      {auditAppId && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={(e) => e.target === e.currentTarget && setAuditAppId(null)}
+          role="presentation"
+          data-testid="audit-modal-overlay"
+        >
+          <div className="w-full max-w-[700px] max-h-[80vh] overflow-y-auto rounded-lg bg-background shadow-xl" role="dialog" aria-modal="true">
+            <div className="flex items-center justify-between border-b border-border p-6">
+              <h2 className="text-lg font-semibold text-foreground">Audit Trail — {auditAppName}</h2>
+              <button type="button" className="rounded p-2 text-2xl leading-none text-muted-foreground hover:bg-muted" onClick={() => setAuditAppId(null)} aria-label="Close">&times;</button>
+            </div>
+            <div className="p-6">
+              <table className="w-full border-collapse text-sm">
+                <thead>
+                  <tr className="bg-muted">
+                    <th className="border-b border-border px-3 py-2 text-left text-xs font-semibold uppercase text-muted-foreground">Action</th>
+                    <th className="border-b border-border px-3 py-2 text-left text-xs font-semibold uppercase text-muted-foreground">Date</th>
+                    <th className="border-b border-border px-3 py-2 text-left text-xs font-semibold uppercase text-muted-foreground">Performed By</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(auditEntries ?? []).map((entry, i) => (
+                    <tr key={i} className="border-b border-border last:border-0">
+                      <td className="px-3 py-2">
+                        <span className="inline-block rounded-full bg-muted px-2 py-0.5 text-xs font-semibold">
+                          {String(entry.action)}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2">{entry.created_at ? formatDate(new Date(String(entry.created_at)), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}</td>
+                      <td className="px-3 py-2">{String(entry.performed_by ?? '-')}</td>
+                    </tr>
+                  ))}
+                  {(auditEntries ?? []).length === 0 && (
+                    <tr><td colSpan={3} className="px-3 py-6 text-center text-muted-foreground">No audit events.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

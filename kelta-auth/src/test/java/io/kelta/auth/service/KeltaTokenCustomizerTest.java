@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
 import org.springframework.security.oauth2.jwt.JwsHeader;
@@ -31,9 +32,12 @@ class KeltaTokenCustomizerTest {
     @Mock
     private Authentication authentication;
 
+    @Mock
+    private JdbcTemplate jdbcTemplate;
+
     @BeforeEach
     void setUp() {
-        customizer = new KeltaTokenCustomizer();
+        customizer = new KeltaTokenCustomizer(jdbcTemplate);
     }
 
     @Test

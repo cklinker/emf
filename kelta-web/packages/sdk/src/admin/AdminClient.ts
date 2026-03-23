@@ -1786,6 +1786,20 @@ export class AdminClient {
       const response = await this.axios.get(`/api/connected-apps/${id}/connected-app-tokens`);
       return unwrapJsonApiList<ConnectedAppToken>(response.data);
     },
+
+    generateToken: async (id: string): Promise<Record<string, string>> => {
+      const response = await this.axios.post(`/api/connected-apps/${id}/tokens`);
+      return response.data;
+    },
+
+    revokeToken: async (appId: string, tokenId: string): Promise<void> => {
+      await this.axios.delete(`/api/connected-apps/${appId}/tokens/${tokenId}`);
+    },
+
+    listAudit: async (id: string): Promise<Record<string, unknown>[]> => {
+      const response = await this.axios.get(`/api/connected-apps/${id}/audit`);
+      return (response.data as { data: Record<string, unknown>[] }).data ?? [];
+    },
   };
 
   // ---------------------------------------------------------------------------

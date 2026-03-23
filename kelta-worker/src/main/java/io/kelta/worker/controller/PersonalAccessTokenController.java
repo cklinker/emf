@@ -1,6 +1,7 @@
 package io.kelta.worker.controller;
 
 import io.kelta.runtime.context.TenantContext;
+import io.kelta.runtime.router.UserIdResolver;
 import io.kelta.worker.service.SecurityAuditLogger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,22 +47,33 @@ public class PersonalAccessTokenController {
 
     private final JdbcTemplate jdbcTemplate;
     private final StringRedisTemplate redisTemplate;
+    private final UserIdResolver userIdResolver;
     private final SecureRandom secureRandom = new SecureRandom();
 
-    public PersonalAccessTokenController(JdbcTemplate jdbcTemplate, StringRedisTemplate redisTemplate) {
+    public PersonalAccessTokenController(JdbcTemplate jdbcTemplate, StringRedisTemplate redisTemplate,
+                                         UserIdResolver userIdResolver) {
         this.jdbcTemplate = jdbcTemplate;
         this.redisTemplate = redisTemplate;
+        this.userIdResolver = userIdResolver;
+    }
+
+    /**
+     * Resolve the X-User-Id header (email) to a platform_user UUID.
+     */
+    private String resolveUserId(String userIdentifier, String tenantId) {
+        return userIdResolver.resolve(userIdentifier, tenantId);
     }
 
     /**
      * List current user's active (non-revoked) tokens. Never returns the token hash.
      */
     @GetMapping
-    public ResponseEntity<?> listTokens(@RequestHeader(value = "X-User-Id", required = false) String userId) {
+    public ResponseEntity<?> listTokens(@RequestHeader(value = "X-User-Id", required = false) String userIdentifier) {
         String tenantId = TenantContext.get();
-        if (tenantId == null || userId == null) {
+        if (tenantId == null || userIdentifier == null) {
             return ResponseEntity.badRequest().body(Map.of("error", "Missing tenant or user context"));
         }
+        String userId = resolveUserId(userIdentifier, tenantId);
 
         List<Map<String, Object>> tokens = jdbcTemplate.queryForList(
                 "SELECT id, name, token_prefix, scopes, expires_at, last_used_at, created_at " +
@@ -77,12 +89,13 @@ public class PersonalAccessTokenController {
      */
     @PostMapping
     public ResponseEntity<?> createToken(
-            @RequestHeader(value = "X-User-Id", required = false) String userId,
+            @RequestHeader(value = "X-User-Id", required = false) String userIdentifier,
             @RequestBody Map<String, Object> body) {
         String tenantId = TenantContext.get();
-        if (tenantId == null || userId == null) {
+        if (tenantId == null || userIdentifier == null) {
             return ResponseEntity.badRequest().body(Map.of("error", "Missing tenant or user context"));
         }
+        String userId = resolveUserId(userIdentifier, tenantId);
 
         // Validate request body
         String name = (String) body.get("name");
@@ -166,11 +179,12 @@ public class PersonalAccessTokenController {
     @DeleteMapping("/{tokenId}")
     public ResponseEntity<?> revokeToken(
             @PathVariable String tokenId,
-            @RequestHeader(value = "X-User-Id", required = false) String userId) {
+            @RequestHeader(value = "X-User-Id", required = false) String userIdentifier) {
         String tenantId = TenantContext.get();
-        if (tenantId == null || userId == null) {
+        if (tenantId == null || userIdentifier == null) {
             return ResponseEntity.badRequest().body(Map.of("error", "Missing tenant or user context"));
         }
+        String userId = resolveUserId(userIdentifier, tenantId);
 
         // Verify token belongs to current user
         var tokens = jdbcTemplate.queryForList(

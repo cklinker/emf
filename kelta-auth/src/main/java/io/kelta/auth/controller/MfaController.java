@@ -5,6 +5,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -23,6 +24,7 @@ import java.util.List;
  * @since 1.0.0
  */
 @Controller
+@ConditionalOnBean(TotpService.class)
 public class MfaController {
 
     private static final Logger log = LoggerFactory.getLogger(MfaController.class);

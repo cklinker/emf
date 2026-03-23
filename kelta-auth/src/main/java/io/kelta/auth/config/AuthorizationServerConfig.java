@@ -105,7 +105,7 @@ public class AuthorizationServerConfig {
             FederatedUserMapper federatedUserMapper,
             WorkerClient workerClient,
             ClientRegistrationRepository clientRegistrationRepository,
-            TotpService totpService,
+            @org.springframework.beans.factory.annotation.Autowired(required = false) TotpService totpService,
             PasswordPolicyService passwordPolicyService) throws Exception {
         http
                 .cors(Customizer.withDefaults())
@@ -132,7 +132,8 @@ public class AuthorizationServerConfig {
                         .loginProcessingUrl("/login")
                         .successHandler((request, response, authentication) -> {
                             // Check MFA requirements after successful password authentication
-                            if (authentication.getPrincipal() instanceof KeltaUserDetails userDetails) {
+                            if (authentication.getPrincipal() instanceof KeltaUserDetails userDetails
+                                    && totpService != null) {
                                 String userId = userDetails.getId();
                                 String tenantId = userDetails.getTenantId();
                                 String email = userDetails.getEmail();

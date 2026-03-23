@@ -1,0 +1,103 @@
+package io.kelta.gateway.listener;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.kelta.gateway.websocket.RealtimeWebSocketHandler;
+import io.kelta.gateway.websocket.SubscriptionManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.stereotype.Component;
+import org.springframework.web.reactive.socket.WebSocketSession;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * Bridges Kafka record change events to WebSocket subscribers.
+ *
+ * <p>Consumes from {@code kelta.record.changed} topic using a separate
+ * consumer group from the config event listeners. Routes events to
+ * subscribed WebSocket sessions based on tenant and collection.
+ *
+ * @since 1.0.0
+ */
+@Component
+public class RealtimeKafkaBridge {
+
+    private static final Logger log = LoggerFactory.getLogger(RealtimeKafkaBridge.class);
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+
+    private final SubscriptionManager subscriptionManager;
+    private final RealtimeWebSocketHandler webSocketHandler;
+
+    public RealtimeKafkaBridge(SubscriptionManager subscriptionManager,
+                                RealtimeWebSocketHandler webSocketHandler) {
+        this.subscriptionManager = subscriptionManager;
+        this.webSocketHandler = webSocketHandler;
+    }
+
+    @KafkaListener(
+            topics = "${kelta.kafka.topics.record-changed:kelta.record.changed}",
+            groupId = "kelta-gateway-realtime",
+            containerFactory = "recordEventKafkaListenerContainerFactory"
+    )
+    @SuppressWarnings("unchecked")
+    public void onRecordChanged(String message) {
+        try {
+            Map<String, Object> event = MAPPER.readValue(message, Map.class);
+
+            String tenantId = (String) event.get("tenantId");
+            Object payloadObj = event.get("payload");
+            if (!(payloadObj instanceof Map<?, ?> payload)) {
+                return;
+            }
+
+            String collectionName = (String) payload.get("collectionName");
+            String recordId = (String) payload.get("recordId");
+            String changeType = (String) payload.get("changeType");
+            Object data = payload.get("data");
+
+            if (tenantId == null || collectionName == null) {
+                return;
+            }
+
+            Set<WebSocketSession> subscribers = subscriptionManager.getSubscribers(tenantId, collectionName);
+            if (subscribers.isEmpty()) {
+                return;
+            }
+
+            // Build WebSocket event message
+            Map<String, Object> wsEvent = new LinkedHashMap<>();
+            wsEvent.put("event", "record.changed");
+            wsEvent.put("collection", collectionName);
+            wsEvent.put("changeType", changeType);
+            wsEvent.put("recordId", recordId);
+            if (data != null) {
+                wsEvent.put("data", data);
+            }
+            wsEvent.put("timestamp", event.get("timestamp"));
+
+            // Fan out to subscribers
+            int delivered = 0;
+            for (WebSocketSession session : subscribers) {
+                try {
+                    if (session.isOpen()) {
+                        webSocketHandler.sendMessage(session, wsEvent);
+                        delivered++;
+                    }
+                } catch (Exception e) {
+                    log.debug("Failed to deliver event to session {}: {}", session.getId(), e.getMessage());
+                }
+            }
+
+            if (delivered > 0) {
+                log.debug("Routed {} event for {}/{} to {} sessions",
+                        changeType, collectionName, recordId, delivered);
+            }
+
+        } catch (Exception e) {
+            log.error("Failed to process record changed event for realtime bridge: {}", e.getMessage());
+        }
+    }
+}

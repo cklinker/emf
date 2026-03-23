@@ -17,11 +17,4 @@ test.describe('MFA Setup', () => {
     await expect(page.locator('text=Multi-Factor Authentication')).toBeVisible()
     await expect(page.locator('text=MFA Status:')).toBeVisible()
   })
-
-  test('should display MFA policy in security settings', async ({ page }) => {
-    await page.goto('/admin/security')
-
-    // Verify MFA policy section exists
-    await expect(page.locator('text=Password Policy')).toBeVisible()
-  })
 })

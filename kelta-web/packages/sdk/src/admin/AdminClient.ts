@@ -1789,7 +1789,7 @@ export class AdminClient {
 
     generateToken: async (id: string): Promise<Record<string, string>> => {
       const response = await this.axios.post(`/api/connected-apps/${id}/tokens`);
-      return response.data;
+      return response.data as Record<string, string>;
     },
 
     revokeToken: async (appId: string, tokenId: string): Promise<void> => {

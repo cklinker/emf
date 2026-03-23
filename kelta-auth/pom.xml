@@ -124,6 +124,13 @@
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
 
+        <!-- TOTP (Time-based One-Time Password) for MFA -->
+        <dependency>
+            <groupId>dev.samstevens.totp</groupId>
+            <artifactId>totp</artifactId>
+            <version>1.7.1</version>
+        </dependency>
+
         <!-- Testing dependencies -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Two-Factor Authentication — Kelta Platform</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f1117; color: #e4e4e7;
+            min-height: 100vh; display: flex; align-items: center; justify-content: center;
+        }
+        .container { width: 100%; max-width: 400px; padding: 2rem; }
+        .logo { text-align: center; margin-bottom: 2rem; }
+        .logo h1 { font-size: 1.5rem; font-weight: 600; color: #fff; }
+        .card {
+            background: #1a1b23; border: 1px solid #2a2b35; border-radius: 12px; padding: 2rem;
+        }
+        .card h2 { font-size: 1.1rem; margin-bottom: 0.5rem; color: #fff; }
+        .card p { font-size: 0.875rem; color: #a1a1aa; margin-bottom: 1.5rem; }
+        .form-group { margin-bottom: 1rem; }
+        label { display: block; font-size: 0.875rem; color: #a1a1aa; margin-bottom: 0.5rem; }
+        input[type="text"] {
+            width: 100%; padding: 0.75rem; background: #0f1117; border: 1px solid #2a2b35;
+            border-radius: 8px; color: #fff; font-size: 1.25rem; text-align: center;
+            letter-spacing: 0.5em;
+        }
+        input:focus { outline: none; border-color: #6366f1; }
+        .btn {
+            width: 100%; padding: 0.75rem; background: #6366f1; color: #fff; border: none;
+            border-radius: 8px; font-size: 0.875rem; font-weight: 500; cursor: pointer;
+            margin-top: 0.5rem;
+        }
+        .btn:hover { background: #5558e6; }
+        .error { background: #371520; border: 1px solid #5c2134; color: #f87171;
+            padding: 0.75rem; border-radius: 8px; margin-bottom: 1rem; font-size: 0.875rem; }
+        .links { text-align: center; margin-top: 1rem; }
+        .links a { color: #6366f1; font-size: 0.875rem; text-decoration: none; }
+        .links a:hover { text-decoration: underline; }
+        .recovery-form { display: none; }
+        .recovery-form.active { display: block; }
+        .totp-form.hidden { display: none; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="logo"><h1>Kelta</h1></div>
+    <div class="card">
+        <h2>Two-Factor Authentication</h2>
+        <p>Enter the 6-digit code from your authenticator app.</p>
+
+        <div th:if="${error}" class="error" th:text="${error}"></div>
+
+        <div id="totp-form" class="totp-form">
+            <form method="post" th:action="@{/mfa-challenge}">
+                <div class="form-group">
+                    <label for="code">Verification Code</label>
+                    <input type="text" id="code" name="code" maxlength="6" pattern="[0-9]{6}"
+                           autocomplete="one-time-code" autofocus required
+                           placeholder="000000">
+                </div>
+                <button type="submit" class="btn">Verify</button>
+            </form>
+        </div>
+
+        <div id="recovery-form" class="recovery-form">
+            <form method="post" th:action="@{/mfa-challenge/recovery}">
+                <div class="form-group">
+                    <label for="recovery-code">Recovery Code</label>
+                    <input type="text" id="recovery-code" name="code"
+                           autocomplete="off" placeholder="xxxx-xxxx" required>
+                </div>
+                <button type="submit" class="btn">Use Recovery Code</button>
+            </form>
+        </div>
+
+        <div class="links">
+            <a href="#" id="toggle-recovery" onclick="toggleRecovery(); return false;">
+                Use a recovery code
+            </a>
+            <br><br>
+            <a th:href="@{/login}">Cancel</a>
+        </div>
+    </div>
+</div>
+
+<script>
+    function toggleRecovery() {
+        var totp = document.getElementById('totp-form');
+        var recovery = document.getElementById('recovery-form');
+        var link = document.getElementById('toggle-recovery');
+        if (recovery.classList.contains('active')) {
+            recovery.classList.remove('active');
+            totp.classList.remove('hidden');
+            link.textContent = 'Use a recovery code';
+        } else {
+            recovery.classList.add('active');
+            totp.classList.add('hidden');
+            link.textContent = 'Use authenticator app';
+        }
+    }
+</script>
+</body>
+</html>

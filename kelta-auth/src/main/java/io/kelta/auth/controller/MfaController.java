@@ -5,7 +5,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,7 +23,6 @@ import java.util.List;
  * @since 1.0.0
  */
 @Controller
-@ConditionalOnBean(TotpService.class)
 public class MfaController {
 
     private static final Logger log = LoggerFactory.getLogger(MfaController.class);
@@ -39,7 +37,7 @@ public class MfaController {
 
     private final TotpService totpService;
 
-    public MfaController(TotpService totpService) {
+    public MfaController(@org.springframework.beans.factory.annotation.Autowired(required = false) TotpService totpService) {
         this.totpService = totpService;
     }
 
@@ -49,7 +47,7 @@ public class MfaController {
 
     @GetMapping("/mfa-challenge")
     public String showMfaChallenge(HttpSession session, Model model) {
-        if (session.getAttribute(SESSION_MFA_PENDING) == null) {
+        if (totpService == null || session.getAttribute(SESSION_MFA_PENDING) == null) {
             return "redirect:/login";
         }
         model.addAttribute("email", session.getAttribute(SESSION_MFA_EMAIL));

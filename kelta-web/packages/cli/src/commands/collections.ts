@@ -1,6 +1,22 @@
 import { Command } from 'commander';
 import { createClient } from '../client.js';
 
+interface CollectionAttrs {
+  name?: string;
+  displayName?: string;
+  fields?: { name: string; type: string; nullable: boolean }[];
+  readOnly?: boolean;
+}
+
+interface CollectionResource {
+  id: string;
+  attributes?: CollectionAttrs;
+}
+
+interface CollectionResponse {
+  data?: CollectionResource[] | CollectionResource;
+}
+
 export function registerCollectionCommands(program: Command): void {
   const collections = program.command('collections').description('Collection management');
 
@@ -10,33 +26,33 @@ export function registerCollectionCommands(program: Command): void {
     .option('--json', 'Output raw JSON')
     .action(async (opts: { json?: boolean }) => {
       const client = createClient();
-      const res = await client.get('/api/collections');
+      const res = await client.get<CollectionResponse>('/api/collections');
 
       if (res.status !== 200) {
-        console.error(`Error ${res.status}: ${JSON.stringify(res.data)}`);
+        process.stderr.write(`Error ${String(res.status)}: ${JSON.stringify(res.data)}\n`);
         process.exit(1);
       }
 
       if (opts.json) {
-        console.log(JSON.stringify(res.data, null, 2));
+        process.stdout.write(JSON.stringify(res.data, null, 2) + '\n');
         return;
       }
 
-      const collections = res.data?.data || [];
-      if (collections.length === 0) {
-        console.log('No collections found.');
+      const data = Array.isArray(res.data?.data) ? res.data.data : [];
+      if (data.length === 0) {
+        process.stdout.write('No collections found.\n');
         return;
       }
 
-      console.log(`${'Name'.padEnd(30)} ${'Display Name'.padEnd(30)} ${'Fields'.padEnd(8)} Read-Only`);
-      console.log('-'.repeat(80));
-      for (const col of collections) {
-        const attrs = col.attributes || col;
-        const name = (attrs.name || col.id || '').padEnd(30);
-        const display = (attrs.displayName || '').padEnd(30);
-        const fields = String(attrs.fields?.length || 0).padEnd(8);
+      process.stdout.write(`${'Name'.padEnd(30)} ${'Display Name'.padEnd(30)} ${'Fields'.padEnd(8)} Read-Only\n`);
+      process.stdout.write('-'.repeat(80) + '\n');
+      for (const col of data) {
+        const attrs: CollectionAttrs = col.attributes ?? {};
+        const name = (attrs.name ?? col.id ?? '').padEnd(30);
+        const display = (attrs.displayName ?? '').padEnd(30);
+        const fields = String(attrs.fields?.length ?? 0).padEnd(8);
         const readOnly = attrs.readOnly ? 'Yes' : 'No';
-        console.log(`${name} ${display} ${fields} ${readOnly}`);
+        process.stdout.write(`${name} ${display} ${fields} ${readOnly}\n`);
       }
     });
 
@@ -46,27 +62,28 @@ export function registerCollectionCommands(program: Command): void {
     .option('--json', 'Output raw JSON')
     .action(async (name: string, opts: { json?: boolean }) => {
       const client = createClient();
-      const res = await client.get(`/api/collections/${name}`);
+      const res = await client.get<CollectionResponse>(`/api/collections/${name}`);
 
       if (res.status !== 200) {
-        console.error(`Error ${res.status}: ${JSON.stringify(res.data)}`);
+        process.stderr.write(`Error ${String(res.status)}: ${JSON.stringify(res.data)}\n`);
         process.exit(1);
       }
 
       if (opts.json) {
-        console.log(JSON.stringify(res.data, null, 2));
+        process.stdout.write(JSON.stringify(res.data, null, 2) + '\n');
         return;
       }
 
-      const col = res.data?.data?.attributes || res.data?.data || res.data;
-      console.log(`Collection: ${col.name || name}`);
-      console.log(`Display:    ${col.displayName || ''}`);
-      console.log(`Read-Only:  ${col.readOnly ? 'Yes' : 'No'}`);
-      console.log(`\nFields:`);
-      console.log(`  ${'Name'.padEnd(25)} ${'Type'.padEnd(15)} Nullable`);
-      console.log(`  ${'-'.repeat(50)}`);
-      for (const field of col.fields || []) {
-        console.log(`  ${(field.name || '').padEnd(25)} ${(field.type || '').padEnd(15)} ${field.nullable ? 'Yes' : 'No'}`);
+      const resource = !Array.isArray(res.data?.data) ? res.data?.data : undefined;
+      const attrs: CollectionAttrs = resource?.attributes ?? {};
+      process.stdout.write(`Collection: ${attrs.name ?? name}\n`);
+      process.stdout.write(`Display:    ${attrs.displayName ?? ''}\n`);
+      process.stdout.write(`Read-Only:  ${attrs.readOnly ? 'Yes' : 'No'}\n`);
+      process.stdout.write('\nFields:\n');
+      process.stdout.write(`  ${'Name'.padEnd(25)} ${'Type'.padEnd(15)} Nullable\n`);
+      process.stdout.write(`  ${'-'.repeat(50)}\n`);
+      for (const field of attrs.fields ?? []) {
+        process.stdout.write(`  ${field.name.padEnd(25)} ${field.type.padEnd(15)} ${field.nullable ? 'Yes' : 'No'}\n`);
       }
     });
 }

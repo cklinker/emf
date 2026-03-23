@@ -7,6 +7,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -14,6 +16,8 @@ import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
+
+import java.util.Map;
 
 /**
  * Global filter that validates JWT tokens and extracts authenticated principal information.
@@ -34,6 +38,8 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
     private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
     private static final String PRINCIPAL_ATTRIBUTE = "gateway.principal";
+
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final DynamicReactiveJwtDecoder jwtDecoder;
     private final PrincipalExtractor principalExtractor;
@@ -140,13 +146,23 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
     private Mono<Void> unauthorized(ServerWebExchange exchange, String message) {
         exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
         exchange.getResponse().getHeaders().add(HttpHeaders.CONTENT_TYPE, "application/json");
-        
-        String errorJson = String.format(
-            "{\"error\":{\"status\":401,\"code\":\"UNAUTHORIZED\",\"message\":\"%s\",\"path\":\"%s\"}}",
-            message,
-            exchange.getRequest().getPath().value()
-        );
-        
+
+        String path = exchange.getRequest().getPath().value();
+        String errorJson;
+        try {
+            errorJson = OBJECT_MAPPER.writeValueAsString(Map.of(
+                    "error", Map.of(
+                            "status", 401,
+                            "code", "UNAUTHORIZED",
+                            "message", message,
+                            "path", path
+                    )
+            ));
+        } catch (JsonProcessingException e) {
+            log.error("Failed to serialize error response", e);
+            errorJson = "{\"error\":{\"status\":401,\"code\":\"UNAUTHORIZED\"}}";
+        }
+
         return exchange.getResponse().writeWith(
             Mono.just(exchange.getResponse().bufferFactory().wrap(errorJson.getBytes()))
         );

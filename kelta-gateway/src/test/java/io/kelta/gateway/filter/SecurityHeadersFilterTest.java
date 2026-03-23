@@ -129,6 +129,22 @@ class SecurityHeadersFilterTest {
     }
 
     @Test
+    @DisplayName("Should add Content-Security-Policy header")
+    void shouldAddContentSecurityPolicyHeader() {
+        MockServerWebExchange exchange = createExchange("/api/users");
+        when(chain.filter(any(ServerWebExchange.class))).thenReturn(Mono.empty());
+
+        StepVerifier.create(filter.filter(exchange, chain))
+                .verifyComplete();
+
+        HttpHeaders headers = exchange.getResponse().getHeaders();
+        String csp = headers.getFirst("Content-Security-Policy");
+        assertThat(csp).isNotNull();
+        assertThat(csp).contains("default-src 'self'");
+        assertThat(csp).contains("frame-ancestors 'none'");
+    }
+
+    @Test
     @DisplayName("Should add all security headers to every response")
     void shouldAddAllSecurityHeaders() {
         MockServerWebExchange exchange = createExchange("/api/data");
@@ -148,6 +164,7 @@ class SecurityHeadersFilterTest {
                 .isEqualTo("camera=(), microphone=(), geolocation=()");
         assertThat(headers.getFirst("Cache-Control")).isEqualTo("no-store");
         assertThat(headers.getFirst("Pragma")).isEqualTo("no-cache");
+        assertThat(headers.getFirst("Content-Security-Policy")).contains("default-src 'self'");
     }
 
     @Test

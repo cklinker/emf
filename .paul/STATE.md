@@ -5,19 +5,21 @@
 See: .paul/PROJECT.md (updated 2026-03-22)
 
 **Core value:** Teams can build and manage business applications through a multi-tenant enterprise platform with configurable objects, fields, permissions, and workflows — without custom development.
-**Current focus:** Phase 1 — Foundation Gaps (3 of 4 plans complete)
+**Current focus:** Phase 1B — Security Hardening (1 of 2 plans complete)
 
 ## Current Position
 
 Milestone: v1.0 Competitive Parity
-Phase: 1 of 5 (Foundation Gaps) — In Progress
-Plan: 01-03 complete, ready for next plan
+Phase: 1B of 7 (Security Hardening) — In Progress
+Plan: 01b-01 complete, 01b-02 next
 Status: Loop closed — ready for next PLAN
-Last activity: 2026-03-22 — Unified plan 01-03 (API keys / connected app tokens)
+Last activity: 2026-03-22 — Unified plan 01b-01 (code-level security fixes)
 
 Progress:
-- Milestone: [██░░░░░░░░] 15%
-- Phase 1: [███████░░░] 75% (3 of 4 plans)
+- Milestone: [███░░░░░░░] 28%
+- Phase 1: [██████████] 100% — Complete
+- Phase 1A: [██████████] 100% — Complete
+- Phase 1B: [█████░░░░░] 50% (1 of 2 plans)
 
 ## Loop Position
 
@@ -30,15 +32,17 @@ PLAN ──▶ APPLY ──▶ UNIFY
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 3
-- Average duration: 25 min
-- Total execution time: 1.25 hours
+- Total plans completed: 6
+- Average duration: 20 min
+- Total execution time: ~2 hours
 
 **By Phase:**
 
 | Phase | Plans | Total Time | Avg/Plan |
 |-------|-------|------------|----------|
-| 01-foundation-gaps | 3/4 | 75 min | 25 min |
+| 01-foundation-gaps | 4/4 | ~100 min | 25 min |
+| 01a-namespace-alignment | 1/1 | ~10 min | 10 min |
+| 01b-security-hardening | 1/2 | ~15 min | 15 min |
 
 ## Accumulated Context
 
@@ -51,6 +55,10 @@ Documents: .paul/codebase/ (7 files)
 - .paul/research/strapi-vs-kelta.md
 - .paul/research/jsonapi-atomic-operations.md
 
+### Security Audit Completed
+Date: 2026-03-22
+Findings: 12 items — 5 high (FIXED in 01b-01), 3 medium (01b-02), 4 infra (01b-02)
+
 ### Decisions
 - GraphQL API excluded from roadmap (user decision)
 - Batch operations to follow JSON:API Atomic Operations extension
@@ -62,6 +70,12 @@ Documents: .paul/codebase/ (7 files)
 - Redis jti set for near-instant token revocation
 - Token generation rate limited: 10 per 5 min per app
 - All features require full UI + unit tests + e2e tests
+- NIST SP 800-63B password defaults (length > complexity, no arbitrary rotation)
+- Bundled 10k dictionary (no HIBP API) — open source only
+- Namespace alignment: single PR, all 509 files (user decision)
+- Security audit: full scope including infra recommendations (user decision)
+- CSP allows 'unsafe-inline' for styles (React needs it)
+- Federation fail-fast on lookup, not startup
 
 ### Deferred Issues
 | Issue | Origin | Effort | Revisit |
@@ -74,6 +88,10 @@ Documents: .paul/codebase/ (7 files)
 | IP restriction enforcement in gateway | 01-03 | M | Phase 2 (Enterprise Security) |
 | Scope enforcement in RouteAuthorizationFilter | 01-03 | M | Phase 2 (Enterprise Security) |
 | Dynamic OAuth2 client registration on app create | 01-03 | M | Next connected apps enhancement |
+| Database TLS (sslmode=require) | Security Audit | S | Phase 1B-02 infra doc |
+| Redis TLS | Security Audit | S | Phase 1B-02 infra doc |
+| Service-to-service mTLS | Security Audit | M | Phase 1B-02 infra doc |
+| K8s network policies | Security Audit | S | Phase 1B-02 infra doc |
 
 ### Blockers/Concerns
 None.
@@ -81,15 +99,9 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-22
-Stopped at: Plan 01-03 loop closed, session paused
-Next action: Run /paul:plan for plan 01-04 (Enhanced Password Policies)
-Resume file: .paul/HANDOFF-2026-03-22.md
-Resume context:
-- Phase 1 at 75% (3 of 4 plans complete: email, scheduler, API keys)
-- 01-04 is the LAST plan in Phase 1 (enhanced password policies)
-- After 01-04: Phase 1 transition, then Phase 2 (Enterprise Security)
-- Enterprise audit enabled — include all findings, no deferrals
-- All features need full UI + unit tests + e2e tests
+Stopped at: Plan 01b-01 loop closed
+Next action: /paul:apply .paul/phases/01b-security-hardening/01b-02-PLAN.md
+Resume file: .paul/phases/01b-security-hardening/01b-02-PLAN.md
 
 ---
 *STATE.md — Updated after every significant action*

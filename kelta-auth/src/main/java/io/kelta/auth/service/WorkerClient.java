@@ -216,4 +216,37 @@ public class WorkerClient {
             return Optional.empty();
         }
     }
+
+    // -----------------------------------------------------------------------
+    // SMS Verification
+    // -----------------------------------------------------------------------
+
+    public boolean sendSmsCode(String phoneNumber, String tenantId) {
+        try {
+            restClient.post()
+                    .uri("/internal/sms/send")
+                    .body(Map.of("phoneNumber", phoneNumber, "tenantId", tenantId))
+                    .retrieve()
+                    .toBodilessEntity();
+            return true;
+        } catch (Exception e) {
+            log.error("Failed to send SMS code via worker: phone={}, error={}", phoneNumber, e.getMessage());
+            return false;
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    public boolean verifySmsCode(String phoneNumber, String code, String tenantId) {
+        try {
+            Map<String, Object> response = restClient.post()
+                    .uri("/internal/sms/verify")
+                    .body(Map.of("phoneNumber", phoneNumber, "code", code, "tenantId", tenantId))
+                    .retrieve()
+                    .body(Map.class);
+            return response != null && Boolean.TRUE.equals(response.get("verified"));
+        } catch (Exception e) {
+            log.error("Failed to verify SMS code via worker: error={}", e.getMessage());
+            return false;
+        }
+    }
 }

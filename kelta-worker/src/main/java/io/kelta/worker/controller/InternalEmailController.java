@@ -1,6 +1,6 @@
 package io.kelta.worker.controller;
 
-import io.kelta.worker.service.email.DefaultEmailService;
+import io.kelta.runtime.module.integration.spi.EmailService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -28,11 +28,11 @@ public class InternalEmailController {
 
     private static final Logger log = LoggerFactory.getLogger(InternalEmailController.class);
 
-    private final DefaultEmailService emailService;
+    private final EmailService emailService;
     private final String internalToken;
 
     public InternalEmailController(
-            DefaultEmailService emailService,
+            EmailService emailService,
             @Value("${kelta.internal.token:}") String internalToken) {
         this.emailService = emailService;
         this.internalToken = internalToken;

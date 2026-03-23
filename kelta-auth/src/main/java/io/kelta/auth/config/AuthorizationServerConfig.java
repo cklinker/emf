@@ -34,14 +34,20 @@ import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 
 import io.kelta.auth.controller.ForcePasswordChangeController;
+import io.kelta.auth.controller.MfaController;
 import io.kelta.auth.federation.DynamicClientRegistrationRepository;
 import io.kelta.auth.federation.FederatedLoginSuccessHandler;
 import io.kelta.auth.federation.FederatedUserMapper;
+import io.kelta.auth.model.KeltaUserDetails;
 import io.kelta.auth.service.OidcDiscoveryService;
+import io.kelta.auth.service.PasswordPolicyService;
+import io.kelta.auth.service.TotpService;
 import io.kelta.auth.service.WorkerClient;
 import io.kelta.crypto.EncryptionService;
 
+import jakarta.servlet.http.HttpSession;
 import org.springframework.security.authentication.AuthenticationProvider;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationProvider;
@@ -98,13 +104,19 @@ public class AuthorizationServerConfig {
             @org.springframework.beans.factory.annotation.Autowired(required = false)
             FederatedUserMapper federatedUserMapper,
             WorkerClient workerClient,
-            ClientRegistrationRepository clientRegistrationRepository) throws Exception {
+            ClientRegistrationRepository clientRegistrationRepository,
+            TotpService totpService,
+            PasswordPolicyService passwordPolicyService) throws Exception {
         http
                 .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(
                                 "/login",
                                 "/change-password",
+                                "/mfa-challenge",
+                                "/mfa-challenge/recovery",
+                                "/mfa-setup",
+                                "/mfa-setup/complete",
                                 "/actuator/health",
                                 "/actuator/health/**",
                                 "/auth/session",
@@ -118,7 +130,44 @@ public class AuthorizationServerConfig {
                 .formLogin(form -> form
                         .loginPage("/login")
                         .loginProcessingUrl("/login")
-                        .defaultSuccessUrl("/", false)
+                        .successHandler((request, response, authentication) -> {
+                            // Check MFA requirements after successful password authentication
+                            if (authentication.getPrincipal() instanceof KeltaUserDetails userDetails) {
+                                String userId = userDetails.getId();
+                                String tenantId = userDetails.getTenantId();
+                                String email = userDetails.getEmail();
+
+                                boolean mfaEnrolled = totpService.isEnrolled(userId);
+                                boolean mfaRequired = isMfaRequiredForTenant(passwordPolicyService, tenantId);
+
+                                if (mfaEnrolled) {
+                                    // User has MFA — redirect to challenge
+                                    HttpSession session = request.getSession();
+                                    session.setAttribute(MfaController.SESSION_MFA_PENDING, true);
+                                    session.setAttribute(MfaController.SESSION_MFA_USER_ID, userId);
+                                    session.setAttribute(MfaController.SESSION_MFA_TENANT_ID, tenantId);
+                                    session.setAttribute(MfaController.SESSION_MFA_EMAIL, email);
+                                    SecurityContextHolder.clearContext();
+                                    response.sendRedirect("/mfa-challenge");
+                                    return;
+                                }
+
+                                if (mfaRequired && !mfaEnrolled) {
+                                    // Tenant requires MFA but user not enrolled — redirect to setup
+                                    HttpSession session = request.getSession();
+                                    session.setAttribute(MfaController.SESSION_MFA_PENDING, true);
+                                    session.setAttribute(MfaController.SESSION_MFA_SETUP_REQUIRED, true);
+                                    session.setAttribute(MfaController.SESSION_MFA_USER_ID, userId);
+                                    session.setAttribute(MfaController.SESSION_MFA_TENANT_ID, tenantId);
+                                    session.setAttribute(MfaController.SESSION_MFA_EMAIL, email);
+                                    SecurityContextHolder.clearContext();
+                                    response.sendRedirect("/mfa-setup");
+                                    return;
+                                }
+                            }
+                            // No MFA required — proceed normally
+                            response.sendRedirect("/");
+                        })
                         .failureHandler((request, response, exception) -> {
                             if (exception.getCause() instanceof CredentialsExpiredException
                                     || exception instanceof CredentialsExpiredException) {
@@ -250,6 +299,10 @@ public class AuthorizationServerConfig {
                 }
             }
         };
+    }
+
+    private boolean isMfaRequiredForTenant(PasswordPolicyService policyService, String tenantId) {
+        return policyService.isMfaRequired(tenantId);
     }
 
     private static RSAKey generateRsaKey() {

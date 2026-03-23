@@ -27,7 +27,13 @@ public final class SecurityAuditLogger {
         ACCOUNT_UNLOCKED,
         TOKEN_ISSUED,
         TOKEN_REVOKED,
-        AUTH_FAILURE
+        AUTH_FAILURE,
+        MFA_CHALLENGE_SUCCESS,
+        MFA_CHALLENGE_FAILED,
+        MFA_ENROLLED,
+        MFA_DISABLED,
+        MFA_RESET,
+        RECOVERY_CODE_USED
     }
 
     /**

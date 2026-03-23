@@ -1998,4 +1998,44 @@ export class AdminClient {
       return unwrapJsonApiResource<SearchReindexResult>(response.data);
     },
   };
+
+  // ---------------------------------------------------------------------------
+  // MFA Management
+  // ---------------------------------------------------------------------------
+
+  readonly mfa = {
+    getUserStatus: async (
+      userId: string
+    ): Promise<{
+      userId: string;
+      mfaEnabled: boolean;
+      enrolled: boolean;
+      enrolledAt: string | null;
+      remainingRecoveryCodes: number;
+    }> => {
+      const response = await this.axios.get(`/api/admin/mfa/users/${userId}/status`);
+      return response.data as {
+        userId: string;
+        mfaEnabled: boolean;
+        enrolled: boolean;
+        enrolledAt: string | null;
+        remainingRecoveryCodes: number;
+      };
+    },
+
+    resetUser: async (userId: string): Promise<{ status: string; userId: string }> => {
+      const response = await this.axios.post(`/api/admin/mfa/users/${userId}/reset`);
+      return response.data as { status: string; userId: string };
+    },
+
+    getPolicy: async (): Promise<{ mfaRequired: boolean }> => {
+      const response = await this.axios.get('/api/admin/mfa/policy');
+      return response.data as { mfaRequired: boolean };
+    },
+
+    updatePolicy: async (policy: { mfaRequired: boolean }): Promise<{ status: string }> => {
+      const response = await this.axios.put('/api/admin/mfa/policy', policy);
+      return response.data as { status: string };
+    },
+  };
 }

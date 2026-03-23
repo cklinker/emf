@@ -485,6 +485,38 @@ export function UserDetailPage({ testId = 'user-detail-page' }: UserDetailPagePr
               )}
             </div>
           </div>
+
+          {/* MFA Section */}
+          <div className="rounded-lg border border-border bg-card p-6">
+            <h2 className="mb-4 text-lg font-semibold text-foreground">Multi-Factor Authentication</h2>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">
+                  MFA Status:{' '}
+                  <span className={user.mfaEnabled ? 'text-green-500 font-medium' : 'text-muted-foreground'}>
+                    {user.mfaEnabled ? 'Enabled' : 'Not enabled'}
+                  </span>
+                </p>
+              </div>
+              {user.mfaEnabled && (
+                <button
+                  className="rounded-md border border-destructive px-4 py-2 text-sm font-medium text-destructive hover:bg-destructive/10"
+                  onClick={() => {
+                    if (window.confirm('Are you sure you want to reset MFA for this user? They will need to re-enroll.')) {
+                      fetch(`/api/admin/mfa/users/${id}/reset`, { method: 'POST' })
+                        .then(() => {
+                          queryClient.invalidateQueries({ queryKey: ['users', id] })
+                          showToast('MFA reset successfully', 'success')
+                        })
+                        .catch(() => showToast('Failed to reset MFA', 'error'))
+                    }
+                  }}
+                >
+                  Reset MFA
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       )}
 

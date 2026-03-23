@@ -110,6 +110,18 @@ public class PasswordPolicyService {
     }
 
     // -----------------------------------------------------------------------
+    // MFA Policy
+    // -----------------------------------------------------------------------
+
+    public boolean isMfaRequired(String tenantId) {
+        if (tenantId == null) return false;
+        var results = jdbcTemplate.queryForList(
+                "SELECT mfa_required FROM password_policy WHERE tenant_id = ?", tenantId);
+        if (results.isEmpty()) return false;
+        return Boolean.TRUE.equals(results.get(0).get("mfa_required"));
+    }
+
+    // -----------------------------------------------------------------------
     // Password Validation
     // -----------------------------------------------------------------------
 

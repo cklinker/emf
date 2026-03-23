@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Set Up Two-Factor Authentication — Kelta Platform</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f1117; color: #e4e4e7;
+            min-height: 100vh; display: flex; align-items: center; justify-content: center;
+        }
+        .container { width: 100%; max-width: 480px; padding: 2rem; }
+        .logo { text-align: center; margin-bottom: 2rem; }
+        .logo h1 { font-size: 1.5rem; font-weight: 600; color: #fff; }
+        .card {
+            background: #1a1b23; border: 1px solid #2a2b35; border-radius: 12px; padding: 2rem;
+        }
+        .card h2 { font-size: 1.1rem; margin-bottom: 0.5rem; color: #fff; }
+        .card p { font-size: 0.875rem; color: #a1a1aa; margin-bottom: 1rem; }
+        .step { margin-bottom: 1.5rem; }
+        .step-number {
+            display: inline-block; width: 24px; height: 24px; background: #6366f1;
+            border-radius: 50%; text-align: center; line-height: 24px;
+            font-size: 0.75rem; font-weight: 600; margin-right: 0.5rem;
+        }
+        .step-title { font-size: 0.875rem; font-weight: 500; color: #fff; }
+        .qr-container { text-align: center; margin: 1rem 0; padding: 1rem; background: #fff; border-radius: 8px; }
+        .secret-manual {
+            background: #0f1117; border: 1px solid #2a2b35; border-radius: 8px;
+            padding: 0.75rem; text-align: center; font-family: monospace;
+            font-size: 0.875rem; color: #6366f1; margin: 0.5rem 0; word-break: break-all;
+        }
+        .form-group { margin-bottom: 1rem; }
+        label { display: block; font-size: 0.875rem; color: #a1a1aa; margin-bottom: 0.5rem; }
+        input[type="text"] {
+            width: 100%; padding: 0.75rem; background: #0f1117; border: 1px solid #2a2b35;
+            border-radius: 8px; color: #fff; font-size: 1.25rem; text-align: center;
+            letter-spacing: 0.5em;
+        }
+        input:focus { outline: none; border-color: #6366f1; }
+        .btn {
+            width: 100%; padding: 0.75rem; background: #6366f1; color: #fff; border: none;
+            border-radius: 8px; font-size: 0.875rem; font-weight: 500; cursor: pointer;
+        }
+        .btn:hover { background: #5558e6; }
+        .btn-secondary {
+            background: transparent; border: 1px solid #2a2b35; color: #e4e4e7;
+        }
+        .btn-secondary:hover { background: #2a2b35; }
+        .error {
+            background: #371520; border: 1px solid #5c2134; color: #f87171;
+            padding: 0.75rem; border-radius: 8px; margin-bottom: 1rem; font-size: 0.875rem;
+        }
+        .recovery-codes {
+            background: #0f1117; border: 1px solid #2a2b35; border-radius: 8px; padding: 1rem;
+            margin: 1rem 0;
+        }
+        .recovery-codes code {
+            display: block; font-family: monospace; font-size: 1rem; color: #fff;
+            padding: 0.25rem 0; text-align: center;
+        }
+        .warning {
+            background: #3b2a15; border: 1px solid #5c4320; color: #fbbf24;
+            padding: 0.75rem; border-radius: 8px; margin: 1rem 0; font-size: 0.813rem;
+        }
+        .small { font-size: 0.75rem; color: #71717a; text-align: center; margin-top: 0.5rem; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="logo"><h1>Kelta</h1></div>
+    <div class="card">
+
+        <!-- Setup Phase: QR Code + Verification -->
+        <div th:if="${!enrolled}" id="setup-phase">
+            <h2>Set Up Two-Factor Authentication</h2>
+            <p>Scan the QR code with your authenticator app (Google Authenticator, Authy, etc.)</p>
+
+            <div th:if="${error}" class="error" th:text="${error}"></div>
+
+            <div class="step">
+                <span class="step-number">1</span>
+                <span class="step-title">Scan QR Code</span>
+                <div class="qr-container">
+                    <img th:src="@{'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + ${qrCodeUri}}"
+                         alt="QR Code" width="200" height="200">
+                </div>
+                <p class="small">Can't scan? Enter this code manually:</p>
+                <div class="secret-manual" th:text="${secret}"></div>
+            </div>
+
+            <div class="step">
+                <span class="step-number">2</span>
+                <span class="step-title">Enter Verification Code</span>
+                <form method="post" th:action="@{/mfa-setup}">
+                    <div class="form-group">
+                        <label for="code">6-digit code from your app</label>
+                        <input type="text" id="code" name="code" maxlength="6" pattern="[0-9]{6}"
+                               autocomplete="one-time-code" autofocus required placeholder="000000">
+                    </div>
+                    <button type="submit" class="btn">Verify and Enable MFA</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Recovery Codes Phase -->
+        <div th:if="${enrolled}" id="codes-phase">
+            <h2>Save Your Recovery Codes</h2>
+            <p>These codes can be used to access your account if you lose your authenticator device.
+               Each code can only be used once.</p>
+
+            <div class="warning">
+                Save these codes in a secure location. They will not be shown again.
+            </div>
+
+            <div class="recovery-codes" id="recovery-codes">
+                <code th:each="code : ${recoveryCodes}" th:text="${code}"></code>
+            </div>
+
+            <button class="btn btn-secondary" onclick="downloadCodes()" style="margin-bottom: 0.5rem;">
+                Download Codes
+            </button>
+
+            <form method="post" th:action="@{/mfa-setup/complete}">
+                <button type="submit" class="btn">I've Saved My Codes</button>
+            </form>
+        </div>
+
+    </div>
+</div>
+
+<script th:inline="javascript">
+    function downloadCodes() {
+        var codes = /*[[${recoveryCodes}]]*/ [];
+        var text = 'Kelta Recovery Codes\n';
+        text += '====================\n\n';
+        text += 'Keep these codes safe. Each can be used once.\n\n';
+        for (var i = 0; i < codes.length; i++) {
+            text += (i + 1) + '. ' + codes[i] + '\n';
+        }
+        text += '\nGenerated: ' + new Date().toISOString() + '\n';
+
+        var blob = new Blob([text], { type: 'text/plain' });
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'kelta-recovery-codes.txt';
+        a.click();
+    }
+</script>
+</body>
+</html>

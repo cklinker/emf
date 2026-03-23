@@ -974,16 +974,6 @@ function TenantRoutes(): React.ReactElement {
         }
       />
 
-      {/* API Tokens route */}
-      <Route
-        path="api-tokens"
-        element={
-          <AdminPageRoute>
-            <ApiTokensPage />
-          </AdminPageRoute>
-        }
-      />
-
       {/* Bulk Jobs route */}
       <Route
         path="bulk-jobs"
@@ -1093,6 +1083,7 @@ function TenantRoutes(): React.ReactElement {
             </React.Suspense>
           }
         />
+        <Route path="api-tokens" element={<ApiTokensPage />} />
       </Route>
 
       {/* 404 Not Found - catch all within tenant scope */}

@@ -1789,7 +1789,7 @@ export class AdminClient {
 
     generateToken: async (id: string): Promise<Record<string, string>> => {
       const response = await this.axios.post(`/api/connected-apps/${id}/tokens`);
-      return response.data;
+      return response.data as Record<string, string>;
     },
 
     revokeToken: async (appId: string, tokenId: string): Promise<void> => {
@@ -1799,6 +1799,25 @@ export class AdminClient {
     listAudit: async (id: string): Promise<Record<string, unknown>[]> => {
       const response = await this.axios.get(`/api/connected-apps/${id}/audit`);
       return (response.data as { data: Record<string, unknown>[] }).data ?? [];
+    },
+  };
+
+  // ---------------------------------------------------------------------------
+  // Password Policy (admin API)
+  // ---------------------------------------------------------------------------
+
+  readonly passwordPolicy = {
+    get: async (): Promise<Record<string, unknown>> => {
+      const response = await this.axios.get('/api/admin/password-policy');
+      return (response.data as { data: Record<string, unknown> }).data;
+    },
+
+    update: async (policy: Record<string, unknown>): Promise<void> => {
+      await this.axios.put('/api/admin/password-policy', policy);
+    },
+
+    unlockUser: async (userId: string): Promise<void> => {
+      await this.axios.post(`/api/admin/password-policy/users/${userId}/unlock`);
     },
   };
 

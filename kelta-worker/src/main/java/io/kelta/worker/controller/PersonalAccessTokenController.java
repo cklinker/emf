@@ -65,6 +65,21 @@ public class PersonalAccessTokenController {
     }
 
     /**
+     * Convert a JDBC row with snake_case column names to camelCase keys for the frontend SDK.
+     */
+    private Map<String, Object> toCamelCaseToken(Map<String, Object> row) {
+        Map<String, Object> result = new java.util.LinkedHashMap<>();
+        result.put("id", row.get("id"));
+        result.put("name", row.get("name"));
+        result.put("tokenPrefix", row.get("token_prefix"));
+        result.put("scopes", row.get("scopes"));
+        result.put("expiresAt", row.get("expires_at") != null ? row.get("expires_at").toString() : null);
+        result.put("lastUsedAt", row.get("last_used_at") != null ? row.get("last_used_at").toString() : null);
+        result.put("createdAt", row.get("created_at") != null ? row.get("created_at").toString() : null);
+        return result;
+    }
+
+    /**
      * List current user's active (non-revoked) tokens. Never returns the token hash.
      */
     @GetMapping
@@ -75,12 +90,13 @@ public class PersonalAccessTokenController {
         }
         String userId = resolveUserId(userIdentifier, tenantId);
 
-        List<Map<String, Object>> tokens = jdbcTemplate.queryForList(
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
                 "SELECT id, name, token_prefix, scopes, expires_at, last_used_at, created_at " +
                         "FROM user_api_token WHERE user_id = ? AND tenant_id = ? AND revoked = false " +
                         "ORDER BY created_at DESC",
                 userId, tenantId);
 
+        List<Map<String, Object>> tokens = rows.stream().map(this::toCamelCaseToken).toList();
         return ResponseEntity.ok(Map.of("data", tokens));
     }
 

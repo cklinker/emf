@@ -35,6 +35,7 @@ Every collection automatically gets a fully compliant JSON:API endpoint. No boil
 - **Pagination**: `?page[number]=1&page[size]=20`
 - **Sub-resources**: `/{parent}/{parentId}/{child}` for parent-child traversal
 - **Dynamic route registration**: Collection schema changes publish Kafka events that update gateway routes in real-time — no restart required
+- **Atomic Operations**: `POST /{tenant}/_operations` for bulk CRUD per the JSON:API Atomic Operations spec — multiple create/update/delete operations in a single transactional request
 
 ---
 
@@ -52,13 +53,52 @@ Search across all your data with a single query. PostgreSQL `tsvector`-backed fu
 
 ### Authentication & Identity | Complete
 
-Bring your own identity provider. Kelta supports any OIDC-compliant provider out of the box, with Keycloak as the default.
+Kelta ships its own internal OIDC provider (kelta-auth) built on Spring Authorization Server — no external identity server required. Optionally federate with any external OIDC provider for SSO.
 
-- **Multi-provider support**: Configure multiple OIDC providers per tenant with independent claim mapping
+- **Internal OIDC provider**: Full OAuth 2.0 Authorization Server with endpoints for authorization, token issuance, and OIDC discovery (`/.well-known/openid-configuration`). The platform is its own JWT issuer.
+- **Federated identity brokering**: Connect external OIDC providers (Google, Okta, Azure AD, etc.) via dynamic client registration. Users authenticate at external IdPs and are automatically mapped to platform users via `FederatedUserMapper`.
+- **Multi-provider support**: Configure multiple OIDC providers per tenant with independent claim mapping for roles, email, username, and name
 - **Dynamic JWKS resolution**: The gateway resolves the correct JWKS URI by JWT issuer claim at runtime — cached in Redis with 15-minute TTL, fallback to OIDC discovery
-- **Claim mapping**: Configurable mappings for roles, email, username, and name claims per provider
+- **Session management**: JDBC-backed sessions with `KeltaTokenCustomizer` enriching JWT tokens with tenant and role claims
+- **Password management**: Password reset flow, forced password change on first login, default admin user seeded per tenant
 - **Login tracking**: Every authentication attempt recorded with timestamps and IP addresses
 - **Service accounts**: Internal gateway-to-worker communication uses dedicated OAuth2 client credentials
+
+---
+
+### Multi-Factor Authentication | Complete
+
+Protect accounts with TOTP and SMS-based multi-factor authentication.
+
+- **TOTP (RFC 6238)**: Time-based one-time passwords with QR code enrollment, 6-digit codes, 30-second time steps, and ±1 window tolerance
+- **Recovery codes**: 8 single-use codes generated at enrollment, BCrypt hashed for storage, usable when TOTP device is unavailable
+- **SMS OTP**: SMS-based one-time password verification via `SmsAuthController` with E.164 phone number validation, 6-digit codes, and 5-minute expiry
+- **Rate limiting**: TOTP and SMS verification rate-limited (3 sends per window, 5 verify attempts) with constant-time comparison to prevent timing attacks
+- **Encrypted secrets**: TOTP secrets encrypted at rest via `EncryptionService` (AES-256-GCM)
+- **Admin management**: `MfaController` at `/api/auth/mfa/*` for enrollment, verification, recovery, and admin reset
+- **SPI pattern**: `SmsProvider` interface for pluggable SMS backends — ships with a log-only default provider
+
+---
+
+### Per-Tenant Password Policies | Complete
+
+Enforce password requirements and account lockout rules on a per-tenant basis.
+
+- **Configurable policies**: Minimum length, uppercase/lowercase/digit/special character requirements — all configurable per tenant
+- **Account lockout**: Maximum failed attempts and lockout duration, preventing brute-force attacks
+- **Forced password change**: Require password change on first login or after admin reset
+
+---
+
+### Personal Access Tokens | Complete
+
+User-managed API tokens for programmatic access without interactive authentication.
+
+- **Token format**: `klt_` prefix + 40 random characters, SHA-256 hashed before storage (plain token shown only at creation)
+- **Per-user management**: CRUD at `/api/me/tokens` with max 10 tokens per user
+- **Expiration and scoping**: Optional expiration dates and scope restrictions
+- **Revocation**: Redis-backed revocation cache with `pat:revoked:` keys for instant invalidation
+- **Gateway integration**: PATs resolved alongside JWTs for seamless API authentication
 
 ---
 
@@ -74,7 +114,7 @@ A multi-layer permission model that gives you fine-grained control over who can 
 - **7 built-in profiles**: System Administrator, Standard User, Read Only, Marketing User, Contract Manager, Solution Manager, Minimum Access
 
 > **TODO**
-> - Field-level security (HIDDEN fields) is resolved but not yet stripped from API responses
+> - Field-level security (HIDDEN fields): Write-side enforcement is complete — HIDDEN fields are blocked from create/update operations via `CerbosFieldSecurityAdvice`. Read-side stripping from API responses is still TODO.
 > - Permission enforcement defaults to disabled (`permissions-enabled=false`) — needs production-ready default
 
 ---
@@ -90,6 +130,7 @@ Fine-grained authorization powered by Cerbos PDP, providing ABAC policy evaluati
 - **Circuit breaker**: Fail-closed design — after 3 consecutive Cerbos failures, the circuit opens for 10 seconds (all checks denied). 2-second timeout per gRPC call. Auto-recovers when Cerbos becomes available
 - **Custom ABAC rules**: `CustomRuleController` at `/api/admin/profiles/{profileId}/custom-rules` provides full CRUD for custom rules per profile, converted to CEL conditions in Cerbos policies
 - **Authorization testing**: `AuthorizationTestController` at `/api/admin/authorization/test` for debugging permission decisions, with `PolicyTestPanel` in the admin UI
+- **Policy-change-driven cache invalidation**: Permission decisions cached for performance, automatically invalidated when policies are updated via `CerbosPolicySyncService` — prevents stale authorization
 
 ---
 
@@ -109,6 +150,7 @@ Enterprise-grade data protection at every layer.
 Built for multi-tenant SaaS from the ground up. Every request is scoped to a tenant, every resource is quota-controlled.
 
 - **URL-based resolution**: `/{tenantSlug}/api/...` — the gateway extracts the slug, resolves to a tenant ID, and injects `X-Tenant-ID` headers
+- **Custom tenant domains**: CNAME-based routing via `CustomDomainFilter` — tenants can use their own domain (e.g., `app.acme.com`) instead of slug-based URLs. Domain registration API with uniqueness validation and reserved domain protection.
 - **Slug-to-ID caching**: Caffeine in-process cache refreshed from the worker's tenant map endpoint
 - **Per-tenant governor limits** with real-time usage tracking:
 
@@ -147,7 +189,7 @@ A full state-machine automation engine inspired by AWS Step Functions, with a vi
 
 **Data Flow**: Full JSONPath support — every state transition processes `InputPath` (select) -> Execute -> `ResultPath` (place) -> `OutputPath` (forward).
 
-**15 Built-In Action Handlers:**
+**16 Built-In Action Handlers:**
 - Data: Field Update, Create Record, Update Record, Delete Record, Query Records, Create Task, Log Message
 - Communication: Email Alert, Send Notification
 - Integration: HTTP Callout, Outbound Message, Invoke Script, Publish Event, Trigger Flow
@@ -177,14 +219,13 @@ A full state-machine automation engine inspired by AWS Step Functions, with a vi
 |---------|--------|
 | Record-Triggered (on create/update/delete with filter formulas) | Working |
 | API / Webhook (`POST /api/webhooks/{flowId}` with request body mapping, header capture) | Working |
-| Scheduled (cron expression with timezone) | TODO |
+| Scheduled (cron expression with timezone) | Working |
 | Kafka-Triggered (key/message filter with dynamic consumer) | TODO |
 
 **Workflow Migration:**
 - `WorkflowMigrationController` migrates legacy workflow rules to modern flow definitions — migrate individual rules or all at once via `/api/admin/migrate-workflow-rules`
 
 > **TODO**
-> - SCHEDULED trigger: No cron runner wired — flows with cron expressions are not dispatched
 > - KAFKA_TRIGGERED: No dynamic Kafka consumer created per flow
 > - Wait state resume: `resumeExecution()` is not implemented — long-duration Wait states persist as WAITING but never resume
 
@@ -255,14 +296,15 @@ Connect Kelta to your existing systems with HTTP callouts, webhooks, event strea
 - **Outbound Message**: Structured webhook payloads (XML/JSON) to external systems
 - **Kafka Event Publishing**: Publish custom events to arbitrary Kafka topics from any flow
 - **Inbound Webhooks**: Flows with AUTOLAUNCHED type get dedicated `POST /api/webhooks/{flowId}` endpoints with request body mapping and header capture (content-type, user-agent)
-- **Outbound Webhooks (Svix)**: Outbound webhook delivery via Svix with event type mapping (`collection.created`, `collection.updated`, etc.), multi-tenant isolation, and management portal UI. `SvixWebhookPublisher` bridges Kafka config events to Svix. `SvixTenantLifecycleHook` initializes a Svix application per tenant on creation.
+- **Outbound Webhooks (Svix)**: Outbound webhook delivery via Svix with event type mapping (`collection.created`, `collection.updated`, etc.), multi-tenant isolation, management portal UI, and collection-scoped webhook filtering. `SvixWebhookPublisher` bridges Kafka config events to Svix. `SvixTenantLifecycleHook` initializes a Svix application per tenant on creation.
+- **Email Delivery**: Standards-based email via `SmtpEmailProvider` with per-tenant SMTP settings stored in `tenant.settings` JSONB column. Async delivery via dedicated thread pool, email logging to `email_log` table, template management, configurable from address/name per tenant, and cached `JavaMailSender` instances (Caffeine, 5-min TTL).
+- **Push Notifications (SPI)**: `PushProvider` SPI with device registration API (`PushDeviceController`). Ships with a log-only default provider — plug in FCM, APNs, or any push backend.
 - **Embedded Analytics (Apache Superset)**: Embedded dashboards with guest token authentication, automatic dataset sync from collections, and tenant-isolated Superset management. `SupersetTenantLifecycleHook` initializes Superset resources on tenant creation. See Embedded Analytics section below.
 - **Merge Field Templating**: DataPath system for dot-notation traversal across relationship boundaries
 
 > **TODO**
-> - Email delivery: `EmailService` SPI exists but only has a no-op logging implementation — no SMTP, SendGrid, or other email sender is wired
 > - Script execution: `ScriptExecutor` SPI exists but only has a no-op logging implementation — no JavaScript engine (GraalVM, Nashorn, etc.)
-> - Connected Apps: OAuth client registration data model exists but no OAuth 2.0 authorization server endpoints (`/oauth/token`, `/oauth/authorize`)
+> - Connected Apps: OAuth2 client credentials flow working via `ConnectedAppRegistrar`; full authorization code flow for third-party apps not yet implemented
 
 ---
 
@@ -275,6 +317,40 @@ Embed interactive dashboards and reports directly into the platform using Apache
 - **Dataset sync**: `POST /api/superset/datasets/sync` synchronizes collection schemas to Superset datasets. `SupersetCollectionSyncListener` triggers sync automatically when collections change via Kafka events
 - **Tenant isolation**: `SupersetTenantService` manages per-tenant Superset resources. `SupersetTenantLifecycleHook` provisions Superset access on tenant creation
 - **Frontend embedding**: `SupersetEmbed` component renders dashboards inline. `AnalyticsPage` and `DashboardPage` provide dedicated analytics views in the admin UI
+
+---
+
+### WebSocket Realtime Subscriptions | Complete
+
+Push real-time record change notifications to connected clients over WebSocket.
+
+- **WebSocket endpoint**: `/ws/realtime` with JWT authentication on upgrade — only authenticated users receive events
+- **Kafka bridge**: `RealtimeKafkaBridge` consumes `kelta.record.changed` Kafka events and routes them to subscribed WebSocket sessions
+- **Subscription management**: `SubscriptionManager` with thread-safe per-session subscription tracking. Subscribe to specific collections or record IDs.
+- **Tenant isolation**: Sessions only receive events scoped to their tenant
+- **Subscription limits**: 50 subscriptions per session, 100 connections per tenant — prevents resource exhaustion
+- **Automatic cleanup**: Token expiration monitoring with session termination on expired credentials
+
+---
+
+### On-the-Fly Image Transformations | Complete
+
+Transform images dynamically via URL parameters — no pre-processing or separate image service required.
+
+- **URL-based transforms**: `GET /api/images/{path}?w=400&h=300&fit=cover&format=webp&quality=80`
+- **Operations**: Resize (width/height), crop (cover/contain/fill), format conversion (JPEG, PNG, WebP, GIF), quality adjustment (1-100)
+- **Security**: Decompression bomb protection (max 20 megapixels, max 4096x4096 output), concurrent transform limiting (4 simultaneous operations via semaphore)
+- **Caching**: Transformed images cached to avoid repeated processing
+
+---
+
+### Direct File Serving | Complete
+
+Serve stored files directly with streaming and security controls.
+
+- **Streaming endpoint**: `GET /api/files/{path}` with content-type detection and range request support
+- **Security**: Tenant-scoped file access, authentication required
+- **Complements S3 presigned URLs**: Direct serving for files that don't need S3 presigned URL overhead
 
 ---
 
@@ -333,13 +409,12 @@ Support for collection subtypes with type-specific picklist values and page layo
 
 ---
 
-### Scheduled Jobs | Planned (UI Complete)
+### Scheduled Jobs | Partial (UI Complete)
 
-**The full UI is built** — scheduled job management with cron expression configuration, timezone selection, execution history, and run-now capability.
+**The full UI is built** — scheduled job management with cron expression configuration, timezone selection, execution history, and run-now capability. Flow-type scheduled triggers are working (cron-based flow execution dispatches flows on schedule).
 
 > **TODO**
-> - No cron runner: Nothing reads `cron_expression` from the `scheduled_jobs` table to dispatch jobs
-> - No job type dispatchers for FLOW, SCRIPT, or REPORT_EXPORT job types
+> - General-purpose scheduled job runner: The standalone `scheduled_jobs` table dispatcher for SCRIPT and REPORT_EXPORT job types is not yet implemented
 
 ---
 
@@ -403,10 +478,12 @@ Everything developers need to build on top of Kelta.
 - **Error taxonomy**: `ValidationError`, `AuthenticationError`, `AuthorizationError`, `NotFoundError`, `ServerError`, `NetworkError`
 - **OpenAPI type generation**: `generateTypesFromUrl()` and `generateTypesFromSpec()`
 - **Zod schemas** for all API response types
-- **65+ admin and end-user UI pages** — all fully implemented with real data fetching, forms with validation, and loading/error/empty states
+- **Auto-generated OpenAPI documentation**: Dynamic OpenAPI 3.0 spec generated from live collection schema with embedded Swagger UI at `/api/docs` — authenticated access only to prevent schema leakage
+- **CLI tool** (`@kelta/cli`): Command-line interface built with Commander.js for collection and record management. Commands for auth, collections (list/describe/create), and records (list/get/create/update/delete). Config stored at `~/.keltarc`.
+- **70+ admin and end-user UI pages** — all fully implemented with real data fetching, forms with validation, and loading/error/empty states
 - **Page layout system**: Drag-and-drop layout editor with field palette, property panel, conditional visibility rules, related list configuration, and mobile preview
 - **End-user application shell**: Dedicated `EndUserShell` with top navigation, global search, and purpose-built pages for object browsing (list, detail, form), custom pages, and an app home dashboard
-- **Internationalization (i18n)**: `I18nContext` with `useTranslation` hook supporting multiple languages
+- **Internationalization (i18n)**: `I18nContext` with `useTranslation` hook supporting 6 languages (English, Spanish, French, German, Portuguese, Arabic) with RTL support
 - **Theme system**: Dark/light mode toggle via `ThemeContext`, persisted in user preferences
 - **Accessibility**: Skip links, ARIA live regions, table keyboard navigation, global keyboard shortcuts with `KeyboardShortcutsHelp` dialog
 - **OpenTelemetry instrumentation**: Frontend telemetry via OpenTelemetry SDK for end-to-end tracing
@@ -422,7 +499,9 @@ Production-ready infrastructure patterns baked into the platform.
 - **Multi-layer caching**: Caffeine (in-process) -> Redis -> worker backend, with Kafka-driven cache invalidation
 - **Dual-layer rate limiting**: Per-tenant fixed-window (Redis) + governor limit daily quota
 - **Dynamic route management**: Gateway routes updated in real-time via Kafka events — no restart on schema changes
-- **Security headers**: `SecurityHeadersFilter` adds standard security headers (X-Content-Type-Options, X-Frame-Options, etc.) to all responses
+- **Security hardening**: CSP headers, strict CORS policies, encrypted session cookies, JSON-only error responses (no stack traces leaked), and mandatory encryption for sensitive fields
+- **Dependency scanning**: Automated security audit pipeline for identifying vulnerable dependencies
+- **Security headers**: `SecurityHeadersFilter` adds standard security headers (X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, Referrer-Policy, etc.) to all responses
 - **Health endpoints**: `/actuator/health` with Redis and Kafka connectivity checks, worker reachability monitoring from gateway
 - **Prometheus metrics**: Request counts, latency histograms, error counters, and active collection gauges for HPA autoscaling
 - **Kubernetes-native**: Deployed via ArgoCD with standard deployment manifests
@@ -433,15 +512,16 @@ Production-ready infrastructure patterns baked into the platform.
 
 | Component | Technology | Role |
 |-----------|-----------|------|
-| Gateway | Java 21, Spring Cloud Gateway (reactive) | API ingress: JWT auth, tenant resolution, rate limiting, Cerbos authorization, JSON:API processing |
-| Worker | Java 21, Spring Boot 3.2 | Business logic engine: CRUD, workflows, flows, schema management, integrations |
-| Admin UI | React 19, Vite, TypeScript | Full-featured admin console and end-user app runtime |
+| Gateway | Java 21, Spring Cloud Gateway (reactive) | API ingress: JWT/PAT auth, tenant resolution, rate limiting, Cerbos authorization, WebSocket realtime, JSON:API processing |
+| Auth | Java 21, Spring Authorization Server | Internal OIDC provider, federated identity brokering, MFA (TOTP + SMS), password policies, session management |
+| Worker | Java 21, Spring Boot 3.2 | Business logic engine: CRUD, workflows, flows, schema management, integrations, email, image transforms |
+| Admin UI | React 19, Vite, TypeScript | 70+ page admin console and end-user app runtime |
 | SDK | TypeScript | Client library with typed access to all APIs |
-| Database | PostgreSQL 15 | Primary data store (99 Flyway migrations) |
-| Cache | Redis 7 | Rate limiting, caching (routes, permissions, JSON:API responses) |
-| Messaging | Kafka 3.7 (KRaft) | Event streaming (record changes, config changes, module events) |
-| Identity | Keycloak 23 (or any OIDC provider) | Authentication and identity management |
-| Authorization | Cerbos PDP | Fine-grained ABAC policy evaluation with per-tenant resource policies |
+| CLI | TypeScript, Commander.js | Command-line interface for collection and record management |
+| Database | PostgreSQL 15 | Primary data store (111 Flyway migrations) |
+| Cache | Redis 7 | Rate limiting, caching (routes, permissions, JSON:API responses), PAT revocation |
+| Messaging | Kafka 3.7 (KRaft) | Event streaming (record changes, config changes, module events, realtime bridge) |
+| Authorization | Cerbos PDP | Fine-grained ABAC policy evaluation with per-tenant resource policies and cache invalidation |
 | Observability | OpenSearch, Jaeger, OpenTelemetry | Traces, logs, audit events, metrics |
 | Analytics | Apache Superset | Embedded dashboards with guest token auth and automatic dataset sync |
 | Webhooks | Svix | Outbound webhook delivery with event type mapping and tenant isolation |
@@ -459,9 +539,16 @@ What SMB and larger enterprises need from an application platform, and where Kel
 | **Multi-Tenancy** | URL-based tenant routing, PostgreSQL schema isolation, Row Level Security on every table |
 | **Fine-Grained Access Control** | RBAC profiles + permission sets + groups, enforced by Cerbos PDP at gateway and service layers |
 | **Audit & Compliance** | Setup audit trails, security audit logs, login history — all shipped to OpenSearch with configurable retention |
-| **SSO / Identity Federation** | Multi-provider OIDC support with per-provider claim mapping; Keycloak default, any compliant provider supported |
-| **API-First Architecture** | Every collection auto-generates a JSON:API endpoint with filtering, sorting, pagination, includes, and sparse fieldsets |
-| **Workflow Automation** | Visual Flow Builder with 15 action handlers, 8 state types, retry/catch error handling, and durable execution |
+| **SSO / Identity Federation** | Internal OIDC provider (kelta-auth) with federated identity brokering to any external OIDC provider |
+| **Multi-Factor Authentication** | TOTP (RFC 6238) with recovery codes and SMS OTP — encrypted secrets, rate limiting, admin management |
+| **Password Policies** | Per-tenant configurable password requirements and account lockout rules |
+| **Personal Access Tokens** | SHA-256 hashed `klt_` tokens for API access, max 10 per user, Redis-backed revocation |
+| **Custom Domains** | CNAME-based custom tenant domains alongside slug-based URL routing |
+| **API-First Architecture** | Every collection auto-generates a JSON:API endpoint with filtering, sorting, pagination, includes, sparse fieldsets, and atomic bulk operations |
+| **Real-Time Data** | WebSocket subscriptions for live record change notifications with Kafka bridge and tenant isolation |
+| **API Documentation** | Auto-generated OpenAPI 3.0 spec with embedded Swagger UI, dynamically reflecting collection schema |
+| **Workflow Automation** | Visual Flow Builder with 16 action handlers, 8 state types, retry/catch error handling, durable execution, and scheduled triggers |
+| **Email Delivery** | Standards-based SMTP with per-tenant settings, async delivery, email logging, and template management |
 | **Data Encryption** | AES-256-GCM field-level encryption with per-tenant key derivation; PostgreSQL RLS for row-level isolation |
 | **Rate Limiting & Quotas** | Dual-layer rate limiting (per-route + daily governor quota) with configurable per-tenant limits |
 | **Embedded Analytics** | Apache Superset integration with guest tokens, automatic dataset sync, and tenant-isolated dashboards |
@@ -479,16 +566,15 @@ What SMB and larger enterprises need from an application platform, and where Kel
 
 | Capability | Current State | What Remains |
 |------------|--------------|-------------|
-| **Email / Notifications** | SPI defined, no-op implementation | Wire SMTP, SendGrid, or SES provider |
 | **Approval Workflows** | Full UI built | Backend submit/approve/reject logic, record locking |
-| **Scheduled Automation** | Full UI built, cron config stored | Cron dispatcher to trigger flows and jobs on schedule |
 | **Bulk Data Operations** | Full UI built | Backend batch processor, file upload/download |
 | **Report Execution** | Full UI built, config stored | Query engine to execute report definitions, export to CSV/PDF |
-| **OAuth Server (Connected Apps)** | Data model exists | Authorization server endpoints (`/oauth/token`, `/oauth/authorize`) |
+| **OAuth Server (Connected Apps)** | Client credentials flow working | Full authorization code flow for third-party apps |
 | **Server-Side Scripting** | SPI defined, no-op implementation | GraalVM or equivalent script engine |
-| **File Uploads** | S3 download URLs work | Presigned PUT URL generation, upload endpoint |
+| **File Uploads** | S3 download URLs + direct file serving work | Presigned PUT URL generation, upload endpoint |
 | **Configuration Packages** | Full UI built | Backend export/import/preview/history endpoints |
 | **Record Type Enforcement** | Data model and UI exist | Runtime picklist restriction and layout association |
+| **Push Notifications** | SPI + device registration working | Wire FCM, APNs, or other push provider |
 
 ### Enterprise Gaps to Address
 
@@ -510,20 +596,19 @@ What SMB and larger enterprises need from an application platform, and where Kel
 
 ### High Priority — Core Platform Gaps
 
-- [ ] **Field-level security enforcement**: HIDDEN field permissions are resolved but not stripped from API responses
-- [ ] **Flow SCHEDULED trigger**: Wire a cron runner that dispatches flows based on their cron expressions
+- [ ] **Field-level security read-side stripping**: Write-side enforcement is complete — HIDDEN fields are blocked from create/update. Read-side stripping from API responses is still needed.
 - [ ] **Flow KAFKA_TRIGGERED trigger**: Wire dynamic Kafka consumers per flow with key/message filtering
 - [ ] **Flow Wait state resume**: Implement `resumeExecution()` to resume flows paused in Wait states
 - [ ] **Permission enforcement default**: Change `permissions-enabled` to default to `true` for production deployments
 
 ### Medium Priority — Integration & Data Gaps
 
-- [ ] **Email delivery**: Implement a real `EmailService` (SMTP, SendGrid, or SES) to replace the no-op logging stub
 - [ ] **Script execution**: Implement a real `ScriptExecutor` (GraalVM or similar) to replace the no-op logging stub
 - [ ] **Attachment uploads**: Add presigned PUT URL generation to `S3StorageService` and expose an upload endpoint
 - [ ] **Configuration packages backend**: Implement `PackageController` and `PackageService` with export, import preview, import, and history endpoints
-- [ ] **Scheduled job runner**: Build a cron-based job dispatcher that reads `scheduled_jobs` and dispatches FLOW, SCRIPT, and REPORT_EXPORT jobs
+- [ ] **Scheduled job runner (general)**: Build a dispatcher for SCRIPT and REPORT_EXPORT job types in the `scheduled_jobs` table (flow-type scheduling already works)
 - [ ] **Page Builder fields**: Add `slug` and `published` fields to the `ui-pages` system collection definition
+- [ ] **Push notification provider**: Wire a real push provider (FCM, APNs) to replace the log-only stub
 
 ### Lower Priority — Advanced Features
 
@@ -531,7 +616,7 @@ What SMB and larger enterprises need from an application platform, and where Kel
 - [ ] **Dashboard data endpoints**: Serve live aggregated data to dashboard widget types
 - [ ] **Approval workflow engine**: Implement submit/approve/reject logic with record locking and field updates
 - [ ] **Bulk job processor**: Build a batch processor for INSERT/UPDATE/UPSERT/DELETE operations with file upload
-- [ ] **Connected Apps OAuth server**: Implement `/oauth/token` and `/oauth/authorize` endpoints that validate against the `connected_apps` table
+- [ ] **Connected Apps full OAuth**: Client credentials flow works; implement full authorization code flow for third-party app integrations
 - [ ] **Runtime module JAR loading**: Implement ClassLoader-based JAR loading with S3 storage and sandboxing
 - [ ] **Plugin SDK host wiring**: Wire `ComponentRegistry` into the admin UI to discover and render custom field renderers and page components
 - [ ] **Record type enforcement**: Enforce picklist value restrictions and field defaults based on record type during create/update

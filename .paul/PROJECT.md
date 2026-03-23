@@ -24,6 +24,33 @@ Teams can build and manage business applications through a multi-tenant enterpri
 - Platform works out-of-the-box with zero proprietary dependencies
 - Every integration has a standards-based default and an SPI for customization
 
+## Validated Requirements (Shipped)
+
+- Email delivery integration (SMTP, per-tenant config) — Phase 1, Plan 01
+- Scheduled flow triggers (cron-based, leader election) — Phase 1, Plan 02
+- OAuth2 client credentials for connected apps (RFC 6749 §4.4) — Phase 1, Plan 03
+- Per-tenant password policies (NIST SP 800-63B, dictionary, lockout) — Phase 1, Plan 04
+- Java namespace alignment (filesystem matches package declarations) — Phase 1A, Plan 01
+- Security hardening: CSP, session cookies, CORS, JSON safety, encryption enforcement — Phase 1B, Plan 01
+- Dependency vulnerability scanning (OWASP) in CI — Phase 1B, Plan 02
+- Security audit logging (structured MDC-based) — Phase 1B, Plan 02
+
+## Key Decisions
+
+| Decision | Rationale | Phase |
+|----------|-----------|-------|
+| SMTP as default email (no SendGrid) | Open source only principle | 1-01 |
+| SELECT FOR UPDATE SKIP LOCKED for scheduler | Standard PostgreSQL, no external coordinator | 1-02 |
+| OAuth2 Client Credentials (not custom API keys) | RFC 6749 §4.4 standard | 1-03 |
+| Redis jti set for token revocation | Near-instant revocation, simple implementation | 1-03 |
+| NIST SP 800-63B password defaults | Industry standard, length > complexity | 1-04 |
+| Bundled 10k dictionary (no HIBP API) | Open source only, no network dependency | 1-04 |
+| Single PR for namespace alignment | Mechanical change, easier to review as one unit | 1A-01 |
+| CSP allows 'unsafe-inline' for styles | React commonly injects inline styles | 1B-01 |
+| Federation fail-fast on lookup | Non-federation deployments unaffected | 1B-01 |
+| Dependency-check non-blocking in CI | Tune suppressions before blocking | 1B-02 |
+| MDC-based structured security logging | Standard SLF4J, works with all log aggregators | 1B-02 |
+
 ---
 *Created: 2026-03-22*
-*Updated: 2026-03-22*
+*Updated: 2026-03-22 after Phase 1B (Security Hardening)*

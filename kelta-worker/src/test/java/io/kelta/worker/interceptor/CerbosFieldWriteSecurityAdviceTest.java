@@ -1,0 +1,237 @@
+package io.kelta.worker.interceptor;
+
+import io.kelta.worker.service.CerbosAuthorizationService;
+import io.kelta.worker.service.CerbosPermissionResolver;
+import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
+
+import java.util.*;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+@DisplayName("CerbosFieldWriteSecurityAdvice Tests")
+class CerbosFieldWriteSecurityAdviceTest {
+
+    @Mock private CerbosAuthorizationService authzService;
+    @Mock private CerbosPermissionResolver permissionResolver;
+
+    private CerbosFieldWriteSecurityAdvice advice;
+
+    @BeforeEach
+    void setUp() {
+        advice = new CerbosFieldWriteSecurityAdvice(authzService, permissionResolver, true);
+    }
+
+    @AfterEach
+    void tearDown() {
+        RequestContextHolder.resetRequestAttributes();
+    }
+
+    private void setUpRequest(String method, String path) {
+        MockHttpServletRequest request = new MockHttpServletRequest(method, path);
+        request.addHeader("X-User-Email", "user@example.com");
+        request.addHeader("X-User-Profile-Id", "profile-1");
+        request.addHeader("X-Cerbos-Scope", "tenant-1");
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+        lenient().when(permissionResolver.hasIdentity(any())).thenReturn(true);
+        lenient().when(permissionResolver.getEmail(any())).thenReturn("user@example.com");
+        lenient().when(permissionResolver.getProfileId(any())).thenReturn("profile-1");
+        lenient().when(permissionResolver.getTenantId(any())).thenReturn("tenant-1");
+    }
+
+    @Nested
+    @DisplayName("supports()")
+    class Supports {
+        @Test
+        void shouldSupportPutRequests() {
+            setUpRequest("PUT", "/api/contacts/123");
+            assertThat(advice.supports(null, null, null)).isTrue();
+        }
+
+        @Test
+        void shouldSupportPatchRequests() {
+            setUpRequest("PATCH", "/api/contacts/123");
+            assertThat(advice.supports(null, null, null)).isTrue();
+        }
+
+        @Test
+        void shouldNotSupportGetRequests() {
+            setUpRequest("GET", "/api/contacts/123");
+            assertThat(advice.supports(null, null, null)).isFalse();
+        }
+
+        @Test
+        void shouldNotSupportPostRequests() {
+            setUpRequest("POST", "/api/contacts");
+            assertThat(advice.supports(null, null, null)).isFalse();
+        }
+
+        @Test
+        void shouldNotSupportAdminPaths() {
+            setUpRequest("PUT", "/api/admin/settings");
+            assertThat(advice.supports(null, null, null)).isFalse();
+        }
+
+        @Test
+        void shouldNotSupportMetadataPaths() {
+            setUpRequest("PUT", "/api/collections/contacts");
+            assertThat(advice.supports(null, null, null)).isFalse();
+        }
+
+        @Test
+        void shouldNotSupportWhenPermissionsDisabled() {
+            var disabledAdvice = new CerbosFieldWriteSecurityAdvice(authzService, permissionResolver, false);
+            setUpRequest("PUT", "/api/contacts/123");
+            assertThat(disabledAdvice.supports(null, null, null)).isFalse();
+        }
+    }
+
+    @Nested
+    @DisplayName("afterBodyRead() — field stripping")
+    class FieldStripping {
+        @Test
+        void shouldStripHiddenFields() {
+            setUpRequest("PUT", "/api/contacts/123");
+            // Only "name" is allowed for write; "ssn" is denied
+            when(authzService.batchCheckFieldAccess(
+                    eq("user@example.com"), eq("profile-1"), eq("tenant-1"),
+                    eq("contacts"), anyList(), eq("write")))
+                    .thenReturn(List.of("name"));
+
+            Map<String, Object> attributes = new LinkedHashMap<>();
+            attributes.put("name", "John");
+            attributes.put("ssn", "123-45-6789");
+            Map<String, Object> body = Map.of("data", Map.of("type", "contacts", "attributes", attributes));
+
+            advice.afterBodyRead(body, null, null, null, null);
+
+            assertThat(attributes).containsKey("name");
+            assertThat(attributes).doesNotContainKey("ssn");
+        }
+
+        @Test
+        void shouldStripReadOnlyFields() {
+            setUpRequest("PUT", "/api/contacts/123");
+            when(authzService.batchCheckFieldAccess(any(), any(), any(), any(), anyList(), eq("write")))
+                    .thenReturn(List.of("name"));
+
+            Map<String, Object> attributes = new LinkedHashMap<>();
+            attributes.put("name", "John");
+            attributes.put("internalScore", 95);
+            Map<String, Object> body = Map.of("data", Map.of("type", "contacts", "attributes", attributes));
+
+            advice.afterBodyRead(body, null, null, null, null);
+
+            assertThat(attributes).containsKey("name");
+            assertThat(attributes).doesNotContainKey("internalScore");
+        }
+
+        @Test
+        void shouldPassVisibleFieldsThrough() {
+            setUpRequest("PUT", "/api/contacts/123");
+            when(authzService.batchCheckFieldAccess(any(), any(), any(), any(), anyList(), eq("write")))
+                    .thenReturn(List.of("name", "email", "phone"));
+
+            Map<String, Object> attributes = new LinkedHashMap<>();
+            attributes.put("name", "John");
+            attributes.put("email", "john@example.com");
+            attributes.put("phone", "555-1234");
+            Map<String, Object> body = Map.of("data", Map.of("type", "contacts", "attributes", attributes));
+
+            advice.afterBodyRead(body, null, null, null, null);
+
+            assertThat(attributes).containsKeys("name", "email", "phone");
+        }
+
+        @Test
+        void shouldNotStripSystemFields() {
+            setUpRequest("PUT", "/api/contacts/123");
+            when(authzService.batchCheckFieldAccess(any(), any(), any(), any(), anyList(), eq("write")))
+                    .thenReturn(List.of()); // Deny all non-system fields
+
+            Map<String, Object> attributes = new LinkedHashMap<>();
+            attributes.put("createdAt", "2026-01-01T00:00:00Z");
+            attributes.put("updatedAt", "2026-01-01T00:00:00Z");
+            attributes.put("createdBy", "admin");
+            attributes.put("updatedBy", "admin");
+            attributes.put("name", "John"); // This should be stripped
+            Map<String, Object> body = Map.of("data", Map.of("type", "contacts", "attributes", attributes));
+
+            advice.afterBodyRead(body, null, null, null, null);
+
+            assertThat(attributes).containsKeys("createdAt", "updatedAt", "createdBy", "updatedBy");
+            assertThat(attributes).doesNotContainKey("name");
+        }
+
+        @Test
+        void shouldHandleEmptyAttributes() {
+            setUpRequest("PUT", "/api/contacts/123");
+
+            Map<String, Object> attributes = new LinkedHashMap<>();
+            Map<String, Object> body = Map.of("data", Map.of("type", "contacts", "attributes", attributes));
+
+            Object result = advice.afterBodyRead(body, null, null, null, null);
+            assertThat(result).isNotNull();
+        }
+
+        @Test
+        void shouldNavigateJsonApiStructure() {
+            setUpRequest("PUT", "/api/contacts/123");
+            when(authzService.batchCheckFieldAccess(any(), any(), any(), any(), anyList(), eq("write")))
+                    .thenReturn(List.of("name"));
+
+            Map<String, Object> attributes = new LinkedHashMap<>();
+            attributes.put("name", "John");
+            attributes.put("hidden", "secret");
+
+            // JSON:API structure with data.attributes
+            Map<String, Object> data = new LinkedHashMap<>();
+            data.put("type", "contacts");
+            data.put("attributes", attributes);
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("data", data);
+
+            advice.afterBodyRead(body, null, null, null, null);
+
+            assertThat(attributes).containsKey("name");
+            assertThat(attributes).doesNotContainKey("hidden");
+        }
+
+        @Test
+        void shouldFailClosedWhenCerbosUnreachable() {
+            setUpRequest("PUT", "/api/contacts/123");
+            when(authzService.batchCheckFieldAccess(any(), any(), any(), any(), anyList(), eq("write")))
+                    .thenThrow(new RuntimeException("Cerbos connection refused"));
+
+            Map<String, Object> attributes = new LinkedHashMap<>();
+            attributes.put("name", "John");
+            attributes.put("email", "john@example.com");
+            attributes.put("createdAt", "2026-01-01"); // System field — should survive
+            Map<String, Object> body = Map.of("data", Map.of("type", "contacts", "attributes", attributes));
+
+            advice.afterBodyRead(body, null, null, null, null);
+
+            // Fail-closed: all non-system fields stripped
+            assertThat(attributes).doesNotContainKey("name");
+            assertThat(attributes).doesNotContainKey("email");
+            assertThat(attributes).containsKey("createdAt");
+        }
+
+        @Test
+        void shouldHandleNonMapBody() {
+            setUpRequest("PUT", "/api/contacts/123");
+            String body = "not a map";
+            Object result = advice.afterBodyRead(body, null, null, null, null);
+            assertThat(result).isEqualTo("not a map");
+        }
+    }
+}

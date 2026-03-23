@@ -6,13 +6,15 @@ Close competitive gaps identified from Appwrite and Strapi analysis while preser
 ## Current Milestone
 **v1.0 Competitive Parity** (v1.0.0)
 Status: In progress
-Phases: 0 of 5 complete
+Phases: 2 of 7 complete
 
 ## Phases
 
 | Phase | Name | Plans | Status | Completed |
 |-------|------|-------|--------|-----------|
-| 1 | Foundation Gaps | 4 | Not started | - |
+| 1 | Foundation Gaps | 4 | Complete | 2026-03-22 |
+| 1A | Namespace Alignment | 1 | Complete | 2026-03-22 |
+| 1B | Security Hardening | 2 | Planning | - |
 | 2 | Enterprise Security | 3 | Not started | - |
 | 3 | Developer Experience | 3 | Not started | - |
 | 4 | Realtime & Messaging | 3 | Not started | - |
@@ -32,10 +34,38 @@ Phases: 0 of 5 complete
 - Enhanced password policies — history, dictionary, complexity rules
 
 **Plans:**
-- [ ] 01-01: Email delivery integration (SMTP/SendGrid)
-- [ ] 01-02: Scheduled flow triggers
-- [ ] 01-03: API keys and personal access tokens
-- [ ] 01-04: Enhanced password policies
+- [x] 01-01: Email delivery integration (SMTP)
+- [x] 01-02: Scheduled flow triggers
+- [x] 01-03: Connected apps (OAuth2 Client Credentials)
+- [x] 01-04: Enhanced password policies
+
+### Phase 1A: Namespace Alignment
+**Goal:** Align all Java filesystem directories with package declarations
+**Depends on:** Phase 1 (complete Foundation Gaps first)
+**Research:** None
+
+**Scope:**
+- Move 509 Java files to directories matching their package declarations
+- Zero code changes — filesystem reorganization only
+- Single PR covering all projects
+
+**Plans:**
+- [x] 01a-01: Move all Java files to match package declarations
+
+### Phase 1B: Security Hardening
+**Goal:** Address security audit findings at code and CI level, document infrastructure recommendations
+**Depends on:** Phase 1A (namespace alignment — file paths change)
+**Research:** None
+
+**Scope:**
+- Session cookie hardening, CSP header, CORS fix, JSON error safety, encryption enforcement
+- OWASP Dependency-Check integration in CI
+- Security event audit logging
+- Infrastructure security recommendations document
+
+**Plans:**
+- [ ] 01b-01: Code-level security fixes (5 high-priority findings)
+- [ ] 01b-02: CI security integration + infra recommendations
 
 ### Phase 2: Enterprise Security
 **Goal:** Harden authentication and authorization for enterprise compliance
@@ -97,4 +127,4 @@ Phases: 0 of 5 complete
 
 ---
 *Roadmap created: 2026-03-22*
-*Last updated: 2026-03-22*
+*Last updated: 2026-03-22 — Phase 1 + 1A complete*

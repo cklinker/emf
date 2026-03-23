@@ -5,23 +5,23 @@
 See: .paul/PROJECT.md (updated 2026-03-22)
 
 **Core value:** Teams can build and manage business applications through a multi-tenant enterprise platform with configurable objects, fields, permissions, and workflows — without custom development.
-**Current focus:** Phase 1 — Foundation Gaps (3 of 4 plans complete)
+**Current focus:** Phase 3 — Developer Experience (2 of 3 plans complete)
 
 ## Current Position
 
 Milestone: v1.0 Competitive Parity
-Phase: 1 of 5 (Foundation Gaps) — In Progress
-Plan: 01-03 complete, ready for next plan
+Phase: 3 of 7 (Developer Experience) — In Progress
+Plan: 03-02 complete, 03-03 next
 Status: Loop closed — ready for next PLAN
-Last activity: 2026-03-22 — Unified plan 01-03 (API keys / connected app tokens)
+Last activity: 2026-03-22 — Unified plan 03-02 (Image transformations)
 
 Progress:
-- Milestone: [██░░░░░░░░] 15%
-- Phase 1: [███████░░░] 75% (3 of 4 plans)
+- Milestone: [███████░░░] 70%
+- Phase 1-2: Complete
+- Phase 3: [██████░░░░] 66% (2 of 3 plans)
 
 ## Loop Position
 
-Current loop state:
 ```
 PLAN ──▶ APPLY ──▶ UNIFY
   ✓        ✓        ✓     [Loop complete — ready for next PLAN]
@@ -30,50 +30,23 @@ PLAN ──▶ APPLY ──▶ UNIFY
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 3
-- Average duration: 25 min
-- Total execution time: 1.25 hours
-
-**By Phase:**
-
-| Phase | Plans | Total Time | Avg/Plan |
-|-------|-------|------------|----------|
-| 01-foundation-gaps | 3/4 | 75 min | 25 min |
+- Total plans completed: 12
+- Average duration: 18 min
+- Total execution time: ~3.7 hours
 
 ## Accumulated Context
-
-### Codebase Mapped
-Date: 2026-03-22
-Documents: .paul/codebase/ (7 files)
-
-### Research Completed
-- .paul/research/appwrite-vs-kelta.md
-- .paul/research/strapi-vs-kelta.md
-- .paul/research/jsonapi-atomic-operations.md
-
-### Decisions
-- GraphQL API excluded from roadmap (user decision)
-- Batch operations to follow JSON:API Atomic Operations extension
-- Standards-first: SMTP, OAuth2 Client Credentials, Spring CronExpression — open source only
-- Per-tenant SMTP overrides stored in tenant.settings JSONB
-- JdbcTemplate repos for worker code — matches existing patterns
-- SELECT FOR UPDATE SKIP LOCKED for scheduler leader election
-- OAuth2 Client Credentials (RFC 6749 §4.4) for connected apps — no custom API keys
-- Redis jti set for near-instant token revocation
-- Token generation rate limited: 10 per 5 min per app
-- All features require full UI + unit tests + e2e tests
 
 ### Deferred Issues
 | Issue | Origin | Effort | Revisit |
 |-------|--------|--------|---------|
 | Tenant SMTP credential encryption at rest | Audit 01-01 | S | When DB-level encryption reviewed |
-| Email rate limiting on internal endpoint | Audit 01-01 | S | Phase 2 or when abuse patterns emerge |
-| Email content sanitization (XSS) | Audit 01-01 | S | When user-supplied HTML templates added |
-| Scheduler health check alert | 01-02 | S | When monitoring enhancements planned |
-| SCRIPT/REPORT_EXPORT job types | 01-02 | M | When those features are built |
-| IP restriction enforcement in gateway | 01-03 | M | Phase 2 (Enterprise Security) |
-| Scope enforcement in RouteAuthorizationFilter | 01-03 | M | Phase 2 (Enterprise Security) |
-| Dynamic OAuth2 client registration on app create | 01-03 | M | Next connected apps enhancement |
+| Database/Redis TLS | Security Audit | S | Ops/ArgoCD repo |
+| QR code rendering via external API | 02-01 | S | Bundle zxing for offline |
+| Self-service MFA re-auth | 02-01 | S | UI password prompt component |
+| Cerbos pre-auth for batch operations | 03-01 | M | Wire when gateway auth context tested |
+| Rate limiter batch operation counting | 03-01 | M | Gateway-side change |
+| Idempotency key for batch retries | 03-01 | M | Redis middleware |
+| Batch operation progress tracking | 03-01 audit | S | WebSocket progress events |
 
 ### Blockers/Concerns
 None.
@@ -81,15 +54,9 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-22
-Stopped at: Plan 01-03 loop closed, session paused
-Next action: Run /paul:plan for plan 01-04 (Enhanced Password Policies)
-Resume file: .paul/HANDOFF-2026-03-22.md
-Resume context:
-- Phase 1 at 75% (3 of 4 plans complete: email, scheduler, API keys)
-- 01-04 is the LAST plan in Phase 1 (enhanced password policies)
-- After 01-04: Phase 1 transition, then Phase 2 (Enterprise Security)
-- Enterprise audit enabled — include all findings, no deferrals
-- All features need full UI + unit tests + e2e tests
+Stopped at: Plan 03-02 loop closed
+Next action: /paul:plan for plan 03-03 (API documentation site)
+Resume file: .paul/ROADMAP.md
 
 ---
 *STATE.md — Updated after every significant action*

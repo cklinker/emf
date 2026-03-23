@@ -1803,6 +1803,25 @@ export class AdminClient {
   };
 
   // ---------------------------------------------------------------------------
+  // Password Policy (admin API)
+  // ---------------------------------------------------------------------------
+
+  readonly passwordPolicy = {
+    get: async (): Promise<Record<string, unknown>> => {
+      const response = await this.axios.get('/api/admin/password-policy');
+      return (response.data as { data: Record<string, unknown> }).data;
+    },
+
+    update: async (policy: Record<string, unknown>): Promise<void> => {
+      await this.axios.put('/api/admin/password-policy', policy);
+    },
+
+    unlockUser: async (userId: string): Promise<void> => {
+      await this.axios.post(`/api/admin/password-policy/users/${userId}/unlock`);
+    },
+  };
+
+  // ---------------------------------------------------------------------------
   // Bulk jobs (already on /api/)
   // ---------------------------------------------------------------------------
 

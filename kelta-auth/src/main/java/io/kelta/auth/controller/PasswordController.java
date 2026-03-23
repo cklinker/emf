@@ -1,6 +1,7 @@
 package io.kelta.auth.controller;
 
 import io.kelta.auth.config.AuthProperties;
+import io.kelta.auth.service.PasswordPolicyService;
 import io.kelta.auth.service.WorkerClient;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
@@ -15,7 +16,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 @RestController
@@ -27,15 +30,18 @@ public class PasswordController {
     private final JdbcTemplate jdbcTemplate;
     private final PasswordEncoder passwordEncoder;
     private final WorkerClient workerClient;
+    private final PasswordPolicyService policyService;
     private final String uiBaseUrl;
 
     public PasswordController(JdbcTemplate jdbcTemplate,
                               PasswordEncoder passwordEncoder,
                               WorkerClient workerClient,
+                              PasswordPolicyService policyService,
                               AuthProperties authProperties) {
         this.jdbcTemplate = jdbcTemplate;
         this.passwordEncoder = passwordEncoder;
         this.workerClient = workerClient;
+        this.policyService = policyService;
         this.uiBaseUrl = authProperties.getUiBaseUrl();
     }
 
@@ -72,6 +78,31 @@ public class PasswordController {
             return ResponseEntity.badRequest().body(Map.of("error", "Current password is incorrect"));
         }
 
+        // Look up user details for policy validation
+        var userInfo = jdbcTemplate.queryForList(
+                "SELECT pu.id, pu.tenant_id, pu.first_name, pu.last_name FROM platform_user pu WHERE pu.email = ?",
+                email
+        );
+        String userId = userInfo.isEmpty() ? null : (String) userInfo.get(0).get("id");
+        String tenantId = userInfo.isEmpty() ? null : (String) userInfo.get(0).get("tenant_id");
+        String displayName = userInfo.isEmpty() ? "" :
+                ((String) userInfo.get(0).getOrDefault("first_name", "")) + " " +
+                ((String) userInfo.get(0).getOrDefault("last_name", ""));
+
+        // Validate against password policy
+        List<String> violations = policyService.validatePassword(request.newPassword(), email, displayName.trim(), tenantId);
+        if (!violations.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", String.join("; ", violations)));
+        }
+
+        // Check password history
+        if (userId != null) {
+            Optional<String> historyViolation = policyService.checkHistory(userId, request.newPassword(), tenantId);
+            if (historyViolation.isPresent()) {
+                return ResponseEntity.badRequest().body(Map.of("error", historyViolation.get()));
+            }
+        }
+
         // Update password
         String newHash = passwordEncoder.encode(request.newPassword());
         jdbcTemplate.update(
@@ -80,6 +111,11 @@ public class PasswordController {
                         "WHERE user_id = (SELECT id FROM platform_user WHERE email = ?)",
                 newHash, Instant.now(), Instant.now(), email
         );
+
+        // Save to password history
+        if (userId != null) {
+            policyService.saveToHistory(userId, newHash, tenantId);
+        }
 
         log.info("Password changed for user {}", email);
         return ResponseEntity.ok(Map.of("status", "ok"));

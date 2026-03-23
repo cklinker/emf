@@ -138,6 +138,53 @@ jobs:
           retention-days: 7
 
   # ===========================================================================
+  # Dependency vulnerability scanning (non-blocking initially)
+  # ===========================================================================
+  dependency-check:
+    name: Dependency Check
+    needs: [test-java]
+    runs-on: k8s-runner
+    continue-on-error: true
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+
+      - name: Install Maven
+        run: |
+          if ! command -v mvn &> /dev/null; then
+            curl -fsSL https://archive.apache.org/dist/maven/maven-3/${{ env.MAVEN_VERSION }}/binaries/apache-maven-${{ env.MAVEN_VERSION }}-bin.tar.gz | tar xz -C /opt
+            echo "/opt/apache-maven-${{ env.MAVEN_VERSION }}/bin" >> $GITHUB_PATH
+          fi
+
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: maven-${{ runner.os }}-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            maven-${{ runner.os }}-
+
+      - name: Run OWASP Dependency-Check
+        run: mvn org.owasp:dependency-check-maven:check -f kelta-platform/pom.xml -B
+        timeout-minutes: 15
+
+      - name: Upload dependency-check report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-check-report
+          path: |
+            kelta-platform/**/target/dependency-check-report.html
+          if-no-files-found: ignore
+          retention-days: 30
+
+  # ===========================================================================
   # Quality gate - all checks must pass
   # ===========================================================================
   quality-gate:

@@ -33,7 +33,10 @@ public final class SecurityAuditLogger {
         MFA_ENROLLED,
         MFA_DISABLED,
         MFA_RESET,
-        RECOVERY_CODE_USED
+        RECOVERY_CODE_USED,
+        PASSWORD_RESET_ADMIN,
+        PAT_CREATED,
+        PAT_REVOKED
     }
 
     /**

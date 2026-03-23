@@ -133,6 +133,9 @@ export type {
   SearchIndexStats,
   SearchIndexCollectionStats,
   SearchReindexResult,
+  PersonalAccessToken,
+  PersonalAccessTokenCreated,
+  CreatePersonalAccessTokenRequest,
 } from './admin/types';
 
 // Authentication

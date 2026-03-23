@@ -92,6 +92,7 @@ import {
   ScriptsPage,
   WebhooksPage,
   ConnectedAppsPage,
+  ApiTokensPage,
   ModulesPage,
   BulkJobsPage,
   SetupHomePage,
@@ -969,6 +970,16 @@ function TenantRoutes(): React.ReactElement {
             <RequirePermission permission="MANAGE_CONNECTED_APPS">
               <ConnectedAppsPage />
             </RequirePermission>
+          </AdminPageRoute>
+        }
+      />
+
+      {/* API Tokens route */}
+      <Route
+        path="api-tokens"
+        element={
+          <AdminPageRoute>
+            <ApiTokensPage />
           </AdminPageRoute>
         }
       />

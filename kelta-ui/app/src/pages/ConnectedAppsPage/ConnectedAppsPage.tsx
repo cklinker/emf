@@ -11,6 +11,8 @@ interface ConnectedApp {
   name: string
   description: string | null
   clientId: string
+  redirectUris: string[] | null
+  ipRestrictions: string[] | null
   active: boolean
   rateLimitPerHour: number
   lastUsedAt: string | null
@@ -35,6 +37,8 @@ interface ConnectedAppFormData {
   name: string
   description: string
   scopes: string
+  redirectUris: string
+  ipRestrictions: string
   rateLimitPerHour: number
   active: boolean
 }
@@ -43,6 +47,8 @@ interface FormErrors {
   name?: string
   description?: string
   scopes?: string
+  redirectUris?: string
+  ipRestrictions?: string
   rateLimitPerHour?: string
 }
 
@@ -70,6 +76,34 @@ function validateForm(data: ConnectedAppFormData): FormErrors {
       errors.scopes = 'Scopes must be valid JSON (e.g. ["api"])'
     }
   }
+  if (data.redirectUris.trim()) {
+    const uris = data.redirectUris
+      .split('\n')
+      .map((s) => s.trim())
+      .filter(Boolean)
+    for (const uri of uris) {
+      try {
+        new URL(uri)
+      } catch {
+        errors.redirectUris =
+          'Each redirect URI must be a valid URL (e.g. https://example.com/callback)'
+        break
+      }
+    }
+  }
+  if (data.ipRestrictions.trim()) {
+    const cidrs = data.ipRestrictions
+      .split('\n')
+      .map((s) => s.trim())
+      .filter(Boolean)
+    const cidrPattern = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(\/\d{1,2})?$/
+    for (const cidr of cidrs) {
+      if (!cidrPattern.test(cidr)) {
+        errors.ipRestrictions = 'Each entry must be a valid IP or CIDR (e.g. 10.0.0.0/8)'
+        break
+      }
+    }
+  }
   if (data.rateLimitPerHour < 1 || data.rateLimitPerHour > 1000000) {
     errors.rateLimitPerHour = 'Rate limit must be between 1 and 1,000,000'
   }
@@ -94,6 +128,8 @@ function ConnectedAppForm({
     name: connectedApp?.name ?? '',
     description: connectedApp?.description ?? '',
     scopes: '',
+    redirectUris: connectedApp?.redirectUris?.join('\n') ?? '',
+    ipRestrictions: connectedApp?.ipRestrictions?.join('\n') ?? '',
     rateLimitPerHour: connectedApp?.rateLimitPerHour ?? 10000,
     active: connectedApp?.active ?? true,
   })
@@ -131,7 +167,14 @@ function ConnectedAppForm({
       e.preventDefault()
       const validationErrors = validateForm(formData)
       setErrors(validationErrors)
-      setTouched({ name: true, description: true, scopes: true, rateLimitPerHour: true })
+      setTouched({
+        name: true,
+        description: true,
+        scopes: true,
+        redirectUris: true,
+        ipRestrictions: true,
+        rateLimitPerHour: true,
+      })
       if (Object.keys(validationErrors).length === 0) {
         onSubmit(formData)
       }
@@ -275,6 +318,70 @@ function ConnectedAppForm({
                 )}
               </div>
             )}
+
+            <div>
+              <label
+                htmlFor="connected-app-redirect-uris"
+                className="mb-1 block text-sm font-medium text-foreground"
+              >
+                Redirect URIs
+              </label>
+              <textarea
+                id="connected-app-redirect-uris"
+                className={cn(
+                  'w-full rounded-md border px-3 py-2 text-sm text-foreground bg-background focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary',
+                  touched.redirectUris && errors.redirectUris
+                    ? 'border-destructive'
+                    : 'border-border'
+                )}
+                value={formData.redirectUris}
+                onChange={(e) => handleChange('redirectUris', e.target.value)}
+                onBlur={() => handleBlur('redirectUris')}
+                placeholder="https://example.com/callback"
+                disabled={isSubmitting}
+                rows={3}
+                data-testid="connected-app-redirect-uris-input"
+              />
+              <span className="mt-1 block text-xs text-muted-foreground">One URI per line</span>
+              {touched.redirectUris && errors.redirectUris && (
+                <span className="mt-1 block text-xs text-destructive" role="alert">
+                  {errors.redirectUris}
+                </span>
+              )}
+            </div>
+
+            <div>
+              <label
+                htmlFor="connected-app-ip-restrictions"
+                className="mb-1 block text-sm font-medium text-foreground"
+              >
+                IP Restrictions
+              </label>
+              <textarea
+                id="connected-app-ip-restrictions"
+                className={cn(
+                  'w-full rounded-md border px-3 py-2 text-sm text-foreground bg-background focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary',
+                  touched.ipRestrictions && errors.ipRestrictions
+                    ? 'border-destructive'
+                    : 'border-border'
+                )}
+                value={formData.ipRestrictions}
+                onChange={(e) => handleChange('ipRestrictions', e.target.value)}
+                onBlur={() => handleBlur('ipRestrictions')}
+                placeholder="10.0.0.0/8"
+                disabled={isSubmitting}
+                rows={3}
+                data-testid="connected-app-ip-restrictions-input"
+              />
+              <span className="mt-1 block text-xs text-muted-foreground">
+                One CIDR block per line. Leave empty for no restrictions.
+              </span>
+              {touched.ipRestrictions && errors.ipRestrictions && (
+                <span className="mt-1 block text-xs text-destructive" role="alert">
+                  {errors.ipRestrictions}
+                </span>
+              )}
+            </div>
 
             <div>
               <label
@@ -494,9 +601,27 @@ export function ConnectedAppsPage({
     onError: (err: Error) => showToast(err.message || 'Failed to revoke token', 'error'),
   })
 
+  const toJsonArray = (text: string): string | undefined => {
+    const items = text
+      .split('\n')
+      .map((s) => s.trim())
+      .filter(Boolean)
+    return items.length > 0 ? JSON.stringify(items) : undefined
+  }
+
+  const toConnectedAppRequest = (data: ConnectedAppFormData): CreateConnectedAppRequest => ({
+    name: data.name,
+    description: data.description || undefined,
+    scopes: data.scopes || undefined,
+    redirectUris: toJsonArray(data.redirectUris),
+    ipRestrictions: toJsonArray(data.ipRestrictions),
+    rateLimitPerHour: data.rateLimitPerHour,
+    active: data.active,
+  })
+
   const createMutation = useMutation({
     mutationFn: (data: ConnectedAppFormData) =>
-      keltaClient.admin.connectedApps.create('', '', data as unknown as CreateConnectedAppRequest),
+      keltaClient.admin.connectedApps.create('', '', toConnectedAppRequest(data)),
     onSuccess: (result: ConnectedAppCreatedResponse) => {
       queryClient.invalidateQueries({ queryKey: ['connected-apps'] })
       showToast('Connected app created successfully', 'success')
@@ -510,10 +635,7 @@ export function ConnectedAppsPage({
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: ConnectedAppFormData }) =>
-      keltaClient.admin.connectedApps.update(
-        id,
-        data as unknown as Partial<CreateConnectedAppRequest>
-      ),
+      keltaClient.admin.connectedApps.update(id, toConnectedAppRequest(data)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['connected-apps'] })
       showToast('Connected app updated successfully', 'success')
@@ -819,34 +941,84 @@ export function ConnectedAppsPage({
           role="presentation"
           data-testid="tokens-modal-overlay"
         >
-          <div className="w-full max-w-[700px] max-h-[80vh] overflow-y-auto rounded-lg bg-background shadow-xl" role="dialog" aria-modal="true">
+          <div
+            className="w-full max-w-[700px] max-h-[80vh] overflow-y-auto rounded-lg bg-background shadow-xl"
+            role="dialog"
+            aria-modal="true"
+          >
             <div className="flex items-center justify-between border-b border-border p-6">
               <h2 className="text-lg font-semibold text-foreground">Tokens — {tokensAppName}</h2>
-              <button type="button" className="rounded p-2 text-2xl leading-none text-muted-foreground hover:bg-muted" onClick={() => setTokensAppId(null)} aria-label="Close">&times;</button>
+              <button
+                type="button"
+                className="rounded p-2 text-2xl leading-none text-muted-foreground hover:bg-muted"
+                onClick={() => setTokensAppId(null)}
+                aria-label="Close"
+              >
+                &times;
+              </button>
             </div>
             <div className="p-6 space-y-4">
-              <p className="text-sm text-muted-foreground">Use <code>client_id</code> and <code>client_secret</code> with <code>grant_type=client_credentials</code> at the OAuth2 token endpoint to obtain access tokens.</p>
+              <p className="text-sm text-muted-foreground">
+                Use <code>client_id</code> and <code>client_secret</code> with{' '}
+                <code>grant_type=client_credentials</code> at the OAuth2 token endpoint to obtain
+                access tokens.
+              </p>
               {tokensLoading ? (
                 <LoadingSpinner size="small" label="Loading tokens..." />
               ) : (
                 <table className="w-full border-collapse text-sm">
                   <thead>
                     <tr className="bg-muted">
-                      <th className="border-b border-border px-3 py-2 text-left text-xs font-semibold uppercase text-muted-foreground">Scopes</th>
-                      <th className="border-b border-border px-3 py-2 text-left text-xs font-semibold uppercase text-muted-foreground">Issued</th>
-                      <th className="border-b border-border px-3 py-2 text-left text-xs font-semibold uppercase text-muted-foreground">Expires</th>
-                      <th className="border-b border-border px-3 py-2 text-left text-xs font-semibold uppercase text-muted-foreground">Status</th>
-                      <th className="border-b border-border px-3 py-2 text-right text-xs font-semibold uppercase text-muted-foreground">Actions</th>
+                      <th className="border-b border-border px-3 py-2 text-left text-xs font-semibold uppercase text-muted-foreground">
+                        Scopes
+                      </th>
+                      <th className="border-b border-border px-3 py-2 text-left text-xs font-semibold uppercase text-muted-foreground">
+                        Issued
+                      </th>
+                      <th className="border-b border-border px-3 py-2 text-left text-xs font-semibold uppercase text-muted-foreground">
+                        Expires
+                      </th>
+                      <th className="border-b border-border px-3 py-2 text-left text-xs font-semibold uppercase text-muted-foreground">
+                        Status
+                      </th>
+                      <th className="border-b border-border px-3 py-2 text-right text-xs font-semibold uppercase text-muted-foreground">
+                        Actions
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {(tokens ?? []).map((token) => (
                       <tr key={token.id} className="border-b border-border last:border-0">
                         <td className="px-3 py-2">{token.scopes || '-'}</td>
-                        <td className="px-3 py-2">{token.issuedAt ? formatDate(new Date(token.issuedAt), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}</td>
-                        <td className="px-3 py-2">{token.expiresAt ? formatDate(new Date(token.expiresAt), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}</td>
                         <td className="px-3 py-2">
-                          <span className={cn('inline-block rounded-full px-2 py-0.5 text-xs font-semibold', token.revoked ? 'bg-destructive/10 text-destructive' : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300')}>
+                          {token.issuedAt
+                            ? formatDate(new Date(token.issuedAt), {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })
+                            : '-'}
+                        </td>
+                        <td className="px-3 py-2">
+                          {token.expiresAt
+                            ? formatDate(new Date(token.expiresAt), {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })
+                            : '-'}
+                        </td>
+                        <td className="px-3 py-2">
+                          <span
+                            className={cn(
+                              'inline-block rounded-full px-2 py-0.5 text-xs font-semibold',
+                              token.revoked
+                                ? 'bg-destructive/10 text-destructive'
+                                : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                            )}
+                          >
                             {token.revoked ? 'Revoked' : 'Active'}
                           </span>
                         </td>
@@ -855,7 +1027,12 @@ export function ConnectedAppsPage({
                             <button
                               type="button"
                               className="rounded-md border border-destructive/30 px-2 py-1 text-xs text-destructive hover:bg-destructive/10"
-                              onClick={() => revokeTokenMutation.mutate({ appId: tokensAppId, tokenId: token.id })}
+                              onClick={() =>
+                                revokeTokenMutation.mutate({
+                                  appId: tokensAppId,
+                                  tokenId: token.id,
+                                })
+                              }
                               data-testid={`revoke-token-${token.id}`}
                             >
                               Revoke
@@ -865,7 +1042,11 @@ export function ConnectedAppsPage({
                       </tr>
                     ))}
                     {(tokens ?? []).length === 0 && (
-                      <tr><td colSpan={5} className="px-3 py-6 text-center text-muted-foreground">No tokens found.</td></tr>
+                      <tr>
+                        <td colSpan={5} className="px-3 py-6 text-center text-muted-foreground">
+                          No tokens found.
+                        </td>
+                      </tr>
                     )}
                   </tbody>
                 </table>
@@ -883,18 +1064,37 @@ export function ConnectedAppsPage({
           role="presentation"
           data-testid="audit-modal-overlay"
         >
-          <div className="w-full max-w-[700px] max-h-[80vh] overflow-y-auto rounded-lg bg-background shadow-xl" role="dialog" aria-modal="true">
+          <div
+            className="w-full max-w-[700px] max-h-[80vh] overflow-y-auto rounded-lg bg-background shadow-xl"
+            role="dialog"
+            aria-modal="true"
+          >
             <div className="flex items-center justify-between border-b border-border p-6">
-              <h2 className="text-lg font-semibold text-foreground">Audit Trail — {auditAppName}</h2>
-              <button type="button" className="rounded p-2 text-2xl leading-none text-muted-foreground hover:bg-muted" onClick={() => setAuditAppId(null)} aria-label="Close">&times;</button>
+              <h2 className="text-lg font-semibold text-foreground">
+                Audit Trail — {auditAppName}
+              </h2>
+              <button
+                type="button"
+                className="rounded p-2 text-2xl leading-none text-muted-foreground hover:bg-muted"
+                onClick={() => setAuditAppId(null)}
+                aria-label="Close"
+              >
+                &times;
+              </button>
             </div>
             <div className="p-6">
               <table className="w-full border-collapse text-sm">
                 <thead>
                   <tr className="bg-muted">
-                    <th className="border-b border-border px-3 py-2 text-left text-xs font-semibold uppercase text-muted-foreground">Action</th>
-                    <th className="border-b border-border px-3 py-2 text-left text-xs font-semibold uppercase text-muted-foreground">Date</th>
-                    <th className="border-b border-border px-3 py-2 text-left text-xs font-semibold uppercase text-muted-foreground">Performed By</th>
+                    <th className="border-b border-border px-3 py-2 text-left text-xs font-semibold uppercase text-muted-foreground">
+                      Action
+                    </th>
+                    <th className="border-b border-border px-3 py-2 text-left text-xs font-semibold uppercase text-muted-foreground">
+                      Date
+                    </th>
+                    <th className="border-b border-border px-3 py-2 text-left text-xs font-semibold uppercase text-muted-foreground">
+                      Performed By
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -905,12 +1105,25 @@ export function ConnectedAppsPage({
                           {String(entry.action)}
                         </span>
                       </td>
-                      <td className="px-3 py-2">{entry.created_at ? formatDate(new Date(String(entry.created_at)), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}</td>
+                      <td className="px-3 py-2">
+                        {entry.created_at
+                          ? formatDate(new Date(String(entry.created_at)), {
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })
+                          : '-'}
+                      </td>
                       <td className="px-3 py-2">{String(entry.performed_by ?? '-')}</td>
                     </tr>
                   ))}
                   {(auditEntries ?? []).length === 0 && (
-                    <tr><td colSpan={3} className="px-3 py-6 text-center text-muted-foreground">No audit events.</td></tr>
+                    <tr>
+                      <td colSpan={3} className="px-3 py-6 text-center text-muted-foreground">
+                        No audit events.
+                      </td>
+                    </tr>
                   )}
                 </tbody>
               </table>

@@ -1,0 +1,213 @@
+package io.kelta.gateway.auth;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.kelta.gateway.filter.TenantResolutionFilter;
+import io.kelta.gateway.metrics.GatewayMetrics;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cloud.gateway.filter.GatewayFilterChain;
+import org.springframework.cloud.gateway.filter.GlobalFilter;
+import org.springframework.core.Ordered;
+import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Component;
+import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.server.ServerWebExchange;
+import reactor.core.publisher.Mono;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Collections;
+import java.util.HexFormat;
+import java.util.Map;
+
+/**
+ * Global filter for Personal Access Token (PAT) authentication.
+ *
+ * <p>Handles Bearer tokens with the {@code klt_} prefix. The JWT filter
+ * skips these tokens, delegating to this filter.
+ *
+ * <p>Validation strategy: Redis first, worker API fallback.
+ * Token metadata is cached in Redis by the worker on creation.
+ * If Redis misses, the gateway calls the worker's validation endpoint
+ * which re-caches the data in Redis.
+ *
+ * @since 1.0.0
+ */
+@Component
+public class PatAuthenticationFilter implements GlobalFilter, Ordered {
+
+    private static final Logger log = LoggerFactory.getLogger(PatAuthenticationFilter.class);
+
+    private static final String AUTHORIZATION_HEADER = "Authorization";
+    private static final String BEARER_PREFIX = "Bearer ";
+    private static final String PAT_PREFIX = "klt_";
+    private static final String PRINCIPAL_ATTRIBUTE = "gateway.principal";
+    private static final String PAT_KEY_PREFIX = "pat:";
+    private static final String REVOCATION_KEY_PREFIX = "pat:revoked:";
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
+    private final ReactiveStringRedisTemplate redisTemplate;
+    private final WebClient workerClient;
+    private final GatewayMetrics metrics;
+
+    public PatAuthenticationFilter(
+            ReactiveStringRedisTemplate redisTemplate,
+            WebClient.Builder webClientBuilder,
+            @Value("${kelta.gateway.worker-service-url:http://kelta-worker:80}") String workerServiceUrl,
+            GatewayMetrics metrics) {
+        this.redisTemplate = redisTemplate;
+        this.workerClient = webClientBuilder.baseUrl(workerServiceUrl).build();
+        this.metrics = metrics;
+    }
+
+    @Override
+    public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
+        // Only handle PAT tokens — skip if already authenticated or not a PAT
+        GatewayPrincipal existing = exchange.getAttribute(PRINCIPAL_ATTRIBUTE);
+        if (existing != null) {
+            return chain.filter(exchange);
+        }
+
+        String authHeader = exchange.getRequest().getHeaders().getFirst(AUTHORIZATION_HEADER);
+        if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
+            return chain.filter(exchange);
+        }
+
+        String token = authHeader.substring(BEARER_PREFIX.length());
+        if (!token.startsWith(PAT_PREFIX)) {
+            return chain.filter(exchange);
+        }
+
+        String path = exchange.getRequest().getPath().value();
+        String tenantSlug = TenantResolutionFilter.getTenantSlug(exchange);
+        String tokenHash = sha256(token);
+
+        // Check revocation first
+        return redisTemplate.opsForValue().get(REVOCATION_KEY_PREFIX + tokenHash)
+                .hasElement()
+                .flatMap(isRevoked -> {
+                    if (Boolean.TRUE.equals(isRevoked)) {
+                        log.warn("Revoked PAT used for path: {}", path);
+                        metrics.recordAuthFailure(tenantSlug, "revoked_pat");
+                        return unauthorized(exchange, "Token has been revoked");
+                    }
+                    // Try Redis first, fall back to worker
+                    return redisTemplate.opsForValue().get(PAT_KEY_PREFIX + tokenHash)
+                            .switchIfEmpty(fetchFromWorker(tokenHash))
+                            .flatMap(patJson -> authenticateWithPat(patJson, exchange, chain, path, tenantSlug))
+                            .switchIfEmpty(Mono.defer(() -> {
+                                log.warn("Unknown PAT used for path: {}", path);
+                                metrics.recordAuthFailure(tenantSlug, "unknown_pat");
+                                return unauthorized(exchange, "Invalid or expired token");
+                            }));
+                });
+    }
+
+    /**
+     * Fallback: call the worker's PAT validation endpoint.
+     */
+    private Mono<String> fetchFromWorker(String tokenHash) {
+        return workerClient.get()
+                .uri("/api/me/tokens/validate/{hash}", tokenHash)
+                .retrieve()
+                .bodyToMono(String.class)
+                .onErrorResume(e -> {
+                    log.debug("Worker PAT validation fallback failed: {}", e.getMessage());
+                    return Mono.empty();
+                });
+    }
+
+    private Mono<Void> authenticateWithPat(String patJson, ServerWebExchange exchange,
+                                            GatewayFilterChain chain, String path, String tenantSlug) {
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> patData = OBJECT_MAPPER.readValue(patJson, Map.class);
+
+            // Validate expiry
+            String expiresAt = (String) patData.get("expiresAt");
+            if (expiresAt != null && !expiresAt.isEmpty()) {
+                try {
+                    java.time.Instant expiry = java.time.Instant.parse(expiresAt);
+                    if (expiry.isBefore(java.time.Instant.now())) {
+                        log.warn("Expired PAT used for path: {}", path);
+                        metrics.recordAuthFailure(tenantSlug, "expired_pat");
+                        return unauthorized(exchange, "Token has expired");
+                    }
+                } catch (Exception e) {
+                    log.warn("Failed to parse PAT expiry: {}", expiresAt);
+                }
+            }
+
+            String userId = (String) patData.get("userId");
+            String tenantId = (String) patData.get("tenantId");
+            String email = (String) patData.get("email");
+            String scopes = patData.get("scopes") != null
+                    ? patData.get("scopes").toString() : "[\"api\"]";
+
+            GatewayPrincipal principal = new GatewayPrincipal(
+                    email, Collections.emptyList(), Map.of(
+                    "sub", userId,
+                    "pat", "true",
+                    "pat_scopes", scopes
+            ));
+            principal.setTenantId(tenantId);
+
+            ServerWebExchange mutatedExchange = exchange.mutate()
+                    .request(r -> r.header("X-User-Id", userId))
+                    .build();
+            mutatedExchange.getAttributes().put(PRINCIPAL_ATTRIBUTE, principal);
+
+            log.debug("PAT authenticated user {} for path: {}", email, path);
+            return chain.filter(mutatedExchange);
+        } catch (JsonProcessingException e) {
+            log.error("Failed to parse PAT data", e);
+            metrics.recordAuthFailure(tenantSlug, "pat_parse_error");
+            return unauthorized(exchange, "Authentication failed");
+        }
+    }
+
+    private Mono<Void> unauthorized(ServerWebExchange exchange, String message) {
+        exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+        exchange.getResponse().getHeaders().add(HttpHeaders.CONTENT_TYPE, "application/json");
+
+        String path = exchange.getRequest().getPath().value();
+        String errorJson;
+        try {
+            errorJson = OBJECT_MAPPER.writeValueAsString(Map.of(
+                    "error", Map.of(
+                            "status", 401,
+                            "code", "UNAUTHORIZED",
+                            "message", message,
+                            "path", path
+                    )
+            ));
+        } catch (JsonProcessingException e) {
+            log.error("Failed to serialize error response", e);
+            errorJson = "{\"error\":{\"status\":401,\"code\":\"UNAUTHORIZED\"}}";
+        }
+
+        return exchange.getResponse().writeWith(
+                Mono.just(exchange.getResponse().bufferFactory().wrap(errorJson.getBytes()))
+        );
+    }
+
+    static String sha256(String input) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException("SHA-256 not available", e);
+        }
+    }
+
+    @Override
+    public int getOrder() {
+        return -99; // Run after JwtAuthenticationFilter (-100)
+    }
+}

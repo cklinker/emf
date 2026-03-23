@@ -92,9 +92,14 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
             metrics.recordAuthFailure(TenantResolutionFilter.getTenantSlug(exchange), "invalid_format");
             return unauthorized(exchange, "Invalid Authorization header format. Expected 'Bearer <token>'");
         }
-        
+
         // Extract token from header
         String token = authHeader.substring(BEARER_PREFIX.length());
+
+        // Skip PAT tokens — they are handled by PatAuthenticationFilter
+        if (token.startsWith("klt_")) {
+            return chain.filter(exchange);
+        }
 
         // Get tenant context (set by TenantSlugExtractionFilter / TenantResolutionFilter)
         // to scope JWT issuer validation to the correct tenant

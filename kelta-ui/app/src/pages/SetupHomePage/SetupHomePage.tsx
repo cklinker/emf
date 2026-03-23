@@ -171,6 +171,11 @@ const CATEGORIES: SetupCategory[] = [
         permission: 'MANAGE_CONNECTED_APPS',
       },
       {
+        name: 'API Tokens',
+        path: '/api-tokens',
+        description: 'Manage personal access tokens',
+      },
+      {
         name: 'Webhooks',
         path: '/webhooks',
         description: 'Configure outbound webhooks',

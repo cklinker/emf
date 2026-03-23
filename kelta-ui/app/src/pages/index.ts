@@ -205,6 +205,10 @@ export type { WebhooksPageProps } from './WebhooksPage'
 export { ConnectedAppsPage } from './ConnectedAppsPage'
 export type { ConnectedAppsPageProps } from './ConnectedAppsPage'
 
+// ApiTokensPage - Personal access token management page
+export { ApiTokensPage } from './ApiTokensPage'
+export type { ApiTokensPageProps } from './ApiTokensPage'
+
 // ModulesPage - Runtime module management page
 export { ModulesPage } from './ModulesPage'
 export type { ModulesPageProps } from './ModulesPage'

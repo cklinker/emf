@@ -116,6 +116,9 @@ import type {
   UpdateObservabilitySettingsRequest,
   SearchIndexStats,
   SearchReindexResult,
+  PersonalAccessToken,
+  PersonalAccessTokenCreated,
+  CreatePersonalAccessTokenRequest,
 } from './types';
 import {
   toJsonApiBody,
@@ -493,6 +496,11 @@ export class AdminClient {
       const items = unwrapJsonApiList<LoginHistoryEntry>(response.data);
       const meta = extractMetadata(response.data);
       return toPage(items, meta);
+    },
+
+    resetPassword: async (userId: string): Promise<{ status: string; userId: string }> => {
+      const response = await this.axios.post(`/api/admin/users/${userId}/reset-password`);
+      return response.data as { status: string; userId: string };
     },
   };
 
@@ -2036,6 +2044,28 @@ export class AdminClient {
     updatePolicy: async (policy: { mfaRequired: boolean }): Promise<{ status: string }> => {
       const response = await this.axios.put('/api/admin/mfa/policy', policy);
       return response.data as { status: string };
+    },
+  };
+
+  // ---------------------------------------------------------------------------
+  // Personal Access Tokens
+  // ---------------------------------------------------------------------------
+
+  readonly personalTokens = {
+    list: async (): Promise<PersonalAccessToken[]> => {
+      const response = await this.axios.get('/api/me/tokens');
+      return (response.data as { data: PersonalAccessToken[] }).data;
+    },
+
+    create: async (
+      request: CreatePersonalAccessTokenRequest
+    ): Promise<PersonalAccessTokenCreated> => {
+      const response = await this.axios.post('/api/me/tokens', request);
+      return response.data as PersonalAccessTokenCreated;
+    },
+
+    revoke: async (tokenId: string): Promise<void> => {
+      await this.axios.delete(`/api/me/tokens/${tokenId}`);
     },
   };
 }

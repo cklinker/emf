@@ -8,22 +8,30 @@ Teams can build and manage business applications through a multi-tenant enterpri
 
 ## Design Principles
 
-1. **Standards everywhere** — Use open standards as the foundation: JSON:API, OIDC, OAuth2, SMTP (RFC 5321), OpenTelemetry, Cerbos, etc. Standards-compliant by default, not as an afterthought.
+1. **Standards everywhere** — Use open standards as the foundation: JSON:API, OIDC, OAuth2, SMTP (RFC 5321), TOTP (RFC 6238), OpenTelemetry, Cerbos, etc.
+2. **Highly opinionated, customizable** — Pick the best default and ship it. Extension points (SPIs) for customization.
+3. **Open source only** — No proprietary SDKs in the core path. Users can add proprietary integrations via extension points.
 
-2. **Highly opinionated, customizable** — Pick the best default and ship it. Don't offer 5 options — offer 1 good one with an extension point. The out-of-the-box experience should work without configuration. Power users can swap components via SPIs.
+## Validated Requirements (Shipped)
 
-3. **Open source only** — The default solution stack uses only open source products. No proprietary SDKs (SendGrid, Twilio, etc.) in the core path. Users can add proprietary integrations via extension points, but the platform ships with open source defaults.
+**Phase 1 — Foundation Gaps:**
+- Email delivery (SMTP, per-tenant config)
+- Scheduled flow triggers (cron, leader election)
+- OAuth2 client credentials for connected apps (RFC 6749 §4.4)
+- Per-tenant password policies (NIST SP 800-63B, dictionary, lockout)
 
-## Constraints
-- Open source only for default integrations
-- Standards-compliant APIs and protocols
-- Extension points (SPIs) for all integration boundaries
+**Phase 1A — Namespace Alignment:**
+- Java filesystem directories match package declarations (509 files)
 
-## Success Criteria
-- Teams can build and manage business applications through configuration
-- Platform works out-of-the-box with zero proprietary dependencies
-- Every integration has a standards-based default and an SPI for customization
+**Phase 1B — Security Hardening:**
+- CSP, session cookies, CORS, JSON error safety, encryption enforcement
+- OWASP Dependency-Check in CI, security audit logging
+
+**Phase 2 — Enterprise Security:**
+- MFA/TOTP authentication (RFC 6238) with encrypted secrets + recovery codes
+- Bidirectional field-level security (read stripping + write enforcement via Cerbos)
+- Direct file serving endpoint with streaming, path traversal prevention, range support
 
 ---
 *Created: 2026-03-22*
-*Updated: 2026-03-22*
+*Updated: 2026-03-22 after Phase 2 (Enterprise Security)*

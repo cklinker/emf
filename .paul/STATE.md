@@ -5,19 +5,22 @@
 See: .paul/PROJECT.md (updated 2026-03-22)
 
 **Core value:** Teams can build and manage business applications through a multi-tenant enterprise platform with configurable objects, fields, permissions, and workflows — without custom development.
-**Current focus:** Phase 1 — Foundation Gaps (3 of 4 plans complete)
+**Current focus:** Phase 2 — Enterprise Security (1 of 3 plans complete)
 
 ## Current Position
 
 Milestone: v1.0 Competitive Parity
-Phase: 1 of 5 (Foundation Gaps) — In Progress
-Plan: 01-03 complete, ready for next plan
+Phase: 2 of 7 (Enterprise Security) — In Progress
+Plan: 02-01 complete, 02-02 next
 Status: Loop closed — ready for next PLAN
-Last activity: 2026-03-22 — Unified plan 01-03 (API keys / connected app tokens)
+Last activity: 2026-03-22 — Unified plan 02-01 (MFA/TOTP authentication)
 
 Progress:
-- Milestone: [██░░░░░░░░] 15%
-- Phase 1: [███████░░░] 75% (3 of 4 plans)
+- Milestone: [████░░░░░░] 47%
+- Phase 1: [██████████] 100% — Complete
+- Phase 1A: [██████████] 100% — Complete
+- Phase 1B: [██████████] 100% — Complete
+- Phase 2: [███░░░░░░░] 33% (1 of 3 plans)
 
 ## Loop Position
 
@@ -30,15 +33,18 @@ PLAN ──▶ APPLY ──▶ UNIFY
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 3
-- Average duration: 25 min
-- Total execution time: 1.25 hours
+- Total plans completed: 8
+- Average duration: 21 min
+- Total execution time: ~2.8 hours
 
 **By Phase:**
 
 | Phase | Plans | Total Time | Avg/Plan |
 |-------|-------|------------|----------|
-| 01-foundation-gaps | 3/4 | 75 min | 25 min |
+| 01-foundation-gaps | 4/4 | ~100 min | 25 min |
+| 01a-namespace-alignment | 1/1 | ~10 min | 10 min |
+| 01b-security-hardening | 2/2 | ~35 min | 17 min |
+| 02-enterprise-security | 1/3 | ~35 min | 35 min |
 
 ## Accumulated Context
 
@@ -53,27 +59,29 @@ Documents: .paul/codebase/ (7 files)
 
 ### Decisions
 - GraphQL API excluded from roadmap (user decision)
-- Batch operations to follow JSON:API Atomic Operations extension
 - Standards-first: SMTP, OAuth2 Client Credentials, Spring CronExpression — open source only
-- Per-tenant SMTP overrides stored in tenant.settings JSONB
-- JdbcTemplate repos for worker code — matches existing patterns
-- SELECT FOR UPDATE SKIP LOCKED for scheduler leader election
-- OAuth2 Client Credentials (RFC 6749 §4.4) for connected apps — no custom API keys
-- Redis jti set for near-instant token revocation
-- Token generation rate limited: 10 per 5 min per app
-- All features require full UI + unit tests + e2e tests
+- NIST SP 800-63B password defaults (length > complexity)
+- Bundled 10k dictionary (no HIBP API) — open source only
+- Namespace alignment: single PR, all 509 files
+- Security audit: full scope including infra recommendations
+- TOTP via dev.samstevens.totp (open source, no external API)
+- Post-auth MFA via session state, not custom AuthenticationProvider
+- MFA rate limiting independent from password lockout
+- Session ID regenerated after MFA completion
 
 ### Deferred Issues
 | Issue | Origin | Effort | Revisit |
 |-------|--------|--------|---------|
 | Tenant SMTP credential encryption at rest | Audit 01-01 | S | When DB-level encryption reviewed |
-| Email rate limiting on internal endpoint | Audit 01-01 | S | Phase 2 or when abuse patterns emerge |
-| Email content sanitization (XSS) | Audit 01-01 | S | When user-supplied HTML templates added |
+| Email rate limiting on internal endpoint | Audit 01-01 | S | When abuse patterns emerge |
 | Scheduler health check alert | 01-02 | S | When monitoring enhancements planned |
-| SCRIPT/REPORT_EXPORT job types | 01-02 | M | When those features are built |
-| IP restriction enforcement in gateway | 01-03 | M | Phase 2 (Enterprise Security) |
-| Scope enforcement in RouteAuthorizationFilter | 01-03 | M | Phase 2 (Enterprise Security) |
-| Dynamic OAuth2 client registration on app create | 01-03 | M | Next connected apps enhancement |
+| IP restriction enforcement in gateway | 01-03 | M | Phase 2 |
+| Scope enforcement in RouteAuthorizationFilter | 01-03 | M | Phase 2 |
+| Database TLS (sslmode=require) | Security Audit | S | Ops/ArgoCD repo |
+| Redis TLS | Security Audit | S | Ops/ArgoCD repo |
+| Service-to-service mTLS | Security Audit | M | Ops/ArgoCD repo |
+| QR code rendering via external API | 02-01 | S | Bundle zxing for offline |
+| Self-service MFA re-auth (AC-14 partial) | 02-01 | S | UI password prompt component |
 
 ### Blockers/Concerns
 None.
@@ -81,15 +89,9 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-22
-Stopped at: Plan 01-03 loop closed, session paused
-Next action: Run /paul:plan for plan 01-04 (Enhanced Password Policies)
-Resume file: .paul/HANDOFF-2026-03-22.md
-Resume context:
-- Phase 1 at 75% (3 of 4 plans complete: email, scheduler, API keys)
-- 01-04 is the LAST plan in Phase 1 (enhanced password policies)
-- After 01-04: Phase 1 transition, then Phase 2 (Enterprise Security)
-- Enterprise audit enabled — include all findings, no deferrals
-- All features need full UI + unit tests + e2e tests
+Stopped at: Plan 02-01 loop closed
+Next action: /paul:plan for plan 02-02 (Field-level security enforcement)
+Resume file: .paul/ROADMAP.md
 
 ---
 *STATE.md — Updated after every significant action*

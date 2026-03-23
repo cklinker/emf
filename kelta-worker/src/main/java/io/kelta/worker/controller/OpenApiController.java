@@ -44,9 +44,9 @@ public class OpenApiController {
 
     @GetMapping(value = "/openapi.json", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> getOpenApiSpec(
-            @RequestHeader(value = "X-User-Email", required = false) String userEmail) {
+            @RequestHeader(value = "X-Tenant-ID", required = false) String tenantId) {
 
-        if (userEmail == null || userEmail.isBlank()) {
+        if (tenantId == null || tenantId.isBlank()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("error", "Authentication required"));
         }
@@ -65,10 +65,10 @@ public class OpenApiController {
 
     @GetMapping(produces = MediaType.TEXT_HTML_VALUE)
     public ResponseEntity<String> getSwaggerUi(
-            @RequestHeader(value = "X-User-Email", required = false) String userEmail,
+            @RequestHeader(value = "X-Tenant-ID", required = false) String tenantId,
             HttpServletRequest request) {
 
-        if (userEmail == null || userEmail.isBlank()) {
+        if (tenantId == null || tenantId.isBlank()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body("<html><body><h1>401 Unauthorized</h1><p>Authentication required to view API docs.</p></body></html>");
         }

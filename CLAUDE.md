@@ -244,3 +244,13 @@ gh pr merge --auto --squash
 ```
 
 This replaces the previous workflow of waiting for manual merge approval. PRs will merge automatically once all required checks pass.
+
+### After a PR is Merged
+
+Always return to `main` and pull the latest changes after a PR is merged:
+
+```bash
+git checkout main && git pull origin main
+```
+
+This ensures your next branch is based on the latest code and avoids stale-branch issues.

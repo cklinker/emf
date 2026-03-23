@@ -414,6 +414,7 @@ export function Sidebar({ menus, collapsed, onToggle, onItemClick }: SidebarProp
       `${base}/scripts`,
       `${base}/webhooks`,
       `${base}/connected-apps`,
+      `${base}/api-tokens`,
       `${base}/plugins`,
       `${base}/packages`,
       `${base}/migrations`,

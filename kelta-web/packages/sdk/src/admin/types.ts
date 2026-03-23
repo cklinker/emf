@@ -1815,3 +1815,29 @@ export interface SearchReindexResult {
   collection: string;
   message: string;
 }
+
+// --- Personal Access Tokens ---
+
+export interface PersonalAccessToken {
+  id: string;
+  name: string;
+  tokenPrefix: string;
+  scopes: string[];
+  expiresAt: string;
+  lastUsedAt: string | null;
+  createdAt: string;
+}
+
+export interface PersonalAccessTokenCreated {
+  token: string;
+  name: string;
+  tokenPrefix: string;
+  scopes: string[];
+  expiresAt: string;
+}
+
+export interface CreatePersonalAccessTokenRequest {
+  name: string;
+  scopes?: string[];
+  expiresInDays?: number;
+}

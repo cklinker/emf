@@ -5,6 +5,7 @@ import { useApi } from '../../context/ApiContext'
 import { useI18n } from '../../context/I18nContext'
 import { getTenantSlug } from '../../context/TenantContext'
 import { useToast } from '../../components/Toast'
+import { ConfirmDialog } from '../../components'
 import { cn } from '@/lib/utils'
 
 interface PlatformUser {
@@ -88,7 +89,7 @@ export function UserDetailPage({ testId = 'user-detail-page' }: UserDetailPagePr
   const { id } = useParams<{ id: string }>()
   const queryClient = useQueryClient()
   const { t, formatDate } = useI18n()
-  const { apiClient } = useApi()
+  const { apiClient, keltaClient } = useApi()
   const { showToast } = useToast()
   const navigate = useNavigate()
   const tenantSlug = getTenantSlug()
@@ -103,6 +104,8 @@ export function UserDetailPage({ testId = 'user-detail-page' }: UserDetailPagePr
     timezone: '',
   })
   const [historyPage, setHistoryPage] = useState(0)
+  const [showMfaResetConfirm, setShowMfaResetConfirm] = useState(false)
+  const [showPasswordResetConfirm, setShowPasswordResetConfirm] = useState(false)
   const {
     data: user,
     isLoading,
@@ -188,6 +191,44 @@ export function UserDetailPage({ testId = 'user-detail-page' }: UserDetailPagePr
     },
     onError: (err: Error) => {
       showToast(err.message || 'Failed to update profile', 'error')
+    },
+  })
+
+  // MFA status query
+  const { data: mfaStatus } = useQuery({
+    queryKey: ['users', id, 'mfa-status'],
+    queryFn: () => keltaClient.admin.mfa.getUserStatus(id!),
+    enabled: !!id && activeTab === 'security' && !!user?.mfaEnabled,
+  })
+
+  // MFA reset mutation
+  const resetMfaMutation = useMutation({
+    mutationFn: () => keltaClient.admin.mfa.resetUser(id!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users', id] })
+      queryClient.invalidateQueries({ queryKey: ['users', id, 'mfa-status'] })
+      showToast('MFA reset successfully', 'success')
+      setShowMfaResetConfirm(false)
+    },
+    onError: () => {
+      showToast('Failed to reset MFA', 'error')
+      setShowMfaResetConfirm(false)
+    },
+  })
+
+  // Password reset mutation
+  const resetPasswordMutation = useMutation({
+    mutationFn: () => keltaClient.admin.users.resetPassword(id!),
+    onSuccess: () => {
+      showToast(
+        'Password reset initiated. User will be prompted to change their password on next login.',
+        'success'
+      )
+      setShowPasswordResetConfirm(false)
+    },
+    onError: (err: Error) => {
+      showToast(err.message || 'Failed to reset password', 'error')
+      setShowPasswordResetConfirm(false)
     },
   })
 
@@ -488,35 +529,84 @@ export function UserDetailPage({ testId = 'user-detail-page' }: UserDetailPagePr
 
           {/* MFA Section */}
           <div className="rounded-lg border border-border bg-card p-6">
-            <h2 className="mb-4 text-lg font-semibold text-foreground">Multi-Factor Authentication</h2>
+            <h2 className="mb-4 text-lg font-semibold text-foreground">
+              Multi-Factor Authentication
+            </h2>
             <div className="flex items-center justify-between">
-              <div>
+              <div className="space-y-1">
                 <p className="text-sm text-muted-foreground">
                   MFA Status:{' '}
-                  <span className={user.mfaEnabled ? 'text-green-500 font-medium' : 'text-muted-foreground'}>
+                  <span
+                    className={
+                      user.mfaEnabled ? 'text-green-500 font-medium' : 'text-muted-foreground'
+                    }
+                  >
                     {user.mfaEnabled ? 'Enabled' : 'Not enabled'}
                   </span>
                 </p>
+                {user.mfaEnabled && mfaStatus && (
+                  <>
+                    {mfaStatus.enrolledAt && (
+                      <p className="text-xs text-muted-foreground">
+                        Enrolled: {formatDate(mfaStatus.enrolledAt)}
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      Recovery codes remaining: {mfaStatus.remainingRecoveryCodes}
+                    </p>
+                  </>
+                )}
               </div>
               {user.mfaEnabled && (
                 <button
-                  className="rounded-md border border-destructive px-4 py-2 text-sm font-medium text-destructive hover:bg-destructive/10"
-                  onClick={() => {
-                    if (window.confirm('Are you sure you want to reset MFA for this user? They will need to re-enroll.')) {
-                      fetch(`/api/admin/mfa/users/${id}/reset`, { method: 'POST' })
-                        .then(() => {
-                          queryClient.invalidateQueries({ queryKey: ['users', id] })
-                          showToast('MFA reset successfully', 'success')
-                        })
-                        .catch(() => showToast('Failed to reset MFA', 'error'))
-                    }
-                  }}
+                  className="rounded-md border border-destructive px-4 py-2 text-sm font-medium text-destructive hover:bg-destructive/10 disabled:opacity-50"
+                  onClick={() => setShowMfaResetConfirm(true)}
+                  disabled={resetMfaMutation.isPending}
+                  data-testid="reset-mfa-button"
                 >
                   Reset MFA
                 </button>
               )}
             </div>
           </div>
+
+          {/* Password Management Section */}
+          <div className="rounded-lg border border-border bg-card p-6">
+            <h2 className="mb-4 text-lg font-semibold text-foreground">Password Management</h2>
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                Force the user to change their password on next login.
+              </p>
+              <button
+                className="rounded-md border border-border bg-secondary px-4 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50"
+                onClick={() => setShowPasswordResetConfirm(true)}
+                disabled={resetPasswordMutation.isPending}
+                data-testid="reset-password-button"
+              >
+                Reset Password
+              </button>
+            </div>
+          </div>
+
+          <ConfirmDialog
+            open={showMfaResetConfirm}
+            title="Reset MFA"
+            message="Are you sure you want to reset MFA for this user? They will need to re-enroll their authenticator."
+            confirmLabel="Reset MFA"
+            onConfirm={() => resetMfaMutation.mutate()}
+            onCancel={() => setShowMfaResetConfirm(false)}
+            variant="danger"
+          />
+
+          <ConfirmDialog
+            open={showPasswordResetConfirm}
+            title="Reset Password"
+            message="This will force the user to change their password on their next login. Are you sure?"
+            confirmLabel="Reset Password"
+            onConfirm={() => resetPasswordMutation.mutate()}
+            onCancel={() => setShowPasswordResetConfirm(false)}
+            variant="danger"
+          />
         </div>
       )}
 

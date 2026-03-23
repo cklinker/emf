@@ -2,6 +2,7 @@ package io.kelta.worker.controller;
 
 import io.kelta.runtime.context.TenantContext;
 import io.kelta.worker.repository.PasswordPolicyRepository;
+import io.kelta.worker.service.SecurityAuditLogger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -82,6 +83,9 @@ public class PasswordPolicyController {
 
         repository.upsert(tenantId, policy);
 
+        SecurityAuditLogger.log(SecurityAuditLogger.EventType.PASSWORD_POLICY_UPDATED,
+                "admin", tenantId, tenantId, "success",
+                "before=" + before.toString());
         log.info("Password policy updated for tenant {}", tenantId);
         return ResponseEntity.ok(Map.of("status", "ok"));
     }
@@ -107,6 +111,8 @@ public class PasswordPolicyController {
                 Timestamp.from(Instant.now()), userId
         );
 
+        SecurityAuditLogger.log(SecurityAuditLogger.EventType.ACCOUNT_UNLOCKED,
+                "admin", userId, tenantId, "success", null);
         log.info("Account unlocked: userId={}, tenantId={}", userId, tenantId);
         return ResponseEntity.ok(Map.of("status", "unlocked", "userId", userId));
     }

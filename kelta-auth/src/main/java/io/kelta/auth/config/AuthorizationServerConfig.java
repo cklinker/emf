@@ -107,6 +107,9 @@ public class AuthorizationServerConfig {
             ClientRegistrationRepository clientRegistrationRepository,
             @org.springframework.beans.factory.annotation.Autowired(required = false) TotpService totpService,
             PasswordPolicyService passwordPolicyService) throws Exception {
+        org.springframework.security.web.authentication.SavedRequestAwareAuthenticationSuccessHandler
+                savedRequestHandler = new org.springframework.security.web.authentication.SavedRequestAwareAuthenticationSuccessHandler();
+
         http
                 .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(authorize -> authorize
@@ -166,8 +169,9 @@ public class AuthorizationServerConfig {
                                     return;
                                 }
                             }
-                            // No MFA required — proceed normally
-                            response.sendRedirect("/");
+                            // No MFA required — replay the original saved request (e.g. /oauth2/authorize?...)
+                            // so the authorization code flow completes and redirects back to the UI.
+                            savedRequestHandler.onAuthenticationSuccess(request, response, authentication);
                         })
                         .failureHandler((request, response, exception) -> {
                             if (exception.getCause() instanceof CredentialsExpiredException

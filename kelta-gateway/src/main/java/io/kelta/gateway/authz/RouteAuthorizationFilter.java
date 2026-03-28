@@ -151,6 +151,20 @@ public class RouteAuthorizationFilter implements GlobalFilter, Ordered {
                     // real collections — they only require the API_ACCESS check
                     // above.  Skip the collection-level Cerbos check for them.
                     if (collectionId.startsWith("static-")) {
+                        // Tenant management write operations require MANAGE_TENANTS
+                        if ("static-tenants".equals(collectionId) && isWriteMethod(exchange)) {
+                            return cerbosService.checkSystemPermission(principal, "MANAGE_TENANTS")
+                                    .flatMap(allowed -> {
+                                        if (!allowed) {
+                                            log.warn("User {} denied MANAGE_TENANTS for tenant write on path: {}",
+                                                    principal.getUsername(), path);
+                                            metrics.recordAuthzDenied(tenantSlug, collectionName, methodStr);
+                                            return forbidden(exchange,
+                                                    "Insufficient permissions: MANAGE_TENANTS required");
+                                        }
+                                        return forwardWithHeaders(exchange, chain, principal);
+                                    });
+                        }
                         return forwardWithHeaders(exchange, chain, principal);
                     }
 
@@ -186,6 +200,12 @@ public class RouteAuthorizationFilter implements GlobalFilter, Ordered {
                         .header("X-Cerbos-Scope", principal.getTenantId() != null ? principal.getTenantId() : ""))
                 .build();
         return chain.filter(mutated);
+    }
+
+    private boolean isWriteMethod(ServerWebExchange exchange) {
+        HttpMethod method = exchange.getRequest().getMethod();
+        return method == HttpMethod.POST || method == HttpMethod.PUT
+                || method == HttpMethod.PATCH || method == HttpMethod.DELETE;
     }
 
     private String mapMethodToAction(HttpMethod method) {

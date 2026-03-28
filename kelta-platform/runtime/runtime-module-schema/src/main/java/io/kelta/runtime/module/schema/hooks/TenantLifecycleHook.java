@@ -61,7 +61,7 @@ public class TenantLifecycleHook implements BeforeSaveHook {
         Map<String, Object> updates = new HashMap<>();
 
         if (!record.containsKey("status") || record.get("status") == null) {
-            updates.put("status", "ACTIVE");
+            updates.put("status", "PROVISIONING");
         }
 
         // Normalize slug to lowercase

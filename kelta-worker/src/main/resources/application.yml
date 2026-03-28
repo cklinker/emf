@@ -43,6 +43,8 @@ kelta:
   # Generate with: openssl rand -base64 32
   encryption:
     key: ${KELTA_ENCRYPTION_KEY:}
+  auth:
+    issuer-uri: ${KELTA_AUTH_ISSUER_URI:https://auth.rzware.com}
   external-base-url: ${EXTERNAL_BASE_URL:http://localhost:8080}
   worker:
     id: ${WORKER_ID:}

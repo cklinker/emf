@@ -541,6 +541,7 @@ public final class SystemCollectionDefinitions {
             .addField(FieldDefinition.requiredString("name", 100))
             .addField(FieldDefinition.requiredString("issuer", 500))
             .addField(FieldDefinition.bool("active").withDefault(true))
+            .addField(FieldDefinition.bool("isInternal").withColumnName("is_internal").withDefault(false))
             .addField(FieldDefinition.string("clientId", 200).withColumnName("client_id"))
             .addField(FieldDefinition.string("clientSecretEnc")
                 .withColumnName("client_secret_enc"))

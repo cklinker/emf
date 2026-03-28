@@ -75,4 +75,5 @@ export interface OIDCProviderSummary {
   name: string
   issuer: string
   clientId: string
+  isInternal?: boolean
 }

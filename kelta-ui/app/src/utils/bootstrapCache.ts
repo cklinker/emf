@@ -185,7 +185,7 @@ export function fetchBootstrapConfig(): Promise<unknown> {
     .then(([pagesRes, menusRes, providersRes, tenantsRes]) => {
       const pages = unwrapList(pagesRes)
       const menus = unwrapMenusWithItems(menusRes)
-      const oidcProviders = unwrapList(providersRes)
+      const oidcProviders = unwrapList(providersRes).filter((p) => !p.isInternal)
       const tenants = unwrapList(tenantsRes)
       const tenantId = tenants.length > 0 ? (tenants[0].id as string) : undefined
       const tenantName = tenants.length > 0 ? (tenants[0].name as string) : undefined

@@ -67,18 +67,21 @@ export function LoginPage({ title }: LoginPageProps): React.ReactElement {
     }
   }, [isAuthenticated, authLoading, navigate, from])
 
-  // Get OIDC providers from config
+  // Get OIDC providers from config — split internal from external
   const providers = config?.oidcProviders || []
+  const externalProviders = providers.filter((p) => !p.isInternal)
 
   // Track whether auto-login has been attempted to prevent duplicate calls
   const autoLoginAttempted = useRef(false)
 
-  // Auto-login if only one provider (skip if there was a previous error or user just logged out)
+  // Auto-login only when there is exactly one *external* provider.
+  // Internal providers (kelta-auth itself) must not be auto-initiated because
+  // that would create a redirect loop: kelta-ui → kelta-auth → kelta-ui → …
   useEffect(() => {
     if (
       !authLoading &&
       !configLoading &&
-      providers.length === 1 &&
+      externalProviders.length === 1 &&
       !isAuthenticated &&
       !authError &&
       !autoLoginAttempted.current &&
@@ -87,7 +90,7 @@ export function LoginPage({ title }: LoginPageProps): React.ReactElement {
       autoLoginAttempted.current = true
       // Clear any persisted login error and redirect directly
       sessionStorage.removeItem('kelta_auth_login_error')
-      login(providers[0].id).catch(() => {
+      login(externalProviders[0].id).catch(() => {
         // Error will be shown via authError from AuthContext
       })
     }

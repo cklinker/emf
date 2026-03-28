@@ -128,9 +128,9 @@ public class TenantProvisioningHook implements BeforeSaveHook {
 
             for (String perm : ALL_PERMISSIONS) {
                 jdbcTemplate.update("""
-                        INSERT INTO profile_system_permission (id, profile_id, permission_name, granted)
-                        VALUES (?, ?, ?, ?)
-                        """, UUID.randomUUID().toString(), profileId, perm, def.grantedPermissions.contains(perm));
+                        INSERT INTO profile_system_permission (id, tenant_id, profile_id, permission_name, granted)
+                        VALUES (?, ?, ?, ?, ?)
+                        """, UUID.randomUUID().toString(), tenantId, profileId, perm, def.grantedPermissions.contains(perm));
             }
         }
 

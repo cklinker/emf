@@ -272,6 +272,10 @@ export { MonitoringLayout, MonitoringOverviewPage } from './MonitoringPage'
 export { SearchSettingsPage } from './SearchSettingsPage'
 export type { SearchSettingsPageProps } from './SearchSettingsPage'
 
+// AiSettingsPage - AI configuration and usage (admin only)
+export { AiSettingsPage } from './AiSettingsPage'
+export type { AiSettingsPageProps } from './AiSettingsPage'
+
 // NotFoundPage - 404 error page
 export { NotFoundPage } from './NotFoundPage'
 export type { NotFoundPageProps } from './NotFoundPage'

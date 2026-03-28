@@ -119,6 +119,13 @@ import type {
   PersonalAccessToken,
   PersonalAccessTokenCreated,
   CreatePersonalAccessTokenRequest,
+  AiChatRequest,
+  AiChatResponse,
+  AiConversationSummary,
+  AiConversationDetail,
+  AiTokenUsage,
+  AiConfig,
+  AiApplyResult,
 } from './types';
 import {
   toJsonApiBody,
@@ -2066,6 +2073,107 @@ export class AdminClient {
 
     revoke: async (tokenId: string): Promise<void> => {
       await this.axios.delete(`/api/me/tokens/${tokenId}`);
+    },
+  };
+
+  // ---------------------------------------------------------------------------
+  // AI Chat
+  // ---------------------------------------------------------------------------
+
+  readonly ai = {
+    chat: async (request: AiChatRequest): Promise<AiChatResponse> => {
+      const response = await this.axios.post('/api/ai/chat', request);
+      return response.data as AiChatResponse;
+    },
+
+    chatStream: (request: AiChatRequest): ReadableStream => {
+      const url = `${this.axios.defaults.baseURL ?? ''}/api/ai/chat/stream`;
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+
+      // Forward auth headers from axios defaults
+      const authHeader = this.axios.defaults.headers?.common?.Authorization;
+      if (authHeader) {
+        headers['Authorization'] = String(authHeader);
+      }
+
+      // Forward tenant headers
+      const tenantId = this.axios.defaults.headers?.common?.['X-Tenant-ID'];
+      if (tenantId) headers['X-Tenant-ID'] = String(tenantId);
+      const userId = this.axios.defaults.headers?.common?.['X-User-Id'];
+      if (userId) headers['X-User-Id'] = String(userId);
+
+      const fetchPromise = fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(request),
+      });
+
+      return new ReadableStream({
+        async start(controller) {
+          try {
+            const response = await fetchPromise;
+            if (!response.ok || !response.body) {
+              controller.error(new Error(`AI chat stream failed: ${response.status}`));
+              return;
+            }
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split('\n');
+              buffer = lines.pop() ?? '';
+
+              for (const line of lines) {
+                if (line.trim()) {
+                  controller.enqueue(line);
+                }
+              }
+            }
+            controller.close();
+          } catch (err) {
+            controller.error(err);
+          }
+        },
+      });
+    },
+
+    conversations: async (): Promise<AiConversationSummary[]> => {
+      const response = await this.axios.get('/api/ai/conversations');
+      return (response.data as { data: AiConversationSummary[] }).data;
+    },
+
+    conversation: async (id: string): Promise<AiConversationDetail> => {
+      const response = await this.axios.get(`/api/ai/conversations/${id}`);
+      return (response.data as { data: AiConversationDetail }).data;
+    },
+
+    applyProposal: async (proposalId: string): Promise<AiApplyResult> => {
+      const response = await this.axios.post(`/api/ai/proposals/${proposalId}/apply`);
+      return response.data as AiApplyResult;
+    },
+
+    usage: async (): Promise<AiTokenUsage> => {
+      const response = await this.axios.get('/api/ai/usage');
+      return (response.data as { data: AiTokenUsage }).data;
+    },
+
+    config: {
+      get: async (): Promise<AiConfig> => {
+        const response = await this.axios.get('/api/ai/config');
+        return (response.data as { data: AiConfig }).data;
+      },
+
+      update: async (config: Partial<AiConfig>): Promise<AiConfig> => {
+        const response = await this.axios.put('/api/ai/config', config);
+        return (response.data as { data: AiConfig }).data;
+      },
     },
   };
 }

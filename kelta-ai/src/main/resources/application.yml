@@ -1,0 +1,59 @@
+server:
+  port: ${SERVER_PORT:8080}
+  shutdown: graceful
+
+spring:
+  application:
+    name: kelta-ai
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/kelta_control_plane}
+    username: ${SPRING_DATASOURCE_USERNAME:kelta}
+    password: ${SPRING_DATASOURCE_PASSWORD:kelta}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      connection-init-sql: SET app.current_tenant_id = ''
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 0
+    table: ai_flyway_schema_history
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
+kelta:
+  ai:
+    anthropic:
+      api-key: ${ANTHROPIC_API_KEY:}
+      default-model: ${AI_DEFAULT_MODEL:claude-sonnet-4-20250514}
+      default-max-tokens: ${AI_DEFAULT_MAX_TOKENS:4096}
+      default-temperature: ${AI_DEFAULT_TEMPERATURE:0.7}
+    worker-service-url: ${WORKER_SERVICE_URL:http://localhost:8080}
+    sse-timeout-ms: ${AI_SSE_TIMEOUT_MS:300000}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+    metrics:
+      enabled: true
+  health:
+    readinessState:
+      enabled: true
+    livenessState:
+      enabled: true
+  tracing:
+    enabled: true
+    sampling:
+      probability: ${OTEL_TRACES_SAMPLER_ARG:1.0}
+    propagation:
+      type: w3c

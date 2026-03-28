@@ -1,10 +1,12 @@
 package io.kelta.gateway.config;
 
 import io.kelta.gateway.cache.GatewayCacheManager;
+import io.kelta.gateway.route.RouteDefinition;
 import io.kelta.gateway.route.RouteRegistry;
 import io.kelta.gateway.service.RouteConfigService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.cloud.gateway.event.RefreshRoutesEvent;
@@ -32,6 +34,9 @@ public class RouteInitializer implements ApplicationRunner {
     private final RouteConfigService routeConfigService;
     private final ApplicationEventPublisher eventPublisher;
     private final GatewayCacheManager cacheManager;
+
+    @Value("${kelta.gateway.ai-service-url:}")
+    private String aiServiceUrl;
 
     /**
      * Creates a new RouteInitializer.
@@ -63,6 +68,9 @@ public class RouteInitializer implements ApplicationRunner {
             logger.warn("Failed to prime tenant slug cache on startup; will retry on next cache refresh: {}", e.getMessage());
         }
 
+        // Register static routes for auxiliary services
+        registerStaticRoutes();
+
         // Fetch and add dynamic routes from the worker service
         try {
             routeConfigService.refreshRoutes();
@@ -75,5 +83,17 @@ public class RouteInitializer implements ApplicationRunner {
         eventPublisher.publishEvent(new RefreshRoutesEvent(this));
 
         logger.info("Route initialization completed with {} routes", routeRegistry.size());
+    }
+
+    /**
+     * Registers static routes for auxiliary services (e.g., AI service).
+     * These routes are not fetched from the worker's bootstrap endpoint.
+     */
+    private void registerStaticRoutes() {
+        if (aiServiceUrl != null && !aiServiceUrl.isBlank()) {
+            routeRegistry.addRoute(new RouteDefinition(
+                    "ai-service", "/api/ai/**", aiServiceUrl, null));
+            logger.info("Registered AI service route: /api/ai/** -> {}", aiServiceUrl);
+        }
     }
 }

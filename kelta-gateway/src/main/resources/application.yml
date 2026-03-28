@@ -73,6 +73,9 @@ kelta:
 
     # Worker service URL (used for routing AND internal API calls)
     worker-service-url: ${WORKER_SERVICE_URL:http://kelta-worker:80}
+
+    # AI service URL (used for routing /api/ai/** requests)
+    ai-service-url: ${AI_SERVICE_URL:http://emf-ai:80}
     
     # Kafka topics for configuration updates and record change events
     kafka:

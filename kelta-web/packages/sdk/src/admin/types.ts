@@ -1841,3 +1841,74 @@ export interface CreatePersonalAccessTokenRequest {
   scopes?: string[];
   expiresInDays?: number;
 }
+
+// ---------------------------------------------------------------------------
+// AI Chat
+// ---------------------------------------------------------------------------
+
+export interface AiChatRequest {
+  message: string;
+  conversationId?: string | null;
+  contextType?: string;
+  contextId?: string;
+}
+
+export interface AiChatResponse {
+  conversationId: string;
+  content: string;
+  proposals: AiProposal[];
+  tokensUsed: { input: number; output: number };
+}
+
+export interface AiProposal {
+  id: string;
+  type: 'collection' | 'layout';
+  status: 'pending' | 'applied' | 'dismissed';
+  data: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface AiConversationSummary {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AiConversationDetail {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  messages: AiMessage[];
+}
+
+export interface AiMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  proposalJson: string | null;
+  tokensInput: number;
+  tokensOutput: number;
+  createdAt: string;
+}
+
+export interface AiTokenUsage {
+  currentMonthUsage: number;
+  tokenLimit: number;
+  aiEnabled: boolean;
+  history: Record<string, { inputTokens: number; outputTokens: number; requestCount: number }>;
+}
+
+export interface AiConfig {
+  model: string;
+  maxTokens: string;
+  temperature: string;
+  aiTokensPerMonth: string;
+  aiEnabled: string;
+}
+
+export interface AiApplyResult {
+  data: Record<string, unknown>;
+  status: string;
+}

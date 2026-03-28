@@ -643,8 +643,7 @@ export function AuthProvider({
       if (authBaseUrl) {
         const currentProviderId = sessionStorage.getItem(STORAGE_KEYS.PROVIDER_ID)
         const currentProvider = availableProviders.find((p) => p.id === currentProviderId)
-        const isInternalProvider =
-          currentProvider && currentProvider.name === 'Kelta Platform (Internal)'
+        const isInternalProvider = currentProvider?.isInternal === true
         if (!isInternalProvider) {
           fetch(`${authBaseUrl}/auth/session`, {
             method: 'POST',

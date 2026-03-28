@@ -72,12 +72,12 @@ class TenantLifecycleHookTest {
         }
 
         @Test
-        @DisplayName("Should set default status to ACTIVE")
+        @DisplayName("Should set default status to PROVISIONING")
         void shouldSetDefaultStatus() {
             BeforeSaveResult result = hook.beforeCreate(new HashMap<>(Map.of("slug", "acme")), "t1");
             assertTrue(result.isSuccess());
             assertTrue(result.hasFieldUpdates());
-            assertEquals("ACTIVE", result.getFieldUpdates().get("status"));
+            assertEquals("PROVISIONING", result.getFieldUpdates().get("status"));
         }
 
         @Test

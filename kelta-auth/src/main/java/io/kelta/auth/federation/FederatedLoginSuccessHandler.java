@@ -72,7 +72,7 @@ public class FederatedLoginSuccessHandler implements AuthenticationSuccessHandle
         String[] parts = registrationId.split(":", 2);
         if (parts.length != 2) {
             log.error("Invalid registration ID format: {}", registrationId);
-            response.sendRedirect("/login?error=federation");
+            response.sendRedirect("/login?federation");
             return;
         }
 
@@ -86,7 +86,7 @@ public class FederatedLoginSuccessHandler implements AuthenticationSuccessHandle
         if (providerOpt.isEmpty()) {
             log.error("OIDC provider not found for issuer={} tenant={}",
                     oidcUser.getIssuer(), tenantId);
-            response.sendRedirect("/login?error=provider_not_found");
+            response.sendRedirect("/login?federation");
             return;
         }
 
@@ -97,7 +97,7 @@ public class FederatedLoginSuccessHandler implements AuthenticationSuccessHandle
         if (userDetailsOpt.isEmpty()) {
             log.warn("User mapping failed or user pending activation: subject={}",
                     oidcUser.getSubject());
-            response.sendRedirect("/login?error=pending_activation");
+            response.sendRedirect("/login?pending_activation");
             return;
         }
 

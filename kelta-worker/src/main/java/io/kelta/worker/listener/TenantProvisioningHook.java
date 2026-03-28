@@ -156,8 +156,8 @@ public class TenantProvisioningHook implements BeforeSaveHook {
                 : authIssuerUri + "/oauth2/jwks";
 
         jdbcTemplate.update("""
-                INSERT INTO oidc_provider (id, tenant_id, name, issuer, jwks_uri, client_id, active, created_at, updated_at)
-                VALUES (?, ?, 'Kelta Platform (Internal)', ?, ?, 'kelta-platform', TRUE, NOW(), NOW())
+                INSERT INTO oidc_provider (id, tenant_id, name, issuer, jwks_uri, client_id, active, is_internal, created_at, updated_at)
+                VALUES (?, ?, 'Kelta Platform (Internal)', ?, ?, 'kelta-platform', TRUE, TRUE, NOW(), NOW())
                 """, UUID.randomUUID().toString(), tenantId, authIssuerUri, jwksUri);
 
         log.info("Created internal OIDC provider for tenant {} (issuer={})", tenantId, authIssuerUri);

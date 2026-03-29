@@ -32,7 +32,15 @@ public class ProposalController {
         try {
             Map<String, Object> result = proposalService.applyProposal(
                     id, tenantId, userId);
-            return ResponseEntity.ok(Map.of("data", result, "status", "applied"));
+            Map<String, Object> response = new java.util.LinkedHashMap<>();
+            response.put("data", result);
+            response.put("status", "applied");
+            // Include warnings if any steps had issues
+            Object warnings = result.get("_warnings");
+            if (warnings != null) {
+                response.put("warnings", warnings);
+            }
+            return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of(
                     "errors", java.util.List.of(Map.of(

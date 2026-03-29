@@ -73,6 +73,20 @@ export function AiChatPanel({
         })
         if (response.ok) {
           dispatch({ type: 'UPDATE_PROPOSAL_STATUS', id: proposalId, status: 'applied' })
+          // Check for warnings (partial failures)
+          try {
+            const body = await response.json()
+            const warnings = body.warnings as string[] | undefined
+            if (warnings && warnings.length > 0) {
+              const warningMsg = {
+                id: crypto.randomUUID(),
+                role: 'assistant' as const,
+                content: `Collection created with ${warnings.length} warning(s):\n${warnings.map((w: string) => `- ${w}`).join('\n')}`,
+                createdAt: new Date().toISOString(),
+              }
+              dispatch({ type: 'ADD_MESSAGE', message: warningMsg })
+            }
+          } catch { /* ignore parse error */ }
         } else {
           let errorMsg = `Apply failed (${response.status})`
           try {

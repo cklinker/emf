@@ -74,6 +74,8 @@ public class ProposalService {
 
     @SuppressWarnings("unchecked")
     private Map<String, Object> applyCollectionProposal(String tenantId, String userId, Map<String, Object> data) {
+        List<String> warnings = new java.util.ArrayList<>();
+
         // Extract fields from the proposal data
         List<Map<String, Object>> fields = (List<Map<String, Object>>) data.get("fields");
 
@@ -81,13 +83,12 @@ public class ProposalService {
         Map<String, Object> collectionData = new java.util.LinkedHashMap<>(data);
         collectionData.remove("fields");
 
-        Map<String, Object> result = workerApiClient.createCollection(tenantId, userId, collectionData);
-        log.info("Collection created: {}", result);
+        Map<String, Object> result = new java.util.LinkedHashMap<>();
+        result.putAll(workerApiClient.createCollection(tenantId, userId, collectionData));
+        log.info("Collection created successfully");
 
         // Then create the fields if any
         if (fields != null && !fields.isEmpty()) {
-            // Extract the collection ID from the JSON:API response
-            // Response format: { "data": { "id": "...", "type": "collections", "attributes": {...} } }
             String collectionId = null;
             Object dataObj = result.get("data");
             if (dataObj instanceof Map) {
@@ -97,23 +98,23 @@ public class ProposalService {
             log.info("Extracted collection ID: {} from response", collectionId);
 
             if (collectionId != null) {
-                try {
-                    // Pre-create global picklists for PICKLIST/MULTI_PICKLIST fields
-                    createPicklistsForFields(tenantId, userId, fields);
+                // Pre-create global picklists for PICKLIST/MULTI_PICKLIST fields
+                List<String> picklistErrors = createPicklistsForFields(tenantId, userId, fields);
+                warnings.addAll(picklistErrors);
 
-                    workerApiClient.createFields(tenantId, userId, collectionId, fields);
-                    log.info("Created {} fields for collection {}", fields.size(), collectionId);
-                } catch (Exception e) {
-                    log.error("Failed to create fields for collection {}: {}", collectionId, e.getMessage());
-                    result.put("_fieldError", e.getMessage());
-                }
+                // Create fields
+                List<String> fieldErrors = workerApiClient.createFields(tenantId, userId, collectionId, fields);
+                warnings.addAll(fieldErrors);
+                log.info("Field creation completed with {} warnings", fieldErrors.size());
 
                 // Auto-generate a default DETAIL layout with all fields
                 try {
                     createDefaultLayout(tenantId, userId, collectionId,
                             (String) data.getOrDefault("displayName", data.get("name")));
                 } catch (Exception e) {
-                    log.error("Failed to create default layout for collection {}: {}", collectionId, e.getMessage());
+                    String msg = "Failed to create layout: " + e.getMessage();
+                    log.error(msg);
+                    warnings.add(msg);
                 }
 
                 // Add collection to the navigation menu
@@ -122,11 +123,18 @@ public class ProposalService {
                             (String) data.get("name"),
                             (String) data.getOrDefault("displayName", data.get("name")));
                 } catch (Exception e) {
-                    log.error("Failed to add menu item for collection {}: {}", collectionId, e.getMessage());
+                    String msg = "Failed to add menu item: " + e.getMessage();
+                    log.error(msg);
+                    warnings.add(msg);
                 }
             } else {
+                warnings.add("Could not extract collection ID from response");
                 log.error("Could not extract collection ID from response: {}", result);
             }
+        }
+
+        if (!warnings.isEmpty()) {
+            result.put("_warnings", warnings);
         }
 
         return result;
@@ -244,7 +252,8 @@ public class ProposalService {
      * the enumValues array and set the fieldTypeConfig.globalPicklistId.
      */
     @SuppressWarnings("unchecked")
-    private void createPicklistsForFields(String tenantId, String userId, List<Map<String, Object>> fields) {
+    private List<String> createPicklistsForFields(String tenantId, String userId, List<Map<String, Object>> fields) {
+        List<String> errors = new java.util.ArrayList<>();
         for (Map<String, Object> field : fields) {
             String type = String.valueOf(field.get("type")).toUpperCase();
             if (!"PICKLIST".equals(type) && !"MULTI_PICKLIST".equals(type)) continue;
@@ -296,9 +305,12 @@ public class ProposalService {
                 field.remove("enumValues");
 
             } catch (Exception e) {
-                log.error("Failed to create global picklist for field '{}': {}", fieldName, e.getMessage());
+                String msg = "Failed to create picklist for '" + fieldName + "': " + e.getMessage();
+                log.error(msg);
+                errors.add(msg);
             }
         }
+        return errors;
     }
 
     private Map<String, Object> applyLayoutProposal(String tenantId, String userId, Map<String, Object> data) {

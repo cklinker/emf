@@ -51,9 +51,10 @@ public class WorkerApiClient {
                 .block();
     }
 
-    public void createFields(String tenantId, String userId, String collectionId,
+    public List<String> createFields(String tenantId, String userId, String collectionId,
                               List<Map<String, Object>> fields) {
         log.info("Creating {} fields for collection {} via worker API", fields.size(), collectionId);
+        List<String> errors = new java.util.ArrayList<>();
 
         for (Map<String, Object> field : fields) {
             Map<String, Object> fieldAttrs = new java.util.LinkedHashMap<>(field);
@@ -104,10 +105,12 @@ public class WorkerApiClient {
                         .block();
                 log.debug("Created field '{}' for collection {}", field.get("name"), collectionId);
             } catch (Exception e) {
-                log.error("Failed to create field '{}' for collection {}: {}",
-                        field.get("name"), collectionId, e.getMessage());
+                String msg = "Failed to create field '" + field.get("name") + "': " + e.getMessage();
+                log.error(msg);
+                errors.add(msg);
             }
         }
+        return errors;
     }
 
     public Map<String, Object> createPageLayout(String tenantId, String userId, Map<String, Object> layoutData) {

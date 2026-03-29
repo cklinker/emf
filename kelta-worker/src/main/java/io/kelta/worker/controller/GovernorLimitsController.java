@@ -44,8 +44,11 @@ public class GovernorLimitsController {
     private static final int DEFAULT_MAX_FIELDS_PER_COLLECTION = 500;
     private static final int DEFAULT_MAX_WORKFLOWS = 50;
     private static final int DEFAULT_MAX_REPORTS = 200;
+    private static final long DEFAULT_AI_TOKENS_PER_MONTH = 1_000_000L;
+    private static final boolean DEFAULT_AI_ENABLED = true;
 
     private static final String DAILY_KEY_PREFIX = "api-calls-daily:";
+    private static final String AI_TOKEN_KEY_PREFIX = "ai-tokens-monthly:";
 
     private final GovernorLimitsRepository repository;
     private final ObjectMapper objectMapper;
@@ -84,6 +87,9 @@ public class GovernorLimitsController {
         // Read daily API call count from Redis (tracked by gateway's RateLimitFilter)
         int apiCallsUsed = getDailyApiCallCount(tenantId);
 
+        // Read AI token usage from Redis (tracked by kelta-ai service)
+        long aiTokensUsed = getMonthlyAiTokenCount(tenantId);
+
         // Build attributes
         Map<String, Object> attributes = new LinkedHashMap<>();
         attributes.put("limits", limits);
@@ -93,6 +99,9 @@ public class GovernorLimitsController {
         attributes.put("usersLimit", getIntOrDefault(limits, "maxUsers", DEFAULT_MAX_USERS));
         attributes.put("collectionsUsed", collectionsUsed);
         attributes.put("collectionsLimit", getIntOrDefault(limits, "maxCollections", DEFAULT_MAX_COLLECTIONS));
+        attributes.put("aiTokensUsed", aiTokensUsed);
+        attributes.put("aiTokensLimit", getLongOrDefault(limits, "aiTokensPerMonth", DEFAULT_AI_TOKENS_PER_MONTH));
+        attributes.put("aiEnabled", getBooleanOrDefault(limits, "aiEnabled", DEFAULT_AI_ENABLED));
 
         log.info("Returning governor-limits for tenant {}: {} users, {} collections",
                 tenantId, usersUsed, collectionsUsed);
@@ -209,6 +218,8 @@ public class GovernorLimitsController {
         limits.put("maxFieldsPerCollection", getIntOrDefault(parsed, "maxFieldsPerCollection", DEFAULT_MAX_FIELDS_PER_COLLECTION));
         limits.put("maxWorkflows", getIntOrDefault(parsed, "maxWorkflows", DEFAULT_MAX_WORKFLOWS));
         limits.put("maxReports", getIntOrDefault(parsed, "maxReports", DEFAULT_MAX_REPORTS));
+        limits.put("aiTokensPerMonth", getLongOrDefault(parsed, "aiTokensPerMonth", DEFAULT_AI_TOKENS_PER_MONTH));
+        limits.put("aiEnabled", getBooleanOrDefault(parsed, "aiEnabled", DEFAULT_AI_ENABLED));
 
         return limits;
     }
@@ -222,6 +233,8 @@ public class GovernorLimitsController {
         limits.put("maxFieldsPerCollection", DEFAULT_MAX_FIELDS_PER_COLLECTION);
         limits.put("maxWorkflows", DEFAULT_MAX_WORKFLOWS);
         limits.put("maxReports", DEFAULT_MAX_REPORTS);
+        limits.put("aiTokensPerMonth", DEFAULT_AI_TOKENS_PER_MONTH);
+        limits.put("aiEnabled", DEFAULT_AI_ENABLED);
         return limits;
     }
 
@@ -249,10 +262,47 @@ public class GovernorLimitsController {
         return 0;
     }
 
+    /**
+     * Reads the current month's AI token usage from Redis.
+     *
+     * <p>The kelta-ai service increments a monthly counter in Redis
+     * with key {@code ai-tokens-monthly:<tenantId>:<yyyy-MM>}.
+     */
+    private long getMonthlyAiTokenCount(String tenantId) {
+        try {
+            String yearMonth = java.time.YearMonth.now().toString();
+            String key = AI_TOKEN_KEY_PREFIX + tenantId + ":" + yearMonth;
+            String value = redisTemplate.opsForValue().get(key);
+            if (value != null) {
+                return Long.parseLong(value);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to read monthly AI token count from Redis for tenant {}: {}",
+                    tenantId, e.getMessage());
+        }
+        return 0L;
+    }
+
     private int getIntOrDefault(Map<String, Object> map, String key, int defaultValue) {
         Object value = map.get(key);
         if (value instanceof Number num) {
             return num.intValue();
+        }
+        return defaultValue;
+    }
+
+    private long getLongOrDefault(Map<String, Object> map, String key, long defaultValue) {
+        Object value = map.get(key);
+        if (value instanceof Number num) {
+            return num.longValue();
+        }
+        return defaultValue;
+    }
+
+    private boolean getBooleanOrDefault(Map<String, Object> map, String key, boolean defaultValue) {
+        Object value = map.get(key);
+        if (value instanceof Boolean bool) {
+            return bool;
         }
         return defaultValue;
     }

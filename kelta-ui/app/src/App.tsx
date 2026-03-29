@@ -36,6 +36,7 @@ import { PluginProvider } from './context/PluginContext'
 import { TenantProvider, useTenant } from './context/TenantContext'
 import { AppContextProvider } from './context/AppContext'
 import { useAuth } from './context/AuthContext'
+import { AiChatProvider, AiChatPanel, AiChatTrigger } from './components/AiChat'
 
 // Hooks
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts'
@@ -59,6 +60,7 @@ import {
 
 // Pages
 import {
+  AiSettingsPage,
   DashboardPage,
   CollectionsPage,
   CollectionDetailPage,
@@ -433,11 +435,15 @@ function TenantScopedApp({ plugins = [] }: { plugins?: Plugin[] }): React.ReactE
               <I18nProvider>
                 <PluginProvider plugins={plugins}>
                   <AppContextProvider>
-                    <ToastProvider>
-                      <LiveRegionProvider>
-                        <TenantRoutes />
-                      </LiveRegionProvider>
-                    </ToastProvider>
+                    <AiChatProvider>
+                      <ToastProvider>
+                        <LiveRegionProvider>
+                          <TenantRoutes />
+                          <AiChatPanel baseUrl={`${apiBaseUrl}/${tenantSlug}`} />
+                          <AiChatTrigger />
+                        </LiveRegionProvider>
+                      </ToastProvider>
+                    </AiChatProvider>
                   </AppContextProvider>
                 </PluginProvider>
               </I18nProvider>
@@ -866,6 +872,18 @@ function TenantRoutes(): React.ReactElement {
           <AdminPageRoute>
             <RequirePermission permission="VIEW_SETUP">
               <GovernorLimitsPage />
+            </RequirePermission>
+          </AdminPageRoute>
+        }
+      />
+
+      {/* AI Settings route (platform admin only) */}
+      <Route
+        path="ai-settings"
+        element={
+          <AdminPageRoute>
+            <RequirePermission permission="MANAGE_TENANTS">
+              <AiSettingsPage />
             </RequirePermission>
           </AdminPageRoute>
         }

@@ -92,7 +92,7 @@ public class RouteInitializer implements ApplicationRunner {
     private void registerStaticRoutes() {
         if (aiServiceUrl != null && !aiServiceUrl.isBlank()) {
             routeRegistry.addRoute(new RouteDefinition(
-                    "ai-service", "/api/ai/**", aiServiceUrl, null));
+                    "static-ai", "/api/ai/**", aiServiceUrl, "ai"));
             logger.info("Registered AI service route: /api/ai/** -> {}", aiServiceUrl);
         }
     }

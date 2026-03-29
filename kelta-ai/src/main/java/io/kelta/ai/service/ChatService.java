@@ -85,28 +85,68 @@ public class ChatService {
 
             List<MessageParam> messages = buildMessageHistory(conversation.id(), tenantId);
 
-            MessageCreateParams params = anthropicService.buildRequest(tenantId, systemPrompt, messages).build();
-
             StringBuilder fullText = new StringBuilder();
             List<AiProposal> proposals = new ArrayList<>();
             int[] tokenCounts = {0, 0}; // input, output
+            String[] stopReason = {null};
 
-            // Track current tool use across stream events
-            String[] currentToolName = {null};
-            StringBuilder toolInputJson = new StringBuilder();
+            // Tool use continuation loop: Claude may stop after each tool call
+            // expecting a tool result. We send back "Proposal recorded" and continue.
+            int maxIterations = 5; // Safety limit
+            MessageCreateParams.Builder requestBuilder = anthropicService.buildRequest(tenantId, systemPrompt, messages);
 
-            try (StreamResponse<RawMessageStreamEvent> stream = anthropicService.streamMessage(params)) {
-                stream.stream().forEach(event -> {
-                    try {
-                        processStreamEvent(event, emitter, fullText, proposals, tokenCounts,
-                                currentToolName, toolInputJson);
-                    } catch (Exception e) {
-                        log.error("Error processing stream event: {}", e.getMessage());
-                    }
-                });
+            for (int iteration = 0; iteration < maxIterations; iteration++) {
+                MessageCreateParams params = requestBuilder.build();
+
+                // Track current tool use across stream events
+                String[] currentToolName = {null};
+                String[] currentToolId = {null};
+                StringBuilder toolInputJson = new StringBuilder();
+
+                try (StreamResponse<RawMessageStreamEvent> stream = anthropicService.streamMessage(params)) {
+                    stream.stream().forEach(event -> {
+                        try {
+                            processStreamEvent(event, emitter, fullText, proposals, tokenCounts,
+                                    currentToolName, currentToolId, toolInputJson, stopReason);
+                        } catch (Exception e) {
+                            log.error("Error processing stream event: {}", e.getMessage());
+                        }
+                    });
+                }
+
+                tokenTrackingService.recordUsage(tenantId, tokenCounts[0], tokenCounts[1]);
+
+                // If Claude stopped because of tool use, continue with tool results
+                if ("tool_use".equals(stopReason[0]) && !proposals.isEmpty()) {
+                    log.info("Claude stopped for tool use (iteration {}), continuing with tool results", iteration);
+
+                    // Build continuation: add assistant message with tool use, then tool result
+                    // We need to use the non-streaming API for continuation since we need to
+                    // add tool results to the message history
+                    List<MessageParam> continuationMessages = new ArrayList<>(messages);
+
+                    // Add assistant message with the tool use blocks
+                    // For simplicity, just add the last tool result and ask to continue
+                    AiProposal lastProposal = proposals.getLast();
+                    continuationMessages.add(MessageParam.builder()
+                            .role(MessageParam.Role.ASSISTANT)
+                            .content(fullText.toString() + "\n[Called propose_collection for " +
+                                    lastProposal.data().getOrDefault("displayName", "") + "]")
+                            .build());
+                    continuationMessages.add(MessageParam.builder()
+                            .role(MessageParam.Role.USER)
+                            .content("Proposal recorded. Continue creating the remaining collections. " +
+                                    "Call propose_collection for each remaining collection you mentioned.")
+                            .build());
+
+                    requestBuilder = anthropicService.buildRequest(tenantId, systemPrompt, continuationMessages);
+                    fullText.setLength(0); // Reset for next iteration
+                    stopReason[0] = null;
+                } else {
+                    // Normal end or max tokens — stop looping
+                    break;
+                }
             }
-
-            tokenTrackingService.recordUsage(tenantId, tokenCounts[0], tokenCounts[1]);
 
             String proposalJson = proposals.isEmpty() ? null :
                     objectMapper.writeValueAsString(proposals.getFirst());
@@ -140,7 +180,8 @@ public class ChatService {
     private void processStreamEvent(RawMessageStreamEvent event, SseEmitter emitter,
                                      StringBuilder fullText, List<AiProposal> proposals,
                                      int[] tokenCounts, String[] currentToolName,
-                                     StringBuilder toolInputJson) throws IOException {
+                                     String[] currentToolId, StringBuilder toolInputJson,
+                                     String[] stopReason) throws IOException {
         // Handle content block delta (text or tool input JSON)
         event.contentBlockDelta().ifPresent(delta -> {
             // Text delta — stream to client
@@ -165,6 +206,7 @@ public class ChatService {
         event.contentBlockStart().ifPresent(blockStart -> {
             blockStart.contentBlock().toolUse().ifPresent(toolUse -> {
                 currentToolName[0] = toolUse.name();
+                currentToolId[0] = toolUse.id();
                 toolInputJson.setLength(0); // Reset for new tool
                 try {
                     Map<String, Object> toolData = Map.of("name", toolUse.name(), "id", toolUse.id());
@@ -197,9 +239,20 @@ public class ChatService {
             }
         });
 
-        // Handle message delta (output token count)
+        // Handle message delta (output token count and stop reason)
         event.messageDelta().ifPresent(msgDelta -> {
             tokenCounts[1] = (int) msgDelta.usage().outputTokens();
+            // Track stop reason to know if we need to continue for more tool calls
+            try {
+                var delta = msgDelta.delta();
+                var sr = delta.stopReason();
+                if (sr.isPresent()) {
+                    stopReason[0] = sr.get().toString().toLowerCase().replace("\"", "");
+                    log.info("Stream stop reason: {}", stopReason[0]);
+                }
+            } catch (Exception e) {
+                log.debug("Could not extract stop reason: {}", e.getMessage());
+            }
         });
 
         // Handle message start (input token count)

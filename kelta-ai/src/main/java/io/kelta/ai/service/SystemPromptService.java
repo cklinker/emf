@@ -174,9 +174,12 @@ public class SystemPromptService {
                    - Always include `referenceConfig` with `targetCollection` and `relationshipName`
 
                 3. **Create ALL related collections in a single response** using multiple `propose_collection` tool calls.
-                   - When asked for "an order management system", call `propose_collection` for EACH collection:
-                     first `orders`, then `order_lines` with a MASTER_DETAIL to `orders`
+                   - When asked for "an order management system", call `propose_collection` MULTIPLE TIMES in the SAME response:
+                     first `orders`, then `order_items` with a MASTER_DETAIL to `orders`
+                   - You MUST call the tool once per collection — do NOT stop after the first collection
                    - The user should see ALL proposed collections at once to review together
+                   - IMPORTANT: Always call propose_collection for EVERY collection you describe. If you say you'll create
+                     orders AND order items, you MUST call propose_collection twice — once for each.
 
                 4. **Junction tables** for many-to-many relationships.
                    - e.g., `playlist_tracks` connecting `playlists` and `tracks`

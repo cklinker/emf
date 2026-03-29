@@ -104,12 +104,136 @@ public class ProposalService {
                     log.error("Failed to create fields for collection {}: {}", collectionId, e.getMessage());
                     result.put("_fieldError", e.getMessage());
                 }
+
+                // Auto-generate a default DETAIL layout with all fields
+                try {
+                    createDefaultLayout(tenantId, userId, collectionId,
+                            (String) data.getOrDefault("displayName", data.get("name")));
+                } catch (Exception e) {
+                    log.error("Failed to create default layout for collection {}: {}", collectionId, e.getMessage());
+                }
+
+                // Add collection to the navigation menu
+                try {
+                    addToNavigationMenu(tenantId, userId,
+                            (String) data.get("name"),
+                            (String) data.getOrDefault("displayName", data.get("name")));
+                } catch (Exception e) {
+                    log.error("Failed to add menu item for collection {}: {}", collectionId, e.getMessage());
+                }
             } else {
                 log.error("Could not extract collection ID from response: {}", result);
             }
         }
 
         return result;
+    }
+
+    @SuppressWarnings("unchecked")
+    private void createDefaultLayout(String tenantId, String userId, String collectionId, String displayName) {
+        log.info("Creating default DETAIL layout for collection {}", collectionId);
+
+        // 1. Create the page layout
+        Map<String, Object> layoutData = new java.util.LinkedHashMap<>();
+        layoutData.put("collectionId", collectionId);
+        layoutData.put("name", displayName + " Detail");
+        layoutData.put("layoutType", "DETAIL");
+        layoutData.put("isDefault", true);
+
+        Map<String, Object> layoutResult = workerApiClient.createPageLayout(tenantId, userId, layoutData);
+        Object layoutDataObj = layoutResult.get("data");
+        String layoutId = null;
+        if (layoutDataObj instanceof Map) {
+            layoutId = String.valueOf(((Map<String, Object>) layoutDataObj).get("id"));
+        }
+        if (layoutId == null) {
+            log.error("Could not extract layout ID from response");
+            return;
+        }
+        log.info("Created layout {} for collection {}", layoutId, collectionId);
+
+        // 2. Create a section
+        Map<String, Object> sectionData = new java.util.LinkedHashMap<>();
+        sectionData.put("layoutId", layoutId);
+        sectionData.put("heading", "Details");
+        sectionData.put("columns", 2);
+        sectionData.put("sortOrder", 0);
+        sectionData.put("style", "DEFAULT");
+
+        Map<String, Object> sectionResult = workerApiClient.createLayoutSection(tenantId, userId, sectionData);
+        Object sectionDataObj = sectionResult.get("data");
+        String sectionId = null;
+        if (sectionDataObj instanceof Map) {
+            sectionId = String.valueOf(((Map<String, Object>) sectionDataObj).get("id"));
+        }
+        if (sectionId == null) {
+            log.error("Could not extract section ID from response");
+            return;
+        }
+        log.info("Created section {} for layout {}", sectionId, layoutId);
+
+        // 3. Fetch the created fields to get their IDs
+        List<Map<String, Object>> createdFields = workerApiClient.listFields(tenantId, collectionId);
+        log.info("Found {} fields for layout placement", createdFields.size());
+
+        // 4. Place each field in the section
+        int sortOrder = 0;
+        for (Map<String, Object> field : createdFields) {
+            String fieldId = String.valueOf(field.get("id"));
+            try {
+                Map<String, Object> fieldPlacement = new java.util.LinkedHashMap<>();
+                fieldPlacement.put("sectionId", sectionId);
+                fieldPlacement.put("fieldId", fieldId);
+                fieldPlacement.put("sortOrder", sortOrder++);
+                workerApiClient.createLayoutField(tenantId, userId, fieldPlacement);
+            } catch (Exception e) {
+                log.warn("Failed to place field {} in layout: {}", fieldId, e.getMessage());
+            }
+        }
+        log.info("Placed {} fields in layout {}", sortOrder, layoutId);
+    }
+
+    @SuppressWarnings("unchecked")
+    private void addToNavigationMenu(String tenantId, String userId, String collectionName, String displayName) {
+        log.info("Adding {} to navigation menu", collectionName);
+
+        // Find existing menus
+        List<Map<String, Object>> menus = workerApiClient.listMenus(tenantId);
+        String menuId;
+
+        if (menus.isEmpty()) {
+            // Create a default menu
+            Map<String, Object> menuData = new java.util.LinkedHashMap<>();
+            menuData.put("name", "Main");
+            menuData.put("description", "Main navigation menu");
+            menuData.put("displayOrder", 0);
+            Map<String, Object> menuResult = workerApiClient.createMenu(tenantId, userId, menuData);
+            Object menuDataObj = menuResult.get("data");
+            menuId = (menuDataObj instanceof Map) ? String.valueOf(((Map<String, Object>) menuDataObj).get("id")) : null;
+            log.info("Created default menu with ID {}", menuId);
+        } else {
+            // Use the first existing menu
+            Map<String, Object> firstMenu = menus.getFirst();
+            menuId = String.valueOf(firstMenu.get("id"));
+            log.info("Using existing menu {}", menuId);
+        }
+
+        if (menuId == null) {
+            log.error("Could not determine menu ID");
+            return;
+        }
+
+        // Create menu item
+        Map<String, Object> itemData = new java.util.LinkedHashMap<>();
+        itemData.put("menuId", menuId);
+        itemData.put("label", displayName);
+        itemData.put("path", "/resources/" + collectionName);
+        itemData.put("icon", "database");
+        itemData.put("displayOrder", menus.isEmpty() ? 0 : 100); // Add at end
+        itemData.put("active", true);
+
+        workerApiClient.createMenuItem(tenantId, userId, itemData);
+        log.info("Added menu item '{}' -> /resources/{}", displayName, collectionName);
     }
 
     private Map<String, Object> applyLayoutProposal(String tenantId, String userId, Map<String, Object> data) {

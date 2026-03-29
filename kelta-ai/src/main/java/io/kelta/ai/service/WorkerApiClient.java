@@ -128,4 +128,87 @@ public class WorkerApiClient {
         }
         return List.of();
     }
+
+    // =========================================================================
+    // Layout Sections & Fields
+    // =========================================================================
+
+    public Map<String, Object> createLayoutSection(String tenantId, String userId, Map<String, Object> sectionData) {
+        Map<String, Object> jsonApiBody = Map.of(
+                "data", Map.of("type", "layout-sections", "attributes", sectionData));
+
+        return webClient.post()
+                .uri("/api/layout-sections")
+                .header("X-Tenant-ID", tenantId)
+                .header("X-User-Id", userId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(jsonApiBody)
+                .retrieve()
+                .bodyToMono(Map.class)
+                .block();
+    }
+
+    public Map<String, Object> createLayoutField(String tenantId, String userId, Map<String, Object> fieldData) {
+        Map<String, Object> jsonApiBody = Map.of(
+                "data", Map.of("type", "layout-fields", "attributes", fieldData));
+
+        return webClient.post()
+                .uri("/api/layout-fields")
+                .header("X-Tenant-ID", tenantId)
+                .header("X-User-Id", userId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(jsonApiBody)
+                .retrieve()
+                .bodyToMono(Map.class)
+                .block();
+    }
+
+    // =========================================================================
+    // Menus & Menu Items
+    // =========================================================================
+
+    @SuppressWarnings("unchecked")
+    public List<Map<String, Object>> listMenus(String tenantId) {
+        Map<String, Object> response = webClient.get()
+                .uri("/api/ui-menus?include=ui-menu-items&page[size]=100")
+                .header("X-Tenant-ID", tenantId)
+                .retrieve()
+                .bodyToMono(Map.class)
+                .block();
+
+        if (response != null && response.containsKey("data")) {
+            return (List<Map<String, Object>>) response.get("data");
+        }
+        return List.of();
+    }
+
+    public Map<String, Object> createMenu(String tenantId, String userId, Map<String, Object> menuData) {
+        Map<String, Object> jsonApiBody = Map.of(
+                "data", Map.of("type", "ui-menus", "attributes", menuData));
+
+        return webClient.post()
+                .uri("/api/ui-menus")
+                .header("X-Tenant-ID", tenantId)
+                .header("X-User-Id", userId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(jsonApiBody)
+                .retrieve()
+                .bodyToMono(Map.class)
+                .block();
+    }
+
+    public Map<String, Object> createMenuItem(String tenantId, String userId, Map<String, Object> itemData) {
+        Map<String, Object> jsonApiBody = Map.of(
+                "data", Map.of("type", "ui-menu-items", "attributes", itemData));
+
+        return webClient.post()
+                .uri("/api/ui-menu-items")
+                .header("X-Tenant-ID", tenantId)
+                .header("X-User-Id", userId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(jsonApiBody)
+                .retrieve()
+                .bodyToMono(Map.class)
+                .block();
+    }
 }

@@ -51,10 +51,14 @@ public interface CollectionRegistry {
     
     /**
      * Gets a collection definition by name.
-     * 
+     *
+     * <p>Implementations should use the current {@link io.kelta.runtime.context.TenantContext}
+     * to resolve tenant-scoped collections when multiple tenants have collections
+     * with the same name.
+     *
      * <p>This is a lock-free read operation that can be called concurrently
      * from multiple threads without blocking.
-     * 
+     *
      * @param collectionName the name of the collection to retrieve
      * @return the collection definition, or null if not found
      */

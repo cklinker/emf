@@ -58,6 +58,7 @@ public class CollectionDefinitionBuilder {
     private Set<String> immutableFields = new HashSet<>();
     private Map<String, String> columnMapping = new HashMap<>();
     private String displayFieldName;
+    private String tenantId;
 
     /**
      * Creates a new collection definition builder.
@@ -276,6 +277,17 @@ public class CollectionDefinitionBuilder {
     }
 
     /**
+     * Sets the tenant ID that owns this collection.
+     *
+     * @param tenantId the tenant ID (null for system collections)
+     * @return this builder for method chaining
+     */
+    public CollectionDefinitionBuilder tenantId(String tenantId) {
+        this.tenantId = tenantId;
+        return this;
+    }
+
+    /**
      * Builds the collection definition.
      *
      * <p>Applies sensible defaults for optional configuration:
@@ -333,7 +345,8 @@ public class CollectionDefinitionBuilder {
             readOnly,
             immutableFields,
             columnMapping,
-            displayFieldName
+            displayFieldName,
+            tenantId
         );
     }
 }

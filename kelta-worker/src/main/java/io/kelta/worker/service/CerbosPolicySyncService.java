@@ -1,6 +1,7 @@
 package io.kelta.worker.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.kelta.runtime.context.TenantContext;
 import io.kelta.worker.repository.BootstrapRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -68,6 +69,7 @@ public class CerbosPolicySyncService {
      * Syncs all Cerbos policies for a tenant.
      */
     public void syncTenant(String tenantId) {
+        TenantContext.set(tenantId);
         try {
             log.info("Syncing Cerbos policies for tenant {}", tenantId);
 
@@ -95,6 +97,8 @@ public class CerbosPolicySyncService {
             publishPolicyChangedEvent(tenantId);
         } catch (Exception e) {
             log.error("Failed to sync Cerbos policies for tenant {}: {}", tenantId, e.getMessage(), e);
+        } finally {
+            TenantContext.clear();
         }
     }
 

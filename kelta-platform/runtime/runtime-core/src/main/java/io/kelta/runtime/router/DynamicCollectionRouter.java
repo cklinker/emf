@@ -128,19 +128,19 @@ public class DynamicCollectionRouter {
 
         logger.debug("List request for collection '{}' with params: {}", collectionName, params);
 
-        CollectionDefinition definition = resolveCollection(collectionName, request);
-        if (definition == null) {
-            logger.debug("Collection '{}' not found", collectionName);
-            return ResponseEntity.notFound().build();
-        }
-
-        QueryRequest queryRequest = QueryRequest.fromParams(params);
-
-        // For tenant-scoped system collections, inject tenant_id filter
-        queryRequest = injectTenantFilter(queryRequest, definition, request);
-
         setTenantContext(request);
         try {
+            CollectionDefinition definition = resolveCollection(collectionName, request);
+            if (definition == null) {
+                logger.debug("Collection '{}' not found", collectionName);
+                return ResponseEntity.notFound().build();
+            }
+
+            QueryRequest queryRequest = QueryRequest.fromParams(params);
+
+            // For tenant-scoped system collections, inject tenant_id filter
+            queryRequest = injectTenantFilter(queryRequest, definition, request);
+
             QueryResult result = queryEngine.executeQuery(definition, queryRequest);
 
             Map<String, Object> response = toJsonApiListResponse(result, collectionName, definition);
@@ -177,14 +177,14 @@ public class DynamicCollectionRouter {
 
         logger.debug("Get request for collection '{}', id '{}'", collectionName, id);
 
-        CollectionDefinition definition = resolveCollection(collectionName, request);
-        if (definition == null) {
-            logger.debug("Collection '{}' not found", collectionName);
-            return ResponseEntity.notFound().build();
-        }
-
         setTenantContext(request);
         try {
+            CollectionDefinition definition = resolveCollection(collectionName, request);
+            if (definition == null) {
+                logger.debug("Collection '{}' not found", collectionName);
+                return ResponseEntity.notFound().build();
+            }
+
             Optional<Map<String, Object>> record = queryEngine.getById(definition, id);
 
             // If not found by ID and the value is not a UUID, try display field lookup
@@ -229,40 +229,40 @@ public class DynamicCollectionRouter {
 
         logger.debug("Create request for collection '{}' with data: {}", collectionName, requestBody);
 
-        CollectionDefinition definition = resolveCollection(collectionName, request);
-        if (definition == null) {
-            logger.debug("Collection '{}' not found", collectionName);
-            return ResponseEntity.notFound().build();
-        }
-
-        // Reject writes to read-only collections
-        if (definition.readOnly()) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
-                    toJsonApiErrorResponse("Collection '" + collectionName + "' is read-only"));
-        }
-
-        // Extract attributes from JSON:API format
-        Map<String, Object> attributes = extractAttributes(requestBody);
-
-        // Extract relationships from JSON:API format
-        Map<String, Object> relationships = extractRelationships(requestBody);
-
-        // Merge attributes and relationships for storage
-        Map<String, Object> data = new java.util.HashMap<>(attributes);
-        data.putAll(relationships);
-
-        // Inject audit fields from gateway-forwarded user ID (resolved to platform_user UUID)
-        String userId = resolveUserId(request);
-        if (userId != null) {
-            data.put("createdBy", userId);
-            data.put("updatedBy", userId);
-        }
-
-        // Inject tenant ID for tenant-scoped system collections
-        injectTenantId(data, definition, request);
-
+        setTenantContext(request);
         try {
-            setTenantContext(request);
+            CollectionDefinition definition = resolveCollection(collectionName, request);
+            if (definition == null) {
+                logger.debug("Collection '{}' not found", collectionName);
+                return ResponseEntity.notFound().build();
+            }
+
+            // Reject writes to read-only collections
+            if (definition.readOnly()) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
+                        toJsonApiErrorResponse("Collection '" + collectionName + "' is read-only"));
+            }
+
+            // Extract attributes from JSON:API format
+            Map<String, Object> attributes = extractAttributes(requestBody);
+
+            // Extract relationships from JSON:API format
+            Map<String, Object> relationships = extractRelationships(requestBody);
+
+            // Merge attributes and relationships for storage
+            Map<String, Object> data = new java.util.HashMap<>(attributes);
+            data.putAll(relationships);
+
+            // Inject audit fields from gateway-forwarded user ID (resolved to platform_user UUID)
+            String userId = resolveUserId(request);
+            if (userId != null) {
+                data.put("createdBy", userId);
+                data.put("updatedBy", userId);
+            }
+
+            // Inject tenant ID for tenant-scoped system collections
+            injectTenantId(data, definition, request);
+
             Map<String, Object> created = queryEngine.create(definition, data);
 
             // Return in JSON:API format
@@ -325,36 +325,36 @@ public class DynamicCollectionRouter {
 
         logger.debug("Update request for collection '{}', id '{}' with data: {}", collectionName, id, requestBody);
 
-        CollectionDefinition definition = resolveCollection(collectionName, request);
-        if (definition == null) {
-            logger.debug("Collection '{}' not found", collectionName);
-            return ResponseEntity.notFound().build();
-        }
-
-        // Reject writes to read-only collections
-        if (definition.readOnly()) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
-                    toJsonApiErrorResponse("Collection '" + collectionName + "' is read-only"));
-        }
-
-        // Extract attributes from JSON:API format
-        Map<String, Object> attributes = extractAttributes(requestBody);
-
-        // Extract relationships from JSON:API format
-        Map<String, Object> relationships = extractRelationships(requestBody);
-
-        // Merge attributes and relationships for storage
-        Map<String, Object> data = new java.util.HashMap<>(attributes);
-        data.putAll(relationships);
-
-        // Inject audit field from gateway-forwarded user ID (resolved to platform_user UUID)
-        String userId = resolveUserId(request);
-        if (userId != null) {
-            data.put("updatedBy", userId);
-        }
-
+        setTenantContext(request);
         try {
-            setTenantContext(request);
+            CollectionDefinition definition = resolveCollection(collectionName, request);
+            if (definition == null) {
+                logger.debug("Collection '{}' not found", collectionName);
+                return ResponseEntity.notFound().build();
+            }
+
+            // Reject writes to read-only collections
+            if (definition.readOnly()) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
+                        toJsonApiErrorResponse("Collection '" + collectionName + "' is read-only"));
+            }
+
+            // Extract attributes from JSON:API format
+            Map<String, Object> attributes = extractAttributes(requestBody);
+
+            // Extract relationships from JSON:API format
+            Map<String, Object> relationships = extractRelationships(requestBody);
+
+            // Merge attributes and relationships for storage
+            Map<String, Object> data = new java.util.HashMap<>(attributes);
+            data.putAll(relationships);
+
+            // Inject audit field from gateway-forwarded user ID (resolved to platform_user UUID)
+            String userId = resolveUserId(request);
+            if (userId != null) {
+                data.put("updatedBy", userId);
+            }
+
             Optional<Map<String, Object>> updated = queryEngine.update(definition, id, data);
             return updated.map(r -> ResponseEntity.ok(toJsonApiResponse(r, collectionName, definition)))
                           .orElse(ResponseEntity.notFound().build());
@@ -378,19 +378,19 @@ public class DynamicCollectionRouter {
 
         logger.debug("Delete request for collection '{}', id '{}'", collectionName, id);
 
-        CollectionDefinition definition = resolveCollection(collectionName, request);
-        if (definition == null) {
-            logger.debug("Collection '{}' not found", collectionName);
-            return ResponseEntity.notFound().build();
-        }
-
-        // Reject deletes on read-only collections
-        if (definition.readOnly()) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        }
-
+        setTenantContext(request);
         try {
-            setTenantContext(request);
+            CollectionDefinition definition = resolveCollection(collectionName, request);
+            if (definition == null) {
+                logger.debug("Collection '{}' not found", collectionName);
+                return ResponseEntity.notFound().build();
+            }
+
+            // Reject deletes on read-only collections
+            if (definition.readOnly()) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            }
+
             boolean deleted = queryEngine.delete(definition, id);
             return deleted ? ResponseEntity.noContent().build()
                            : ResponseEntity.notFound().build();
@@ -425,23 +425,23 @@ public class DynamicCollectionRouter {
         logger.debug("List children request: parent='{}', parentId='{}', child='{}'",
                 parentName, parentId, childName);
 
-        SubResourceRelation relation = resolveSubResource(parentName, childName, request);
-        if (relation == null) {
-            return ResponseEntity.notFound().build();
-        }
-
-        QueryRequest queryRequest = QueryRequest.fromParams(params);
-
-        // Inject parent ID filter on the child's reference field
-        List<FilterCondition> filters = new ArrayList<>(queryRequest.filters());
-        filters.add(new FilterCondition(relation.parentRefFieldName(), FilterOperator.EQ, parentId));
-        queryRequest = queryRequest.withFilters(filters);
-
-        // Inject tenant filter if applicable
-        queryRequest = injectTenantFilter(queryRequest, relation.childDef(), request);
-
         setTenantContext(request);
         try {
+            SubResourceRelation relation = resolveSubResource(parentName, childName, request);
+            if (relation == null) {
+                return ResponseEntity.notFound().build();
+            }
+
+            QueryRequest queryRequest = QueryRequest.fromParams(params);
+
+            // Inject parent ID filter on the child's reference field
+            List<FilterCondition> filters = new ArrayList<>(queryRequest.filters());
+            filters.add(new FilterCondition(relation.parentRefFieldName(), FilterOperator.EQ, parentId));
+            queryRequest = queryRequest.withFilters(filters);
+
+            // Inject tenant filter if applicable
+            queryRequest = injectTenantFilter(queryRequest, relation.childDef(), request);
+
             QueryResult result = queryEngine.executeQuery(relation.childDef(), queryRequest);
 
             return ResponseEntity.ok(toJsonApiListResponse(result, childName, relation.childDef()));
@@ -471,13 +471,13 @@ public class DynamicCollectionRouter {
         logger.debug("Get child request: parent='{}', parentId='{}', child='{}', childId='{}'",
                 parentName, parentId, childName, childId);
 
-        SubResourceRelation relation = resolveSubResource(parentName, childName, request);
-        if (relation == null) {
-            return ResponseEntity.notFound().build();
-        }
-
         setTenantContext(request);
         try {
+            SubResourceRelation relation = resolveSubResource(parentName, childName, request);
+            if (relation == null) {
+                return ResponseEntity.notFound().build();
+            }
+
             Optional<Map<String, Object>> record = queryEngine.getById(relation.childDef(), childId);
             return record.map(r -> ResponseEntity.ok(toJsonApiResponse(r, childName, relation.childDef())))
                          .orElse(ResponseEntity.notFound().build());
@@ -509,37 +509,37 @@ public class DynamicCollectionRouter {
         logger.debug("Create child request: parent='{}', parentId='{}', child='{}'",
                 parentName, parentId, childName);
 
-        SubResourceRelation relation = resolveSubResource(parentName, childName, request);
-        if (relation == null) {
-            return ResponseEntity.notFound().build();
-        }
-
-        if (relation.childDef().readOnly()) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
-                    toJsonApiErrorResponse("Collection '" + childName + "' is read-only"));
-        }
-
-        Map<String, Object> attributes = extractAttributes(requestBody);
-        Map<String, Object> relationships = extractRelationships(requestBody);
-
-        Map<String, Object> data = new java.util.HashMap<>(attributes);
-        data.putAll(relationships);
-
-        // Auto-set the parent reference field
-        data.put(relation.parentRefFieldName(), parentId);
-
-        // Inject audit fields (resolved to platform_user UUID)
-        String userId = resolveUserId(request);
-        if (userId != null) {
-            data.put("createdBy", userId);
-            data.put("updatedBy", userId);
-        }
-
-        // Inject tenant ID for tenant-scoped system collections
-        injectTenantId(data, relation.childDef(), request);
-
+        setTenantContext(request);
         try {
-            setTenantContext(request);
+            SubResourceRelation relation = resolveSubResource(parentName, childName, request);
+            if (relation == null) {
+                return ResponseEntity.notFound().build();
+            }
+
+            if (relation.childDef().readOnly()) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
+                        toJsonApiErrorResponse("Collection '" + childName + "' is read-only"));
+            }
+
+            Map<String, Object> attributes = extractAttributes(requestBody);
+            Map<String, Object> relationships = extractRelationships(requestBody);
+
+            Map<String, Object> data = new java.util.HashMap<>(attributes);
+            data.putAll(relationships);
+
+            // Auto-set the parent reference field
+            data.put(relation.parentRefFieldName(), parentId);
+
+            // Inject audit fields (resolved to platform_user UUID)
+            String userId = resolveUserId(request);
+            if (userId != null) {
+                data.put("createdBy", userId);
+                data.put("updatedBy", userId);
+            }
+
+            // Inject tenant ID for tenant-scoped system collections
+            injectTenantId(data, relation.childDef(), request);
+
             Map<String, Object> created = queryEngine.create(relation.childDef(), data);
 
             return ResponseEntity.status(HttpStatus.CREATED)
@@ -607,29 +607,29 @@ public class DynamicCollectionRouter {
         logger.debug("Update child request: parent='{}', parentId='{}', child='{}', childId='{}'",
                 parentName, parentId, childName, childId);
 
-        SubResourceRelation relation = resolveSubResource(parentName, childName, request);
-        if (relation == null) {
-            return ResponseEntity.notFound().build();
-        }
-
-        if (relation.childDef().readOnly()) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
-                    toJsonApiErrorResponse("Collection '" + childName + "' is read-only"));
-        }
-
-        Map<String, Object> attributes = extractAttributes(requestBody);
-        Map<String, Object> relationships = extractRelationships(requestBody);
-
-        Map<String, Object> data = new java.util.HashMap<>(attributes);
-        data.putAll(relationships);
-
-        String userId = resolveUserId(request);
-        if (userId != null) {
-            data.put("updatedBy", userId);
-        }
-
+        setTenantContext(request);
         try {
-            setTenantContext(request);
+            SubResourceRelation relation = resolveSubResource(parentName, childName, request);
+            if (relation == null) {
+                return ResponseEntity.notFound().build();
+            }
+
+            if (relation.childDef().readOnly()) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
+                        toJsonApiErrorResponse("Collection '" + childName + "' is read-only"));
+            }
+
+            Map<String, Object> attributes = extractAttributes(requestBody);
+            Map<String, Object> relationships = extractRelationships(requestBody);
+
+            Map<String, Object> data = new java.util.HashMap<>(attributes);
+            data.putAll(relationships);
+
+            String userId = resolveUserId(request);
+            if (userId != null) {
+                data.put("updatedBy", userId);
+            }
+
             Optional<Map<String, Object>> updated = queryEngine.update(relation.childDef(), childId, data);
             return updated.map(r -> ResponseEntity.ok(toJsonApiResponse(r, childName, relation.childDef())))
                           .orElse(ResponseEntity.notFound().build());
@@ -659,17 +659,17 @@ public class DynamicCollectionRouter {
         logger.debug("Delete child request: parent='{}', parentId='{}', child='{}', childId='{}'",
                 parentName, parentId, childName, childId);
 
-        SubResourceRelation relation = resolveSubResource(parentName, childName, request);
-        if (relation == null) {
-            return ResponseEntity.notFound().build();
-        }
-
-        if (relation.childDef().readOnly()) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        }
-
+        setTenantContext(request);
         try {
-            setTenantContext(request);
+            SubResourceRelation relation = resolveSubResource(parentName, childName, request);
+            if (relation == null) {
+                return ResponseEntity.notFound().build();
+            }
+
+            if (relation.childDef().readOnly()) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            }
+
             boolean deleted = queryEngine.delete(relation.childDef(), childId);
             return deleted ? ResponseEntity.noContent().build()
                            : ResponseEntity.notFound().build();
@@ -815,6 +815,8 @@ public class DynamicCollectionRouter {
      * @return the collection definition, or {@code null} if not found
      */
     private CollectionDefinition resolveCollection(String collectionName, HttpServletRequest request) {
+        // TenantContext is already set before this method is called,
+        // so registry.get() will use the tenant-scoped key automatically
         CollectionDefinition definition = registry.get(collectionName);
         if (definition != null) {
             return definition;

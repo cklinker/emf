@@ -1,5 +1,6 @@
 package io.kelta.worker.listener;
 
+import io.kelta.runtime.context.TenantContext;
 import io.kelta.runtime.workflow.BeforeSaveHook;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,6 +65,8 @@ public class TenantProvisioningHook implements BeforeSaveHook {
             return;
         }
 
+        // Set tenant context so RLS policies filter correctly for the new tenant
+        TenantContext.set(id);
         try {
             seedDefaultProfiles(id);
             seedOidcProvider(id);
@@ -73,6 +76,8 @@ public class TenantProvisioningHook implements BeforeSaveHook {
         } catch (Exception e) {
             log.error("Tenant provisioning failed for tenant '{}' (slug={}): {}",
                     id, slug, e.getMessage(), e);
+        } finally {
+            TenantContext.clear();
         }
     }
 

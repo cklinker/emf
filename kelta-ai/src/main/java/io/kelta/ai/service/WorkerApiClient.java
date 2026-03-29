@@ -186,9 +186,10 @@ public class WorkerApiClient {
                                       List<Map<String, Object>> values) {
         log.info("Creating {} picklist values for picklist {}", values.size(), picklistId);
         for (Map<String, Object> value : values) {
-            // Ensure globalPicklistId is set on each value
             Map<String, Object> valueAttrs = new java.util.LinkedHashMap<>(value);
             valueAttrs.put("globalPicklistId", picklistId);
+            valueAttrs.put("picklistSourceType", "GLOBAL");
+            valueAttrs.put("picklistSourceId", picklistId);
 
             Map<String, Object> jsonApiBody = Map.of(
                     "data", Map.of("type", "picklist-values", "attributes", valueAttrs));

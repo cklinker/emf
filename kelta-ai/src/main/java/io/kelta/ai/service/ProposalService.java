@@ -98,6 +98,9 @@ public class ProposalService {
 
             if (collectionId != null) {
                 try {
+                    // Pre-create global picklists for PICKLIST/MULTI_PICKLIST fields
+                    createPicklistsForFields(tenantId, userId, fields);
+
                     workerApiClient.createFields(tenantId, userId, collectionId, fields);
                     log.info("Created {} fields for collection {}", fields.size(), collectionId);
                 } catch (Exception e) {
@@ -234,6 +237,68 @@ public class ProposalService {
 
         workerApiClient.createMenuItem(tenantId, userId, itemData);
         log.info("Added menu item '{}' -> /resources/{}", displayName, collectionName);
+    }
+
+    /**
+     * For PICKLIST and MULTI_PICKLIST fields, create global picklists from
+     * the enumValues array and set the fieldTypeConfig.globalPicklistId.
+     */
+    @SuppressWarnings("unchecked")
+    private void createPicklistsForFields(String tenantId, String userId, List<Map<String, Object>> fields) {
+        for (Map<String, Object> field : fields) {
+            String type = String.valueOf(field.get("type")).toUpperCase();
+            if (!"PICKLIST".equals(type) && !"MULTI_PICKLIST".equals(type)) continue;
+
+            List<String> enumValues = (List<String>) field.get("enumValues");
+            if (enumValues == null || enumValues.isEmpty()) continue;
+
+            String fieldName = String.valueOf(field.get("name"));
+            try {
+                // Create the global picklist
+                Map<String, Object> picklistData = new java.util.LinkedHashMap<>();
+                picklistData.put("name", fieldName);
+                picklistData.put("sorted", false);
+                picklistData.put("restricted", false);
+
+                Map<String, Object> picklistResult = workerApiClient.createGlobalPicklist(tenantId, userId, picklistData);
+                Object plData = picklistResult.get("data");
+                String picklistId = (plData instanceof Map) ? String.valueOf(((Map<String, Object>) plData).get("id")) : null;
+
+                if (picklistId == null) {
+                    log.warn("Could not extract picklist ID for field '{}'", fieldName);
+                    continue;
+                }
+
+                // Create the picklist values
+                List<Map<String, Object>> values = new java.util.ArrayList<>();
+                for (int i = 0; i < enumValues.size(); i++) {
+                    String val = enumValues.get(i);
+                    values.add(Map.of(
+                            "value", val,
+                            "label", val,
+                            "isDefault", i == 0,
+                            "isActive", true,
+                            "sortOrder", i
+                    ));
+                }
+                workerApiClient.createPicklistValues(tenantId, userId, picklistId, values);
+                log.info("Created global picklist '{}' with {} values", fieldName, values.size());
+
+                // Set the globalPicklistId on the field's fieldTypeConfig
+                Map<String, Object> fieldTypeConfig = (Map<String, Object>) field.get("fieldTypeConfig");
+                if (fieldTypeConfig == null) {
+                    fieldTypeConfig = new java.util.LinkedHashMap<>();
+                    field.put("fieldTypeConfig", fieldTypeConfig);
+                }
+                fieldTypeConfig.put("globalPicklistId", picklistId);
+
+                // Remove enumValues since the picklist is now managed globally
+                field.remove("enumValues");
+
+            } catch (Exception e) {
+                log.error("Failed to create global picklist for field '{}': {}", fieldName, e.getMessage());
+            }
+        }
     }
 
     private Map<String, Object> applyLayoutProposal(String tenantId, String userId, Map<String, Object> data) {

@@ -130,6 +130,48 @@ public class WorkerApiClient {
     }
 
     // =========================================================================
+    // Global Picklists
+    // =========================================================================
+
+    public Map<String, Object> createGlobalPicklist(String tenantId, String userId, Map<String, Object> picklistData) {
+        log.info("Creating global picklist '{}' via worker API", picklistData.get("name"));
+
+        Map<String, Object> jsonApiBody = Map.of(
+                "data", Map.of("type", "global-picklists", "attributes", picklistData));
+
+        return webClient.post()
+                .uri("/api/global-picklists")
+                .header("X-Tenant-ID", tenantId)
+                .header("X-User-Id", userId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(jsonApiBody)
+                .retrieve()
+                .bodyToMono(Map.class)
+                .block();
+    }
+
+    public void createPicklistValues(String tenantId, String userId, String picklistId,
+                                      List<Map<String, Object>> values) {
+        for (Map<String, Object> value : values) {
+            Map<String, Object> jsonApiBody = Map.of(
+                    "data", Map.of("type", "picklist-values", "attributes", value));
+            try {
+                webClient.post()
+                        .uri("/api/global-picklists/{picklistId}/picklist-values", picklistId)
+                        .header("X-Tenant-ID", tenantId)
+                        .header("X-User-Id", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(jsonApiBody)
+                        .retrieve()
+                        .bodyToMono(Map.class)
+                        .block();
+            } catch (Exception e) {
+                log.warn("Failed to create picklist value '{}': {}", value.get("value"), e.getMessage());
+            }
+        }
+    }
+
+    // =========================================================================
     // Layout Sections & Fields
     // =========================================================================
 

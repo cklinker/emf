@@ -41,15 +41,16 @@ public class GatewayCacheManager {
     private static final Logger log = LoggerFactory.getLogger(GatewayCacheManager.class);
 
     /**
-     * Window duration for rate limiting. We use 1-minute windows and divide
-     * the daily limit into per-minute buckets.
+     * Window duration for rate limiting. We use 5-minute windows to allow
+     * short bursts (e.g., AI creating a collection + multiple fields)
+     * without hitting the per-window limit.
      */
-    private static final Duration WINDOW_DURATION = Duration.ofMinutes(1);
+    private static final Duration WINDOW_DURATION = Duration.ofMinutes(5);
 
     /**
-     * Number of windows per day (1440 minutes).
+     * Number of windows per day (288 five-minute windows).
      */
-    private static final int WINDOWS_PER_DAY = 1440;
+    private static final int WINDOWS_PER_DAY = 288;
 
     /**
      * Default apiCallsPerDay when a tenant is not found in the cache.

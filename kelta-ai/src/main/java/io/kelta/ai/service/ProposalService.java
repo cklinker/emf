@@ -1,5 +1,6 @@
 package io.kelta.ai.service;
 
+import com.anthropic.models.messages.*;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.kelta.ai.model.AiProposal;
@@ -24,12 +25,14 @@ public class ProposalService {
 
     private final ChatMessageRepository messageRepository;
     private final WorkerApiClient workerApiClient;
+    private final AnthropicService anthropicService;
     private final ObjectMapper objectMapper;
 
     public ProposalService(ChatMessageRepository messageRepository, WorkerApiClient workerApiClient,
-                            ObjectMapper objectMapper) {
+                            AnthropicService anthropicService, ObjectMapper objectMapper) {
         this.messageRepository = messageRepository;
         this.workerApiClient = workerApiClient;
+        this.anthropicService = anthropicService;
         this.objectMapper = objectMapper;
     }
 
@@ -107,10 +110,12 @@ public class ProposalService {
                 warnings.addAll(fieldErrors);
                 log.info("Field creation completed with {} warnings", fieldErrors.size());
 
-                // Auto-generate a default DETAIL layout with all fields
+                // Ask AI to generate an intelligent layout for the collection
                 try {
-                    createDefaultLayout(tenantId, userId, collectionId,
-                            (String) data.getOrDefault("displayName", data.get("name")));
+                    generateAiLayout(tenantId, userId, collectionId,
+                            (String) data.get("name"),
+                            (String) data.getOrDefault("displayName", data.get("name")),
+                            fields);
                 } catch (Exception e) {
                     String msg = "Failed to create layout: " + e.getMessage();
                     log.error(msg);
@@ -140,21 +145,135 @@ public class ProposalService {
         return result;
     }
 
-    // Field types that should go in a "Details" section (short, key info)
-    private static final java.util.Set<String> KEY_FIELD_TYPES = java.util.Set.of(
-            "STRING", "EMAIL", "PHONE", "URL", "EXTERNAL_ID", "AUTO_NUMBER",
-            "PICKLIST", "BOOLEAN", "DATE", "DATETIME", "INTEGER", "DOUBLE",
-            "CURRENCY", "PERCENT");
+    /**
+     * Ask Claude to generate an intelligent DETAIL layout for a collection,
+     * then apply it via the worker API.
+     */
+    @SuppressWarnings("unchecked")
+    private void generateAiLayout(String tenantId, String userId, String collectionId,
+                                   String collectionName, String displayName,
+                                   List<Map<String, Object>> proposedFields) {
+        log.info("Asking AI to generate layout for collection {}", collectionName);
 
-    // Field types that need their own section (long content)
-    private static final java.util.Set<String> LONG_CONTENT_TYPES = java.util.Set.of(
-            "RICH_TEXT", "JSON");
+        // 1. Fetch the actual created fields (with IDs)
+        List<Map<String, Object>> createdFields = workerApiClient.listFields(tenantId, collectionId);
+        if (createdFields.isEmpty()) {
+            log.warn("No fields found for collection {}, skipping layout generation", collectionId);
+            return;
+        }
+
+        // 2. Build a field summary for the AI prompt
+        StringBuilder fieldSummary = new StringBuilder();
+        Map<String, String> fieldNameToId = new java.util.LinkedHashMap<>();
+        for (Map<String, Object> field : createdFields) {
+            Map<String, Object> attrs = (Map<String, Object>) field.getOrDefault("attributes", field);
+            String name = String.valueOf(attrs.getOrDefault("name", ""));
+            String type = String.valueOf(attrs.getOrDefault("type", ""));
+            String fieldId = String.valueOf(field.get("id"));
+            fieldNameToId.put(name, fieldId);
+            fieldSummary.append("- ").append(name).append(" (").append(type).append(")\n");
+        }
+
+        // 3. Ask Claude to generate a layout
+        String layoutPrompt = "Generate a DETAIL page layout for the '" + displayName + "' collection. " +
+                "The collection has these fields:\n" + fieldSummary +
+                "\nCreate a well-organized layout with multiple sections. " +
+                "Group related fields logically (e.g., key info at top in 2 columns, " +
+                "long content like descriptions/instructions in 1-column sections, " +
+                "metadata/dates in a collapsible section at the bottom). " +
+                "Use the propose_layout tool with fieldPlacements using the exact field names listed above.";
+
+        try {
+            MessageCreateParams params = anthropicService.buildRequest(tenantId,
+                            "You are a UI layout designer. Generate a page layout using the propose_layout tool. " +
+                            "Use sections with headings. Put key identifying fields at the top in a 2-column section. " +
+                            "Put long text fields (RICH_TEXT, JSON) in their own 1-column section. " +
+                            "Put date/boolean/status fields in a collapsible section at the bottom. " +
+                            "Use styles: DEFAULT for main sections, COLLAPSIBLE for secondary sections.",
+                            List.of(MessageParam.builder()
+                                    .role(MessageParam.Role.USER)
+                                    .content(layoutPrompt)
+                                    .build()))
+                    .build();
+
+            Message response = anthropicService.sendMessage(params);
+
+            // 4. Extract the layout proposal from the tool use response
+            for (ContentBlock block : response.content()) {
+                block.toolUse().ifPresent(toolUse -> {
+                    if ("propose_layout".equals(toolUse.name())) {
+                        Map<String, Object> layoutInput = objectMapper.convertValue(toolUse._input(), Map.class);
+                        log.info("AI generated layout with {} sections",
+                                ((List<?>) layoutInput.getOrDefault("sections", List.of())).size());
+
+                        // 5. Apply the AI-generated layout
+                        applyGeneratedLayout(tenantId, userId, collectionId, displayName,
+                                layoutInput, fieldNameToId);
+                    }
+                });
+            }
+        } catch (Exception e) {
+            log.error("AI layout generation failed, falling back to simple layout: {}", e.getMessage());
+            // Fallback: create a simple single-section layout
+            createSimpleFallbackLayout(tenantId, userId, collectionId, displayName, createdFields);
+        }
+    }
 
     @SuppressWarnings("unchecked")
-    private void createDefaultLayout(String tenantId, String userId, String collectionId, String displayName) {
-        log.info("Creating default DETAIL layout for collection {}", collectionId);
+    private void applyGeneratedLayout(String tenantId, String userId, String collectionId,
+                                       String displayName, Map<String, Object> layoutInput,
+                                       Map<String, String> fieldNameToId) {
+        // Create the page layout
+        Map<String, Object> layoutData = new java.util.LinkedHashMap<>();
+        layoutData.put("collectionId", collectionId);
+        layoutData.put("name", layoutInput.getOrDefault("name", displayName + " Detail"));
+        layoutData.put("layoutType", layoutInput.getOrDefault("layoutType", "DETAIL"));
+        layoutData.put("isDefault", true);
 
-        // 1. Create the page layout
+        Map<String, Object> layoutResult = workerApiClient.createPageLayout(tenantId, userId, layoutData);
+        String layoutId = extractId(layoutResult);
+        if (layoutId == null) {
+            log.error("Could not extract layout ID");
+            return;
+        }
+
+        // Create sections and place fields
+        List<Map<String, Object>> sections = (List<Map<String, Object>>) layoutInput.getOrDefault("sections", List.of());
+        int sectionOrder = 0;
+        for (Map<String, Object> section : sections) {
+            String heading = String.valueOf(section.getOrDefault("heading", "Section " + (sectionOrder + 1)));
+            int columns = section.containsKey("columns") ? ((Number) section.get("columns")).intValue() : 2;
+            String style = String.valueOf(section.getOrDefault("style", "DEFAULT"));
+
+            String sectionId = createSection(tenantId, userId, layoutId, heading, columns, sectionOrder++, style);
+            if (sectionId == null) continue;
+
+            List<Map<String, Object>> placements = (List<Map<String, Object>>) section.getOrDefault("fieldPlacements", List.of());
+            int fieldOrder = 0;
+            for (Map<String, Object> placement : placements) {
+                String fieldName = String.valueOf(placement.get("fieldName"));
+                String fieldId = fieldNameToId.get(fieldName);
+                if (fieldId == null) {
+                    log.warn("Field '{}' not found in collection, skipping placement", fieldName);
+                    continue;
+                }
+                try {
+                    Map<String, Object> fieldPlacement = new java.util.LinkedHashMap<>();
+                    fieldPlacement.put("sectionId", sectionId);
+                    fieldPlacement.put("fieldId", fieldId);
+                    fieldPlacement.put("sortOrder", fieldOrder++);
+                    workerApiClient.createLayoutField(tenantId, userId, fieldPlacement);
+                } catch (Exception e) {
+                    log.warn("Failed to place field '{}': {}", fieldName, e.getMessage());
+                }
+            }
+        }
+        log.info("Applied AI-generated layout with {} sections", sectionOrder);
+    }
+
+    private void createSimpleFallbackLayout(String tenantId, String userId, String collectionId,
+                                             String displayName, List<Map<String, Object>> fields) {
+        log.info("Creating simple fallback layout for collection {}", collectionId);
         Map<String, Object> layoutData = new java.util.LinkedHashMap<>();
         layoutData.put("collectionId", collectionId);
         layoutData.put("name", displayName + " Detail");
@@ -163,73 +282,12 @@ public class ProposalService {
 
         Map<String, Object> layoutResult = workerApiClient.createPageLayout(tenantId, userId, layoutData);
         String layoutId = extractId(layoutResult);
-        if (layoutId == null) {
-            log.error("Could not extract layout ID from response");
-            return;
+        if (layoutId == null) return;
+
+        String sectionId = createSection(tenantId, userId, layoutId, "Details", 2, 0, "DEFAULT");
+        if (sectionId != null) {
+            placeFieldsInSection(tenantId, userId, sectionId, fields);
         }
-        log.info("Created layout {} for collection {}", layoutId, collectionId);
-
-        // 2. Fetch the created fields
-        List<Map<String, Object>> createdFields = workerApiClient.listFields(tenantId, collectionId);
-        log.info("Found {} fields for layout placement", createdFields.size());
-
-        if (createdFields.isEmpty()) return;
-
-        // 3. Categorize fields into groups
-        List<Map<String, Object>> keyFields = new java.util.ArrayList<>();
-        List<Map<String, Object>> relationshipFields = new java.util.ArrayList<>();
-        List<Map<String, Object>> longContentFields = new java.util.ArrayList<>();
-        List<Map<String, Object>> metadataFields = new java.util.ArrayList<>();
-
-        for (Map<String, Object> field : createdFields) {
-            Map<String, Object> attrs = (Map<String, Object>) field.getOrDefault("attributes", field);
-            String type = String.valueOf(attrs.getOrDefault("type", "STRING")).toUpperCase();
-            String name = String.valueOf(attrs.getOrDefault("name", ""));
-
-            // Metadata fields (dates, status, flags at the bottom)
-            if (name.contains("created") || name.contains("updated") || name.contains("modified")
-                    || name.equals("is_active") || name.equals("active") || name.equals("status")) {
-                metadataFields.add(field);
-            } else if ("MASTER_DETAIL".equals(type) || "LOOKUP".equals(type) || "REFERENCE".equals(type)) {
-                relationshipFields.add(field);
-            } else if (LONG_CONTENT_TYPES.contains(type) || "MULTI_PICKLIST".equals(type)) {
-                longContentFields.add(field);
-            } else {
-                keyFields.add(field);
-            }
-        }
-
-        int sectionOrder = 0;
-
-        // Section 1: Key Details (2 columns) — name, type, short fields
-        if (!keyFields.isEmpty() || !relationshipFields.isEmpty()) {
-            List<Map<String, Object>> detailFields = new java.util.ArrayList<>();
-            detailFields.addAll(keyFields);
-            detailFields.addAll(relationshipFields);
-
-            String sectionId = createSection(tenantId, userId, layoutId, displayName + " Information", 2, sectionOrder++, "DEFAULT");
-            if (sectionId != null) {
-                placeFieldsInSection(tenantId, userId, sectionId, detailFields);
-            }
-        }
-
-        // Section 2: Description / Long Content (1 column, collapsible)
-        if (!longContentFields.isEmpty()) {
-            String sectionId = createSection(tenantId, userId, layoutId, "Details", 1, sectionOrder++, "DEFAULT");
-            if (sectionId != null) {
-                placeFieldsInSection(tenantId, userId, sectionId, longContentFields);
-            }
-        }
-
-        // Section 3: System / Metadata (2 columns, collapsible)
-        if (!metadataFields.isEmpty()) {
-            String sectionId = createSection(tenantId, userId, layoutId, "System Information", 2, sectionOrder++, "COLLAPSIBLE");
-            if (sectionId != null) {
-                placeFieldsInSection(tenantId, userId, sectionId, metadataFields);
-            }
-        }
-
-        log.info("Created {} sections for layout {}", sectionOrder, layoutId);
     }
 
     @SuppressWarnings("unchecked")

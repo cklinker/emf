@@ -198,8 +198,8 @@ public class GatewayCacheManager {
     public RateLimitConfig getRateLimitForTenant(String tenantId) {
         Integer dailyLimit = governorLimitCache.getIfPresent(tenantId);
         int limit = (dailyLimit != null) ? dailyLimit : DEFAULT_API_CALLS_PER_DAY;
-        int requestsPerMinute = Math.max(1, limit / WINDOWS_PER_DAY);
-        return new RateLimitConfig(requestsPerMinute, WINDOW_DURATION);
+        int requestsPerWindow = Math.max(1, (limit / WINDOWS_PER_DAY) * 5);
+        return new RateLimitConfig(requestsPerWindow, WINDOW_DURATION);
     }
 
     /**

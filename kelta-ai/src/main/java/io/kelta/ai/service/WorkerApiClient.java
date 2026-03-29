@@ -184,19 +184,28 @@ public class WorkerApiClient {
 
     public void createPicklistValues(String tenantId, String userId, String picklistId,
                                       List<Map<String, Object>> values) {
+        log.info("Creating {} picklist values for picklist {}", values.size(), picklistId);
         for (Map<String, Object> value : values) {
+            // Ensure globalPicklistId is set on each value
+            Map<String, Object> valueAttrs = new java.util.LinkedHashMap<>(value);
+            valueAttrs.put("globalPicklistId", picklistId);
+
             Map<String, Object> jsonApiBody = Map.of(
-                    "data", Map.of("type", "picklist-values", "attributes", value));
+                    "data", Map.of("type", "picklist-values", "attributes", valueAttrs));
             try {
                 webClient.post()
-                        .uri("/api/global-picklists/{picklistId}/picklist-values", picklistId)
+                        .uri("/api/picklist-values")
                         .header("X-Tenant-ID", tenantId)
                         .header("X-User-Id", userId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .bodyValue(jsonApiBody)
                         .retrieve()
+                        .onStatus(status -> status.is4xxClientError() || status.is5xxServerError(),
+                                response -> response.bodyToMono(String.class)
+                                        .map(body -> new RuntimeException("Picklist value error: " + body)))
                         .bodyToMono(Map.class)
                         .block();
+                log.debug("Created picklist value '{}'", value.get("value"));
             } catch (Exception e) {
                 log.warn("Failed to create picklist value '{}': {}", value.get("value"), e.getMessage());
             }

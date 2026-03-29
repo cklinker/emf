@@ -59,6 +59,35 @@ public class WorkerApiClient {
             Map<String, Object> fieldAttrs = new java.util.LinkedHashMap<>(field);
             fieldAttrs.put("collectionId", collectionId);
 
+            // Flatten referenceConfig into top-level properties for the worker API
+            @SuppressWarnings("unchecked")
+            Map<String, Object> refConfig = (Map<String, Object>) fieldAttrs.remove("referenceConfig");
+            if (refConfig != null) {
+                if (refConfig.containsKey("targetCollection")) {
+                    fieldAttrs.put("referenceTarget", refConfig.get("targetCollection"));
+                }
+                if (refConfig.containsKey("relationshipName")) {
+                    fieldAttrs.put("relationshipName", refConfig.get("relationshipName"));
+                }
+                String type = String.valueOf(fieldAttrs.getOrDefault("type", ""));
+                fieldAttrs.put("relationshipType", type.toUpperCase());
+                fieldAttrs.put("cascadeDelete",
+                        refConfig.getOrDefault("cascadeDelete", false));
+            }
+
+            // Ensure displayName is set (use field name with spaces if missing)
+            if (!fieldAttrs.containsKey("displayName") || fieldAttrs.get("displayName") == null) {
+                String name = String.valueOf(fieldAttrs.getOrDefault("name", ""));
+                fieldAttrs.put("displayName", name.replace("_", " ")
+                        .substring(0, 1).toUpperCase() + name.replace("_", " ").substring(1));
+            }
+
+            // Map nullable to required (worker uses required, AI uses nullable)
+            if (fieldAttrs.containsKey("nullable")) {
+                boolean nullable = Boolean.TRUE.equals(fieldAttrs.remove("nullable"));
+                fieldAttrs.putIfAbsent("required", !nullable);
+            }
+
             Map<String, Object> jsonApiBody = Map.of(
                     "data", Map.of("type", "fields", "attributes", fieldAttrs)
             );

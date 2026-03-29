@@ -46,9 +46,41 @@ public class WorkerApiClient {
                 .retrieve()
                 .onStatus(status -> status.is4xxClientError() || status.is5xxServerError(),
                         response -> response.bodyToMono(String.class)
-                                .map(body -> new RuntimeException("Worker API error: " + body)))
+                                .map(body -> new RuntimeException(parseWorkerError(body))))
                 .bodyToMono(Map.class)
                 .block();
+    }
+
+    /**
+     * Parse a JSON:API error response into a human-readable message.
+     */
+    @SuppressWarnings("unchecked")
+    private String parseWorkerError(String body) {
+        try {
+            Map<String, Object> parsed = new com.fasterxml.jackson.databind.ObjectMapper()
+                    .readValue(body, Map.class);
+            List<Map<String, Object>> errors = (List<Map<String, Object>>) parsed.get("errors");
+            if (errors != null && !errors.isEmpty()) {
+                StringBuilder msg = new StringBuilder();
+                for (Map<String, Object> error : errors) {
+                    String detail = (String) error.getOrDefault("detail", error.get("title"));
+                    Map<String, Object> source = (Map<String, Object>) error.get("source");
+                    String field = source != null ? (String) source.get("pointer") : null;
+                    if (field != null) {
+                        // Extract field name from pointer like "/data/attributes/name"
+                        String fieldName = field.contains("/") ? field.substring(field.lastIndexOf('/') + 1) : field;
+                        msg.append(fieldName).append(": ").append(detail);
+                    } else {
+                        msg.append(detail);
+                    }
+                    msg.append("; ");
+                }
+                return msg.toString().replaceAll("; $", "");
+            }
+        } catch (Exception e) {
+            // Fall through to raw body
+        }
+        return body;
     }
 
     public List<String> createFields(String tenantId, String userId, String collectionId,

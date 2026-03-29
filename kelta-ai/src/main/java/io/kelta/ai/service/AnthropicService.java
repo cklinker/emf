@@ -1,6 +1,7 @@
 package io.kelta.ai.service;
 
 import com.anthropic.client.AnthropicClient;
+import com.anthropic.core.http.StreamResponse;
 import com.anthropic.models.messages.*;
 import io.kelta.ai.config.AiConfigProperties;
 import io.kelta.ai.repository.AiConfigRepository;
@@ -8,8 +9,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Wraps the Anthropic Java SDK for sending messages to Claude.
@@ -36,12 +37,22 @@ public class AnthropicService {
         String model = resolveModel(tenantId);
         int maxTokens = resolveMaxTokens(tenantId);
 
-        return MessageCreateParams.builder()
+        MessageCreateParams.Builder builder = MessageCreateParams.builder()
                 .model(model)
-                .maxTokens(maxTokens)
-                .system(systemPrompt)
-                .messages(messages)
-                .tools(getToolDefinitions());
+                .maxTokens((long) maxTokens)
+                .system(systemPrompt);
+
+        // Add messages
+        for (MessageParam msg : messages) {
+            builder.addMessage(msg);
+        }
+
+        // Add tool definitions
+        for (ToolUnion tool : getToolDefinitions()) {
+            builder.addTool(tool);
+        }
+
+        return builder;
     }
 
     public Message sendMessage(MessageCreateParams params) {
@@ -49,13 +60,12 @@ public class AnthropicService {
         return client.messages().create(params);
     }
 
-    public MessageStreamResponse streamMessage(MessageCreateParams params) {
+    public StreamResponse<RawMessageStreamEvent> streamMessage(MessageCreateParams params) {
         log.debug("Streaming message from Anthropic with model {}", params.model());
         return client.messages().createStreaming(params);
     }
 
     private String resolveModel(long tenantId) {
-        // Resolution chain: tenant config -> global default (tenant 0) -> properties fallback
         return aiConfigRepository.getConfig(tenantId, "anthropic.model")
                 .or(() -> aiConfigRepository.getConfig(0, "anthropic.model"))
                 .orElse(config.anthropic().defaultModel());
@@ -68,58 +78,59 @@ public class AnthropicService {
                 .orElse(config.anthropic().defaultMaxTokens());
     }
 
-    private List<Tool> getToolDefinitions() {
-        List<Tool> tools = new ArrayList<>();
-
-        tools.add(Tool.builder()
+    private List<ToolUnion> getToolDefinitions() {
+        Tool collectionTool = Tool.builder()
                 .name("propose_collection")
                 .description("Propose creating a new collection (data model) with fields. " +
                         "Use this when the user wants to create a new collection or entity type.")
                 .inputSchema(Tool.InputSchema.builder()
                         .properties(com.anthropic.core.JsonValue.from(getCollectionToolSchema()))
                         .build())
-                .build());
+                .build();
 
-        tools.add(Tool.builder()
+        Tool layoutTool = Tool.builder()
                 .name("propose_layout")
                 .description("Propose creating a page layout for a collection. " +
                         "Use this when the user wants to create or customize how a collection's records are displayed.")
                 .inputSchema(Tool.InputSchema.builder()
                         .properties(com.anthropic.core.JsonValue.from(getLayoutToolSchema()))
                         .build())
-                .build());
+                .build();
 
-        return tools;
+        return List.of(
+                ToolUnion.ofTool(collectionTool),
+                ToolUnion.ofTool(layoutTool)
+        );
     }
 
     private Object getCollectionToolSchema() {
-        return java.util.Map.of(
-                "name", java.util.Map.of("type", "string", "description", "Collection name (lowercase, alphanumeric, underscores)"),
-                "displayName", java.util.Map.of("type", "string", "description", "Human-readable collection name"),
-                "description", java.util.Map.of("type", "string", "description", "Collection description"),
-                "displayFieldName", java.util.Map.of("type", "string", "description", "Name of the field used as record label"),
-                "fields", java.util.Map.of(
+        return Map.of(
+                "name", Map.of("type", "string", "description", "Collection name (lowercase, alphanumeric, underscores)"),
+                "displayName", Map.of("type", "string", "description", "Human-readable collection name"),
+                "description", Map.of("type", "string", "description", "Collection description"),
+                "displayFieldName", Map.of("type", "string", "description", "Name of the field used as record label"),
+                "fields", Map.of(
                         "type", "array",
                         "description", "Fields for the collection",
-                        "items", java.util.Map.of("type", "object")
+                        "items", Map.of("type", "object")
                 )
         );
     }
 
     private Object getLayoutToolSchema() {
-        return java.util.Map.of(
-                "collectionName", java.util.Map.of("type", "string", "description", "Name of the collection this layout is for"),
-                "name", java.util.Map.of("type", "string", "description", "Layout name"),
-                "layoutType", java.util.Map.of("type", "string", "description", "Layout type: DETAIL, EDIT, MINI, or LIST"),
-                "sections", java.util.Map.of(
+        return Map.of(
+                "collectionName", Map.of("type", "string", "description", "Name of the collection this layout is for"),
+                "name", Map.of("type", "string", "description", "Layout name"),
+                "layoutType", Map.of("type", "string", "description", "Layout type: DETAIL, EDIT, MINI, or LIST"),
+                "sections", Map.of(
                         "type", "array",
                         "description", "Layout sections with field placements",
-                        "items", java.util.Map.of("type", "object")
+                        "items", Map.of("type", "object")
                 ),
-                "relatedLists", java.util.Map.of(
+                "relatedLists", Map.of(
                         "type", "array",
                         "description", "Related list configurations",
-                        "items", java.util.Map.of("type", "object")
+                        "items", Map.of("type", "object")
                 )
         );
     }

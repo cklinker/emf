@@ -1,5 +1,6 @@
 package io.kelta.ai.service;
 
+import com.anthropic.core.http.StreamResponse;
 import com.anthropic.models.messages.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.kelta.ai.model.AiProposal;
@@ -14,7 +15,6 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * Orchestrates the AI chat flow: builds context, sends to Anthropic,
@@ -52,25 +52,19 @@ public class ChatService {
     @SuppressWarnings("unchecked")
     public Map<String, Object> chat(long tenantId, String userId, UUID conversationId,
                                      String userMessage, String contextType, String contextId) {
-        // Get or create conversation
         Conversation conversation = getOrCreateConversation(tenantId, userId, conversationId, userMessage);
 
-        // Save user message
         ChatMessage userMsg = ChatMessage.user(tenantId, conversation.id(), userMessage);
         messageRepository.save(userMsg);
 
-        // Build system prompt with dynamic context
         String systemPrompt = systemPromptService.buildSystemPrompt(
                 String.valueOf(tenantId), contextType, contextId);
 
-        // Build message history
         List<MessageParam> messages = buildMessageHistory(conversation.id(), tenantId);
 
-        // Send to Anthropic
         MessageCreateParams params = anthropicService.buildRequest(tenantId, systemPrompt, messages).build();
         Message response = anthropicService.sendMessage(params);
 
-        // Process the response
         return processResponse(tenantId, conversation, response);
     }
 
@@ -81,28 +75,23 @@ public class ChatService {
                             String userMessage, String contextType, String contextId,
                             SseEmitter emitter) {
         try {
-            // Get or create conversation
             Conversation conversation = getOrCreateConversation(tenantId, userId, conversationId, userMessage);
 
-            // Save user message
             ChatMessage userMsg = ChatMessage.user(tenantId, conversation.id(), userMessage);
             messageRepository.save(userMsg);
 
-            // Build system prompt
             String systemPrompt = systemPromptService.buildSystemPrompt(
                     String.valueOf(tenantId), contextType, contextId);
 
-            // Build message history
             List<MessageParam> messages = buildMessageHistory(conversation.id(), tenantId);
 
-            // Send to Anthropic with streaming
             MessageCreateParams params = anthropicService.buildRequest(tenantId, systemPrompt, messages).build();
 
             StringBuilder fullText = new StringBuilder();
             List<AiProposal> proposals = new ArrayList<>();
             int[] tokenCounts = {0, 0}; // input, output
 
-            try (MessageStreamResponse stream = anthropicService.streamMessage(params)) {
+            try (StreamResponse<RawMessageStreamEvent> stream = anthropicService.streamMessage(params)) {
                 stream.stream().forEach(event -> {
                     try {
                         processStreamEvent(event, emitter, fullText, proposals, tokenCounts);
@@ -112,10 +101,8 @@ public class ChatService {
                 });
             }
 
-            // Record token usage
             tokenTrackingService.recordUsage(tenantId, tokenCounts[0], tokenCounts[1]);
 
-            // Save assistant message
             String proposalJson = proposals.isEmpty() ? null :
                     objectMapper.writeValueAsString(proposals.getFirst());
             ChatMessage assistantMsg = ChatMessage.assistant(
@@ -123,16 +110,11 @@ public class ChatService {
                     proposalJson, tokenCounts[0], tokenCounts[1]);
             messageRepository.save(assistantMsg);
 
-            // Update conversation timestamp
             conversationRepository.updateTimestamp(conversation.id(), tenantId);
 
-            // Send done event
             Map<String, Object> doneData = new LinkedHashMap<>();
             doneData.put("conversationId", conversation.id().toString());
-            doneData.put("tokensUsed", Map.of(
-                    "input", tokenCounts[0],
-                    "output", tokenCounts[1]
-            ));
+            doneData.put("tokensUsed", Map.of("input", tokenCounts[0], "output", tokenCounts[1]));
             emitter.send(SseEmitter.event().name("done").data(objectMapper.writeValueAsString(doneData)));
             emitter.complete();
 
@@ -152,31 +134,41 @@ public class ChatService {
     private void processStreamEvent(RawMessageStreamEvent event, SseEmitter emitter,
                                      StringBuilder fullText, List<AiProposal> proposals,
                                      int[] tokenCounts) throws IOException {
-        if (event.isContentBlockDelta()) {
-            ContentBlockDeltaEvent delta = event.asContentBlockDelta();
-            if (delta.delta().isTextDelta()) {
-                String text = delta.delta().asTextDelta().text();
+        // Handle content block delta (text streaming)
+        event.contentBlockDelta().ifPresent(delta -> {
+            delta.delta().textDelta().ifPresent(textDelta -> {
+                String text = textDelta.text();
                 fullText.append(text);
-                Map<String, Object> deltaData = Map.of("text", text);
-                emitter.send(SseEmitter.event().name("delta").data(objectMapper.writeValueAsString(deltaData)));
-            }
-        } else if (event.isContentBlockStart()) {
-            ContentBlockStartEvent blockStart = event.asContentBlockStart();
-            if (blockStart.contentBlock().isToolUse()) {
-                ToolUseBlock toolUse = blockStart.contentBlock().asToolUse();
-                Map<String, Object> toolData = Map.of(
-                        "name", toolUse.name(),
-                        "id", toolUse.id()
-                );
-                emitter.send(SseEmitter.event().name("tool_use").data(objectMapper.writeValueAsString(toolData)));
-            }
-        } else if (event.isMessageDelta()) {
-            MessageDeltaEvent msgDelta = event.asMessageDelta();
+                try {
+                    Map<String, Object> deltaData = Map.of("text", text);
+                    emitter.send(SseEmitter.event().name("delta").data(objectMapper.writeValueAsString(deltaData)));
+                } catch (IOException e) {
+                    log.error("Failed to send delta event: {}", e.getMessage());
+                }
+            });
+        });
+
+        // Handle content block start (tool use detection)
+        event.contentBlockStart().ifPresent(blockStart -> {
+            blockStart.contentBlock().toolUse().ifPresent(toolUse -> {
+                try {
+                    Map<String, Object> toolData = Map.of("name", toolUse.name(), "id", toolUse.id());
+                    emitter.send(SseEmitter.event().name("tool_use").data(objectMapper.writeValueAsString(toolData)));
+                } catch (IOException e) {
+                    log.error("Failed to send tool_use event: {}", e.getMessage());
+                }
+            });
+        });
+
+        // Handle message delta (output token count)
+        event.messageDelta().ifPresent(msgDelta -> {
             tokenCounts[1] = (int) msgDelta.usage().outputTokens();
-        } else if (event.isMessageStart()) {
-            MessageStartEvent msgStart = event.asMessageStart();
+        });
+
+        // Handle message start (input token count)
+        event.messageStart().ifPresent(msgStart -> {
             tokenCounts[0] = (int) msgStart.message().usage().inputTokens();
-        }
+        });
     }
 
     @SuppressWarnings("unchecked")
@@ -184,28 +176,31 @@ public class ChatService {
         int inputTokens = (int) response.usage().inputTokens();
         int outputTokens = (int) response.usage().outputTokens();
 
-        // Record token usage
         tokenTrackingService.recordUsage(tenantId, inputTokens, outputTokens);
 
-        // Extract content
         StringBuilder textContent = new StringBuilder();
         List<AiProposal> proposals = new ArrayList<>();
 
         for (ContentBlock block : response.content()) {
-            if (block.isText()) {
-                textContent.append(block.asText().text());
-            } else if (block.isToolUse()) {
-                ToolUseBlock toolUse = block.asToolUse();
+            block.text().ifPresent(textBlock -> textContent.append(textBlock.text()));
+
+            block.toolUse().ifPresent(toolUse -> {
                 String toolName = toolUse.name();
-                Map<String, Object> input = (Map<String, Object>) toolUse.input();
+                // Get the raw input as a JsonValue and convert to Map
+                Object rawInput = toolUse._input();
+                Map<String, Object> input;
+                if (rawInput instanceof Map) {
+                    input = (Map<String, Object>) rawInput;
+                } else {
+                    input = objectMapper.convertValue(rawInput, Map.class);
+                }
 
                 String proposalType = "propose_collection".equals(toolName) ? "collection" : "layout";
                 AiProposal proposal = proposalService.createProposal(proposalType, input);
                 proposals.add(proposal);
-            }
+            });
         }
 
-        // Save assistant message
         String proposalJson = null;
         try {
             proposalJson = proposals.isEmpty() ? null :
@@ -219,10 +214,8 @@ public class ChatService {
                 proposalJson, inputTokens, outputTokens);
         messageRepository.save(assistantMsg);
 
-        // Update conversation timestamp
         conversationRepository.updateTimestamp(conversation.id(), tenantId);
 
-        // Build response
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("conversationId", conversation.id().toString());
         result.put("content", textContent.toString());
@@ -239,7 +232,6 @@ public class ChatService {
                     .orElseThrow(() -> new IllegalArgumentException("Conversation not found: " + conversationId));
         }
 
-        // Create new conversation with first message as title
         String title = userMessage.length() > 100 ? userMessage.substring(0, 100) + "..." : userMessage;
         Conversation conversation = Conversation.create(tenantId, userId, title);
         conversationRepository.save(conversation);
@@ -248,12 +240,19 @@ public class ChatService {
 
     private List<MessageParam> buildMessageHistory(UUID conversationId, long tenantId) {
         List<ChatMessage> history = messageRepository.findByConversation(conversationId, tenantId);
-        return history.stream()
-                .filter(msg -> !"system".equals(msg.role()))
-                .map(msg -> MessageParam.builder()
-                        .role(MessageParam.Role.valueOf(msg.role().toUpperCase()))
-                        .content(msg.content())
-                        .build())
-                .collect(Collectors.toList());
+        List<MessageParam> messages = new ArrayList<>();
+        for (ChatMessage msg : history) {
+            if ("system".equals(msg.role())) continue;
+
+            MessageParam.Role role = "user".equals(msg.role())
+                    ? MessageParam.Role.USER
+                    : MessageParam.Role.ASSISTANT;
+
+            messages.add(MessageParam.builder()
+                    .role(role)
+                    .content(msg.content())
+                    .build());
+        }
+        return messages;
     }
 }

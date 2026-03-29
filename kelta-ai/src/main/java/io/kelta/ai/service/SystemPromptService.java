@@ -52,13 +52,41 @@ public class SystemPromptService {
                 Always use the appropriate tool to make proposals. Never output raw JSON.
                 When proposing changes, explain what you're creating and why.
 
+                ## Platform Built-in Features
+
+                The Kelta platform already provides these features out of the box via system collections.
+                Do NOT create collections for any of these — they already exist and are managed by the platform:
+
+                - **User Management**: `platform_user` — user accounts, authentication, login tracking, profiles
+                - **Roles & Permissions**: `roles`, `policies`, `profiles` — role-based access control, field-level and object-level permissions
+                - **Tenants**: `tenants` — multi-tenant management with governor limits
+                - **Schema Management**: `collections`, `fields` — the metadata system itself
+                - **Page Layouts**: `page_layouts`, `layout_sections`, `layout_fields`, `layout_assignments` — UI layout configuration
+                - **Navigation**: `ui_menus`, `ui_menu_items`, `ui_pages` — menu and page management
+                - **Picklists**: `global_picklists`, `picklist_values` — reusable value sets
+                - **Validation Rules**: `validation_rules` — custom field validation
+                - **Record Types**: `record_types` — record type management with picklist overrides
+                - **Sharing & Security**: `sharing_rules`, `org_wide_defaults` — record-level sharing
+                - **Workflows**: `workflow_rules`, `approval_processes`, `flows` — automation
+                - **Scheduled Jobs**: `scheduled_jobs` — background job scheduling
+                - **Email**: `email_templates`, `email_logs` — email templating and delivery
+                - **Webhooks & Integrations**: `connected_apps`, `webhook_endpoints` — external integrations
+                - **Analytics**: Embedded Superset dashboards and reports
+                - **Audit Trail**: `setup_audit_trail` — change tracking for setup
+
+                When a user asks for "user management" or "authentication", explain that the platform already handles this.
+                Only create collections for the user's **domain-specific data** (e.g., products, orders, customers, recipes, songs).
+
+                If the user's domain needs to reference platform users (e.g., "assigned_to" on a task), use a STRING field
+                to store the user ID — do not create a MASTER_DETAIL to the system user collection.
+
                 ## Collection Rules
 
                 - Collection names must be lowercase alphanumeric with underscores only (pattern: `^[a-z][a-z0-9_]*$`)
                 - Maximum 50 characters for collection name
                 - Every collection should have a meaningful `displayName`
                 - Always suggest a `displayFieldName` (the field shown as the record's label)
-                - RESERVED NAMES (do NOT use): users, roles, permissions, tenants, collections, fields, profiles, ui_pages, ui_menus, ui_menu_items, page_layouts, layout_sections, layout_fields, layout_assignments, global_picklists, picklist_values, validation_rules, record_types, sharing_rules, workflows, approval_processes. Use alternative names like `platform_users`, `app_users`, `members`, `accounts`, etc.
+                - The following names are RESERVED and will fail validation: users, roles, permissions, tenants, collections, fields, profiles, ui_pages, ui_menus, ui_menu_items, page_layouts, layout_sections, layout_fields, layout_assignments, global_picklists, picklist_values, validation_rules, record_types, sharing_rules, workflows, approval_processes, platform_user, connected_apps, scheduled_jobs, email_templates, email_logs, setup_audit_trail, webhook_endpoints, flow_definitions, flow_executions, bulk_jobs
 
                 ## Available Field Types
 

@@ -80,6 +80,14 @@ public class SystemPromptService {
                 If the user's domain needs to reference platform users (e.g., "assigned_to" on a task), use a STRING field
                 to store the user ID — do not create a MASTER_DETAIL to the system user collection.
 
+                **Built-in record features (do NOT add these as fields):**
+                - **Notes** — Every record automatically supports notes/comments. Do NOT add a `notes` field.
+                - **Attachments** — Every record automatically supports file attachments. Do NOT add attachment/file fields.
+                - **Created/Updated timestamps** — Automatically tracked. Do NOT add `created_at`, `updated_at`, `created_date`, `modified_date` fields.
+                - **Created/Updated by** — Automatically tracked. Do NOT add `created_by`, `updated_by` fields.
+                - **Record ID** — Auto-generated UUID. Do NOT add an `id` field.
+                - **Active/Inactive** — Managed by the platform. Do NOT add `is_active` or `active` fields.
+
                 ## Collection Rules
 
                 - Collection names must be lowercase alphanumeric with underscores only (pattern: `^[a-z][a-z0-9_]*$`)

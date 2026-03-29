@@ -50,7 +50,7 @@ public class ChatService {
      * Handles a synchronous chat request. Returns the full response.
      */
     @SuppressWarnings("unchecked")
-    public Map<String, Object> chat(long tenantId, String userId, UUID conversationId,
+    public Map<String, Object> chat(String tenantId, String userId, UUID conversationId,
                                      String userMessage, String contextType, String contextId) {
         Conversation conversation = getOrCreateConversation(tenantId, userId, conversationId, userMessage);
 
@@ -58,7 +58,7 @@ public class ChatService {
         messageRepository.save(userMsg);
 
         String systemPrompt = systemPromptService.buildSystemPrompt(
-                String.valueOf(tenantId), contextType, contextId);
+                tenantId, contextType, contextId);
 
         List<MessageParam> messages = buildMessageHistory(conversation.id(), tenantId);
 
@@ -71,7 +71,7 @@ public class ChatService {
     /**
      * Handles a streaming chat request. Sends SSE events as Claude generates output.
      */
-    public void chatStream(long tenantId, String userId, UUID conversationId,
+    public void chatStream(String tenantId, String userId, UUID conversationId,
                             String userMessage, String contextType, String contextId,
                             SseEmitter emitter) {
         try {
@@ -81,7 +81,7 @@ public class ChatService {
             messageRepository.save(userMsg);
 
             String systemPrompt = systemPromptService.buildSystemPrompt(
-                    String.valueOf(tenantId), contextType, contextId);
+                    tenantId, contextType, contextId);
 
             List<MessageParam> messages = buildMessageHistory(conversation.id(), tenantId);
 
@@ -172,7 +172,7 @@ public class ChatService {
     }
 
     @SuppressWarnings("unchecked")
-    private Map<String, Object> processResponse(long tenantId, Conversation conversation, Message response) {
+    private Map<String, Object> processResponse(String tenantId, Conversation conversation, Message response) {
         int inputTokens = (int) response.usage().inputTokens();
         int outputTokens = (int) response.usage().outputTokens();
 
@@ -225,7 +225,7 @@ public class ChatService {
         return result;
     }
 
-    private Conversation getOrCreateConversation(long tenantId, String userId,
+    private Conversation getOrCreateConversation(String tenantId, String userId,
                                                    UUID conversationId, String userMessage) {
         if (conversationId != null) {
             return conversationRepository.findById(conversationId, tenantId)
@@ -238,7 +238,7 @@ public class ChatService {
         return conversation;
     }
 
-    private List<MessageParam> buildMessageHistory(UUID conversationId, long tenantId) {
+    private List<MessageParam> buildMessageHistory(UUID conversationId, String tenantId) {
         List<ChatMessage> history = messageRepository.findByConversation(conversationId, tenantId);
         List<MessageParam> messages = new ArrayList<>();
         for (ChatMessage msg : history) {

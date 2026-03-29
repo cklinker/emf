@@ -28,11 +28,10 @@ public class AiConfigController {
     public ResponseEntity<Map<String, Object>> getConfig(
             @RequestHeader("X-Tenant-ID") String tenantId) {
 
-        long tid = Long.parseLong(tenantId);
-        Map<String, String> config = configRepository.getAllConfig(tid);
+        Map<String, String> config = configRepository.getAllConfig(tenantId);
 
         // Also include global defaults (tenant 0) for any missing keys
-        Map<String, String> globalConfig = configRepository.getAllConfig(0);
+        Map<String, String> globalConfig = configRepository.getAllConfig("0");
         globalConfig.forEach(config::putIfAbsent);
 
         Map<String, Object> data = new LinkedHashMap<>();
@@ -50,7 +49,6 @@ public class AiConfigController {
             @RequestHeader("X-Tenant-ID") String tenantId,
             @RequestBody Map<String, Object> body) {
 
-        long tid = Long.parseLong(tenantId);
         log.info("Updating AI config for tenant {}: {}", tenantId, body.keySet());
 
         // Map UI field names to config keys
@@ -64,7 +62,7 @@ public class AiConfigController {
 
         for (Map.Entry<String, Object> entry : body.entrySet()) {
             String configKey = keyMapping.getOrDefault(entry.getKey(), entry.getKey());
-            configRepository.setConfig(tid, configKey, String.valueOf(entry.getValue()));
+            configRepository.setConfig(tenantId, configKey, String.valueOf(entry.getValue()));
         }
 
         return getConfig(tenantId);

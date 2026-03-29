@@ -34,7 +34,7 @@ public class TokenTrackingService {
         this.config = config;
     }
 
-    public void recordUsage(long tenantId, int inputTokens, int outputTokens) {
+    public void recordUsage(String tenantId, int inputTokens, int outputTokens) {
         String yearMonth = YearMonth.now().toString();
         int totalTokens = inputTokens + outputTokens;
 
@@ -55,7 +55,7 @@ public class TokenTrackingService {
         }
     }
 
-    public boolean isTokenLimitExceeded(long tenantId) {
+    public boolean isTokenLimitExceeded(String tenantId) {
         try {
             long used = getCurrentMonthUsage(tenantId);
             long limit = getTokenLimit(tenantId);
@@ -66,7 +66,7 @@ public class TokenTrackingService {
         }
     }
 
-    public boolean isAiEnabled(long tenantId) {
+    public boolean isAiEnabled(String tenantId) {
         try {
             return aiConfigRepository.getConfig(tenantId, AI_ENABLED_KEY)
                     .map(Boolean::parseBoolean)
@@ -77,7 +77,7 @@ public class TokenTrackingService {
         }
     }
 
-    public long getCurrentMonthUsage(long tenantId) {
+    public long getCurrentMonthUsage(String tenantId) {
         String yearMonth = YearMonth.now().toString();
         try {
             String key = TOKEN_KEY_PREFIX + tenantId + ":" + yearMonth;
@@ -92,7 +92,7 @@ public class TokenTrackingService {
         return tokenUsageRepository.getTotalTokens(tenantId, yearMonth);
     }
 
-    public long getTokenLimit(long tenantId) {
+    public long getTokenLimit(String tenantId) {
         return aiConfigRepository.getConfig(tenantId, AI_TOKENS_PER_MONTH_KEY)
                 .map(Long::parseLong)
                 .orElse(DEFAULT_TOKENS_PER_MONTH);

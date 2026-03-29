@@ -29,7 +29,7 @@ public class ChatHistoryController {
             @RequestParam(defaultValue = "50") int limit) {
 
         List<Conversation> conversations = conversationRepository.findByUser(
-                Long.parseLong(tenantId), userId, limit);
+                tenantId, userId, limit);
 
         List<Map<String, Object>> data = conversations.stream()
                 .map(c -> {
@@ -50,15 +50,13 @@ public class ChatHistoryController {
             @RequestHeader("X-Tenant-ID") String tenantId,
             @PathVariable UUID id) {
 
-        long tid = Long.parseLong(tenantId);
-
-        Conversation conversation = conversationRepository.findById(id, tid)
+        Conversation conversation = conversationRepository.findById(id, tenantId)
                 .orElse(null);
         if (conversation == null) {
             return ResponseEntity.notFound().build();
         }
 
-        List<ChatMessage> messages = messageRepository.findByConversation(id, tid);
+        List<ChatMessage> messages = messageRepository.findByConversation(id, tenantId);
 
         List<Map<String, Object>> messageData = messages.stream()
                 .map(m -> {

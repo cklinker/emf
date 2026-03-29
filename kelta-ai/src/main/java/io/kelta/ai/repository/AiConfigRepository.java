@@ -16,14 +16,14 @@ public class AiConfigRepository {
         this.jdbc = jdbc;
     }
 
-    public Optional<String> getConfig(long tenantId, String key) {
+    public Optional<String> getConfig(String tenantId, String key) {
         var results = jdbc.queryForList(
                 "SELECT config_value FROM ai_config WHERE tenant_id = ? AND config_key = ?",
                 String.class, tenantId, key);
         return results.isEmpty() ? Optional.empty() : Optional.ofNullable(results.getFirst());
     }
 
-    public Map<String, String> getAllConfig(long tenantId) {
+    public Map<String, String> getAllConfig(String tenantId) {
         Map<String, String> config = new LinkedHashMap<>();
         jdbc.query("SELECT config_key, config_value FROM ai_config WHERE tenant_id = ?",
                 (rs, rowNum) -> {
@@ -33,7 +33,7 @@ public class AiConfigRepository {
         return config;
     }
 
-    public void setConfig(long tenantId, String key, String value) {
+    public void setConfig(String tenantId, String key, String value) {
         jdbc.update("""
                 INSERT INTO ai_config (id, tenant_id, config_key, config_value, updated_at)
                 VALUES (gen_random_uuid(), ?, ?, ?, NOW())
@@ -41,7 +41,7 @@ public class AiConfigRepository {
                 """, tenantId, key, value);
     }
 
-    public void deleteConfig(long tenantId, String key) {
+    public void deleteConfig(String tenantId, String key) {
         jdbc.update("DELETE FROM ai_config WHERE tenant_id = ? AND config_key = ?", tenantId, key);
     }
 }

@@ -32,7 +32,7 @@ public class AnthropicService {
         this.aiConfigRepository = aiConfigRepository;
     }
 
-    public MessageCreateParams.Builder buildRequest(long tenantId, String systemPrompt,
+    public MessageCreateParams.Builder buildRequest(String tenantId, String systemPrompt,
                                                       List<MessageParam> messages) {
         String model = resolveModel(tenantId);
         int maxTokens = resolveMaxTokens(tenantId);
@@ -65,16 +65,16 @@ public class AnthropicService {
         return client.messages().createStreaming(params);
     }
 
-    private String resolveModel(long tenantId) {
+    private String resolveModel(String tenantId) {
         return aiConfigRepository.getConfig(tenantId, "anthropic.model")
-                .or(() -> aiConfigRepository.getConfig(0, "anthropic.model"))
+                .or(() -> aiConfigRepository.getConfig("0", "anthropic.model"))
                 .orElse(config.anthropic().defaultModel());
     }
 
-    private int resolveMaxTokens(long tenantId) {
+    private int resolveMaxTokens(String tenantId) {
         return aiConfigRepository.getConfig(tenantId, "anthropic.maxTokens")
                 .map(Integer::parseInt)
-                .or(() -> aiConfigRepository.getConfig(0, "anthropic.maxTokens").map(Integer::parseInt))
+                .or(() -> aiConfigRepository.getConfig("0", "anthropic.maxTokens").map(Integer::parseInt))
                 .orElse(config.anthropic().defaultMaxTokens());
     }
 

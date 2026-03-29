@@ -42,7 +42,7 @@ public class ChatController {
         log.info("Chat request from tenant {} user {}", tenantId, userId);
 
         Map<String, Object> result = chatService.chat(
-                Long.parseLong(tenantId), userId, conversationId,
+                tenantId, userId, conversationId,
                 message, contextType, contextId);
 
         return ResponseEntity.ok(result);
@@ -67,7 +67,7 @@ public class ChatController {
 
         // Run the streaming in a separate thread to not block
         Thread.startVirtualThread(() -> chatService.chatStream(
-                Long.parseLong(tenantId), userId, conversationId,
+                tenantId, userId, conversationId,
                 message, contextType, contextId, emitter));
 
         return emitter;

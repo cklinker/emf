@@ -38,32 +38,32 @@ public class ConversationRepository {
                 Timestamp.from(conversation.updatedAt()));
     }
 
-    public Optional<Conversation> findById(UUID id, long tenantId) {
+    public Optional<Conversation> findById(UUID id, String tenantId) {
         List<Conversation> results = jdbc.query(
                 "SELECT * FROM ai_conversation WHERE id = ? AND tenant_id = ?",
                 this::mapRow, id, tenantId);
         return results.isEmpty() ? Optional.empty() : Optional.of(results.getFirst());
     }
 
-    public List<Conversation> findByUser(long tenantId, String userId, int limit) {
+    public List<Conversation> findByUser(String tenantId, String userId, int limit) {
         return jdbc.query(
                 "SELECT * FROM ai_conversation WHERE tenant_id = ? AND user_id = ? ORDER BY updated_at DESC LIMIT ?",
                 this::mapRow, tenantId, userId, limit);
     }
 
-    public void updateTitle(UUID id, long tenantId, String title) {
+    public void updateTitle(UUID id, String tenantId, String title) {
         jdbc.update("UPDATE ai_conversation SET title = ?, updated_at = NOW() WHERE id = ? AND tenant_id = ?",
                 title, id, tenantId);
     }
 
-    public void updateTimestamp(UUID id, long tenantId) {
+    public void updateTimestamp(UUID id, String tenantId) {
         jdbc.update("UPDATE ai_conversation SET updated_at = NOW() WHERE id = ? AND tenant_id = ?", id, tenantId);
     }
 
     private Conversation mapRow(ResultSet rs, int rowNum) throws SQLException {
         return new Conversation(
                 rs.getObject("id", UUID.class),
-                rs.getLong("tenant_id"),
+                rs.getString("tenant_id"),
                 rs.getString("user_id"),
                 rs.getString("title"),
                 rs.getTimestamp("created_at").toInstant(),

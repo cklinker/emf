@@ -47,7 +47,7 @@ public class ProposalService {
     }
 
     @SuppressWarnings("unchecked")
-    public Map<String, Object> applyProposal(UUID proposalId, long tenantId, String userId) {
+    public Map<String, Object> applyProposal(UUID proposalId, String tenantId, String userId) {
         log.info("Applying proposal {} for tenant {}", proposalId, tenantId);
 
         // Find the message containing this proposal
@@ -65,11 +65,9 @@ public class ProposalService {
             throw new IllegalStateException("Proposal has already been " + proposal.status());
         }
 
-        String tenantIdStr = String.valueOf(tenantId);
-
         return switch (proposal.type()) {
-            case "collection" -> applyCollectionProposal(tenantIdStr, userId, proposal.data());
-            case "layout" -> applyLayoutProposal(tenantIdStr, userId, proposal.data());
+            case "collection" -> applyCollectionProposal(tenantId, userId, proposal.data());
+            case "layout" -> applyLayoutProposal(tenantId, userId, proposal.data());
             default -> throw new IllegalArgumentException("Unknown proposal type: " + proposal.type());
         };
     }

@@ -16,7 +16,7 @@ public class TokenUsageRepository {
         this.jdbc = jdbc;
     }
 
-    public void incrementUsage(long tenantId, String yearMonth, int inputTokens, int outputTokens) {
+    public void incrementUsage(String tenantId, String yearMonth, int inputTokens, int outputTokens) {
         jdbc.update("""
                 INSERT INTO ai_token_usage (id, tenant_id, year_month, input_tokens, output_tokens, request_count, updated_at)
                 VALUES (gen_random_uuid(), ?, ?, ?, ?, 1, NOW())
@@ -28,14 +28,14 @@ public class TokenUsageRepository {
                 """, tenantId, yearMonth, inputTokens, outputTokens);
     }
 
-    public long getTotalTokens(long tenantId, String yearMonth) {
+    public long getTotalTokens(String tenantId, String yearMonth) {
         var result = jdbc.queryForObject(
                 "SELECT COALESCE(SUM(input_tokens + output_tokens), 0) FROM ai_token_usage WHERE tenant_id = ? AND year_month = ?",
                 Long.class, tenantId, yearMonth);
         return result != null ? result : 0L;
     }
 
-    public Map<String, Map<String, Long>> getUsageHistory(long tenantId, int months) {
+    public Map<String, Map<String, Long>> getUsageHistory(String tenantId, int months) {
         String startMonth = YearMonth.now().minusMonths(months - 1).toString();
         Map<String, Map<String, Long>> history = new LinkedHashMap<>();
         jdbc.query("""

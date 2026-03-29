@@ -31,7 +31,7 @@ public class ProposalController {
 
         try {
             Map<String, Object> result = proposalService.applyProposal(
-                    id, Long.parseLong(tenantId), userId);
+                    id, tenantId, userId);
             return ResponseEntity.ok(Map.of("data", result, "status", "applied"));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of(

@@ -28,13 +28,11 @@ public class AiUsageController {
     public ResponseEntity<Map<String, Object>> getUsage(
             @RequestHeader("X-Tenant-ID") String tenantId) {
 
-        long tid = Long.parseLong(tenantId);
-
         Map<String, Object> data = new LinkedHashMap<>();
-        data.put("currentMonthUsage", tokenTrackingService.getCurrentMonthUsage(tid));
-        data.put("tokenLimit", tokenTrackingService.getTokenLimit(tid));
-        data.put("aiEnabled", tokenTrackingService.isAiEnabled(tid));
-        data.put("history", tokenUsageRepository.getUsageHistory(tid, 12));
+        data.put("currentMonthUsage", tokenTrackingService.getCurrentMonthUsage(tenantId));
+        data.put("tokenLimit", tokenTrackingService.getTokenLimit(tenantId));
+        data.put("aiEnabled", tokenTrackingService.isAiEnabled(tenantId));
+        data.put("history", tokenUsageRepository.getUsageHistory(tenantId, 12));
 
         return ResponseEntity.ok(Map.of("data", data));
     }

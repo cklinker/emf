@@ -36,20 +36,20 @@ public class ChatMessageRepository {
                 Timestamp.from(message.createdAt()));
     }
 
-    public List<ChatMessage> findByConversation(UUID conversationId, long tenantId) {
+    public List<ChatMessage> findByConversation(UUID conversationId, String tenantId) {
         return jdbc.query(
                 "SELECT * FROM ai_message WHERE conversation_id = ? AND tenant_id = ? ORDER BY created_at ASC",
                 this::mapRow, conversationId, tenantId);
     }
 
-    public Optional<ChatMessage> findById(UUID id, long tenantId) {
+    public Optional<ChatMessage> findById(UUID id, String tenantId) {
         List<ChatMessage> results = jdbc.query(
                 "SELECT * FROM ai_message WHERE id = ? AND tenant_id = ?",
                 this::mapRow, id, tenantId);
         return results.isEmpty() ? Optional.empty() : Optional.of(results.getFirst());
     }
 
-    public Optional<ChatMessage> findByProposalId(UUID proposalId, long tenantId) {
+    public Optional<ChatMessage> findByProposalId(UUID proposalId, String tenantId) {
         // Proposal ID is stored inside the proposal_json JSONB
         List<ChatMessage> results = jdbc.query(
                 "SELECT * FROM ai_message WHERE tenant_id = ? AND proposal_json->>'id' = ? LIMIT 1",
@@ -60,7 +60,7 @@ public class ChatMessageRepository {
     private ChatMessage mapRow(ResultSet rs, int rowNum) throws SQLException {
         return new ChatMessage(
                 rs.getObject("id", UUID.class),
-                rs.getLong("tenant_id"),
+                rs.getString("tenant_id"),
                 rs.getObject("conversation_id", UUID.class),
                 rs.getString("role"),
                 rs.getString("content"),

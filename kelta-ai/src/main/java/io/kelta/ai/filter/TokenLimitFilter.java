@@ -48,15 +48,7 @@ public class TokenLimitFilter extends OncePerRequestFilter {
             return;
         }
 
-        long tid;
-        try {
-            tid = Long.parseLong(tenantId);
-        } catch (NumberFormatException e) {
-            filterChain.doFilter(request, response);
-            return;
-        }
-
-        if (!tokenTrackingService.isAiEnabled(tid)) {
+        if (!tokenTrackingService.isAiEnabled(tenantId)) {
             log.info("AI disabled for tenant {}", tenantId);
             response.setStatus(403);
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
@@ -66,7 +58,7 @@ public class TokenLimitFilter extends OncePerRequestFilter {
             return;
         }
 
-        if (tokenTrackingService.isTokenLimitExceeded(tid)) {
+        if (tokenTrackingService.isTokenLimitExceeded(tenantId)) {
             log.info("Token limit exceeded for tenant {}", tenantId);
             response.setStatus(429);
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);

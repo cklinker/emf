@@ -86,9 +86,15 @@ public class ProposalService {
 
         // Then create the fields if any
         if (fields != null && !fields.isEmpty()) {
-            // Extract the collection ID from the response
-            Map<String, Object> resultData = (Map<String, Object>) result.get("data");
-            String collectionId = resultData != null ? String.valueOf(resultData.get("id")) : null;
+            // Extract the collection ID from the JSON:API response
+            // Response format: { "data": { "id": "...", "type": "collections", "attributes": {...} } }
+            String collectionId = null;
+            Object dataObj = result.get("data");
+            if (dataObj instanceof Map) {
+                Map<String, Object> resultData = (Map<String, Object>) dataObj;
+                collectionId = resultData.get("id") != null ? String.valueOf(resultData.get("id")) : null;
+            }
+            log.info("Extracted collection ID: {} from response", collectionId);
 
             if (collectionId != null) {
                 try {
@@ -96,9 +102,10 @@ public class ProposalService {
                     log.info("Created {} fields for collection {}", fields.size(), collectionId);
                 } catch (Exception e) {
                     log.error("Failed to create fields for collection {}: {}", collectionId, e.getMessage());
-                    // Collection was created, but fields failed - include partial error
                     result.put("_fieldError", e.getMessage());
                 }
+            } else {
+                log.error("Could not extract collection ID from response: {}", result);
             }
         }
 

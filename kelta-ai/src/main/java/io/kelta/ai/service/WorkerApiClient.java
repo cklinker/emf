@@ -48,25 +48,34 @@ public class WorkerApiClient {
                 .block();
     }
 
-    public Map<String, Object> createFields(String tenantId, String userId, String collectionId,
-                                             List<Map<String, Object>> fields) {
+    public void createFields(String tenantId, String userId, String collectionId,
+                              List<Map<String, Object>> fields) {
         log.info("Creating {} fields for collection {} via worker API", fields.size(), collectionId);
 
-        Map<String, Object> jsonApiBody = Map.of(
-                "data", fields.stream()
-                        .map(f -> Map.of("type", "fields", "attributes", f))
-                        .toList()
-        );
+        for (Map<String, Object> field : fields) {
+            Map<String, Object> fieldAttrs = new java.util.LinkedHashMap<>(field);
+            fieldAttrs.put("collectionId", collectionId);
 
-        return webClient.post()
-                .uri("/api/collections/{collectionId}/fields", collectionId)
-                .header("X-Tenant-ID", tenantId)
-                .header("X-User-Id", userId)
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(jsonApiBody)
-                .retrieve()
-                .bodyToMono(Map.class)
-                .block();
+            Map<String, Object> jsonApiBody = Map.of(
+                    "data", Map.of("type", "fields", "attributes", fieldAttrs)
+            );
+
+            try {
+                webClient.post()
+                        .uri("/api/fields")
+                        .header("X-Tenant-ID", tenantId)
+                        .header("X-User-Id", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(jsonApiBody)
+                        .retrieve()
+                        .bodyToMono(Map.class)
+                        .block();
+                log.debug("Created field '{}' for collection {}", field.get("name"), collectionId);
+            } catch (Exception e) {
+                log.error("Failed to create field '{}' for collection {}: {}",
+                        field.get("name"), collectionId, e.getMessage());
+            }
+        }
     }
 
     public Map<String, Object> createPageLayout(String tenantId, String userId, Map<String, Object> layoutData) {

@@ -93,6 +93,8 @@ public class WorkerApiClient {
                     "data", Map.of("type", "fields", "attributes", fieldAttrs)
             );
 
+            log.info("Creating field '{}' type={} attrs={}", fieldAttrs.get("name"), fieldAttrs.get("type"), fieldAttrs.keySet());
+
             try {
                 webClient.post()
                         .uri("/api/fields")
@@ -101,6 +103,9 @@ public class WorkerApiClient {
                         .contentType(MediaType.APPLICATION_JSON)
                         .bodyValue(jsonApiBody)
                         .retrieve()
+                        .onStatus(status -> status.is4xxClientError() || status.is5xxServerError(),
+                                response -> response.bodyToMono(String.class)
+                                        .map(body -> new RuntimeException(body)))
                         .bodyToMono(Map.class)
                         .block();
                 log.debug("Created field '{}' for collection {}", field.get("name"), collectionId);

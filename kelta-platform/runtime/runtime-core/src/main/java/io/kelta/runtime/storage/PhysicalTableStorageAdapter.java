@@ -474,6 +474,15 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         List<Object> params = new ArrayList<>();
         params.add(value);
 
+        // For tenant-scoped collections, scope the uniqueness check to the current tenant
+        if (definition.tenantScoped()) {
+            String tenantId = io.kelta.runtime.context.TenantContext.get();
+            if (tenantId != null && !tenantId.isBlank()) {
+                sql.append(" AND tenant_id = ?");
+                params.add(tenantId);
+            }
+        }
+
         if (excludeId != null) {
             sql.append(" AND id != ?");
             params.add(excludeId);

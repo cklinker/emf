@@ -1,5 +1,6 @@
 package io.kelta.worker.controller;
 
+import io.kelta.runtime.context.TenantContext;
 import io.kelta.worker.repository.BootstrapRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -283,6 +284,17 @@ public class InternalBootstrapController {
 
         log.info("JIT provision: email={} tenant={} profileId={}", email, tenantId, profileId);
 
+        // Set tenant context so RLS policies filter correctly
+        TenantContext.set(tenantId);
+        try {
+            return doJitProvisionUser(email, tenantId, firstName, lastName, profileId);
+        } finally {
+            TenantContext.clear();
+        }
+    }
+
+    private ResponseEntity<Map<String, Object>> doJitProvisionUser(
+            String email, String tenantId, String firstName, String lastName, String profileId) {
         // Check if user already exists (any status)
         Optional<Map<String, Object>> existingOpt = repository.findUserByEmailAnyStatus(email, tenantId);
 

@@ -1,5 +1,6 @@
 package io.kelta.runtime.registry;
 
+import io.kelta.runtime.context.TenantContext;
 import io.kelta.runtime.model.CollectionDefinition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -88,18 +89,19 @@ public class ConcurrentCollectionRegistry implements CollectionRegistry {
     @Override
     public void register(CollectionDefinition definition) {
         Objects.requireNonNull(definition, "definition cannot be null");
-        
+
+        String key = definition.registryKey();
         CollectionDefinition oldDefinition = null;
         CollectionDefinition registeredDefinition;
-        
+
         lock.writeLock().lock();
         try {
             // Create a mutable copy of the current map
             Map<String, CollectionDefinition> newMap = new HashMap<>(collections);
-            
+
             // Check if this is an update or new registration
-            oldDefinition = newMap.get(definition.name());
-            
+            oldDefinition = newMap.get(key);
+
             if (oldDefinition != null) {
                 // Update: increment version if not already incremented
                 if (definition.version() <= oldDefinition.version()) {
@@ -107,25 +109,25 @@ public class ConcurrentCollectionRegistry implements CollectionRegistry {
                 } else {
                     registeredDefinition = definition;
                 }
-                logger.debug("Updating collection '{}' from version {} to version {}", 
-                    definition.name(), oldDefinition.version(), registeredDefinition.version());
+                logger.debug("Updating collection '{}' (key='{}') from version {} to version {}",
+                    definition.name(), key, oldDefinition.version(), registeredDefinition.version());
             } else {
                 // New registration
                 registeredDefinition = definition;
-                logger.debug("Registering new collection '{}' with version {}", 
-                    definition.name(), registeredDefinition.version());
+                logger.debug("Registering new collection '{}' (key='{}') with version {}",
+                    definition.name(), key, registeredDefinition.version());
             }
-            
-            newMap.put(definition.name(), registeredDefinition);
-            
+
+            newMap.put(key, registeredDefinition);
+
             // Replace with immutable snapshot
             collections = Map.copyOf(newMap);
             registryVersion++;
-            
+
         } finally {
             lock.writeLock().unlock();
         }
-        
+
         // Notify listeners outside the lock to prevent deadlocks
         // and allow listeners to call back into the registry
         if (oldDefinition == null) {
@@ -134,14 +136,25 @@ public class ConcurrentCollectionRegistry implements CollectionRegistry {
             notifyUpdated(oldDefinition, registeredDefinition);
         }
     }
-    
+
     @Override
     public CollectionDefinition get(String collectionName) {
         // No lock needed - reading volatile reference to immutable map
-        // Handle null gracefully - immutable maps throw NPE on null keys
         if (collectionName == null) {
             return null;
         }
+
+        // If tenant context is set, try tenant-scoped key first
+        String tenantId = TenantContext.get();
+        if (tenantId != null && !tenantId.isBlank()) {
+            String tenantKey = tenantId + ":" + collectionName;
+            CollectionDefinition result = collections.get(tenantKey);
+            if (result != null) {
+                return result;
+            }
+        }
+
+        // Fall back to name-only key (system collections or legacy registrations)
         return collections.get(collectionName);
     }
     
@@ -156,27 +169,41 @@ public class ConcurrentCollectionRegistry implements CollectionRegistry {
         if (collectionName == null) {
             return;
         }
-        
+
         boolean wasRemoved = false;
-        
+
         lock.writeLock().lock();
         try {
+            // Try direct key match first (handles both "name" and "tenantId:name" keys)
             if (collections.containsKey(collectionName)) {
-                // Create a mutable copy and remove the collection
                 Map<String, CollectionDefinition> newMap = new HashMap<>(collections);
                 newMap.remove(collectionName);
-                
-                // Replace with immutable snapshot
                 collections = Map.copyOf(newMap);
                 registryVersion++;
                 wasRemoved = true;
-                
                 logger.debug("Unregistered collection '{}'", collectionName);
+            } else {
+                // Fall back: remove any entry whose collection name matches
+                Map<String, CollectionDefinition> newMap = new HashMap<>(collections);
+                String keyToRemove = null;
+                for (Map.Entry<String, CollectionDefinition> entry : newMap.entrySet()) {
+                    if (entry.getValue().name().equals(collectionName)) {
+                        keyToRemove = entry.getKey();
+                        break;
+                    }
+                }
+                if (keyToRemove != null) {
+                    newMap.remove(keyToRemove);
+                    collections = Map.copyOf(newMap);
+                    registryVersion++;
+                    wasRemoved = true;
+                    logger.debug("Unregistered collection '{}' (key='{}')", collectionName, keyToRemove);
+                }
             }
         } finally {
             lock.writeLock().unlock();
         }
-        
+
         // Notify listeners outside the lock
         if (wasRemoved) {
             notifyUnregistered(collectionName);
@@ -223,7 +250,16 @@ public class ConcurrentCollectionRegistry implements CollectionRegistry {
      * @return true if the collection is registered, false otherwise
      */
     public boolean contains(String collectionName) {
-        return collections.containsKey(collectionName);
+        if (collections.containsKey(collectionName)) {
+            return true;
+        }
+        // Check if any tenant-scoped entry has this collection name
+        for (CollectionDefinition def : collections.values()) {
+            if (def.name().equals(collectionName)) {
+                return true;
+            }
+        }
+        return false;
     }
     
     /**

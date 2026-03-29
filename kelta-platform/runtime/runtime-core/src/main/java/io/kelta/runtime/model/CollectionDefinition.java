@@ -32,6 +32,7 @@ import java.util.Set;
  * @param displayFieldName Name of the field used for display-value lookups (nullable).
  *                         When set and the referenced field is unique and required,
  *                         GET-by-id requests accept either a UUID or this field's value.
+ * @param tenantId The tenant that owns this collection (nullable for system collections).
  *
  * @since 1.0.0
  */
@@ -51,7 +52,8 @@ public record CollectionDefinition(
     boolean readOnly,
     Set<String> immutableFields,
     Map<String, String> columnMapping,
-    String displayFieldName
+    String displayFieldName,
+    String tenantId
 ) {
     /**
      * Compact constructor with validation and defensive copying.
@@ -85,7 +87,7 @@ public record CollectionDefinition(
             long version, Instant createdAt, Instant updatedAt) {
         this(name, displayName, description, fields, storageConfig, apiConfig,
              authzConfig, version, createdAt, updatedAt,
-             false, true, false, Set.of(), Map.of(), null);
+             false, true, false, Set.of(), Map.of(), null, null);
     }
 
     /**
@@ -100,7 +102,34 @@ public record CollectionDefinition(
             Set<String> immutableFields, Map<String, String> columnMapping) {
         this(name, displayName, description, fields, storageConfig, apiConfig,
              authzConfig, version, createdAt, updatedAt,
-             systemCollection, tenantScoped, readOnly, immutableFields, columnMapping, null);
+             systemCollection, tenantScoped, readOnly, immutableFields, columnMapping, null, null);
+    }
+
+    /**
+     * Backward-compatible constructor without tenantId parameter.
+     */
+    public CollectionDefinition(
+            String name, String displayName, String description,
+            List<FieldDefinition> fields, StorageConfig storageConfig,
+            ApiConfig apiConfig, AuthzConfig authzConfig,
+            long version, Instant createdAt, Instant updatedAt,
+            boolean systemCollection, boolean tenantScoped, boolean readOnly,
+            Set<String> immutableFields, Map<String, String> columnMapping,
+            String displayFieldName) {
+        this(name, displayName, description, fields, storageConfig, apiConfig,
+             authzConfig, version, createdAt, updatedAt,
+             systemCollection, tenantScoped, readOnly, immutableFields, columnMapping,
+             displayFieldName, null);
+    }
+
+    /**
+     * Returns the registry key for this collection, combining tenantId and name
+     * for tenant-scoped collections. System collections (null tenantId) use name only.
+     *
+     * @return the registry key
+     */
+    public String registryKey() {
+        return tenantId != null ? tenantId + ":" + name : name;
     }
     
     /**
@@ -158,7 +187,7 @@ public record CollectionDefinition(
             storageConfig, apiConfig, authzConfig,
             version + 1, createdAt, Instant.now(),
             systemCollection, tenantScoped, readOnly,
-            immutableFields, columnMapping, displayFieldName
+            immutableFields, columnMapping, displayFieldName, tenantId
         );
     }
 
@@ -174,7 +203,7 @@ public record CollectionDefinition(
             storageConfig, apiConfig, authzConfig,
             version + 1, createdAt, Instant.now(),
             systemCollection, tenantScoped, readOnly,
-            immutableFields, columnMapping, displayFieldName
+            immutableFields, columnMapping, displayFieldName, tenantId
         );
     }
 

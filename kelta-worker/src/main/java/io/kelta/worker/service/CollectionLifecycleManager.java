@@ -328,12 +328,16 @@ public class CollectionLifecycleManager {
      * @return the loaded collection definition, or {@code null} if not found
      */
     public CollectionDefinition loadCollectionByName(String collectionName, String tenantId) {
-        // Check if already loaded
+        // Check if already loaded (TenantContext drives tenant-scoped lookup)
         CollectionDefinition existing = collectionRegistry.get(collectionName);
         if (existing != null) {
             return existing;
         }
 
+        // Set tenant context so RLS filters the query correctly
+        if (tenantId != null && !tenantId.isBlank()) {
+            TenantContext.set(tenantId);
+        }
         try {
             List<Map<String, Object>> rows = jdbcTemplate.queryForList(
                     SELECT_COLLECTION_BY_NAME, collectionName);
@@ -360,6 +364,10 @@ public class CollectionLifecycleManager {
             log.warn("Failed to load collection '{}' on demand (tenantId={}): {}",
                     collectionName, tenantId, e.getMessage());
             return null;
+        } finally {
+            if (tenantId != null && !tenantId.isBlank()) {
+                TenantContext.clear();
+            }
         }
     }
 
@@ -442,6 +450,12 @@ public class CollectionLifecycleManager {
         fields.add(FieldDefinition.lookup("updated_by", "users", "Updated By"));
 
         builder.fields(fields);
+
+        // Set tenant ID
+        String tenantId = (String) data.get("tenant_id");
+        if (tenantId != null && !tenantId.isBlank()) {
+            builder.tenantId(tenantId);
+        }
 
         // Resolve display field ID to field name
         String displayFieldId = getStringOrNull(data, "display_field_id", null);

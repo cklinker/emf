@@ -136,7 +136,7 @@ public class ChatService {
                                      int[] tokenCounts) throws IOException {
         // Handle content block delta (text streaming)
         event.contentBlockDelta().ifPresent(delta -> {
-            delta.delta().textDelta().ifPresent(textDelta -> {
+            delta.delta().text().ifPresent(textDelta -> {
                 String text = textDelta.text();
                 fullText.append(text);
                 try {

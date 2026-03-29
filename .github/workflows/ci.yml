@@ -174,7 +174,7 @@ jobs:
             maven-${{ runner.os }}-
 
       - name: Run OWASP Dependency-Check
-        run: mvn org.owasp:dependency-check-maven:check -f kelta-platform/pom.xml -B
+        run: mvn org.owasp:dependency-check-maven:check -f kelta-platform/pom.xml -B -DnvdApiKey=${{ secrets.NVD_API_KEY }}
         timeout-minutes: 15
 
       - name: Upload dependency-check report

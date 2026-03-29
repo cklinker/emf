@@ -29,7 +29,7 @@ kelta:
     anthropic:
       api-key: ${ANTHROPIC_API_KEY:}
       default-model: ${AI_DEFAULT_MODEL:claude-sonnet-4-20250514}
-      default-max-tokens: ${AI_DEFAULT_MAX_TOKENS:4096}
+      default-max-tokens: ${AI_DEFAULT_MAX_TOKENS:16384}
       default-temperature: ${AI_DEFAULT_TEMPERATURE:0.7}
     worker-service-url: ${WORKER_SERVICE_URL:http://localhost:8080}
     sse-timeout-ms: ${AI_SSE_TIMEOUT_MS:300000}

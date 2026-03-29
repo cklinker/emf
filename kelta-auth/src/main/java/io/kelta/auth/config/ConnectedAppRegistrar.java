@@ -84,8 +84,8 @@ public class ConnectedAppRegistrar implements ApplicationRunner {
                         .requireProofKey(true)
                         .build())
                 .tokenSettings(TokenSettings.builder()
-                        .accessTokenTimeToLive(Duration.ofHours(1))
-                        .refreshTokenTimeToLive(Duration.ofHours(8))
+                        .accessTokenTimeToLive(Duration.ofHours(8))
+                        .refreshTokenTimeToLive(Duration.ofDays(7))
                         .reuseRefreshTokens(false)
                         .build())
                 .build();

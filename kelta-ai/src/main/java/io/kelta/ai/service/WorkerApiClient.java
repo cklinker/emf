@@ -89,6 +89,20 @@ public class WorkerApiClient {
                 fieldAttrs.putIfAbsent("required", !nullable);
             }
 
+            // Remove defaultValue — the worker expects JSON type, but Claude sends
+            // plain strings like "false" or "0" which fail validation.
+            // Better to not set defaults than to fail field creation.
+            fieldAttrs.remove("defaultValue");
+
+            // Remove unique if false (worker uses uniqueConstraint, not unique)
+            Object uniqueVal = fieldAttrs.remove("unique");
+            if (Boolean.TRUE.equals(uniqueVal)) {
+                fieldAttrs.put("uniqueConstraint", true);
+            }
+
+            // Remove any null values that could cause serialization issues
+            fieldAttrs.entrySet().removeIf(e -> e.getValue() == null);
+
             Map<String, Object> jsonApiBody = Map.of(
                     "data", Map.of("type", "fields", "attributes", fieldAttrs)
             );

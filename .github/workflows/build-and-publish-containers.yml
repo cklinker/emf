@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
     paths:
+      - 'kelta-ai/**'
       - 'kelta-gateway/**'
       - 'kelta-platform/runtime/**'
       - 'kelta-worker/**'
@@ -84,6 +85,9 @@ jobs:
       - name: Test Auth Server
         run: mvn verify -f kelta-auth/pom.xml -B
 
+      - name: Test AI Service
+        run: mvn verify -f kelta-ai/pom.xml -B
+
   # ===========================================================================
   # Test Frontend
   # ===========================================================================
@@ -140,6 +144,9 @@ jobs:
           - service: ui
             dockerfile: kelta-ui/Dockerfile
             image: kelta-ui
+          - service: ai
+            dockerfile: kelta-ai/Dockerfile
+            image: kelta-ai
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -242,6 +249,11 @@ jobs:
               # Update auth server deployment
               if [ -f "$DIR/auth-deployment.yaml" ]; then
                 sed -i "s|image: .*${PREFIX}-auth:.*|image: harbor.rzware.com/emf/${PREFIX}-auth:${IMAGE_TAG}|g" "$DIR/auth-deployment.yaml"
+              fi
+
+              # Update AI service deployment
+              if [ -f "$DIR/ai-deployment.yaml" ]; then
+                sed -i "s|image: .*${PREFIX}-ai:.*|image: harbor.rzware.com/emf/${PREFIX}-ai:${IMAGE_TAG}|g" "$DIR/ai-deployment.yaml"
               fi
             fi
           done

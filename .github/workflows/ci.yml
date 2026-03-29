@@ -64,6 +64,9 @@ jobs:
       - name: Test Auth Server
         run: mvn verify -f kelta-auth/pom.xml -B
 
+      - name: Test AI Service
+        run: mvn verify -f kelta-ai/pom.xml -B
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4

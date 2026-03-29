@@ -1,4 +1,5 @@
 import { useCallback, useRef } from 'react'
+import { useAuth } from '../../context/AuthContext'
 import { useAiChat } from './AiChatContext'
 import type { AiProposal, ChatMessage } from './types'
 
@@ -9,6 +10,7 @@ interface StreamCallbacks {
 
 export function useAiStream() {
   const { dispatch } = useAiChat()
+  const { getAccessToken } = useAuth()
   const abortControllerRef = useRef<AbortController | null>(null)
 
   const sendStreamMessage = useCallback(
@@ -38,10 +40,19 @@ export function useAiStream() {
       dispatch({ type: 'ADD_MESSAGE', message: userMsg })
 
       try {
+        // Get auth token
+        const token = await getAccessToken()
+
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+        }
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`
+        }
+
         const response = await fetch(`${baseUrl}/api/ai/chat/stream`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
+          headers,
           body: JSON.stringify({
             message,
             conversationId,
@@ -51,8 +62,31 @@ export function useAiStream() {
           signal: abortController.signal,
         })
 
-        if (!response.ok || !response.body) {
-          throw new Error(`Stream request failed: ${response.status}`)
+        if (!response.ok) {
+          let errorMsg = `Request failed with status ${response.status}`
+          try {
+            const errorBody = await response.json()
+            if (errorBody.errors?.[0]?.title) {
+              errorMsg = errorBody.errors[0].title
+            }
+          } catch {
+            // ignore parse error
+          }
+
+          // Add error as assistant message so it's visible in the chat
+          const errorChatMsg: ChatMessage = {
+            id: crypto.randomUUID(),
+            role: 'assistant',
+            content: `Sorry, I encountered an error: ${errorMsg}`,
+            createdAt: new Date().toISOString(),
+          }
+          dispatch({ type: 'ADD_MESSAGE', message: errorChatMsg })
+          callbacks?.onError?.(errorMsg)
+          return
+        }
+
+        if (!response.body) {
+          throw new Error('No response body')
         }
 
         const reader = response.body.getReader()
@@ -61,11 +95,13 @@ export function useAiStream() {
         let fullText = ''
         let currentEvent = ''
 
-        while (true) {
-          const { done, value } = await reader.read()
+        let done = false
+        while (!done) {
+          const result = await reader.read()
+          done = result.done
           if (done) break
 
-          buffer += decoder.decode(value, { stream: true })
+          buffer += decoder.decode(result.value, { stream: true })
           const lines = buffer.split('\n')
           buffer = lines.pop() ?? ''
 
@@ -76,14 +112,39 @@ export function useAiStream() {
               const data = line.slice(5).trim()
               try {
                 const parsed = JSON.parse(data)
-                handleEvent(currentEvent, parsed, dispatch, fullText, (text) => {
-                  fullText = text
-                })
-                if (currentEvent === 'delta') {
-                  fullText += parsed.text
-                }
-                if (currentEvent === 'done' && callbacks?.onDone) {
-                  callbacks.onDone(parsed.conversationId)
+
+                switch (currentEvent) {
+                  case 'delta':
+                    fullText += parsed.text
+                    dispatch({ type: 'APPEND_STREAMING_TEXT', text: parsed.text as string })
+                    break
+                  case 'proposal':
+                    dispatch({
+                      type: 'ADD_PROPOSAL',
+                      proposal: parsed as AiProposal,
+                    })
+                    break
+                  case 'done':
+                    if (parsed.tokensUsed) {
+                      const tokens = parsed.tokensUsed as {
+                        input: number
+                        output: number
+                      }
+                      dispatch({
+                        type: 'SET_TOKEN_USAGE',
+                        usage: {
+                          used: tokens.input + tokens.output,
+                          limit: 0,
+                        },
+                      })
+                    }
+                    if (callbacks?.onDone) {
+                      callbacks.onDone(parsed.conversationId)
+                    }
+                    break
+                  case 'error':
+                    callbacks?.onError?.(parsed.message)
+                    break
                 }
               } catch {
                 // Non-JSON data, ignore
@@ -105,6 +166,14 @@ export function useAiStream() {
       } catch (err) {
         if ((err as Error).name !== 'AbortError') {
           const errorMsg = (err as Error).message
+          // Show error in the chat UI
+          const errorChatMsg: ChatMessage = {
+            id: crypto.randomUUID(),
+            role: 'assistant',
+            content: `Sorry, I encountered an error: ${errorMsg}`,
+            createdAt: new Date().toISOString(),
+          }
+          dispatch({ type: 'ADD_MESSAGE', message: errorChatMsg })
           callbacks?.onError?.(errorMsg)
         }
       } finally {
@@ -112,7 +181,7 @@ export function useAiStream() {
         dispatch({ type: 'CLEAR_STREAMING_TEXT' })
       }
     },
-    [dispatch]
+    [dispatch, getAccessToken]
   )
 
   const cancelStream = useCallback(() => {
@@ -122,41 +191,4 @@ export function useAiStream() {
   }, [dispatch])
 
   return { sendStreamMessage, cancelStream }
-}
-
-function handleEvent(
-  event: string,
-  data: Record<string, unknown>,
-  dispatch: React.Dispatch<unknown>,
-  _fullText: string,
-  _setFullText: (text: string) => void
-) {
-  const d = dispatch as React.Dispatch<{
-    type: string
-    text?: string
-    proposal?: AiProposal
-    usage?: { used: number; limit: number }
-    isStreaming?: boolean
-  }>
-
-  switch (event) {
-    case 'delta':
-      d({ type: 'APPEND_STREAMING_TEXT', text: data.text as string })
-      break
-    case 'proposal':
-      d({ type: 'ADD_PROPOSAL', proposal: data as unknown as AiProposal })
-      break
-    case 'done':
-      if (data.tokensUsed) {
-        const tokens = data.tokensUsed as { input: number; output: number }
-        d({
-          type: 'SET_TOKEN_USAGE',
-          usage: { used: tokens.input + tokens.output, limit: 0 },
-        })
-      }
-      break
-    case 'error':
-      d({ type: 'SET_STREAMING', isStreaming: false })
-      break
-  }
 }

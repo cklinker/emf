@@ -91,10 +91,15 @@ public class ChatService {
             List<AiProposal> proposals = new ArrayList<>();
             int[] tokenCounts = {0, 0}; // input, output
 
+            // Track current tool use across stream events
+            String[] currentToolName = {null};
+            StringBuilder toolInputJson = new StringBuilder();
+
             try (StreamResponse<RawMessageStreamEvent> stream = anthropicService.streamMessage(params)) {
                 stream.stream().forEach(event -> {
                     try {
-                        processStreamEvent(event, emitter, fullText, proposals, tokenCounts);
+                        processStreamEvent(event, emitter, fullText, proposals, tokenCounts,
+                                currentToolName, toolInputJson);
                     } catch (Exception e) {
                         log.error("Error processing stream event: {}", e.getMessage());
                     }
@@ -131,11 +136,14 @@ public class ChatService {
         }
     }
 
+    @SuppressWarnings("unchecked")
     private void processStreamEvent(RawMessageStreamEvent event, SseEmitter emitter,
                                      StringBuilder fullText, List<AiProposal> proposals,
-                                     int[] tokenCounts) throws IOException {
-        // Handle content block delta (text streaming)
+                                     int[] tokenCounts, String[] currentToolName,
+                                     StringBuilder toolInputJson) throws IOException {
+        // Handle content block delta (text or tool input JSON)
         event.contentBlockDelta().ifPresent(delta -> {
+            // Text delta — stream to client
             delta.delta().text().ifPresent(textDelta -> {
                 String text = textDelta.text();
                 fullText.append(text);
@@ -146,11 +154,18 @@ public class ChatService {
                     log.error("Failed to send delta event: {}", e.getMessage());
                 }
             });
+
+            // Tool input JSON delta — accumulate chunks
+            delta.delta().inputJson().ifPresent(inputJsonDelta -> {
+                toolInputJson.append(inputJsonDelta.partialJson());
+            });
         });
 
         // Handle content block start (tool use detection)
         event.contentBlockStart().ifPresent(blockStart -> {
             blockStart.contentBlock().toolUse().ifPresent(toolUse -> {
+                currentToolName[0] = toolUse.name();
+                toolInputJson.setLength(0); // Reset for new tool
                 try {
                     Map<String, Object> toolData = Map.of("name", toolUse.name(), "id", toolUse.id());
                     emitter.send(SseEmitter.event().name("tool_use").data(objectMapper.writeValueAsString(toolData)));
@@ -158,6 +173,28 @@ public class ChatService {
                     log.error("Failed to send tool_use event: {}", e.getMessage());
                 }
             });
+        });
+
+        // Handle content block stop — finalize tool use and emit proposal
+        event.contentBlockStop().ifPresent(stop -> {
+            if (currentToolName[0] != null && toolInputJson.length() > 0) {
+                try {
+                    Map<String, Object> toolInput = objectMapper.readValue(
+                            toolInputJson.toString(), Map.class);
+                    String proposalType = "propose_collection".equals(currentToolName[0])
+                            ? "collection" : "layout";
+                    AiProposal proposal = proposalService.createProposal(proposalType, toolInput);
+                    proposals.add(proposal);
+
+                    String proposalJson = objectMapper.writeValueAsString(proposal);
+                    emitter.send(SseEmitter.event().name("proposal").data(proposalJson));
+                    log.info("Emitted {} proposal: {}", proposalType, proposal.id());
+                } catch (Exception e) {
+                    log.error("Failed to process tool result: {}", e.getMessage());
+                }
+                currentToolName[0] = null;
+                toolInputJson.setLength(0);
+            }
         });
 
         // Handle message delta (output token count)

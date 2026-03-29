@@ -51,21 +51,12 @@ public class RedisRateLimiter {
         return redisTemplate.opsForValue()
             .increment(key)
             .flatMap(count -> {
-                // Always ensure TTL is set — if the key has no expiry (TTL == -1),
-                // a previous expire call may have been lost. This prevents keys
-                // from persisting forever and permanently blocking tenants.
-                return redisTemplate.getExpire(key)
-                    .flatMap(ttl -> {
-                        if (ttl == null || ttl.getSeconds() < 0) {
-                            return redisTemplate.expire(key, config.getWindowDuration())
-                                .thenReturn(count);
-                        }
-                        return Mono.just(count);
-                    })
-                    .switchIfEmpty(
-                        redisTemplate.expire(key, config.getWindowDuration())
-                            .thenReturn(count)
-                    );
+                // Always set/refresh the TTL on every request. This is idempotent
+                // and prevents keys from persisting forever if a previous expire
+                // call was lost. The small overhead of re-setting TTL on each
+                // request is worth the guarantee that keys always expire.
+                return redisTemplate.expire(key, config.getWindowDuration())
+                    .thenReturn(count);
             })
             .map(count -> {
                 long limit = config.getRequestsPerWindow();

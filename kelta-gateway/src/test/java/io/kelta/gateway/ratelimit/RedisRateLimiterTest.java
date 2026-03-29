@@ -16,201 +16,168 @@ import java.time.Duration;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-/**
- * Unit tests for RedisRateLimiter.
- */
 @ExtendWith(MockitoExtension.class)
 class RedisRateLimiterTest {
-    
+
     @Mock
     private ReactiveRedisTemplate<String, String> redisTemplate;
-    
+
     @Mock
     private ReactiveValueOperations<String, String> valueOps;
-    
+
     private RedisRateLimiter rateLimiter;
-    
+
     @BeforeEach
     void setUp() {
         when(redisTemplate.opsForValue()).thenReturn(valueOps);
-        // Default: key has a valid TTL (not stuck)
-        lenient().when(redisTemplate.getExpire(anyString())).thenReturn(Mono.just(Duration.ofMinutes(3)));
+        // Every request calls expire to ensure TTL is always set
+        lenient().when(redisTemplate.expire(anyString(), any(Duration.class))).thenReturn(Mono.just(true));
         rateLimiter = new RedisRateLimiter(redisTemplate);
     }
-    
+
     @Test
     void testFirstRequestInWindow() {
         // Given
         RateLimitConfig config = new RateLimitConfig(10, Duration.ofMinutes(1));
-        String routeId = "users-collection";
-        String principal = "user@example.com";
         String expectedKey = "ratelimit:users-collection:user@example.com";
 
         when(valueOps.increment(expectedKey)).thenReturn(Mono.just(1L));
-        when(redisTemplate.getExpire(expectedKey)).thenReturn(Mono.just(Duration.ofSeconds(-1)));
-        when(redisTemplate.expire(expectedKey, Duration.ofMinutes(1))).thenReturn(Mono.just(true));
-        
+
         // When & Then
-        StepVerifier.create(rateLimiter.checkRateLimit(routeId, principal, config))
-            .expectNextMatches(result -> 
-                result.isAllowed() && result.getRemainingRequests() == 9)
+        StepVerifier.create(rateLimiter.checkRateLimit("users-collection", "user@example.com", config))
+            .expectNextMatches(result -> result.isAllowed() && result.getRemainingRequests() == 9)
             .verifyComplete();
-        
+
         verify(valueOps).increment(expectedKey);
         verify(redisTemplate).expire(expectedKey, Duration.ofMinutes(1));
     }
-    
+
     @Test
     void testSubsequentRequestInWindow() {
         // Given
         RateLimitConfig config = new RateLimitConfig(10, Duration.ofMinutes(1));
-        String routeId = "users-collection";
-        String principal = "user@example.com";
         String expectedKey = "ratelimit:users-collection:user@example.com";
 
         when(valueOps.increment(expectedKey)).thenReturn(Mono.just(5L));
-        // Key already has TTL — no expire call needed
-        when(redisTemplate.getExpire(expectedKey)).thenReturn(Mono.just(Duration.ofMinutes(3)));
 
         // When & Then
-        StepVerifier.create(rateLimiter.checkRateLimit(routeId, principal, config))
-            .expectNextMatches(result ->
-                result.isAllowed() && result.getRemainingRequests() == 5)
+        StepVerifier.create(rateLimiter.checkRateLimit("users-collection", "user@example.com", config))
+            .expectNextMatches(result -> result.isAllowed() && result.getRemainingRequests() == 5)
             .verifyComplete();
 
         verify(valueOps).increment(expectedKey);
-        verify(redisTemplate, never()).expire(anyString(), any(Duration.class));
+        // TTL is always refreshed
+        verify(redisTemplate).expire(expectedKey, Duration.ofMinutes(1));
     }
-    
+
     @Test
     void testRateLimitExceeded() {
         // Given
         RateLimitConfig config = new RateLimitConfig(10, Duration.ofMinutes(1));
-        String routeId = "users-collection";
-        String principal = "user@example.com";
         String expectedKey = "ratelimit:users-collection:user@example.com";
-        
+
         when(valueOps.increment(expectedKey)).thenReturn(Mono.just(11L));
-        
+
         // When & Then
-        StepVerifier.create(rateLimiter.checkRateLimit(routeId, principal, config))
-            .expectNextMatches(result -> 
-                !result.isAllowed() && 
+        StepVerifier.create(rateLimiter.checkRateLimit("users-collection", "user@example.com", config))
+            .expectNextMatches(result ->
+                !result.isAllowed() &&
                 result.getRemainingRequests() == 0 &&
                 result.getRetryAfter().equals(Duration.ofMinutes(1)))
             .verifyComplete();
-        
+
         verify(valueOps).increment(expectedKey);
     }
-    
+
     @Test
     void testExactlyAtLimit() {
         // Given
         RateLimitConfig config = new RateLimitConfig(10, Duration.ofMinutes(1));
-        String routeId = "users-collection";
-        String principal = "user@example.com";
         String expectedKey = "ratelimit:users-collection:user@example.com";
-        
+
         when(valueOps.increment(expectedKey)).thenReturn(Mono.just(10L));
-        
+
         // When & Then
-        StepVerifier.create(rateLimiter.checkRateLimit(routeId, principal, config))
-            .expectNextMatches(result -> 
-                result.isAllowed() && result.getRemainingRequests() == 0)
+        StepVerifier.create(rateLimiter.checkRateLimit("users-collection", "user@example.com", config))
+            .expectNextMatches(result -> result.isAllowed() && result.getRemainingRequests() == 0)
             .verifyComplete();
     }
-    
+
     @Test
     void testRedisUnavailable() {
         // Given
         RateLimitConfig config = new RateLimitConfig(10, Duration.ofMinutes(1));
-        String routeId = "users-collection";
-        String principal = "user@example.com";
         String expectedKey = "ratelimit:users-collection:user@example.com";
-        
+
         when(valueOps.increment(expectedKey))
             .thenReturn(Mono.error(new RuntimeException("Redis connection failed")));
-        
+
         // When & Then - should allow request and not throw exception
-        StepVerifier.create(rateLimiter.checkRateLimit(routeId, principal, config))
-            .expectNextMatches(result -> 
-                result.isAllowed() && result.getRemainingRequests() == 10)
+        StepVerifier.create(rateLimiter.checkRateLimit("users-collection", "user@example.com", config))
+            .expectNextMatches(result -> result.isAllowed() && result.getRemainingRequests() == 10)
             .verifyComplete();
     }
-    
+
     @Test
     void testDifferentPrincipalsHaveSeparateLimits() {
         // Given
         RateLimitConfig config = new RateLimitConfig(10, Duration.ofMinutes(1));
-        String routeId = "users-collection";
-        String principal1 = "user1@example.com";
-        String principal2 = "user2@example.com";
         String key1 = "ratelimit:users-collection:user1@example.com";
         String key2 = "ratelimit:users-collection:user2@example.com";
 
         when(valueOps.increment(key1)).thenReturn(Mono.just(1L));
         when(valueOps.increment(key2)).thenReturn(Mono.just(1L));
-        when(redisTemplate.getExpire(anyString())).thenReturn(Mono.just(Duration.ofSeconds(-1)));
-        when(redisTemplate.expire(anyString(), any(Duration.class))).thenReturn(Mono.just(true));
-        
+
         // When & Then
-        StepVerifier.create(rateLimiter.checkRateLimit(routeId, principal1, config))
+        StepVerifier.create(rateLimiter.checkRateLimit("users-collection", "user1@example.com", config))
             .expectNextMatches(RateLimitResult::isAllowed)
             .verifyComplete();
-        
-        StepVerifier.create(rateLimiter.checkRateLimit(routeId, principal2, config))
+
+        StepVerifier.create(rateLimiter.checkRateLimit("users-collection", "user2@example.com", config))
             .expectNextMatches(RateLimitResult::isAllowed)
             .verifyComplete();
-        
+
         verify(valueOps).increment(key1);
         verify(valueOps).increment(key2);
     }
-    
+
     @Test
     void testDifferentRoutesHaveSeparateLimits() {
         // Given
         RateLimitConfig config = new RateLimitConfig(10, Duration.ofMinutes(1));
-        String routeId1 = "users-collection";
-        String routeId2 = "posts-collection";
-        String principal = "user@example.com";
         String key1 = "ratelimit:users-collection:user@example.com";
         String key2 = "ratelimit:posts-collection:user@example.com";
 
         when(valueOps.increment(key1)).thenReturn(Mono.just(1L));
         when(valueOps.increment(key2)).thenReturn(Mono.just(1L));
-        when(redisTemplate.getExpire(anyString())).thenReturn(Mono.just(Duration.ofSeconds(-1)));
-        when(redisTemplate.expire(anyString(), any(Duration.class))).thenReturn(Mono.just(true));
-        
+
         // When & Then
-        StepVerifier.create(rateLimiter.checkRateLimit(routeId1, principal, config))
+        StepVerifier.create(rateLimiter.checkRateLimit("users-collection", "user@example.com", config))
             .expectNextMatches(RateLimitResult::isAllowed)
             .verifyComplete();
-        
-        StepVerifier.create(rateLimiter.checkRateLimit(routeId2, principal, config))
+
+        StepVerifier.create(rateLimiter.checkRateLimit("posts-collection", "user@example.com", config))
             .expectNextMatches(RateLimitResult::isAllowed)
             .verifyComplete();
-        
+
         verify(valueOps).increment(key1);
         verify(valueOps).increment(key2);
     }
-    
+
     @Test
     void testCustomWindowDuration() {
         // Given
         RateLimitConfig config = new RateLimitConfig(100, Duration.ofSeconds(30));
-        String routeId = "users-collection";
-        String principal = "user@example.com";
         String expectedKey = "ratelimit:users-collection:user@example.com";
 
         when(valueOps.increment(expectedKey)).thenReturn(Mono.just(1L));
-        when(redisTemplate.getExpire(expectedKey)).thenReturn(Mono.just(Duration.ofSeconds(-1)));
         when(redisTemplate.expire(expectedKey, Duration.ofSeconds(30))).thenReturn(Mono.just(true));
-        
+
         // When & Then
-        StepVerifier.create(rateLimiter.checkRateLimit(routeId, principal, config))
+        StepVerifier.create(rateLimiter.checkRateLimit("users-collection", "user@example.com", config))
             .expectNextMatches(RateLimitResult::isAllowed)
             .verifyComplete();
-        
+
         verify(redisTemplate).expire(expectedKey, Duration.ofSeconds(30));
     }
 }

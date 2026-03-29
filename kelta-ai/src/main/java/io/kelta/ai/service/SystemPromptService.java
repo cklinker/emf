@@ -58,6 +58,7 @@ public class SystemPromptService {
                 - Maximum 50 characters for collection name
                 - Every collection should have a meaningful `displayName`
                 - Always suggest a `displayFieldName` (the field shown as the record's label)
+                - RESERVED NAMES (do NOT use): users, roles, permissions, tenants, collections, fields, profiles, ui_pages, ui_menus, ui_menu_items, page_layouts, layout_sections, layout_fields, layout_assignments, global_picklists, picklist_values, validation_rules, record_types, sharing_rules, workflows, approval_processes. Use alternative names like `platform_users`, `app_users`, `members`, `accounts`, etc.
 
                 ## Available Field Types
 

@@ -73,6 +73,23 @@ export function AiChatPanel({
         })
         if (response.ok) {
           dispatch({ type: 'UPDATE_PROPOSAL_STATUS', id: proposalId, status: 'applied' })
+        } else {
+          let errorMsg = `Apply failed (${response.status})`
+          try {
+            const errorBody = await response.json()
+            if (errorBody.errors?.[0]?.detail) {
+              errorMsg = errorBody.errors[0].detail
+            } else if (errorBody.errors?.[0]?.title) {
+              errorMsg = errorBody.errors[0].title
+            }
+          } catch { /* ignore */ }
+          const errorChatMsg = {
+            id: crypto.randomUUID(),
+            role: 'assistant' as const,
+            content: `Failed to apply: ${errorMsg}`,
+            createdAt: new Date().toISOString(),
+          }
+          dispatch({ type: 'ADD_MESSAGE', message: errorChatMsg })
         }
       } catch (err) {
         console.error('Failed to apply proposal:', err)

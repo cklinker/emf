@@ -44,6 +44,9 @@ public class WorkerApiClient {
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(jsonApiBody)
                 .retrieve()
+                .onStatus(status -> status.is4xxClientError() || status.is5xxServerError(),
+                        response -> response.bodyToMono(String.class)
+                                .map(body -> new RuntimeException("Worker API error: " + body)))
                 .bodyToMono(Map.class)
                 .block();
     }

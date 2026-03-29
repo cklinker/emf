@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback, useState } from 'react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { Bot, MessageSquarePlus, History } from 'lucide-react'
+import { useAuth } from '../../context/AuthContext'
 import { useAiChat } from './AiChatContext'
 import { useAiStream } from './useAiStream'
 import { ChatMessage, StreamingMessage } from './ChatMessage'
@@ -24,6 +25,7 @@ export function AiChatPanel({
   contextId,
   contextLabel,
 }: AiChatPanelProps) {
+  const { getAccessToken } = useAuth()
   const { state, dispatch, closePanel } = useAiChat()
   const { sendStreamMessage, cancelStream } = useAiStream()
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -61,9 +63,13 @@ export function AiChatPanel({
     async (proposalId: string) => {
       setApplyingId(proposalId)
       try {
+        const token = await getAccessToken()
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+        if (token) headers['Authorization'] = `Bearer ${token}`
+
         const response = await fetch(`${baseUrl}/api/ai/proposals/${proposalId}/apply`, {
           method: 'POST',
-          credentials: 'include',
+          headers,
         })
         if (response.ok) {
           dispatch({ type: 'UPDATE_PROPOSAL_STATUS', id: proposalId, status: 'applied' })

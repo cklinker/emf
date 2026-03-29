@@ -120,13 +120,13 @@ public class ChatService {
                 if ("tool_use".equals(stopReason[0]) && !proposals.isEmpty()) {
                     log.info("Claude stopped for tool use (iteration {}), continuing with tool results", iteration);
 
-                    // Build continuation: add assistant message with tool use, then tool result
-                    // We need to use the non-streaming API for continuation since we need to
-                    // add tool results to the message history
+                    // Build list of already-proposed collection names
+                    String alreadyProposed = proposals.stream()
+                            .map(p -> "'" + p.data().getOrDefault("name", p.data().getOrDefault("displayName", "unknown")) + "'")
+                            .collect(java.util.stream.Collectors.joining(", "));
+
                     List<MessageParam> continuationMessages = new ArrayList<>(messages);
 
-                    // Add assistant message with the tool use blocks
-                    // For simplicity, just add the last tool result and ask to continue
                     AiProposal lastProposal = proposals.getLast();
                     continuationMessages.add(MessageParam.builder()
                             .role(MessageParam.Role.ASSISTANT)
@@ -135,8 +135,11 @@ public class ChatService {
                             .build());
                     continuationMessages.add(MessageParam.builder()
                             .role(MessageParam.Role.USER)
-                            .content("Proposal recorded. Continue creating the remaining collections. " +
-                                    "Call propose_collection for each remaining collection you mentioned.")
+                            .content("Proposal recorded. The following collections have ALREADY been proposed — do NOT propose them again: " +
+                                    alreadyProposed + ". " +
+                                    "If there are remaining collections you mentioned that are NOT in this list, " +
+                                    "call propose_collection for each one now. If all collections have been proposed, " +
+                                    "just respond with a brief summary.")
                             .build());
 
                     requestBuilder = anthropicService.buildRequest(tenantId, systemPrompt, continuationMessages);

@@ -151,12 +151,25 @@ public class ChatService {
                 }
             }
 
-            String proposalJson = proposals.isEmpty() ? null :
-                    objectMapper.writeValueAsString(proposals.getFirst());
-            ChatMessage assistantMsg = ChatMessage.assistant(
-                    tenantId, conversation.id(), fullText.toString(),
-                    proposalJson, tokenCounts[0], tokenCounts[1]);
-            messageRepository.save(assistantMsg);
+            // Save each proposal as a separate message so they can all be found by ID
+            if (proposals.isEmpty()) {
+                ChatMessage assistantMsg = ChatMessage.assistant(
+                        tenantId, conversation.id(), fullText.toString(),
+                        null, tokenCounts[0], tokenCounts[1]);
+                messageRepository.save(assistantMsg);
+            } else {
+                for (int i = 0; i < proposals.size(); i++) {
+                    String pJson = objectMapper.writeValueAsString(proposals.get(i));
+                    // First message gets the text content, rest are proposal-only
+                    String content = (i == 0) ? fullText.toString() : "";
+                    int inputTok = (i == 0) ? tokenCounts[0] : 0;
+                    int outputTok = (i == 0) ? tokenCounts[1] : 0;
+                    ChatMessage proposalMsg = ChatMessage.assistant(
+                            tenantId, conversation.id(), content,
+                            pJson, inputTok, outputTok);
+                    messageRepository.save(proposalMsg);
+                }
+            }
 
             conversationRepository.updateTimestamp(conversation.id(), tenantId);
 

@@ -151,18 +151,39 @@ public class SystemPromptService {
 
                 Layouts can also have `relatedLists` for showing child/related records.
 
+                ## Relational Database Design Rules — CRITICAL
+
+                You MUST follow proper relational database design principles:
+
+                1. **Normalize data into multiple collections.** NEVER put everything in one collection.
+                   - Orders need an `orders` collection AND an `order_lines` collection
+                   - Recipes need a `recipes` collection AND a `recipe_ingredients` collection
+                   - Invoices need an `invoices` collection AND an `invoice_items` collection
+                   - Courses need a `courses` collection AND a `course_modules` collection
+
+                2. **Use MASTER_DETAIL relationships** to connect parent-child collections.
+                   - The child collection (e.g., `order_lines`) has a MASTER_DETAIL field pointing to the parent (`orders`)
+                   - Always include `referenceConfig` with `targetCollection` and `relationshipName`
+
+                3. **Create ALL related collections in a single response** using multiple `propose_collection` tool calls.
+                   - When asked for "an order management system", call `propose_collection` for EACH collection:
+                     first `orders`, then `order_lines` with a MASTER_DETAIL to `orders`
+                   - The user should see ALL proposed collections at once to review together
+
+                4. **Junction tables** for many-to-many relationships.
+                   - e.g., `playlist_tracks` connecting `playlists` and `tracks`
+
+                5. **Avoid storing lists in a single field.** If something has multiple values (ingredients, line items, tags),
+                   create a separate collection with a MASTER_DETAIL back to the parent.
+
                 ## Best Practices
 
                 1. Always include a display field (usually `name` or `title`)
                 2. Use appropriate field types (EMAIL for emails, PHONE for phone numbers, etc.)
-                3. Add validation rules where appropriate
-                4. For DETAIL layouts, put important fields in a 2-column section at the top
-                5. Group related fields in labeled sections
-                6. Use CARD style for secondary information sections
-                7. Suggest creating both a collection AND its default layout together
-                8. When creating relationships, verify the target collection exists
-                9. Use PICKLIST for fields with a known set of values (e.g., status, priority)
-                10. Add sensible default values where appropriate
+                3. Use PICKLIST for fields with a known set of values (e.g., status, priority) — include `enumValues`
+                4. When creating relationships, the target collection must be proposed first or already exist
+                5. Propose collections in dependency order: parent collections first, then children
+                6. Include `displayFieldName` to set which field represents the record's label
                 """;
     }
 

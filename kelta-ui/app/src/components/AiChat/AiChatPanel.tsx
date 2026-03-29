@@ -196,7 +196,9 @@ export function AiChatPanel({
             return <ChatMessage key={msg.id} message={msg} />
           })}
 
-          {state.isStreaming && <StreamingMessage text={state.streamingText} />}
+          {state.isStreaming && (
+            <StreamingMessage text={state.streamingText} isGenerating={true} />
+          )}
 
           <div ref={messagesEndRef} />
         </div>

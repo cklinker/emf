@@ -118,10 +118,24 @@ export function useAiStream() {
                     fullText += parsed.text
                     dispatch({ type: 'APPEND_STREAMING_TEXT', text: parsed.text as string })
                     break
+                  case 'tool_use':
+                    // When tool use starts, finalize any accumulated text as a message
+                    if (fullText.trim()) {
+                      const textMsg: ChatMessage = {
+                        id: crypto.randomUUID(),
+                        role: 'assistant',
+                        content: fullText,
+                        createdAt: new Date().toISOString(),
+                      }
+                      dispatch({ type: 'ADD_MESSAGE', message: textMsg })
+                      dispatch({ type: 'CLEAR_STREAMING_TEXT' })
+                      fullText = ''
+                    }
+                    break
                   case 'proposal': {
                     const proposal = parsed as AiProposal
                     dispatch({ type: 'ADD_PROPOSAL', proposal })
-                    // Also add as a message so it appears inline in the chat flow
+                    // Add as a message so it appears inline in the chat flow
                     const proposalMsg: ChatMessage = {
                       id: `proposal-${proposal.id}`,
                       role: 'assistant',

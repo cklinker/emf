@@ -311,14 +311,14 @@ class GatewayCacheManagerTest {
         @Test
         void testGetRateLimitForTenant_Known() {
             // Given
-            cacheManager.updateGovernorLimit("tenant-1", 144_000); // 144,000 / 1440 = exactly 100 per minute
+            cacheManager.updateGovernorLimit("tenant-1", 144_000); // (144,000 / 288) * 5 = 2500 per 5-min window
 
             // When
             RateLimitConfig config = cacheManager.getRateLimitForTenant("tenant-1");
 
             // Then
-            assertEquals(100, config.getRequestsPerWindow());
-            assertEquals(Duration.ofMinutes(1), config.getWindowDuration());
+            assertEquals(2500, config.getRequestsPerWindow());
+            assertEquals(Duration.ofMinutes(5), config.getWindowDuration());
         }
 
         @Test
@@ -326,9 +326,9 @@ class GatewayCacheManagerTest {
             // When - tenant not in cache, should use default (100,000/day)
             RateLimitConfig config = cacheManager.getRateLimitForTenant("unknown-tenant");
 
-            // Then - 100,000 / 1440 = 69 per minute
-            assertEquals(69, config.getRequestsPerWindow());
-            assertEquals(Duration.ofMinutes(1), config.getWindowDuration());
+            // Then - (100,000 / 288) * 5 = 1735 per 5-min window
+            assertEquals(1735, config.getRequestsPerWindow());
+            assertEquals(Duration.ofMinutes(5), config.getWindowDuration());
         }
 
         @Test

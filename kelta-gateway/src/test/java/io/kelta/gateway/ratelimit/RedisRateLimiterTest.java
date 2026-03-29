@@ -33,6 +33,8 @@ class RedisRateLimiterTest {
     @BeforeEach
     void setUp() {
         when(redisTemplate.opsForValue()).thenReturn(valueOps);
+        // Default: key has a valid TTL (not stuck)
+        lenient().when(redisTemplate.getExpire(anyString())).thenReturn(Mono.just(Duration.ofMinutes(3)));
         rateLimiter = new RedisRateLimiter(redisTemplate);
     }
     
@@ -43,8 +45,9 @@ class RedisRateLimiterTest {
         String routeId = "users-collection";
         String principal = "user@example.com";
         String expectedKey = "ratelimit:users-collection:user@example.com";
-        
+
         when(valueOps.increment(expectedKey)).thenReturn(Mono.just(1L));
+        when(redisTemplate.getExpire(expectedKey)).thenReturn(Mono.just(Duration.ofSeconds(-1)));
         when(redisTemplate.expire(expectedKey, Duration.ofMinutes(1))).thenReturn(Mono.just(true));
         
         // When & Then
@@ -64,15 +67,17 @@ class RedisRateLimiterTest {
         String routeId = "users-collection";
         String principal = "user@example.com";
         String expectedKey = "ratelimit:users-collection:user@example.com";
-        
+
         when(valueOps.increment(expectedKey)).thenReturn(Mono.just(5L));
-        
+        // Key already has TTL — no expire call needed
+        when(redisTemplate.getExpire(expectedKey)).thenReturn(Mono.just(Duration.ofMinutes(3)));
+
         // When & Then
         StepVerifier.create(rateLimiter.checkRateLimit(routeId, principal, config))
-            .expectNextMatches(result -> 
+            .expectNextMatches(result ->
                 result.isAllowed() && result.getRemainingRequests() == 5)
             .verifyComplete();
-        
+
         verify(valueOps).increment(expectedKey);
         verify(redisTemplate, never()).expire(anyString(), any(Duration.class));
     }
@@ -142,9 +147,10 @@ class RedisRateLimiterTest {
         String principal2 = "user2@example.com";
         String key1 = "ratelimit:users-collection:user1@example.com";
         String key2 = "ratelimit:users-collection:user2@example.com";
-        
+
         when(valueOps.increment(key1)).thenReturn(Mono.just(1L));
         when(valueOps.increment(key2)).thenReturn(Mono.just(1L));
+        when(redisTemplate.getExpire(anyString())).thenReturn(Mono.just(Duration.ofSeconds(-1)));
         when(redisTemplate.expire(anyString(), any(Duration.class))).thenReturn(Mono.just(true));
         
         // When & Then
@@ -169,9 +175,10 @@ class RedisRateLimiterTest {
         String principal = "user@example.com";
         String key1 = "ratelimit:users-collection:user@example.com";
         String key2 = "ratelimit:posts-collection:user@example.com";
-        
+
         when(valueOps.increment(key1)).thenReturn(Mono.just(1L));
         when(valueOps.increment(key2)).thenReturn(Mono.just(1L));
+        when(redisTemplate.getExpire(anyString())).thenReturn(Mono.just(Duration.ofSeconds(-1)));
         when(redisTemplate.expire(anyString(), any(Duration.class))).thenReturn(Mono.just(true));
         
         // When & Then
@@ -194,8 +201,9 @@ class RedisRateLimiterTest {
         String routeId = "users-collection";
         String principal = "user@example.com";
         String expectedKey = "ratelimit:users-collection:user@example.com";
-        
+
         when(valueOps.increment(expectedKey)).thenReturn(Mono.just(1L));
+        when(redisTemplate.getExpire(expectedKey)).thenReturn(Mono.just(Duration.ofSeconds(-1)));
         when(redisTemplate.expire(expectedKey, Duration.ofSeconds(30))).thenReturn(Mono.just(true));
         
         // When & Then

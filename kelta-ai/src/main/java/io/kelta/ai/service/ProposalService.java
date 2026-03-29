@@ -140,6 +140,16 @@ public class ProposalService {
         return result;
     }
 
+    // Field types that should go in a "Details" section (short, key info)
+    private static final java.util.Set<String> KEY_FIELD_TYPES = java.util.Set.of(
+            "STRING", "EMAIL", "PHONE", "URL", "EXTERNAL_ID", "AUTO_NUMBER",
+            "PICKLIST", "BOOLEAN", "DATE", "DATETIME", "INTEGER", "DOUBLE",
+            "CURRENCY", "PERCENT");
+
+    // Field types that need their own section (long content)
+    private static final java.util.Set<String> LONG_CONTENT_TYPES = java.util.Set.of(
+            "RICH_TEXT", "JSON");
+
     @SuppressWarnings("unchecked")
     private void createDefaultLayout(String tenantId, String userId, String collectionId, String displayName) {
         log.info("Creating default DETAIL layout for collection {}", collectionId);
@@ -152,56 +162,115 @@ public class ProposalService {
         layoutData.put("isDefault", true);
 
         Map<String, Object> layoutResult = workerApiClient.createPageLayout(tenantId, userId, layoutData);
-        Object layoutDataObj = layoutResult.get("data");
-        String layoutId = null;
-        if (layoutDataObj instanceof Map) {
-            layoutId = String.valueOf(((Map<String, Object>) layoutDataObj).get("id"));
-        }
+        String layoutId = extractId(layoutResult);
         if (layoutId == null) {
             log.error("Could not extract layout ID from response");
             return;
         }
         log.info("Created layout {} for collection {}", layoutId, collectionId);
 
-        // 2. Create a section
-        Map<String, Object> sectionData = new java.util.LinkedHashMap<>();
-        sectionData.put("layoutId", layoutId);
-        sectionData.put("heading", "Details");
-        sectionData.put("columns", 2);
-        sectionData.put("sortOrder", 0);
-        sectionData.put("style", "DEFAULT");
-
-        Map<String, Object> sectionResult = workerApiClient.createLayoutSection(tenantId, userId, sectionData);
-        Object sectionDataObj = sectionResult.get("data");
-        String sectionId = null;
-        if (sectionDataObj instanceof Map) {
-            sectionId = String.valueOf(((Map<String, Object>) sectionDataObj).get("id"));
-        }
-        if (sectionId == null) {
-            log.error("Could not extract section ID from response");
-            return;
-        }
-        log.info("Created section {} for layout {}", sectionId, layoutId);
-
-        // 3. Fetch the created fields to get their IDs
+        // 2. Fetch the created fields
         List<Map<String, Object>> createdFields = workerApiClient.listFields(tenantId, collectionId);
         log.info("Found {} fields for layout placement", createdFields.size());
 
-        // 4. Place each field in the section
-        int sortOrder = 0;
+        if (createdFields.isEmpty()) return;
+
+        // 3. Categorize fields into groups
+        List<Map<String, Object>> keyFields = new java.util.ArrayList<>();
+        List<Map<String, Object>> relationshipFields = new java.util.ArrayList<>();
+        List<Map<String, Object>> longContentFields = new java.util.ArrayList<>();
+        List<Map<String, Object>> metadataFields = new java.util.ArrayList<>();
+
         for (Map<String, Object> field : createdFields) {
+            Map<String, Object> attrs = (Map<String, Object>) field.getOrDefault("attributes", field);
+            String type = String.valueOf(attrs.getOrDefault("type", "STRING")).toUpperCase();
+            String name = String.valueOf(attrs.getOrDefault("name", ""));
+
+            // Metadata fields (dates, status, flags at the bottom)
+            if (name.contains("created") || name.contains("updated") || name.contains("modified")
+                    || name.equals("is_active") || name.equals("active") || name.equals("status")) {
+                metadataFields.add(field);
+            } else if ("MASTER_DETAIL".equals(type) || "LOOKUP".equals(type) || "REFERENCE".equals(type)) {
+                relationshipFields.add(field);
+            } else if (LONG_CONTENT_TYPES.contains(type) || "MULTI_PICKLIST".equals(type)) {
+                longContentFields.add(field);
+            } else {
+                keyFields.add(field);
+            }
+        }
+
+        int sectionOrder = 0;
+
+        // Section 1: Key Details (2 columns) — name, type, short fields
+        if (!keyFields.isEmpty() || !relationshipFields.isEmpty()) {
+            List<Map<String, Object>> detailFields = new java.util.ArrayList<>();
+            detailFields.addAll(keyFields);
+            detailFields.addAll(relationshipFields);
+
+            String sectionId = createSection(tenantId, userId, layoutId, displayName + " Information", 2, sectionOrder++, "DEFAULT");
+            if (sectionId != null) {
+                placeFieldsInSection(tenantId, userId, sectionId, detailFields);
+            }
+        }
+
+        // Section 2: Description / Long Content (1 column, collapsible)
+        if (!longContentFields.isEmpty()) {
+            String sectionId = createSection(tenantId, userId, layoutId, "Details", 1, sectionOrder++, "DEFAULT");
+            if (sectionId != null) {
+                placeFieldsInSection(tenantId, userId, sectionId, longContentFields);
+            }
+        }
+
+        // Section 3: System / Metadata (2 columns, collapsible)
+        if (!metadataFields.isEmpty()) {
+            String sectionId = createSection(tenantId, userId, layoutId, "System Information", 2, sectionOrder++, "COLLAPSIBLE");
+            if (sectionId != null) {
+                placeFieldsInSection(tenantId, userId, sectionId, metadataFields);
+            }
+        }
+
+        log.info("Created {} sections for layout {}", sectionOrder, layoutId);
+    }
+
+    @SuppressWarnings("unchecked")
+    private String createSection(String tenantId, String userId, String layoutId,
+                                  String heading, int columns, int sortOrder, String style) {
+        Map<String, Object> sectionData = new java.util.LinkedHashMap<>();
+        sectionData.put("layoutId", layoutId);
+        sectionData.put("heading", heading);
+        sectionData.put("columns", columns);
+        sectionData.put("sortOrder", sortOrder);
+        sectionData.put("style", style);
+
+        Map<String, Object> result = workerApiClient.createLayoutSection(tenantId, userId, sectionData);
+        return extractId(result);
+    }
+
+    private void placeFieldsInSection(String tenantId, String userId, String sectionId,
+                                       List<Map<String, Object>> fields) {
+        int sortOrder = 0;
+        for (Map<String, Object> field : fields) {
             String fieldId = String.valueOf(field.get("id"));
             try {
-                Map<String, Object> fieldPlacement = new java.util.LinkedHashMap<>();
-                fieldPlacement.put("sectionId", sectionId);
-                fieldPlacement.put("fieldId", fieldId);
-                fieldPlacement.put("sortOrder", sortOrder++);
-                workerApiClient.createLayoutField(tenantId, userId, fieldPlacement);
+                Map<String, Object> placement = new java.util.LinkedHashMap<>();
+                placement.put("sectionId", sectionId);
+                placement.put("fieldId", fieldId);
+                placement.put("sortOrder", sortOrder++);
+                workerApiClient.createLayoutField(tenantId, userId, placement);
             } catch (Exception e) {
                 log.warn("Failed to place field {} in layout: {}", fieldId, e.getMessage());
             }
         }
-        log.info("Placed {} fields in layout {}", sortOrder, layoutId);
+    }
+
+    @SuppressWarnings("unchecked")
+    private String extractId(Map<String, Object> response) {
+        Object dataObj = response.get("data");
+        if (dataObj instanceof Map) {
+            Object id = ((Map<String, Object>) dataObj).get("id");
+            return id != null ? String.valueOf(id) : null;
+        }
+        return null;
     }
 
     @SuppressWarnings("unchecked")

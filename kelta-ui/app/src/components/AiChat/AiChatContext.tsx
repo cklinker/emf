@@ -38,7 +38,7 @@ function reducer(state: AiChatState, action: AiChatAction): AiChatState {
     case 'SET_CONVERSATIONS':
       return { ...state, conversations: action.conversations }
     case 'SET_ACTIVE_CONVERSATION':
-      return { ...state, activeConversationId: action.id, messages: [], streamingText: '' }
+      return { ...state, activeConversationId: action.id, messages: [], streamingText: '', proposals: [] }
     case 'SET_MESSAGES':
       return { ...state, messages: action.messages }
     case 'ADD_MESSAGE':

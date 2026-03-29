@@ -34,7 +34,7 @@ export function AiChatPanel({
   // Auto-scroll to bottom on new messages or streaming text
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [state.messages, state.streamingText])
+  }, [state.messages, state.streamingText, state.proposals])
 
   const handleSend = useCallback(
     (message: string) => {
@@ -97,7 +97,7 @@ export function AiChatPanel({
         setApplyingId(null)
       }
     },
-    [baseUrl, dispatch]
+    [baseUrl, dispatch, getAccessToken]
   )
 
   const handleDismiss = useCallback(
@@ -156,9 +156,9 @@ export function AiChatPanel({
           </div>
         </SheetHeader>
 
-        {/* Messages */}
+        {/* Messages & Proposals — rendered inline */}
         <div className="flex-1 overflow-y-auto">
-          {state.messages.length === 0 && !state.isStreaming && (
+          {state.messages.length === 0 && !state.isStreaming && state.proposals.length === 0 && (
             <div className="flex h-full items-center justify-center p-8">
               <div className="text-center">
                 <Bot className="mx-auto mb-3 h-12 w-12 text-muted-foreground/30" />
@@ -180,7 +180,7 @@ export function AiChatPanel({
 
           {state.isStreaming && <StreamingMessage text={state.streamingText} />}
 
-          {/* Render proposals */}
+          {/* Render proposals inline after messages */}
           {state.proposals.map(renderProposal)}
 
           <div ref={messagesEndRef} />

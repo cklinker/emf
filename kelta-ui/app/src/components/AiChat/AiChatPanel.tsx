@@ -46,7 +46,7 @@ export function AiChatPanel({
         contextId,
         {
           onDone: (conversationId) => {
-            dispatch({ type: 'SET_ACTIVE_CONVERSATION', id: conversationId })
+            dispatch({ type: 'SET_CONVERSATION_ID', id: conversationId })
           },
         }
       )

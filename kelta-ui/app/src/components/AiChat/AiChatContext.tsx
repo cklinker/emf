@@ -7,6 +7,7 @@ type AiChatAction =
   | { type: 'CLOSE_PANEL' }
   | { type: 'SET_CONVERSATIONS'; conversations: ConversationSummary[] }
   | { type: 'SET_ACTIVE_CONVERSATION'; id: string | null }
+  | { type: 'SET_CONVERSATION_ID'; id: string }
   | { type: 'SET_MESSAGES'; messages: ChatMessage[] }
   | { type: 'ADD_MESSAGE'; message: ChatMessage }
   | { type: 'SET_STREAMING'; isStreaming: boolean }
@@ -39,6 +40,8 @@ function reducer(state: AiChatState, action: AiChatAction): AiChatState {
       return { ...state, conversations: action.conversations }
     case 'SET_ACTIVE_CONVERSATION':
       return { ...state, activeConversationId: action.id, messages: [], streamingText: '', proposals: [] }
+    case 'SET_CONVERSATION_ID':
+      return { ...state, activeConversationId: action.id }
     case 'SET_MESSAGES':
       return { ...state, messages: action.messages }
     case 'ADD_MESSAGE':

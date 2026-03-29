@@ -83,6 +83,17 @@ export function CollectionProposalCard({
                     >
                       {field.type}
                     </span>
+                    {field.referenceConfig?.targetCollection && (
+                      <span className="ml-1 text-xs text-muted-foreground">
+                        → {field.referenceConfig.targetCollection}
+                      </span>
+                    )}
+                    {field.enumValues && field.enumValues.length > 0 && (
+                      <span className="ml-1 text-xs text-muted-foreground">
+                        ({field.enumValues.slice(0, 3).join(', ')}
+                        {field.enumValues.length > 3 ? `, +${field.enumValues.length - 3}` : ''})
+                      </span>
+                    )}
                   </td>
                   <td className="py-1 text-center">
                     {field.nullable === false ? (

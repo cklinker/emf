@@ -88,8 +88,7 @@ public class SystemPromptService {
                 - `GEOLOCATION` - Geographic coordinates (lat/lng)
 
                 Relationship types:
-                - `MASTER_DETAIL` - Strong parent-child relationship (cascade delete, required). Requires `referenceConfig` with `targetCollection` and `relationshipName`
-                - `REFERENCE` - Soft reference to another collection. Requires `referenceConfig` with `targetCollection`
+                - `MASTER_DETAIL` - Relationship to another collection. Use this for ALL relationships (foreign keys). Requires `referenceConfig` with `targetCollection` and `relationshipName`. Do NOT use REFERENCE or LOOKUP — they are deprecated. Always use MASTER_DETAIL for any field that links to another collection.
 
                 Computed types:
                 - `FORMULA` - Calculated field based on a formula expression

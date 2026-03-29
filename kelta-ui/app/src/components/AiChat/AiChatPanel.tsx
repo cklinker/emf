@@ -174,14 +174,15 @@ export function AiChatPanel({
             </div>
           )}
 
-          {state.messages.map((msg) => (
-            <ChatMessage key={msg.id} message={msg} />
-          ))}
+          {state.messages.map((msg) => {
+            // If message has proposals, render them instead of the text
+            if (msg.proposals && msg.proposals.length > 0) {
+              return msg.proposals.map(renderProposal)
+            }
+            return <ChatMessage key={msg.id} message={msg} />
+          })}
 
           {state.isStreaming && <StreamingMessage text={state.streamingText} />}
-
-          {/* Render proposals inline after messages */}
-          {state.proposals.map(renderProposal)}
 
           <div ref={messagesEndRef} />
         </div>

@@ -118,12 +118,20 @@ export function useAiStream() {
                     fullText += parsed.text
                     dispatch({ type: 'APPEND_STREAMING_TEXT', text: parsed.text as string })
                     break
-                  case 'proposal':
-                    dispatch({
-                      type: 'ADD_PROPOSAL',
-                      proposal: parsed as AiProposal,
-                    })
+                  case 'proposal': {
+                    const proposal = parsed as AiProposal
+                    dispatch({ type: 'ADD_PROPOSAL', proposal })
+                    // Also add as a message so it appears inline in the chat flow
+                    const proposalMsg: ChatMessage = {
+                      id: `proposal-${proposal.id}`,
+                      role: 'assistant',
+                      content: '',
+                      proposals: [proposal],
+                      createdAt: new Date().toISOString(),
+                    }
+                    dispatch({ type: 'ADD_MESSAGE', message: proposalMsg })
                     break
+                  }
                   case 'done':
                     if (parsed.tokensUsed) {
                       const tokens = parsed.tokensUsed as {

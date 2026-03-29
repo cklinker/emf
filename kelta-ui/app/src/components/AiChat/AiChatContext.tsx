@@ -60,6 +60,17 @@ function reducer(state: AiChatState, action: AiChatAction): AiChatState {
         proposals: state.proposals.map((p) =>
           p.id === action.id ? { ...p, status: action.status } : p
         ),
+        // Also update the proposal embedded in messages
+        messages: state.messages.map((msg) =>
+          msg.proposals
+            ? {
+                ...msg,
+                proposals: msg.proposals.map((p) =>
+                  p.id === action.id ? { ...p, status: action.status } : p
+                ),
+              }
+            : msg
+        ),
       }
     case 'SET_TOKEN_USAGE':
       return { ...state, tokenUsage: action.usage }

@@ -296,6 +296,31 @@ public class CollectionLifecycleManager {
     }
 
     /**
+     * Refreshes the in-memory validation rules for a specific collection.
+     * Called when validation rules are created, updated, or deleted via the API.
+     *
+     * @param collectionId the collection ID whose rules should be refreshed
+     */
+    public void refreshValidationRules(String collectionId) {
+        String collectionName = activeCollections.get(collectionId);
+        if (collectionName == null) {
+            log.warn("Cannot refresh validation rules for unknown collection: {}", collectionId);
+            return;
+        }
+        loadAndRegisterValidationRules(collectionId, collectionName);
+    }
+
+    /**
+     * Refreshes validation rules for all active collections.
+     * Called when a validation rule is deleted (where the collectionId may not be available).
+     */
+    public void refreshAllValidationRules() {
+        for (Map.Entry<String, String> entry : activeCollections.entrySet()) {
+            loadAndRegisterValidationRules(entry.getKey(), entry.getValue());
+        }
+    }
+
+    /**
      * Returns the set of collection IDs actively managed by this worker.
      *
      * @return set of active collection IDs

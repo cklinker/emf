@@ -8,6 +8,7 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useApi } from '../context/ApiContext'
+import { parseAxiosError } from '../services/apiClient'
 import { wrapResource, unwrapResource } from '../utils/jsonapi'
 import type { CollectionRecord } from './useCollectionRecords'
 
@@ -75,6 +76,12 @@ export function useRecordMutation(options: UseRecordMutationOptions): UseRecordM
     queryClient.invalidateQueries({ queryKey: ['record', collectionName] })
   }
 
+  /** Convert raw Axios errors into structured ApiError with field-level details. */
+  const handleError = (error: Error) => {
+    const apiError = parseAxiosError(error)
+    onError?.(apiError)
+  }
+
   const createMutation = useMutation({
     mutationFn: async (data: Record<string, unknown>) => {
       const body = wrapResource(collectionName, data)
@@ -85,9 +92,7 @@ export function useRecordMutation(options: UseRecordMutationOptions): UseRecordM
       invalidateRecords()
       onSuccess?.()
     },
-    onError: (error: Error) => {
-      onError?.(error)
-    },
+    onError: handleError,
   })
 
   const updateMutation = useMutation({
@@ -100,9 +105,7 @@ export function useRecordMutation(options: UseRecordMutationOptions): UseRecordM
       invalidateRecords()
       onSuccess?.()
     },
-    onError: (error: Error) => {
-      onError?.(error)
-    },
+    onError: handleError,
   })
 
   const patchMutation = useMutation({
@@ -115,9 +118,7 @@ export function useRecordMutation(options: UseRecordMutationOptions): UseRecordM
       invalidateRecords()
       onSuccess?.()
     },
-    onError: (error: Error) => {
-      onError?.(error)
-    },
+    onError: handleError,
   })
 
   const removeMutation = useMutation({
@@ -128,9 +129,7 @@ export function useRecordMutation(options: UseRecordMutationOptions): UseRecordM
       invalidateRecords()
       onSuccess?.()
     },
-    onError: (error: Error) => {
-      onError?.(error)
-    },
+    onError: handleError,
   })
 
   const bulkDeleteMutation = useMutation({
@@ -141,9 +140,7 @@ export function useRecordMutation(options: UseRecordMutationOptions): UseRecordM
       invalidateRecords()
       onSuccess?.()
     },
-    onError: (error: Error) => {
-      onError?.(error)
-    },
+    onError: handleError,
   })
 
   return {

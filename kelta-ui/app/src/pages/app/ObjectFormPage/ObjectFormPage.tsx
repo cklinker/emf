@@ -47,7 +47,9 @@ import { useRecordMutation } from '@/hooks/useRecordMutation'
 import { useCollectionPermissions } from '@/hooks/useCollectionPermissions'
 import { useLookupDisplayMap } from '@/hooks/useLookupDisplayMap'
 import { usePageLayout } from '@/hooks/usePageLayout'
+import { useToast } from '@/components/Toast'
 import { InsufficientPrivileges } from '@/components/InsufficientPrivileges'
+import { ApiError } from '@/services/apiClient'
 import type { FieldDefinition, FieldType } from '@/hooks/useCollectionSchema'
 import type { PageLayoutDto } from '@/hooks/usePageLayout'
 import type { LookupOption } from '@/components/LookupSelect'
@@ -117,6 +119,8 @@ interface FormFieldProps {
   onChange: (name: string, value: unknown) => void
   /** Whether the field is read-only due to field-level permissions */
   readOnly?: boolean
+  /** Server-side validation error message for this field */
+  error?: string
 }
 
 /**
@@ -127,6 +131,7 @@ function FormField({
   value,
   onChange,
   readOnly = false,
+  error,
 }: FormFieldProps): React.ReactElement {
   const isReadOnly = READ_ONLY_TYPES.has(field.type) || readOnly
   const fieldId = `field-${field.name}`
@@ -137,6 +142,12 @@ function FormField({
       {field.required && <span className="ml-1 text-destructive">*</span>}
     </Label>
   )
+
+  const errorEl = error ? (
+    <p className="text-sm text-destructive" role="alert" data-testid={`field-error-${field.name}`}>
+      {error}
+    </p>
+  ) : null
 
   // Boolean fields use a checkbox
   if (field.type === 'boolean') {
@@ -154,6 +165,7 @@ function FormField({
             {field.required && <span className="ml-1 text-destructive">*</span>}
           </Label>
         </div>
+        {errorEl}
       </div>
     )
   }
@@ -173,6 +185,7 @@ function FormField({
           disabled={isReadOnly}
           required={field.required}
         />
+        {errorEl}
       </div>
     )
   }
@@ -197,6 +210,7 @@ function FormField({
             </option>
           ))}
         </select>
+        {errorEl}
       </div>
     )
   }
@@ -217,6 +231,7 @@ function FormField({
           required={field.required}
           disabled={isReadOnly}
         />
+        {errorEl}
       </div>
     )
   }
@@ -236,6 +251,7 @@ function FormField({
           className={field.type === 'json' ? 'font-mono text-sm' : ''}
           placeholder={field.type === 'json' ? '{}' : ''}
         />
+        {errorEl}
       </div>
     )
   }
@@ -252,6 +268,7 @@ function FormField({
           value={value != null ? String(value) : ''}
           onChange={(e) => onChange(field.name, e.target.value)}
         />
+        {errorEl}
       </div>
     )
   }
@@ -281,6 +298,7 @@ function FormField({
         step={step}
         required={field.required}
       />
+      {errorEl}
     </div>
   )
 }
@@ -361,7 +379,9 @@ function ObjectFormBody({
   layout,
 }: ObjectFormBodyProps): React.ReactElement {
   const navigate = useNavigate()
+  const { showToast } = useToast()
   const [formData, setFormData] = useState<Record<string, unknown>>(initialData)
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({})
 
   // Editable fields (exclude system, read-only types, and permission-read-only fields)
   const editableFields = useMemo(() => {
@@ -388,6 +408,18 @@ function ObjectFormBody({
         navigate(`${basePath}/o/${collectionName}/${recordId}`)
       }
     },
+    onError: (error: Error) => {
+      showToast(error.message || 'Failed to save record', 'error')
+      if (error instanceof ApiError && error.fieldErrors.length > 0) {
+        const serverErrors: Record<string, string> = {}
+        for (const fe of error.fieldErrors) {
+          if (fe.field) {
+            serverErrors[fe.field] = fe.message
+          }
+        }
+        setFormErrors((prev) => ({ ...prev, ...serverErrors }))
+      }
+    },
   })
 
   const pageTitle = isNew ? `New ${collectionLabel}` : `Edit ${collectionLabel}`
@@ -395,6 +427,15 @@ function ObjectFormBody({
   // Handle field change
   const handleFieldChange = useCallback((name: string, value: unknown) => {
     setFormData((prev) => ({ ...prev, [name]: value }))
+    // Clear server-side error for this field when user modifies it
+    setFormErrors((prev) => {
+      if (prev[name]) {
+        const next = { ...prev }
+        delete next[name]
+        return next
+      }
+      return prev
+    })
   }, [])
 
   // Handle save
@@ -490,6 +531,7 @@ function ObjectFormBody({
                   value={formData[field.name]}
                   onChange={fieldIsEditable ? handleFieldChange : () => {}}
                   readOnly={!fieldIsEditable}
+                  error={formErrors[field.name]}
                 />
               )
             }}
@@ -516,6 +558,7 @@ function ObjectFormBody({
                       value={formData[field.name]}
                       onChange={fieldIsEditable ? handleFieldChange : () => {}}
                       readOnly={!fieldIsEditable}
+                      error={formErrors[field.name]}
                     />
                   )
                 })}

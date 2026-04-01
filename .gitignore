@@ -60,3 +60,7 @@ coverage/
 # Test databases
 *.jqwik-database
 
+# Claude Code
+.claude/worktrees/
+.claude/plans/
+

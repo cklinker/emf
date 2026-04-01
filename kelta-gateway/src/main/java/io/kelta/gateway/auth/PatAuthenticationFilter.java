@@ -1,7 +1,7 @@
 package io.kelta.gateway.auth;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import io.kelta.gateway.filter.TenantResolutionFilter;
 import io.kelta.gateway.metrics.GatewayMetrics;
 import org.slf4j.Logger;
@@ -154,8 +154,7 @@ public class PatAuthenticationFilter implements GlobalFilter, Ordered {
                     "sub", userId,
                     "pat", "true",
                     "pat_scopes", scopes
-            ));
-            principal.setTenantId(tenantId);
+            )).withTenantId(tenantId);
 
             ServerWebExchange mutatedExchange = exchange.mutate()
                     .request(r -> r.header("X-User-Id", userId))
@@ -164,7 +163,7 @@ public class PatAuthenticationFilter implements GlobalFilter, Ordered {
 
             log.debug("PAT authenticated user {} for path: {}", email, path);
             return chain.filter(mutatedExchange);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             log.error("Failed to parse PAT data", e);
             metrics.recordAuthFailure(tenantSlug, "pat_parse_error");
             return unauthorized(exchange, "Authentication failed");
@@ -186,7 +185,7 @@ public class PatAuthenticationFilter implements GlobalFilter, Ordered {
                             "path", path
                     )
             ));
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             log.error("Failed to serialize error response", e);
             errorJson = "{\"error\":{\"status\":401,\"code\":\"UNAUTHORIZED\"}}";
         }

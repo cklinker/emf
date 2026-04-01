@@ -4,7 +4,7 @@ import io.kelta.runtime.event.ChangeType;
 import io.kelta.runtime.event.CollectionChangedPayload;
 import io.kelta.worker.service.CollectionLifecycleManager;
 import io.kelta.worker.service.SearchIndexService;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;

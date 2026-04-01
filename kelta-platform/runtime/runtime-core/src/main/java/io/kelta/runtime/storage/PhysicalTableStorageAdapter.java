@@ -71,7 +71,7 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
 
     private final JdbcTemplate jdbcTemplate;
     private final SchemaMigrationEngine migrationEngine;
-    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+    private final tools.jackson.databind.ObjectMapper objectMapper;
 
     /**
      * Creates a new PhysicalTableStorageAdapter.
@@ -83,7 +83,7 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
     public PhysicalTableStorageAdapter(
             JdbcTemplate jdbcTemplate,
             SchemaMigrationEngine migrationEngine,
-            com.fasterxml.jackson.databind.ObjectMapper objectMapper) {
+            tools.jackson.databind.ObjectMapper objectMapper) {
         this.jdbcTemplate = jdbcTemplate;
         this.migrationEngine = migrationEngine;
         this.objectMapper = objectMapper;
@@ -824,8 +824,8 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
                 // Convert Map/List to JSON string for JSONB storage
                 if (value instanceof Map || value instanceof List) {
                     try {
-                        com.fasterxml.jackson.databind.ObjectMapper mapper =
-                            new com.fasterxml.jackson.databind.ObjectMapper();
+                        tools.jackson.databind.ObjectMapper mapper =
+                            new tools.jackson.databind.ObjectMapper();
                         yield mapper.writeValueAsString(value);
                     } catch (Exception e) {
                         throw new StorageException("Failed to convert value to JSON", e);

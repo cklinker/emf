@@ -2,7 +2,7 @@ package io.kelta.ai.service;
 
 import com.anthropic.core.http.StreamResponse;
 import com.anthropic.models.messages.*;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import io.kelta.ai.model.AiProposal;
 import io.kelta.ai.model.ChatMessage;
 import io.kelta.ai.model.Conversation;

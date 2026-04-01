@@ -41,11 +41,10 @@ class CerbosAuthorizationServiceTest {
     }
 
     private GatewayPrincipal principal() {
-        GatewayPrincipal p = new GatewayPrincipal("user@test.com", List.of("group1"), Map.of());
-        p.setProfileId("profile-1");
-        p.setTenantId("tenant-1");
-        p.setProfileName("Test User");
-        return p;
+        return new GatewayPrincipal("user@test.com", List.of("group1"), Map.of())
+                .withProfileId("profile-1")
+                .withTenantId("tenant-1")
+                .withProfileName("Test User");
     }
 
     @Nested

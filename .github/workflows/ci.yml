@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  JAVA_VERSION: '21'
+  JAVA_VERSION: '25'
   NODE_VERSION: '18'
   MAVEN_VERSION: '3.9.9'
   # Override MAVEN_OPTS from runner env to use default ~/.m2/repository

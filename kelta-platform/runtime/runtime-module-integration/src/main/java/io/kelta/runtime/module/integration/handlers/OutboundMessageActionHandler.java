@@ -3,8 +3,8 @@ package io.kelta.runtime.module.integration.handlers;
 import io.kelta.runtime.workflow.ActionContext;
 import io.kelta.runtime.workflow.ActionHandler;
 import io.kelta.runtime.workflow.ActionResult;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpEntity;
@@ -78,7 +78,7 @@ public class OutboundMessageActionHandler implements ActionHandler {
             if (configHeaders != null) {
                 configHeaders.forEach(headers::set);
             }
-            if (!headers.containsKey("Content-Type")) {
+            if (!headers.containsHeader("Content-Type")) {
                 headers.set("Content-Type", "application/json");
             }
 

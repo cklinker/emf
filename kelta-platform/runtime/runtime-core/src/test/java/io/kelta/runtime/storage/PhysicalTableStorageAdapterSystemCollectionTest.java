@@ -51,7 +51,7 @@ class PhysicalTableStorageAdapterSystemCollectionTest {
     void setUp() {
         jdbcTemplate = mock(JdbcTemplate.class);
         migrationEngine = mock(SchemaMigrationEngine.class);
-        adapter = new PhysicalTableStorageAdapter(jdbcTemplate, migrationEngine, new com.fasterxml.jackson.databind.ObjectMapper());
+        adapter = new PhysicalTableStorageAdapter(jdbcTemplate, migrationEngine, new tools.jackson.databind.ObjectMapper());
     }
 
     // ==================== Helper Methods ====================

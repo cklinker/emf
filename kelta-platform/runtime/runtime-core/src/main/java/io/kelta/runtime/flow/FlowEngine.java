@@ -2,7 +2,7 @@ package io.kelta.runtime.flow;
 
 import io.kelta.runtime.flow.executor.*;
 import io.kelta.runtime.workflow.ActionHandlerRegistry;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

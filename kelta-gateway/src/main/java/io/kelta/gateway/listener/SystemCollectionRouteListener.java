@@ -3,7 +3,7 @@ package io.kelta.gateway.listener;
 import io.kelta.gateway.cache.GatewayCacheManager;
 import io.kelta.gateway.route.RouteRegistry;
 import io.kelta.runtime.event.RecordChangedPayload;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cloud.gateway.event.RefreshRoutesEvent;

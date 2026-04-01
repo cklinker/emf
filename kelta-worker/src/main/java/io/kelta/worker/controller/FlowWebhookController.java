@@ -1,6 +1,6 @@
 package io.kelta.worker.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import io.kelta.jsonapi.JsonApiResponseBuilder;
 import io.kelta.runtime.flow.FlowEngine;
 import io.kelta.runtime.flow.InitialStateBuilder;

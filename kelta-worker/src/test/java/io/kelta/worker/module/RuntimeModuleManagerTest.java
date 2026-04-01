@@ -3,7 +3,7 @@ package io.kelta.worker.module;
 import io.kelta.runtime.module.ModuleStore;
 import io.kelta.runtime.module.TenantModuleData;
 import io.kelta.runtime.workflow.ActionHandlerRegistry;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 

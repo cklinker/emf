@@ -17,19 +17,19 @@
     </modules>
 
     <properties>
-        <java.version>21</java.version>
+        <java.version>25</java.version>
         <maven.compiler.source>${java.version}</maven.compiler.source>
         <maven.compiler.target>${java.version}</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
         <!-- Spring Boot -->
-        <spring-boot.version>3.2.2</spring-boot.version>
+        <spring-boot.version>4.0.5</spring-boot.version>
 
-        <!-- Testing — override Spring Boot BOM for Java 24 compatibility -->
+        <!-- Testing -->
         <mockito.version>5.21.0</mockito.version>
         <byte-buddy.version>1.17.6</byte-buddy.version>
         <jqwik.version>1.8.2</jqwik.version>
-        <testcontainers.version>1.19.3</testcontainers.version>
+        <testcontainers.version>1.20.4</testcontainers.version>
     </properties>
 
     <dependencyManagement>
@@ -41,25 +41,6 @@
                 <version>${spring-boot.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
-            </dependency>
-
-            <!-- Override byte-buddy from Spring Boot BOM for Java 24 compatibility -->
-            <dependency>
-                <groupId>net.bytebuddy</groupId>
-                <artifactId>byte-buddy</artifactId>
-                <version>${byte-buddy.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>net.bytebuddy</groupId>
-                <artifactId>byte-buddy-agent</artifactId>
-                <version>${byte-buddy.version}</version>
-            </dependency>
-
-            <!-- Override Mockito from Spring Boot BOM for Java 24 compatibility -->
-            <dependency>
-                <groupId>org.mockito</groupId>
-                <artifactId>mockito-core</artifactId>
-                <version>${mockito.version}</version>
             </dependency>
 
             <!-- Testcontainers BOM -->
@@ -79,25 +60,24 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-compiler-plugin</artifactId>
-                    <version>3.12.1</version>
+                    <version>3.14.0</version>
                     <configuration>
                         <source>${java.version}</source>
                         <target>${java.version}</target>
+                        <release>${java.version}</release>
                         <parameters>true</parameters>
                     </configuration>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-surefire-plugin</artifactId>
-                    <version>3.2.3</version>
+                    <version>3.5.2</version>
                     <configuration>
                         <includes>
                             <include>**/*Test.java</include>
                             <include>**/*Tests.java</include>
                             <include>**/*Properties.java</include>
                         </includes>
-                        <!-- Java 21+ requires byte-buddy agent for Mockito inline mock maker -->
-                        <argLine>-javaagent:${settings.localRepository}/net/bytebuddy/byte-buddy-agent/${byte-buddy.version}/byte-buddy-agent-${byte-buddy.version}.jar</argLine>
                     </configuration>
                 </plugin>
                 <plugin>

@@ -1,8 +1,8 @@
 package io.kelta.ai.service;
 
 import com.anthropic.models.messages.*;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import io.kelta.ai.model.AiProposal;
 import io.kelta.ai.model.ChatMessage;
 import io.kelta.ai.repository.ChatMessageRepository;
@@ -43,7 +43,7 @@ public class ProposalService {
     public String serializeProposal(AiProposal proposal) {
         try {
             return objectMapper.writeValueAsString(proposal);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             log.error("Failed to serialize proposal: {}", e.getMessage());
             throw new RuntimeException("Failed to serialize proposal", e);
         }
@@ -60,7 +60,7 @@ public class ProposalService {
         AiProposal proposal;
         try {
             proposal = objectMapper.readValue(message.proposalJson(), AiProposal.class);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new RuntimeException("Failed to deserialize proposal", e);
         }
 

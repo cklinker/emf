@@ -5,7 +5,7 @@ import io.kelta.gateway.route.RouteRegistry;
 import io.kelta.runtime.event.ChangeType;
 import io.kelta.runtime.event.CollectionChangedPayload;
 import io.kelta.runtime.event.PlatformEvent;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -45,7 +45,6 @@ class ConfigEventListenerTest {
     @BeforeEach
     void setUp() {
         objectMapper = new ObjectMapper();
-        objectMapper.findAndRegisterModules();
         listener = new ConfigEventListener(routeRegistry, objectMapper, event -> {}, WORKER_SERVICE_URL);
     }
 

@@ -5,7 +5,7 @@ import io.kelta.runtime.workflow.ActionHandlerRegistry;
 import io.kelta.worker.module.JdbcModuleStore;
 import io.kelta.worker.module.ModuleConfigEventPublisher;
 import io.kelta.worker.module.RuntimeModuleManager;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;

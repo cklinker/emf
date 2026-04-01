@@ -3,6 +3,9 @@ server:
   shutdown: graceful
 
 spring:
+  threads:
+    virtual:
+      enabled: true
   application:
     name: kelta-ai
   datasource:
@@ -57,3 +60,4 @@ management:
       probability: ${OTEL_TRACES_SAMPLER_ARG:1.0}
     propagation:
       type: w3c
+

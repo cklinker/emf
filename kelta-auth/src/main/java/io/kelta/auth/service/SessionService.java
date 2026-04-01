@@ -1,7 +1,7 @@
 package io.kelta.auth.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import io.kelta.auth.model.KeltaSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,7 +37,7 @@ public class SessionService {
             redisTemplate.opsForValue().set(SESSION_PREFIX + sessionId, json, SESSION_TTL);
             log.debug("Created SSO session {} for user {}", sessionId, session.getEmail());
             return sessionId;
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException("Failed to serialize session", e);
         }
     }
@@ -54,7 +54,7 @@ public class SessionService {
 
         try {
             return Optional.of(objectMapper.readValue(json, KeltaSession.class));
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             log.warn("Failed to deserialize session {}", sessionId, e);
             return Optional.empty();
         }

@@ -8,29 +8,56 @@ import java.util.Objects;
 /**
  * Represents an authenticated user in the gateway.
  * Contains user information extracted from JWT token claims.
+ *
+ * <p>This class is immutable. Use the {@code with*()} copy methods to create
+ * enriched copies as the filter chain progressively resolves identity fields.
  */
-public class GatewayPrincipal {
+public final class GatewayPrincipal {
 
     private final String username;
     private final List<String> groups;
     private final Map<String, Object> claims;
-    private String profileId;
-    private String profileName;
-    private String tenantId;
-    private String connectedAppId;
-    private String appScopes;
+    private final String profileId;
+    private final String profileName;
+    private final String tenantId;
+    private final String connectedAppId;
+    private final String appScopes;
 
     /**
-     * Creates a new GatewayPrincipal.
+     * Creates a new GatewayPrincipal with all fields.
      *
-     * @param username the username of the authenticated user
-     * @param groups the OIDC groups extracted from the JWT token
-     * @param claims all JWT claims for the user
+     * @param username       the username of the authenticated user
+     * @param groups         the OIDC groups extracted from the JWT token
+     * @param claims         all JWT claims for the user
+     * @param profileId      the resolved profile ID (may be null)
+     * @param profileName    the resolved profile name (may be null)
+     * @param tenantId       the resolved tenant ID (may be null)
+     * @param connectedAppId the connected app ID for machine tokens (may be null)
+     * @param appScopes      the app scopes for connected app tokens (may be null)
      */
-    public GatewayPrincipal(String username, List<String> groups, Map<String, Object> claims) {
+    public GatewayPrincipal(String username, List<String> groups, Map<String, Object> claims,
+                            String profileId, String profileName, String tenantId,
+                            String connectedAppId, String appScopes) {
         this.username = Objects.requireNonNull(username, "username cannot be null");
         this.groups = groups != null ? List.copyOf(groups) : Collections.emptyList();
         this.claims = claims != null ? Map.copyOf(claims) : Collections.emptyMap();
+        this.profileId = profileId;
+        this.profileName = profileName;
+        this.tenantId = tenantId;
+        this.connectedAppId = connectedAppId;
+        this.appScopes = appScopes;
+    }
+
+    /**
+     * Creates a new GatewayPrincipal with only the core authentication fields.
+     * All identity fields (profileId, profileName, tenantId, connectedAppId, appScopes) are null.
+     *
+     * @param username the username of the authenticated user
+     * @param groups   the OIDC groups extracted from the JWT token
+     * @param claims   all JWT claims for the user
+     */
+    public GatewayPrincipal(String username, List<String> groups, Map<String, Object> claims) {
+        this(username, groups, claims, null, null, null, null, null);
     }
 
     /**
@@ -74,40 +101,55 @@ public class GatewayPrincipal {
         return profileId;
     }
 
-    public void setProfileId(String profileId) {
-        this.profileId = profileId;
-    }
-
     public String getProfileName() {
         return profileName;
-    }
-
-    public void setProfileName(String profileName) {
-        this.profileName = profileName;
     }
 
     public String getTenantId() {
         return tenantId;
     }
 
-    public void setTenantId(String tenantId) {
-        this.tenantId = tenantId;
-    }
-
     public String getConnectedAppId() {
         return connectedAppId;
-    }
-
-    public void setConnectedAppId(String connectedAppId) {
-        this.connectedAppId = connectedAppId;
     }
 
     public String getAppScopes() {
         return appScopes;
     }
 
-    public void setAppScopes(String appScopes) {
-        this.appScopes = appScopes;
+    /**
+     * Returns a copy of this principal with the given profile ID.
+     */
+    public GatewayPrincipal withProfileId(String profileId) {
+        return new GatewayPrincipal(username, groups, claims, profileId, profileName, tenantId, connectedAppId, appScopes);
+    }
+
+    /**
+     * Returns a copy of this principal with the given profile name.
+     */
+    public GatewayPrincipal withProfileName(String profileName) {
+        return new GatewayPrincipal(username, groups, claims, profileId, profileName, tenantId, connectedAppId, appScopes);
+    }
+
+    /**
+     * Returns a copy of this principal with the given tenant ID.
+     */
+    public GatewayPrincipal withTenantId(String tenantId) {
+        return new GatewayPrincipal(username, groups, claims, profileId, profileName, tenantId, connectedAppId, appScopes);
+    }
+
+    /**
+     * Returns a copy of this principal with the given connected app ID.
+     */
+    public GatewayPrincipal withConnectedAppId(String connectedAppId) {
+        return new GatewayPrincipal(username, groups, claims, profileId, profileName, tenantId, connectedAppId, appScopes);
+    }
+
+    /**
+     * Returns a copy of this principal with the given app scopes.
+     */
+    public GatewayPrincipal withAppScopes(String appScopes) {
+        return new GatewayPrincipal(username, groups, claims, profileId, profileName, tenantId, connectedAppId, appScopes);
     }
 
     /**
@@ -124,12 +166,17 @@ public class GatewayPrincipal {
         GatewayPrincipal that = (GatewayPrincipal) o;
         return Objects.equals(username, that.username) &&
                Objects.equals(groups, that.groups) &&
-               Objects.equals(claims, that.claims);
+               Objects.equals(claims, that.claims) &&
+               Objects.equals(profileId, that.profileId) &&
+               Objects.equals(profileName, that.profileName) &&
+               Objects.equals(tenantId, that.tenantId) &&
+               Objects.equals(connectedAppId, that.connectedAppId) &&
+               Objects.equals(appScopes, that.appScopes);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(username, groups, claims);
+        return Objects.hash(username, groups, claims, profileId, profileName, tenantId, connectedAppId, appScopes);
     }
 
     @Override

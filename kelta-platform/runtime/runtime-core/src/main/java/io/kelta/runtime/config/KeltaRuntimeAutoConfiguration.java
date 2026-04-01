@@ -20,7 +20,7 @@ import org.apache.coyote.http11.AbstractHttp11Protocol;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.springframework.boot.web.embedded.tomcat.TomcatServletWebServerFactory;
+import org.springframework.boot.tomcat.servlet.TomcatServletWebServerFactory;
 import org.springframework.boot.web.server.WebServerFactoryCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
@@ -73,7 +73,7 @@ public class KeltaRuntimeAutoConfiguration {
     public StorageAdapter physicalTableStorageAdapter(
             JdbcTemplate jdbcTemplate,
             SchemaMigrationEngine migrationEngine,
-            com.fasterxml.jackson.databind.ObjectMapper objectMapper) {
+            tools.jackson.databind.ObjectMapper objectMapper) {
         return new PhysicalTableStorageAdapter(jdbcTemplate, migrationEngine, objectMapper);
     }
     

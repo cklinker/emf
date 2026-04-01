@@ -2,7 +2,7 @@ package io.kelta.worker.controller;
 
 import io.kelta.runtime.context.TenantContext;
 import io.kelta.worker.repository.BootstrapRepository;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;

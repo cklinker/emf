@@ -4,7 +4,7 @@ import io.kelta.runtime.event.ModuleChangeType;
 import io.kelta.runtime.event.ModuleChangedPayload;
 import io.kelta.runtime.module.ModuleStore;
 import io.kelta.runtime.module.TenantModuleData;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;

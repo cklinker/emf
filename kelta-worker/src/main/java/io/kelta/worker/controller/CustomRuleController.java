@@ -1,7 +1,7 @@
 package io.kelta.worker.controller;
 
 import io.kelta.worker.service.CerbosPolicySyncService;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

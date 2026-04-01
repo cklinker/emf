@@ -1,7 +1,6 @@
 package io.kelta.worker.listener;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import tools.jackson.databind.ObjectMapper;
 import com.svix.Svix;
 import com.svix.api.Message;
 import com.svix.models.MessageIn;
@@ -36,7 +35,6 @@ class SvixWebhookPublisherTest {
         messageApi = mock(Message.class);
         when(svix.getMessage()).thenReturn(messageApi);
         objectMapper = new ObjectMapper();
-        objectMapper.registerModule(new JavaTimeModule());
         publisher = new SvixWebhookPublisher(svix, objectMapper);
     }
 

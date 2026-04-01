@@ -1,6 +1,6 @@
 package io.kelta.worker.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import io.kelta.jsonapi.AtomicOperation;
 import io.kelta.jsonapi.AtomicResult;
 import io.kelta.runtime.context.TenantContext;

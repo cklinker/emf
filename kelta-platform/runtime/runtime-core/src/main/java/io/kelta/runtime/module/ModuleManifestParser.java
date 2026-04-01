@@ -1,9 +1,9 @@
 package io.kelta.runtime.module;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -20,8 +20,9 @@ public class ModuleManifestParser {
 
     public ModuleManifestParser(ObjectMapper objectMapper) {
         this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper cannot be null")
-            .copy()
-            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+            .rebuild()
+            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+            .build();
     }
 
     /**
@@ -55,7 +56,7 @@ public class ModuleManifestParser {
             );
         } catch (ModuleManifestException e) {
             throw e;
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new ModuleManifestException("Invalid manifest JSON: " + e.getMessage(), e);
         }
     }

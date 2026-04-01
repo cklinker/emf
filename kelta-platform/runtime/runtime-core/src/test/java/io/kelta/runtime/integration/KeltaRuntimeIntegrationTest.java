@@ -49,7 +49,7 @@ class KeltaRuntimeIntegrationTest {
         // Initialize components
         registry = new ConcurrentCollectionRegistry();
         SchemaMigrationEngine migrationEngine = new SchemaMigrationEngine(jdbcTemplate);
-        storageAdapter = new PhysicalTableStorageAdapter(jdbcTemplate, migrationEngine, new com.fasterxml.jackson.databind.ObjectMapper());
+        storageAdapter = new PhysicalTableStorageAdapter(jdbcTemplate, migrationEngine, new tools.jackson.databind.ObjectMapper());
         validationEngine = new DefaultValidationEngine(storageAdapter, registry);
         queryEngine = new DefaultQueryEngine(storageAdapter, validationEngine);
     }

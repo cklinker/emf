@@ -11,7 +11,7 @@ import io.kelta.runtime.workflow.ActionHandlerRegistry;
 import io.kelta.runtime.workflow.ActionResult;
 import io.kelta.runtime.workflow.module.KeltaModule;
 import io.kelta.runtime.workflow.module.ModuleContext;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

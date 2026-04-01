@@ -3,7 +3,7 @@ package io.kelta.gateway.integration;
 import io.kelta.gateway.route.RouteDefinition;
 import io.kelta.gateway.route.RouteRegistry;
 import io.kelta.gateway.service.RouteConfigService;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;

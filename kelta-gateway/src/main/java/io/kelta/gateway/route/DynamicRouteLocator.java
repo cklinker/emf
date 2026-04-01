@@ -3,16 +3,20 @@ package io.kelta.gateway.route;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
-import org.springframework.cloud.gateway.filter.factory.StripPrefixGatewayFilterFactory;
+import org.springframework.cloud.gateway.filter.OrderedGatewayFilter;
 import org.springframework.cloud.gateway.handler.AsyncPredicate;
 import org.springframework.cloud.gateway.route.Route;
 import org.springframework.cloud.gateway.route.RouteLocator;
+import org.springframework.cloud.gateway.support.ServerWebExchangeUtils;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
+import org.springframework.web.util.UriComponentsBuilder;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.net.URI;
+import java.util.Arrays;
+import java.util.stream.Collectors;
 
 /**
  * Dynamic route locator that bridges the RouteRegistry with Spring Cloud Gateway's routing system.
@@ -85,11 +89,7 @@ public class DynamicRouteLocator implements RouteLocator {
                     .asyncPredicate(pathPredicate);
 
             if (routeDefinition.getStripPrefix() > 0) {
-                StripPrefixGatewayFilterFactory factory = new StripPrefixGatewayFilterFactory();
-                StripPrefixGatewayFilterFactory.Config config = new StripPrefixGatewayFilterFactory.Config();
-                config.setParts(routeDefinition.getStripPrefix());
-                GatewayFilter stripFilter = factory.apply(config);
-                routeBuilder.filter(stripFilter);
+                routeBuilder.filter(createStripPrefixFilter(routeDefinition.getStripPrefix()));
             }
 
             Route route = routeBuilder.build();
@@ -106,6 +106,35 @@ public class DynamicRouteLocator implements RouteLocator {
         }
     }
     
+    /**
+     * Creates a filter that strips N path segments from the resolved gateway URL.
+     * <p>
+     * This runs after RouteToRequestUrlFilter (order 10000) which sets
+     * GATEWAY_REQUEST_URL_ATTR to the backend URL with the full request path.
+     * We then strip the leading segments from that resolved URL so the backend
+     * receives the correct path (e.g. /otel/v1/traces → /v1/traces).
+     */
+    private GatewayFilter createStripPrefixFilter(int parts) {
+        return new OrderedGatewayFilter((exchange, chain) -> {
+            URI currentUrl = exchange.getAttribute(ServerWebExchangeUtils.GATEWAY_REQUEST_URL_ATTR);
+            if (currentUrl != null) {
+                String path = currentUrl.getRawPath();
+                String newPath = "/" + Arrays.stream(path.split("/"))
+                        .filter(s -> !s.isEmpty())
+                        .skip(parts)
+                        .collect(Collectors.joining("/"));
+
+                URI newUrl = UriComponentsBuilder.fromUri(currentUrl)
+                        .replacePath(newPath)
+                        .build(true)
+                        .toUri();
+
+                exchange.getAttributes().put(ServerWebExchangeUtils.GATEWAY_REQUEST_URL_ATTR, newUrl);
+            }
+            return chain.filter(exchange);
+        }, 10001); // Run just after RouteToRequestUrlFilter (order 10000)
+    }
+
     /**
      * Matches a request path against a route path pattern.
      * 

@@ -174,10 +174,11 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- MockWebServer for HTTP client testing -->
+        <!-- MockWebServer for HTTP client testing (aligned with okhttp 5.x from spring-boot-starter-opentelemetry) -->
         <dependency>
             <groupId>com.squareup.okhttp3</groupId>
             <artifactId>mockwebserver</artifactId>
+            <version>5.2.1</version>
             <scope>test</scope>
         </dependency>
 

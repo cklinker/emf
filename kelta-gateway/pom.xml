@@ -46,6 +46,12 @@
             <artifactId>spring-cloud-gateway-server-webflux</artifactId>
         </dependency>
 
+        <!-- Load balancer (required by Spring Cloud Gateway, no longer transitive in 2025.x) -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-loadbalancer</artifactId>
+        </dependency>
+
         <!-- Spring WebFlux -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

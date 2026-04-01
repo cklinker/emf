@@ -13,14 +13,12 @@ import static org.mockito.Mockito.*;
 class SetupAuditServiceTest {
 
     private JdbcTemplate jdbcTemplate;
-    private OpenSearchAuditService openSearchAuditService;
     private SetupAuditService service;
 
     @BeforeEach
     void setUp() {
         jdbcTemplate = mock(JdbcTemplate.class);
-        openSearchAuditService = mock(OpenSearchAuditService.class);
-        service = new SetupAuditService(jdbcTemplate, openSearchAuditService);
+        service = new SetupAuditService(jdbcTemplate);
     }
 
     @Test

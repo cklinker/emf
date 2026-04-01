@@ -1,6 +1,5 @@
 package io.kelta.worker.filter;
 
-import io.kelta.worker.service.OpenSearchAuditService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,16 +22,14 @@ import static org.mockito.Mockito.*;
 class LoginTrackingFilterTest {
 
     private JdbcTemplate jdbcTemplate;
-    private OpenSearchAuditService openSearchAuditService;
     private Map<String, Long> throttleCache;
     private LoginTrackingFilter filter;
 
     @BeforeEach
     void setUp() {
         jdbcTemplate = mock(JdbcTemplate.class);
-        openSearchAuditService = mock(OpenSearchAuditService.class);
         throttleCache = new ConcurrentHashMap<>();
-        filter = new LoginTrackingFilter(jdbcTemplate, openSearchAuditService, throttleCache);
+        filter = new LoginTrackingFilter(jdbcTemplate, throttleCache);
     }
 
     @Test
@@ -46,7 +43,6 @@ class LoginTrackingFilterTest {
         MockHttpServletResponse response = new MockHttpServletResponse();
         FilterChain chain = mock(FilterChain.class);
 
-        // Mock user lookup
         when(jdbcTemplate.queryForObject(
                 eq("SELECT id FROM platform_user WHERE tenant_id = ? AND email = ? LIMIT 1"),
                 eq(String.class), eq("tenant-123"), eq("alice@example.com")))
@@ -54,22 +50,18 @@ class LoginTrackingFilterTest {
 
         filter.doFilterInternal(request, response, chain);
 
-        // Filter chain always continues
         verify(chain).doFilter(request, response);
 
-        // platform_user should be updated (last_login_at + login_count)
         verify(jdbcTemplate).update(
                 contains("UPDATE platform_user SET last_login_at"),
                 any(), any(), eq("user-uuid-1"));
 
-        // login_history row should be inserted
         verify(jdbcTemplate).update(
                 contains("INSERT INTO login_history"),
                 any(String.class), eq("user-uuid-1"), eq("tenant-123"),
                 any(), eq("192.168.1.1"), eq("OAUTH"), eq("SUCCESS"),
                 eq("Mozilla/5.0"), any(), any());
 
-        // security_audit_log row should be inserted
         verify(jdbcTemplate).update(
                 contains("INSERT INTO security_audit_log"),
                 any(String.class), eq("tenant-123"), eq("LOGIN_SUCCESS"), eq("AUTH"),
@@ -77,7 +69,6 @@ class LoginTrackingFilterTest {
                 eq("USER"), eq("user-uuid-1"), eq("alice@example.com"),
                 any(String.class), eq("192.168.1.1"), eq("Mozilla/5.0"), any());
 
-        // Throttle cache should be populated
         assertTrue(throttleCache.containsKey("tenant-123:alice@example.com"));
     }
 
@@ -121,15 +112,12 @@ class LoginTrackingFilterTest {
         MockHttpServletResponse response = new MockHttpServletResponse();
         FilterChain chain = mock(FilterChain.class);
 
-        // First lookup returns null (user doesn't exist), then INSERT provisions,
-        // then second lookup returns the new user ID
         when(jdbcTemplate.queryForObject(
                 eq("SELECT id FROM platform_user WHERE tenant_id = ? AND email = ? LIMIT 1"),
                 eq(String.class), eq("tenant-123"), eq("new-user@example.com")))
                 .thenReturn(null)
                 .thenReturn("provisioned-uuid");
 
-        // Profile lookup returns the Standard User profile ID
         when(jdbcTemplate.queryForObject(
                 contains("SELECT id FROM profile"),
                 eq(String.class), eq("tenant-123")))
@@ -139,13 +127,11 @@ class LoginTrackingFilterTest {
 
         verify(chain).doFilter(request, response);
 
-        // Should have attempted to provision the user with a default profile
         verify(jdbcTemplate).update(
                 contains("INSERT INTO platform_user"),
                 any(String.class), eq("tenant-123"), eq("new-user@example.com"),
                 eq("new-user"), eq("standard-user-profile-id"));
 
-        // Should have proceeded with login tracking after provisioning
         verify(jdbcTemplate).update(
                 contains("UPDATE platform_user SET last_login_at"),
                 any(), any(), eq("provisioned-uuid"));
@@ -166,17 +152,14 @@ class LoginTrackingFilterTest {
         MockHttpServletResponse response = new MockHttpServletResponse();
         FilterChain chain = mock(FilterChain.class);
 
-        // Lookup always returns null (user doesn't exist and provisioning fails to resolve)
         when(jdbcTemplate.queryForObject(anyString(), eq(String.class), any(), any()))
                 .thenReturn(null);
-        // Provisioning INSERT throws
         when(jdbcTemplate.update(contains("INSERT INTO platform_user"), any(), any(), any(), any(), any()))
                 .thenThrow(new RuntimeException("FK constraint violation"));
 
         filter.doFilterInternal(request, response, chain);
 
         verify(chain).doFilter(request, response);
-        // Should NOT have tracked login (no UPDATE or login_history INSERT)
         verify(jdbcTemplate, never()).update(contains("UPDATE platform_user SET last_login_at"), any(), any(), any());
         verify(jdbcTemplate, never()).update(contains("INSERT INTO login_history"),
                 any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
@@ -184,8 +167,7 @@ class LoginTrackingFilterTest {
 
     @Test
     void shouldThrottleWithin30MinuteInterval() throws ServletException, IOException {
-        // Pre-populate the throttle cache as if user was tracked recently
-        long recentTime = java.time.Instant.now().getEpochSecond() - 60; // 1 minute ago
+        long recentTime = java.time.Instant.now().getEpochSecond() - 60;
         throttleCache.put("tenant-123:alice@example.com", recentTime);
 
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/accounts");
@@ -198,13 +180,11 @@ class LoginTrackingFilterTest {
         filter.doFilterInternal(request, response, chain);
 
         verify(chain).doFilter(request, response);
-        // Should NOT execute any DB operations due to throttling
         verifyNoInteractions(jdbcTemplate);
     }
 
     @Test
     void shouldAllowTrackingAfterIntervalExpires() throws ServletException, IOException {
-        // Pre-populate the throttle cache with an old timestamp (31 minutes ago)
         long oldTime = java.time.Instant.now().getEpochSecond()
                 - LoginTrackingFilter.TRACKING_INTERVAL_SECONDS - 60;
         throttleCache.put("tenant-123:alice@example.com", oldTime);
@@ -223,7 +203,6 @@ class LoginTrackingFilterTest {
         filter.doFilterInternal(request, response, chain);
 
         verify(chain).doFilter(request, response);
-        // DB operations should execute because the throttle interval has expired
         verify(jdbcTemplate).update(contains("UPDATE platform_user"), any(), any(), any());
         verify(jdbcTemplate).update(contains("INSERT INTO login_history"),
                 any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
@@ -238,11 +217,9 @@ class LoginTrackingFilterTest {
         MockHttpServletResponse response = new MockHttpServletResponse();
         FilterChain chain = mock(FilterChain.class);
 
-        // Make the DB lookup throw an exception
         when(jdbcTemplate.queryForObject(anyString(), eq(String.class), any(), any()))
                 .thenThrow(new RuntimeException("Database connection failed"));
 
-        // Should NOT throw — the filter chain must continue
         assertDoesNotThrow(() -> filter.doFilterInternal(request, response, chain));
         verify(chain).doFilter(request, response);
     }
@@ -312,25 +289,21 @@ class LoginTrackingFilterTest {
         MockHttpServletResponse response = new MockHttpServletResponse();
         FilterChain chain = mock(FilterChain.class);
 
-        // User already exists
         when(jdbcTemplate.queryForObject(
                 eq("SELECT id FROM platform_user WHERE tenant_id = ? AND email = ? LIMIT 1"),
                 eq(String.class), eq("tenant-123"), eq("alice@example.com")))
                 .thenReturn("user-uuid-1");
 
-        // Groups mapping
         when(jdbcTemplate.queryForObject(
                 contains("SELECT groups_profile_mapping FROM oidc_provider"),
                 eq(String.class), eq("tenant-123")))
                 .thenReturn("{\"admins\": \"System Administrator\"}");
 
-        // Profile lookup by name
         when(jdbcTemplate.queryForObject(
                 contains("SELECT id FROM profile WHERE tenant_id = ? AND name = ?"),
                 eq(String.class), eq("tenant-123"), eq("System Administrator")))
                 .thenReturn("sysadmin-profile-id");
 
-        // Current profile is different
         when(jdbcTemplate.queryForObject(
                 eq("SELECT profile_id FROM platform_user WHERE id = ?"),
                 eq(String.class), eq("user-uuid-1")))
@@ -340,7 +313,6 @@ class LoginTrackingFilterTest {
 
         verify(chain).doFilter(request, response);
 
-        // Should update the user's profile
         verify(jdbcTemplate).update(
                 eq("UPDATE platform_user SET profile_id = ?, updated_at = NOW() WHERE id = ?"),
                 eq("sysadmin-profile-id"), eq("user-uuid-1"));
@@ -348,7 +320,6 @@ class LoginTrackingFilterTest {
 
     @Test
     void shouldNotSyncProfileWhenAlreadyCorrect() {
-        // User already has the correct profile
         when(jdbcTemplate.queryForObject(
                 contains("SELECT groups_profile_mapping FROM oidc_provider"),
                 eq(String.class), eq("tenant-123")))
@@ -366,7 +337,6 @@ class LoginTrackingFilterTest {
 
         filter.syncProfileFromGroups("user-uuid-1", "tenant-123", "admins");
 
-        // Should NOT update because profile is already correct
         verify(jdbcTemplate, never()).update(
                 contains("UPDATE platform_user SET profile_id"),
                 any(), any());
@@ -376,7 +346,6 @@ class LoginTrackingFilterTest {
     void shouldNotSyncProfileWhenNoGroupsHeader() {
         filter.syncProfileFromGroups("user-uuid-1", "tenant-123", null);
 
-        // Should not query anything
         verify(jdbcTemplate, never()).queryForObject(
                 contains("groups_profile_mapping"),
                 eq(String.class), any());
@@ -391,29 +360,24 @@ class LoginTrackingFilterTest {
         when(jdbcTemplate.queryForObject(anyString(), eq(String.class), eq("tenant-123"), eq("bob@example.com")))
                 .thenReturn("user-2");
 
-        // Track alice
         MockHttpServletRequest req1 = new MockHttpServletRequest("GET", "/api/accounts");
         req1.addHeader("X-User-Id", "alice@example.com");
         req1.addHeader("X-Tenant-ID", "tenant-123");
         filter.doFilterInternal(req1, new MockHttpServletResponse(), chain);
 
-        // Track bob
         MockHttpServletRequest req2 = new MockHttpServletRequest("GET", "/api/accounts");
         req2.addHeader("X-User-Id", "bob@example.com");
         req2.addHeader("X-Tenant-ID", "tenant-123");
         filter.doFilterInternal(req2, new MockHttpServletResponse(), chain);
 
-        // Both should have been tracked
         assertTrue(throttleCache.containsKey("tenant-123:alice@example.com"));
         assertTrue(throttleCache.containsKey("tenant-123:bob@example.com"));
 
-        // Two UPDATE queries (one per user)
         verify(jdbcTemplate, times(2)).update(contains("UPDATE platform_user"), any(), any(), any());
     }
 
     @Test
     void shouldPreferSystemAdministratorWhenMultipleGroupsMatch() {
-        // User is in both "developers" and "admins" groups, with "developers" first
         when(jdbcTemplate.queryForObject(
                 contains("SELECT groups_profile_mapping FROM oidc_provider"),
                 eq(String.class), eq("tenant-123")))
@@ -429,7 +393,6 @@ class LoginTrackingFilterTest {
                 eq(String.class), eq("tenant-123"), eq("System Administrator")))
                 .thenReturn("sysadmin-profile-id");
 
-        // Current profile is different
         when(jdbcTemplate.queryForObject(
                 eq("SELECT profile_id FROM platform_user WHERE id = ?"),
                 eq(String.class), eq("user-uuid-1")))
@@ -437,7 +400,6 @@ class LoginTrackingFilterTest {
 
         filter.syncProfileFromGroups("user-uuid-1", "tenant-123", "developers,admins");
 
-        // Should update to System Administrator despite "developers" being first
         verify(jdbcTemplate).update(
                 eq("UPDATE platform_user SET profile_id = ?, updated_at = NOW() WHERE id = ?"),
                 eq("sysadmin-profile-id"), eq("user-uuid-1"));

@@ -1,7 +1,7 @@
 package io.kelta.worker.controller;
 
 import io.kelta.jsonapi.JsonApiResponseBuilder;
-import io.kelta.worker.service.OpenSearchQueryService;
+import io.kelta.worker.service.ObservabilityQueryService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -12,19 +12,8 @@ import java.time.Instant;
 import java.util.*;
 
 /**
- * REST controller for tenant metrics, backed by OpenSearch.
- *
- * <p>Provides endpoints for range queries (chart data) and instant queries
- * (summary cards). All queries are scoped to the tenant from the
- * {@code X-Tenant-Slug} header.
- *
- * <p>Metrics are derived from two sources in OpenSearch:
- * <ul>
- *   <li>Trace spans (jaeger-span-*) — per-request latency, errors, throughput</li>
- *   <li>Direct OTEL metrics (kelta-metrics-*) — JVM, HTTP server, custom Micrometer</li>
- * </ul>
- *
- * @since 1.0.0
+ * REST controller for tenant metrics.
+ * Queries OpenSearch via RestClient for trace-derived metrics.
  */
 @RestController
 @RequestMapping("/api/metrics")
@@ -32,15 +21,12 @@ public class MetricsController {
 
     private static final Logger log = LoggerFactory.getLogger(MetricsController.class);
 
-    private final OpenSearchQueryService queryService;
+    private final ObservabilityQueryService queryService;
 
-    public MetricsController(OpenSearchQueryService queryService) {
+    public MetricsController(ObservabilityQueryService queryService) {
         this.queryService = queryService;
     }
 
-    /**
-     * Range query endpoint for chart data.
-     */
     @GetMapping("/query")
     public ResponseEntity<Map<String, Object>> query(
             @RequestHeader("X-Tenant-Slug") String tenantSlug,
@@ -88,16 +74,13 @@ public class MetricsController {
 
             return ResponseEntity.ok(JsonApiResponseBuilder.single("metrics-query", metric, attributes));
         } catch (Exception e) {
-            log.error("Failed to query metrics from OpenSearch: {}", e.getMessage(), e);
+            log.error("Failed to query metrics: {}", e.getMessage(), e);
             return ResponseEntity.internalServerError().body(
                     JsonApiResponseBuilder.error("500", "Internal Server Error",
                             "Failed to query metrics"));
         }
     }
 
-    /**
-     * Summary endpoint for dashboard cards.
-     */
     @GetMapping("/summary")
     public ResponseEntity<Map<String, Object>> summary(
             @RequestHeader("X-Tenant-Slug") String tenantSlug) {
@@ -114,22 +97,19 @@ public class MetricsController {
             attributes.put("totalRequests", summaryData.getOrDefault("totalRequests", 0L));
             attributes.put("errorRate", summaryData.getOrDefault("errorRate", 0.0));
             attributes.put("avgLatencyMs", summaryData.getOrDefault("avgLatencyMs", 0.0));
-            attributes.put("activeRequests", 0); // Active requests not available from historical data
+            attributes.put("activeRequests", 0);
             attributes.put("authFailures", summaryData.getOrDefault("authFailures", 0L));
             attributes.put("rateLimited", summaryData.getOrDefault("rateLimited", 0L));
 
             return ResponseEntity.ok(JsonApiResponseBuilder.single("metrics-summary", "current", attributes));
         } catch (Exception e) {
-            log.error("Failed to query metrics summary from OpenSearch: {}", e.getMessage(), e);
+            log.error("Failed to query metrics summary: {}", e.getMessage(), e);
             return ResponseEntity.internalServerError().body(
                     JsonApiResponseBuilder.error("500", "Internal Server Error",
                             "Failed to query metrics summary"));
         }
     }
 
-    /**
-     * Top endpoints ranked by request count with latency percentiles.
-     */
     @GetMapping("/endpoints")
     public ResponseEntity<Map<String, Object>> topEndpoints(
             @RequestHeader("X-Tenant-Slug") String tenantSlug,
@@ -152,9 +132,6 @@ public class MetricsController {
         }
     }
 
-    /**
-     * Top error paths with status code breakdown.
-     */
     @GetMapping("/errors")
     public ResponseEntity<Map<String, Object>> topErrors(
             @RequestHeader("X-Tenant-Slug") String tenantSlug,
@@ -177,9 +154,6 @@ public class MetricsController {
         }
     }
 
-    /**
-     * Latency percentiles for a time range.
-     */
     @GetMapping("/latency")
     public ResponseEntity<Map<String, Object>> latencyPercentiles(
             @RequestHeader("X-Tenant-Slug") String tenantSlug,
@@ -217,12 +191,7 @@ public class MetricsController {
     }
 
     private String convertStepToInterval(String step) {
-        // Convert Prometheus-style step to OpenSearch date histogram interval
-        if (step.endsWith("s")) {
-            return step;
-        } else if (step.endsWith("m")) {
-            return step;
-        } else if (step.endsWith("h")) {
+        if (step.endsWith("s") || step.endsWith("m") || step.endsWith("h")) {
             return step;
         }
         return "1m";

@@ -122,6 +122,13 @@
             <artifactId>spring-boot-starter-opentelemetry</artifactId>
         </dependency>
 
+        <!-- Force okio version compatible with okhttp 5.x from spring-boot-starter-opentelemetry -->
+        <dependency>
+            <groupId>com.squareup.okio</groupId>
+            <artifactId>okio</artifactId>
+            <version>3.9.1</version>
+        </dependency>
+
         <!-- Spring Kafka -->
         <dependency>
             <groupId>org.springframework.kafka</groupId>

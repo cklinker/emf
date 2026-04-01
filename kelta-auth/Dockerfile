@@ -62,7 +62,8 @@ RUN groupadd -r kelta && useradd -r -g kelta kelta
 
 COPY --from=builder /build/target/kelta-auth.jar app.jar
 
-RUN curl -fL -o opentelemetry-javaagent.jar \
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/* && \
+    curl -fL -o opentelemetry-javaagent.jar \
     https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v2.25.0/opentelemetry-javaagent.jar && \
     test -s opentelemetry-javaagent.jar
 

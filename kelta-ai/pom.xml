@@ -74,24 +74,10 @@
             <version>8.0</version>
         </dependency>
 
-        <!-- OpenTelemetry API for manual span enrichment -->
+        <!-- OpenTelemetry auto-configuration with OTLP exporters -->
         <dependency>
-            <groupId>io.opentelemetry</groupId>
-            <artifactId>opentelemetry-api</artifactId>
-            <version>1.35.0</version>
-        </dependency>
-
-        <!-- Bridge Micrometer observations to OTEL -->
-        <dependency>
-            <groupId>io.micrometer</groupId>
-            <artifactId>micrometer-tracing-bridge-otel</artifactId>
-        </dependency>
-
-        <!-- @WithSpan, @SpanAttribute annotations -->
-        <dependency>
-            <groupId>io.opentelemetry.instrumentation</groupId>
-            <artifactId>opentelemetry-instrumentation-annotations</artifactId>
-            <version>2.11.0</version>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-opentelemetry</artifactId>
         </dependency>
 
         <!-- PostgreSQL JDBC Driver -->

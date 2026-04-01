@@ -18,8 +18,10 @@ import io.kelta.worker.flow.JdbcFlowStore;
 import io.kelta.worker.listener.CollectionConfigEventPublisher;
 import io.kelta.worker.listener.FieldConfigEventPublisher;
 import io.kelta.worker.listener.CerbosPolicySyncHook;
+import io.kelta.worker.listener.ValidationRuleRefreshHook;
 import io.kelta.worker.service.AuditBeforeSaveHook;
 import io.kelta.worker.service.CerbosPolicySyncService;
+import io.kelta.worker.service.CollectionLifecycleManager;
 import io.kelta.worker.service.SetupAuditService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -206,6 +208,15 @@ public class FlowConfig {
             BeforeSaveHookRegistry hookRegistry,
             SetupAuditService auditService) {
         AuditBeforeSaveHook hook = new AuditBeforeSaveHook(auditService);
+        hookRegistry.register(hook);
+        return hook;
+    }
+
+    @Bean
+    public ValidationRuleRefreshHook validationRuleRefreshHook(
+            BeforeSaveHookRegistry hookRegistry,
+            CollectionLifecycleManager lifecycleManager) {
+        ValidationRuleRefreshHook hook = new ValidationRuleRefreshHook(lifecycleManager);
         hookRegistry.register(hook);
         return hook;
     }

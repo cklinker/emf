@@ -258,6 +258,8 @@ gh pr merge --auto --squash
 
 This replaces the previous workflow of waiting for manual merge approval. PRs will merge automatically once all required checks pass.
 
+**Never push additional commits to an existing PR.** Because auto-merge is enabled, the PR will merge as soon as CI passes. If you push a fix to an existing PR, the first CI run may complete and merge before your fix is included, causing your push to be lost. Instead, always create a new branch and a new PR for follow-up changes.
+
 ### After a PR is Merged
 
 Always return to `main` and pull the latest changes after a PR is merged:

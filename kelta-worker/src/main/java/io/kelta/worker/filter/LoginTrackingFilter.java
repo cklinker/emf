@@ -1,6 +1,5 @@
 package io.kelta.worker.filter;
 
-import io.kelta.worker.service.OpenSearchAuditService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -70,21 +69,18 @@ public class LoginTrackingFilter extends OncePerRequestFilter {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final JdbcTemplate jdbcTemplate;
-    private final OpenSearchAuditService openSearchAuditService;
 
     /** Maps "tenantId:email" to the epoch-second of the last tracking write. */
     private final Map<String, Long> lastTrackedAt;
 
     @Autowired
-    public LoginTrackingFilter(JdbcTemplate jdbcTemplate, OpenSearchAuditService openSearchAuditService) {
-        this(jdbcTemplate, openSearchAuditService, new ConcurrentHashMap<>());
+    public LoginTrackingFilter(JdbcTemplate jdbcTemplate) {
+        this(jdbcTemplate, new ConcurrentHashMap<>());
     }
 
     /** Constructor for testing — allows injecting the throttle cache. */
-    LoginTrackingFilter(JdbcTemplate jdbcTemplate, OpenSearchAuditService openSearchAuditService,
-                        Map<String, Long> lastTrackedAt) {
+    LoginTrackingFilter(JdbcTemplate jdbcTemplate, Map<String, Long> lastTrackedAt) {
         this.jdbcTemplate = jdbcTemplate;
-        this.openSearchAuditService = openSearchAuditService;
         this.lastTrackedAt = lastTrackedAt;
     }
 
@@ -153,11 +149,6 @@ public class LoginTrackingFilter extends OncePerRequestFilter {
 
         // 3. Insert security_audit_log LOGIN event
         insertSecurityAuditLogin(userId, email, tenantId, sourceIp, userAgent);
-
-        // 4. Write to OpenSearch for observability
-        openSearchAuditService.logLoginHistory(tenantId, userId, email, "OAUTH", "SUCCESS", sourceIp);
-        openSearchAuditService.logSecurityAudit(tenantId, userId, "LOGIN_SUCCESS", "AUTH",
-                sourceIp, "{\"provider\":\"OIDC\",\"loginType\":\"OAUTH\"}");
 
         lastTrackedAt.put(cacheKey, now);
         log.debug("Tracked login for user {} ({}) in tenant {}", userId, email, tenantId);

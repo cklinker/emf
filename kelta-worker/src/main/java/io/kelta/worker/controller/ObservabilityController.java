@@ -1,9 +1,9 @@
 package io.kelta.worker.controller;
 
 import io.kelta.jsonapi.JsonApiResponseBuilder;
-import io.kelta.worker.service.OpenSearchQueryService;
-import io.kelta.worker.service.OpenSearchQueryService.SearchResult;
-import org.opensearch.search.sort.SortOrder;
+import io.kelta.worker.service.AuditQueryService;
+import io.kelta.worker.service.ObservabilityQueryService;
+import io.kelta.worker.service.ObservabilityQueryService.SearchResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -14,7 +14,7 @@ import java.util.*;
 
 /**
  * REST controller for observability data — request logs, application logs, and audit events.
- * All data is queried from OpenSearch.
+ * Trace/log queries go to OpenSearch via RestClient; audit queries go to PostgreSQL.
  */
 @RestController
 @RequestMapping("/api/admin/observability")
@@ -22,18 +22,15 @@ public class ObservabilityController {
 
     private static final Logger log = LoggerFactory.getLogger(ObservabilityController.class);
 
-    private final OpenSearchQueryService queryService;
+    private final ObservabilityQueryService queryService;
+    private final AuditQueryService auditQueryService;
 
-    public ObservabilityController(OpenSearchQueryService queryService) {
+    public ObservabilityController(ObservabilityQueryService queryService,
+                                   AuditQueryService auditQueryService) {
         this.queryService = queryService;
+        this.auditQueryService = auditQueryService;
     }
 
-    /**
-     * Search request logs (trace spans).
-     *
-     * <p>Filters are passed as simple query params and translated internally
-     * to the correct nested tag queries against the Jaeger span index.
-     */
     @GetMapping("/request-logs")
     public ResponseEntity<Map<String, Object>> searchRequestLogs(
             @RequestHeader(value = "X-Tenant-Slug", required = false) String tenantSlug,
@@ -75,11 +72,6 @@ public class ObservabilityController {
         }
     }
 
-    /**
-     * Get a single request log detail by trace ID.
-     * Merges span data from Jaeger with captured request/response data from the
-     * kelta-request-data index (headers, bodies).
-     */
     @GetMapping("/request-logs/{traceId}")
     public ResponseEntity<Map<String, Object>> getRequestLog(
             @PathVariable String traceId) {
@@ -89,21 +81,14 @@ public class ObservabilityController {
                     Instant.now().minusSeconds(86400 * 30), Instant.now(),
                     filters, 0, 100);
 
-            // Also query the kelta-request-data index for captured bodies/headers
-            Map<String, String> dataFilters = Map.of("traceId", traceId);
-            SearchResult requestData = queryService.search("kelta-request-data-*",
-                    dataFilters, 0, 100, "@timestamp", org.opensearch.search.sort.SortOrder.DESC);
+            // Query request data from PostgreSQL
+            List<Map<String, Object>> requestDataList = queryService.getTraceRequestData(traceId);
 
-            // Merge captured data into spans by matching spanId.
-            // The OTEL agent creates the server span inside DispatcherServlet, so by the
-            // time SpanBodyEnrichmentFilter's finally block runs, Span.current() has reverted
-            // to the propagated parent context (from the traceparent header). This means the
-            // captured spanId is the PARENT span, not the worker's server span. We handle
-            // this by also matching on the span's parent reference.
-            if (requestData.totalHits() > 0) {
+            // Merge captured data into spans by matching spanId
+            if (!requestDataList.isEmpty()) {
                 Map<String, Map<String, Object>> dataBySpanId = new HashMap<>();
-                for (Map<String, Object> dataHit : requestData.hits()) {
-                    String spanId = (String) dataHit.get("spanId");
+                for (Map<String, Object> dataHit : requestDataList) {
+                    String spanId = (String) dataHit.get("span_id");
                     if (spanId != null) {
                         dataBySpanId.put(spanId, dataHit);
                     }
@@ -112,8 +97,7 @@ public class ObservabilityController {
                     String spanId = (String) span.get("spanID");
                     Map<String, Object> captured = dataBySpanId.get(spanId);
 
-                    // Fallback: match by parent spanId — the captured spanId is often the
-                    // propagated parent (gateway client span) rather than the worker's own span
+                    // Fallback: match by parent spanId
                     if (captured == null) {
                         @SuppressWarnings("unchecked")
                         List<Map<String, Object>> refs = (List<Map<String, Object>>) span.get("references");
@@ -147,9 +131,6 @@ public class ObservabilityController {
         }
     }
 
-    /**
-     * Search application logs.
-     */
     @GetMapping("/logs")
     public ResponseEntity<Map<String, Object>> searchLogs(
             @RequestParam(required = false) String query,
@@ -166,13 +147,10 @@ public class ObservabilityController {
             if (level != null) filters.put("level", level);
             if (service != null) filters.put("service", service);
             if (traceId != null) filters.put("traceId", traceId);
-
-            // Add time range filter
             if (start != null) filters.put("@timestamp_gte", start);
             if (end != null) filters.put("@timestamp_lte", end);
 
-            SearchResult result = queryService.search("kelta-logs-*", filters, page, size,
-                    "@timestamp", SortOrder.DESC);
+            SearchResult result = queryService.searchLogs(filters, page, size);
 
             Map<String, Object> attributes = new LinkedHashMap<>();
             attributes.put("hits", result.hits());
@@ -189,9 +167,6 @@ public class ObservabilityController {
         }
     }
 
-    /**
-     * Search audit events (setup, security, login).
-     */
     @GetMapping("/audit")
     public ResponseEntity<Map<String, Object>> searchAudit(
             @RequestHeader(value = "X-Tenant-ID", required = false) String tenantId,
@@ -203,14 +178,12 @@ public class ObservabilityController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
         try {
-            Map<String, String> filters = new HashMap<>();
-            if (tenantId != null) filters.put("tenant_id", tenantId);
-            if (auditType != null) filters.put("audit_type", auditType);
-            if (action != null) filters.put("action", action);
-            if (userId != null) filters.put("user_id", userId);
+            Instant startInstant = start != null ? Instant.parse(start) : null;
+            Instant endInstant = end != null ? Instant.parse(end) : null;
 
-            SearchResult result = queryService.search("kelta-audit-*", filters, page, size,
-                    "@timestamp", SortOrder.DESC);
+            SearchResult result = auditQueryService.searchAudit(
+                    tenantId, auditType, action, userId,
+                    startInstant, endInstant, page, size);
 
             Map<String, Object> attributes = new LinkedHashMap<>();
             attributes.put("hits", result.hits());
@@ -227,9 +200,6 @@ public class ObservabilityController {
         }
     }
 
-    /**
-     * Merges captured request/response data (bodies, headers) into a span's tagMap.
-     */
     @SuppressWarnings("unchecked")
     private void mergeCapturedData(Map<String, Object> span, Map<String, Object> captured) {
         Map<String, Object> tagMap = (Map<String, Object>) span.get("tagMap");
@@ -237,24 +207,25 @@ public class ObservabilityController {
             tagMap = new LinkedHashMap<>();
             span.put("tagMap", tagMap);
         }
-        if (captured.get("requestBody") != null) {
-            tagMap.put("http.request.body", captured.get("requestBody"));
+        if (captured.get("request_body") != null) {
+            tagMap.put("http.request.body", captured.get("request_body"));
         }
-        if (captured.get("responseBody") != null) {
-            tagMap.put("http.response.body", captured.get("responseBody"));
+        if (captured.get("response_body") != null) {
+            tagMap.put("http.response.body", captured.get("response_body"));
         }
-        // Add request headers as individual tags
-        Map<String, String> reqHeaders = (Map<String, String>) captured.get("requestHeaders");
-        if (reqHeaders != null) {
-            for (Map.Entry<String, String> entry : reqHeaders.entrySet()) {
-                tagMap.put("http.request.header." + entry.getKey().toLowerCase(), entry.getValue());
+        // Request/response headers from JSONB come back as Map or String
+        Object reqHeaders = captured.get("request_headers");
+        if (reqHeaders instanceof Map<?, ?> headers) {
+            for (Map.Entry<?, ?> entry : headers.entrySet()) {
+                tagMap.put("http.request.header." + entry.getKey().toString().toLowerCase(),
+                        entry.getValue());
             }
         }
-        // Add response headers
-        Map<String, String> respHeaders = (Map<String, String>) captured.get("responseHeaders");
-        if (respHeaders != null) {
-            for (Map.Entry<String, String> entry : respHeaders.entrySet()) {
-                tagMap.put("http.response.header." + entry.getKey().toLowerCase(), entry.getValue());
+        Object respHeaders = captured.get("response_headers");
+        if (respHeaders instanceof Map<?, ?> headers) {
+            for (Map.Entry<?, ?> entry : headers.entrySet()) {
+                tagMap.put("http.response.header." + entry.getKey().toString().toLowerCase(),
+                        entry.getValue());
             }
         }
     }

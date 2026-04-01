@@ -10,13 +10,10 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Service for recording configuration changes.
- * Writes to both PostgreSQL (for backward compatibility) and OpenSearch (for observability).
+ * Service for recording configuration changes to PostgreSQL.
  *
  * <p>All logging is non-fatal — exceptions are caught and logged as warnings
  * to ensure audit failures never disrupt normal operations.
- *
- * @since 1.0.0
  */
 @Service
 public class SetupAuditService {
@@ -24,26 +21,11 @@ public class SetupAuditService {
     private static final Logger log = LoggerFactory.getLogger(SetupAuditService.class);
 
     private final JdbcTemplate jdbcTemplate;
-    private final OpenSearchAuditService openSearchAuditService;
 
-    public SetupAuditService(JdbcTemplate jdbcTemplate, OpenSearchAuditService openSearchAuditService) {
+    public SetupAuditService(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
-        this.openSearchAuditService = openSearchAuditService;
     }
 
-    /**
-     * Logs a setup audit entry.
-     *
-     * @param tenantId   the tenant ID
-     * @param userId     the user who made the change (platform_user UUID)
-     * @param action     the action performed (e.g., CREATE, UPDATE, DELETE)
-     * @param section    the setup section (e.g., Schema, Profiles, Users)
-     * @param entityType the type of entity changed (e.g., collection, field, profile)
-     * @param entityId   the ID of the entity (may be null)
-     * @param entityName the name of the entity (may be null)
-     * @param oldValue   the old value as JSON (may be null)
-     * @param newValue   the new value as JSON (may be null)
-     */
     public void log(String tenantId, String userId, String action, String section,
                     String entityType, String entityId, String entityName,
                     String oldValue, String newValue) {
@@ -64,9 +46,5 @@ public class SetupAuditService {
             log.warn("Failed to write setup audit entry: {} {} {}: {}",
                     action, entityType, entityId, e.getMessage());
         }
-
-        // Also write to OpenSearch for observability
-        openSearchAuditService.logSetupAudit(tenantId, userId, action, section,
-                entityType, entityId, entityName, oldValue, newValue);
     }
 }

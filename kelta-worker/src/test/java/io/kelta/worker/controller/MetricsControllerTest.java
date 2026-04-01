@@ -1,13 +1,12 @@
 package io.kelta.worker.controller;
 
-import io.kelta.worker.service.OpenSearchQueryService;
+import io.kelta.worker.service.ObservabilityQueryService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.ResponseEntity;
 
-import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -16,20 +15,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-/**
- * Tests for {@link MetricsController}.
- *
- * <p>Verifies the metrics query and summary endpoints backed by OpenSearch,
- * including parameter validation and JSON:API response format.
- */
 class MetricsControllerTest {
 
-    private OpenSearchQueryService queryService;
+    private ObservabilityQueryService queryService;
     private MetricsController controller;
 
     @BeforeEach
     void setUp() {
-        queryService = mock(OpenSearchQueryService.class);
+        queryService = mock(ObservabilityQueryService.class);
         controller = new MetricsController(queryService);
     }
 
@@ -44,15 +37,13 @@ class MetricsControllerTest {
         return (Map<String, Object>) body.get("data");
     }
 
-    // ==================== Query Tests ====================
-
     @Nested
     @DisplayName("GET /api/metrics/query")
     class QueryTests {
 
         @Test
         @DisplayName("Should return JSON:API envelope with type 'metrics-query'")
-        void returnsJsonApiEnvelope() throws IOException {
+        void returnsJsonApiEnvelope() {
             when(queryService.getRequestCountOverTime(anyString(), any(Instant.class), any(Instant.class), anyString()))
                     .thenReturn(List.of());
 
@@ -71,7 +62,7 @@ class MetricsControllerTest {
 
         @Test
         @DisplayName("Should return time series data in attributes")
-        void returnsTimeSeriesData() throws IOException {
+        void returnsTimeSeriesData() {
             List<Map<String, Object>> mockDataPoints = List.of(
                     Map.of("timestamp", "2024-01-01T00:00:00Z", "value", 42L),
                     Map.of("timestamp", "2024-01-01T00:01:00Z", "value", 38L)
@@ -112,11 +103,10 @@ class MetricsControllerTest {
 
         @Test
         @DisplayName("Should auto-calculate step when not provided")
-        void autoCalculatesStep() throws IOException {
+        void autoCalculatesStep() {
             when(queryService.getRequestCountOverTime(anyString(), any(Instant.class), any(Instant.class), anyString()))
                     .thenReturn(List.of());
 
-            // 1 hour range → should use 15s step
             ResponseEntity<Map<String, Object>> response = controller.query(
                     "tenant-1", "requests",
                     "2024-01-01T00:00:00Z", "2024-01-01T01:00:00Z",
@@ -127,8 +117,8 @@ class MetricsControllerTest {
         }
 
         @Test
-        @DisplayName("Should return empty series when OpenSearch returns no data")
-        void returnsEmptySeriesWhenNoData() throws IOException {
+        @DisplayName("Should return empty series when no data")
+        void returnsEmptySeriesWhenNoData() {
             when(queryService.getRequestCountOverTime(anyString(), any(Instant.class), any(Instant.class), anyString()))
                     .thenReturn(List.of());
 
@@ -147,10 +137,10 @@ class MetricsControllerTest {
         }
 
         @Test
-        @DisplayName("Should return 500 when OpenSearch throws")
-        void returns500OnOpenSearchError() throws IOException {
+        @DisplayName("Should return 500 when query throws")
+        void returns500OnError() {
             when(queryService.getRequestCountOverTime(anyString(), any(Instant.class), any(Instant.class), anyString()))
-                    .thenThrow(new IOException("Connection refused"));
+                    .thenThrow(new RuntimeException("Connection refused"));
 
             ResponseEntity<Map<String, Object>> response = controller.query(
                     "tenant-1", "requests",
@@ -161,15 +151,13 @@ class MetricsControllerTest {
         }
     }
 
-    // ==================== Summary Tests ====================
-
     @Nested
     @DisplayName("GET /api/metrics/summary")
     class SummaryTests {
 
         @Test
         @DisplayName("Should return JSON:API envelope with type 'metrics-summary'")
-        void returnsJsonApiEnvelope() throws IOException {
+        void returnsJsonApiEnvelope() {
             when(queryService.getMetricsSummary(anyString(), any(Instant.class), any(Instant.class)))
                     .thenReturn(Map.of(
                             "totalRequests", 0L,
@@ -189,7 +177,7 @@ class MetricsControllerTest {
 
         @Test
         @DisplayName("Should return summary metrics with correct keys")
-        void returnsSummaryMetrics() throws IOException {
+        void returnsSummaryMetrics() {
             when(queryService.getMetricsSummary(anyString(), any(Instant.class), any(Instant.class)))
                     .thenReturn(Map.of(
                             "totalRequests", 1500L,
@@ -210,10 +198,10 @@ class MetricsControllerTest {
         }
 
         @Test
-        @DisplayName("Should return 500 when OpenSearch throws")
-        void returns500OnOpenSearchError() throws IOException {
+        @DisplayName("Should return 500 when query throws")
+        void returns500OnError() {
             when(queryService.getMetricsSummary(anyString(), any(Instant.class), any(Instant.class)))
-                    .thenThrow(new IOException("Connection refused"));
+                    .thenThrow(new RuntimeException("Connection refused"));
 
             ResponseEntity<Map<String, Object>> response = controller.summary("tenant-1");
 
@@ -221,15 +209,13 @@ class MetricsControllerTest {
         }
     }
 
-    // ==================== Endpoints Tests ====================
-
     @Nested
     @DisplayName("GET /api/metrics/endpoints")
     class EndpointsTests {
 
         @Test
         @DisplayName("Should return top endpoints in JSON:API envelope")
-        void returnsTopEndpoints() throws IOException {
+        void returnsTopEndpoints() {
             List<Map<String, Object>> mockEndpoints = List.of(
                     Map.of("endpoint", "/api/users", "requestCount", 500L, "p50", 12.5, "p95", 45.0, "p99", 120.0, "avgDuration", 20.0),
                     Map.of("endpoint", "/api/collections", "requestCount", 300L, "p50", 8.0, "p95", 30.0, "p99", 80.0, "avgDuration", 15.0)
@@ -252,10 +238,10 @@ class MetricsControllerTest {
         }
 
         @Test
-        @DisplayName("Should return 500 when OpenSearch throws")
-        void returns500OnOpenSearchError() throws IOException {
+        @DisplayName("Should return 500 when query throws")
+        void returns500OnError() {
             when(queryService.getTopEndpoints(anyString(), any(Instant.class), any(Instant.class), anyInt()))
-                    .thenThrow(new IOException("Connection refused"));
+                    .thenThrow(new RuntimeException("Connection refused"));
 
             ResponseEntity<Map<String, Object>> response = controller.topEndpoints("tenant-1", 20);
 
@@ -263,15 +249,13 @@ class MetricsControllerTest {
         }
     }
 
-    // ==================== Errors Tests ====================
-
     @Nested
     @DisplayName("GET /api/metrics/errors")
     class ErrorsTests {
 
         @Test
         @DisplayName("Should return top errors in JSON:API envelope")
-        void returnsTopErrors() throws IOException {
+        void returnsTopErrors() {
             List<Map<String, Object>> mockErrors = List.of(
                     Map.of("path", "/api/users", "count", 15L, "statusCodes", Map.of("404", 10L, "500", 5L))
             );
@@ -292,15 +276,13 @@ class MetricsControllerTest {
         }
     }
 
-    // ==================== Latency Tests ====================
-
     @Nested
     @DisplayName("GET /api/metrics/latency")
     class LatencyTests {
 
         @Test
         @DisplayName("Should return latency percentiles in JSON:API envelope")
-        void returnsLatencyPercentiles() throws IOException {
+        void returnsLatencyPercentiles() {
             when(queryService.getLatencyPercentiles(anyString(), any(Instant.class), any(Instant.class)))
                     .thenReturn(Map.of("p50", 12.5, "p95", 45.0, "p99", 120.0, "avg", 20.0));
 
@@ -319,7 +301,7 @@ class MetricsControllerTest {
 
         @Test
         @DisplayName("Should use default time range when start/end not provided")
-        void usesDefaultTimeRange() throws IOException {
+        void usesDefaultTimeRange() {
             when(queryService.getLatencyPercentiles(anyString(), any(Instant.class), any(Instant.class)))
                     .thenReturn(Map.of("p50", 10.0, "p95", 30.0, "p99", 80.0, "avg", 15.0));
 
@@ -331,10 +313,10 @@ class MetricsControllerTest {
         }
 
         @Test
-        @DisplayName("Should return 500 when OpenSearch throws")
-        void returns500OnOpenSearchError() throws IOException {
+        @DisplayName("Should return 500 when query throws")
+        void returns500OnError() {
             when(queryService.getLatencyPercentiles(anyString(), any(Instant.class), any(Instant.class)))
-                    .thenThrow(new IOException("Connection refused"));
+                    .thenThrow(new RuntimeException("Connection refused"));
 
             ResponseEntity<Map<String, Object>> response = controller.latencyPercentiles(
                     "tenant-1", "2024-01-01T00:00:00Z", "2024-01-01T01:00:00Z");

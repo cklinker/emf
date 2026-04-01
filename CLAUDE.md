@@ -161,6 +161,19 @@ gh pr merge --auto --squash
 
 ---
 
+## Multi-Pod Architecture Rules
+
+The platform runs on multiple worker pods. **Never use in-process-only state changes for configuration data.** Any change to in-memory registries or caches must be broadcast via Kafka so all pods receive the update.
+
+**Pattern:** When a system collection record changes (e.g., validation rules, scripts, flows) and the change affects an in-memory registry:
+1. Create a `BeforeSaveHook` for the system collection
+2. In the after-create/after-update/after-delete methods, publish a Kafka event to the appropriate topic
+3. All pods consume the event and refresh their local registries
+
+**Do NOT** call `lifecycleManager.refreshX()` directly from a hook — that only updates the local pod. Instead, publish a Kafka event (e.g., to `kelta.config.collection.changed`) so the existing `CollectionSchemaListener` on every pod picks it up and refreshes.
+
+**Example:** `ValidationRuleRefreshHook` publishes a `collection-changed` event when validation rules are created/updated/deleted. `CollectionSchemaListener` on all pods consumes it and calls `refreshCollection()` which reloads validation rules from the database.
+
 ## Key Codebase Facts
 
 | Fact | Value |

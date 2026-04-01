@@ -2,6 +2,8 @@ package io.kelta.gateway.route;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cloud.gateway.filter.GatewayFilter;
+import org.springframework.cloud.gateway.filter.factory.StripPrefixGatewayFilterFactory;
 import org.springframework.cloud.gateway.handler.AsyncPredicate;
 import org.springframework.cloud.gateway.route.Route;
 import org.springframework.cloud.gateway.route.RouteLocator;
@@ -77,11 +79,20 @@ public class DynamicRouteLocator implements RouteLocator {
                 return Mono.just(matches);
             };
 
-            Route route = Route.async()
+            Route.AsyncBuilder routeBuilder = Route.async()
                     .id(routeDefinition.getId())
                     .uri(uri)
-                    .asyncPredicate(pathPredicate)
-                    .build();
+                    .asyncPredicate(pathPredicate);
+
+            if (routeDefinition.getStripPrefix() > 0) {
+                StripPrefixGatewayFilterFactory factory = new StripPrefixGatewayFilterFactory();
+                StripPrefixGatewayFilterFactory.Config config = new StripPrefixGatewayFilterFactory.Config();
+                config.setParts(routeDefinition.getStripPrefix());
+                GatewayFilter stripFilter = factory.apply(config);
+                routeBuilder.filter(stripFilter);
+            }
+
+            Route route = routeBuilder.build();
 
             logger.trace("Converted RouteDefinition to Route: id={}, path={}, uri={}",
                     routeDefinition.getId(), routeDefinition.getPath(), uri);

@@ -38,6 +38,9 @@ public class RouteInitializer implements ApplicationRunner {
     @Value("${kelta.gateway.ai-service-url:}")
     private String aiServiceUrl;
 
+    @Value("${OTEL_COLLECTOR_URL:http://jaeger.observability.svc.cluster.local:4318}")
+    private String otelCollectorUrl;
+
     /**
      * Creates a new RouteInitializer.
      *
@@ -95,5 +98,11 @@ public class RouteInitializer implements ApplicationRunner {
                     "static-ai", "/api/ai/**", aiServiceUrl, "ai"));
             logger.info("Registered AI service route: /api/ai/** -> {}", aiServiceUrl);
         }
+
+        // OTEL traces route: strips /otel prefix before forwarding to the collector
+        routeRegistry.addRoute(new RouteDefinition(
+                "otel-traces", "/otel/v1/traces", otelCollectorUrl, "otel",
+                null, 1));
+        logger.info("Registered OTEL traces route: /otel/v1/traces -> {}", otelCollectorUrl);
     }
 }

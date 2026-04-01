@@ -17,6 +17,7 @@ public class RouteDefinition {
     private final String backendUrl;
     private final String collectionName;
     private final RateLimitConfig rateLimit;
+    private final int stripPrefix;
 
     /**
      * Creates a new RouteDefinition.
@@ -26,23 +27,34 @@ public class RouteDefinition {
      * @param backendUrl Backend service URL
      * @param collectionName Collection name for authorization lookup
      * @param rateLimit Optional rate limit configuration (can be null)
+     * @param stripPrefix Number of path segments to strip before forwarding (0 = none)
      */
     public RouteDefinition(String id, String path,
                           String backendUrl, String collectionName,
-                          RateLimitConfig rateLimit) {
+                          RateLimitConfig rateLimit, int stripPrefix) {
         this.id = id;
         this.path = path;
         this.backendUrl = backendUrl;
         this.collectionName = collectionName;
         this.rateLimit = rateLimit;
+        this.stripPrefix = stripPrefix;
     }
 
     /**
-     * Creates a new RouteDefinition without rate limiting.
+     * Creates a new RouteDefinition with rate limiting but no prefix stripping.
+     */
+    public RouteDefinition(String id, String path,
+                          String backendUrl, String collectionName,
+                          RateLimitConfig rateLimit) {
+        this(id, path, backendUrl, collectionName, rateLimit, 0);
+    }
+
+    /**
+     * Creates a new RouteDefinition without rate limiting or prefix stripping.
      */
     public RouteDefinition(String id, String path,
                           String backendUrl, String collectionName) {
-        this(id, path, backendUrl, collectionName, null);
+        this(id, path, backendUrl, collectionName, null, 0);
     }
 
     public String getId() {
@@ -72,12 +84,17 @@ public class RouteDefinition {
         return rateLimit != null;
     }
 
+    public int getStripPrefix() {
+        return stripPrefix;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         RouteDefinition that = (RouteDefinition) o;
-        return Objects.equals(id, that.id) &&
+        return stripPrefix == that.stripPrefix &&
+               Objects.equals(id, that.id) &&
                Objects.equals(path, that.path) &&
                Objects.equals(backendUrl, that.backendUrl) &&
                Objects.equals(collectionName, that.collectionName) &&
@@ -86,7 +103,7 @@ public class RouteDefinition {
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, path, backendUrl, collectionName, rateLimit);
+        return Objects.hash(id, path, backendUrl, collectionName, rateLimit, stripPrefix);
     }
 
     @Override
@@ -97,6 +114,7 @@ public class RouteDefinition {
                ", backendUrl='" + backendUrl + '\'' +
                ", collectionName='" + collectionName + '\'' +
                ", rateLimit=" + rateLimit +
+               ", stripPrefix=" + stripPrefix +
                '}';
     }
 }

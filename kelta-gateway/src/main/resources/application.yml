@@ -48,13 +48,6 @@ spring:
         - name: RequestSize
           args:
             maxSize: 10MB          # Default 10 MB request body limit
-      routes:
-        - id: otel-traces
-          uri: ${OTEL_COLLECTOR_URL:http://jaeger.observability.svc.cluster.local:4318}
-          predicates:
-            - Path=/otel/v1/traces
-          filters:
-            - StripPrefix=1
       httpclient:
         connect-timeout: 5000
         response-timeout: 120s

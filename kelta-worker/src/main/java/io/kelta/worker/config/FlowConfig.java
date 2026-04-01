@@ -21,7 +21,6 @@ import io.kelta.worker.listener.CerbosPolicySyncHook;
 import io.kelta.worker.listener.ValidationRuleRefreshHook;
 import io.kelta.worker.service.AuditBeforeSaveHook;
 import io.kelta.worker.service.CerbosPolicySyncService;
-import io.kelta.worker.service.CollectionLifecycleManager;
 import io.kelta.worker.service.SetupAuditService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -215,8 +214,11 @@ public class FlowConfig {
     @Bean
     public ValidationRuleRefreshHook validationRuleRefreshHook(
             BeforeSaveHookRegistry hookRegistry,
-            CollectionLifecycleManager lifecycleManager) {
-        ValidationRuleRefreshHook hook = new ValidationRuleRefreshHook(lifecycleManager);
+            KafkaTemplate<String, String> kafkaTemplate,
+            ObjectMapper objectMapper,
+            JdbcTemplate jdbcTemplate) {
+        ValidationRuleRefreshHook hook = new ValidationRuleRefreshHook(
+                kafkaTemplate, objectMapper, jdbcTemplate);
         hookRegistry.register(hook);
         return hook;
     }

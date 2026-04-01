@@ -21,6 +21,7 @@
     <properties>
         <java.version>25</java.version>
         <spring-cloud.version>2025.1.1</spring-cloud.version>
+        <protobuf.version>4.32.0</protobuf.version>
         <junit-quickcheck.version>1.0</junit-quickcheck.version>
         <skipITs>true</skipITs>
     </properties>
@@ -211,6 +212,18 @@
                 <version>${spring-cloud.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
+            </dependency>
+            <!-- Override protobuf version to resolve conflict between
+                 Cerbos SDK (4.26.1) and OTLP metrics registry (gencode 4.32.0) -->
+            <dependency>
+                <groupId>com.google.protobuf</groupId>
+                <artifactId>protobuf-java</artifactId>
+                <version>${protobuf.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.google.protobuf</groupId>
+                <artifactId>protobuf-java-util</artifactId>
+                <version>${protobuf.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

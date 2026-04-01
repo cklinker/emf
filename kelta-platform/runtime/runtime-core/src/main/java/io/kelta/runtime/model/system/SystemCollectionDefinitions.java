@@ -398,7 +398,7 @@ public final class SystemCollectionDefinitions {
                 .withColumnName("collection_id"))
             .addField(FieldDefinition.requiredString("name", 100))
             .addField(FieldDefinition.string("description", 500))
-            .addField(FieldDefinition.bool("active"))
+            .addField(FieldDefinition.bool("active").withDefault(true))
             .addField(FieldDefinition.requiredString("errorConditionFormula")
                 .withColumnName("error_condition_formula"))
             .addField(FieldDefinition.requiredString("errorMessage", 1000)

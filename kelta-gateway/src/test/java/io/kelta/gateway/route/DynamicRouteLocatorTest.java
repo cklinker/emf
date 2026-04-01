@@ -2,13 +2,17 @@ package io.kelta.gateway.route;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.cloud.gateway.filter.GatewayFilter;
+import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.route.Route;
+import org.springframework.cloud.gateway.support.ServerWebExchangeUtils;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
 import org.springframework.mock.web.server.MockServerWebExchange;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
+import java.net.URI;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -243,6 +247,63 @@ class DynamicRouteLocatorTest {
         assertThat(Mono.from(route.getPredicate().apply(differentExchange)).block()).isFalse();
     }
     
+    @Test
+    void convertToRoute_withStripPrefix_addsFilterThatStripsResolvedUrl() {
+        // Given
+        RouteDefinition routeDef = new RouteDefinition(
+                "otel-traces", "/otel/v1/traces",
+                "http://jaeger:4318", "otel", null, 1);
+        routeRegistry.addRoute(routeDef);
+
+        // When
+        List<Route> routes = routeLocator.getRoutes().collectList().block();
+        Route route = routes.get(0);
+
+        // Then - route should have a filter
+        assertThat(route.getFilters()).isNotEmpty();
+
+        // Simulate what RouteToRequestUrlFilter does: set GATEWAY_REQUEST_URL_ATTR
+        MockServerHttpRequest request = MockServerHttpRequest.post("/otel/v1/traces").build();
+        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+        exchange.getAttributes().put(ServerWebExchangeUtils.GATEWAY_REQUEST_URL_ATTR,
+                URI.create("http://jaeger:4318/otel/v1/traces"));
+
+        // Execute the filter
+        GatewayFilter filter = route.getFilters().get(0);
+        GatewayFilterChain noopChain = ex -> Mono.empty();
+        filter.filter(exchange, noopChain).block();
+
+        // The filter should have stripped /otel, leaving /v1/traces
+        URI resolvedUrl = exchange.getAttribute(ServerWebExchangeUtils.GATEWAY_REQUEST_URL_ATTR);
+        assertThat(resolvedUrl).isNotNull();
+        assertThat(resolvedUrl.toString()).isEqualTo("http://jaeger:4318/v1/traces");
+    }
+
+    @Test
+    void convertToRoute_withStripPrefix_preservesQueryParams() {
+        // Given
+        RouteDefinition routeDef = new RouteDefinition(
+                "otel-traces", "/otel/v1/traces",
+                "http://jaeger:4318", "otel", null, 1);
+        routeRegistry.addRoute(routeDef);
+
+        List<Route> routes = routeLocator.getRoutes().collectList().block();
+        GatewayFilter filter = routes.get(0).getFilters().get(0);
+
+        MockServerHttpRequest request = MockServerHttpRequest.post("/otel/v1/traces").build();
+        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+        exchange.getAttributes().put(ServerWebExchangeUtils.GATEWAY_REQUEST_URL_ATTR,
+                URI.create("http://jaeger:4318/otel/v1/traces?timeout=30s"));
+
+        // When
+        GatewayFilterChain noopChain = ex -> Mono.empty();
+        filter.filter(exchange, noopChain).block();
+
+        // Then
+        URI resolvedUrl = exchange.getAttribute(ServerWebExchangeUtils.GATEWAY_REQUEST_URL_ATTR);
+        assertThat(resolvedUrl.toString()).isEqualTo("http://jaeger:4318/v1/traces?timeout=30s");
+    }
+
     @Test
     void convertToRoute_withSingleWildcard_matchesSingleSegmentOnly() {
         // Given

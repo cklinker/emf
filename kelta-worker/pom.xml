@@ -49,6 +49,22 @@
                 <artifactId>protobuf-java-util</artifactId>
                 <version>${protobuf.version}</version>
             </dependency>
+            <!-- Override okio version to resolve conflict between
+                 Svix SDK (okhttp 4.12.0 → okio 3.6.0) and
+                 OpenTelemetry exporter (okhttp 5.2.1 → okio 3.16.1).
+                 okhttp 5.2.1 requires Okio.socket() added in okio 3.10.0.
+                 Both okio and okio-jvm must be pinned since Maven resolves
+                 them as separate artifacts. -->
+            <dependency>
+                <groupId>com.squareup.okio</groupId>
+                <artifactId>okio</artifactId>
+                <version>3.16.1</version>
+            </dependency>
+            <dependency>
+                <groupId>com.squareup.okio</groupId>
+                <artifactId>okio-jvm</artifactId>
+                <version>3.16.1</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
@@ -120,13 +136,6 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-opentelemetry</artifactId>
-        </dependency>
-
-        <!-- Force okio version compatible with okhttp 5.x from spring-boot-starter-opentelemetry -->
-        <dependency>
-            <groupId>com.squareup.okio</groupId>
-            <artifactId>okio</artifactId>
-            <version>3.9.1</version>
         </dependency>
 
         <!-- Spring Kafka -->

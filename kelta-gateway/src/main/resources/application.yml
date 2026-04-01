@@ -126,7 +126,8 @@ management:
     kafka:
       enabled: true
   tracing:
-    enabled: true
+    export:
+      enabled: true
     sampling:
       probability: ${OTEL_TRACES_SAMPLER_ARG:1.0}
     propagation:

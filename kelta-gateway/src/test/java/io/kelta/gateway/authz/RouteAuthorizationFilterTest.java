@@ -1,6 +1,6 @@
 package io.kelta.gateway.authz;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import io.kelta.gateway.auth.GatewayPrincipal;
 import io.kelta.gateway.auth.PublicPathMatcher;
 import io.kelta.gateway.authz.cerbos.CerbosAuthorizationService;
@@ -65,11 +65,10 @@ class RouteAuthorizationFilterTest {
     }
 
     private GatewayPrincipal principalWithIdentity(String email) {
-        GatewayPrincipal principal = new GatewayPrincipal(email, List.of("USER"), Map.of());
-        principal.setProfileId("profile-1");
-        principal.setProfileName("Standard User");
-        principal.setTenantId("tenant-1");
-        return principal;
+        return new GatewayPrincipal(email, List.of("USER"), Map.of())
+                .withProfileId("profile-1")
+                .withProfileName("Standard User")
+                .withTenantId("tenant-1");
     }
 
     @Test

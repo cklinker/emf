@@ -1,6 +1,6 @@
 package io.kelta.worker.service.email;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 
 /**
  * Per-tenant email configuration extracted from the tenant.settings JSONB column.

@@ -3,8 +3,8 @@ package io.kelta.worker.event;
 import io.kelta.runtime.event.EventFactory;
 import io.kelta.runtime.event.PlatformEvent;
 import io.kelta.runtime.event.RecordChangedPayload;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -33,7 +33,6 @@ class KafkaRecordEventPublisherTest {
     void setUp() {
         kafkaTemplate = mock(KafkaTemplate.class);
         objectMapper = new ObjectMapper();
-        objectMapper.findAndRegisterModules(); // for Instant serialization
         publisher = new KafkaRecordEventPublisher(kafkaTemplate, objectMapper);
     }
 
@@ -129,7 +128,7 @@ class KafkaRecordEventPublisherTest {
     void shouldNotThrowWhenSerializationFails() throws Exception {
         ObjectMapper failingMapper = mock(ObjectMapper.class);
         when(failingMapper.writeValueAsString(any()))
-                .thenThrow(new JsonProcessingException("Serialization error") {});
+                .thenThrow(new JacksonException("Serialization error") {});
 
         KafkaRecordEventPublisher failingPublisher =
                 new KafkaRecordEventPublisher(kafkaTemplate, failingMapper);

@@ -1,7 +1,7 @@
 package io.kelta.worker.listener;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import com.svix.Svix;
 import com.svix.models.MessageIn;
 import io.kelta.runtime.event.ChangeType;

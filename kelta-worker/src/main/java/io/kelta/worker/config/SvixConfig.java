@@ -1,6 +1,6 @@
 package io.kelta.worker.config;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.svix.Svix;
 import com.svix.models.EventTypeIn;
 import io.kelta.runtime.workflow.BeforeSaveHookRegistry;

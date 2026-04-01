@@ -47,15 +47,15 @@ public class PrincipalExtractor {
         // for UserIdentityResolutionFilter to make a separate worker call.
         String profileId = jwt.getClaimAsString("profile_id");
         if (profileId != null && !profileId.isEmpty()) {
-            principal.setProfileId(profileId);
+            principal = principal.withProfileId(profileId);
         }
         String profileName = jwt.getClaimAsString("profile_name");
         if (profileName != null && !profileName.isEmpty()) {
-            principal.setProfileName(profileName);
+            principal = principal.withProfileName(profileName);
         }
         String tenantId = jwt.getClaimAsString("tenant_id");
         if (tenantId != null && !tenantId.isEmpty()) {
-            principal.setTenantId(tenantId);
+            principal = principal.withTenantId(tenantId);
         }
 
         // Detect connected app (client_credentials) tokens
@@ -63,11 +63,11 @@ public class PrincipalExtractor {
         if ("api_key".equals(authMethod)) {
             String connectedAppId = jwt.getClaimAsString("connected_app_id");
             if (connectedAppId != null && !connectedAppId.isEmpty()) {
-                principal.setConnectedAppId(connectedAppId);
+                principal = principal.withConnectedAppId(connectedAppId);
             }
             String appScopes = jwt.getClaimAsString("app_scopes");
             if (appScopes != null && !appScopes.isEmpty()) {
-                principal.setAppScopes(appScopes);
+                principal = principal.withAppScopes(appScopes);
             }
         }
 

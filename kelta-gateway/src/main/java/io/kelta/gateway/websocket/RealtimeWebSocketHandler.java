@@ -1,7 +1,7 @@
 package io.kelta.gateway.websocket;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import io.kelta.gateway.auth.DynamicReactiveJwtDecoder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -159,7 +159,7 @@ public class RealtimeWebSocketHandler implements WebSocketHandler {
             if (outbound != null) {
                 outbound.tryEmitNext(session.textMessage(json));
             }
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             log.error("Failed to serialize WebSocket message", e);
         }
     }

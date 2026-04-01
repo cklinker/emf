@@ -29,6 +29,7 @@ public class UserIdentityResolutionFilter implements GlobalFilter, Ordered {
 
     private static final Logger log = LoggerFactory.getLogger(UserIdentityResolutionFilter.class);
     private static final String CACHE_KEY_PREFIX = "user-identity:";
+    private static final String PRINCIPAL_ATTRIBUTE = "gateway.principal";
 
     private final WebClient webClient;
     private final ReactiveRedisTemplate<String, String> redisTemplate;
@@ -68,7 +69,8 @@ public class UserIdentityResolutionFilter implements GlobalFilter, Ordered {
 
         // Set tenantId on principal from URL resolution (if not already set from JWT claims)
         if (principal.getTenantId() == null) {
-            principal.setTenantId(tenantId);
+            principal = principal.withTenantId(tenantId);
+            exchange.getAttributes().put(PRINCIPAL_ATTRIBUTE, principal);
         }
 
         // Skip worker lookup when profile is already in the JWT claims (kelta-auth tokens).
@@ -83,26 +85,32 @@ public class UserIdentityResolutionFilter implements GlobalFilter, Ordered {
 
         return redisTemplate.opsForValue().get(cacheKey)
                 .flatMap(json -> {
-                    parseIdentity(json, principal);
+                    GatewayPrincipal current = JwtAuthenticationFilter.getPrincipal(exchange);
+                    GatewayPrincipal enriched = enrichFromIdentityJson(json, current);
+                    if (enriched != current) {
+                        exchange.getAttributes().put(PRINCIPAL_ATTRIBUTE, enriched);
+                    }
                     return Mono.just(json);
                 })
-                .switchIfEmpty(fetchFromWorker(tenantId, email, principal, cacheKey))
+                .switchIfEmpty(fetchFromWorker(tenantId, email, exchange, cacheKey))
                 .then(chain.filter(exchange));
     }
 
-    private void parseIdentity(String json, GatewayPrincipal principal) {
+    private GatewayPrincipal enrichFromIdentityJson(String json, GatewayPrincipal principal) {
         try {
             Map<String, String> identity = objectMapper.readValue(json,
                     new TypeReference<Map<String, String>>() {});
-            principal.setProfileId(identity.get("profileId"));
-            principal.setProfileName(identity.get("profileName"));
+            return principal
+                    .withProfileId(identity.get("profileId"))
+                    .withProfileName(identity.get("profileName"));
         } catch (Exception e) {
             log.warn("Failed to parse cached user identity: {}", e.getMessage());
+            return principal;
         }
     }
 
     private Mono<String> fetchFromWorker(String tenantId, String email,
-                                         GatewayPrincipal principal, String cacheKey) {
+                                         ServerWebExchange exchange, String cacheKey) {
         return webClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/internal/user-identity")
@@ -112,7 +120,11 @@ public class UserIdentityResolutionFilter implements GlobalFilter, Ordered {
                 .retrieve()
                 .bodyToMono(String.class)
                 .flatMap(json -> {
-                    parseIdentity(json, principal);
+                    GatewayPrincipal current = JwtAuthenticationFilter.getPrincipal(exchange);
+                    GatewayPrincipal enriched = enrichFromIdentityJson(json, current);
+                    if (enriched != current) {
+                        exchange.getAttributes().put(PRINCIPAL_ATTRIBUTE, enriched);
+                    }
                     return redisTemplate.opsForValue().set(cacheKey, json, cacheTtl)
                             .thenReturn(json);
                 })

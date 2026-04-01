@@ -4,7 +4,7 @@
 # =============================================================================
 # Stage 1: Build runtime-core and runtime-events dependencies
 # =============================================================================
-FROM maven:3.9-eclipse-temurin-21 AS runtime-builder
+FROM maven:3.9-eclipse-temurin-25 AS runtime-builder
 
 WORKDIR /kelta-platform
 
@@ -33,7 +33,7 @@ RUN mvn clean install -DskipTests -pl runtime/runtime-core,runtime/runtime-event
 # =============================================================================
 # Stage 2: Build the application
 # =============================================================================
-FROM maven:3.9-eclipse-temurin-21 AS builder
+FROM maven:3.9-eclipse-temurin-25 AS builder
 
 WORKDIR /build
 
@@ -53,7 +53,7 @@ RUN mvn clean package -DskipTests -B
 # =============================================================================
 # Stage 3: Runtime image
 # =============================================================================
-FROM eclipse-temurin:21-jre
+FROM eclipse-temurin:25-jre
 
 WORKDIR /app
 
@@ -74,6 +74,6 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
   CMD curl -f http://localhost:8080/actuator/health || exit 1
 
-ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UseG1GC -javaagent:/app/opentelemetry-javaagent.jar"
+ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:+UseCompactObjectHeaders -XX:MaxRAMPercentage=75.0 -XX:+UseG1GC -javaagent:/app/opentelemetry-javaagent.jar"
 
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

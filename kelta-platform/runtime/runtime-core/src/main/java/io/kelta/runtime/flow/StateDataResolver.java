@@ -1,12 +1,10 @@
 package io.kelta.runtime.flow;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import com.jayway.jsonpath.Configuration;
 import com.jayway.jsonpath.JsonPath;
 import com.jayway.jsonpath.Option;
-import com.jayway.jsonpath.spi.json.JacksonJsonProvider;
-import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -36,9 +34,9 @@ public class StateDataResolver {
 
     public StateDataResolver(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
+        // Use JsonPath's default provider (JsonSmartJsonProvider) instead of the
+        // Jackson-specific provider, since Jayway JsonPath does not yet support Jackson 3.
         this.jsonPathConfig = Configuration.builder()
-            .jsonProvider(new JacksonJsonProvider(objectMapper))
-            .mappingProvider(new JacksonMappingProvider(objectMapper))
             .options(Option.SUPPRESS_EXCEPTIONS)
             .build();
     }

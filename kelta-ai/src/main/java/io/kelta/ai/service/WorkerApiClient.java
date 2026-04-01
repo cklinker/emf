@@ -57,7 +57,7 @@ public class WorkerApiClient {
     @SuppressWarnings("unchecked")
     private String parseWorkerError(String body) {
         try {
-            Map<String, Object> parsed = new com.fasterxml.jackson.databind.ObjectMapper()
+            Map<String, Object> parsed = new tools.jackson.databind.ObjectMapper()
                     .readValue(body, Map.class);
             List<Map<String, Object>> errors = (List<Map<String, Object>>) parsed.get("errors");
             if (errors != null && !errors.isEmpty()) {

@@ -6,8 +6,8 @@ import io.kelta.runtime.event.EventFactory;
 import io.kelta.runtime.event.PlatformEvent;
 import io.kelta.runtime.workflow.BeforeSaveHook;
 import io.kelta.runtime.workflow.BeforeSaveResult;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -94,7 +94,7 @@ public class FieldConfigEventPublisher implements BeforeSaveHook {
                                 "for collectionId={}", collectionId);
                     }
                 });
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             log.error("Failed to serialize collection changed event for field change " +
                     "(collectionId={}): {}", collectionId, e.getMessage());
         }

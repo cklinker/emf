@@ -1,6 +1,6 @@
 package io.kelta.worker.service.email;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import io.kelta.runtime.module.integration.spi.EmailService;
 import io.kelta.worker.repository.EmailRepository;
 import org.slf4j.Logger;

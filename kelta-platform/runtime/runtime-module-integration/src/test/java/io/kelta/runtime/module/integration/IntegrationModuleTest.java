@@ -5,7 +5,7 @@ import io.kelta.runtime.module.integration.spi.PendingActionStore;
 import io.kelta.runtime.module.integration.spi.ScriptExecutor;
 import io.kelta.runtime.workflow.ActionHandler;
 import io.kelta.runtime.workflow.module.ModuleContext;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

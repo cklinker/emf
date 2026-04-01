@@ -6,7 +6,7 @@ import io.kelta.runtime.event.RecordChangedPayload;
 import io.kelta.runtime.registry.CollectionRegistry;
 import io.kelta.worker.service.CollectionLifecycleManager;
 import io.kelta.worker.service.SearchIndexService;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -31,7 +31,6 @@ class SearchIndexListenerTest {
         lifecycleManager = mock(CollectionLifecycleManager.class);
         collectionRegistry = mock(CollectionRegistry.class);
         objectMapper = new ObjectMapper();
-        objectMapper.findAndRegisterModules();
         listener = new SearchIndexListener(searchIndexService, lifecycleManager,
                 collectionRegistry, objectMapper);
 

@@ -1,7 +1,6 @@
 package io.kelta.auth.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import tools.jackson.databind.ObjectMapper;
 import io.kelta.auth.model.KeltaSession;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,7 +32,6 @@ class SessionServiceTest {
     @BeforeEach
     void setUp() {
         objectMapper = new ObjectMapper();
-        objectMapper.registerModule(new JavaTimeModule());
         sessionService = new SessionService(redisTemplate, objectMapper);
         lenient().when(redisTemplate.opsForValue()).thenReturn(valueOps);
     }

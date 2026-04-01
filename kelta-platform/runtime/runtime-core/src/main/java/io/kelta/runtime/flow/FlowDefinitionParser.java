@@ -1,9 +1,9 @@
 package io.kelta.runtime.flow;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ArrayNode;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -55,9 +55,7 @@ public class FlowDefinitionParser {
             }
 
             Map<String, StateDefinition> states = new LinkedHashMap<>();
-            var fields = statesNode.fields();
-            while (fields.hasNext()) {
-                var entry = fields.next();
+            for (var entry : statesNode.properties()) {
                 states.put(entry.getKey(), parseState(entry.getKey(), entry.getValue()));
             }
 

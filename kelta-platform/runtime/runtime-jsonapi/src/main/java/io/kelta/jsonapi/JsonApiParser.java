@@ -1,9 +1,9 @@
 package io.kelta.jsonapi;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -71,7 +71,7 @@ public class JsonApiParser {
             }
 
             return document;
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             log.error("Failed to parse JSON:API response: {}", e.getMessage());
             throw new JsonApiParseException("Failed to parse JSON:API response", e);
         }
@@ -80,7 +80,7 @@ public class JsonApiParser {
     /**
      * Parse the data field, which can be either a single resource object or an array of resources.
      */
-    private List<ResourceObject> parseData(JsonNode dataNode) throws JsonProcessingException {
+    private List<ResourceObject> parseData(JsonNode dataNode) throws JacksonException {
         List<ResourceObject> resources = new ArrayList<>();
 
         if (dataNode.isNull()) {
@@ -106,7 +106,7 @@ public class JsonApiParser {
     /**
      * Parse the included field, which is always an array of resource objects.
      */
-    private List<ResourceObject> parseIncluded(JsonNode includedNode) throws JsonProcessingException {
+    private List<ResourceObject> parseIncluded(JsonNode includedNode) throws JacksonException {
         List<ResourceObject> resources = new ArrayList<>();
 
         if (includedNode.isArray()) {
@@ -122,7 +122,7 @@ public class JsonApiParser {
     /**
      * Parse a single resource object with type, id, attributes, and relationships.
      */
-    private ResourceObject parseResourceObject(JsonNode resourceNode) throws JsonProcessingException {
+    private ResourceObject parseResourceObject(JsonNode resourceNode) throws JacksonException {
         ResourceObject resource = new ResourceObject();
 
         // Parse type and id (required fields)
@@ -151,24 +151,24 @@ public class JsonApiParser {
     /**
      * Parse attributes as a map of field names to values.
      */
-    private Map<String, Object> parseAttributes(JsonNode attributesNode) throws JsonProcessingException {
+    private Map<String, Object> parseAttributes(JsonNode attributesNode) throws JacksonException {
         return objectMapper.convertValue(attributesNode, new TypeReference<Map<String, Object>>() {});
     }
 
     /**
      * Parse relationships as a map of relationship names to Relationship objects.
      */
-    private Map<String, Relationship> parseRelationships(JsonNode relationshipsNode) throws JsonProcessingException {
+    private Map<String, Relationship> parseRelationships(JsonNode relationshipsNode) throws JacksonException {
         Map<String, Relationship> relationships = new HashMap<>();
 
-        relationshipsNode.fields().forEachRemaining(entry -> {
+        relationshipsNode.properties().forEach(entry -> {
             String relationshipName = entry.getKey();
             JsonNode relationshipNode = entry.getValue();
 
             try {
                 Relationship relationship = parseRelationship(relationshipNode);
                 relationships.put(relationshipName, relationship);
-            } catch (JsonProcessingException e) {
+            } catch (JacksonException e) {
                 log.warn("Failed to parse relationship '{}': {}", relationshipName, e.getMessage());
             }
         });
@@ -179,7 +179,7 @@ public class JsonApiParser {
     /**
      * Parse a single relationship, which can contain data (single or array) and links.
      */
-    private Relationship parseRelationship(JsonNode relationshipNode) throws JsonProcessingException {
+    private Relationship parseRelationship(JsonNode relationshipNode) throws JacksonException {
         Relationship relationship = new Relationship();
 
         // Parse data (can be single ResourceIdentifier, array, or null)
@@ -234,7 +234,7 @@ public class JsonApiParser {
     /**
      * Parse errors array.
      */
-    private List<JsonApiError> parseErrors(JsonNode errorsNode) throws JsonProcessingException {
+    private List<JsonApiError> parseErrors(JsonNode errorsNode) throws JacksonException {
         List<JsonApiError> errors = new ArrayList<>();
 
         if (errorsNode.isArray()) {
@@ -250,7 +250,7 @@ public class JsonApiParser {
     /**
      * Parse a single error object.
      */
-    private JsonApiError parseError(JsonNode errorNode) throws JsonProcessingException {
+    private JsonApiError parseError(JsonNode errorNode) throws JacksonException {
         JsonApiError error = new JsonApiError();
 
         if (errorNode.has("id")) {
@@ -289,7 +289,7 @@ public class JsonApiParser {
     /**
      * Parse meta as a map of key-value pairs.
      */
-    private Map<String, Object> parseMeta(JsonNode metaNode) throws JsonProcessingException {
+    private Map<String, Object> parseMeta(JsonNode metaNode) throws JacksonException {
         return objectMapper.convertValue(metaNode, new TypeReference<Map<String, Object>>() {});
     }
 
@@ -336,7 +336,7 @@ public class JsonApiParser {
             }
 
             return resource;
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             log.error("Failed to parse ResourceObject from JSON: {}", e.getMessage());
             throw new JsonApiParseException("Failed to parse ResourceObject from JSON", e);
         }
@@ -345,17 +345,17 @@ public class JsonApiParser {
     /**
      * Static helper to parse relationships for the static parseResourceObject method.
      */
-    private static Map<String, Relationship> parseRelationshipsStatic(JsonNode relationshipsNode, ObjectMapper mapper) throws JsonProcessingException {
+    private static Map<String, Relationship> parseRelationshipsStatic(JsonNode relationshipsNode, ObjectMapper mapper) throws JacksonException {
         Map<String, Relationship> relationships = new HashMap<>();
 
-        relationshipsNode.fields().forEachRemaining(entry -> {
+        relationshipsNode.properties().forEach(entry -> {
             String relationshipName = entry.getKey();
             JsonNode relationshipNode = entry.getValue();
 
             try {
                 Relationship relationship = parseRelationshipStatic(relationshipNode, mapper);
                 relationships.put(relationshipName, relationship);
-            } catch (JsonProcessingException e) {
+            } catch (JacksonException e) {
                 log.warn("Failed to parse relationship '{}': {}", relationshipName, e.getMessage());
             }
         });
@@ -366,7 +366,7 @@ public class JsonApiParser {
     /**
      * Static helper to parse a single relationship for the static parseResourceObject method.
      */
-    private static Relationship parseRelationshipStatic(JsonNode relationshipNode, ObjectMapper mapper) throws JsonProcessingException {
+    private static Relationship parseRelationshipStatic(JsonNode relationshipNode, ObjectMapper mapper) throws JacksonException {
         Relationship relationship = new Relationship();
 
         // Parse data (can be single ResourceIdentifier, array, or null)
@@ -446,7 +446,7 @@ public class JsonApiParser {
 
         try {
             return objectMapper.writeValueAsString(resource);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             log.error("Failed to serialize ResourceObject to JSON: {}", e.getMessage());
             throw new JsonApiParseException("Failed to serialize ResourceObject to JSON", e);
         }
@@ -499,7 +499,7 @@ public class JsonApiParser {
             }
 
             return objectMapper.writeValueAsString(result);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             log.error("Failed to serialize JsonApiDocument to JSON: {}", e.getMessage());
             throw new JsonApiParseException("Failed to serialize JsonApiDocument to JSON", e);
         }

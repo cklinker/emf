@@ -254,9 +254,9 @@ class HeaderTransformationFilterTest {
         // Then: Headers should remain unchanged
         assertThat(capturedExchange[0]).isNotNull();
         HttpHeaders headers = capturedExchange[0].getRequest().getHeaders();
-        assertThat(headers.containsKey("X-Forwarded-User")).isFalse();
-        assertThat(headers.containsKey("X-Forwarded-Groups")).isFalse();
-        assertThat(headers.containsKey("X-Forwarded-Roles")).isFalse();
+        assertThat(headers.containsHeader("X-Forwarded-User")).isFalse();
+        assertThat(headers.containsHeader("X-Forwarded-Groups")).isFalse();
+        assertThat(headers.containsHeader("X-Forwarded-Roles")).isFalse();
         assertThat(headers.getFirst("X-Custom-Header")).isEqualTo("custom-value");
     }
     

@@ -67,8 +67,8 @@ class TestFrameworkVerificationTest extends IntegrationTestBase {
         HttpHeaders headers = authHelper.createAuthHeaders(token);
         
         assertNotNull(headers, "Headers should not be null");
-        assertTrue(headers.containsKey("Authorization"), "Headers should contain Authorization");
-        assertTrue(headers.containsKey("Content-Type"), "Headers should contain Content-Type");
+        assertTrue(headers.containsHeader("Authorization"), "Headers should contain Authorization");
+        assertTrue(headers.containsHeader("Content-Type"), "Headers should contain Content-Type");
     }
     
     @Test

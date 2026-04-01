@@ -2,7 +2,7 @@ package io.kelta.runtime.model.system;
 
 import io.kelta.runtime.model.FieldType;
 import io.kelta.runtime.model.ValidationRules;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;

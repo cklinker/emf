@@ -7,7 +7,7 @@ import io.kelta.runtime.event.RecordChangedPayload;
 import io.kelta.runtime.flow.FlowEngine;
 import io.kelta.runtime.flow.FlowTriggerEvaluator;
 import io.kelta.runtime.flow.InitialStateBuilder;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -40,7 +40,6 @@ class FlowEventListenerTest {
         initialStateBuilder = mock(InitialStateBuilder.class);
         jdbcTemplate = mock(JdbcTemplate.class);
         objectMapper = new ObjectMapper();
-        objectMapper.findAndRegisterModules();
         listener = new FlowEventListener(flowEngine, triggerEvaluator, initialStateBuilder, jdbcTemplate, objectMapper);
     }
 

@@ -1,7 +1,7 @@
 package io.kelta.worker.controller;
 
 import io.kelta.worker.repository.BootstrapRepository;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;

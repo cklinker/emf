@@ -1,6 +1,6 @@
 package io.kelta.worker.config;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import io.kelta.runtime.workflow.BeforeSaveHookRegistry;
 import io.kelta.worker.listener.SupersetCollectionSyncListener;
 import io.kelta.worker.listener.SupersetTenantLifecycleHook;

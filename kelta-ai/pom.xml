@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.2.2</version>
+        <version>4.0.5</version>
         <relativePath/>
     </parent>
 
@@ -20,7 +20,7 @@
     <description>AI-powered assistant service for the Kelta platform using Anthropic Claude</description>
 
     <properties>
-        <java.version>21</java.version>
+        <java.version>25</java.version>
         <maven.compiler.source>${java.version}</maven.compiler.source>
         <maven.compiler.target>${java.version}</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -71,7 +71,7 @@
         <dependency>
             <groupId>net.logstash.logback</groupId>
             <artifactId>logstash-logback-encoder</artifactId>
-            <version>7.4</version>
+            <version>8.0</version>
         </dependency>
 
         <!-- OpenTelemetry API for manual span enrichment -->
@@ -107,15 +107,12 @@
             <artifactId>flyway-core</artifactId>
         </dependency>
 
-        <!-- Jackson -->
+        <!-- Jackson 3 -->
         <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
+            <groupId>tools.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
         </dependency>
-        <dependency>
-            <groupId>com.fasterxml.jackson.datatype</groupId>
-            <artifactId>jackson-datatype-jsr310</artifactId>
-        </dependency>
+        <!-- jackson-datatype-jsr310 merged into jackson-databind in Jackson 3 -->
 
         <!-- Testing -->
         <dependency>
@@ -139,7 +136,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.12.1</version>
+                <version>3.14.0</version>
                 <configuration>
                     <source>${java.version}</source>
                     <target>${java.version}</target>

@@ -4,7 +4,7 @@ import io.kelta.runtime.formula.FormulaEvaluator;
 import io.kelta.runtime.query.QueryEngine;
 import io.kelta.runtime.registry.CollectionRegistry;
 import io.kelta.runtime.workflow.ActionHandlerRegistry;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 
 import java.util.Collections;
 import java.util.HashMap;

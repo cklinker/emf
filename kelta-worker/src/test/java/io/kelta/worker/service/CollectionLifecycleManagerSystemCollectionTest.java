@@ -5,7 +5,7 @@ import io.kelta.runtime.model.FieldType;
 import io.kelta.runtime.model.system.SystemCollectionDefinitions;
 import io.kelta.runtime.registry.CollectionRegistry;
 import io.kelta.runtime.storage.StorageAdapter;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

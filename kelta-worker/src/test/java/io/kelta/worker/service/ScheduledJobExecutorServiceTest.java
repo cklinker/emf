@@ -1,6 +1,6 @@
 package io.kelta.worker.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import io.kelta.runtime.context.TenantContext;
 import io.kelta.runtime.flow.FlowEngine;
 import io.kelta.runtime.flow.InitialStateBuilder;

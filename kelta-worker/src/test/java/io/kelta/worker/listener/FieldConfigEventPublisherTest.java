@@ -2,8 +2,7 @@ package io.kelta.worker.listener;
 
 import io.kelta.runtime.event.ChangeType;
 import io.kelta.runtime.event.CollectionChangedPayload;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -31,7 +30,6 @@ class FieldConfigEventPublisherTest {
     void setUp() {
         kafkaTemplate = mock(KafkaTemplate.class);
         objectMapper = new ObjectMapper();
-        objectMapper.registerModule(new JavaTimeModule());
         publisher = new FieldConfigEventPublisher(kafkaTemplate, objectMapper);
         when(kafkaTemplate.send(anyString(), anyString(), anyString()))
             .thenReturn(new CompletableFuture<>());

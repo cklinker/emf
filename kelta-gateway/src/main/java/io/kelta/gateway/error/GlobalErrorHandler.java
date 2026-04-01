@@ -4,12 +4,11 @@ import io.kelta.gateway.filter.TenantResolutionFilter;
 import io.kelta.gateway.metrics.GatewayMetrics;
 import io.kelta.jsonapi.JsonApiError;
 import io.kelta.jsonapi.JsonApiParser;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.web.reactive.error.ErrorWebExceptionHandler;
+import org.springframework.boot.webflux.error.ErrorWebExceptionHandler;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.HttpStatus;
@@ -56,8 +55,6 @@ public class GlobalErrorHandler implements ErrorWebExceptionHandler {
     public GlobalErrorHandler(ObjectMapper objectMapper, GatewayMetrics metrics) {
         this.objectMapper = objectMapper;
         this.metrics = metrics;
-        // Register JavaTimeModule to handle Java 8 date/time types
-        this.objectMapper.registerModule(new JavaTimeModule());
     }
 
     @Override
@@ -189,7 +186,7 @@ public class GlobalErrorHandler implements ErrorWebExceptionHandler {
             DataBuffer buffer = exchange.getResponse().bufferFactory().wrap(bytes);
 
             return exchange.getResponse().writeWith(Mono.just(buffer));
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             log.error("Failed to serialize error response for path: {}, correlationId: {}",
                 path, correlationId, e);
 

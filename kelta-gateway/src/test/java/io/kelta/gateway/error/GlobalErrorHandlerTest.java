@@ -2,7 +2,7 @@ package io.kelta.gateway.error;
 
 import io.kelta.gateway.metrics.GatewayMetrics;
 import io.kelta.jsonapi.JsonApiParser;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;

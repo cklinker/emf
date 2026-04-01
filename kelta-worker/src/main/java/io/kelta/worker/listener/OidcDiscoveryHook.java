@@ -1,7 +1,7 @@
 package io.kelta.worker.listener;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import io.kelta.runtime.workflow.BeforeSaveHook;
 import io.kelta.runtime.workflow.BeforeSaveResult;
 import org.slf4j.Logger;

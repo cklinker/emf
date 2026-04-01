@@ -3,7 +3,7 @@ package io.kelta.worker.controller;
 import io.kelta.runtime.flow.WorkflowRuleToFlowMigrator;
 import io.kelta.runtime.workflow.WorkflowRuleData;
 import io.kelta.worker.repository.WorkflowMigrationRepository;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;

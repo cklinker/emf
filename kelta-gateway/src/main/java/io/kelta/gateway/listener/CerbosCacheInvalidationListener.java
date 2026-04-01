@@ -1,6 +1,6 @@
 package io.kelta.gateway.listener;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import io.kelta.gateway.authz.cerbos.CerbosAuthorizationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

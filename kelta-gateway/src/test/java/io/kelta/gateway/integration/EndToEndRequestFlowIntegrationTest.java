@@ -4,7 +4,7 @@ import io.kelta.gateway.auth.DynamicReactiveJwtDecoder;
 import io.kelta.gateway.route.RateLimitConfig;
 import io.kelta.gateway.route.RouteDefinition;
 import io.kelta.gateway.route.RouteRegistry;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
@@ -13,7 +13,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -58,7 +58,7 @@ class EndToEndRequestFlowIntegrationTest {
     @Autowired
     private RouteRegistry routeRegistry;
 
-    @MockBean
+    @MockitoBean
     private DynamicReactiveJwtDecoder jwtDecoder;
 
     @Autowired

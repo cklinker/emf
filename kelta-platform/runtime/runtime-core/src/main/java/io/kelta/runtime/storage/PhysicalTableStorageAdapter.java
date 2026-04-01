@@ -363,6 +363,13 @@ public class PhysicalTableStorageAdapter implements StorageAdapter {
         try {
             jdbcTemplate.update(sql, values.toArray());
             log.debug("Created record with ID '{}' in collection '{}'", data.get("id"), definition.name());
+            // Read back from DB to capture DB-level defaults (e.g., active = true),
+            // then merge into the original data so callers see the complete record.
+            getById(definition, (String) data.get("id")).ifPresent(readBack -> {
+                for (Map.Entry<String, Object> entry : readBack.entrySet()) {
+                    data.putIfAbsent(entry.getKey(), entry.getValue());
+                }
+            });
             return data;
         } catch (DuplicateKeyException e) {
             // Determine which field caused the violation

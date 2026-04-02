@@ -3,7 +3,9 @@ package io.kelta.worker.controller;
 import io.kelta.runtime.event.PlatformEvent;
 import io.kelta.runtime.event.RecordChangedPayload;
 import io.kelta.runtime.events.RecordEventPublisher;
+import io.kelta.worker.cache.WorkerCacheManager;
 import io.kelta.worker.repository.GovernorLimitsRepository;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -49,7 +51,8 @@ class GovernorLimitsControllerTest {
         when(redisTemplate.opsForValue()).thenReturn(valueOps);
         // Default: Redis returns null (0 API calls)
         when(valueOps.get(anyString())).thenReturn(null);
-        controller = new GovernorLimitsController(repository, objectMapper, redisTemplate, recordEventPublisher);
+        WorkerCacheManager cacheManager = new WorkerCacheManager(new SimpleMeterRegistry());
+        controller = new GovernorLimitsController(repository, objectMapper, redisTemplate, recordEventPublisher, cacheManager);
     }
 
     /** Extracts the attributes map from a JSON:API single-resource response body. */

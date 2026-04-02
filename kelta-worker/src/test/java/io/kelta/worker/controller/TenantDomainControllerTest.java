@@ -1,6 +1,8 @@
 package io.kelta.worker.controller;
 
 import io.kelta.runtime.context.TenantContext;
+import io.kelta.worker.cache.WorkerCacheManager;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -24,7 +26,8 @@ class TenantDomainControllerTest {
 
     @BeforeEach
     void setUp() {
-        controller = new TenantDomainController(jdbcTemplate);
+        WorkerCacheManager cacheManager = new WorkerCacheManager(new SimpleMeterRegistry());
+        controller = new TenantDomainController(jdbcTemplate, cacheManager);
         TenantContext.set("tenant-1");
     }
 

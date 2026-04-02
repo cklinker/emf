@@ -5,6 +5,7 @@ import io.kelta.runtime.event.EventFactory;
 import io.kelta.runtime.event.PlatformEvent;
 import io.kelta.runtime.event.RecordChangedPayload;
 import io.kelta.runtime.events.RecordEventPublisher;
+import io.kelta.worker.cache.WorkerCacheManager;
 import io.kelta.worker.repository.GovernorLimitsRepository;
 import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -54,14 +55,17 @@ public class GovernorLimitsController {
     private final ObjectMapper objectMapper;
     private final StringRedisTemplate redisTemplate;
     private final RecordEventPublisher recordEventPublisher;
+    private final WorkerCacheManager cacheManager;
 
     public GovernorLimitsController(GovernorLimitsRepository repository, ObjectMapper objectMapper,
                                      StringRedisTemplate redisTemplate,
-                                     RecordEventPublisher recordEventPublisher) {
+                                     RecordEventPublisher recordEventPublisher,
+                                     WorkerCacheManager cacheManager) {
         this.repository = repository;
         this.objectMapper = objectMapper;
         this.redisTemplate = redisTemplate;
         this.recordEventPublisher = recordEventPublisher;
+        this.cacheManager = cacheManager;
     }
 
     /**
@@ -125,6 +129,7 @@ public class GovernorLimitsController {
         try {
             String limitsJson = objectMapper.writeValueAsString(body);
             repository.updateTenantLimits(tenantId, limitsJson);
+            cacheManager.evictTenantLimits(tenantId);
 
             log.info("Updated governor-limits for tenant {}", tenantId);
 
@@ -172,6 +177,12 @@ public class GovernorLimitsController {
 
     @SuppressWarnings("unchecked")
     private Map<String, Object> loadLimits(String tenantId) {
+        // Check cache first
+        Optional<Map<String, Object>> cached = cacheManager.getTenantLimits(tenantId);
+        if (cached.isPresent()) {
+            return cached.get();
+        }
+
         Optional<Object> limitsOpt = repository.findTenantLimits(tenantId);
         if (limitsOpt.isEmpty()) {
             return buildDefaultLimits();
@@ -221,6 +232,7 @@ public class GovernorLimitsController {
         limits.put("aiTokensPerMonth", getLongOrDefault(parsed, "aiTokensPerMonth", DEFAULT_AI_TOKENS_PER_MONTH));
         limits.put("aiEnabled", getBooleanOrDefault(parsed, "aiEnabled", DEFAULT_AI_ENABLED));
 
+        cacheManager.putTenantLimits(tenantId, limits);
         return limits;
     }
 

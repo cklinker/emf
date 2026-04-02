@@ -1,5 +1,6 @@
 package io.kelta.worker.controller;
 
+import io.kelta.worker.cache.WorkerCacheManager;
 import io.kelta.worker.service.CerbosPermissionResolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,6 +14,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Serves the current user's permissions (system, object, and field level).
@@ -35,11 +37,14 @@ public class UserPermissionsController {
 
     private final CerbosPermissionResolver permissionResolver;
     private final JdbcTemplate jdbcTemplate;
+    private final WorkerCacheManager cacheManager;
 
     public UserPermissionsController(CerbosPermissionResolver permissionResolver,
-                                     JdbcTemplate jdbcTemplate) {
+                                     JdbcTemplate jdbcTemplate,
+                                     WorkerCacheManager cacheManager) {
         this.permissionResolver = permissionResolver;
         this.jdbcTemplate = jdbcTemplate;
+        this.cacheManager = cacheManager;
     }
 
     @GetMapping("/permissions")
@@ -53,6 +58,12 @@ public class UserPermissionsController {
                     "objectPermissions", Map.of(),
                     "fieldPermissions", Map.of()
             ));
+        }
+
+        // Check cache first
+        Optional<Map<String, Object>> cached = cacheManager.getPermissions(profileId);
+        if (cached.isPresent()) {
+            return ResponseEntity.ok(cached.get());
         }
 
         Map<String, Boolean> systemPermissions = new LinkedHashMap<>();
@@ -105,6 +116,8 @@ public class UserPermissionsController {
         response.put("systemPermissions", systemPermissions);
         response.put("objectPermissions", objectPermissions);
         response.put("fieldPermissions", fieldPermissions);
+
+        cacheManager.putPermissions(profileId, response);
         return ResponseEntity.ok(response);
     }
 }

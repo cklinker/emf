@@ -76,6 +76,19 @@ public class SystemCollectionRouteListener {
                 cacheManager.refreshGovernorLimitsFromWorker();
             }
 
+            if ("tenant_custom_domains".equals(collectionName)) {
+                String domain = payload.getData() != null
+                        ? (String) payload.getData().get("domain") : null;
+                log.info("Custom domain changed (recordId={}, changeType={}, domain={}), evicting domain cache",
+                        payload.getRecordId(), payload.getChangeType(), domain);
+                if (domain != null) {
+                    cacheManager.removeCustomDomain(domain);
+                } else {
+                    // If we can't identify the specific domain, evict all custom domain entries
+                    cacheManager.evictAllCustomDomains();
+                }
+            }
+
         } catch (Exception e) {
             log.error("Error processing record change event: {}", e.getMessage(), e);
         }

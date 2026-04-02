@@ -169,6 +169,51 @@ class SystemCollectionRouteListenerTest {
     }
 
     @Nested
+    @DisplayName("System Collection Response Cache Invalidation Tests")
+    class SystemCollectionResponseCacheTests {
+
+        @Test
+        @DisplayName("Should evict response cache when cacheable collection changes")
+        void shouldEvictResponseCacheOnCacheableCollectionChange() throws Exception {
+            String message = createEventMessage("collections", "col-1", ChangeType.UPDATED);
+
+            listener.onRecordChanged(message);
+
+            verify(cacheManager).evictSystemCollectionResponses("collections");
+        }
+
+        @Test
+        @DisplayName("Should evict response cache for ui-pages changes")
+        void shouldEvictResponseCacheForUiPages() throws Exception {
+            String message = createEventMessage("ui-pages", "page-1", ChangeType.CREATED);
+
+            listener.onRecordChanged(message);
+
+            verify(cacheManager).evictSystemCollectionResponses("ui-pages");
+        }
+
+        @Test
+        @DisplayName("Should NOT evict response cache for non-cacheable collections")
+        void shouldNotEvictResponseCacheForNonCacheableCollections() throws Exception {
+            String message = createEventMessage("users", "user-1", ChangeType.UPDATED);
+
+            listener.onRecordChanged(message);
+
+            verify(cacheManager, never()).evictSystemCollectionResponses(anyString());
+        }
+
+        @Test
+        @DisplayName("Should NOT evict response cache for user-defined collections")
+        void shouldNotEvictResponseCacheForUserCollections() throws Exception {
+            String message = createEventMessage("products", "prod-1", ChangeType.CREATED);
+
+            listener.onRecordChanged(message);
+
+            verify(cacheManager, never()).evictSystemCollectionResponses(anyString());
+        }
+    }
+
+    @Nested
     @DisplayName("Error Handling Tests")
     class ErrorHandlingTests {
 

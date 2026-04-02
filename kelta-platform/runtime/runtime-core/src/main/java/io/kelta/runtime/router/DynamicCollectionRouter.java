@@ -92,6 +92,14 @@ public class DynamicCollectionRouter {
     private UserIdResolver userIdResolver;
 
     /**
+     * Optional cache for system collection query results. When present, list
+     * and get-by-id operations on system collections check the cache first and
+     * store results on cache miss. Write operations evict the cache for the
+     * affected collection.
+     */
+    private SystemCollectionCache systemCollectionCache;
+
+    /**
      * Creates a new DynamicCollectionRouter.
      *
      * @param registry the collection registry
@@ -110,6 +118,11 @@ public class DynamicCollectionRouter {
     @Autowired(required = false)
     public void setUserIdResolver(UserIdResolver userIdResolver) {
         this.userIdResolver = userIdResolver;
+    }
+
+    @Autowired(required = false)
+    public void setSystemCollectionCache(SystemCollectionCache systemCollectionCache) {
+        this.systemCollectionCache = systemCollectionCache;
     }
 
     /**
@@ -141,18 +154,36 @@ public class DynamicCollectionRouter {
             // For tenant-scoped system collections, inject tenant_id filter
             queryRequest = injectTenantFilter(queryRequest, definition, request);
 
+            // Check system collection cache before querying
+            String tenantId = request.getHeader("X-Tenant-ID");
+            List<String> includeNames = parseIncludeParam(params);
+            if (definition.systemCollection() && systemCollectionCache != null && includeNames.isEmpty()) {
+                String queryHash = buildQueryHash(queryRequest);
+                Optional<Map<String, Object>> cached = systemCollectionCache.getListResponse(
+                        tenantId, collectionName, queryHash);
+                if (cached.isPresent()) {
+                    logger.debug("Cache hit for system collection list: {}", collectionName);
+                    return ResponseEntity.ok(cached.get());
+                }
+            }
+
             QueryResult result = queryEngine.executeQuery(definition, queryRequest);
 
             Map<String, Object> response = toJsonApiListResponse(result, collectionName, definition);
 
             // Resolve JSON:API ?include= parameter for inverse (has-many) relationships
-            List<String> includeNames = parseIncludeParam(params);
             if (!includeNames.isEmpty() && !result.data().isEmpty()) {
                 List<Map<String, Object>> included = resolveIncludes(
                         includeNames, result.data(), collectionName, definition, request);
                 if (!included.isEmpty()) {
                     response.put("included", included);
                 }
+            }
+
+            // Cache the response for system collections (only when no includes, to keep cache simple)
+            if (definition.systemCollection() && systemCollectionCache != null && includeNames.isEmpty()) {
+                String queryHash = buildQueryHash(queryRequest);
+                systemCollectionCache.putListResponse(tenantId, collectionName, queryHash, response);
             }
 
             return ResponseEntity.ok(response);
@@ -185,6 +216,17 @@ public class DynamicCollectionRouter {
                 return ResponseEntity.notFound().build();
             }
 
+            // Check system collection cache for get-by-id
+            String tenantId = request.getHeader("X-Tenant-ID");
+            if (definition.systemCollection() && systemCollectionCache != null) {
+                Optional<Map<String, Object>> cached = systemCollectionCache.getByIdResponse(
+                        tenantId, collectionName, id);
+                if (cached.isPresent()) {
+                    logger.debug("Cache hit for system collection get: {}/{}", collectionName, id);
+                    return ResponseEntity.ok(cached.get());
+                }
+            }
+
             Optional<Map<String, Object>> record = queryEngine.getById(definition, id);
 
             // If not found by ID and the value is not a UUID, try display field lookup
@@ -206,6 +248,11 @@ public class DynamicCollectionRouter {
                 if (!included.isEmpty()) {
                     response.put("included", included);
                 }
+            }
+
+            // Cache the response for system collections (only when no includes)
+            if (definition.systemCollection() && systemCollectionCache != null && includeNames.isEmpty()) {
+                systemCollectionCache.putByIdResponse(tenantId, collectionName, id, response);
             }
 
             return ResponseEntity.ok(response);
@@ -264,6 +311,9 @@ public class DynamicCollectionRouter {
             injectTenantId(data, definition, request);
 
             Map<String, Object> created = queryEngine.create(definition, data);
+
+            // Evict system collection cache after write
+            evictSystemCollectionCache(definition, request);
 
             // Return in JSON:API format
             return ResponseEntity.status(HttpStatus.CREATED).body(toJsonApiResponse(created, collectionName, definition));
@@ -356,6 +406,12 @@ public class DynamicCollectionRouter {
             }
 
             Optional<Map<String, Object>> updated = queryEngine.update(definition, id, data);
+
+            // Evict system collection cache after write
+            if (updated.isPresent()) {
+                evictSystemCollectionCache(definition, request);
+            }
+
             return updated.map(r -> ResponseEntity.ok(toJsonApiResponse(r, collectionName, definition)))
                           .orElse(ResponseEntity.notFound().build());
         } finally {
@@ -392,6 +448,12 @@ public class DynamicCollectionRouter {
             }
 
             boolean deleted = queryEngine.delete(definition, id);
+
+            // Evict system collection cache after delete
+            if (deleted) {
+                evictSystemCollectionCache(definition, request);
+            }
+
             return deleted ? ResponseEntity.noContent().build()
                            : ResponseEntity.notFound().build();
         } finally {
@@ -542,6 +604,8 @@ public class DynamicCollectionRouter {
 
             Map<String, Object> created = queryEngine.create(relation.childDef(), data);
 
+            evictSystemCollectionCache(relation.childDef(), request);
+
             return ResponseEntity.status(HttpStatus.CREATED)
                     .body(toJsonApiResponse(created, childName, relation.childDef()));
         } finally {
@@ -631,6 +695,11 @@ public class DynamicCollectionRouter {
             }
 
             Optional<Map<String, Object>> updated = queryEngine.update(relation.childDef(), childId, data);
+
+            if (updated.isPresent()) {
+                evictSystemCollectionCache(relation.childDef(), request);
+            }
+
             return updated.map(r -> ResponseEntity.ok(toJsonApiResponse(r, childName, relation.childDef())))
                           .orElse(ResponseEntity.notFound().build());
         } finally {
@@ -671,6 +740,11 @@ public class DynamicCollectionRouter {
             }
 
             boolean deleted = queryEngine.delete(relation.childDef(), childId);
+
+            if (deleted) {
+                evictSystemCollectionCache(relation.childDef(), request);
+            }
+
             return deleted ? ResponseEntity.noContent().build()
                            : ResponseEntity.notFound().build();
         } finally {
@@ -1322,6 +1396,34 @@ public class DynamicCollectionRouter {
         }
 
         return allIncluded;
+    }
+
+    /**
+     * Builds a deterministic hash string from a query request for use as a cache key.
+     * Uses the record's toString() which includes all components (pagination, sorting,
+     * fields, filters).
+     *
+     * @param queryRequest the query request
+     * @return a deterministic string representation suitable for cache keys
+     */
+    private String buildQueryHash(QueryRequest queryRequest) {
+        return queryRequest.toString();
+    }
+
+    /**
+     * Evicts cached entries for a system collection after a write operation.
+     * No-op if the collection is not a system collection or no cache is configured.
+     *
+     * @param definition the collection definition
+     * @param request the HTTP servlet request (used to extract tenant ID)
+     */
+    private void evictSystemCollectionCache(CollectionDefinition definition, HttpServletRequest request) {
+        if (!definition.systemCollection() || systemCollectionCache == null) {
+            return;
+        }
+        String tenantId = request.getHeader("X-Tenant-ID");
+        systemCollectionCache.evict(tenantId, definition.name());
+        logger.debug("Evicted system collection cache for: {} (tenant={})", definition.name(), tenantId);
     }
 
     /**

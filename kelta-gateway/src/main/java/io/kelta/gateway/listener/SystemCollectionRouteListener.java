@@ -1,6 +1,7 @@
 package io.kelta.gateway.listener;
 
 import io.kelta.gateway.cache.GatewayCacheManager;
+import io.kelta.gateway.filter.SystemCollectionResponseCacheFilter;
 import io.kelta.gateway.route.RouteRegistry;
 import io.kelta.runtime.event.RecordChangedPayload;
 import tools.jackson.databind.ObjectMapper;
@@ -87,6 +88,14 @@ public class SystemCollectionRouteListener {
                     // If we can't identify the specific domain, evict all custom domain entries
                     cacheManager.evictAllCustomDomains();
                 }
+            }
+
+            // Evict gateway response cache for any cacheable system collection change
+            if (SystemCollectionResponseCacheFilter.CACHEABLE_COLLECTIONS.contains(collectionName)) {
+                log.info("System collection changed (collection={}, recordId={}, changeType={}), "
+                                + "evicting gateway response cache",
+                        collectionName, payload.getRecordId(), payload.getChangeType());
+                cacheManager.evictSystemCollectionResponses(collectionName);
             }
 
         } catch (Exception e) {

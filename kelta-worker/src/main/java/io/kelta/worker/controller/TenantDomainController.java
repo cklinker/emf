@@ -1,6 +1,7 @@
 package io.kelta.worker.controller;
 
 import io.kelta.runtime.context.TenantContext;
+import io.kelta.worker.cache.WorkerCacheManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -10,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -31,9 +33,11 @@ public class TenantDomainController {
     );
 
     private final JdbcTemplate jdbcTemplate;
+    private final WorkerCacheManager cacheManager;
 
-    public TenantDomainController(JdbcTemplate jdbcTemplate) {
+    public TenantDomainController(JdbcTemplate jdbcTemplate, WorkerCacheManager cacheManager) {
         this.jdbcTemplate = jdbcTemplate;
+        this.cacheManager = cacheManager;
     }
 
     @GetMapping("/api/admin/domains")
@@ -82,6 +86,7 @@ public class TenantDomainController {
                 "INSERT INTO tenant_custom_domain (id, tenant_id, domain, created_at) VALUES (?, ?, ?, NOW())",
                 id, tenantId, domain);
 
+        cacheManager.evictCustomDomain(domain);
         log.info("Custom domain registered: {} → tenant {}", domain, tenantId);
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("data", Map.of("id", id, "domain", domain)));
     }
@@ -91,10 +96,19 @@ public class TenantDomainController {
         String tenantId = TenantContext.get();
         if (tenantId == null) return ResponseEntity.badRequest().body(Map.of("error", "No tenant context"));
 
+        // Look up the domain name before deleting so we can evict the cache entry
+        var domainRows = jdbcTemplate.queryForList(
+                "SELECT domain FROM tenant_custom_domain WHERE id = ? AND tenant_id = ?", domainId, tenantId);
+
         int deleted = jdbcTemplate.update(
                 "DELETE FROM tenant_custom_domain WHERE id = ? AND tenant_id = ?", domainId, tenantId);
         if (deleted == 0) {
             return ResponseEntity.notFound().build();
+        }
+
+        if (!domainRows.isEmpty()) {
+            String domain = (String) domainRows.get(0).get("domain");
+            cacheManager.evictCustomDomain(domain);
         }
 
         log.info("Custom domain removed: id={} tenant={}", domainId, tenantId);
@@ -104,13 +118,22 @@ public class TenantDomainController {
     // Internal endpoint for gateway domain resolution
     @GetMapping("/internal/domains/resolve")
     public ResponseEntity<String> resolveDomain(@RequestParam String domain) {
+        // Check cache first
+        Optional<String> cached = cacheManager.getCustomDomain(domain);
+        if (cached.isPresent()) {
+            return ResponseEntity.ok(cached.get());
+        }
+
         var results = jdbcTemplate.queryForList(
                 "SELECT t.slug FROM tenant_custom_domain tcd JOIN tenant t ON t.id = tcd.tenant_id WHERE tcd.domain = ?",
                 domain);
         if (results.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
-        return ResponseEntity.ok((String) results.get(0).get("slug"));
+
+        String slug = (String) results.get(0).get("slug");
+        cacheManager.putCustomDomain(domain, slug);
+        return ResponseEntity.ok(slug);
     }
 
     private boolean isReservedDomain(String domain) {

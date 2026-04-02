@@ -2,6 +2,7 @@ package io.kelta.worker.service;
 
 import tools.jackson.databind.ObjectMapper;
 import io.kelta.runtime.context.TenantContext;
+import io.kelta.worker.cache.WorkerCacheManager;
 import io.kelta.worker.repository.BootstrapRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,6 +42,7 @@ public class CerbosPolicySyncService {
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
     private final KafkaTemplate<String, String> kafkaTemplate;
+    private final WorkerCacheManager cacheManager;
     private final String cerbosAdminUrl;
     private final String cerbosAdminAuth;
 
@@ -50,6 +52,7 @@ public class CerbosPolicySyncService {
             CerbosPolicyGenerator policyGenerator,
             ObjectMapper objectMapper,
             KafkaTemplate<String, String> kafkaTemplate,
+            WorkerCacheManager cacheManager,
             @Value("${kelta.worker.cerbos.host:cerbos.emf.svc.cluster.local}") String cerbosHost,
             @Value("${kelta.worker.cerbos.http-port:3592}") int cerbosHttpPort,
             @Value("${kelta.worker.cerbos.admin-username:cerbos}") String adminUsername,
@@ -59,6 +62,7 @@ public class CerbosPolicySyncService {
         this.policyGenerator = policyGenerator;
         this.objectMapper = objectMapper;
         this.kafkaTemplate = kafkaTemplate;
+        this.cacheManager = cacheManager;
         this.httpClient = HttpClient.newHttpClient();
         this.cerbosAdminUrl = "http://" + cerbosHost + ":" + cerbosHttpPort;
         this.cerbosAdminAuth = "Basic " + Base64.getEncoder()
@@ -93,6 +97,9 @@ public class CerbosPolicySyncService {
 
             log.info("Cerbos policies synced for tenant {} ({} profiles, {} collections)",
                     tenantId, profiles.size(), collectionIds.size());
+
+            // Evict cached permissions — profile permissions may have changed
+            cacheManager.evictAllPermissions();
 
             publishPolicyChangedEvent(tenantId);
         } catch (Exception e) {

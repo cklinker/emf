@@ -522,6 +522,62 @@ class GatewayCacheManagerTest {
         }
     }
 
+    // ── System Collection Response Cache Tests ─────────────────────────
+
+    @Nested
+    class SystemCollectionResponseCacheTests {
+
+        @Test
+        void getSystemCollectionResponse_returnsEmptyWhenNotCached() {
+            assertThat(cacheManager.getSystemCollectionResponse("t1:/api/collections")).isEmpty();
+        }
+
+        @Test
+        void putAndGetSystemCollectionResponse_returnsCachedValue() {
+            byte[] body = "{\"data\":[]}".getBytes();
+            cacheManager.putSystemCollectionResponse("t1:/api/collections", body);
+
+            Optional<byte[]> result = cacheManager.getSystemCollectionResponse("t1:/api/collections");
+            assertThat(result).isPresent();
+            assertThat(new String(result.get())).isEqualTo("{\"data\":[]}");
+        }
+
+        @Test
+        void evictSystemCollectionResponses_removesMatchingEntries() {
+            cacheManager.putSystemCollectionResponse("t1:/api/collections", "{}".getBytes());
+            cacheManager.putSystemCollectionResponse("t1:/api/collections?page[number]=2", "{}".getBytes());
+            cacheManager.putSystemCollectionResponse("t1:/api/ui-pages", "{}".getBytes());
+
+            cacheManager.evictSystemCollectionResponses("collections");
+
+            assertThat(cacheManager.getSystemCollectionResponse("t1:/api/collections")).isEmpty();
+            assertThat(cacheManager.getSystemCollectionResponse("t1:/api/collections?page[number]=2")).isEmpty();
+            // ui-pages should not be affected
+            assertThat(cacheManager.getSystemCollectionResponse("t1:/api/ui-pages")).isPresent();
+        }
+
+        @Test
+        void evictAllSystemCollectionResponses_clearsAllEntries() {
+            cacheManager.putSystemCollectionResponse("t1:/api/collections", "{}".getBytes());
+            cacheManager.putSystemCollectionResponse("t2:/api/ui-pages", "{}".getBytes());
+
+            cacheManager.evictAllSystemCollectionResponses();
+
+            assertThat(cacheManager.getSystemCollectionResponse("t1:/api/collections")).isEmpty();
+            assertThat(cacheManager.getSystemCollectionResponse("t2:/api/ui-pages")).isEmpty();
+        }
+
+        @Test
+        void systemCollectionResponseCacheSize_reflectsEntries() {
+            assertThat(cacheManager.systemCollectionResponseCacheSize()).isEqualTo(0);
+
+            cacheManager.putSystemCollectionResponse("t1:/api/collections", "{}".getBytes());
+            cacheManager.putSystemCollectionResponse("t1:/api/ui-pages", "{}".getBytes());
+
+            assertThat(cacheManager.systemCollectionResponseCacheSize()).isEqualTo(2);
+        }
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────
 
     @SuppressWarnings("unchecked")

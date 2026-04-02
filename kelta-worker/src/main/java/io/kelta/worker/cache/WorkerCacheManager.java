@@ -49,9 +49,13 @@ public class WorkerCacheManager {
     private static final Duration TENANT_LIMITS_TTL = Duration.ofMinutes(10);
     private static final int TENANT_LIMITS_MAX_SIZE = 1_000;
 
+    private static final Duration SYSTEM_COLLECTION_TTL = Duration.ofMinutes(10);
+    private static final int SYSTEM_COLLECTION_MAX_SIZE = 10_000;
+
     private final Cache<String, String> customDomainCache;
     private final Cache<String, Map<String, Object>> permissionsCache;
     private final Cache<String, Map<String, Object>> tenantLimitsCache;
+    private final Cache<String, Map<String, Object>> systemCollectionCache;
 
     public WorkerCacheManager(MeterRegistry meterRegistry) {
         this.customDomainCache = Caffeine.newBuilder()
@@ -72,9 +76,16 @@ public class WorkerCacheManager {
                 .recordStats()
                 .build();
 
+        this.systemCollectionCache = Caffeine.newBuilder()
+                .maximumSize(SYSTEM_COLLECTION_MAX_SIZE)
+                .expireAfterWrite(SYSTEM_COLLECTION_TTL)
+                .recordStats()
+                .build();
+
         meterRegistry.gauge("worker.cache.size.custom-domain", customDomainCache, Cache::estimatedSize);
         meterRegistry.gauge("worker.cache.size.permissions", permissionsCache, Cache::estimatedSize);
         meterRegistry.gauge("worker.cache.size.tenant-limits", tenantLimitsCache, Cache::estimatedSize);
+        meterRegistry.gauge("worker.cache.size.system-collection", systemCollectionCache, Cache::estimatedSize);
     }
 
     // ── Custom Domain Cache ──────────────────────────────────────────────
@@ -188,15 +199,61 @@ public class WorkerCacheManager {
         log.debug("Evicted tenant limits cache entry: {}", tenantId);
     }
 
+    // ── System Collection Cache ────────────────────────────────────────────
+
+    /**
+     * Returns a cached system collection query response.
+     *
+     * @param cacheKey the composite key (tenantId:collectionName:queryHash)
+     * @return the cached response if present, empty otherwise
+     */
+    public Optional<Map<String, Object>> getSystemCollectionResponse(String cacheKey) {
+        return Optional.ofNullable(systemCollectionCache.getIfPresent(cacheKey));
+    }
+
+    /**
+     * Caches a system collection query response.
+     *
+     * @param cacheKey the composite key
+     * @param response the JSON:API response to cache
+     */
+    public void putSystemCollectionResponse(String cacheKey, Map<String, Object> response) {
+        systemCollectionCache.put(cacheKey, response);
+    }
+
+    /**
+     * Evicts all cached entries for a specific system collection within a tenant.
+     *
+     * <p>Since cache keys are composite (tenantId:collectionName:queryHash), this
+     * method iterates over all keys and removes those matching the given prefix.
+     *
+     * @param tenantId       the tenant ID (may be null)
+     * @param collectionName the collection name
+     */
+    public void evictSystemCollection(String tenantId, String collectionName) {
+        String prefix = (tenantId != null ? tenantId : "_") + ":" + collectionName + ":";
+        systemCollectionCache.asMap().keySet().removeIf(key -> key.startsWith(prefix));
+        log.debug("Evicted system collection cache entries for: {} (tenant={})", collectionName, tenantId);
+    }
+
+    /**
+     * Evicts all cached system collection entries across all tenants and collections.
+     */
+    public void evictAllSystemCollections() {
+        systemCollectionCache.invalidateAll();
+        log.debug("Evicted all system collection cache entries");
+    }
+
     // ── Metrics / Diagnostics ────────────────────────────────────────────
 
     /**
      * Returns estimated sizes for diagnostic logging.
      */
     public String getCacheSummary() {
-        return String.format("WorkerCaches[domains=%d, permissions=%d, limits=%d]",
+        return String.format("WorkerCaches[domains=%d, permissions=%d, limits=%d, sysCollections=%d]",
                 customDomainCache.estimatedSize(),
                 permissionsCache.estimatedSize(),
-                tenantLimitsCache.estimatedSize());
+                tenantLimitsCache.estimatedSize(),
+                systemCollectionCache.estimatedSize());
     }
 }

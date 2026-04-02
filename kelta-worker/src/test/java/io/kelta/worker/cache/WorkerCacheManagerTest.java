@@ -131,6 +131,57 @@ class WorkerCacheManagerTest {
         assertThat(cacheManager.getTenantLimits("tenant-abc")).isEmpty();
     }
 
+    // ── System Collection Cache ───────────────────────────────────────────
+
+    @Test
+    void getSystemCollectionResponse_returnsEmptyWhenNotCached() {
+        assertThat(cacheManager.getSystemCollectionResponse("t1:collections:list:q1")).isEmpty();
+    }
+
+    @Test
+    void putAndGetSystemCollectionResponse_returnsCachedValue() {
+        Map<String, Object> response = Map.of("data", java.util.List.of());
+        cacheManager.putSystemCollectionResponse("t1:collections:list:q1", response);
+
+        Optional<Map<String, Object>> result = cacheManager.getSystemCollectionResponse("t1:collections:list:q1");
+        assertThat(result).isPresent();
+        assertThat(result.get()).containsKey("data");
+    }
+
+    @Test
+    void evictSystemCollection_removesMatchingEntries() {
+        cacheManager.putSystemCollectionResponse("t1:collections:list:q1", Map.of("data", java.util.List.of()));
+        cacheManager.putSystemCollectionResponse("t1:collections:id:abc", Map.of("data", Map.of()));
+        cacheManager.putSystemCollectionResponse("t1:ui-pages:list:q1", Map.of("data", java.util.List.of()));
+
+        cacheManager.evictSystemCollection("t1", "collections");
+
+        assertThat(cacheManager.getSystemCollectionResponse("t1:collections:list:q1")).isEmpty();
+        assertThat(cacheManager.getSystemCollectionResponse("t1:collections:id:abc")).isEmpty();
+        // ui-pages should not be affected
+        assertThat(cacheManager.getSystemCollectionResponse("t1:ui-pages:list:q1")).isPresent();
+    }
+
+    @Test
+    void evictAllSystemCollections_clearsAllEntries() {
+        cacheManager.putSystemCollectionResponse("t1:collections:list:q1", Map.of("data", java.util.List.of()));
+        cacheManager.putSystemCollectionResponse("t2:ui-pages:list:q1", Map.of("data", java.util.List.of()));
+
+        cacheManager.evictAllSystemCollections();
+
+        assertThat(cacheManager.getSystemCollectionResponse("t1:collections:list:q1")).isEmpty();
+        assertThat(cacheManager.getSystemCollectionResponse("t2:ui-pages:list:q1")).isEmpty();
+    }
+
+    @Test
+    void evictSystemCollection_handlesNullTenantId() {
+        cacheManager.putSystemCollectionResponse("_:collections:list:q1", Map.of("data", java.util.List.of()));
+
+        cacheManager.evictSystemCollection(null, "collections");
+
+        assertThat(cacheManager.getSystemCollectionResponse("_:collections:list:q1")).isEmpty();
+    }
+
     // ── Metrics ──────────────────────────────────────────────────────────
 
     @Test
@@ -138,6 +189,7 @@ class WorkerCacheManagerTest {
         assertThat(meterRegistry.find("worker.cache.size.custom-domain").gauge()).isNotNull();
         assertThat(meterRegistry.find("worker.cache.size.permissions").gauge()).isNotNull();
         assertThat(meterRegistry.find("worker.cache.size.tenant-limits").gauge()).isNotNull();
+        assertThat(meterRegistry.find("worker.cache.size.system-collection").gauge()).isNotNull();
     }
 
     // ── Diagnostics ──────────────────────────────────────────────────────
@@ -146,5 +198,6 @@ class WorkerCacheManagerTest {
     void getCacheSummary_returnsFormattedString() {
         String summary = cacheManager.getCacheSummary();
         assertThat(summary).startsWith("WorkerCaches[");
+        assertThat(summary).contains("sysCollections=");
     }
 }

@@ -61,6 +61,7 @@ public class GatewayCacheManager {
     private final Cache<String, String> tenantSlugCache;
     private final Cache<String, Integer> governorLimitCache;
     private final Cache<String, String> customDomainCache; // domain → tenantSlug
+    private final Cache<String, byte[]> systemCollectionResponseCache; // tenantId:path → response body
     private final WebClient webClient;
 
     public GatewayCacheManager(
@@ -83,6 +84,12 @@ public class GatewayCacheManager {
         this.customDomainCache = Caffeine.newBuilder()
                 .expireAfterWrite(10, TimeUnit.MINUTES)
                 .maximumSize(10_000)
+                .build();
+
+        this.systemCollectionResponseCache = Caffeine.newBuilder()
+                .expireAfterWrite(10, TimeUnit.MINUTES)
+                .maximumSize(10_000)
+                .recordStats()
                 .build();
     }
 
@@ -317,5 +324,57 @@ public class GatewayCacheManager {
     public void evictAllCustomDomains() {
         customDomainCache.invalidateAll();
         log.info("Evicted all custom domain cache entries");
+    }
+
+    // ── System Collection Response Cache ─────────────────────────────────
+
+    /**
+     * Returns a cached system collection response for the given cache key.
+     *
+     * @param cacheKey the composite key (tenantId:path with query string)
+     * @return the cached response body bytes, or empty if not cached
+     */
+    public Optional<byte[]> getSystemCollectionResponse(String cacheKey) {
+        return Optional.ofNullable(systemCollectionResponseCache.getIfPresent(cacheKey));
+    }
+
+    /**
+     * Caches a system collection response.
+     *
+     * @param cacheKey     the composite key
+     * @param responseBody the response body bytes to cache
+     */
+    public void putSystemCollectionResponse(String cacheKey, byte[] responseBody) {
+        systemCollectionResponseCache.put(cacheKey, responseBody);
+    }
+
+    /**
+     * Evicts cached system collection responses for a specific collection.
+     *
+     * <p>Since cache keys include the collection name in the path segment,
+     * this method removes all entries whose key contains {@code /api/<collectionName>}.
+     *
+     * @param collectionName the collection name whose cached responses should be evicted
+     */
+    public void evictSystemCollectionResponses(String collectionName) {
+        String pathSegment = "/api/" + collectionName;
+        systemCollectionResponseCache.asMap().keySet()
+                .removeIf(key -> key.contains(pathSegment));
+        log.info("Evicted system collection response cache entries for: {}", collectionName);
+    }
+
+    /**
+     * Evicts all cached system collection responses.
+     */
+    public void evictAllSystemCollectionResponses() {
+        systemCollectionResponseCache.invalidateAll();
+        log.info("Evicted all system collection response cache entries");
+    }
+
+    /**
+     * Returns the number of cached system collection responses.
+     */
+    public long systemCollectionResponseCacheSize() {
+        return systemCollectionResponseCache.estimatedSize();
     }
 }

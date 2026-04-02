@@ -151,10 +151,13 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- Flyway Database Migrations -->
+        <!-- Flyway Database Migrations
+             Spring Boot 4.x modularized auto-configuration — FlywayAutoConfiguration
+             moved from spring-boot-autoconfigure to spring-boot-flyway. The starter
+             pulls in that module so Flyway actually runs on startup. -->
         <dependency>
-            <groupId>org.flywaydb</groupId>
-            <artifactId>flyway-core</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-flyway</artifactId>
         </dependency>
         <dependency>
             <groupId>org.flywaydb</groupId>

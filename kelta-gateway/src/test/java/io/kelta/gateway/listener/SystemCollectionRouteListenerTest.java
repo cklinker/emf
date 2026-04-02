@@ -123,6 +123,52 @@ class SystemCollectionRouteListenerTest {
     }
 
     @Nested
+    @DisplayName("Custom Domain Cache Invalidation Tests")
+    class CustomDomainCacheTests {
+
+        @Test
+        @DisplayName("Should evict specific domain from cache when domain record changes")
+        void shouldEvictDomainOnChange() throws Exception {
+            RecordChangedPayload payload = new RecordChangedPayload(
+                    "tenant_custom_domains", "domain-1", ChangeType.CREATED,
+                    Map.of("domain", "app.acme.com"), null, java.util.List.of());
+            PlatformEvent<RecordChangedPayload> event = EventFactory.createRecordEvent(
+                    "record.created", "tenant-1", "user-1", payload);
+            String message = objectMapper.writeValueAsString(event);
+
+            listener.onRecordChanged(message);
+
+            verify(cacheManager).removeCustomDomain("app.acme.com");
+        }
+
+        @Test
+        @DisplayName("Should evict all domains when domain field is missing from event data")
+        void shouldEvictAllDomainsWhenDomainMissing() throws Exception {
+            RecordChangedPayload payload = new RecordChangedPayload(
+                    "tenant_custom_domains", "domain-1", ChangeType.DELETED,
+                    Map.of(), null, java.util.List.of());
+            PlatformEvent<RecordChangedPayload> event = EventFactory.createRecordEvent(
+                    "record.deleted", "tenant-1", "user-1", payload);
+            String message = objectMapper.writeValueAsString(event);
+
+            listener.onRecordChanged(message);
+
+            verify(cacheManager).evictAllCustomDomains();
+        }
+
+        @Test
+        @DisplayName("Should NOT evict domains for non-domain collections")
+        void shouldNotEvictDomainsForOtherCollections() throws Exception {
+            String message = createEventMessage("products", "prod-1", ChangeType.CREATED);
+
+            listener.onRecordChanged(message);
+
+            verify(cacheManager, never()).removeCustomDomain(anyString());
+            verify(cacheManager, never()).evictAllCustomDomains();
+        }
+    }
+
+    @Nested
     @DisplayName("Error Handling Tests")
     class ErrorHandlingTests {
 

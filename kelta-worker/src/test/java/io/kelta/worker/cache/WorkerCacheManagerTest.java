@@ -37,6 +37,14 @@ class WorkerCacheManagerTest {
     }
 
     @Test
+    void putCustomDomainNotFound_cachesNegativeResult() {
+        cacheManager.putCustomDomainNotFound("unknown.com");
+
+        Optional<String> result = cacheManager.getCustomDomain("unknown.com");
+        assertThat(result).isPresent().contains(WorkerCacheManager.DOMAIN_NOT_FOUND);
+    }
+
+    @Test
     void evictCustomDomain_removesCachedEntry() {
         cacheManager.putCustomDomain("app.acme.com", "acme");
         cacheManager.evictCustomDomain("app.acme.com");

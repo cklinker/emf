@@ -80,7 +80,20 @@ public class WorkerCacheManager {
     // ── Custom Domain Cache ──────────────────────────────────────────────
 
     /**
-     * Returns the cached tenant slug for a custom domain, if present.
+     * Sentinel value indicating a domain was looked up and not found in the database.
+     * Cached to avoid repeated DB queries for domains that don't resolve to any tenant.
+     */
+    public static final String DOMAIN_NOT_FOUND = "__NOT_FOUND__";
+
+    /**
+     * Returns the cached result for a custom domain lookup.
+     *
+     * <p>Returns:
+     * <ul>
+     *   <li>{@code Optional.empty()} — domain is not in the cache (cache miss)</li>
+     *   <li>{@code Optional.of(DOMAIN_NOT_FOUND)} — domain was previously looked up and not found</li>
+     *   <li>{@code Optional.of(slug)} — domain resolves to the given tenant slug</li>
+     * </ul>
      */
     public Optional<String> getCustomDomain(String domain) {
         return Optional.ofNullable(customDomainCache.getIfPresent(domain));
@@ -91,6 +104,13 @@ public class WorkerCacheManager {
      */
     public void putCustomDomain(String domain, String tenantSlug) {
         customDomainCache.put(domain, tenantSlug);
+    }
+
+    /**
+     * Caches a negative lookup — the domain does not resolve to any tenant.
+     */
+    public void putCustomDomainNotFound(String domain) {
+        customDomainCache.put(domain, DOMAIN_NOT_FOUND);
     }
 
     /**

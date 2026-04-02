@@ -439,6 +439,89 @@ class GatewayCacheManagerTest {
         }
     }
 
+    // ── Custom Domain Cache Tests ────────────────────────────────────
+
+    @Nested
+    class CustomDomainCacheTests {
+
+        @Test
+        void resolveCustomDomain_cachesPositiveResult() {
+            // Given - stub a successful worker response
+            stubCustomDomainResolveResponse("app.acme.com", Mono.just("acme"));
+
+            // When - first lookup hits worker
+            Optional<String> first = cacheManager.resolveCustomDomain("app.acme.com");
+
+            // Then
+            assertThat(first).contains("acme");
+        }
+
+        @Test
+        void resolveCustomDomain_cachesNegativeResult() {
+            // Given - stub a 404 from worker (WebClient throws on non-2xx)
+            stubCustomDomainResolveResponse("unknown.com",
+                    Mono.error(new org.springframework.web.reactive.function.client.WebClientResponseException(
+                            404, "Not Found", null, null, null)));
+
+            // When - first lookup hits worker, returns empty
+            Optional<String> first = cacheManager.resolveCustomDomain("unknown.com");
+            assertThat(first).isEmpty();
+
+            // Second lookup should NOT call worker again (cached negative)
+            // Reset mock interactions
+            reset(webClient);
+
+            Optional<String> second = cacheManager.resolveCustomDomain("unknown.com");
+            assertThat(second).isEmpty();
+
+            // Verify no more interactions with webClient
+            verifyNoInteractions(webClient);
+        }
+
+        @Test
+        void registerCustomDomain_addsToCacheDirectly() {
+            cacheManager.registerCustomDomain("app.acme.com", "acme");
+
+            Optional<String> result = cacheManager.resolveCustomDomain("app.acme.com");
+            assertThat(result).contains("acme");
+            verifyNoInteractions(webClient);
+        }
+
+        @Test
+        void removeCustomDomain_evictsFromCache() {
+            cacheManager.registerCustomDomain("app.acme.com", "acme");
+            cacheManager.removeCustomDomain("app.acme.com");
+
+            // Next resolve should try the worker again (entry was evicted)
+            stubCustomDomainResolveResponse("app.acme.com", Mono.just("acme-new"));
+
+            Optional<String> result = cacheManager.resolveCustomDomain("app.acme.com");
+            assertThat(result).contains("acme-new");
+        }
+
+        @Test
+        void evictAllCustomDomains_clearsAllEntries() {
+            cacheManager.registerCustomDomain("app.acme.com", "acme");
+            cacheManager.registerCustomDomain("app.beta.com", "beta");
+            cacheManager.evictAllCustomDomains();
+
+            // Both should require worker lookup now
+            stubCustomDomainResolveResponse("app.acme.com", Mono.just("acme"));
+            Optional<String> result = cacheManager.resolveCustomDomain("app.acme.com");
+            assertThat(result).contains("acme");
+            verify(webClient).get(); // Confirms worker was called
+        }
+
+        @SuppressWarnings("unchecked")
+        private void stubCustomDomainResolveResponse(String domain, Mono<String> response) {
+            when(webClient.get()).thenReturn(requestHeadersUriSpec);
+            when(requestHeadersUriSpec.uri("/internal/domains/resolve?domain={domain}", domain))
+                    .thenReturn(requestHeadersSpec);
+            when(requestHeadersSpec.retrieve()).thenReturn(responseSpec);
+            when(responseSpec.bodyToMono(String.class)).thenReturn(response);
+        }
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────
 
     @SuppressWarnings("unchecked")

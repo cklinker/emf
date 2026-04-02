@@ -251,14 +251,29 @@ public class GatewayCacheManager {
     // ── Custom Domain Cache ───────────────────────────────────────────────
 
     /**
+     * Sentinel value indicating a domain was looked up and is not a custom domain.
+     * Cached to avoid repeated worker API calls for regular subdomain-based tenants.
+     */
+    private static final String DOMAIN_NOT_FOUND = "__NOT_FOUND__";
+
+    /**
      * Resolves a custom domain to a tenant slug.
+     *
+     * <p>Uses a three-tier lookup: local cache → worker API → not found.
+     * Both positive results (domain → slug) and negative results (domain not found)
+     * are cached to avoid repeated worker calls.
      *
      * @param domain the custom domain (e.g., "app.acme.com")
      * @return the tenant slug if the domain is registered, empty otherwise
      */
     public Optional<String> resolveCustomDomain(String domain) {
-        String slug = customDomainCache.getIfPresent(domain);
-        if (slug != null) return Optional.of(slug);
+        String cached = customDomainCache.getIfPresent(domain);
+        if (cached != null) {
+            if (DOMAIN_NOT_FOUND.equals(cached)) {
+                return Optional.empty();
+            }
+            return Optional.of(cached);
+        }
 
         // Try loading from worker on cache miss
         try {
@@ -275,6 +290,8 @@ public class GatewayCacheManager {
             log.debug("Custom domain lookup failed for {}: {}", domain, e.getMessage());
         }
 
+        // Cache the negative result to avoid calling the worker on every request
+        customDomainCache.put(domain, DOMAIN_NOT_FOUND);
         return Optional.empty();
     }
 
@@ -287,8 +304,18 @@ public class GatewayCacheManager {
 
     /**
      * Removes a custom domain mapping from the local cache.
+     * Evicts the entry entirely so the next lookup will re-fetch from the worker.
      */
     public void removeCustomDomain(String domain) {
         customDomainCache.invalidate(domain);
+    }
+
+    /**
+     * Evicts all custom domain cache entries (positive and negative).
+     * Used as a fallback when a domain change event lacks the specific domain name.
+     */
+    public void evictAllCustomDomains() {
+        customDomainCache.invalidateAll();
+        log.info("Evicted all custom domain cache entries");
     }
 }

@@ -125,6 +125,10 @@ management:
       probability: ${OTEL_TRACES_SAMPLER_ARG:1.0}
     propagation:
       type: w3c
+  otlp:
+    metrics:
+      export:
+        transport: grpc
   metrics:
     distribution:
       percentiles-histogram:

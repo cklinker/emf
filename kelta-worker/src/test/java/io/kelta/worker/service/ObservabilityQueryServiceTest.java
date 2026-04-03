@@ -252,6 +252,7 @@ class ObservabilityQueryServiceTest {
 
         assertEquals(3, result.size());
         assertEquals(10L, result.get(0).get("value"));
+        assertEquals(1700000000L, result.get(0).get("timestamp"));
         assertEquals(15L, result.get(1).get("value"));
         assertEquals(8L, result.get(2).get("value"));
     }
@@ -329,6 +330,7 @@ class ObservabilityQueryServiceTest {
         when(tempoClient.get()).thenReturn(requestSpec);
         when(requestSpec.uri(anyString())).thenReturn(requestSpec);
         when(requestSpec.uri(anyString(), any(Object.class))).thenReturn(requestSpec);
+        when(requestSpec.accept(any())).thenReturn(requestSpec);
         var responseSpec = mock(RestClient.ResponseSpec.class);
         when(requestSpec.retrieve()).thenReturn(responseSpec);
         when(responseSpec.body(String.class)).thenReturn(responseBody);

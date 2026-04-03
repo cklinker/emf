@@ -93,6 +93,10 @@ public class ValidationRuleRefreshHook implements BeforeSaveHook {
 
         // Look up the collection name for the event payload
         String collectionName = resolveCollectionName(collectionId);
+        if (collectionName == null) {
+            log.warn("Could not resolve collection name for id={}, skipping collection-changed broadcast", collectionId);
+            return;
+        }
 
         CollectionChangedPayload payload = new CollectionChangedPayload();
         payload.setId(collectionId);

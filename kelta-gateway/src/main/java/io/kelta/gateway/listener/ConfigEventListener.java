@@ -124,13 +124,13 @@ public class ConfigEventListener {
             String collectionId = payload.getId();
             String collectionName = payload.getName();
 
-            String path = "/api/" + collectionName + "/**";
-
             if (collectionId == null || collectionName == null) {
                 logger.error("Missing required fields in collection payload: id={}, name={}",
                             collectionId, collectionName);
                 return null;
             }
+
+            String path = "/api/" + collectionName + "/**";
 
             return new RouteDefinition(
                 collectionId,

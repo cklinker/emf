@@ -367,6 +367,11 @@ public class ObservabilityQueryService {
         }
 
         sb.append(" }");
+
+        // Select attributes needed for the request-log table columns so Tempo
+        // includes them in the search response spanSets.
+        sb.append(" | select(.http.request.method, .http.response.status_code, .http.url.path, .http.route)");
+
         return sb.toString();
     }
 

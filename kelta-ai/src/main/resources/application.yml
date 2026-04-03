@@ -57,7 +57,7 @@ management:
   otlp:
     metrics:
       export:
-        transport: grpc
+        url: ${MANAGEMENT_OTLP_METRICS_EXPORT_URL:http://localhost:4318/v1/metrics}
   tracing:
     export:
       enabled: true

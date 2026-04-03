@@ -54,6 +54,10 @@ management:
       enabled: true
     livenessState:
       enabled: true
+  otlp:
+    metrics:
+      export:
+        transport: grpc
   tracing:
     export:
       enabled: true

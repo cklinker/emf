@@ -249,13 +249,13 @@ class ObservabilityQueryServiceTest {
         Instant start = Instant.ofEpochSecond(1700000000);
         Instant end = Instant.ofEpochSecond(1700000120);
 
-        List<Map<String, Object>> result = service.getRequestCountOverTime(null, start, end, "60s");
+        List<Map<String, Object>> result = service.getRequestRateOverTime(null, start, end, "60s");
 
         assertEquals(3, result.size());
-        assertEquals(10L, result.get(0).get("value"));
+        assertEquals(10.0, result.get(0).get("value"));
         assertEquals(1700000000L, result.get(0).get("timestamp"));
-        assertEquals(15L, result.get(1).get("value"));
-        assertEquals(8L, result.get(2).get("value"));
+        assertEquals(15.0, result.get(1).get("value"));
+        assertEquals(8.0, result.get(2).get("value"));
     }
 
     @Test

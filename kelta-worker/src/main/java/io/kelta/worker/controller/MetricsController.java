@@ -55,8 +55,8 @@ public class MetricsController {
         }
 
         try {
-            List<Map<String, Object>> dataPoints = queryService.getRequestCountOverTime(
-                    tenantSlug, startInstant, endInstant, step);
+            List<Map<String, Object>> dataPoints = queryMetric(
+                    metric, tenantSlug, startInstant, endInstant, step);
 
             List<Map<String, Object>> series = new ArrayList<>();
             Map<String, Object> seriesMap = new LinkedHashMap<>();
@@ -172,6 +172,32 @@ public class MetricsController {
                     JsonApiResponseBuilder.error("500", "Internal Server Error",
                             "Failed to query latency percentiles"));
         }
+    }
+
+    private List<Map<String, Object>> queryMetric(String metric, String tenantSlug,
+                                                      Instant start, Instant end, String step) {
+        return switch (metric) {
+            case "requests", "requests_by_route", "request_rate" ->
+                    queryService.getRequestRateOverTime(tenantSlug, start, end, step);
+            case "latency_p50" ->
+                    queryService.getLatencyOverTime(tenantSlug, start, end, step, 0.50);
+            case "latency_p95" ->
+                    queryService.getLatencyOverTime(tenantSlug, start, end, step, 0.95);
+            case "latency_p99" ->
+                    queryService.getLatencyOverTime(tenantSlug, start, end, step, 0.99);
+            case "errors" ->
+                    queryService.getErrorCountOverTime(tenantSlug, start, end, step);
+            case "auth_failures" ->
+                    queryService.getAuthFailuresOverTime(tenantSlug, start, end, step);
+            case "rate_limit" ->
+                    queryService.getRateLimitOverTime(tenantSlug, start, end, step);
+            case "active_requests" ->
+                    queryService.getActiveRequestsOverTime(tenantSlug, start, end, step);
+            default -> {
+                log.warn("Unknown metric '{}', falling back to request rate", metric);
+                yield queryService.getRequestRateOverTime(tenantSlug, start, end, step);
+            }
+        };
     }
 
     private String calculateStep(Instant start, Instant end) {

@@ -19,7 +19,7 @@ public class ObservabilityQueryConfig {
     @Value("${kelta.loki.url:http://localhost:3100}")
     private String lokiUrl;
 
-    @Value("${kelta.mimir.url:http://localhost:8080/prometheus}")
+    @Value("${kelta.mimir.url:http://localhost:8080}")
     private String mimirUrl;
 
     @Bean("tempoRestClient")

@@ -592,7 +592,7 @@ public class ObservabilityQueryService {
 
     private JsonNode executeMimirInstantQuery(String promQL, Instant time) {
         try {
-            String url = "/api/v1/query?query=" + urlEncode(promQL)
+            String url = "/prometheus/api/v1/query?query=" + urlEncode(promQL)
                     + "&time=" + time.getEpochSecond();
 
             String responseBody = mimirClient.get()
@@ -609,7 +609,7 @@ public class ObservabilityQueryService {
     private JsonNode executeMimirRangeQuery(String promQL, Instant start, Instant end,
                                              String step) {
         try {
-            String url = "/api/v1/query_range?query=" + urlEncode(promQL)
+            String url = "/prometheus/api/v1/query_range?query=" + urlEncode(promQL)
                     + "&start=" + start.getEpochSecond()
                     + "&end=" + end.getEpochSecond()
                     + "&step=" + urlEncode(step);

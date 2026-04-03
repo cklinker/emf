@@ -77,7 +77,7 @@ kelta:
   loki:
     url: ${LOKI_URL:http://loki.observability.svc.cluster.local:3100}
   mimir:
-    url: ${MIMIR_URL:http://mimir.observability.svc.cluster.local:8080/prometheus}
+    url: ${MIMIR_URL:http://mimir.observability.svc.cluster.local:8080}
   observability:
     request-logging:
       enabled: ${REQUEST_LOGGING_ENABLED:true}

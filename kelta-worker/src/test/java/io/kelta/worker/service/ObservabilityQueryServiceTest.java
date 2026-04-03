@@ -4,6 +4,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.client.RestClient;
 
+import java.net.URI;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -329,6 +330,7 @@ class ObservabilityQueryServiceTest {
         var requestSpec = mock(RestClient.RequestHeadersUriSpec.class);
         when(tempoClient.get()).thenReturn(requestSpec);
         when(requestSpec.uri(anyString())).thenReturn(requestSpec);
+        when(requestSpec.uri(any(URI.class))).thenReturn(requestSpec);
         when(requestSpec.uri(anyString(), any(Object.class))).thenReturn(requestSpec);
         when(requestSpec.accept(any())).thenReturn(requestSpec);
         var responseSpec = mock(RestClient.ResponseSpec.class);
@@ -339,6 +341,7 @@ class ObservabilityQueryServiceTest {
     private void mockLokiGet(String responseBody) {
         var requestSpec = mock(RestClient.RequestHeadersUriSpec.class);
         when(lokiClient.get()).thenReturn(requestSpec);
+        when(requestSpec.uri(any(URI.class))).thenReturn(requestSpec);
         when(requestSpec.uri(anyString())).thenReturn(requestSpec);
         var responseSpec = mock(RestClient.ResponseSpec.class);
         when(requestSpec.retrieve()).thenReturn(responseSpec);
@@ -348,6 +351,7 @@ class ObservabilityQueryServiceTest {
     private void mockMimirGet(String responseBody) {
         var requestSpec = mock(RestClient.RequestHeadersUriSpec.class);
         when(mimirClient.get()).thenReturn(requestSpec);
+        when(requestSpec.uri(any(URI.class))).thenReturn(requestSpec);
         when(requestSpec.uri(anyString())).thenReturn(requestSpec);
         var responseSpec = mock(RestClient.ResponseSpec.class);
         when(requestSpec.retrieve()).thenReturn(responseSpec);

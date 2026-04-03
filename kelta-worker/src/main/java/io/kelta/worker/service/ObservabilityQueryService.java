@@ -10,6 +10,7 @@ import org.springframework.web.client.RestClient;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
+import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -70,7 +71,7 @@ public class ObservabilityQueryService {
                     + "&spss=1";
 
             String responseBody = tempoClient.get()
-                    .uri(url)
+                    .uri(URI.create(url))
                     .retrieve()
                     .body(String.class);
             JsonNode response = MAPPER.readTree(responseBody);
@@ -138,7 +139,7 @@ public class ObservabilityQueryService {
                     + "&direction=backward";
 
             String responseBody = lokiClient.get()
-                    .uri(url)
+                    .uri(URI.create(url))
                     .retrieve()
                     .body(String.class);
             JsonNode response = MAPPER.readTree(responseBody);
@@ -595,7 +596,7 @@ public class ObservabilityQueryService {
                     + "&time=" + time.getEpochSecond();
 
             String responseBody = mimirClient.get()
-                    .uri(url)
+                    .uri(URI.create(url))
                     .retrieve()
                     .body(String.class);
             return MAPPER.readTree(responseBody);
@@ -614,7 +615,7 @@ public class ObservabilityQueryService {
                     + "&step=" + urlEncode(step);
 
             String responseBody = mimirClient.get()
-                    .uri(url)
+                    .uri(URI.create(url))
                     .retrieve()
                     .body(String.class);
             return MAPPER.readTree(responseBody);

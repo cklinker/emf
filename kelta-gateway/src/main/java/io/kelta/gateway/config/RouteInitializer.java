@@ -38,7 +38,7 @@ public class RouteInitializer implements ApplicationRunner {
     @Value("${kelta.gateway.ai-service-url:}")
     private String aiServiceUrl;
 
-    @Value("${OTEL_COLLECTOR_URL:http://jaeger.observability.svc.cluster.local:4318}")
+    @Value("${OTEL_COLLECTOR_URL:http://alloy-collector.observability.svc.cluster.local:4318}")
     private String otelCollectorUrl;
 
     /**

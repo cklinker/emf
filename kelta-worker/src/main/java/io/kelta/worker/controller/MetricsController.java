@@ -202,9 +202,7 @@ public class MetricsController {
 
     private String calculateStep(Instant start, Instant end) {
         long durationSeconds = Duration.between(start, end).getSeconds();
-        if (durationSeconds <= 3600) {
-            return "15s";
-        } else if (durationSeconds <= 21600) {
+        if (durationSeconds <= 21600) {
             return "60s";
         } else if (durationSeconds <= 86400) {
             return "5m";

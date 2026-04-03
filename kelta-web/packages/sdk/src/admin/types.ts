@@ -1678,11 +1678,17 @@ export interface RequestLogEntry {
   spanID: string;
   operationName: string;
   startTime: number;
+  startTimeMillis: number;
   duration: number;
-  tags: Record<string, string>;
+  tagMap: Record<string, string | number | boolean>;
   process?: {
     serviceName: string;
   };
+  references?: Array<{
+    refType: string;
+    traceID: string;
+    spanID: string;
+  }>;
 }
 
 export interface RequestLogSearchParams {

@@ -279,7 +279,10 @@ export function RequestLogDetailPage({ className }: RequestLogDetailPageProps) {
               <div className="space-y-2">
                 {childSpans.map((span, idx) => {
                   const spanDur = span.duration ? (span.duration / 1000).toFixed(0) : '?'
-                  const spanService = span.process?.serviceName || ''
+                  const spanTags = span.tagMap || {}
+                  const spanService = String(
+                    spanTags['process.serviceName'] || span.process?.serviceName || ''
+                  )
                   return (
                     <div
                       key={span.spanID || idx}

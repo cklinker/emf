@@ -78,6 +78,10 @@ public class CerbosPolicySyncService {
             log.info("Syncing Cerbos policies for tenant {}", tenantId);
 
             List<CerbosPolicyGenerator.ProfileData> profiles = loadProfilesForTenant(tenantId);
+            if (profiles.isEmpty()) {
+                log.info("No profiles found for tenant {} — skipping Cerbos policy sync", tenantId);
+                return;
+            }
             List<String> collectionIds = loadCollectionIdsForTenant(tenantId);
             List<CerbosPolicyGenerator.CustomRule> customRules = loadCustomRulesForTenant(tenantId);
 

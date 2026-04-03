@@ -113,7 +113,7 @@ class MetricsControllerTest {
                     null, null);
 
             Map<String, Object> attrs = getAttributes(response.getBody());
-            assertThat(attrs.get("step")).isEqualTo("15s");
+            assertThat(attrs.get("step")).isEqualTo("60s");
         }
 
         @Test

@@ -14,7 +14,7 @@ import java.util.*;
 
 /**
  * REST controller for observability data — request logs, application logs, and audit events.
- * Trace/log queries go to OpenSearch via RestClient; audit queries go to PostgreSQL.
+ * Trace queries go to Tempo; log queries go to Loki; audit queries go to PostgreSQL.
  */
 @RestController
 @RequestMapping("/api/admin/observability")
@@ -76,50 +76,10 @@ public class ObservabilityController {
     public ResponseEntity<Map<String, Object>> getRequestLog(
             @PathVariable String traceId) {
         try {
-            Map<String, String> filters = Map.of("traceId", traceId);
-            SearchResult result = queryService.searchTraceSpans(null,
-                    Instant.now().minusSeconds(86400 * 30), Instant.now(),
-                    filters, 0, 100);
-
-            // Query request data from PostgreSQL
-            List<Map<String, Object>> requestDataList = queryService.getTraceRequestData(traceId);
-
-            // Merge captured data into spans by matching spanId
-            if (!requestDataList.isEmpty()) {
-                Map<String, Map<String, Object>> dataBySpanId = new HashMap<>();
-                for (Map<String, Object> dataHit : requestDataList) {
-                    String spanId = (String) dataHit.get("span_id");
-                    if (spanId != null) {
-                        dataBySpanId.put(spanId, dataHit);
-                    }
-                }
-                for (Map<String, Object> span : result.hits()) {
-                    String spanId = (String) span.get("spanID");
-                    Map<String, Object> captured = dataBySpanId.get(spanId);
-
-                    // Fallback: match by parent spanId
-                    if (captured == null) {
-                        @SuppressWarnings("unchecked")
-                        List<Map<String, Object>> refs = (List<Map<String, Object>>) span.get("references");
-                        if (refs != null) {
-                            for (Map<String, Object> ref : refs) {
-                                String parentSpanId = (String) ref.get("spanID");
-                                if (parentSpanId != null) {
-                                    captured = dataBySpanId.get(parentSpanId);
-                                    if (captured != null) break;
-                                }
-                            }
-                        }
-                    }
-
-                    if (captured != null) {
-                        mergeCapturedData(span, captured);
-                    }
-                }
-            }
+            List<Map<String, Object>> spans = queryService.getTraceDetail(traceId);
 
             Map<String, Object> attributes = new LinkedHashMap<>();
-            attributes.put("spans", result.hits());
+            attributes.put("spans", spans);
             attributes.put("traceId", traceId);
 
             return ResponseEntity.ok(JsonApiResponseBuilder.single("request-log-detail", traceId, attributes));
@@ -197,36 +157,6 @@ public class ObservabilityController {
             return ResponseEntity.internalServerError().body(
                     JsonApiResponseBuilder.error("500", "Internal Server Error",
                             "Failed to search audit events"));
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-    private void mergeCapturedData(Map<String, Object> span, Map<String, Object> captured) {
-        Map<String, Object> tagMap = (Map<String, Object>) span.get("tagMap");
-        if (tagMap == null) {
-            tagMap = new LinkedHashMap<>();
-            span.put("tagMap", tagMap);
-        }
-        if (captured.get("request_body") != null) {
-            tagMap.put("http.request.body", captured.get("request_body"));
-        }
-        if (captured.get("response_body") != null) {
-            tagMap.put("http.response.body", captured.get("response_body"));
-        }
-        // Request/response headers from JSONB come back as Map or String
-        Object reqHeaders = captured.get("request_headers");
-        if (reqHeaders instanceof Map<?, ?> headers) {
-            for (Map.Entry<?, ?> entry : headers.entrySet()) {
-                tagMap.put("http.request.header." + entry.getKey().toString().toLowerCase(),
-                        entry.getValue());
-            }
-        }
-        Object respHeaders = captured.get("response_headers");
-        if (respHeaders instanceof Map<?, ?> headers) {
-            for (Map.Entry<?, ?> entry : headers.entrySet()) {
-                tagMap.put("http.response.header." + entry.getKey().toString().toLowerCase(),
-                        entry.getValue());
-            }
         }
     }
 }

@@ -1,12 +1,13 @@
 package io.kelta.worker.filter;
 
 import io.kelta.worker.interceptor.SpanIdCaptureInterceptor;
-import io.kelta.worker.service.RequestDataCaptureService;
 import io.opentelemetry.api.trace.Span;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -17,19 +18,18 @@ import org.springframework.web.util.ContentCachingResponseWrapper;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
- * Captures request/response bodies and headers, writing them both as OTEL span
- * attributes and directly to OpenSearch. The direct OpenSearch write is the primary
- * mechanism because the OTEL Java agent silently drops span attributes set via
- * Span.current().setAttribute() when trace context is propagated from upstream services.
+ * Captures request/response bodies and enriches OTEL span attributes.
+ * Request/response payloads are logged at DEBUG level for troubleshooting.
  */
 @Component
 @Order(Ordered.LOWEST_PRECEDENCE - 1)
 public class SpanBodyEnrichmentFilter extends OncePerRequestFilter {
+
+    private static final Logger log = LoggerFactory.getLogger(SpanBodyEnrichmentFilter.class);
 
     private static final Set<String> EXCLUDE_PREFIXES = Set.of(
             "/actuator", "/health"
@@ -40,17 +40,11 @@ public class SpanBodyEnrichmentFilter extends OncePerRequestFilter {
             Pattern.CASE_INSENSITIVE
     );
 
-    private final RequestDataCaptureService captureService;
-
     @Value("${kelta.observability.request-logging.max-body-size:16384}")
     private int maxBodySize;
 
     @Value("${kelta.observability.request-logging.enabled:true}")
     private boolean enabled;
-
-    public SpanBodyEnrichmentFilter(RequestDataCaptureService captureService) {
-        this.captureService = captureService;
-    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
@@ -82,38 +76,26 @@ public class SpanBodyEnrichmentFilter extends OncePerRequestFilter {
         String userEmail = request.getHeader("X-Forwarded-User");
         String correlationId = request.getHeader("X-Correlation-ID");
 
-        // Try to set OTEL span attributes (works when no trace propagation)
+        // Enrich OTEL span attributes (stored by Tempo)
         enrichSpan(requestBody, responseBody, tenantId, userId, userEmail, correlationId);
 
-        // Write directly to OpenSearch (always works, bypasses OTEL agent limitations).
-        // Prefer the span ID captured by SpanIdCaptureInterceptor (which runs inside the
-        // DispatcherServlet scope where the OTEL server span is active). By the time this
-        // filter's finally block runs, the OTEL agent has closed the server span scope and
-        // Span.current() returns the propagated parent context instead.
-        String traceId = (String) request.getAttribute(SpanIdCaptureInterceptor.SERVER_TRACE_ID_ATTR);
-        String spanId = (String) request.getAttribute(SpanIdCaptureInterceptor.SERVER_SPAN_ID_ATTR);
+        // Log at DEBUG level for troubleshooting
+        if (log.isDebugEnabled()) {
+            String traceId = (String) request.getAttribute(SpanIdCaptureInterceptor.SERVER_TRACE_ID_ATTR);
+            String spanId = (String) request.getAttribute(SpanIdCaptureInterceptor.SERVER_SPAN_ID_ATTR);
 
-        // Fallback to Span.current() for requests that don't go through the DispatcherServlet
-        if (traceId == null || spanId == null) {
-            Span span = Span.current();
-            if (span.getSpanContext().isValid()) {
-                traceId = span.getSpanContext().getTraceId();
-                spanId = span.getSpanContext().getSpanId();
+            if (traceId == null || spanId == null) {
+                Span span = Span.current();
+                if (span.getSpanContext().isValid()) {
+                    traceId = span.getSpanContext().getTraceId();
+                    spanId = span.getSpanContext().getSpanId();
+                }
             }
-        }
 
-        if (traceId != null && spanId != null) {
-
-            Map<String, String> requestHeaders = RequestDataCaptureService.extractRequestHeaders(request);
-            Map<String, String> responseHeaders = RequestDataCaptureService.extractResponseHeaders(response);
-
-            captureService.captureRequestData(
-                    traceId, spanId,
-                    requestHeaders, responseHeaders,
-                    requestBody, responseBody,
+            log.debug("HTTP {} {} status={} traceId={} spanId={} tenant={} user={} reqBody={} respBody={}",
                     request.getMethod(), request.getRequestURI(), response.getStatus(),
-                    tenantId, userId, userEmail, correlationId
-            );
+                    traceId, spanId, tenantId, userId,
+                    requestBody, responseBody);
         }
     }
 

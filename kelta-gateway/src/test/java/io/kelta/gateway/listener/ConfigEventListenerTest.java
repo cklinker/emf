@@ -186,6 +186,33 @@ class ConfigEventListenerTest {
         }
 
         @Test
+        @DisplayName("Should not add route when collection name is null")
+        void shouldNotAddRouteWhenCollectionNameIsNull() throws Exception {
+            // Arrange - payload with null name (e.g., from a record missing the name field)
+            CollectionChangedPayload payload = new CollectionChangedPayload();
+            payload.setId("collection-no-name");
+            payload.setChangeType(ChangeType.CREATED);
+            // name is intentionally not set (null)
+
+            PlatformEvent<CollectionChangedPayload> event = new PlatformEvent<>(
+                UUID.randomUUID().toString(),
+                "config.collection.changed",
+                null,
+                UUID.randomUUID().toString(),
+                null,
+                Instant.now(),
+                payload
+            );
+
+            // Act
+            listener.handleCollectionChanged(toJson(event));
+
+            // Assert - should not add route when name is missing
+            verify(routeRegistry, never()).updateRoute(any());
+            verify(routeRegistry, never()).removeRoute(any());
+        }
+
+        @Test
         @DisplayName("Should route system collections like users normally")
         void shouldRouteSystemCollectionsNormally() throws Exception {
             // Arrange — system collections (users, profiles, etc.) should be routed to worker

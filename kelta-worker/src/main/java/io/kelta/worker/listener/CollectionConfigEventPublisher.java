@@ -84,6 +84,11 @@ public class CollectionConfigEventPublisher implements BeforeSaveHook {
         payload.setDescription(getString(record, "description"));
         payload.setChangeType(changeType);
 
+        if (payload.getName() == null) {
+            log.warn("Skipping collection changed event: record missing 'name' field (id={})", payload.getId());
+            return;
+        }
+
         Object active = record.get("active");
         if (active instanceof Boolean b) {
             payload.setActive(b);

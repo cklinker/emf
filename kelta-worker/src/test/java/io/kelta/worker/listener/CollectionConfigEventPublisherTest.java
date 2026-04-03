@@ -117,6 +117,20 @@ class CollectionConfigEventPublisherTest {
     }
 
     @Test
+    @DisplayName("Should not publish event when record is missing name field")
+    void shouldNotPublishEventWhenNameMissing() {
+        Map<String, Object> record = new HashMap<>(Map.of(
+            "id", "col-no-name",
+            "active", true
+        ));
+        // name is intentionally missing
+
+        publisher.afterCreate(record, "tenant-1");
+
+        verify(kafkaTemplate, never()).send(anyString(), anyString(), anyString());
+    }
+
+    @Test
     @DisplayName("Should publish DELETED event wrapped in PlatformEvent")
     void shouldPublishDeletedEvent() throws Exception {
         publisher.afterDelete("col-1", "tenant-1");

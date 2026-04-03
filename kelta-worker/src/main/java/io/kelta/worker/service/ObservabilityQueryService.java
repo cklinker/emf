@@ -163,16 +163,89 @@ public class ObservabilityQueryService {
     // -----------------------------------------------------------------------
 
     /**
-     * Get request count over time (range query).
+     * Get request rate over time as requests per second (range query).
      */
-    public List<Map<String, Object>> getRequestCountOverTime(String tenantSlug,
+    public List<Map<String, Object>> getRequestRateOverTime(String tenantSlug,
+                                                             Instant start, Instant end,
+                                                             String step) {
+        String promQL = "sum(rate(traces_spanmetrics_calls_total{span_kind=\"SPAN_KIND_SERVER\"}["
+                + step + "]))";
+
+        return parseRangeQueryToDataPoints(executeMimirRangeQuery(promQL, start, end, step), false);
+    }
+
+    /**
+     * Get latency percentile over time (range query).
+     * Returns values in seconds.
+     */
+    public List<Map<String, Object>> getLatencyOverTime(String tenantSlug,
+                                                         Instant start, Instant end,
+                                                         String step, double quantile) {
+        String promQL = "histogram_quantile(" + quantile
+                + ", sum(rate(traces_spanmetrics_latency_bucket{span_kind=\"SPAN_KIND_SERVER\"}["
+                + step + "])) by (le))";
+
+        return parseRangeQueryToDataPoints(executeMimirRangeQuery(promQL, start, end, step), false);
+    }
+
+    /**
+     * Get error count over time (range query).
+     */
+    public List<Map<String, Object>> getErrorCountOverTime(String tenantSlug,
+                                                            Instant start, Instant end,
+                                                            String step) {
+        String promQL = "sum(increase(traces_spanmetrics_calls_total"
+                + "{span_kind=\"SPAN_KIND_SERVER\", http_status_code=~\"[4-5]..\"}"
+                + "[" + step + "]))";
+
+        return parseRangeQueryToDataPoints(executeMimirRangeQuery(promQL, start, end, step), true);
+    }
+
+    /**
+     * Get auth failure count over time (range query).
+     */
+    public List<Map<String, Object>> getAuthFailuresOverTime(String tenantSlug,
                                                               Instant start, Instant end,
-                                                              String interval) {
-        String promQL = "sum(increase(traces_spanmetrics_calls_total{span_kind=\"SPAN_KIND_SERVER\"}["
-                + interval + "]))";
+                                                              String step) {
+        String promQL = "sum(increase(traces_spanmetrics_calls_total"
+                + "{span_kind=\"SPAN_KIND_SERVER\", http_status_code=~\"401|403\"}"
+                + "[" + step + "]))";
 
-        JsonNode response = executeMimirRangeQuery(promQL, start, end, interval);
+        return parseRangeQueryToDataPoints(executeMimirRangeQuery(promQL, start, end, step), true);
+    }
 
+    /**
+     * Get rate-limited request count over time (range query).
+     */
+    public List<Map<String, Object>> getRateLimitOverTime(String tenantSlug,
+                                                           Instant start, Instant end,
+                                                           String step) {
+        String promQL = "sum(increase(traces_spanmetrics_calls_total"
+                + "{span_kind=\"SPAN_KIND_SERVER\", http_status_code=\"429\"}"
+                + "[" + step + "]))";
+
+        return parseRangeQueryToDataPoints(executeMimirRangeQuery(promQL, start, end, step), true);
+    }
+
+    /**
+     * Get active (in-flight) request count over time (range query).
+     */
+    public List<Map<String, Object>> getActiveRequestsOverTime(String tenantSlug,
+                                                                Instant start, Instant end,
+                                                                String step) {
+        String promQL = "sum(rate(traces_spanmetrics_calls_total{span_kind=\"SPAN_KIND_SERVER\"}["
+                + step + "])) * "
+                + "avg(sum(rate(traces_spanmetrics_latency_sum{span_kind=\"SPAN_KIND_SERVER\"}["
+                + step + "])) / sum(rate(traces_spanmetrics_latency_count{span_kind=\"SPAN_KIND_SERVER\"}["
+                + step + "])))";
+
+        return parseRangeQueryToDataPoints(executeMimirRangeQuery(promQL, start, end, step), false);
+    }
+
+    /**
+     * Parse a Mimir range query response into a list of timestamp/value data points.
+     */
+    private List<Map<String, Object>> parseRangeQueryToDataPoints(JsonNode response, boolean roundValues) {
         List<Map<String, Object>> result = new ArrayList<>();
         JsonNode results = response.path("data").path("result");
         if (results.isArray() && !results.isEmpty()) {
@@ -181,7 +254,9 @@ public class ObservabilityQueryService {
                 Map<String, Object> point = new HashMap<>();
                 long epochSec = pair.get(0).asLong();
                 point.put("timestamp", epochSec);
-                point.put("value", Math.round(Double.parseDouble(pair.get(1).asText())));
+                double val = Double.parseDouble(pair.get(1).asText());
+                if (Double.isNaN(val) || Double.isInfinite(val)) val = 0.0;
+                point.put("value", roundValues ? Math.round(val) : val);
                 result.add(point);
             }
         }

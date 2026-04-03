@@ -44,7 +44,7 @@ class MetricsControllerTest {
         @Test
         @DisplayName("Should return JSON:API envelope with type 'metrics-query'")
         void returnsJsonApiEnvelope() {
-            when(queryService.getRequestCountOverTime(anyString(), any(Instant.class), any(Instant.class), anyString()))
+            when(queryService.getRequestRateOverTime(anyString(), any(Instant.class), any(Instant.class), anyString()))
                     .thenReturn(List.of());
 
             ResponseEntity<Map<String, Object>> response = controller.query(
@@ -67,7 +67,7 @@ class MetricsControllerTest {
                     Map.of("timestamp", "2024-01-01T00:00:00Z", "value", 42L),
                     Map.of("timestamp", "2024-01-01T00:01:00Z", "value", 38L)
             );
-            when(queryService.getRequestCountOverTime(anyString(), any(Instant.class), any(Instant.class), anyString()))
+            when(queryService.getRequestRateOverTime(anyString(), any(Instant.class), any(Instant.class), anyString()))
                     .thenReturn(mockDataPoints);
 
             ResponseEntity<Map<String, Object>> response = controller.query(
@@ -104,7 +104,7 @@ class MetricsControllerTest {
         @Test
         @DisplayName("Should auto-calculate step when not provided")
         void autoCalculatesStep() {
-            when(queryService.getRequestCountOverTime(anyString(), any(Instant.class), any(Instant.class), anyString()))
+            when(queryService.getRequestRateOverTime(anyString(), any(Instant.class), any(Instant.class), anyString()))
                     .thenReturn(List.of());
 
             ResponseEntity<Map<String, Object>> response = controller.query(
@@ -119,7 +119,7 @@ class MetricsControllerTest {
         @Test
         @DisplayName("Should return empty series when no data")
         void returnsEmptySeriesWhenNoData() {
-            when(queryService.getRequestCountOverTime(anyString(), any(Instant.class), any(Instant.class), anyString()))
+            when(queryService.getRequestRateOverTime(anyString(), any(Instant.class), any(Instant.class), anyString()))
                     .thenReturn(List.of());
 
             ResponseEntity<Map<String, Object>> response = controller.query(
@@ -139,7 +139,7 @@ class MetricsControllerTest {
         @Test
         @DisplayName("Should return 500 when query throws")
         void returns500OnError() {
-            when(queryService.getRequestCountOverTime(anyString(), any(Instant.class), any(Instant.class), anyString()))
+            when(queryService.getRequestRateOverTime(anyString(), any(Instant.class), any(Instant.class), anyString()))
                     .thenThrow(new RuntimeException("Connection refused"));
 
             ResponseEntity<Map<String, Object>> response = controller.query(
@@ -148,6 +148,40 @@ class MetricsControllerTest {
                     "60s", null);
 
             assertThat(response.getStatusCode().value()).isEqualTo(500);
+        }
+
+        @Test
+        @DisplayName("Should dispatch latency_p50 metric to getLatencyOverTime")
+        void dispatchesLatencyP50() {
+            List<Map<String, Object>> mockDataPoints = List.of(
+                    Map.of("timestamp", 1704067200L, "value", 0.065)
+            );
+            when(queryService.getLatencyOverTime(anyString(), any(Instant.class), any(Instant.class), anyString(), eq(0.50)))
+                    .thenReturn(mockDataPoints);
+
+            ResponseEntity<Map<String, Object>> response = controller.query(
+                    "tenant-1", "latency_p50",
+                    "2024-01-01T00:00:00Z", "2024-01-01T01:00:00Z",
+                    "60s", null);
+
+            assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+            verify(queryService).getLatencyOverTime(anyString(), any(Instant.class), any(Instant.class), eq("60s"), eq(0.50));
+            verify(queryService, never()).getRequestRateOverTime(anyString(), any(Instant.class), any(Instant.class), anyString());
+        }
+
+        @Test
+        @DisplayName("Should dispatch errors metric to getErrorCountOverTime")
+        void dispatchesErrors() {
+            when(queryService.getErrorCountOverTime(anyString(), any(Instant.class), any(Instant.class), anyString()))
+                    .thenReturn(List.of());
+
+            ResponseEntity<Map<String, Object>> response = controller.query(
+                    "tenant-1", "errors",
+                    "2024-01-01T00:00:00Z", "2024-01-01T01:00:00Z",
+                    "60s", null);
+
+            assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+            verify(queryService).getErrorCountOverTime(anyString(), any(Instant.class), any(Instant.class), eq("60s"));
         }
     }
 

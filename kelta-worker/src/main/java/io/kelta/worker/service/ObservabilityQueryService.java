@@ -3,27 +3,25 @@ package io.kelta.worker.service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.http.MediaType;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.node.ArrayNode;
-import tools.jackson.databind.node.ObjectNode;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 
 /**
- * Service for querying OpenSearch indices for observability data using Spring RestClient.
- * Replaces OpenSearchQueryService (which used the heavyweight RestHighLevelClient)
- * for AOT compatibility.
- *
- * <p>Jaeger V2 stores span tags in a nested array format:
- * {@code tags: [{key: "http.request.method", type: "string", value: "GET"}, ...]}
- * All tag queries must use OpenSearch nested queries against this structure.
+ * Service for querying the Grafana observability stack:
+ * <ul>
+ *   <li>Tempo — distributed traces (TraceQL)</li>
+ *   <li>Loki — application logs (LogQL)</li>
+ *   <li>Mimir — metrics via Prometheus-compatible API (PromQL)</li>
+ * </ul>
  */
 @Service
 public class ObservabilityQueryService {
@@ -31,143 +29,158 @@ public class ObservabilityQueryService {
     private static final Logger log = LoggerFactory.getLogger(ObservabilityQueryService.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    private final RestClient restClient;
-    private final JdbcTemplate jdbcTemplate;
+    private final RestClient tempoClient;
+    private final RestClient lokiClient;
+    private final RestClient mimirClient;
 
-    public ObservabilityQueryService(@Qualifier("opensearchRestClient") RestClient restClient,
-                                     JdbcTemplate jdbcTemplate) {
-        this.restClient = restClient;
-        this.jdbcTemplate = jdbcTemplate;
+    public ObservabilityQueryService(@Qualifier("tempoRestClient") RestClient tempoClient,
+                                     @Qualifier("lokiRestClient") RestClient lokiClient,
+                                     @Qualifier("mimirRestClient") RestClient mimirClient) {
+        this.tempoClient = tempoClient;
+        this.lokiClient = lokiClient;
+        this.mimirClient = mimirClient;
     }
 
-    /**
-     * Generic search with filters, pagination, and sorting.
-     */
-    public SearchResult search(String indexPattern, Map<String, String> filters,
-                               int page, int size, String sortField, String sortOrder) {
-        ObjectNode root = MAPPER.createObjectNode();
-        ObjectNode query = buildBoolQuery(root);
-
-        filters.forEach((key, value) -> {
-            if (value == null || value.isEmpty()) return;
-            ArrayNode filterArray = getFilterArray(query);
-            if (key.equals("query")) {
-                getMustArray(query).add(MAPPER.createObjectNode()
-                        .putObject("query_string").put("query", value));
-            } else if (key.equals("@timestamp_gte")) {
-                filterArray.add(MAPPER.createObjectNode()
-                        .putObject("range").putObject("@timestamp").put("gte", value));
-            } else if (key.equals("@timestamp_lte")) {
-                filterArray.add(MAPPER.createObjectNode()
-                        .putObject("range").putObject("@timestamp").put("lte", value));
-            } else {
-                String fieldName = isTextFieldWithKeyword(key) ? key + ".keyword" : key;
-                filterArray.add(MAPPER.createObjectNode()
-                        .putObject("term").put(fieldName, value));
-            }
-        });
-
-        root.put("from", page * size);
-        root.put("size", size);
-        root.putArray("sort").addObject()
-                .putObject(sortField != null ? sortField : "@timestamp")
-                .put("order", sortOrder != null ? sortOrder : "desc");
-
-        return executeSearch(indexPattern, root);
-    }
+    // -----------------------------------------------------------------------
+    // Trace search (Tempo)
+    // -----------------------------------------------------------------------
 
     /**
-     * Search for trace spans by time range and optional filters.
+     * Search for trace spans by time range and optional filters using Tempo TraceQL.
      */
     public SearchResult searchTraceSpans(String tenantSlug, Instant start, Instant end,
                                          Map<String, String> filters, int page, int size) {
-        ObjectNode root = MAPPER.createObjectNode();
-        ObjectNode query = buildBoolQuery(root);
-        ArrayNode filterArray = getFilterArray(query);
-
-        // Time range filter
-        filterArray.add(MAPPER.createObjectNode()
-                .putObject("range").putObject("startTimeMillis")
-                .put("gte", start.toEpochMilli()).put("lte", end.toEpochMilli()));
-
-        // Tenant filter
-        if (tenantSlug != null && !tenantSlug.isEmpty()) {
-            filterArray.add(nestedTagQuery("kelta.tenant.slug", tenantSlug));
+        String traceId = filters.get("traceId");
+        if (traceId != null && !traceId.isEmpty()) {
+            List<Map<String, Object>> spans = getTraceDetail(traceId);
+            // Filter to server spans only and apply other filters
+            List<Map<String, Object>> filtered = filterServerSpans(spans, filters);
+            return new SearchResult(filtered, filtered.size());
         }
 
-        // User-provided filters
-        for (Map.Entry<String, String> entry : filters.entrySet()) {
-            String key = entry.getKey();
-            String value = entry.getValue();
-            if (value == null || value.isEmpty()) continue;
+        String traceQL = buildTraceQL(tenantSlug, filters);
+        int limit = (page + 1) * size;
 
-            switch (key) {
-                case "method" -> filterArray.add(nestedTagQuery("http.request.method", value));
-                case "status" -> {
-                    if (value.endsWith("xx")) {
-                        filterArray.add(nestedTagPrefixQuery("http.response.status_code", value.substring(0, 1)));
-                    } else {
-                        filterArray.add(nestedTagQuery("http.response.status_code", value));
-                    }
+        try {
+            String url = "/api/search?q=" + urlEncode(traceQL)
+                    + "&start=" + start.getEpochSecond()
+                    + "&end=" + end.getEpochSecond()
+                    + "&limit=" + limit
+                    + "&spss=1";
+
+            String responseBody = tempoClient.get()
+                    .uri(url)
+                    .retrieve()
+                    .body(String.class);
+            JsonNode response = MAPPER.readTree(responseBody);
+
+            List<Map<String, Object>> hits = new ArrayList<>();
+            JsonNode traces = response.path("traces");
+            if (traces.isArray()) {
+                for (JsonNode trace : traces) {
+                    hits.add(mapTempoSearchResult(trace));
                 }
-                case "path" -> {
-                    ObjectNode pathBool = MAPPER.createObjectNode();
-                    ArrayNode should = pathBool.putObject("bool").putArray("should");
-                    should.add(nestedTagWildcardQuery("http.url.path", "*" + value + "*"));
-                    should.add(nestedTagWildcardQuery("http.route", "*" + value + "*"));
-                    pathBool.path("bool").asObject().put("minimum_should_match", 1);
-                    filterArray.add(pathBool);
-                }
-                case "traceId" -> filterArray.add(MAPPER.createObjectNode()
-                        .putObject("term").put("traceID", value));
-                case "userId" -> filterArray.add(nestedTagQuery("kelta.user.id", value));
-                default -> log.warn("Unknown filter key: {}", key);
             }
+
+            // Client-side pagination (Tempo doesn't support offset)
+            int fromIndex = Math.min(page * size, hits.size());
+            int toIndex = Math.min(fromIndex + size, hits.size());
+            List<Map<String, Object>> pagedHits = hits.subList(fromIndex, toIndex);
+
+            return new SearchResult(new ArrayList<>(pagedHits), hits.size());
+        } catch (Exception e) {
+            log.error("Tempo search failed: {}", e.getMessage(), e);
+            return new SearchResult(List.of(), 0);
         }
-
-        // Only server spans
-        filterArray.add(MAPPER.createObjectNode()
-                .putObject("term").put("tag.span@kind", "server"));
-
-        root.put("from", page * size);
-        root.put("size", size);
-        root.putArray("sort").addObject()
-                .putObject("startTimeMillis").put("order", "desc");
-
-        SearchResult result = executeSearch("jaeger-span-*", root);
-
-        // Flatten tags into tagMap for frontend
-        for (Map<String, Object> hit : result.hits()) {
-            hit.put("tagMap", flattenTags(hit));
-        }
-
-        return result;
     }
 
     /**
-     * Get request count over time (date histogram aggregation).
+     * Get all spans for a trace from Tempo.
+     */
+    public List<Map<String, Object>> getTraceDetail(String traceId) {
+        try {
+            String responseBody = tempoClient.get()
+                    .uri("/api/traces/{traceId}", traceId)
+                    .retrieve()
+                    .body(String.class);
+            JsonNode response = MAPPER.readTree(responseBody);
+            return parseOtlpTrace(response);
+        } catch (Exception e) {
+            log.error("Tempo trace detail failed for {}: {}", traceId, e.getMessage(), e);
+            return List.of();
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Log search (Loki)
+    // -----------------------------------------------------------------------
+
+    /**
+     * Search application logs using Loki LogQL.
+     */
+    public SearchResult searchLogs(Map<String, String> filters, int page, int size) {
+        String logQL = buildLogQL(filters);
+        int limit = (page + 1) * size;
+
+        String startFilter = filters.get("@timestamp_gte");
+        String endFilter = filters.get("@timestamp_lte");
+
+        Instant end = endFilter != null ? Instant.parse(endFilter) : Instant.now();
+        Instant start = startFilter != null ? Instant.parse(startFilter) : end.minus(Duration.ofHours(1));
+
+        try {
+            String url = "/loki/api/v1/query_range?query=" + urlEncode(logQL)
+                    + "&start=" + toNanos(start)
+                    + "&end=" + toNanos(end)
+                    + "&limit=" + limit
+                    + "&direction=backward";
+
+            String responseBody = lokiClient.get()
+                    .uri(url)
+                    .retrieve()
+                    .body(String.class);
+            JsonNode response = MAPPER.readTree(responseBody);
+
+            List<Map<String, Object>> hits = parseLokiResponse(response);
+
+            // Client-side pagination
+            int fromIndex = Math.min(page * size, hits.size());
+            int toIndex = Math.min(fromIndex + size, hits.size());
+            List<Map<String, Object>> pagedHits = hits.subList(fromIndex, toIndex);
+
+            return new SearchResult(new ArrayList<>(pagedHits), hits.size());
+        } catch (Exception e) {
+            log.error("Loki query failed: {}", e.getMessage(), e);
+            return new SearchResult(List.of(), 0);
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Metrics (Mimir / Prometheus API)
+    // -----------------------------------------------------------------------
+
+    /**
+     * Get request count over time (range query).
      */
     public List<Map<String, Object>> getRequestCountOverTime(String tenantSlug,
                                                               Instant start, Instant end,
                                                               String interval) {
-        ObjectNode root = buildSpanBaseQuery(tenantSlug, start, end);
-        root.put("size", 0);
+        String promQL = "sum(increase(traces_spanmetrics_calls_total{span_kind=\"SPAN_KIND_SERVER\"}["
+                + interval + "]))";
 
-        ObjectNode aggs = root.putObject("aggs");
-        aggs.putObject("requests_over_time")
-                .putObject("date_histogram")
-                .put("field", "startTimeMillis")
-                .put("fixed_interval", interval);
-
-        JsonNode response = executeRawSearch("jaeger-span-*", root);
+        JsonNode response = executeMimirRangeQuery(promQL, start, end, interval);
 
         List<Map<String, Object>> result = new ArrayList<>();
-        JsonNode buckets = response.path("aggregations").path("requests_over_time").path("buckets");
-        for (JsonNode bucket : buckets) {
-            Map<String, Object> point = new HashMap<>();
-            point.put("timestamp", bucket.path("key_as_string").asText());
-            point.put("value", bucket.path("doc_count").asLong());
-            result.add(point);
+        JsonNode results = response.path("data").path("result");
+        if (results.isArray() && !results.isEmpty()) {
+            JsonNode values = results.get(0).path("values");
+            for (JsonNode pair : values) {
+                Map<String, Object> point = new HashMap<>();
+                long epochSec = pair.get(0).asLong();
+                point.put("timestamp", Instant.ofEpochSecond(epochSec).toString());
+                point.put("value", Math.round(Double.parseDouble(pair.get(1).asText())));
+                result.add(point);
+            }
         }
         return result;
     }
@@ -177,28 +190,25 @@ public class ObservabilityQueryService {
      */
     public Map<String, Double> getLatencyPercentiles(String tenantSlug,
                                                      Instant start, Instant end) {
-        ObjectNode root = buildSpanBaseQuery(tenantSlug, start, end);
-        root.put("size", 0);
+        String rangeDuration = toPrometheusDuration(start, end);
+        String baseSelector = "{span_kind=\"SPAN_KIND_SERVER\"}";
 
-        ObjectNode aggs = root.putObject("aggs");
-        aggs.putObject("latency_percentiles")
-                .putObject("percentiles")
-                .put("field", "duration")
-                .putArray("percents").add(50).add(95).add(99);
-        aggs.putObject("latency_avg")
-                .putObject("avg").put("field", "duration");
-
-        JsonNode response = executeRawSearch("jaeger-span-*", root);
+        String p50Query = "histogram_quantile(0.50, sum(rate(traces_spanmetrics_latency_bucket"
+                + baseSelector + "[" + rangeDuration + "])) by (le))";
+        String p95Query = "histogram_quantile(0.95, sum(rate(traces_spanmetrics_latency_bucket"
+                + baseSelector + "[" + rangeDuration + "])) by (le))";
+        String p99Query = "histogram_quantile(0.99, sum(rate(traces_spanmetrics_latency_bucket"
+                + baseSelector + "[" + rangeDuration + "])) by (le))";
+        String avgQuery = "sum(rate(traces_spanmetrics_latency_sum" + baseSelector + "["
+                + rangeDuration + "])) / sum(rate(traces_spanmetrics_latency_count"
+                + baseSelector + "[" + rangeDuration + "]))";
 
         Map<String, Double> result = new HashMap<>();
-        JsonNode values = response.path("aggregations").path("latency_percentiles").path("values");
-        result.put("p50", values.path("50.0").asDouble());
-        result.put("p95", values.path("95.0").asDouble());
-        result.put("p99", values.path("99.0").asDouble());
-
-        double avg = response.path("aggregations").path("latency_avg").path("value").asDouble();
-        result.put("avg", Double.isNaN(avg) ? 0.0 : avg);
-
+        // Tempo span metrics uses seconds — convert to microseconds to match existing API contract
+        result.put("p50", parsePrometheusScalar(executeMimirInstantQuery(p50Query, end)) * 1_000_000);
+        result.put("p95", parsePrometheusScalar(executeMimirInstantQuery(p95Query, end)) * 1_000_000);
+        result.put("p99", parsePrometheusScalar(executeMimirInstantQuery(p99Query, end)) * 1_000_000);
+        result.put("avg", parsePrometheusScalar(executeMimirInstantQuery(avgQuery, end)) * 1_000_000);
         return result;
     }
 
@@ -208,42 +218,45 @@ public class ObservabilityQueryService {
     public List<Map<String, Object>> getTopEndpoints(String tenantSlug,
                                                       Instant start, Instant end,
                                                       int limit) {
-        ObjectNode root = buildSpanBaseQuery(tenantSlug, start, end);
-        root.put("size", 0);
+        String rangeDuration = toPrometheusDuration(start, end);
+        String baseSelector = "{span_kind=\"SPAN_KIND_SERVER\"}";
 
-        ObjectNode topEndpoints = root.putObject("aggs")
-                .putObject("top_endpoints");
-        ObjectNode terms = topEndpoints.putObject("terms");
-        terms.put("field", "operationName");
-        terms.put("size", limit);
+        String countQuery = "topk(" + limit + ", sum by (span_name) (increase(traces_spanmetrics_calls_total"
+                + baseSelector + "[" + rangeDuration + "])))";
 
-        ObjectNode subAggs = topEndpoints.putObject("aggs");
-        subAggs.putObject("latency")
-                .putObject("percentiles")
-                .put("field", "duration")
-                .putArray("percents").add(50).add(95).add(99);
-        subAggs.putObject("avg_duration")
-                .putObject("avg").put("field", "duration");
-        subAggs.putObject("request_count")
-                .putObject("value_count").put("field", "startTimeMillis");
+        String p50Query = "histogram_quantile(0.50, sum by (span_name, le) (rate(traces_spanmetrics_latency_bucket"
+                + baseSelector + "[" + rangeDuration + "])))";
+        String p95Query = "histogram_quantile(0.95, sum by (span_name, le) (rate(traces_spanmetrics_latency_bucket"
+                + baseSelector + "[" + rangeDuration + "])))";
+        String p99Query = "histogram_quantile(0.99, sum by (span_name, le) (rate(traces_spanmetrics_latency_bucket"
+                + baseSelector + "[" + rangeDuration + "])))";
+        String avgQuery = "sum by (span_name) (rate(traces_spanmetrics_latency_sum" + baseSelector
+                + "[" + rangeDuration + "])) / sum by (span_name) (rate(traces_spanmetrics_latency_count"
+                + baseSelector + "[" + rangeDuration + "]))";
 
-        JsonNode response = executeRawSearch("jaeger-span-*", root);
+        // Execute all queries
+        Map<String, Double> counts = parsePrometheusVector(executeMimirInstantQuery(countQuery, end));
+        Map<String, Double> p50s = parsePrometheusVector(executeMimirInstantQuery(p50Query, end));
+        Map<String, Double> p95s = parsePrometheusVector(executeMimirInstantQuery(p95Query, end));
+        Map<String, Double> p99s = parsePrometheusVector(executeMimirInstantQuery(p99Query, end));
+        Map<String, Double> avgs = parsePrometheusVector(executeMimirInstantQuery(avgQuery, end));
 
         List<Map<String, Object>> result = new ArrayList<>();
-        JsonNode buckets = response.path("aggregations").path("top_endpoints").path("buckets");
-        for (JsonNode bucket : buckets) {
+        for (Map.Entry<String, Double> entry : counts.entrySet()) {
+            String spanName = entry.getKey();
             Map<String, Object> endpoint = new HashMap<>();
-            endpoint.put("endpoint", bucket.path("key").asText());
-            endpoint.put("requestCount", bucket.path("doc_count").asLong());
-
-            JsonNode latencyValues = bucket.path("latency").path("values");
-            endpoint.put("p50", latencyValues.path("50.0").asDouble());
-            endpoint.put("p95", latencyValues.path("95.0").asDouble());
-            endpoint.put("p99", latencyValues.path("99.0").asDouble());
-
-            endpoint.put("avgDuration", bucket.path("avg_duration").path("value").asDouble());
+            endpoint.put("endpoint", spanName);
+            endpoint.put("requestCount", Math.round(entry.getValue()));
+            // Convert seconds to microseconds
+            endpoint.put("p50", p50s.getOrDefault(spanName, 0.0) * 1_000_000);
+            endpoint.put("p95", p95s.getOrDefault(spanName, 0.0) * 1_000_000);
+            endpoint.put("p99", p99s.getOrDefault(spanName, 0.0) * 1_000_000);
+            endpoint.put("avgDuration", avgs.getOrDefault(spanName, 0.0) * 1_000_000);
             result.add(endpoint);
         }
+
+        // Sort by request count descending
+        result.sort((a, b) -> Long.compare((long) b.get("requestCount"), (long) a.get("requestCount")));
         return result;
     }
 
@@ -253,29 +266,22 @@ public class ObservabilityQueryService {
     public List<Map<String, Object>> getTopErrors(String tenantSlug,
                                                    Instant start, Instant end,
                                                    int limit) {
-        ObjectNode root = buildSpanBaseQuery(tenantSlug, start, end);
-        root.put("size", 0);
+        String rangeDuration = toPrometheusDuration(start, end);
+        String promQL = "topk(" + limit + ", sum by (span_name) (increase(traces_spanmetrics_calls_total"
+                + "{span_kind=\"SPAN_KIND_SERVER\", status_code=\"STATUS_CODE_ERROR\"}"
+                + "[" + rangeDuration + "])))";
 
-        // Add error filter (status >= 400) — nested range on tag value
-        ArrayNode filterArray = getFilterArray(root.path("query").path("bool").asObject());
-        filterArray.add(nestedTagRangeQuery("http.response.status_code", "400"));
-
-        root.putObject("aggs")
-                .putObject("error_operations")
-                .putObject("terms")
-                .put("field", "operationName")
-                .put("size", limit);
-
-        JsonNode response = executeRawSearch("jaeger-span-*", root);
+        Map<String, Double> errors = parsePrometheusVector(executeMimirInstantQuery(promQL, end));
 
         List<Map<String, Object>> result = new ArrayList<>();
-        JsonNode buckets = response.path("aggregations").path("error_operations").path("buckets");
-        for (JsonNode bucket : buckets) {
+        for (Map.Entry<String, Double> entry : errors.entrySet()) {
             Map<String, Object> error = new HashMap<>();
-            error.put("path", bucket.path("key").asText());
-            error.put("count", bucket.path("doc_count").asLong());
+            error.put("path", entry.getKey());
+            error.put("count", Math.round(entry.getValue()));
             result.add(error);
         }
+
+        result.sort((a, b) -> Long.compare((long) b.get("count"), (long) a.get("count")));
         return result;
     }
 
@@ -284,242 +290,442 @@ public class ObservabilityQueryService {
      */
     public Map<String, Object> getMetricsSummary(String tenantSlug,
                                                   Instant start, Instant end) {
-        ObjectNode root = buildSpanBaseQuery(tenantSlug, start, end);
-        root.put("size", 0);
+        String rangeDuration = toPrometheusDuration(start, end);
+        String baseSelector = "{span_kind=\"SPAN_KIND_SERVER\"}";
 
-        ObjectNode aggs = root.putObject("aggs");
-        aggs.putObject("total_requests")
-                .putObject("value_count").put("field", "startTimeMillis");
-        aggs.putObject("avg_duration")
-                .putObject("avg").put("field", "duration");
+        String totalQuery = "sum(increase(traces_spanmetrics_calls_total" + baseSelector
+                + "[" + rangeDuration + "]))";
+        String errorQuery = "sum(increase(traces_spanmetrics_calls_total"
+                + "{span_kind=\"SPAN_KIND_SERVER\", status_code=\"STATUS_CODE_ERROR\"}"
+                + "[" + rangeDuration + "]))";
+        String avgLatencyQuery = "sum(rate(traces_spanmetrics_latency_sum" + baseSelector
+                + "[" + rangeDuration + "])) / sum(rate(traces_spanmetrics_latency_count"
+                + baseSelector + "[" + rangeDuration + "]))";
 
-        JsonNode response = executeRawSearch("jaeger-span-*", root);
+        double totalRequests = parsePrometheusScalar(executeMimirInstantQuery(totalQuery, end));
+        double errorCount = parsePrometheusScalar(executeMimirInstantQuery(errorQuery, end));
+        double avgLatency = parsePrometheusScalar(executeMimirInstantQuery(avgLatencyQuery, end));
 
         Map<String, Object> summary = new HashMap<>();
-        long totalRequests = response.path("aggregations").path("total_requests").path("value").asLong();
-        summary.put("totalRequests", totalRequests);
-
-        double avgDuration = response.path("aggregations").path("avg_duration").path("value").asDouble();
-        summary.put("avgLatencyMs", Double.isNaN(avgDuration) ? 0 : avgDuration / 1000.0);
-
-        long errorCount = countSpansWithStatusGte(tenantSlug, start, end, "400");
-        summary.put("errorCount", errorCount);
-        summary.put("errorRate", totalRequests > 0
-                ? (double) errorCount / totalRequests * 100.0 : 0.0);
-
-        long authFailures = countSpansWithStatus(tenantSlug, start, end, "401") +
-                countSpansWithStatus(tenantSlug, start, end, "403");
-        summary.put("authFailures", authFailures);
-
-        long rateLimited = countSpansWithStatus(tenantSlug, start, end, "429");
-        summary.put("rateLimited", rateLimited);
-
+        summary.put("totalRequests", Math.round(totalRequests));
+        summary.put("errorCount", Math.round(errorCount));
+        summary.put("errorRate", totalRequests > 0 ? errorCount / totalRequests * 100.0 : 0.0);
+        // Convert seconds to milliseconds for the API contract
+        summary.put("avgLatencyMs", Double.isNaN(avgLatency) ? 0.0 : avgLatency * 1000.0);
+        summary.put("authFailures", 0L);
+        summary.put("rateLimited", 0L);
         return summary;
     }
 
-    /**
-     * Search application logs.
-     */
-    public SearchResult searchLogs(Map<String, String> filters, int page, int size) {
-        return search("kelta-logs-*", filters, page, size, "@timestamp", "desc");
-    }
+    // -----------------------------------------------------------------------
+    // TraceQL builder
+    // -----------------------------------------------------------------------
 
-    /**
-     * Get request data from PostgreSQL for a given trace ID.
-     */
-    public List<Map<String, Object>> getTraceRequestData(String traceId) {
-        return jdbcTemplate.queryForList(
-                "SELECT trace_id, span_id, method, path, status_code, " +
-                        "request_headers, response_headers, request_body, response_body, " +
-                        "tenant_id, user_id, user_email, correlation_id, created_at " +
-                        "FROM request_data WHERE trace_id = ? ORDER BY created_at DESC",
-                traceId);
-    }
-
-    // --- Private helpers ---
-
-    private ObjectNode buildSpanBaseQuery(String tenantSlug, Instant start, Instant end) {
-        ObjectNode root = MAPPER.createObjectNode();
-        ObjectNode query = buildBoolQuery(root);
-        ArrayNode filterArray = getFilterArray(query);
-
-        filterArray.add(MAPPER.createObjectNode()
-                .putObject("range").putObject("startTimeMillis")
-                .put("gte", start.toEpochMilli()).put("lte", end.toEpochMilli()));
-        filterArray.add(MAPPER.createObjectNode()
-                .putObject("term").put("tag.span@kind", "server"));
+    private String buildTraceQL(String tenantSlug, Map<String, String> filters) {
+        StringBuilder sb = new StringBuilder("{ span:kind = server");
 
         if (tenantSlug != null && !tenantSlug.isEmpty()) {
-            filterArray.add(nestedTagQuery("kelta.tenant.slug", tenantSlug));
+            sb.append(" && span:kelta.tenant.slug = \"").append(escape(tenantSlug)).append("\"");
         }
 
-        return root;
-    }
+        for (Map.Entry<String, String> entry : filters.entrySet()) {
+            String key = entry.getKey();
+            String value = entry.getValue();
+            if (value == null || value.isEmpty()) continue;
 
-    private long countSpansWithStatus(String tenantSlug, Instant start, Instant end,
-                                       String statusCode) {
-        ObjectNode root = buildSpanBaseQuery(tenantSlug, start, end);
-        root.put("size", 0);
-        getFilterArray(root.path("query").path("bool").asObject())
-                .add(nestedTagQuery("http.response.status_code", statusCode));
-
-        JsonNode response = executeRawSearch("jaeger-span-*", root);
-        return response.path("hits").path("total").path("value").asLong();
-    }
-
-    private long countSpansWithStatusGte(String tenantSlug, Instant start, Instant end,
-                                          String minStatusCode) {
-        ObjectNode root = buildSpanBaseQuery(tenantSlug, start, end);
-        root.put("size", 0);
-        getFilterArray(root.path("query").path("bool").asObject())
-                .add(nestedTagRangeQuery("http.response.status_code", minStatusCode));
-
-        JsonNode response = executeRawSearch("jaeger-span-*", root);
-        return response.path("hits").path("total").path("value").asLong();
-    }
-
-    private ObjectNode nestedTagQuery(String tagKey, String tagValue) {
-        ObjectNode nested = MAPPER.createObjectNode();
-        ObjectNode nestedObj = nested.putObject("nested");
-        nestedObj.put("path", "tags");
-        ObjectNode bool = nestedObj.putObject("query").putObject("bool");
-        ArrayNode must = bool.putArray("must");
-        must.addObject().putObject("term").put("tags.key", tagKey);
-        must.addObject().putObject("term").put("tags.value", tagValue);
-        return nested;
-    }
-
-    private ObjectNode nestedTagPrefixQuery(String tagKey, String valuePrefix) {
-        ObjectNode nested = MAPPER.createObjectNode();
-        ObjectNode nestedObj = nested.putObject("nested");
-        nestedObj.put("path", "tags");
-        ObjectNode bool = nestedObj.putObject("query").putObject("bool");
-        ArrayNode must = bool.putArray("must");
-        must.addObject().putObject("term").put("tags.key", tagKey);
-        must.addObject().putObject("prefix").put("tags.value", valuePrefix);
-        return nested;
-    }
-
-    private ObjectNode nestedTagWildcardQuery(String tagKey, String pattern) {
-        ObjectNode nested = MAPPER.createObjectNode();
-        ObjectNode nestedObj = nested.putObject("nested");
-        nestedObj.put("path", "tags");
-        ObjectNode bool = nestedObj.putObject("query").putObject("bool");
-        ArrayNode must = bool.putArray("must");
-        must.addObject().putObject("term").put("tags.key", tagKey);
-        must.addObject().putObject("wildcard").put("tags.value", pattern);
-        return nested;
-    }
-
-    private ObjectNode nestedTagRangeQuery(String tagKey, String gteValue) {
-        ObjectNode nested = MAPPER.createObjectNode();
-        ObjectNode nestedObj = nested.putObject("nested");
-        nestedObj.put("path", "tags");
-        ObjectNode bool = nestedObj.putObject("query").putObject("bool");
-        ArrayNode must = bool.putArray("must");
-        must.addObject().putObject("term").put("tags.key", tagKey);
-        must.addObject().putObject("range").putObject("tags.value").put("gte", gteValue);
-        return nested;
-    }
-
-    private ObjectNode buildBoolQuery(ObjectNode root) {
-        return root.putObject("query").putObject("bool");
-    }
-
-    private ArrayNode getFilterArray(ObjectNode boolQuery) {
-        if (boolQuery.has("filter")) {
-            return (ArrayNode) boolQuery.get("filter");
+            switch (key) {
+                case "method" -> sb.append(" && span:http.request.method = \"")
+                        .append(escape(value)).append("\"");
+                case "status" -> {
+                    if (value.endsWith("xx")) {
+                        int base = Integer.parseInt(value.substring(0, 1)) * 100;
+                        sb.append(" && span:http.response.status_code >= ").append(base)
+                                .append(" && span:http.response.status_code < ").append(base + 100);
+                    } else {
+                        sb.append(" && span:http.response.status_code = ").append(value);
+                    }
+                }
+                case "path" -> sb.append(" && (span:http.url.path =~ \".*")
+                        .append(escape(value)).append(".*\" || span:http.route =~ \".*")
+                        .append(escape(value)).append(".*\")");
+                case "userId" -> sb.append(" && span:kelta.user.id = \"")
+                        .append(escape(value)).append("\"");
+                // traceId is handled before buildTraceQL is called
+                default -> { /* ignore */ }
+            }
         }
-        return boolQuery.putArray("filter");
+
+        sb.append(" }");
+        return sb.toString();
     }
 
-    private ArrayNode getMustArray(ObjectNode boolQuery) {
-        if (boolQuery.has("must")) {
-            return (ArrayNode) boolQuery.get("must");
+    // -----------------------------------------------------------------------
+    // LogQL builder
+    // -----------------------------------------------------------------------
+
+    private String buildLogQL(Map<String, String> filters) {
+        String service = filters.get("service");
+        StringBuilder sb = new StringBuilder("{namespace=\"emf\"");
+        if (service != null && !service.isEmpty()) {
+            sb.append(", app=\"").append(escape(service)).append("\"");
         }
-        return boolQuery.putArray("must");
+        sb.append("}");
+
+        String query = filters.get("query");
+        if (query != null && !query.isEmpty()) {
+            sb.append(" |= \"").append(escape(query)).append("\"");
+        }
+
+        // Use json pipeline for structured field filters
+        boolean needsJson = false;
+        StringBuilder pipeline = new StringBuilder();
+
+        String level = filters.get("level");
+        if (level != null && !level.isEmpty()) {
+            needsJson = true;
+            pipeline.append(" | level =~ \"(?i)").append(escape(level)).append("\"");
+        }
+
+        String traceId = filters.get("traceId");
+        if (traceId != null && !traceId.isEmpty()) {
+            needsJson = true;
+            pipeline.append(" | traceId = \"").append(escape(traceId)).append("\"");
+        }
+
+        if (needsJson) {
+            sb.append(" | json").append(pipeline);
+        }
+
+        return sb.toString();
     }
 
-    private SearchResult executeSearch(String indexPattern, ObjectNode query) {
-        JsonNode response = executeRawSearch(indexPattern, query);
+    // -----------------------------------------------------------------------
+    // Tempo response parsers
+    // -----------------------------------------------------------------------
 
-        List<Map<String, Object>> hits = new ArrayList<>();
-        JsonNode hitsArray = response.path("hits").path("hits");
-        for (JsonNode hit : hitsArray) {
+    private Map<String, Object> mapTempoSearchResult(JsonNode trace) {
+        Map<String, Object> hit = new LinkedHashMap<>();
+        hit.put("traceID", trace.path("traceID").asText());
+        hit.put("operationName", trace.path("rootTraceName").asText());
+
+        String startNano = trace.path("startTimeUnixNano").asText("0");
+        long startMs = Long.parseLong(startNano) / 1_000_000;
+        hit.put("startTimeMillis", startMs);
+        hit.put("duration", trace.path("durationMs").asLong() * 1000); // ms → μs
+
+        // Extract tagMap from spanSets attributes
+        Map<String, Object> tagMap = new LinkedHashMap<>();
+        tagMap.put("process.serviceName", trace.path("rootServiceName").asText());
+
+        JsonNode spanSets = trace.path("spanSets");
+        if (spanSets.isArray() && !spanSets.isEmpty()) {
+            JsonNode spans = spanSets.get(0).path("spans");
+            if (spans.isArray() && !spans.isEmpty()) {
+                JsonNode span = spans.get(0);
+                hit.put("spanID", span.path("spanID").asText());
+                flattenOtlpAttributes(span.path("attributes"), tagMap);
+            }
+        }
+
+        hit.put("tagMap", tagMap);
+        return hit;
+    }
+
+    private List<Map<String, Object>> parseOtlpTrace(JsonNode response) {
+        List<Map<String, Object>> spans = new ArrayList<>();
+
+        JsonNode batches = response.path("batches");
+        if (!batches.isArray()) {
+            // Tempo may return resourceSpans format
+            batches = response.path("resourceSpans");
+        }
+        if (!batches.isArray()) return spans;
+
+        for (JsonNode batch : batches) {
+            Map<String, Object> resourceTagMap = new LinkedHashMap<>();
+            JsonNode resourceAttrs = batch.path("resource").path("attributes");
+            flattenOtlpAttributes(resourceAttrs, resourceTagMap);
+
+            String serviceName = resourceTagMap.getOrDefault("service.name", "").toString();
+
+            JsonNode scopeSpans = batch.path("scopeSpans");
+            if (!scopeSpans.isArray()) {
+                scopeSpans = batch.path("instrumentationLibrarySpans");
+            }
+            if (!scopeSpans.isArray()) continue;
+
+            for (JsonNode scope : scopeSpans) {
+                JsonNode spanArray = scope.path("spans");
+                if (!spanArray.isArray()) continue;
+
+                for (JsonNode span : spanArray) {
+                    Map<String, Object> hit = new LinkedHashMap<>();
+                    hit.put("traceID", hexFromBase64OrPlain(span.path("traceId").asText()));
+                    hit.put("spanID", hexFromBase64OrPlain(span.path("spanId").asText()));
+                    hit.put("operationName", span.path("name").asText());
+
+                    String startNano = span.path("startTimeUnixNano").asText("0");
+                    String endNano = span.path("endTimeUnixNano").asText("0");
+                    long startNs = Long.parseLong(startNano);
+                    long endNs = Long.parseLong(endNano);
+                    hit.put("startTimeMillis", startNs / 1_000_000);
+                    hit.put("duration", (endNs - startNs) / 1_000); // nanos → μs
+
+                    Map<String, Object> tagMap = new LinkedHashMap<>();
+                    tagMap.put("process.serviceName", serviceName);
+                    for (Map.Entry<String, Object> re : resourceTagMap.entrySet()) {
+                        tagMap.put("process." + re.getKey(), re.getValue());
+                    }
+                    flattenOtlpAttributes(span.path("attributes"), tagMap);
+                    hit.put("tagMap", tagMap);
+
+                    String parentSpanId = span.path("parentSpanId").asText("");
+                    if (!parentSpanId.isEmpty()) {
+                        String hexParent = hexFromBase64OrPlain(parentSpanId);
+                        hit.put("references", List.of(Map.of("refType", "CHILD_OF",
+                                "traceID", hit.get("traceID"), "spanID", hexParent)));
+                    }
+
+                    spans.add(hit);
+                }
+            }
+        }
+
+        // Sort by start time
+        spans.sort(Comparator.comparingLong(s -> (long) s.get("startTimeMillis")));
+        return spans;
+    }
+
+    private List<Map<String, Object>> filterServerSpans(List<Map<String, Object>> spans,
+                                                         Map<String, String> filters) {
+        return spans.stream().filter(span -> {
             @SuppressWarnings("unchecked")
-            Map<String, Object> source = MAPPER.convertValue(hit.path("_source"), Map.class);
-            source.put("_id", hit.path("_id").asText());
-            hits.add(source);
-        }
+            Map<String, Object> tagMap = (Map<String, Object>) span.get("tagMap");
+            if (tagMap == null) return false;
 
-        long totalHits = response.path("hits").path("total").path("value").asLong();
-        return new SearchResult(hits, totalHits);
+            Object kind = tagMap.get("span.kind");
+            if (kind == null) kind = tagMap.get("span_kind");
+            // Accept if kind is "server" or if it's a top-level span
+            if (kind != null && !"server".equalsIgnoreCase(kind.toString())
+                    && !"SPAN_KIND_SERVER".equals(kind.toString())) {
+                return false;
+            }
+
+            String method = filters.get("method");
+            if (method != null && !method.isEmpty()) {
+                Object m = tagMap.get("http.request.method");
+                if (m == null) m = tagMap.get("http.method");
+                if (m == null || !method.equalsIgnoreCase(m.toString())) return false;
+            }
+            return true;
+        }).toList();
     }
 
-    private JsonNode executeRawSearch(String indexPattern, ObjectNode query) {
+    // -----------------------------------------------------------------------
+    // Loki response parser
+    // -----------------------------------------------------------------------
+
+    private List<Map<String, Object>> parseLokiResponse(JsonNode response) {
+        List<Map<String, Object>> hits = new ArrayList<>();
+
+        JsonNode results = response.path("data").path("result");
+        if (!results.isArray()) return hits;
+
+        for (JsonNode stream : results) {
+            JsonNode streamLabels = stream.path("stream");
+            String app = streamLabels.path("app").asText("");
+
+            JsonNode values = stream.path("values");
+            if (!values.isArray()) continue;
+
+            for (JsonNode entry : values) {
+                if (!entry.isArray() || entry.size() < 2) continue;
+                String nanoTimestamp = entry.get(0).asText();
+                String logLine = entry.get(1).asText();
+
+                Map<String, Object> hit = new LinkedHashMap<>();
+                hit.put("_id", nanoTimestamp);
+                hit.put("@timestamp", Instant.ofEpochSecond(0,
+                        Long.parseLong(nanoTimestamp)).toString());
+                hit.put("service", app);
+
+                // Try to parse structured JSON log
+                try {
+                    JsonNode logJson = MAPPER.readTree(logLine);
+                    hit.put("message", logJson.path("message").asText(logLine));
+                    hit.put("level", logJson.path("level").asText(""));
+                    hit.put("logger", logJson.path("logger_name").asText(
+                            logJson.path("logger").asText("")));
+                    hit.put("thread", logJson.path("thread_name").asText(
+                            logJson.path("thread").asText("")));
+                    hit.put("traceId", logJson.path("traceId").asText(
+                            logJson.path("trace_id").asText("")));
+                } catch (Exception e) {
+                    // Plain text log
+                    hit.put("message", logLine);
+                    hit.put("level", "");
+                    hit.put("logger", "");
+                    hit.put("thread", "");
+                    hit.put("traceId", "");
+                }
+
+                hits.add(hit);
+            }
+        }
+        return hits;
+    }
+
+    // -----------------------------------------------------------------------
+    // Mimir (Prometheus API) helpers
+    // -----------------------------------------------------------------------
+
+    private JsonNode executeMimirInstantQuery(String promQL, Instant time) {
         try {
-            String body = MAPPER.writeValueAsString(query);
-            String responseBody = restClient.post()
-                    .uri("/{index}/_search", indexPattern)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(body)
+            String url = "/api/v1/query?query=" + urlEncode(promQL)
+                    + "&time=" + time.getEpochSecond();
+
+            String responseBody = mimirClient.get()
+                    .uri(url)
                     .retrieve()
                     .body(String.class);
             return MAPPER.readTree(responseBody);
         } catch (Exception e) {
-            log.error("OpenSearch query failed for index {}: {}", indexPattern, e.getMessage(), e);
-            // Build an empty response structure
-            ObjectNode emptyResponse = MAPPER.createObjectNode();
-            ObjectNode hits = emptyResponse.putObject("hits");
-            hits.putObject("total").put("value", 0);
-            hits.putArray("hits");
-            return emptyResponse;
+            log.error("Mimir instant query failed: {}", e.getMessage(), e);
+            return MAPPER.createObjectNode();
         }
     }
 
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> flattenTags(Map<String, Object> source) {
-        Map<String, Object> tagMap = new LinkedHashMap<>();
-        Object tagsObj = source.get("tags");
-        if (tagsObj instanceof List<?> tagsList) {
-            for (Object tagObj : tagsList) {
-                if (tagObj instanceof Map<?, ?> tag) {
-                    String key = String.valueOf(tag.get("key"));
-                    Object value = tag.get("value");
-                    String type = String.valueOf(tag.get("type"));
-                    if ("int64".equals(type) && value instanceof Number n) {
-                        tagMap.put(key, n.longValue());
-                    } else if ("float64".equals(type) && value instanceof Number n) {
-                        tagMap.put(key, n.doubleValue());
-                    } else if ("bool".equals(type)) {
-                        tagMap.put(key, Boolean.parseBoolean(String.valueOf(value)));
-                    } else {
-                        tagMap.put(key, value);
-                    }
-                }
-            }
+    private JsonNode executeMimirRangeQuery(String promQL, Instant start, Instant end,
+                                             String step) {
+        try {
+            String url = "/api/v1/query_range?query=" + urlEncode(promQL)
+                    + "&start=" + start.getEpochSecond()
+                    + "&end=" + end.getEpochSecond()
+                    + "&step=" + urlEncode(step);
+
+            String responseBody = mimirClient.get()
+                    .uri(url)
+                    .retrieve()
+                    .body(String.class);
+            return MAPPER.readTree(responseBody);
+        } catch (Exception e) {
+            log.error("Mimir range query failed: {}", e.getMessage(), e);
+            return MAPPER.createObjectNode();
         }
-        Object processObj = source.get("process");
-        if (processObj instanceof Map<?, ?> process) {
-            Object processTagsObj = process.get("tags");
-            if (processTagsObj instanceof List<?> processTags) {
-                for (Object tagObj : processTags) {
-                    if (tagObj instanceof Map<?, ?> tag) {
-                        String key = "process." + tag.get("key");
-                        tagMap.put(key, tag.get("value"));
-                    }
-                }
-            }
-            Object serviceName = process.get("serviceName");
-            if (serviceName != null) {
-                tagMap.put("process.serviceName", serviceName);
-            }
-        }
-        return tagMap;
     }
 
-    private static boolean isTextFieldWithKeyword(String fieldName) {
-        return Set.of("level", "service", "logger", "thread").contains(fieldName);
+    /**
+     * Extract a single scalar value from a Prometheus instant query response.
+     */
+    private double parsePrometheusScalar(JsonNode response) {
+        JsonNode result = response.path("data").path("result");
+        if (result.isArray() && !result.isEmpty()) {
+            JsonNode value = result.get(0).path("value");
+            if (value.isArray() && value.size() >= 2) {
+                String val = value.get(1).asText("0");
+                try {
+                    double d = Double.parseDouble(val);
+                    return Double.isNaN(d) || Double.isInfinite(d) ? 0.0 : d;
+                } catch (NumberFormatException e) {
+                    return 0.0;
+                }
+            }
+        }
+        return 0.0;
+    }
+
+    /**
+     * Extract label-value pairs from a Prometheus instant vector response,
+     * keyed by the "span_name" label.
+     */
+    private Map<String, Double> parsePrometheusVector(JsonNode response) {
+        Map<String, Double> result = new LinkedHashMap<>();
+        JsonNode results = response.path("data").path("result");
+        if (!results.isArray()) return result;
+
+        for (JsonNode item : results) {
+            String spanName = item.path("metric").path("span_name").asText("");
+            JsonNode value = item.path("value");
+            if (value.isArray() && value.size() >= 2) {
+                try {
+                    double d = Double.parseDouble(value.get(1).asText("0"));
+                    if (!Double.isNaN(d) && !Double.isInfinite(d)) {
+                        result.put(spanName, d);
+                    }
+                } catch (NumberFormatException e) {
+                    // skip
+                }
+            }
+        }
+        return result;
+    }
+
+    // -----------------------------------------------------------------------
+    // OTLP attribute flattening
+    // -----------------------------------------------------------------------
+
+    private void flattenOtlpAttributes(JsonNode attributes, Map<String, Object> target) {
+        if (attributes == null || !attributes.isArray()) return;
+
+        for (JsonNode attr : attributes) {
+            String key = attr.path("key").asText();
+            JsonNode valueNode = attr.path("value");
+
+            if (valueNode.has("stringValue")) {
+                target.put(key, valueNode.path("stringValue").asText());
+            } else if (valueNode.has("intValue")) {
+                target.put(key, Long.parseLong(valueNode.path("intValue").asText()));
+            } else if (valueNode.has("doubleValue")) {
+                target.put(key, valueNode.path("doubleValue").asDouble());
+            } else if (valueNode.has("boolValue")) {
+                target.put(key, valueNode.path("boolValue").asBoolean());
+            } else {
+                target.put(key, valueNode.toString());
+            }
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Utility
+    // -----------------------------------------------------------------------
+
+    private String toPrometheusDuration(Instant start, Instant end) {
+        long seconds = Duration.between(start, end).getSeconds();
+        if (seconds <= 0) seconds = 3600; // default 1h
+        return seconds + "s";
+    }
+
+    private static String toNanos(Instant instant) {
+        return String.valueOf(instant.getEpochSecond() * 1_000_000_000L + instant.getNano());
+    }
+
+    private static String urlEncode(String value) {
+        return URLEncoder.encode(value, StandardCharsets.UTF_8);
+    }
+
+    private static String escape(String value) {
+        return value.replace("\\", "\\\\").replace("\"", "\\\"");
+    }
+
+    /**
+     * Convert a value that may be base64-encoded or plain hex to hex.
+     * Tempo returns IDs as hex strings in search but may use base64 in OTLP responses.
+     */
+    private static String hexFromBase64OrPlain(String value) {
+        if (value == null || value.isEmpty()) return "";
+        // If it looks like hex already (only hex chars), return as-is
+        if (value.matches("[0-9a-fA-F]+")) return value;
+        // Try base64 decode
+        try {
+            byte[] bytes = Base64.getDecoder().decode(value);
+            StringBuilder sb = new StringBuilder();
+            for (byte b : bytes) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            return value;
+        }
     }
 
     public record SearchResult(List<Map<String, Object>> hits, long totalHits) {}

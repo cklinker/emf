@@ -13,7 +13,7 @@ import java.util.*;
 
 /**
  * REST controller for tenant metrics.
- * Queries OpenSearch via RestClient for trace-derived metrics.
+ * Queries Mimir (Prometheus-compatible API) for trace-derived span metrics.
  */
 @RestController
 @RequestMapping("/api/metrics")
@@ -29,7 +29,7 @@ public class MetricsController {
 
     @GetMapping("/query")
     public ResponseEntity<Map<String, Object>> query(
-            @RequestHeader("X-Tenant-Slug") String tenantSlug,
+            @RequestHeader(value = "X-Tenant-Slug", required = false) String tenantSlug,
             @RequestParam String metric,
             @RequestParam String start,
             @RequestParam String end,
@@ -55,13 +55,12 @@ public class MetricsController {
         }
 
         try {
-            String interval = convertStepToInterval(step);
             List<Map<String, Object>> dataPoints = queryService.getRequestCountOverTime(
-                    tenantSlug, startInstant, endInstant, interval);
+                    tenantSlug, startInstant, endInstant, step);
 
             List<Map<String, Object>> series = new ArrayList<>();
             Map<String, Object> seriesMap = new LinkedHashMap<>();
-            seriesMap.put("labels", Map.of("metric", metric, "tenant", tenantSlug));
+            seriesMap.put("labels", Map.of("metric", metric));
             seriesMap.put("dataPoints", dataPoints);
             series.add(seriesMap);
 
@@ -83,7 +82,7 @@ public class MetricsController {
 
     @GetMapping("/summary")
     public ResponseEntity<Map<String, Object>> summary(
-            @RequestHeader("X-Tenant-Slug") String tenantSlug) {
+            @RequestHeader(value = "X-Tenant-Slug", required = false) String tenantSlug) {
 
         log.debug("Metrics summary for tenant={}", tenantSlug);
 
@@ -112,7 +111,7 @@ public class MetricsController {
 
     @GetMapping("/endpoints")
     public ResponseEntity<Map<String, Object>> topEndpoints(
-            @RequestHeader("X-Tenant-Slug") String tenantSlug,
+            @RequestHeader(value = "X-Tenant-Slug", required = false) String tenantSlug,
             @RequestParam(defaultValue = "20") int limit) {
         try {
             Instant end = Instant.now();
@@ -134,7 +133,7 @@ public class MetricsController {
 
     @GetMapping("/errors")
     public ResponseEntity<Map<String, Object>> topErrors(
-            @RequestHeader("X-Tenant-Slug") String tenantSlug,
+            @RequestHeader(value = "X-Tenant-Slug", required = false) String tenantSlug,
             @RequestParam(defaultValue = "20") int limit) {
         try {
             Instant end = Instant.now();
@@ -156,7 +155,7 @@ public class MetricsController {
 
     @GetMapping("/latency")
     public ResponseEntity<Map<String, Object>> latencyPercentiles(
-            @RequestHeader("X-Tenant-Slug") String tenantSlug,
+            @RequestHeader(value = "X-Tenant-Slug", required = false) String tenantSlug,
             @RequestParam(required = false) String start,
             @RequestParam(required = false) String end) {
         try {
@@ -188,12 +187,5 @@ public class MetricsController {
         } else {
             return "2h";
         }
-    }
-
-    private String convertStepToInterval(String step) {
-        if (step.endsWith("s") || step.endsWith("m") || step.endsWith("h")) {
-            return step;
-        }
-        return "1m";
     }
 }

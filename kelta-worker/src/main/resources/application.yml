@@ -72,9 +72,12 @@ kelta:
   scheduler:
     enabled: ${SCHEDULER_ENABLED:true}
     poll-interval-ms: ${SCHEDULER_POLL_INTERVAL_MS:60000}
-  opensearch:
-    url: ${OPENSEARCH_URL:http://localhost:9200}
-    index-prefix: ${OPENSEARCH_INDEX_PREFIX:kelta}
+  tempo:
+    url: ${TEMPO_URL:http://tempo.observability.svc.cluster.local:3200}
+  loki:
+    url: ${LOKI_URL:http://loki.observability.svc.cluster.local:3100}
+  mimir:
+    url: ${MIMIR_URL:http://mimir.observability.svc.cluster.local:8080/prometheus}
   observability:
     request-logging:
       enabled: ${REQUEST_LOGGING_ENABLED:true}

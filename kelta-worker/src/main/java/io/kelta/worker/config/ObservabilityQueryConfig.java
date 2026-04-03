@@ -7,22 +7,42 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
 /**
- * Configures a RestClient for querying OpenSearch REST API directly.
- * Replaces the heavyweight opensearch-rest-high-level-client for AOT compatibility.
+ * Configures RestClient beans for querying the Grafana observability stack:
+ * Tempo (traces), Loki (logs), and Mimir (metrics via PromQL).
  */
 @Configuration
 public class ObservabilityQueryConfig {
 
-    @Value("${kelta.opensearch.url:http://localhost:9200}")
-    private String opensearchUrl;
+    @Value("${kelta.tempo.url:http://localhost:3200}")
+    private String tempoUrl;
 
-    @Bean("opensearchRestClient")
-    public RestClient opensearchRestClient() {
+    @Value("${kelta.loki.url:http://localhost:3100}")
+    private String lokiUrl;
+
+    @Value("${kelta.mimir.url:http://localhost:8080/prometheus}")
+    private String mimirUrl;
+
+    @Bean("tempoRestClient")
+    public RestClient tempoRestClient() {
+        return buildRestClient(tempoUrl);
+    }
+
+    @Bean("lokiRestClient")
+    public RestClient lokiRestClient() {
+        return buildRestClient(lokiUrl);
+    }
+
+    @Bean("mimirRestClient")
+    public RestClient mimirRestClient() {
+        return buildRestClient(mimirUrl);
+    }
+
+    private RestClient buildRestClient(String baseUrl) {
         var factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(5000);
         factory.setReadTimeout(30000);
         return RestClient.builder()
-                .baseUrl(opensearchUrl)
+                .baseUrl(baseUrl)
                 .requestFactory(factory)
                 .build();
     }

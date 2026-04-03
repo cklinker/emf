@@ -3,6 +3,7 @@ package io.kelta.worker.service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
@@ -101,6 +102,7 @@ public class ObservabilityQueryService {
         try {
             String responseBody = tempoClient.get()
                     .uri("/api/traces/{traceId}", traceId)
+                    .accept(MediaType.APPLICATION_JSON)
                     .retrieve()
                     .body(String.class);
             JsonNode response = MAPPER.readTree(responseBody);
@@ -177,7 +179,7 @@ public class ObservabilityQueryService {
             for (JsonNode pair : values) {
                 Map<String, Object> point = new HashMap<>();
                 long epochSec = pair.get(0).asLong();
-                point.put("timestamp", Instant.ofEpochSecond(epochSec).toString());
+                point.put("timestamp", epochSec);
                 point.put("value", Math.round(Double.parseDouble(pair.get(1).asText())));
                 result.add(point);
             }
@@ -268,7 +270,7 @@ public class ObservabilityQueryService {
                                                    int limit) {
         String rangeDuration = toPrometheusDuration(start, end);
         String promQL = "topk(" + limit + ", sum by (span_name) (increase(traces_spanmetrics_calls_total"
-                + "{span_kind=\"SPAN_KIND_SERVER\", status_code=\"STATUS_CODE_ERROR\"}"
+                + "{span_kind=\"SPAN_KIND_SERVER\", http_status_code=~\"[4-5]..\"}"
                 + "[" + rangeDuration + "])))";
 
         Map<String, Double> errors = parsePrometheusVector(executeMimirInstantQuery(promQL, end));
@@ -296,7 +298,13 @@ public class ObservabilityQueryService {
         String totalQuery = "sum(increase(traces_spanmetrics_calls_total" + baseSelector
                 + "[" + rangeDuration + "]))";
         String errorQuery = "sum(increase(traces_spanmetrics_calls_total"
-                + "{span_kind=\"SPAN_KIND_SERVER\", status_code=\"STATUS_CODE_ERROR\"}"
+                + "{span_kind=\"SPAN_KIND_SERVER\", http_status_code=~\"[4-5]..\"}"
+                + "[" + rangeDuration + "]))";
+        String authQuery = "sum(increase(traces_spanmetrics_calls_total"
+                + "{span_kind=\"SPAN_KIND_SERVER\", http_status_code=~\"401|403\"}"
+                + "[" + rangeDuration + "]))";
+        String rateLimitQuery = "sum(increase(traces_spanmetrics_calls_total"
+                + "{span_kind=\"SPAN_KIND_SERVER\", http_status_code=\"429\"}"
                 + "[" + rangeDuration + "]))";
         String avgLatencyQuery = "sum(rate(traces_spanmetrics_latency_sum" + baseSelector
                 + "[" + rangeDuration + "])) / sum(rate(traces_spanmetrics_latency_count"
@@ -304,6 +312,8 @@ public class ObservabilityQueryService {
 
         double totalRequests = parsePrometheusScalar(executeMimirInstantQuery(totalQuery, end));
         double errorCount = parsePrometheusScalar(executeMimirInstantQuery(errorQuery, end));
+        double authFailures = parsePrometheusScalar(executeMimirInstantQuery(authQuery, end));
+        double rateLimited = parsePrometheusScalar(executeMimirInstantQuery(rateLimitQuery, end));
         double avgLatency = parsePrometheusScalar(executeMimirInstantQuery(avgLatencyQuery, end));
 
         Map<String, Object> summary = new HashMap<>();
@@ -312,8 +322,8 @@ public class ObservabilityQueryService {
         summary.put("errorRate", totalRequests > 0 ? errorCount / totalRequests * 100.0 : 0.0);
         // Convert seconds to milliseconds for the API contract
         summary.put("avgLatencyMs", Double.isNaN(avgLatency) ? 0.0 : avgLatency * 1000.0);
-        summary.put("authFailures", 0L);
-        summary.put("rateLimited", 0L);
+        summary.put("authFailures", Math.round(authFailures));
+        summary.put("rateLimited", Math.round(rateLimited));
         return summary;
     }
 
@@ -322,10 +332,10 @@ public class ObservabilityQueryService {
     // -----------------------------------------------------------------------
 
     private String buildTraceQL(String tenantSlug, Map<String, String> filters) {
-        StringBuilder sb = new StringBuilder("{ span:kind = server");
+        StringBuilder sb = new StringBuilder("{ kind = server");
 
         if (tenantSlug != null && !tenantSlug.isEmpty()) {
-            sb.append(" && span:kelta.tenant.slug = \"").append(escape(tenantSlug)).append("\"");
+            sb.append(" && .kelta.tenant.slug = \"").append(escape(tenantSlug)).append("\"");
         }
 
         for (Map.Entry<String, String> entry : filters.entrySet()) {
@@ -334,21 +344,21 @@ public class ObservabilityQueryService {
             if (value == null || value.isEmpty()) continue;
 
             switch (key) {
-                case "method" -> sb.append(" && span:http.request.method = \"")
+                case "method" -> sb.append(" && .http.request.method = \"")
                         .append(escape(value)).append("\"");
                 case "status" -> {
                     if (value.endsWith("xx")) {
                         int base = Integer.parseInt(value.substring(0, 1)) * 100;
-                        sb.append(" && span:http.response.status_code >= ").append(base)
-                                .append(" && span:http.response.status_code < ").append(base + 100);
+                        sb.append(" && .http.response.status_code >= ").append(base)
+                                .append(" && .http.response.status_code < ").append(base + 100);
                     } else {
-                        sb.append(" && span:http.response.status_code = ").append(value);
+                        sb.append(" && .http.response.status_code = ").append(value);
                     }
                 }
-                case "path" -> sb.append(" && (span:http.url.path =~ \".*")
-                        .append(escape(value)).append(".*\" || span:http.route =~ \".*")
+                case "path" -> sb.append(" && (.http.url.path =~ \".*")
+                        .append(escape(value)).append(".*\" || .http.route =~ \".*")
                         .append(escape(value)).append(".*\")");
-                case "userId" -> sb.append(" && span:kelta.user.id = \"")
+                case "userId" -> sb.append(" && .kelta.user.id = \"")
                         .append(escape(value)).append("\"");
                 // traceId is handled before buildTraceQL is called
                 default -> { /* ignore */ }

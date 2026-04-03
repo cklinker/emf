@@ -75,7 +75,11 @@ export function LogViewerPage({ className }: LogViewerPageProps) {
 
   if (error) return <ErrorMessage error={t('logViewer.loadError')} />
 
-  const hits = data?.hits ?? []
+  const hits = [...(data?.hits ?? [])].sort((a, b) => {
+    const ta = a['@timestamp'] ? new Date(a['@timestamp']).getTime() : 0
+    const tb = b['@timestamp'] ? new Date(b['@timestamp']).getTime() : 0
+    return tb - ta
+  })
   const totalHits = data?.totalHits ?? 0
   const totalPages = Math.max(1, Math.ceil(totalHits / pageSize))
 

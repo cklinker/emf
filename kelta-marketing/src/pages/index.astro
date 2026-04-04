@@ -1,0 +1,170 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import FeatureCard from '../components/FeatureCard.astro';
+
+const features = [
+  {
+    title: 'Dynamic Schema Engine',
+    description: 'Define your data model at runtime. 27 field types, relationships, validation rules, and computed fields — all without redeployments.',
+    icon: '🗃️',
+  },
+  {
+    title: 'Instant REST API',
+    description: 'Every collection gets a fully compliant JSON:API endpoint automatically. Full CRUD, filtering, sorting, pagination, and atomic operations.',
+    icon: '⚡',
+  },
+  {
+    title: 'Visual Flow Builder',
+    description: 'A full state-machine automation engine with 8 state types, 16 action handlers, durable execution, and a drag-and-drop designer.',
+    icon: '🔄',
+  },
+  {
+    title: 'Enterprise Security',
+    description: 'Built-in OIDC provider, federated SSO, MFA, RBAC with Cerbos policy engine, field-level encryption, and Row Level Security.',
+    icon: '🔒',
+  },
+  {
+    title: 'Multi-Tenant from Day One',
+    description: 'Schema isolation, governor limits, custom domains, and per-tenant configuration. Built for SaaS from the ground up.',
+    icon: '🏢',
+  },
+  {
+    title: 'Full Observability',
+    description: 'Distributed tracing, log aggregation, metrics dashboards, audit trails, and 7 monitoring pages in the admin UI.',
+    icon: '📊',
+  },
+];
+
+const stats = [
+  { value: '27', label: 'Field types' },
+  { value: '70+', label: 'Admin pages' },
+  { value: '16', label: 'Workflow handlers' },
+  { value: '111', label: 'DB migrations' },
+];
+---
+
+<BaseLayout title="Enterprise Application Platform">
+  <!-- Hero -->
+  <section class="relative overflow-hidden bg-gradient-to-b from-kelta-50 to-white">
+    <div class="mx-auto max-w-7xl px-6 py-24 text-center md:py-32">
+      <div class="mx-auto max-w-3xl">
+        <!-- TODO: Replace with CMO copy from KEL-29 -->
+        <h1 class="text-4xl font-extrabold tracking-tight text-gray-900 md:text-6xl">
+          Build enterprise apps in hours,
+          <span class="text-kelta-600">not months</span>
+        </h1>
+        <p class="mt-6 text-lg leading-relaxed text-gray-600 md:text-xl">
+          Kelta is a metadata-driven platform that lets you define your entire data model, business logic, security,
+          and integrations at runtime. Self-hosted, open source, no vendor lock-in.
+        </p>
+        <div class="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
+          <a
+            href="https://github.com/cklinker/emf"
+            class="rounded-lg bg-kelta-600 px-8 py-3 text-base font-semibold text-white shadow-lg shadow-kelta-200 transition-all hover:bg-kelta-700 hover:shadow-xl"
+          >
+            Get Started Free
+          </a>
+          <a
+            href="/features"
+            class="rounded-lg border border-gray-200 bg-white px-8 py-3 text-base font-semibold text-gray-700 transition-colors hover:border-kelta-300 hover:text-kelta-600"
+          >
+            View Features
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Stats -->
+  <section class="border-y border-gray-100 bg-white">
+    <div class="mx-auto max-w-7xl px-6 py-12">
+      <div class="grid grid-cols-2 gap-8 md:grid-cols-4">
+        {stats.map((stat) => (
+          <div class="text-center">
+            <div class="text-3xl font-bold text-kelta-600">{stat.value}</div>
+            <div class="mt-1 text-sm text-gray-500">{stat.label}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section class="bg-gray-50 py-24">
+    <div class="mx-auto max-w-7xl px-6">
+      <div class="mb-16 text-center">
+        <h2 class="text-3xl font-bold text-gray-900 md:text-4xl">Everything you need to build, automate, and scale</h2>
+        <p class="mt-4 text-lg text-gray-500">
+          A complete platform with the power of Salesforce, without the complexity, cost, or lock-in.
+        </p>
+      </div>
+      <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {features.map((feature) => (
+          <FeatureCard title={feature.title} description={feature.description} icon={feature.icon} />
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Comparison -->
+  <section class="py-24">
+    <div class="mx-auto max-w-7xl px-6">
+      <div class="mb-16 text-center">
+        <h2 class="text-3xl font-bold text-gray-900 md:text-4xl">Why Kelta?</h2>
+      </div>
+      <div class="grid gap-8 md:grid-cols-3">
+        <div class="rounded-xl border border-gray-100 p-8">
+          <h3 class="mb-4 text-lg font-semibold text-gray-900">vs. Salesforce</h3>
+          <ul class="space-y-3 text-sm text-gray-600">
+            <li>No per-seat licensing — self-hosted</li>
+            <li>No proprietary languages — standard REST APIs</li>
+            <li>Deploy anywhere — your cloud, on-prem, air-gapped</li>
+            <li>Open standards — JSON:API, OAuth 2.0, OIDC</li>
+          </ul>
+        </div>
+        <div class="rounded-xl border border-gray-100 p-8">
+          <h3 class="mb-4 text-lg font-semibold text-gray-900">vs. Low-Code Tools</h3>
+          <ul class="space-y-3 text-sm text-gray-600">
+            <li>Enterprise-grade security at every layer</li>
+            <li>Real workflow engine — not simple automations</li>
+            <li>27 field types including encrypted and geolocation</li>
+            <li>No row limits, no record caps</li>
+          </ul>
+        </div>
+        <div class="rounded-xl border border-gray-100 p-8">
+          <h3 class="mb-4 text-lg font-semibold text-gray-900">vs. Building from Scratch</h3>
+          <ul class="space-y-3 text-sm text-gray-600">
+            <li>111 database migrations you don't have to write</li>
+            <li>16 pre-built workflow action handlers</li>
+            <li>70+ admin pages ready to go</li>
+            <li>Authentication and security engineering done</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="bg-kelta-600 py-20">
+    <div class="mx-auto max-w-3xl px-6 text-center">
+      <h2 class="text-3xl font-bold text-white md:text-4xl">Ready to get started?</h2>
+      <p class="mt-4 text-lg text-kelta-100">
+        Deploy Kelta on your infrastructure in minutes. Open source, free forever.
+      </p>
+      <div class="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
+        <a
+          href="https://github.com/cklinker/emf"
+          class="rounded-lg bg-white px-8 py-3 text-base font-semibold text-kelta-700 transition-colors hover:bg-kelta-50"
+        >
+          View on GitHub
+        </a>
+        <a
+          href="/docs"
+          class="rounded-lg border border-kelta-400 px-8 py-3 text-base font-semibold text-white transition-colors hover:bg-kelta-500"
+        >
+          Read the Docs
+        </a>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

@@ -1,0 +1,184 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+const capabilities = [
+  {
+    title: 'Dynamic Schema Engine',
+    items: [
+      '27 field types covering every enterprise need',
+      'LOOKUP and MASTER_DETAIL relationships with automatic FK management',
+      'Formula expressions and rollup summaries (COUNT, SUM, MIN, MAX, AVG)',
+      'Field-level validation rules with regex, min/max, and custom expressions',
+      'Auto-number sequences with configurable prefix and padding',
+      'Immutable schema versioning across every change',
+    ],
+  },
+  {
+    title: 'Auto-Generated REST API',
+    items: [
+      'Full CRUD at /{tenant}/{collection} — JSON:API compliant',
+      'Relationship includes with multi-level transitive resolution',
+      'Sparse fieldsets, filtering, sorting, and pagination',
+      'Atomic operations for bulk create/update/delete',
+      'WebSocket realtime subscriptions via Kafka bridge',
+      'Auto-generated OpenAPI 3.0 docs with Swagger UI',
+      'Global full-text search via PostgreSQL tsvector',
+    ],
+  },
+  {
+    title: 'Visual Flow Builder',
+    items: [
+      '8 state types: Task, Choice, Parallel, Map, Wait, Pass, Succeed, Fail',
+      '16 built-in action handlers for data, comms, integration, and flow control',
+      'Durable execution — every state transition persisted, survives pod restarts',
+      'Record-triggered, webhook, and scheduled (cron) triggers',
+      'Full JSONPath data flow with InputPath, ResultPath, OutputPath',
+      'React Flow-based visual designer with drag-and-drop',
+    ],
+  },
+  {
+    title: 'Authentication & Identity',
+    items: [
+      'Internal OIDC provider — no external identity server required',
+      'Federated identity brokering (Google, Okta, Azure AD, any OIDC)',
+      'TOTP MFA with QR code enrollment and recovery codes',
+      'SMS OTP with rate limiting and E.164 validation',
+      'Per-tenant password policies and account lockout',
+      'Personal access tokens with SHA-256 hashing and Redis revocation',
+    ],
+  },
+  {
+    title: 'Role-Based Access Control',
+    items: [
+      'Profiles, Permission Sets, and Groups with OR resolution',
+      '15 system permission types and per-object CRUD permissions',
+      'Field-level security (VISIBLE, READ_ONLY, HIDDEN)',
+      'Custom ABAC rules with CEL expressions via Cerbos Policy Engine',
+      '7 built-in profiles from System Administrator to Minimum Access',
+      'Authorization testing UI for debugging permission decisions',
+    ],
+  },
+  {
+    title: 'Multi-Tenancy & Governor Limits',
+    items: [
+      'URL-based or custom domain (CNAME) tenant routing',
+      'PostgreSQL schema isolation with Row Level Security',
+      'Per-tenant governor limits: API calls, storage, users, collections',
+      'Real-time usage tracking with Redis counters',
+      'Governor limits dashboard in admin UI',
+    ],
+  },
+  {
+    title: 'Observability & Monitoring',
+    items: [
+      'OpenTelemetry distributed tracing with Jaeger and OpenSearch',
+      'Structured log aggregation with MDC enrichment',
+      'Metrics dashboard: request counts, error rates, latency percentiles',
+      'Setup audit trail with before/after values',
+      'Prometheus metrics for HPA autoscaling',
+      '7 monitoring pages in the admin UI',
+    ],
+  },
+  {
+    title: 'Integration',
+    items: [
+      'HTTP callouts with header, method, and body templating',
+      'Inbound and outbound webhooks (Svix-powered)',
+      'Kafka event streaming from any flow',
+      'Per-tenant SMTP email with async delivery and templates',
+      'Embedded analytics via Apache Superset',
+      'On-the-fly image transformations via URL parameters',
+    ],
+  },
+];
+
+const architecture = [
+  { service: 'Gateway', tech: 'Java 21, Spring Cloud Gateway', purpose: 'API ingress, auth, tenant routing, rate limiting, WebSocket' },
+  { service: 'Auth', tech: 'Java 21, Spring Authorization Server', purpose: 'OIDC provider, identity federation, MFA, sessions' },
+  { service: 'Worker', tech: 'Java 21, Spring Boot 3.2', purpose: 'Business logic, CRUD, flows, schema, integrations' },
+  { service: 'Admin UI', tech: 'React 19, Vite, TypeScript, Tailwind', purpose: '70+ page admin console and app runtime' },
+  { service: 'PostgreSQL', tech: 'v15', purpose: 'Primary data store with RLS and full-text search' },
+  { service: 'Redis', tech: 'v7', purpose: 'Rate limiting, caching, session storage' },
+  { service: 'Kafka', tech: 'v3.7 (KRaft)', purpose: 'Event streaming, realtime bridge, config propagation' },
+  { service: 'Cerbos', tech: 'PDP', purpose: 'Fine-grained ABAC policy engine' },
+];
+---
+
+<BaseLayout title="Features" description="Explore every capability of the Kelta enterprise application platform.">
+  <!-- Hero -->
+  <section class="bg-gradient-to-b from-kelta-50 to-white py-20">
+    <div class="mx-auto max-w-7xl px-6 text-center">
+      <h1 class="text-4xl font-extrabold text-gray-900 md:text-5xl">Platform Capabilities</h1>
+      <p class="mt-4 text-lg text-gray-600">
+        Everything you need to build, automate, and scale enterprise applications.
+      </p>
+    </div>
+  </section>
+
+  <!-- Capabilities -->
+  <section class="py-20">
+    <div class="mx-auto max-w-7xl px-6">
+      <div class="space-y-16">
+        {capabilities.map((cap, i) => (
+          <div class={`flex flex-col gap-8 md:flex-row ${i % 2 === 1 ? 'md:flex-row-reverse' : ''}`}>
+            <div class="flex-1">
+              <h2 class="text-2xl font-bold text-gray-900">{cap.title}</h2>
+              <ul class="mt-4 space-y-2">
+                {cap.items.map((item) => (
+                  <li class="flex items-start gap-2 text-sm text-gray-600">
+                    <span class="mt-1 text-kelta-500">&#10003;</span>
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div class="flex flex-1 items-center justify-center rounded-xl border border-gray-100 bg-gray-50 p-12">
+              <span class="text-sm text-gray-400">Visual coming soon</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Architecture -->
+  <section class="bg-gray-50 py-20">
+    <div class="mx-auto max-w-7xl px-6">
+      <h2 class="mb-10 text-center text-3xl font-bold text-gray-900">Architecture at a Glance</h2>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm">
+          <thead>
+            <tr class="border-b border-gray-200">
+              <th class="py-3 pr-6 font-semibold text-gray-900">Service</th>
+              <th class="py-3 pr-6 font-semibold text-gray-900">Technology</th>
+              <th class="py-3 font-semibold text-gray-900">Purpose</th>
+            </tr>
+          </thead>
+          <tbody>
+            {architecture.map((row) => (
+              <tr class="border-b border-gray-100">
+                <td class="py-3 pr-6 font-medium text-kelta-700">{row.service}</td>
+                <td class="py-3 pr-6 font-mono text-xs text-gray-500">{row.tech}</td>
+                <td class="py-3 text-gray-600">{row.purpose}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="py-20">
+    <div class="mx-auto max-w-3xl px-6 text-center">
+      <h2 class="text-3xl font-bold text-gray-900">See it in action</h2>
+      <p class="mt-4 text-gray-600">Clone the repo, run docker-compose up, and explore the full platform.</p>
+      <a
+        href="https://github.com/cklinker/emf"
+        class="mt-8 inline-block rounded-lg bg-kelta-600 px-8 py-3 text-base font-semibold text-white hover:bg-kelta-700"
+      >
+        Get Started on GitHub
+      </a>
+    </div>
+  </section>
+</BaseLayout>

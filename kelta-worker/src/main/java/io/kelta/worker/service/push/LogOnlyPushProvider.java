@@ -12,7 +12,7 @@ public class LogOnlyPushProvider implements PushProvider {
     private static final Logger log = LoggerFactory.getLogger(LogOnlyPushProvider.class);
 
     @Override
-    public void send(PushMessage message) {
+    public void send(PushMessage message, TenantPushSettings tenantSettings) {
         log.info("PUSH [{}] to={}: {} — {}", message.platform(), message.deviceToken(),
                 message.title(), message.body());
     }

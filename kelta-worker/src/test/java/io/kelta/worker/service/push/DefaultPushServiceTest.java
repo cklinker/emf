@@ -5,6 +5,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.jdbc.core.JdbcTemplate;
+import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
 import java.util.Map;
@@ -25,7 +26,7 @@ class DefaultPushServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new DefaultPushService(pushProvider, jdbcTemplate);
+        service = new DefaultPushService(pushProvider, jdbcTemplate, new ObjectMapper());
     }
 
     @Nested
@@ -88,25 +89,56 @@ class DefaultPushServiceTest {
                             Map.of("id", "d1", "device_token", "tok1", "platform", "ios"),
                             Map.of("id", "d2", "device_token", "tok2", "platform", "android")
                     ));
+            when(jdbcTemplate.queryForList(contains("tenant WHERE id"), eq("t1")))
+                    .thenReturn(List.of());
 
             int delivered = service.sendToUser("u1", "t1", "Title", "Body", null);
 
             assertThat(delivered).isEqualTo(2);
-            verify(pushProvider, times(2)).send(any());
+            verify(pushProvider, times(2)).send(any(), isNull());
         }
 
         @Test
         void shouldRemoveStaleTokenOnInvalidTokenError() {
             when(jdbcTemplate.queryForList(contains("push_device WHERE user_id"), eq("u1"), eq("t1")))
                     .thenReturn(List.of(Map.of("id", "d1", "device_token", "stale", "platform", "ios")));
+            when(jdbcTemplate.queryForList(contains("tenant WHERE id"), eq("t1")))
+                    .thenReturn(List.of());
 
             doThrow(new PushDeliveryException("Invalid token", true))
-                    .when(pushProvider).send(any());
+                    .when(pushProvider).send(any(), any());
 
             int delivered = service.sendToUser("u1", "t1", "Title", "Body", null);
 
             assertThat(delivered).isEqualTo(0);
             verify(jdbcTemplate).update(contains("DELETE FROM push_device WHERE id"), eq("d1"));
+        }
+
+        @Test
+        void shouldLoadTenantPushSettings() {
+            when(jdbcTemplate.queryForList(contains("push_device WHERE user_id"), eq("u1"), eq("t1")))
+                    .thenReturn(List.of(Map.of("id", "d1", "device_token", "tok1", "platform", "ios")));
+            when(jdbcTemplate.queryForList(contains("tenant WHERE id"), eq("t1")))
+                    .thenReturn(List.of(Map.of("settings",
+                            "{\"push\":{\"fcm\":{\"projectId\":\"tenant-proj\",\"clientEmail\":\"sa@tenant.iam\",\"privateKey\":\"pk\"}}}")));
+
+            service.sendToUser("u1", "t1", "Title", "Body", null);
+
+            verify(pushProvider).send(any(), argThat(settings ->
+                    settings != null && "tenant-proj".equals(settings.fcmProjectId())));
+        }
+
+        @Test
+        void shouldHandleMissingTenantSettings() {
+            when(jdbcTemplate.queryForList(contains("push_device WHERE tenant_id"), eq("t1")))
+                    .thenReturn(List.of(Map.of("id", "d1", "device_token", "tok1", "platform", "web")));
+            when(jdbcTemplate.queryForList(contains("tenant WHERE id"), eq("t1")))
+                    .thenReturn(List.of(Map.of("settings", "{}")));
+
+            int delivered = service.sendToTenant("t1", "Title", "Body", null);
+
+            assertThat(delivered).isEqualTo(1);
+            verify(pushProvider).send(any(), isNull());
         }
     }
 }

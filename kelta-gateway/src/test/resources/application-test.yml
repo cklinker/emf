@@ -37,7 +37,7 @@ kelta:
         collection-changed: kelta.collection.changed
     # Rate limiting is driven by per-tenant governor limits from the worker
     security:
-      permissions-enabled: false
+      permissions-enabled: true
       permissions-cache-ttl-minutes: 5
 
 # Disable actuator endpoints for tests

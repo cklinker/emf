@@ -1,6 +1,8 @@
 package io.kelta.gateway.integration;
 
 import io.kelta.gateway.auth.DynamicReactiveJwtDecoder;
+import io.kelta.gateway.auth.GatewayPrincipal;
+import io.kelta.gateway.authz.cerbos.CerbosAuthorizationService;
 import io.kelta.gateway.route.RateLimitConfig;
 import io.kelta.gateway.route.RouteDefinition;
 import io.kelta.gateway.route.RouteRegistry;
@@ -30,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
@@ -61,6 +64,9 @@ class EndToEndRequestFlowIntegrationTest {
     @MockitoBean
     private DynamicReactiveJwtDecoder jwtDecoder;
 
+    @MockitoBean
+    private CerbosAuthorizationService cerbosService;
+
     @Autowired
     private ObjectMapper objectMapper;
 
@@ -75,16 +81,25 @@ class EndToEndRequestFlowIntegrationTest {
         // Clear registries
         routeRegistry.clear();
 
-        // Configure mock JWT decoder
+        // Configure mock JWT decoder with identity claims required for permission enforcement
         Jwt mockJwt = Jwt.withTokenValue("mock-token")
                 .header("alg", "RS256")
                 .claim("sub", "test-user")
                 .claim("roles", List.of("USER"))
+                .claim("profile_id", "test-profile-id")
+                .claim("profile_name", "Test User")
+                .claim("tenant_id", "test-tenant-id")
                 .issuedAt(Instant.now())
                 .expiresAt(Instant.now().plusSeconds(3600))
                 .build();
 
         when(jwtDecoder.decode(anyString(), anyString())).thenReturn(Mono.just(mockJwt));
+
+        // Mock Cerbos to allow all permissions in end-to-end flow tests
+        when(cerbosService.checkSystemPermission(any(GatewayPrincipal.class), anyString()))
+                .thenReturn(Mono.just(true));
+        when(cerbosService.checkObjectPermission(any(GatewayPrincipal.class), anyString(), anyString()))
+                .thenReturn(Mono.just(true));
     }
 
     @AfterEach

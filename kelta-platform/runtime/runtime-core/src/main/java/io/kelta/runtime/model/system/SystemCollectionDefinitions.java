@@ -323,9 +323,11 @@ public final class SystemCollectionDefinitions {
             .displayFieldName("name")
             .addField(FieldDefinition.requiredString("name", 100))
             .addField(FieldDefinition.requiredString("path", 200))
+            .addField(FieldDefinition.string("slug", 200))
             .addField(FieldDefinition.string("title", 200))
             .addField(FieldDefinition.json("config"))
             .addField(FieldDefinition.bool("active").withDefault(true).withNullable(false))
+            .addField(FieldDefinition.bool("published").withDefault(false).withNullable(false))
             .build();
     }
 
